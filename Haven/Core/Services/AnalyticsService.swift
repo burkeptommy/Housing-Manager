@@ -73,6 +73,31 @@ enum AnalyticsEvent: String {
     /// `*@alfred.havenhome.dev` forwarding address from the
     /// `VendorScheduleStrip` empty state caption.
     case dashboardForwardingEmailCopied = "dashboard_forwarding_email_copied"
+    /// Build 91 — user swiped "Hide" on a vendor coverage row they don't
+    /// want to see anymore (e.g. a legacy "Washer & Dryer" system that
+    /// shouldn't be surfaced as needing a dedicated pro).
+    case coverageItemDismissed = "coverage_item_dismissed"
+    /// Phase 54B — handyman punch list analytics.
+    case handymanPunchItemAdded = "handyman_punch_item_added"
+    case handymanPunchItemRemoved = "handyman_punch_item_removed"
+    case handymanPunchListScheduled = "handyman_punch_list_scheduled"
+    /// Phase 54B — Wave view (seasonal orchestration) analytics.
+    case maintenanceWaveScheduleAllTapped = "maintenance_wave_schedule_all_tapped"
+    case maintenanceWaveDetailsTapped = "maintenance_wave_details_tapped"
+    /// Phase 54C — Recommended for your home analytics.
+    case recommendedServiceScheduled = "recommended_service_scheduled"
+    case recommendedServiceDismissed = "recommended_service_dismissed"
+    /// Phase 57 — "What's New" HNW review card.
+    case whatsNewPhase57Opened = "whats_new_phase57_opened"
+    case whatsNewPhase57Dismissed = "whats_new_phase57_dismissed"
+    /// Phase 54D — Household cadences (trash day, recycling, etc.).
+    case householdCadenceSaved = "household_cadence_saved"
+    case householdCadenceDeleted = "household_cadence_deleted"
+    case householdCadenceBannerTapped = "household_cadence_banner_tapped"
+    /// Phase 56.5 — Duplicate detection events.
+    case duplicateDetected = "duplicate_detected"
+    case duplicateResolved = "duplicate_resolved"
+    case duplicatePreventionWarned = "duplicate_prevention_warned"
 
     // MARK: - Property
     case propertyViewed = "property_viewed"
@@ -93,6 +118,7 @@ enum AnalyticsEvent: String {
     case systemContractorAssigned = "system_contractor_assigned"
     case homeSystemsSetupStarted = "home_systems_setup_started"
     case homeSystemsSetupCompleted = "home_systems_setup_completed"
+    case specialtySystemAdded = "specialty_system_added"
 
     // MARK: - Maintenance
     case maintenanceTaskViewed = "maintenance_task_viewed"
@@ -209,6 +235,7 @@ enum AnalyticsEvent: String {
 
     // MARK: - Household
     case householdAccessViewed = "household_access_viewed"
+    case householdAccessRevoked = "household_access_revoked"
     case householdInviteSent = "household_invite_sent"
     case householdInviteAccepted = "household_invite_accepted"
     case householdMergeStarted = "household_merge_started"

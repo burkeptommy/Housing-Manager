@@ -131,6 +131,17 @@ enum MaintenanceTaskReconciler {
 
     /// Reconciles tasks for a single system based on its current subtype.
     /// Idempotent — safe to call repeatedly with the same inputs.
+    ///
+    /// `preferredContractorId` lets the caller pass the system's explicit
+    /// vendor pick (captured in `home_systems.preferred_contractor_id`) so
+    /// the new-task path links that vendor even when its `category` string
+    /// doesn't exactly match the system's category. This matches what the
+    /// maintenance task detail sheet already does: it stamps the
+    /// preferred_contractor_id on the system whenever a user assigns a
+    /// vendor to any of its tasks. Before this hook, a Well System with
+    /// "Rick's Pump" saved as its preferred contractor would still get
+    /// "Find a contractor for:" tasks because the contractor's category
+    /// was "Plumbing" or "Well" rather than "Well System".
     static func reconcile(
         propertyId: UUID,
         householdId: UUID,
@@ -139,20 +150,9 @@ enum MaintenanceTaskReconciler {
         confirmedSubtype: String?,
         fuelType: String? = nil,
         flags: [String: Bool] = [:],
-        mode: ReconcileMode = .full
+        mode: ReconcileMode = .full,
+        preferredContractorId: UUID? = nil
     ) async -> ReconciliationResult {
-        // 1. Compute the correct set of templates for the confirmed subtype.
-        let activeSubtypes = MaintenanceTemplates.activeSubtypes(
-            category: systemCategory,
-            subtype: confirmedSubtype,
-            fuelType: fuelType,
-            flags: flags
-        )
-        let rawTemplates = MaintenanceTemplates.essentialTemplates(
-            for: systemCategory,
-            activeSubtypes: activeSubtypes
-        )
-
         // Phase 19j: Fetch the property once so template `{city}` and
         // `{state}` placeholders can be substituted with the user's actual
         // location before tasks are written. Failures fall back to generic
@@ -161,6 +161,55 @@ enum MaintenanceTaskReconciler {
         // assignment for `.either` templates honors the user's choice.
         let property = try? await DatabaseService.shared.fetchProperty(id: propertyId)
         let preferenceTier = preferenceTierFromProperty(property)
+
+        // Phase 57: Resolve the property's regional maintenance pack so the
+        // template filter excludes regionally-gated templates that don't
+        // apply here. The stored `regional_pack` column takes precedence;
+        // we fall back to deriving it from state for properties saved
+        // before the Phase 57 backfill ran.
+        let regionalPack: RegionalPack? = {
+            if let stored = property?.regionalPack,
+               let parsed = RegionalPack(rawValue: stored) {
+                return parsed
+            }
+            return RegionalPack(state: property?.state)
+        }()
+
+        // Phase 57: HNW subtype flags live in `properties.attributes` as
+        // "true"/"false" strings. Merge them into the caller-supplied
+        // `flags` dict so `activeSubtypes` can gate templates on property-
+        // level state (has_humidifier, has_ev_charger, has_radon_mitigation,
+        // has_central_vacuum, has_leak_detector, has_whole_house_filter,
+        // has_built_in_grill, has_outdoor_lighting, has_pool_safety_fence,
+        // has_pets). Caller flags win when both are present — the House
+        // Quiz passes its own `has_pets` for Q28b's post-answer reconcile
+        // before the attribute has been written.
+        let propertyFlagKeys: [String] = [
+            "has_humidifier", "has_ev_charger", "has_radon_mitigation",
+            "has_central_vacuum", "has_leak_detector", "has_whole_house_filter",
+            "has_built_in_grill", "has_outdoor_lighting", "has_pool_safety_fence",
+            "has_pets"
+        ]
+        var mergedFlags = flags
+        for key in propertyFlagKeys where mergedFlags[key] == nil {
+            if property?.attributes?[key]?.stringValue == "true" {
+                mergedFlags[key] = true
+            }
+        }
+
+        // 1. Compute the correct set of templates for the confirmed subtype.
+        let activeSubtypes = MaintenanceTemplates.activeSubtypes(
+            category: systemCategory,
+            subtype: confirmedSubtype,
+            fuelType: fuelType,
+            flags: mergedFlags
+        )
+        let rawTemplates = MaintenanceTemplates.essentialTemplates(
+            for: systemCategory,
+            activeSubtypes: activeSubtypes,
+            regionalPack: regionalPack
+        )
+
         let correctTemplates = rawTemplates.map {
             $0.interpolated(city: property?.city, state: property?.state)
         }
@@ -229,23 +278,36 @@ enum MaintenanceTaskReconciler {
         //    checklist in the notes field.
         var added: [String] = []
         if mode != .removeOnly {
-            let calendar = Calendar.current
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
 
             // Find a matching contractor for the system's category (used
             // by both standalone and bundled paths).
-            let matchingContractor = allContractors.first { contractor in
-                if let cat = contractor.category,
-                   cat.caseInsensitiveCompare(systemCategory) == .orderedSame {
-                    return true
+            //
+            // Precedence:
+            //   1. The system's explicit `preferredContractorId` — honors
+            //      whatever vendor the user last assigned via the task
+            //      detail sheet, even when its stored category string
+            //      doesn't line up with the system's category label.
+            //   2. Category match on the contractor's `category` column.
+            //   3. Specialty match on the contractor's `specialties` array.
+            let matchingContractor: ContractorRow? = {
+                if let prefId = preferredContractorId,
+                   let pref = allContractors.first(where: { $0.id == prefId }) {
+                    return pref
                 }
-                if let specs = contractor.specialties,
-                   specs.contains(where: { $0.caseInsensitiveCompare(systemCategory) == .orderedSame }) {
-                    return true
+                return allContractors.first { contractor in
+                    if let cat = contractor.category,
+                       cat.caseInsensitiveCompare(systemCategory) == .orderedSame {
+                        return true
+                    }
+                    if let specs = contractor.specialties,
+                       specs.contains(where: { $0.caseInsensitiveCompare(systemCategory) == .orderedSame }) {
+                        return true
+                    }
+                    return false
                 }
-                return false
-            }
+            }()
 
             // Partition templates into standalone vs bundled.
             var standaloneIndices: [Int] = []
@@ -273,7 +335,7 @@ enum MaintenanceTaskReconciler {
                     matchingContractor: matchingContractor
                 )
 
-                let nextDue = calendar.date(byAdding: template.interval, to: Date()) ?? Date()
+                let nextDue = initialDueDate(for: template)
                 var insert = MaintenanceTaskInsert(
                     householdId: householdId,
                     title: result.title,
@@ -332,8 +394,8 @@ enum MaintenanceTaskReconciler {
                 let needsVendor: Bool
 
                 if let contractor = matchingContractor {
-                    bundleTitle = "Schedule \(contractor.companyName): \(title.lowercased())"
-                    bundleDescription = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\n\(bundleNotes)"
+                    bundleTitle = title
+                    bundleDescription = "\(contractor.companyName) will handle the work.\n\n\(bundleNotes)"
                     contractorId = contractor.id
                     needsVendor = false
                 } else {
@@ -343,7 +405,7 @@ enum MaintenanceTaskReconciler {
                     needsVendor = true
                 }
 
-                let nextDue = calendar.date(byAdding: firstTemplate.interval, to: Date()) ?? Date()
+                let nextDue = initialDueDate(for: firstTemplate)
                 var insert = MaintenanceTaskInsert(
                     householdId: householdId,
                     title: bundleTitle,
@@ -441,7 +503,8 @@ enum MaintenanceTaskReconciler {
                 systemCategory: system.category,
                 confirmedSubtype: system.subtype,
                 fuelType: system.catalogFuelType,
-                flags: [:]
+                flags: [:],
+                preferredContractorId: system.preferredContractorId
             )
             aggregate = aggregate.merging(result)
             processedCategories.insert(system.category.lowercased())
@@ -580,13 +643,13 @@ enum MaintenanceTaskReconciler {
                 var update = MaintenanceTaskUpdate()
                 update.assignmentType = "vendor"
                 if let contractor = matching {
-                    update.title = "Schedule \(contractor.companyName): \(template.title.lowercased())"
-                    update.description = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)"
+                    update.title = template.title
+                    update.description = "\(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)"
                     update.assignedContractorId = contractor.id
                     update.needsVendor = false
                 } else {
-                    update.title = "Find a contractor for: \(template.title.lowercased())"
-                    update.description = "We'll find you a vetted local pro for this. In the meantime, here's what they'll do:\n\n\(template.description)"
+                    update.title = template.title
+                    update.description = "What they'll do:\n\(template.description)"
                     update.needsVendor = true
                 }
                 if (try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)) != nil {
@@ -632,6 +695,15 @@ enum MaintenanceTaskReconciler {
         preferenceTier: VendorPreferenceTier
     ) -> TaskAssignmentType {
         if template.safetyFloor { return .vendor }
+        // Phase 55.2: `routingOverride: .diyDefault` is a hard floor
+        // for the personal lane. Monthly filter swaps / weather-
+        // stripping walks / generator oil checks / wine cellar reads
+        // are quick, physical, and the-user-is-already-there chores
+        // that shouldn't get flipped to a vendor for `.hireOut` users.
+        // The 54A reframing was letting `.either + .diyDefault`
+        // templates drift to vendor, producing "Tyler Heating ·
+        // Twice a year" rows on a monthly DIY template.
+        if template.routing == .diyDefault { return .personal }
         guard template.assignmentType == .either else {
             return template.assignmentType
         }
@@ -741,16 +813,16 @@ enum MaintenanceTaskReconciler {
         case .vendor:
             if let contractor = matchingContractor {
                 return TaskFields(
-                    title: "Schedule \(contractor.companyName): \(template.title.lowercased())",
-                    description: "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)",
+                    title: template.title,
+                    description: "\(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)",
                     assignmentType: "vendor",
                     contractorId: contractor.id,
                     needsVendor: false
                 )
             } else {
                 return TaskFields(
-                    title: "Find a contractor for: \(template.title.lowercased())",
-                    description: "We'll find you a vetted local pro for this. In the meantime, here's what they'll do:\n\n\(template.description)",
+                    title: template.title,
+                    description: "What they'll do:\n\(template.description)",
                     assignmentType: "vendor",
                     contractorId: nil,
                     needsVendor: true
@@ -765,16 +837,16 @@ enum MaintenanceTaskReconciler {
             if resolved == .vendor {
                 if let contractor = matchingContractor {
                     return TaskFields(
-                        title: "Schedule \(contractor.companyName): \(template.title.lowercased())",
-                        description: "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)",
+                        title: template.title,
+                        description: "\(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)",
                         assignmentType: "vendor",
                         contractorId: contractor.id,
                         needsVendor: false
                     )
                 } else {
                     return TaskFields(
-                        title: "Find a contractor for: \(template.title.lowercased())",
-                        description: "We'll find you a vetted local pro for this. In the meantime, here's what they'll do:\n\n\(template.description)",
+                        title: template.title,
+                        description: "What they'll do:\n\(template.description)",
                         assignmentType: "vendor",
                         contractorId: nil,
                         needsVendor: true
@@ -789,6 +861,435 @@ enum MaintenanceTaskReconciler {
                     needsVendor: false
                 )
             }
+        }
+    }
+
+    /// Phase 54C: Opt-in "Schedule it" path for a single template.
+    /// Called from "Recommended for your home" when the user taps
+    /// "Schedule it" on a non-essential template. Creates (or finds)
+    /// a `home_systems` row for the template's category, then inserts
+    /// a matching `maintenance_tasks` row with the Phase-54A seasonal
+    /// anchor. Returns the created task id on success.
+    ///
+    /// Unlike the reconciler's category-wide pass, this one never
+    /// touches other tasks on the property — it only adds the one the
+    /// user picked. Dedup is by templateKey so re-tapping the same
+    /// recommendation is a no-op (returns the existing task's id).
+    @MainActor
+    static func scheduleOptInTemplate(
+        _ template: MaintenanceTemplate,
+        propertyId: UUID,
+        householdId: UUID
+    ) async -> UUID? {
+        let db = DatabaseService.shared
+
+        // 1. Find or create the home_systems row for this category.
+        //    Auto-created rows match the Phase 54A auto-create pattern
+        //    (name uses the registry's displayName fallback).
+        let systems = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
+        let category = template.systemCategory
+        let existingSystem = systems.first(where: {
+            $0.category.caseInsensitiveCompare(category) == .orderedSame
+                && $0.parentSystemId == nil
+        })
+
+        let systemId: UUID?
+        if let existingSystem {
+            systemId = existingSystem.id
+        } else {
+            let displayName = SystemCategoryRegistry.metaForCategory(category)?.displayName
+                ?? category
+            let insert = HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: displayName,
+                category: category,
+                notes: "Auto-created from Recommended for your home."
+            )
+            if let created = try? await db.createHomeSystem(insert) {
+                systemId = created.id
+            } else {
+                systemId = nil
+            }
+        }
+
+        // 2. Check dedup — the user may tap "Schedule it" twice by
+        //    accident, and a template already scheduled via the
+        //    reconciler should stay one row.
+        let existingTasks = (try? await db.fetchMaintenanceTasks(propertyId: propertyId)) ?? []
+        if let existing = existingTasks.first(where: {
+            $0.templateId == template.templateKey && $0.isArchived != true
+        }) {
+            return existing.id
+        }
+
+        // 3. Interpolate and build the insert. Vendor-managed templates
+        //    go to "Find a contractor" when there's no matching
+        //    contractor on file, mirroring the reconciler's branch.
+        let property = try? await db.fetchProperty(id: propertyId)
+        let interpolated = template.interpolated(city: property?.city, state: property?.state)
+        let contractors = (try? await db.fetchContractors()) ?? []
+        let matching = contractors.first { contractor in
+            if let cat = contractor.category,
+               cat.caseInsensitiveCompare(category) == .orderedSame { return true }
+            if let specs = contractor.specialties,
+               specs.contains(where: { $0.caseInsensitiveCompare(category) == .orderedSame }) {
+                return true
+            }
+            return false
+        }
+
+        let fields = createTaskFields(
+            template: interpolated,
+            preferenceTier: preferenceTierFromProperty(property),
+            matchingContractor: matching
+        )
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let nextDue = initialDueDate(for: interpolated)
+
+        var insert = MaintenanceTaskInsert(
+            householdId: householdId,
+            title: fields.title,
+            frequency: interpolated.frequency,
+            nextDueDate: formatter.string(from: nextDue)
+        )
+        insert.propertyId = propertyId
+        insert.systemId = systemId
+        insert.description = fields.description
+        insert.priority = interpolated.priority
+        insert.isTemplateBased = true
+        insert.templateId = interpolated.templateKey
+        insert.seasonalTiming = interpolated.seasonalTiming
+        insert.isDiy = interpolated.isDIY
+        insert.professionalRequired = interpolated.professionalRequired
+        insert.costRange = interpolated.estimatedCostRange
+        insert.assignedContractorId = fields.contractorId
+        insert.assignmentType = fields.assignmentType
+        insert.needsVendor = fields.needsVendor
+
+        guard let row = try? await db.createMaintenanceTask(insert) else { return nil }
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        return row.id
+    }
+
+    /// Phase 54A: Compute the next due date for a brand-new template-based
+    /// task. When `template.seasonalTiming` is set ("Spring", "Summer",
+    /// "Fall", "Winter", "Spring/Fall"), walk forward to the next occurrence
+    /// of that season's anchor month rather than naively adding the
+    /// template's interval to today. This distributes annual and
+    /// semi-annual tasks across the year instead of bunching them on the
+    /// reconciler-run anniversary.
+    ///
+    /// Anchor months (Northern Hemisphere defaults — fine for Northeast US):
+    ///   Spring → April 1
+    ///   Summer → July 1
+    ///   Fall   → October 1
+    ///   Winter → January 1
+    ///   Spring/Fall (semi-annual) → next of April 1 or October 1
+    ///
+    /// For sub-annual frequencies (Weekly, Monthly, Quarterly, etc.),
+    /// seasonal timing is ignored and the standard `today + interval` math
+    /// applies — those are pace tasks, not seasonal tasks.
+    static func initialDueDate(
+        for template: MaintenanceTemplate,
+        today: Date = Date()
+    ) -> Date {
+        let calendar = Calendar.current
+
+        let isAnnualOrLonger: Bool = {
+            switch template.frequency.lowercased() {
+            case "annually", "annually (spring)", "annually (fall)",
+                 "semi-annually", "twice yearly",
+                 "every 2 years", "every 2-3 years", "every 3 years",
+                 "every 3-5 years", "every 5 years", "every 5-7 years",
+                 "every 10 years", "every 10-15 years":
+                return true
+            default:
+                return false
+            }
+        }()
+
+        guard isAnnualOrLonger,
+              let timing = template.seasonalTiming?.lowercased(),
+              !timing.isEmpty else {
+            return calendar.date(byAdding: template.interval, to: today) ?? today
+        }
+
+        let candidateMonths: [Int] = {
+            switch timing {
+            case "spring":            return [4]
+            case "summer":            return [7]
+            case "fall", "autumn":    return [10]
+            case "winter":            return [1]
+            case "spring/fall":       return [4, 10]
+            default:                  return []
+            }
+        }()
+
+        guard !candidateMonths.isEmpty else {
+            return calendar.date(byAdding: template.interval, to: today) ?? today
+        }
+
+        let currentYear = calendar.component(.year, from: today)
+        var candidates: [Date] = []
+        for yearOffset in 0...1 {
+            for month in candidateMonths {
+                var comps = DateComponents()
+                comps.year = currentYear + yearOffset
+                comps.month = month
+                comps.day = 1
+                if let date = calendar.date(from: comps) {
+                    candidates.append(date)
+                }
+            }
+        }
+
+        let earliestAcceptable = calendar.date(byAdding: .day, value: 14, to: today) ?? today
+        let valid = candidates.filter { $0 >= earliestAcceptable }.sorted()
+        return valid.first ?? (calendar.date(byAdding: template.interval, to: today) ?? today)
+    }
+
+    /// Phase 54A: One-time re-dating pass for existing template-based tasks
+    /// whose initial due dates were computed before the seasonal-seeding
+    /// fix. Only touches tasks that are template-based, never been
+    /// completed, never been manually rescheduled, and have a template
+    /// with `seasonalTiming` set. Preserves user actions; the goal is
+    /// strictly to redistribute the seed dates the buggy reconciler
+    /// produced.
+    @MainActor
+    static func reseedSeasonalTasksOnceIfNeeded() async {
+        let migrationKey = "hasRunSeasonalReseedP54A_v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+
+        let db = DatabaseService.shared
+        guard let tasks = try? await db.fetchAllMaintenanceTasks() else { return }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        var redated = 0
+        for task in tasks {
+            if let last = task.lastCompletedDate, !last.isEmpty { continue }
+            if task.scheduledDate != nil { continue }
+            if task.isArchived == true { continue }
+            if task.vehicleId != nil { continue }
+
+            guard let templateKey = task.templateId,
+                  let template = MaintenanceTemplates.template(forKey: templateKey),
+                  let timing = template.seasonalTiming,
+                  !timing.isEmpty else { continue }
+
+            let newDue = initialDueDate(for: template)
+            let newDueString = formatter.string(from: newDue)
+
+            if let currentDue = formatter.date(from: task.nextDueDate),
+               abs(newDue.timeIntervalSince(currentDue)) < 30 * 86400 {
+                continue
+            }
+
+            var update = MaintenanceTaskUpdate()
+            update.nextDueDate = newDueString
+            if (try? await db.updateMaintenanceTask(id: task.id, update)) != nil {
+                redated += 1
+            }
+        }
+
+        print("[Phase54A] Re-seeded \(redated) seasonal tasks")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        if redated > 0 {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+    }
+
+    /// Phase 54A: One-time backfill that consolidates pre-Phase-52
+    /// individual tasks into the new bundle parents. Without this,
+    /// existing TestFlight users see the old chore list forever because
+    /// the reconciler refuses to create a bundle when any individual
+    /// member exists.
+    ///
+    /// Phase 55.2: One-time fix for the HVAC filter-swap assignment
+    /// leak. A Phase 54A regression let `assignmentType: .either` +
+    /// `routingOverride: .diyDefault` templates drift to vendor for
+    /// users on the `.hireOut` preference tier, so "Replace air
+    /// filters" showed up as a Tyler-Heating twice-a-year task on
+    /// some installs. The updated `resolveAssignment` now clamps
+    /// `.diyDefault` to personal; this migration sweeps the
+    /// previously-leaked rows back to personal / monthly / no vendor.
+    @MainActor
+    static func fixAirFilterAssignmentP55() async {
+        let migrationKey = "hasFixedAirFilterAssignmentP55_v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+
+        let db = DatabaseService.shared
+        guard let tasks = try? await db.fetchAllMaintenanceTasks() else { return }
+
+        var fixed = 0
+        for task in tasks {
+            let title = task.title.lowercased()
+            // Match both the template's canonical title and the
+            // "Schedule Tyler Heating:" reframe that the vendor flow
+            // applied. Fallback: match on templateId prefix because
+            // the title may drift.
+            let isAirFilter =
+                title.contains("replace air filter") ||
+                title.contains("replace air filters") ||
+                title.contains("hvac filter") ||
+                (task.templateId?.lowercased() == "hvac:replace air filters")
+            guard isAirFilter else { continue }
+            guard task.assignmentType?.lowercased() == "vendor" else { continue }
+
+            var update = MaintenanceTaskUpdate()
+            update.assignmentType = "personal"
+            update.frequency = "Monthly"
+            update.assignedContractorId = nil
+            update.needsVendor = false
+            if (try? await db.updateMaintenanceTask(id: task.id, update)) != nil {
+                fixed += 1
+            }
+        }
+
+        print("[Phase55] Fixed \(fixed) air filter task assignments")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+    }
+
+    /// Strategy: per property, per known bundleId — find member tasks,
+    /// archive them with a backfill reason, then create the bundle
+    /// parent at the seasonally-correct date. Preserves user actions:
+    /// any bundle that contains a user-touched member is left alone.
+    @MainActor
+    static func backfillBundlesOnceIfNeeded() async {
+        let migrationKey = "hasRunBundleBackfillP54A_v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+
+        let db = DatabaseService.shared
+        guard let properties = try? await db.fetchProperties() else { return }
+
+        // Build bundleId → [(templateKey, template)] index for every
+        // bundled template across all categories.
+        var bundleMembers: [String: [(String, MaintenanceTemplate)]] = [:]
+        for (_, sectionTemplates) in MaintenanceTemplates.allTemplates {
+            for template in sectionTemplates {
+                guard let bid = template.bundleId else { continue }
+                bundleMembers[bid, default: []].append((template.templateKey, template))
+            }
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        var totalArchived = 0
+        var totalCreated = 0
+
+        let contractors = (try? await db.fetchContractors()) ?? []
+
+        for property in properties {
+            guard let tasks = try? await db.fetchMaintenanceTasks(propertyId: property.id) else { continue }
+            let activeTasks = tasks.filter { $0.isArchived != true && $0.vehicleId == nil }
+            let existingTemplateIds = Set(activeTasks.compactMap { $0.templateId })
+
+            for (bundleId, members) in bundleMembers {
+                // Skip if the bundle parent already exists
+                if existingTemplateIds.contains(bundleId) { continue }
+
+                // Find member tasks present today
+                let memberTasks = activeTasks.filter { task in
+                    guard let tid = task.templateId else { return false }
+                    return members.contains(where: { $0.0 == tid })
+                }
+                guard !memberTasks.isEmpty else { continue }
+
+                // Skip if any member is user-touched (completed, assigned,
+                // or has notes that aren't a template checklist)
+                let userTouched = memberTasks.contains { task in
+                    if let last = task.lastCompletedDate, !last.isEmpty { return true }
+                    if task.assignedToUserId != nil { return true }
+                    if let notes = task.notes, !notes.isEmpty,
+                       !notes.hasPrefix("What's included:") { return true }
+                    return false
+                }
+                if userTouched { continue }
+
+                // Pick the bundle's representative template
+                let representative = members.first(where: { $0.1.bundleTitle != nil }) ?? members.first
+                guard let (_, repTemplate) = representative else { continue }
+                let bundleTitle = repTemplate.bundleTitle ?? repTemplate.title
+
+                // Use the first member's systemId as the attach point
+                let systemId: UUID? = memberTasks.first?.systemId
+
+                // Category-match a contractor (same logic as reconciler)
+                let category = repTemplate.systemCategory
+                let matching = contractors.first { contractor in
+                    if let cat = contractor.category,
+                       cat.caseInsensitiveCompare(category) == .orderedSame { return true }
+                    if let specs = contractor.specialties,
+                       specs.contains(where: { $0.caseInsensitiveCompare(category) == .orderedSame }) { return true }
+                    return false
+                }
+
+                let checklist = members.map { "- \($0.1.title)" }.joined(separator: "\n")
+                let bundleNotes = "What's included:\n\(checklist)"
+
+                let description: String
+                let contractorId: UUID?
+                let needsVendor: Bool
+                if let contractor = matching {
+                    description = "\(contractor.companyName) will handle the work.\n\n\(bundleNotes)"
+                    contractorId = contractor.id
+                    needsVendor = false
+                } else {
+                    description = bundleNotes
+                    contractorId = nil
+                    needsVendor = true
+                }
+
+                let nextDue = initialDueDate(for: repTemplate)
+
+                var insert = MaintenanceTaskInsert(
+                    householdId: property.householdId,
+                    title: bundleTitle,
+                    frequency: repTemplate.frequency,
+                    nextDueDate: formatter.string(from: nextDue)
+                )
+                insert.propertyId = property.id
+                insert.systemId = systemId
+                insert.description = description
+                insert.priority = repTemplate.priority
+                insert.isTemplateBased = true
+                insert.templateId = bundleId
+                insert.seasonalTiming = repTemplate.seasonalTiming
+                insert.isDiy = false
+                insert.professionalRequired = true
+                insert.costRange = repTemplate.estimatedCostRange
+                insert.assignedContractorId = contractorId
+                insert.assignmentType = "vendor"
+                insert.needsVendor = needsVendor
+                insert.notes = bundleNotes
+
+                guard (try? await db.createMaintenanceTask(insert)) != nil else { continue }
+                totalCreated += 1
+
+                // Archive the individual member tasks
+                for memberTask in memberTasks {
+                    do {
+                        try await db.archiveMaintenanceTask(
+                            id: memberTask.id,
+                            reason: "backfilled_to_bundle:\(bundleId)"
+                        )
+                        totalArchived += 1
+                    } catch {
+                        continue
+                    }
+                }
+            }
+        }
+
+        print("[Phase54A] Bundle backfill: created \(totalCreated) bundles, archived \(totalArchived) members")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        if totalCreated > 0 || totalArchived > 0 {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         }
     }
 

@@ -220,6 +220,11 @@ struct FamilyMemberUpdate: Codable {
     var legalName: String?
     var school: String?
     var notes: String?
+    /// Set when an invited user accepts their invitation — stamps the
+    /// accepting auth user's id on the family_member row so task
+    /// assignment, profile lookup, and the dashboard greeting all
+    /// resolve back to the human record the homeowner already typed in.
+    var linkedUserId: UUID?
     /// Build 87: 'family' (default), 'home_manager', or 'staff'. Update
     /// path is intentionally permissive — the form layer is responsible
     /// for not flipping a family member into a staff member after creation.
@@ -236,6 +241,7 @@ struct FamilyMemberUpdate: Codable {
         case expectedDate = "expected_date"
         case isExpecting = "is_expecting"
         case legalName = "legal_name"
+        case linkedUserId = "linked_user_id"
         case memberType = "member_type"
     }
 }
@@ -466,6 +472,12 @@ struct PropertyRow: Codable, Identifiable {
     let purchaseDate: String?
     let purchasePrice: Double?
     let currentEstimatedValue: Double?
+    /// Phase 56.2: Lower/upper band of the ATTOM/RentCast AVM range. Both
+    /// nil when the lookup didn't supply a range or when the user manually
+    /// overrode the value (the override flow clears the band so stale
+    /// ranges don't bracket user-entered numbers).
+    let currentEstimatedValueLow: Double?
+    let currentEstimatedValueHigh: Double?
     /// Phase 16e: which fallback layer produced `currentEstimatedValue`. One of
     /// "attom" | "rentcast" | "computed" | "estimated" | "manual". Used by
     /// InvestmentSummaryCard to render a transparency caption beneath the value.
@@ -487,6 +499,10 @@ struct PropertyRow: Codable, Identifiable {
     let attributes: [String: FlexibleValue]?
     let houseQuizState: HouseQuizState?
     let createdAt: Date?
+    /// Phase 57: Regional maintenance pack derived from `state`. Backfilled
+    /// for every existing property by the migration. Nil when the property
+    /// has no state on file.
+    let regionalPack: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, street, unit, city, state, notes, attributes
@@ -497,6 +513,8 @@ struct PropertyRow: Codable, Identifiable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
+        case currentEstimatedValueLow = "current_estimated_value_low"
+        case currentEstimatedValueHigh = "current_estimated_value_high"
         case estimatedValueSource = "estimated_value_source"
         case estimatedValueConfidence = "estimated_value_confidence"
         case estimatedValueReasoning = "estimated_value_reasoning"
@@ -505,6 +523,7 @@ struct PropertyRow: Codable, Identifiable {
         case ownershipEntity = "ownership_entity"
         case houseQuizState = "house_quiz_state"
         case createdAt = "created_at"
+        case regionalPack = "regional_pack"
     }
 
     init(from decoder: Decoder) throws {
@@ -522,6 +541,8 @@ struct PropertyRow: Codable, Identifiable {
         purchaseDate = try? c.decode(String.self, forKey: .purchaseDate)
         purchasePrice = try? c.decode(Double.self, forKey: .purchasePrice)
         currentEstimatedValue = try? c.decode(Double.self, forKey: .currentEstimatedValue)
+        currentEstimatedValueLow = try? c.decodeIfPresent(Double.self, forKey: .currentEstimatedValueLow)
+        currentEstimatedValueHigh = try? c.decodeIfPresent(Double.self, forKey: .currentEstimatedValueHigh)
         estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
         estimatedValueConfidence = try? c.decodeIfPresent(Int.self, forKey: .estimatedValueConfidence)
         estimatedValueReasoning = try? c.decodeIfPresent(String.self, forKey: .estimatedValueReasoning)
@@ -532,6 +553,7 @@ struct PropertyRow: Codable, Identifiable {
         attributes = try? c.decode([String: FlexibleValue].self, forKey: .attributes)
         houseQuizState = try? c.decode(HouseQuizState.self, forKey: .houseQuizState)
         createdAt = try? c.decode(Date.self, forKey: .createdAt)
+        regionalPack = try? c.decodeIfPresent(String.self, forKey: .regionalPack)
     }
 }
 
@@ -548,6 +570,10 @@ struct PropertyInsert: Codable {
     var purchaseDate: String?
     var purchasePrice: Double?
     var currentEstimatedValue: Double?
+    /// Phase 56.2: ATTOM/RentCast AVM low/high band. Nil unless the
+    /// lookup response supplied a range.
+    var currentEstimatedValueLow: Double?
+    var currentEstimatedValueHigh: Double?
     var estimatedValueSource: String?
     var estimatedValueConfidence: Int?
     /// Phase 18g: AI-derived value reasoning paragraph (only set when source = "ai_comps").
@@ -556,6 +582,10 @@ struct PropertyInsert: Codable {
     var yearBuilt: Int?
     var ownershipEntity: String?
     var notes: String?
+    /// Phase 57: Regional maintenance pack. Callers can pass this on insert
+    /// when the region is known at creation time; otherwise the DB row stays
+    /// nil until `PropertyUpdate` or the backfill fills it.
+    var regionalPack: String?
 
     enum CodingKeys: String, CodingKey {
         case name, street, unit, city, state, notes, country
@@ -565,12 +595,15 @@ struct PropertyInsert: Codable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
+        case currentEstimatedValueLow = "current_estimated_value_low"
+        case currentEstimatedValueHigh = "current_estimated_value_high"
         case estimatedValueSource = "estimated_value_source"
         case estimatedValueConfidence = "estimated_value_confidence"
         case estimatedValueReasoning = "estimated_value_reasoning"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
+        case regionalPack = "regional_pack"
     }
 }
 
@@ -585,6 +618,13 @@ struct PropertyUpdate: Codable {
     var purchaseDate: String?
     var purchasePrice: Double?
     var currentEstimatedValue: Double?
+    /// Phase 56.2: ATTOM/RentCast AVM low/high band. Writers set both
+    /// when a lookup supplies a range, and set both to nil when the
+    /// user manually overrides the value (the override invalidates the
+    /// band so the card doesn't bracket a user-typed number with a
+    /// stale machine-generated range).
+    var currentEstimatedValueLow: Double?
+    var currentEstimatedValueHigh: Double?
     var estimatedValueSource: String?
     var estimatedValueConfidence: Int?
     /// Phase 18g: AI-derived value reasoning paragraph (only set when source = "ai_comps").
@@ -595,6 +635,10 @@ struct PropertyUpdate: Codable {
     var notes: String?
     var attributes: [String: FlexibleValue]?
     var houseQuizState: HouseQuizState?
+    /// Phase 57: Regional maintenance pack. Updating `state` via this
+    /// struct does NOT recompute this; callers that change state also need
+    /// to recompute via `RegionalPack(state:)` and pass the new value here.
+    var regionalPack: String?
 
     enum CodingKeys: String, CodingKey {
         case name, street, unit, city, state, notes, attributes
@@ -603,6 +647,8 @@ struct PropertyUpdate: Codable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
+        case currentEstimatedValueLow = "current_estimated_value_low"
+        case currentEstimatedValueHigh = "current_estimated_value_high"
         case estimatedValueSource = "estimated_value_source"
         case estimatedValueConfidence = "estimated_value_confidence"
         case estimatedValueReasoning = "estimated_value_reasoning"
@@ -610,6 +656,7 @@ struct PropertyUpdate: Codable {
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
         case houseQuizState = "house_quiz_state"
+        case regionalPack = "regional_pack"
     }
 }
 
@@ -1082,6 +1129,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     /// UI renders these as "Find a contractor for: X" with an orange CTA.
     /// Cleared when the user picks a vendor.
     let needsVendor: Bool?
+    /// Phase 51: Links this task to a standing appointment for recurring vendor visits.
+    let standingAppointmentId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -1108,6 +1157,7 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case archivedAt = "archived_at"
         case assignmentType = "assignment_type"
         case needsVendor = "needs_vendor"
+        case standingAppointmentId = "standing_appointment_id"
     }
 
     /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
@@ -1157,7 +1207,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             isArchived: nil,
             archivedAt: nil,
             assignmentType: nil,
-            needsVendor: nil
+            needsVendor: nil,
+            standingAppointmentId: nil
         )
     }
 
@@ -1198,7 +1249,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             isArchived: nil,
             archivedAt: nil,
             assignmentType: nil,
-            needsVendor: nil
+            needsVendor: nil,
+            standingAppointmentId: nil
         )
     }
 }
@@ -1229,6 +1281,10 @@ struct MaintenanceTaskInsert: Codable {
     var assignmentType: String?
     /// Phase 19k: True for vendor-managed tasks with no contractor on file.
     var needsVendor: Bool?
+    /// Phase 51B: Confirmed visit date. When set, the task moves to the "Scheduled" bucket.
+    var scheduledDate: String?
+    /// Phase 51: Links to a standing appointment for recurring vendor visits.
+    var standingAppointmentId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1250,6 +1306,8 @@ struct MaintenanceTaskInsert: Codable {
         case recurrenceRule = "recurrence_rule"
         case assignmentType = "assignment_type"
         case needsVendor = "needs_vendor"
+        case standingAppointmentId = "standing_appointment_id"
+        case scheduledDate = "scheduled_date"
     }
 }
 
@@ -1276,6 +1334,8 @@ struct MaintenanceTaskUpdate: Codable {
     /// vendor delegation sheet promote multiple tasks at once.
     var assignmentType: String?
     var needsVendor: Bool?
+    /// Phase 51: Links to a standing appointment for recurring vendor visits.
+    var standingAppointmentId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1293,6 +1353,7 @@ struct MaintenanceTaskUpdate: Codable {
         case archivedReason = "archived_reason"
         case assignmentType = "assignment_type"
         case needsVendor = "needs_vendor"
+        case standingAppointmentId = "standing_appointment_id"
     }
 }
 
@@ -3206,6 +3267,16 @@ struct UtilityProviderRow: Codable, Identifiable {
     /// names ('Bedford Hills', 'Greenwich', 'Sherman'). Used by the quiz
     /// picker to rank regional matches above generic ones.
     let regions: [String]?
+    /// Phase 50 (advisor picker fix): smaller = more prominent. The Life
+    /// tab advisor picker uses 1..10 to surface the biggest national
+    /// brands first across estate attorney / CPA / financial advisor /
+    /// life insurance categories. Nil for everything else (utilities
+    /// don't use prominence ordering — they keep the Phase 19h region
+    /// score). Backed by `utility_providers.prominence_rank` from
+    /// migration `20260468_utility_provider_prominence.sql`. Resilient
+    /// decoding so older rows pre-migration just fall back to the
+    /// alphabetical bucket.
+    let prominenceRank: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, name, slug, website, phone, regions
@@ -3214,6 +3285,7 @@ struct UtilityProviderRow: Codable, Identifiable {
         case brandColor = "brand_color"
         case bundlesWithHome = "bundles_with_home"
         case bundlesWithAuto = "bundles_with_auto"
+        case prominenceRank = "prominence_rank"
     }
 
     init(from decoder: Decoder) throws {
@@ -3229,6 +3301,7 @@ struct UtilityProviderRow: Codable, Identifiable {
         bundlesWithHome = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithHome)
         bundlesWithAuto = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithAuto)
         regions = try? c.decodeIfPresent([String].self, forKey: .regions)
+        prominenceRank = try? c.decodeIfPresent(Int.self, forKey: .prominenceRank)
     }
 }
 
@@ -3803,5 +3876,237 @@ struct LocalVendorResultInsert: Codable {
         case reviewCount = "review_count"
         case isHavenCertified = "is_haven_certified"
         case rankPosition = "rank_position"
+    }
+}
+
+// MARK: - Standing Appointments (Phase 51)
+
+struct StandingAppointmentRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let propertyId: UUID?
+    let vendorId: UUID?
+    let systemId: UUID
+
+    let cadenceType: String
+    let cadenceIntervalDays: Int?
+
+    let startDate: String
+    let nextExpectedDate: String
+    let lastConfirmedDate: String?
+    let lastAssumedDate: String?
+
+    let isPaused: Bool
+    let pausedAt: Date?
+    let pauseReason: String?
+    let autoResumeDate: String?
+
+    let cadenceSource: String
+    let confidenceScore: Double?
+
+    let serviceDescription: String?
+    let notes: String?
+    let archivedAt: Date?
+    let createdAt: Date?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, notes
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case vendorId = "vendor_id"
+        case systemId = "system_id"
+        case cadenceType = "cadence_type"
+        case cadenceIntervalDays = "cadence_interval_days"
+        case startDate = "start_date"
+        case nextExpectedDate = "next_expected_date"
+        case lastConfirmedDate = "last_confirmed_date"
+        case lastAssumedDate = "last_assumed_date"
+        case isPaused = "is_paused"
+        case pausedAt = "paused_at"
+        case pauseReason = "pause_reason"
+        case autoResumeDate = "auto_resume_date"
+        case cadenceSource = "cadence_source"
+        case confidenceScore = "confidence_score"
+        case serviceDescription = "service_description"
+        case archivedAt = "archived_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    /// Effective interval in days for any cadence type.
+    var effectiveIntervalDays: Int {
+        if let cadenceIntervalDays { return cadenceIntervalDays }
+        switch cadenceType {
+        case "weekly": return 7
+        case "biweekly": return 14
+        case "triweekly": return 21
+        case "monthly": return 30
+        case "bimonthly": return 60
+        case "quarterly": return 91
+        case "semiannual": return 182
+        case "annual": return 365
+        default: return 30
+        }
+    }
+
+    /// Human-readable cadence label.
+    var cadenceLabel: String {
+        switch cadenceType {
+        case "weekly": return "Weekly"
+        case "biweekly": return "Every 2 weeks"
+        case "triweekly": return "Every 3 weeks"
+        case "monthly": return "Monthly"
+        case "bimonthly": return "Every 2 months"
+        case "quarterly": return "Quarterly"
+        case "semiannual": return "Twice a year"
+        case "annual": return "Annually"
+        case "custom_days":
+            if let days = cadenceIntervalDays {
+                if days % 7 == 0 { return "Every \(days / 7) weeks" }
+                return "Every \(days) days"
+            }
+            return "Custom"
+        default: return cadenceType.capitalized
+        }
+    }
+}
+
+struct StandingAppointmentInsert: Codable {
+    let householdId: UUID
+    var propertyId: UUID?
+    var vendorId: UUID?
+    let systemId: UUID
+    let cadenceType: String
+    var cadenceIntervalDays: Int?
+    let startDate: String
+    let nextExpectedDate: String
+    var lastConfirmedDate: String?
+    var isPaused: Bool = false
+    let cadenceSource: String
+    var confidenceScore: Double?
+    var serviceDescription: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case notes
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case vendorId = "vendor_id"
+        case systemId = "system_id"
+        case cadenceType = "cadence_type"
+        case cadenceIntervalDays = "cadence_interval_days"
+        case startDate = "start_date"
+        case nextExpectedDate = "next_expected_date"
+        case lastConfirmedDate = "last_confirmed_date"
+        case isPaused = "is_paused"
+        case cadenceSource = "cadence_source"
+        case confidenceScore = "confidence_score"
+        case serviceDescription = "service_description"
+    }
+}
+
+struct StandingAppointmentUpdate: Codable {
+    var cadenceType: String?
+    var cadenceIntervalDays: Int?
+    var nextExpectedDate: String?
+    var lastConfirmedDate: String?
+    var lastAssumedDate: String?
+    var isPaused: Bool?
+    var pausedAt: Date?
+    var pauseReason: String?
+    var autoResumeDate: String?
+    var cadenceSource: String?
+    var confidenceScore: Double?
+    var serviceDescription: String?
+    var notes: String?
+    var archivedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case notes
+        case cadenceType = "cadence_type"
+        case cadenceIntervalDays = "cadence_interval_days"
+        case nextExpectedDate = "next_expected_date"
+        case lastConfirmedDate = "last_confirmed_date"
+        case lastAssumedDate = "last_assumed_date"
+        case isPaused = "is_paused"
+        case pausedAt = "paused_at"
+        case pauseReason = "pause_reason"
+        case autoResumeDate = "auto_resume_date"
+        case cadenceSource = "cadence_source"
+        case confidenceScore = "confidence_score"
+        case serviceDescription = "service_description"
+        case archivedAt = "archived_at"
+    }
+}
+
+// MARK: - Standing Appointment Visits (Phase 51)
+
+struct StandingAppointmentVisitRow: Codable, Identifiable {
+    let id: UUID
+    let standingAppointmentId: UUID
+    let scheduledDate: String
+    let status: String
+    let confirmedAt: Date?
+    let confirmedBy: String?
+    let notes: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, status, notes
+        case standingAppointmentId = "standing_appointment_id"
+        case scheduledDate = "scheduled_date"
+        case confirmedAt = "confirmed_at"
+        case confirmedBy = "confirmed_by"
+        case createdAt = "created_at"
+    }
+}
+
+struct StandingAppointmentVisitInsert: Codable {
+    let standingAppointmentId: UUID
+    let scheduledDate: String
+    let status: String
+    var confirmedAt: Date?
+    var confirmedBy: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status, notes
+        case standingAppointmentId = "standing_appointment_id"
+        case scheduledDate = "scheduled_date"
+        case confirmedAt = "confirmed_at"
+        case confirmedBy = "confirmed_by"
+    }
+}
+
+struct StandingAppointmentVisitUpdate: Codable {
+    var status: String?
+    var confirmedAt: Date?
+    var confirmedBy: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status, notes
+        case confirmedAt = "confirmed_at"
+        case confirmedBy = "confirmed_by"
+    }
+}
+
+// MARK: - Category Cadence Defaults (Phase 51)
+
+struct CategoryCadenceDefaultRow: Codable, Identifiable {
+    var id: String { categoryKey }
+    let categoryKey: String
+    let defaultCadenceType: String
+    let defaultIntervalDays: Int?
+    let seasonalPauseMonths: [Int]?
+    let serviceDescriptionTemplate: String?
+
+    enum CodingKeys: String, CodingKey {
+        case categoryKey = "category_key"
+        case defaultCadenceType = "default_cadence_type"
+        case defaultIntervalDays = "default_interval_days"
+        case seasonalPauseMonths = "seasonal_pause_months"
+        case serviceDescriptionTemplate = "service_description_template"
     }
 }

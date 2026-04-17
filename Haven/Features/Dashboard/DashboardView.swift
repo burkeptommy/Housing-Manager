@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Identifiable wrapper so sheet(item:) carries the system name atomically.
+struct VendorActionItem: Identifiable {
+    let id = UUID()
+    let systemName: String
+}
+
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = DashboardViewModel()
@@ -19,6 +25,10 @@ struct DashboardView: View {
     @State private var showApplianceSetup = false
     @State private var pendingMergeRequest: [String: Any]?
     @State private var showEstateIntake = false
+    @State private var showVendorCoverage = false
+    @State private var findVendorSystemName: String?
+    @State private var findVendorItem: VendorActionItem?
+    @State private var addVendorItem: VendorActionItem?
     @State private var isAcceptingMerge = false
     @State private var showMergeResolution = false
     @State private var mergePreviewResponse: MergePreviewResponse?
@@ -34,6 +44,12 @@ struct DashboardView: View {
     @AppStorage("hasSkippedHouseQuizForever") private var hasSkippedHouseQuizForever = false
     @AppStorage(PendingInviteKeys.needsPersonalQuiz) private var needsPersonalQuiz = false
     @State private var showPersonalQuiz = false
+
+    /// Phase 56.4: Session-only dismissal flag for the
+    /// HandymanSuggestionCard. Intentionally not persisted — the punch
+    /// list is real work that needs scheduling, so "Not now" comes back
+    /// next launch. Matches the Maintenance tab's behavior.
+    @State private var handymanSuggestionDismissedThisSession = false
 
     /// Phase 19l — re-fire path for the post-quiz vendor delegation sheet.
     /// When a new contractor is added mid-app (via ContractorDirectoryView
@@ -56,8 +72,10 @@ struct DashboardView: View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: HavenTheme.spacing16) {
-                    // Page title — rendered in content for stability
-                    screenTitle("Haven")
+                    // Phase 56.2: the 32pt in-content "Haven" title was
+                    // removed so the hero/greeting sit higher in the
+                    // viewport. Brand identity lives in the nav bar's
+                    // principal toolbar item below.
 
                     if viewModel.isLoading && !hasAppeared {
                         SkeletonScorecard()
@@ -81,8 +99,11 @@ struct DashboardView: View {
                             )
                         }
 
-                        // 1. Greeting
-                        greetingView
+                        // Phase 56.2: compact greeting — single line
+                        // + optional seasonal context tip. Replaces
+                        // the two-line "Good evening" / weekday-date
+                        // view. Saves ~32pt vertical.
+                        compactGreeting
 
                         // 2. Getting Started / Quiz hero — Day 0 focal point.
                         // Phase 50 (sub-phase B first-login): only renders
@@ -92,8 +113,6 @@ struct DashboardView: View {
                         // over as the primary CTA.
                         if viewModel.showGettingStarted {
                             gettingStartedCard
-                        } else if !viewModel.recommendations.isEmpty {
-                            recommendationsCard
                         }
 
                         // 2.5 Incomplete address banner
@@ -106,161 +125,218 @@ struct DashboardView: View {
                             mergeRequestBanner(merge)
                         }
 
-                        // 2.7 Phase 50 (sub-phase B first-login): YOUR HOME
-                        // vendor schedule section. Gated on quiz completion
-                        // so Day 0 stays focused on the Quiz CTA above.
-                        // Post-quiz, this is the primary action surface and
-                        // sits above the household strip — it absorbs the
-                        // role of the old Getting Started Step 2 ("Upload
-                        // your first document"). Once the user has at least
-                        // one vendor visit, the empty state collapses and
-                        // the horizontal scroll of `VendorVisitCard`s
-                        // takes over.
+                        // ── Build 90 / Phase 56.2: Focused Dashboard ──
+                        //
+                        // Scroll order tightened: Hero → Quick Actions →
+                        // UP NEXT (conditional) → View full schedule →
+                        // event banners → Recent → Foundation. Quick
+                        // Actions promoted above UP NEXT so the primary
+                        // 4 actions are visible without scrolling.
+
+                        // 2 + 3. Hero + Quick Actions — conceptually one
+                        // unit ("your home status + what you can do").
+                        // Phase 56.2 Addendum Fix 6: VStack(spacing: 8)
+                        // couples them tightly so the actions sit right
+                        // below the hero without the default 16pt gap.
                         if viewModel.hasCompletedAnyQuiz {
-                            vendorScheduleSection
+                            VStack(spacing: 4) {
+                                HomeCoverageHero(
+                                    coveredCount: viewModel.coveredCoverageItems.count,
+                                    totalCount: viewModel.coveredCoverageItems.count + viewModel.uncoveredCoverageItems.count,
+                                    activeVendorCount: viewModel.activeVendorCount,
+                                    nextVisit: viewModel.nextScheduledService,
+                                    uncoveredSystemNames: viewModel.uncoveredCoverageItems.map(\.systemName),
+                                    onTap: {
+                                        Haptics.light()
+                                        // Phase 56.4: the segmented filter is gone;
+                                        // route to the Maintenance list directly and
+                                        // let the user tap stats pills to scope.
+                                        navigationPath.append("maintenance")
+                                    },
+                                    onFindVendor: {
+                                        Haptics.medium()
+                                        showVendorCoverage = true
+                                    }
+                                )
+
+                                QuickActionsRow(
+                                onAskAlfred: {
+                                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3])
+                                },
+                                onUploadDoc: {
+                                    showUploadDocument = true
+                                },
+                                onScenarioStudio: {
+                                    showScenarioStudio = true
+                                    Analytics.track(.scenarioStudioOpened, ["source": "dashboard_quick_action"])
+                                },
+                                onAddVendor: {
+                                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+                                }
+                            )
+                            } // end hero + quick actions VStack
                         }
 
-                        // 3. Household strip
-                        HouseholdStrip(
-                            members: viewModel.familyMembers,
-                            currentUserName: viewModel.userFirstName,
-                            onMemberTapped: { member in
-                                selectedMemberForProfile = member
-                            },
-                            onAddTapped: {
-                                showFamilyMemberChooser = true
-                            },
-                            onManageTapped: {
-                                showSettings = true
-                            }
-                        )
-
-                        // Build 87 — paid household staff strip. Hidden
-                        // entirely when the household has no staff. The
-                        // "+" button routes to the Settings → Household
-                        // Staff add flow rather than the family chooser
-                        // so the two entry points stay clearly separated.
-                        if !viewModel.householdStaff.isEmpty {
-                            HouseholdStaffStrip(
-                                staff: viewModel.householdStaff,
-                                onMemberTapped: { member in
-                                    selectedMemberForProfile = member
+                        // Phase 56.4: Proactive handyman scheduling
+                        // suggestion. Surfaces when ≥3 punch items
+                        // accumulate with no upcoming handyman task
+                        // scheduled in the next 30 days and no recent
+                        // completion. Session-dismissible.
+                        if viewModel.hasCompletedAnyQuiz,
+                           viewModel.shouldShowHandymanSuggestion,
+                           !handymanSuggestionDismissedThisSession {
+                            HandymanSuggestionCard(
+                                punchItemCount: viewModel.handymanPunchItemCount,
+                                onSchedule: {
+                                    NotificationCenter.default.post(
+                                        name: .switchToTab,
+                                        object: nil,
+                                        userInfo: ["tab": 1]
+                                    )
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        NotificationCenter.default.post(
+                                            name: .navigateToPropertySection,
+                                            object: nil,
+                                            userInfo: ["section": "handyman_punch_list"]
+                                        )
+                                    }
                                 },
-                                onAddTapped: {
-                                    showSettings = true
+                                onDismiss: {
+                                    handymanSuggestionDismissedThisSession = true
                                 }
                             )
                         }
 
-                        // 3.5 "Make it Yours" hero card for invitees who joined an
-                        // existing household. Disappears once the personal quiz
-                        // completes (or the user dismisses with "Not now").
+                        // Phase 57: "What's New" card surfaces the new
+                        // HNW routines to existing users. Only renders for
+                        // properties created before the release cutoff and
+                        // stays dismissed once the user closes it. Opens
+                        // `UpdateHomeDetailsSheet` for opt-in review.
+                        if viewModel.hasCompletedAnyQuiz,
+                           let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
+                            WhatsNewPhase57Card(
+                                property: primaryProperty,
+                                onReviewComplete: {
+                                    Task { await viewModel.refresh() }
+                                }
+                            )
+                        }
+
+                        // 4. YOUR TO-DOS — Phase 56.2 conditional.
+                        //   0 items: section absent, just "View full schedule"
+                        //   1 item:  compact inline strip, no titled section
+                        //   2+:      existing full titled section
+                        if viewModel.hasCompletedAnyQuiz {
+                            let itemCount = viewModel.thisWeekItems.count
+                            if itemCount == 0 {
+                                viewFullScheduleLink
+                            } else if itemCount == 1 {
+                                singleUpNextStrip
+                                viewFullScheduleLink
+                            } else {
+                                thisWeekSection
+                                viewFullScheduleLink
+                            }
+                        }
+
+                        // 3.5 Cadence suggestion (inline, event-driven)
+                        if let suggestion = cadenceCoordinator.current {
+                            CadenceSuggestionCard(
+                                suggestion: suggestion,
+                                onAccept: {
+                                    Task {
+                                        let ok = await cadenceCoordinator.apply(suggestion)
+                                        if ok {
+                                            Haptics.success()
+                                            await viewModel.refresh()
+                                        } else {
+                                            Haptics.error()
+                                        }
+                                    }
+                                },
+                                onDismiss: {
+                                    cadenceCoordinator.dismiss()
+                                    Haptics.light()
+                                }
+                            )
+                        }
+
+                        // 3.4 Phase 54D.3: Pickup day banner (trash /
+                        // recycling / school dropoff). Renders only
+                        // inside the banner's own surfacing window
+                        // (after 6pm for tomorrow, before 10am for
+                        // today) so the dashboard stays quiet the
+                        // rest of the day.
+                        if viewModel.hasCompletedAnyQuiz,
+                           let householdId = viewModel.primaryHouseholdId {
+                            PickupDayBanner(
+                                householdId: householdId,
+                                onTap: {
+                                    navigationPath.append("routines")
+                                },
+                                onEdit: {
+                                    navigationPath.append("routines")
+                                }
+                            )
+                        }
+
+                        // 5. Recent Activity feed — Phase 56.2: feed
+                        // uses `dashboardActivityEvents`, which filters
+                        // onboarding "X added" noise after Day 7 so the
+                        // card stays useful beyond the setup week. The
+                        // full unfiltered list is still reachable via
+                        // "View all activity" → ActivityLogView.
+                        if viewModel.hasCompletedAnyQuiz && !viewModel.dashboardActivityEvents.isEmpty {
+                            RecentActivityFeed(
+                                events: viewModel.dashboardActivityEvents,
+                                totalEventCount: viewModel.allActivityEvents.count,
+                                onTap: { event in
+                                    handleActivityTap(event)
+                                },
+                                onViewAll: {
+                                    navigationPath.append("activity_log")
+                                }
+                            )
+                        }
+
+                        // Phase 56.2: "Discover more services for your
+                        // home" orphan link removed. Accessible from
+                        // Property → Maintenance → Recommended row and
+                        // from Contacts → Add or discover, so three
+                        // entry points remain without the dashboard
+                        // clutter.
+
+                        // 5. Foundation (contextual estate card)
+                        if viewModel.shouldShowFoundation {
+                            FoundationCard(
+                                message: viewModel.foundationMessage,
+                                icon: viewModel.foundationIcon,
+                                onTap: {
+                                    Haptics.light()
+                                    let hasStartedIntake = viewModel.estateState?.intakeState?.startedAt != nil
+                                    let isStale = viewModel.estateState?.stalenessTier == "critical" || viewModel.estateState?.stalenessTier == "amber"
+                                    if hasStartedIntake || isStale {
+                                        showEstateIntake = true
+                                    } else {
+                                        NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                                    }
+                                }
+                            )
+                        }
+
+                        // ── Conditional sections ──
+
+                        // "Make it Yours" hero card for invitees
                         if needsPersonalQuiz {
                             makeItYoursHeroCard
                         }
 
-                        // 4. Expecting members
+                        // Expecting members
                         ForEach(viewModel.expectingMembers) { member in
                             NavigationLink(value: "expecting_\(member.id.uuidString)") {
                                 expectingCard(member: member)
                             }
                             .buttonStyle(.plain)
-                        }
-
-                        // 5. Incoming items (inbox banners)
-                        if !viewModel.inboxItems.isEmpty {
-                            inboxSection
-                        }
-
-                        // Email forwarding callout
-                        if !hasSeenEmailCallout {
-                            emailForwardingCallout
-                        }
-
-                        // 7b. Estate Drip Card (Phase 48)
-                        // Only shows after all house quizzes are complete.
-                        // Empty state redirects to Life tab; stale/partial opens intake directly.
-                        if viewModel.shouldShowEstateDripCard {
-                            EstateIntakeDripCard(
-                                estateState: viewModel.estateState,
-                                onStart: {
-                                    let hasStartedIntake = viewModel.estateState?.intakeState?.startedAt != nil
-                                    let isStale = viewModel.estateState?.stalenessTier == "critical" || viewModel.estateState?.stalenessTier == "amber"
-                                    if hasStartedIntake || isStale {
-                                        // Stale or partial: open intake directly
-                                        showEstateIntake = true
-                                    } else {
-                                        // Empty/first-time: navigate to Life tab
-                                        NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
-                                    }
-                                },
-                                onDismiss: { tier in viewModel.dismissEstateDrip(tier: tier) }
-                            )
-                        }
-
-                        // (vendorScheduleSection moved above HouseholdStrip
-                        // in Phase 50 sub-phase B first-login fixes — see
-                        // section 2.7 above. The hasCompletedAnyQuiz gate
-                        // lives there, so Day 0 stays focused on the Quiz
-                        // CTA and the strip never renders mid-scroll.)
-
-                        // 9. Unified "Needs Your Attention" list — hidden on
-                        // Day 0 until any property's house quiz is complete.
-                        if viewModel.hasCompletedAnyQuiz {
-                            UnifiedAttentionList(
-                                items: viewModel.unifiedAttentionItems,
-                                onItemTapped: { item in
-                                    if case .vehicleAlert = item.kind {
-                                        navigationPath.append("vehicles")
-                                    }
-                                },
-                                onSeeAll: {
-                                    navigationPath.append("maintenance")
-                                },
-                                onDeleteTask: { task in
-                                    Task {
-                                        try? await DatabaseService.shared.deleteMaintenanceTask(id: task.id)
-                                        Haptics.success()
-                                        await viewModel.refresh()
-                                    }
-                                }
-                            )
-                        }
-
-                        // (Standalone Upload button removed — uploads still
-                        // reachable via the VendorScheduleStrip "Upload
-                        // invoice" button and the email forwarding flow.)
-
-                        // 11. Estate readiness (compact) — hidden on Day 0
-                        // until any property's house quiz is complete.
-                        if viewModel.hasCompletedAnyQuiz {
-                            NavigationLink(value: "estate_readiness") {
-                                compactEstateScorecard
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        // 12. Scenario Planning (slim single-row) — hidden
-                        // on Day 0. Scenarios are also folded into Alfred's
-                        // toolbar so the AI surface area lives in one place.
-                        if viewModel.hasCompletedAnyQuiz {
-                            compactScenarioCard
-                        }
-
-                        // 13. Security trust badge — hidden on Day 0 to keep
-                        // the empty-state dashboard focused on onboarding.
-                        if !hasSeenSecurityBadge && viewModel.hasCompletedAnyQuiz {
-                            securityBadge
-                                .overlay(alignment: .topTrailing) {
-                                    Button {
-                                        hasSeenSecurityBadge = true
-                                    } label: {
-                                        Image(systemName: "xmark")
-                                            .font(.caption2)
-                                            .foregroundStyle(HavenColors.textTertiary)
-                                            .padding(8)
-                                    }
-                                }
                         }
                     }
                 }
@@ -273,7 +349,12 @@ struct DashboardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Color.clear.frame(height: 0)
+                    // Phase 56.2: small brand wordmark in the nav bar
+                    // replaces the 32pt in-content title. Serif, navy,
+                    // never competing with the hero for vertical space.
+                    Text("Haven")
+                        .font(HavenTypography.fraunces(size: 18, weight: 700))
+                        .foregroundStyle(HavenColors.navy800)
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -362,6 +443,29 @@ struct DashboardView: View {
                     SecurityDashboardView()
                 } else if destination == "maintenance" {
                     MaintenanceScheduleView()
+                } else if destination == "maintenance_calendar" {
+                    // Phase 54A: "View full schedule" on the dashboard
+                    // lands users in the Calendar layout of the canonical
+                    // maintenance view — no more parallel ScheduleCalendarView.
+                    MaintenanceScheduleView(initialLayout: .calendar)
+                } else if destination == "recommended_services" {
+                    // Phase 54C.3: Dashboard "Discover more" link.
+                    if let property = viewModel.properties.first {
+                        RecommendedServicesView(
+                            householdId: property.householdId,
+                            propertyId: property.id
+                        )
+                    }
+                } else if destination == "routines" {
+                    // Phase 55.3: Pickup day banner tap / edit opens
+                    // the unified routines list. Replaces the
+                    // Phase 54D.3 "household_cadences" destination.
+                    if let householdId = viewModel.primaryHouseholdId {
+                        RoutinesListView(
+                            householdId: householdId,
+                            propertyId: viewModel.properties.first?.id
+                        )
+                    }
                 } else if destination == "estate_readiness" {
                     ReadinessDetailView()
                         .environmentObject(vaultViewModel)
@@ -395,6 +499,13 @@ struct DashboardView: View {
                             }
                         }
                     )
+                } else if destination == "activity_log" {
+                    ActivityLogView(
+                        events: viewModel.allActivityEvents,
+                        onTap: { event in
+                            handleActivityTap(event)
+                        }
+                    )
                 } else if destination.hasPrefix("expecting_"),
                           let memberId = UUID(uuidString: String(destination.dropFirst("expecting_".count))),
                           let member = viewModel.expectingMembers.first(where: { $0.id == memberId }) {
@@ -403,6 +514,68 @@ struct DashboardView: View {
                     EmptyView()
                 }
             }
+            .sheet(isPresented: $showVendorCoverage) {
+                vendorCoverageSheetContent
+            }
+            .sheet(item: $findVendorItem) { item in
+                // Phase 56.1: Find-a-Pro must always open the local vendor
+                // recommender, even when there's no "Find a contractor for:"
+                // task row yet (common for covered-but-gap-flagged systems
+                // or Tier 1 gaps that don't have a DB system row).
+                // FindLocalVendorSheet now accepts an optional task + an
+                // explicit household id so it can render and adopt without
+                // a triggering task.
+                if let property = viewModel.properties.first,
+                   let context = resolveFindVendorContext(for: item.systemName, property: property) {
+                    FindLocalVendorSheet(
+                        task: context.task,
+                        householdId: property.householdId,
+                        town: property.city ?? "",
+                        state: property.state ?? "",
+                        systemCategory: context.category,
+                        categoryDisplayName: context.category.lowercased(),
+                        onComplete: {
+                            Task { await viewModel.refresh() }
+                        }
+                    )
+                } else {
+                    // No property or household available — defensive
+                    // fallback so the sheet never dead-ends.
+                    AddVendorSheet(onComplete: {
+                        Task { await viewModel.refresh() }
+                    })
+                }
+            }
+            .sheet(item: $addVendorItem) { action in
+                // Tapping "I have one" on a Vendor Coverage gap card
+                // opens the pick-or-add picker so the user can link an
+                // existing vendor (e.g. the water softener shares a
+                // provider with water & well services) or add a new
+                // one. Both paths link the contractor to the system
+                // via `preferredContractorId`.
+                if let coverageItem = viewModel.uncoveredCoverageItems.first(where: { $0.systemName == action.systemName }),
+                   let householdId = viewModel.primaryHouseholdId {
+                    VendorCoveragePickerSheet(
+                        coverageItem: coverageItem,
+                        householdId: householdId,
+                        propertyId: viewModel.primaryPropertyId,
+                        onComplete: {
+                            Task { await viewModel.refresh() }
+                        }
+                    )
+                } else {
+                    // Fallback when the coverage item isn't available
+                    // (coverage data refreshed between tap and sheet
+                    // presentation, or no household resolved yet).
+                    AddVendorSheet(onComplete: {
+                        Task { await viewModel.refresh() }
+                    })
+                }
+            }
+            // Phase 56.1: BrowseSpecialty / AddRecurringService /
+            // AddSystemFromCoverage / AddCustomVendorFromCoverage sheets
+            // were removed with the Vendor Coverage discovery footer —
+            // those entry points now live on Property → Contacts.
             .sheet(isPresented: $showServiceContractSheet) {
                 ServiceContractSheet(
                     serviceType: serviceContractType,
@@ -542,7 +715,8 @@ struct DashboardView: View {
                         Task {
                             await viewModel.loadInboxItems()
                             try? await Task.sleep(nanoseconds: 300_000_000)
-                            if let item = viewModel.inboxItems.first(where: { $0.relatedDocumentId == documentId }) {
+                            let matchedItem = viewModel.inboxItems.first(where: { $0.relatedDocumentId == documentId })
+                            if let item = matchedItem {
                                 navigationPath.append("inbox_item_\(item.id.uuidString)")
                             }
                         }
@@ -779,9 +953,266 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Phase 50: Vendor schedule strip + cadence suggestion card. Pulled
-    /// out of `body` so the dashboard's main scroll view stays under
-    /// SwiftUI's expression type-check budget.
+    /// Phase 56.2 / Addendum Fix 4: Bold greeting + lighter date + icon-
+    /// anchored seasonal tip. "**Good evening, Tom**  ·  Wednesday,
+    /// April 15" reads as two semantically distinct items via weight
+    /// contrast. The seasonal tip gains a month-driven icon (leaf, sun,
+    /// wind, snowflake) so it doesn't float as a footnote.
+    private var compactGreeting: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 0) {
+                Text(greetingText)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("  \u{00B7}  ")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Text(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+
+            if let tip = viewModel.seasonalContextTip {
+                HStack(spacing: 6) {
+                    Image(systemName: seasonalIcon)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text(tip)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var seasonalIcon: String {
+        let month = Calendar.current.component(.month, from: Date())
+        switch month {
+        case 3, 4, 5: return "leaf.fill"
+        case 6, 7, 8: return "sun.max.fill"
+        case 9, 10, 11: return "wind"
+        case 12, 1, 2: return "snowflake"
+        default: return "calendar"
+        }
+    }
+
+    /// Phase 56.2: trailing "View full schedule →" link. Extracted from
+    /// the inline block inside `body` so the 0/1/2+ conditional UP NEXT
+    /// branches can all reuse it.
+    private var viewFullScheduleLink: some View {
+        Button {
+            Haptics.light()
+            navigationPath.append("maintenance_calendar")
+        } label: {
+            HStack(spacing: 4) {
+                Text("View full schedule")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.navy700)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Phase 56.2: Type-aware caption for the single-item strip so the
+    /// label reflects what the row actually is. Keeps the strip clearly
+    /// distinct from the hero's "Next visit:" vendor schedule.
+    private func singleStripCaption(for item: ThisWeekItem) -> String {
+        switch item.kind {
+        case .overdue:
+            return "Overdue"
+        case .vendorVisit:
+            return "Also coming up"
+        case .diyTask:
+            return "Your to-do"
+        case .inboxReview:
+            return "To review"
+        }
+    }
+
+    /// Phase 56.2: Compact one-row strip for when UP NEXT has exactly
+    /// one item. Reads as hero context, not as a titled section.
+    @ViewBuilder
+    private var singleUpNextStrip: some View {
+        if let item = viewModel.thisWeekItems.first {
+            Button {
+                Haptics.light()
+                if case .inboxReview = item.kind {
+                    navigationPath.append("inbox")
+                } else if let task = item.task {
+                    selectedDashboardTask = task
+                }
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    // Addendum Fix 7: lighter icon so the strip reads
+                    // as ambient context beneath the bolder quick actions.
+                    Image(systemName: item.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 28, height: 28)
+                        .background(HavenColors.beige200.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        // Phase 56.2: "Your to-do" distinguishes a
+                        // personal action item from the hero's
+                        // "Next visit:" vendor-schedule label above.
+                        Text(singleStripCaption(for: item))
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text(item.title)
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Build 90: Up Next section extracted to stay under SwiftUI's
+    /// expression type-check budget.
+    @ViewBuilder
+    private var thisWeekSection: some View {
+        ThisWeekSection(
+            items: viewModel.thisWeekItems,
+            totalTaskCount: viewModel.overdueMaintenanceTasks.count + viewModel.dueThisWeekTasks.count,
+            onItemTapped: { item in
+                Haptics.light()
+                if case .inboxReview = item.kind {
+                    navigationPath.append("inbox")
+                } else if let task = item.task {
+                    selectedDashboardTask = task
+                }
+            },
+            onSeeAll: {
+                // TODO: Navigate to MaintenanceScheduleView with .mine filter
+                navigationPath.append("maintenance")
+            },
+            onSnooze: { item in
+                Task {
+                    await viewModel.snoozeTask(item)
+                }
+            }
+        )
+    }
+
+    /// Phase 56.1: Resolves the context FindLocalVendorSheet needs when
+    /// entered from the dashboard Vendor Coverage sheet. Uses the
+    /// matching coverage item's category key (stable across
+    /// system-backed and Tier 1 gap rows) so "Find a Pro" works even
+    /// when no `needs_vendor` task exists yet. When a task does exist,
+    /// we pass it through so the adoption pass has a concrete anchor.
+    private func resolveFindVendorContext(
+        for systemName: String,
+        property: PropertyRow
+    ) -> (task: MaintenanceTaskDBRow?, category: String)? {
+        let candidate = (viewModel.uncoveredCoverageItems + viewModel.coveredCoverageItems)
+            .first(where: { $0.systemName == systemName })
+
+        // Prefer the category key from the coverage item — it's the
+        // canonical token used across the registry + reconciler.
+        let category: String? = {
+            if let c = candidate, !c.id.isEmpty { return c.id }
+            return viewModel.homeSystems
+                .first(where: { $0.name == systemName })?.category
+        }()
+
+        guard let resolvedCategory = category else { return nil }
+
+        let task: MaintenanceTaskDBRow? = {
+            // Exact match by systemId first (strongest signal).
+            if let systemId = candidate?.systemId ?? viewModel.homeSystems
+                .first(where: { $0.name == systemName })?.id {
+                if let t = MaintenanceViewModel.shared.tasks.first(where: {
+                    $0.systemId == systemId && $0.needsVendor == true
+                }) {
+                    return t
+                }
+            }
+            // Otherwise fall through — no triggering task, but the sheet
+            // will still render because `task` is optional and the
+            // adoption pass walks matching category tasks.
+            return nil
+        }()
+
+        return (task: task, category: resolvedCategory)
+    }
+
+    private var vendorCoverageSheetContent: some View {
+        // Phase 56.1: Vendor Coverage is now a focused gap-resolution
+        // surface. Discovery actions (add vendor / browse specialty /
+        // add routine / see recommended) moved to Property → Contacts.
+        let uncovered = viewModel.uncoveredCoverageItems
+        let total = uncovered.count + viewModel.coveredCoverageItems.count
+        return VendorCoverageSheet(
+            uncoveredItems: uncovered,
+            totalSystemCount: total,
+            onFindVendor: { systemName in
+                showVendorCoverage = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    findVendorItem = VendorActionItem(systemName: systemName)
+                }
+            },
+            onAddVendor: { systemName in
+                showVendorCoverage = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    addVendorItem = VendorActionItem(systemName: systemName)
+                }
+            },
+            onDismissItem: { item in
+                guard let householdId = viewModel.primaryHouseholdId else { return }
+                Task {
+                    try? await DatabaseService.shared.dismissCategory(
+                        householdId: householdId,
+                        category: item.id
+                    )
+                    Analytics.track(.coverageItemDismissed, ["category": item.id])
+                    await viewModel.refresh()
+                }
+            },
+            onManageVendors: {
+                // Phase 56.1: dismiss the sheet, switch to the Property
+                // tab, and land on the Contacts sub-tab. Matches the
+                // rest of the app's cross-tab navigation pattern
+                // (switchToTab + navigateToPropertySection).
+                showVendorCoverage = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    NotificationCenter.default.post(
+                        name: .switchToTab,
+                        object: nil,
+                        userInfo: ["tab": 1]
+                    )
+                    NotificationCenter.default.post(
+                        name: .navigateToPropertySection,
+                        object: nil,
+                        userInfo: ["section": "contacts"]
+                    )
+                }
+            }
+        )
+    }
+
+    /// Phase 50: Vendor schedule strip (kept for reference, no longer
+    /// rendered on the dashboard body as of Build 90).
     @ViewBuilder
     private var vendorScheduleSection: some View {
         VendorScheduleStrip(
@@ -1101,7 +1532,7 @@ struct DashboardView: View {
                         .frame(height: 6)
                     GeometryReader { geo in
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(HavenColors.navy800)
+                            .fill(HavenColors.action)
                             .frame(width: max(0, geo.size.width * completion), height: 6)
                     }
                     .frame(height: 6)
@@ -1344,6 +1775,47 @@ struct DashboardView: View {
     }
 
     // (Enrichment cards section removed — replaced by the House Quiz hero card.)
+
+    // MARK: - Activity Tap Handler
+
+    private func handleActivityTap(_ event: RecentActivityEvent) {
+        switch event.eventType {
+        case .taskCompleted:
+            if let id = event.entityId,
+               let task = viewModel.allUpcomingTasks.first(where: { $0.id == id })
+                  ?? viewModel.overdueMaintenanceTasks.first(where: { $0.id == id })
+                  ?? viewModel.recentlyCompletedTasks.first(where: { $0.id == id }) {
+                selectedDashboardTask = task
+            }
+        case .documentProcessed, .invoiceProcessed, .estateDocumentExtracted:
+            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+        case .vendorLinked, .systemAdded, .propertyAdded, .projectCreated:
+            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+        case .vehicleAdded:
+            if event.entityId != nil {
+                navigationPath.append("vehicles")
+            } else {
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+            }
+        case .familyMemberJoined:
+            if let id = event.entityId,
+               let member = viewModel.familyMembers.first(where: { $0.id == id }) {
+                selectedMemberForProfile = member
+            }
+        case .inboxItemReceived:
+            if let id = event.entityId {
+                navigationPath.append("inbox_item_\(id.uuidString)")
+            } else {
+                navigationPath.append("inbox")
+            }
+        case .recallDetected:
+            navigationPath.append("vehicles")
+        case .scenarioRun:
+            NotificationCenter.default.post(name: .openScenarioStudio, object: nil)
+        case .gapAnalysisRun:
+            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+        }
+    }
 
     private func handleRecommendationAction(_ action: RecommendationAction) {
         switch action {

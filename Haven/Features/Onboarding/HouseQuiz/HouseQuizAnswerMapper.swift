@@ -1485,57 +1485,23 @@ final class HouseQuizAnswerMapper {
         }
     }
 
-    /// Phase 19k: Service-category provider_types that should also create a
-    /// contractor row mirror. Utility-bill types (electric, internet, oil,
-    /// gas, water, propane, trash) are excluded — those don't represent
-    /// human contractors who do recurring maintenance work.
-    private static let serviceCategoryProviderTypes: [String: String] = [
-        "landscaping":   "Landscaping",
-        "pool_service":  "Pool/Spa",
-        "pest_control":  "Pest Control",
-        "irrigation":    "Irrigation",
-        "security":      "Security System",
-        "solar":         "Solar",
-        "hvac":          "HVAC",
-        "plumbing":      "Plumbing",
-        "roofing":       "Roofing",
-        "electrical":    "Electrical",
-    ]
-
-    /// Mirrors a quiz-captured service vendor into the `contractors` table.
-    /// Idempotent — skips if a contractor with the same name already exists
-    /// for this household. Maps the provider_type to the matching home_systems
-    /// category so the reconciler's category-based lookup finds the row.
+    /// Phase 19k / 54E.3: Mirrors a quiz-captured service vendor into
+    /// the `contractors` table via the shared `UtilityContractorMirror`
+    /// so the quiz, manual Add Utility sheet, and backfill all share
+    /// one implementation. Idempotent. Errors are swallowed — the quiz
+    /// must keep moving even if a mirror fails.
     private func mirrorContractorIfNeeded(
         name: String,
         providerType: String,
         catalogProvider: UtilityProviderRow?
     ) async throws {
-        let lowerType = providerType.lowercased()
-        guard let category = Self.serviceCategoryProviderTypes[lowerType] else {
-            // Not a service category — utility bill, no contractor needed.
-            return
-        }
-
-        // Skip if a contractor with this name already exists in the household.
-        let existing = (try? await db.fetchContractors()) ?? []
-        if existing.contains(where: { $0.companyName.lowercased() == name.lowercased() }) {
-            return
-        }
-
-        var insert = ContractorInsert(
+        _ = try? await UtilityContractorMirror.mirrorIfNeeded(
+            name: name,
+            providerType: providerType,
+            catalogProvider: catalogProvider,
             householdId: householdId,
-            companyName: name,
-            phone: catalogProvider?.phone ?? "Not provided"
+            db: db
         )
-        insert.category = category
-        insert.specialties = [category]
-        insert.utilityProviderId = catalogProvider?.id
-        insert.logoUrl = catalogProvider?.logoUrl
-        insert.brandColor = catalogProvider?.brandColor
-        insert.website = catalogProvider?.website
-        insert.source = "quiz"
-        _ = try? await db.createContractor(insert)
     }
 
     /// Build 86: Flip every task in `systemCategory` on this property to
@@ -1608,12 +1574,12 @@ final class HouseQuizAnswerMapper {
                 let originalTitle = originalTemplate?.title ?? task.title
                 let originalDescription = originalTemplate?.description ?? task.description ?? ""
 
-                let newTitle = "Schedule \(contractor.companyName): \(originalTitle.lowercased())"
+                let newTitle = originalTitle
                 let newDescription: String = {
                     if originalDescription.isEmpty {
-                        return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work."
+                        return "\(contractor.companyName) will handle the work."
                     }
-                    return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
+                    return "\(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
                 }()
 
                 var update = MaintenanceTaskUpdate()
@@ -1738,6 +1704,124 @@ final class HouseQuizAnswerMapper {
             insert.needsVendor = false
             insert.notes = spec.diyEffortLabel
             _ = try? await db.createMaintenanceTask(insert)
+        }
+    }
+
+    // MARK: - Phase 54A: Missing-system auto-create
+
+    /// Phase 54A: US states where snow removal is a standing winter
+    /// contract decision. Defines the "Northeast / Upper Midwest / Mountain
+    /// West + Alaska" band where a plowing contract is a default-on
+    /// expectation rather than a specialty opt-in.
+    static let snowStates: Set<String> = [
+        "MA", "CT", "RI", "NY", "NH", "VT", "ME", "NJ", "PA",
+        "OH", "MI", "WI", "MN", "IA", "IL", "IN",
+        "CO", "UT", "WY", "ID", "MT", "ND", "SD", "NE", "AK"
+    ]
+
+    static func isSnowState(_ state: String?) -> Bool {
+        guard let raw = state?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return false }
+        return snowStates.contains(raw.uppercased())
+    }
+
+    /// Phase 54A: Instance entry point used by the quiz completion path.
+    /// Delegates to the static helper so existing-user backfill on
+    /// `AppState` can share the same rules without duplicating logic.
+    func ensureAutoCreatedSystemsAtCompletion() async {
+        await Self.ensureAutoCreatedSystems(
+            propertyId: propertyId,
+            householdId: householdId,
+            db: db
+        )
+    }
+
+    /// Phase 54A: Creates the `home_systems` rows that Vendor Coverage knows
+    /// about but the quiz didn't directly ask for. Without these rows,
+    /// the reconciler has no attach point for Handyman, Pet Waste,
+    /// Mosquito & Tick, Chimney, or Snow Removal templates — so they
+    /// stay invisible even when the gap-detection logic flags them as
+    /// missing.
+    ///
+    /// Rules:
+    /// - Always create: Handyman, Mosquito & Tick
+    /// - Conditional:
+    ///     - Pet Waste — if `properties.attributes["has_pets"] == "true"`
+    ///     - Chimney — if any `home_systems` row exists with category
+    ///       "Fireplace" (captures Q20 wood/propane fireplace selections)
+    ///     - Snow Removal — if `property.state` is in `snowStates`
+    ///
+    /// Idempotent: categories that already have a top-level system row
+    /// are skipped. Callers should run the reconciler afterward so
+    /// templates attach to the new rows.
+    @MainActor
+    static func ensureAutoCreatedSystems(
+        propertyId: UUID,
+        householdId: UUID,
+        db: DatabaseService = .shared
+    ) async {
+        let property = try? await db.fetchProperty(id: propertyId)
+        let systems = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
+        let existingCategories: Set<String> = Set(systems.map { $0.category.lowercased() })
+
+        let hasPets = property?.attributes?["has_pets"]?.stringValue == "true"
+
+        let fireplaceSystem = systems.first { $0.category.caseInsensitiveCompare("Fireplace") == .orderedSame }
+        let hasChimney = fireplaceSystem != nil
+        // Pick a chimney subtype that reflects the fuel the user said they use.
+        // Fallback is nil (any chimney template still fires).
+        let chimneySubtype: String? = {
+            guard let fp = fireplaceSystem else { return nil }
+            let name = fp.name.lowercased()
+            if name.contains("wood") || name.contains("pellet") { return "wood" }
+            if name.contains("propane") || name.contains("gas") { return "gas" }
+            return nil
+        }()
+
+        let isSnow = isSnowState(property?.state)
+
+        // Phase 57: Air Quality is gated on the Northeast regional pack —
+        // radon risk tracks granite-belt geology, so non-NE households
+        // don't see the category auto-created (they can still add it from
+        // the Browse Specialty sheet).
+        let isNortheast = RegionalPack(state: property?.state) == .northeast
+
+        struct Rule {
+            let category: String
+            let subtype: String?
+            let shouldCreate: Bool
+        }
+
+        let rules: [Rule] = [
+            .init(category: "Handyman", subtype: nil, shouldCreate: true),
+            .init(category: "Mosquito & Tick", subtype: nil, shouldCreate: true),
+            // Phase 54E.3: Trash & Recycling is universal so every
+            // household sees the category in Vendor Coverage + the
+            // contractor directory's Assign Systems picker.
+            .init(category: "Trash & Recycling", subtype: nil, shouldCreate: true),
+            .init(category: "Pet Waste", subtype: nil, shouldCreate: hasPets),
+            .init(category: "Chimney", subtype: chimneySubtype, shouldCreate: hasChimney),
+            .init(category: "Snow Removal", subtype: nil, shouldCreate: isSnow),
+            // Phase 57: Air Quality for Northeast properties.
+            .init(category: "Air Quality", subtype: nil, shouldCreate: isNortheast),
+        ]
+
+        for rule in rules {
+            guard rule.shouldCreate,
+                  !existingCategories.contains(rule.category.lowercased()) else { continue }
+
+            let displayName = SystemCategoryRegistry.metaForCategory(rule.category)?.displayName
+                ?? rule.category
+
+            var insert = HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: displayName,
+                category: rule.category,
+                notes: "Auto-created by Haven so vendor coverage stays complete."
+            )
+            insert.subtype = rule.subtype
+            _ = try? await db.createHomeSystem(insert)
         }
     }
 }
