@@ -105,6 +105,30 @@ final class DatabaseService {
             .value
     }
 
+    /// Revokes a linked user's access to the current household.
+    ///
+    /// Routed through the `remove_household_access` SECURITY DEFINER
+    /// RPC (migration `20260703_remove_household_access_rpc.sql`)
+    /// because the base RLS policy on `public.users` is
+    /// `USING (id = auth.uid())` — a client-side UPDATE targeting
+    /// another household member's `users.household_id` silently
+    /// affects 0 rows. The RPC verifies caller + target share a
+    /// household, then performs both writes atomically:
+    ///   1. `family_members.linked_user_id = NULL` for any row
+    ///      pointing at the target (the member card survives so the
+    ///      homeowner can re-invite from the same profile).
+    ///   2. `users.household_id = NULL` for the target so RLS stops
+    ///      returning household data to them.
+    ///
+    /// Self-removal is rejected server-side with SQLSTATE `22023` —
+    /// account deletion runs through the existing `delete-account`
+    /// Edge Function, not this path.
+    func removeHouseholdAccess(userId: UUID) async throws {
+        _ = try await HavenSupabase.client
+            .rpc("remove_household_access", params: ["target_user_id": userId.uuidString])
+            .execute()
+    }
+
     /// Insert a user row without returning the result (avoids RLS SELECT issues).
     func createUserWithoutReturn(_ user: UserInsert) async throws {
         try await from("users")
@@ -948,12 +972,21 @@ final class DatabaseService {
     }
 
     func createContractor(_ contractor: ContractorInsert) async throws -> ContractorRow {
-        try await from("contractors")
+        let created: ContractorRow = try await from("contractors")
             .insert(contractor)
             .select()
             .single()
             .execute()
             .value
+        // Phase 58: seed a matching routine if this contractor falls into
+        // one of the archetypal recurring-service categories (cleaning,
+        // landscaping, pool, pest, pet waste, mosquito & tick).
+        // Fire-and-forget — routine seeding should never block the
+        // contractor creation itself.
+        Task { @MainActor in
+            await RoutineSeeder.shared.seedIfNeeded(for: created)
+        }
+        return created
     }
 
     func updateContractor(id: UUID, _ updates: ContractorUpdate) async throws -> ContractorRow {
@@ -966,7 +999,42 @@ final class DatabaseService {
             .value
     }
 
+    func fetchContractor(id: UUID) async throws -> ContractorRow {
+        try await from("contractors")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
+    private struct ContractorDisassociation: Encodable {
+        let assigned_contractor_id: String? = nil
+        let needs_vendor: Bool = true
+        let assignment_type: String = "vendor"
+    }
+
     func deleteContractor(id: UUID) async throws {
+        // Disassociate any tasks assigned to this contractor before deleting
+        // (FK constraint defaults to RESTRICT, so deletion would fail otherwise)
+        try await from("maintenance_tasks")
+            .update(ContractorDisassociation())
+            .eq("assigned_contractor_id", value: id.uuidString)
+            .execute()
+
+        // Nullify service record references
+        try await from("service_records")
+            .update(["contractor_id": nil] as [String: String?])
+            .eq("contractor_id", value: id.uuidString)
+            .execute()
+
+        // Nullify home system preferred contractor references
+        try await from("home_systems")
+            .update(["preferred_contractor_id": nil] as [String: String?])
+            .eq("preferred_contractor_id", value: id.uuidString)
+            .execute()
+
+        // Now safe to delete the contractor row
         try await from("contractors")
             .delete()
             .eq("id", value: id.uuidString)
@@ -991,6 +1059,31 @@ final class DatabaseService {
         if !includeArchived { query = query.eq("is_archived", value: false) }
         return try await query
             .order("next_due_date")
+            .execute()
+            .value
+    }
+
+    /// Phase 58: fetches tasks assigned to a specific contractor, used by
+    /// the vendor detail view's Upcoming + Recent Activity sections.
+    func fetchMaintenanceTasksByContractor(_ contractorId: UUID, includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
+        var query = from("maintenance_tasks")
+            .select()
+            .eq("assigned_contractor_id", value: contractorId.uuidString)
+        if !includeArchived { query = query.eq("is_archived", value: false) }
+        return try await query.order("next_due_date").execute().value
+    }
+
+    /// Phase 58: fetches documents directly linked to a contractor via
+    /// `documents.contractor_id`. Used by vendor detail's Recent Activity
+    /// timeline. Does not include service-record invoices without the
+    /// direct FK — caller should also query service_records if they want
+    /// full coverage.
+    func fetchDocumentsByContractor(_ contractorId: UUID) async throws -> [DocumentRow] {
+        try await from("documents")
+            .select()
+            .eq("contractor_id", value: contractorId.uuidString)
+            .is("deleted_at", value: nil)
+            .order("uploaded_at", ascending: false)
             .execute()
             .value
     }
@@ -1115,6 +1208,594 @@ final class DatabaseService {
         try await from("maintenance_tasks")
             .update(payload)
             .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Handyman Punch Items (Phase 54B)
+
+    // MARK: - Routing Preferences (Phase 65)
+
+    /// Phase 65: Fetch all routing preferences for a household, optionally
+    /// filtered to a specific property. Callers that resolve a task at
+    /// creation time pass the property_id; the Settings screen passes nil
+    /// to surface preferences across every property.
+    func fetchRoutingPreferences(
+        householdId: UUID,
+        propertyId: UUID? = nil
+    ) async throws -> [RoutingPreferenceRow] {
+        var query = from("routing_preferences")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+        if let propertyId {
+            query = query.eq("property_id", value: propertyId.uuidString)
+        }
+        return try await query.execute().value
+    }
+
+    /// Phase 65: Upsert a category-level or template-level preference.
+    /// Uses the unique index (household, property, category, scope_type)
+    /// so re-calling with the same scope updates in place instead of
+    /// creating a second row.
+    @discardableResult
+    func upsertRoutingPreference(_ insert: RoutingPreferenceInsert) async throws -> RoutingPreferenceRow {
+        try await from("routing_preferences")
+            .upsert(insert, onConflict: "household_id,property_id,task_category,scope_type", returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Phase 65: Delete a single preference row. Used by the Settings
+    /// reset affordance.
+    func deleteRoutingPreference(id: UUID) async throws {
+        try await from("routing_preferences")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Phase 65: Stamp last_confirmed_at = now() across every preference
+    /// row in the household. Called when the user taps "All good" on the
+    /// annual re-confirm dashboard card.
+    func confirmAllRoutingPreferences(householdId: UUID, propertyId: UUID?) async throws {
+        struct ConfirmPayload: Encodable {
+            let lastConfirmedAt: String
+            enum CodingKeys: String, CodingKey {
+                case lastConfirmedAt = "last_confirmed_at"
+            }
+        }
+        let payload = ConfirmPayload(lastConfirmedAt: ISO8601DateFormatter().string(from: Date()))
+        var query = try from("routing_preferences")
+            .update(payload)
+            .eq("household_id", value: householdId.uuidString)
+        if let propertyId {
+            query = query.eq("property_id", value: propertyId.uuidString)
+        }
+        try await query.execute()
+    }
+
+    /// Phase 64: Set the assigned_route on a maintenance task AND keep
+    /// the handyman_punch_items surface in sync. Unifies Phase 54B's
+    /// punch list with the routing column — tasks with route='handyman'
+    /// materialize a punch item, and tasks routed away from handyman
+    /// archive the corresponding punch item.
+    ///
+    /// Returns the updated task row for caller convenience.
+    @discardableResult
+    func setTaskRoute(
+        taskId: UUID,
+        route: String?,
+        task: MaintenanceTaskDBRow? = nil
+    ) async throws -> MaintenanceTaskDBRow? {
+        // 1. Update the task's assigned_route.
+        var update = MaintenanceTaskUpdate()
+        update.assignedRoute = route
+        let updatedTask = try await updateMaintenanceTask(id: taskId, update)
+
+        // 2. Handyman punch-item synchronization.
+        let resolvedTask = task ?? updatedTask
+        let householdId = resolvedTask.householdId
+        if route == "handyman" {
+            // Materialize a punch item if there isn't one yet for this task.
+            let existing = try? await fetchPendingHandymanPunchItems(householdId: householdId)
+            let alreadyExists = existing?.contains { $0.maintenanceTaskId == taskId || $0.sourceTaskId == taskId } ?? false
+            if !alreadyExists {
+                var punch = HandymanPunchItemInsert(
+                    householdId: householdId,
+                    propertyId: resolvedTask.propertyId,
+                    title: resolvedTask.title
+                )
+                punch.description = resolvedTask.description
+                punch.source = "maintenance_task"
+                punch.sourceTaskId = taskId
+                punch.maintenanceTaskId = taskId
+                punch.notes = "Routed from the task list via the routing picker."
+                _ = try? await createHandymanPunchItem(punch)
+            }
+        } else {
+            // Archive any pending punch item tied to this task — the user
+            // chose a different route and we shouldn't leave stale items
+            // on the list.
+            if let existing = try? await fetchPendingHandymanPunchItems(householdId: householdId) {
+                for item in existing where (item.maintenanceTaskId == taskId || item.sourceTaskId == taskId) {
+                    try? await archiveHandymanPunchItem(id: item.id)
+                }
+            }
+        }
+        return updatedTask
+    }
+
+    /// Phase 54B: Fetch pending punch list items for a household — not
+    /// yet folded into a scheduled handyman visit and not archived.
+    /// Ordered by creation so oldest-added surfaces first (FIFO).
+    func fetchPendingHandymanPunchItems(householdId: UUID) async throws -> [HandymanPunchItemRow] {
+        try await from("handyman_punch_items")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .is("completed_at", value: nil)
+            .is("archived_at", value: nil)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    func createHandymanPunchItem(_ insert: HandymanPunchItemInsert) async throws -> HandymanPunchItemRow {
+        try await from("handyman_punch_items")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Phase 54B: Soft-delete a punch item (user tapped "Remove" or
+    /// "Not relevant"). Sets `archived_at` instead of DELETE so we keep
+    /// history for any future audit + undo affordance.
+    func archiveHandymanPunchItem(id: UUID) async throws {
+        struct ArchivePayload: Encodable {
+            let archivedAt: String
+            enum CodingKeys: String, CodingKey {
+                case archivedAt = "archived_at"
+            }
+        }
+        let payload = ArchivePayload(archivedAt: ISO8601DateFormatter().string(from: Date()))
+        try await from("handyman_punch_items")
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Phase 54B: Mark a batch of punch items complete + link them to
+    /// the handyman visit task they were rolled into. Called by
+    /// `HandymanPunchListView` after it creates the Handyman:spring /
+    /// Handyman:fall bundle task.
+    func completePunchItems(ids: [UUID], visitTaskId: UUID) async throws {
+        guard !ids.isEmpty else { return }
+        struct CompletePayload: Encodable {
+            let completedAt: String
+            let completedVisitTaskId: String
+            enum CodingKeys: String, CodingKey {
+                case completedAt = "completed_at"
+                case completedVisitTaskId = "completed_visit_task_id"
+            }
+        }
+        let payload = CompletePayload(
+            completedAt: ISO8601DateFormatter().string(from: Date()),
+            completedVisitTaskId: visitTaskId.uuidString
+        )
+        try await from("handyman_punch_items")
+            .update(payload)
+            .in("id", values: ids.map { $0.uuidString })
+            .execute()
+    }
+
+    // Phase 55.3: The Phase 54D household_cadences CRUD block and
+    // the Phase 55.2.9 cadence → routine write bridge were removed.
+    // Every writer now lives against `routines` directly via the
+    // block below. The `household_cadences` table stays in place on
+    // Supabase for rollback safety; a future Phase 55.4 drops it.
+
+    // MARK: - Routines (Phase 55)
+    //
+    // Unified recurring-event primitive replacing both household_cadences
+    // and standing_appointments. The old methods above remain during
+    // Section 55.1 so legacy views keep working; Section 55.2 repoints
+    // every reader and the old tables become read-only mirrors.
+
+    /// Phase 55: Fetches every active routine for a household, sorted by
+    /// label. Archived rows (archived_at IS NOT NULL) are excluded server-
+    /// side to match the Phase 51/54D pattern.
+    func fetchRoutines(householdId: UUID) async throws -> [RoutineRow] {
+        try await from("routines")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .is("archived_at", value: nil)
+            .order("label", ascending: true)
+            .execute()
+            .value
+    }
+
+    func fetchRoutine(id: UUID) async throws -> RoutineRow {
+        try await from("routines")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
+    func createRoutine(_ insert: RoutineInsert) async throws -> RoutineRow {
+        try await from("routines")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateRoutine(id: UUID, _ update: RoutineUpdate) async throws -> RoutineRow {
+        try await from("routines")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Phase 55: Soft-delete a routine via archived_at. The list
+    /// fetch filters on archived_at IS NULL so the row disappears
+    /// everywhere without losing history or cascading to visits.
+    func archiveRoutine(id: UUID) async throws {
+        var update = RoutineUpdate()
+        update.archivedAt = Date()
+        _ = try await updateRoutine(id: id, update)
+    }
+
+    /// Phase 55: Hard delete. Use when the user explicitly wants the
+    /// routine gone — cascades to routine_visits. Prefer archiveRoutine
+    /// for user-initiated removals from the list UI.
+    func deleteRoutine(id: UUID) async throws {
+        try await from("routines")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Phase 55: Per-visit instances attached to a routine. Mirrors
+    /// `fetchStandingAppointmentVisits` — returns every visit for a
+    /// routine, ordered by scheduled_date descending so the most recent
+    /// is first.
+    func fetchRoutineVisits(routineId: UUID) async throws -> [RoutineVisitRow] {
+        try await from("routine_visits")
+            .select()
+            .eq("routine_id", value: routineId.uuidString)
+            .order("scheduled_date", ascending: false)
+            .execute()
+            .value
+    }
+
+    // Phase 55.3: The 55.2.9 cadence → routine write bridge was
+    // removed alongside the legacy CadenceEditSheet. Native writers
+    // (RoutineEditSheet) go straight at `routines` via
+    // `createRoutine` / `updateRoutine` above.
+
+    // MARK: - Phase 66: Routines as first-class Services
+
+    /// Phase 66: Fetch routines filtered by scope + setup state. Used by
+    /// the Maintenance tab's Your Services section (scope='property',
+    /// setupState IN active/pending_vendor) and the Vehicles section
+    /// (scope='vehicle').
+    func fetchRoutinesByScope(
+        householdId: UUID,
+        scope: RoutineScope,
+        includingPaused: Bool = true
+    ) async throws -> [RoutineRow] {
+        var query = from("routines")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("scope", value: scope.rawValue)
+            .is("archived_at", value: nil)
+
+        if !includingPaused {
+            query = query.neq("setup_state", value: "archived")
+                .is("is_paused", value: false)
+        }
+
+        return try await query.order("label", ascending: true).execute().value
+    }
+
+    /// Phase 66: Fetch the singleton handyman routine for a property,
+    /// or nil if none exists yet. Day1TaskCurator + the Next Handyman
+    /// Visit section both call `fetchOrCreateHandymanRoutine` to lazy-
+    /// create on first access.
+    func fetchHandymanRoutine(
+        householdId: UUID,
+        propertyId: UUID
+    ) async throws -> RoutineRow? {
+        let rows: [RoutineRow] = try await from("routines")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("property_id", value: propertyId.uuidString)
+            .eq("routine_kind", value: RoutineKind.handymanRecurring.rawValue)
+            .eq("scope", value: RoutineScope.property.rawValue)
+            .is("archived_at", value: nil)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Phase 66: Return the existing handyman routine for a property, or
+    /// lazy-create a new one with `setup_state = 'active'`. Pre-filled
+    /// with the household's `preferredHandymanContractorId` when set so
+    /// the card renders with a vendor logo + "Schedule visit" CTA out of
+    /// the gate. Cadence is on-demand (uses customDays with a large
+    /// interval so `isActive(on:)` never fires — the visit happens when
+    /// enough work has accumulated, not on a calendar).
+    func fetchOrCreateHandymanRoutine(
+        householdId: UUID,
+        propertyId: UUID,
+        preferredHandymanContractorId: UUID? = nil
+    ) async throws -> RoutineRow {
+        if let existing = try await fetchHandymanRoutine(
+            householdId: householdId, propertyId: propertyId
+        ) {
+            return existing
+        }
+
+        var insert = RoutineInsert(
+            householdId: householdId,
+            propertyId: propertyId,
+            label: "Next handyman visit",
+            routineKind: RoutineKind.handymanRecurring.rawValue,
+            cadenceType: RoutineCadenceType.customDays.rawValue
+        )
+        insert.cadenceIntervalDays = 9999  // Effectively on-demand
+        insert.vendorId = preferredHandymanContractorId
+        insert.icon = "wrench.adjustable.fill"
+        insert.setupState = "active"
+        return try await createRoutine(insert)
+    }
+
+    /// Phase 66: Routines in the Your Services list where the user wants
+    /// Haven to find them a vendor. Rendered with a "Haven helping" tag.
+    func fetchPendingVendorRoutines(
+        householdId: UUID,
+        propertyId: UUID
+    ) async throws -> [RoutineRow] {
+        try await from("routines")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("property_id", value: propertyId.uuidString)
+            .eq("setup_state", value: "pending_vendor")
+            .is("archived_at", value: nil)
+            .order("label", ascending: true)
+            .execute()
+            .value
+    }
+
+    /// Phase 66: Fetch the active routine for a specific vehicle, if any.
+    /// Uses the partial unique index so we know there's at most one row.
+    func fetchVehicleRoutine(vehicleId: UUID) async throws -> RoutineRow? {
+        let rows: [RoutineRow] = try await from("routines")
+            .select()
+            .eq("vehicle_id", value: vehicleId.uuidString)
+            .eq("scope", value: RoutineScope.vehicle.rawValue)
+            .is("archived_at", value: nil)
+            .in("setup_state", values: ["draft", "pending_vendor", "active", "paused"])
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Phase 66: All vehicle routines in the household. Used by the
+    /// Maintenance tab's Vehicles section to render one summary card per
+    /// vehicle (vehicles without a routine show an empty-state card).
+    func fetchVehicleRoutines(householdId: UUID) async throws -> [RoutineRow] {
+        try await fetchRoutinesByScope(householdId: householdId, scope: .vehicle)
+    }
+
+    /// Phase 66: Create a vehicle-scoped routine. Defaults to shop-managed
+    /// mode since HNW users typically drop the car at the dealer and want
+    /// the individual service items to hide under the shop.
+    func createVehicleRoutine(
+        vehicle: VehicleRow,
+        householdId: UUID,
+        shopContractorId: UUID?,
+        programMode: RoutineProgramMode = .shopManaged,
+        notes: String? = nil
+    ) async throws -> RoutineRow {
+        let label: String = {
+            let make = vehicle.make ?? "Vehicle"
+            let model = vehicle.model ?? ""
+            return "\(make) \(model) service".trimmingCharacters(in: .whitespaces)
+        }()
+        var insert = RoutineInsert(
+            householdId: householdId,
+            propertyId: nil,
+            label: label,
+            routineKind: RoutineKind.otherService.rawValue,
+            cadenceType: RoutineCadenceType.customDays.rawValue
+        )
+        insert.cadenceIntervalDays = 9999  // Vehicle cadence is mileage-driven
+        insert.vendorId = shopContractorId
+        insert.icon = "car.fill"
+        insert.scope = RoutineScope.vehicle.rawValue
+        insert.vehicleId = vehicle.id
+        insert.programMode = programMode.rawValue
+        insert.setupState = shopContractorId != nil ? "active" : "pending_vendor"
+        insert.notes = notes
+        return try await createRoutine(insert)
+    }
+
+    // MARK: - Phase 66: Routine visits write path
+
+    /// Phase 66: Create a routine_visits row with the new visit_state
+    /// machine. Use `visitState: "scheduled"` when the user confirms a
+    /// date, "planned" for a bucket that exists but hasn't been scheduled.
+    func createRoutineVisit(_ insert: RoutineVisitInsert) async throws -> RoutineVisitRow {
+        try await from("routine_visits")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateRoutineVisit(id: UUID, _ update: RoutineVisitUpdate) async throws -> RoutineVisitRow {
+        try await from("routine_visits")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Phase 66: Fetch active visits (planned/scheduled/in_progress) for
+    /// a specific routine. Powers the RoutineDetailView's upcoming-visits
+    /// list and the Maintenance tab's "Upcoming Scheduled" section.
+    func fetchActiveRoutineVisits(routineId: UUID) async throws -> [RoutineVisitRow] {
+        try await from("routine_visits")
+            .select()
+            .eq("routine_id", value: routineId.uuidString)
+            .in("visit_state", values: ["planned", "scheduled", "in_progress"])
+            .order("scheduled_date", ascending: true)
+            .execute()
+            .value
+    }
+
+    /// Phase 66: Fetch every scheduled-or-in-progress visit across all
+    /// routines for a household. Powers the "Upcoming Scheduled" section
+    /// on the Maintenance tab in one DB round-trip instead of N+1.
+    func fetchScheduledVisitsForHousehold(householdId: UUID) async throws -> [RoutineVisitRow] {
+        // routine_visits doesn't carry household_id directly, so join via
+        // routines. Supabase PostgREST embeds: select routine_visits with
+        // routines joined, then filter on routines.household_id.
+        struct VisitWithRoutine: Codable {
+            let id: UUID
+            let routineId: UUID
+            let scheduledDate: String
+            let status: String
+            let visitState: String?
+            let targetWindowStart: String?
+            let targetWindowEnd: String?
+            let actualCostCents: Int?
+            let notes: String?
+            let confirmedAt: Date?
+            let confirmedBy: String?
+            let createdAt: Date
+            enum CodingKeys: String, CodingKey {
+                case id, status, notes
+                case routineId = "routine_id"
+                case scheduledDate = "scheduled_date"
+                case visitState = "visit_state"
+                case targetWindowStart = "target_window_start"
+                case targetWindowEnd = "target_window_end"
+                case actualCostCents = "actual_cost_cents"
+                case confirmedAt = "confirmed_at"
+                case confirmedBy = "confirmed_by"
+                case createdAt = "created_at"
+            }
+        }
+        // Phase 66: route through the existing active-visits path per
+        // routine; household-wide aggregation happens client-side because
+        // RLS + PostgREST embedded filtering is finicky with the routines
+        // FK. At ~5-20 routines per household this is fine.
+        let routines = try await fetchRoutines(householdId: householdId)
+        var all: [RoutineVisitRow] = []
+        for routine in routines {
+            let visits = (try? await fetchActiveRoutineVisits(routineId: routine.id)) ?? []
+            all.append(contentsOf: visits)
+        }
+        return all.sorted { $0.scheduledDate < $1.scheduledDate }
+    }
+
+    // MARK: - Phase 66: Task ↔ routine linking
+
+    /// Phase 66: Fetch every task whose parent_routine_id = the given
+    /// routine. Used by RoutineDetailView and NextHandymanVisitSection
+    /// to render the "What's included" list. Filters archived.
+    func fetchTasksForRoutine(routineId: UUID) async throws -> [MaintenanceTaskDBRow] {
+        try await from("maintenance_tasks")
+            .select()
+            .eq("parent_routine_id", value: routineId.uuidString)
+            .or("is_archived.is.null,is_archived.eq.false")
+            .execute()
+            .value
+    }
+
+    /// Phase 66: Promote a DIY-default or `.either` task to the handyman
+    /// routine. Used by the routing picker's "Add to handyman list"
+    /// action. Creates the handyman routine lazily on first call.
+    func assignTaskToHandymanRoutine(
+        task: MaintenanceTaskDBRow,
+        preferredHandymanContractorId: UUID? = nil
+    ) async throws -> RoutineRow {
+        guard let propertyId = task.propertyId else {
+            throw NSError(
+                domain: "DatabaseService",
+                code: 66,
+                userInfo: [NSLocalizedDescriptionKey: "Task has no property — can't route to handyman"]
+            )
+        }
+        let routine = try await fetchOrCreateHandymanRoutine(
+            householdId: task.householdId,
+            propertyId: propertyId,
+            preferredHandymanContractorId: preferredHandymanContractorId
+        )
+        var update = MaintenanceTaskUpdate()
+        update.parentRoutineId = routine.id
+        update.assignedRoute = "handyman"
+        _ = try await updateMaintenanceTask(id: task.id, update)
+        return routine
+    }
+
+    // MARK: - Dismissed Recommendations (Phase 54C)
+
+    /// Phase 54C: Returns the set of template ids the household has
+    /// explicitly tapped "Hide" on in the Recommended for your home
+    /// view. The set drives the filter that keeps dismissed items out
+    /// of the browsing surface.
+    func fetchDismissedRecommendations(householdId: UUID) async throws -> Set<String> {
+        struct Row: Decodable {
+            let templateId: String
+            enum CodingKeys: String, CodingKey { case templateId = "template_id" }
+        }
+        let rows: [Row] = try await from("dismissed_recommendations")
+            .select("template_id")
+            .eq("household_id", value: householdId.uuidString)
+            .execute()
+            .value
+        return Set(rows.map(\.templateId))
+    }
+
+    func dismissRecommendation(householdId: UUID, templateId: String, userId: UUID?) async throws {
+        struct InsertPayload: Encodable {
+            let householdId: String
+            let templateId: String
+            let dismissedByUserId: String?
+            enum CodingKeys: String, CodingKey {
+                case householdId = "household_id"
+                case templateId = "template_id"
+                case dismissedByUserId = "dismissed_by_user_id"
+            }
+        }
+        let payload = InsertPayload(
+            householdId: householdId.uuidString,
+            templateId: templateId,
+            dismissedByUserId: userId?.uuidString
+        )
+        try await from("dismissed_recommendations")
+            .upsert(payload, onConflict: "household_id,template_id")
+            .execute()
+    }
+
+    func resetDismissedRecommendations(householdId: UUID) async throws {
+        try await from("dismissed_recommendations")
+            .delete()
+            .eq("household_id", value: householdId.uuidString)
             .execute()
     }
 
@@ -1618,12 +2299,44 @@ final class DatabaseService {
         return result.invitation
     }
 
-    /// Accept an invitation — link user to household
-    func acceptInvitation(invitationId: UUID, userId: UUID) async throws {
+    /// Accept an invitation — flip the invitation row to accepted and,
+    /// when the invitation carries a `family_member_id`, stamp the
+    /// accepting user onto that family_member row so their name, role,
+    /// and task assignments all resolve back to the record the
+    /// homeowner already typed in. Without this link the accepting
+    /// user shows up as "Member" in task assignment and the dashboard
+    /// greeting falls back to the household's Primary Client (i.e.
+    /// the inviter's name).
+    ///
+    /// The family_member update is done second and tolerates failure —
+    /// if RLS or a row mismatch blocks the write, the invitation is
+    /// still accepted and the user still joins the household; they'll
+    /// just need a manual profile link later. Failing the whole accept
+    /// over a secondary write would be worse than a recoverable profile
+    /// gap.
+    func acceptInvitation(
+        invitationId: UUID,
+        userId: UUID,
+        familyMemberId: UUID? = nil
+    ) async throws {
         try await from("household_invitations")
-            .update(["status": "accepted", "accepted_at": ISO8601DateFormatter().string(from: Date()), "accepted_by": userId.uuidString])
+            .update([
+                "status": "accepted",
+                "accepted_at": ISO8601DateFormatter().string(from: Date()),
+                "accepted_by": userId.uuidString,
+            ])
             .eq("id", value: invitationId.uuidString)
             .execute()
+
+        if let memberId = familyMemberId {
+            do {
+                var update = FamilyMemberUpdate()
+                update.linkedUserId = userId
+                _ = try await updateFamilyMember(id: memberId, update)
+            } catch {
+                print("[Invites] acceptInvitation: family_member link write failed (invitation still accepted): \(error)")
+            }
+        }
     }
 
     /// Look up invitation by invite code
@@ -1666,6 +2379,19 @@ final class DatabaseService {
         var query = from("service_contracts").select()
         if let propertyId { query = query.eq("property_id", value: propertyId.uuidString) }
         return try await query.order("created_at", ascending: false).execute().value
+    }
+
+    /// Phase 59: fetch service contracts scoped to a specific contractor —
+    /// used by ContractorDetailView to surface the standing service
+    /// relationships (HVAC plan, monitoring subscription, snow plow
+    /// contract, salt delivery subscription) that define the vendor.
+    func fetchServiceContracts(contractorId: UUID) async throws -> [ServiceContractRow] {
+        try await from("service_contracts")
+            .select()
+            .eq("contractor_id", value: contractorId.uuidString)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
     }
 
     func createServiceContract(_ contract: ServiceContractInsert) async throws -> ServiceContractRow {
@@ -2685,5 +3411,172 @@ final class DatabaseService {
             .single()
             .execute()
             .value
+    }
+
+    // MARK: - Standing Appointments (Phase 51)
+
+    func fetchStandingAppointments(householdId: UUID, includeArchived: Bool = false) async throws -> [StandingAppointmentRow] {
+        var query = from("standing_appointments")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+        if !includeArchived {
+            query = query.is("archived_at", value: nil)
+        }
+        return try await query
+            .order("next_expected_date")
+            .execute()
+            .value
+    }
+
+    func fetchStandingAppointment(id: UUID) async throws -> StandingAppointmentRow {
+        try await from("standing_appointments")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
+    func fetchStandingAppointmentsForVendor(vendorId: UUID) async throws -> [StandingAppointmentRow] {
+        try await from("standing_appointments")
+            .select()
+            .eq("vendor_id", value: vendorId.uuidString)
+            .is("archived_at", value: nil)
+            .order("next_expected_date")
+            .execute()
+            .value
+    }
+
+    func createStandingAppointment(_ appointment: StandingAppointmentInsert) async throws -> StandingAppointmentRow {
+        try await from("standing_appointments")
+            .insert(appointment)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateStandingAppointment(id: UUID, _ updates: StandingAppointmentUpdate) async throws -> StandingAppointmentRow {
+        try await from("standing_appointments")
+            .update(updates)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    // MARK: - Standing Appointment Visits (Phase 51)
+
+    func fetchVisits(appointmentId: UUID, limit: Int = 20) async throws -> [StandingAppointmentVisitRow] {
+        try await from("standing_appointment_visits")
+            .select()
+            .eq("standing_appointment_id", value: appointmentId.uuidString)
+            .order("scheduled_date", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
+    func fetchUpcomingVisit(appointmentId: UUID) async throws -> StandingAppointmentVisitRow? {
+        let rows: [StandingAppointmentVisitRow] = try await from("standing_appointment_visits")
+            .select()
+            .eq("standing_appointment_id", value: appointmentId.uuidString)
+            .eq("status", value: "upcoming")
+            .order("scheduled_date")
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func fetchMostRecentPastVisit(appointmentId: UUID) async throws -> StandingAppointmentVisitRow? {
+        let rows: [StandingAppointmentVisitRow] = try await from("standing_appointment_visits")
+            .select()
+            .eq("standing_appointment_id", value: appointmentId.uuidString)
+            .neq("status", value: "upcoming")
+            .order("scheduled_date", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func createVisit(_ visit: StandingAppointmentVisitInsert) async throws -> StandingAppointmentVisitRow {
+        try await from("standing_appointment_visits")
+            .insert(visit)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateVisit(id: UUID, _ updates: StandingAppointmentVisitUpdate) async throws -> StandingAppointmentVisitRow {
+        try await from("standing_appointment_visits")
+            .update(updates)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Count consecutive assumed visits without a confirmed visit in between.
+    func countConsecutiveAssumedVisits(appointmentId: UUID) async throws -> Int {
+        let visits: [StandingAppointmentVisitRow] = try await from("standing_appointment_visits")
+            .select()
+            .eq("standing_appointment_id", value: appointmentId.uuidString)
+            .order("scheduled_date", ascending: false)
+            .limit(10)
+            .execute()
+            .value
+        var count = 0
+        for visit in visits {
+            if visit.status == "assumed" { count += 1 }
+            else if visit.status == "confirmed" { break }
+            else { continue } // skip upcoming/skipped
+        }
+        return count
+    }
+
+    // MARK: - Category Cadence Defaults (Phase 51)
+
+    func fetchCategoryCadenceDefaults() async throws -> [CategoryCadenceDefaultRow] {
+        try await from("category_cadence_defaults")
+            .select()
+            .execute()
+            .value
+    }
+
+    func fetchCadenceDefault(category: String) async throws -> CategoryCadenceDefaultRow? {
+        let rows: [CategoryCadenceDefaultRow] = try await from("category_cadence_defaults")
+            .select()
+            .eq("category_key", value: category)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    // MARK: - Dismissed Specialty Suggestions (Phase 52b)
+
+    /// Record a dismissed specialty system suggestion so the server
+    /// doesn't re-suggest the same category for this household.
+    func dismissSpecialtySuggestion(householdId: UUID, category: String, evidence: String) async throws {
+        struct Insert: Codable {
+            let householdId: UUID
+            let category: String
+            let evidence: String
+
+            enum CodingKeys: String, CodingKey {
+                case householdId = "household_id"
+                case category
+                case evidence
+            }
+        }
+
+        try await from("household_dismissed_suggestions")
+            .insert(Insert(householdId: householdId, category: category, evidence: evidence))
+            .execute()
     }
 }

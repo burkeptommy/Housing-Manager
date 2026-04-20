@@ -12,12 +12,31 @@ struct HouseholdRow: Codable, Identifiable {
     let createdAt: Date?
     let subscriptionTier: String?
     let subscriptionExpiresAt: Date?
+    /// Phase 63: FK to the household's preferred handyman contractor.
+    /// Null when the household hasn't captured one (either because they
+    /// prefer DIY or they need help finding one — the preference string
+    /// lives in `properties.attributes.handyman_preference`).
+    let preferredHandymanContractorId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id, name
         case createdAt = "created_at"
         case subscriptionTier = "subscription_tier"
         case subscriptionExpiresAt = "subscription_expires_at"
+        case preferredHandymanContractorId = "preferred_handyman_contractor_id"
+    }
+
+    /// Resilient decoder (CLAUDE.md requirement for externally-fed structs).
+    /// Pre-Phase-63 rows won't have the preferred_handyman_contractor_id
+    /// column, so we decodeIfPresent and fall back to nil.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        subscriptionTier = try? c.decodeIfPresent(String.self, forKey: .subscriptionTier)
+        subscriptionExpiresAt = try? c.decodeIfPresent(Date.self, forKey: .subscriptionExpiresAt)
+        preferredHandymanContractorId = try? c.decodeIfPresent(UUID.self, forKey: .preferredHandymanContractorId)
     }
 }
 
@@ -35,11 +54,13 @@ struct HouseholdUpdate: Codable {
     var name: String?
     var subscriptionTier: String?
     var subscriptionExpiresAt: Date?
+    var preferredHandymanContractorId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case name
         case subscriptionTier = "subscription_tier"
         case subscriptionExpiresAt = "subscription_expires_at"
+        case preferredHandymanContractorId = "preferred_handyman_contractor_id"
     }
 }
 
@@ -287,6 +308,24 @@ struct DocumentRow: Codable, Identifiable {
     /// estate / legal / financial / medical categories default to false
     /// via `DocumentAccessDefaults.visibleToHomeManagers(for:)`.
     let visibleToHomeManagers: Bool?
+    /// Phase 58: optional direct link to the vendor this document relates
+    /// to. Populated by `process-invoice` + `receive-email` when the
+    /// extracted/sender vendor matches an existing contractor, or set
+    /// explicitly when uploading from a vendor-context entry point.
+    let contractorId: UUID?
+    /// Phase 59: total amount extracted by process-invoice. Drives the
+    /// vendor detail spend hero.
+    let invoiceAmount: Double?
+    /// Phase 59: service / bill date extracted by process-invoice.
+    /// Format: "yyyy-MM-dd".
+    let invoiceDate: String?
+    /// Phase 59: invoice number from the bill header.
+    let invoiceNumber: String?
+    /// Phase 59: extracted line items (JSONB array).
+    let invoiceLineItems: [InvoiceLineItem]?
+    /// Phase 59: "high" | "medium" | "low" | "ambiguous" — tier of the
+    /// vendor match. Drives the auto-file vs inbox-fallback branch.
+    let vendorMatchConfidence: String?
 
     /// Convenience accessor that defaults to `true` when the column is nil
     /// (legacy rows from before build 87, or rows decoded without the
@@ -320,6 +359,12 @@ struct DocumentRow: Codable, Identifiable {
         case deletedAt = "deleted_at"
         case linkedAttorneyContactId = "linked_attorney_contact_id"
         case visibleToHomeManagers = "visible_to_home_managers"
+        case contractorId = "contractor_id"
+        case invoiceAmount = "invoice_amount"
+        case invoiceDate = "invoice_date"
+        case invoiceNumber = "invoice_number"
+        case invoiceLineItems = "invoice_line_items"
+        case vendorMatchConfidence = "vendor_match_confidence"
     }
 }
 
@@ -388,6 +433,18 @@ struct DocumentInsert: Codable {
     /// that haven't been updated still compile, but every iOS path should
     /// pass an explicit value.
     var visibleToHomeManagers: Bool?
+    /// Phase 58: optional vendor link. Set when uploading from a vendor
+    /// context (ContractorDetailView "Add a bill"), or populated later by
+    /// `process-invoice` / `receive-email` when a match is detected.
+    var contractorId: UUID?
+    /// Phase 59: invoice metadata set by process-invoice after extraction.
+    /// Callers usually leave these nil on initial insert — the edge function
+    /// writes them back.
+    var invoiceAmount: Double?
+    var invoiceDate: String?
+    var invoiceNumber: String?
+    var invoiceLineItems: [InvoiceLineItem]?
+    var vendorMatchConfidence: String?
 
     enum CodingKeys: String, CodingKey {
         case title, category, status, notes, tags
@@ -403,6 +460,12 @@ struct DocumentInsert: Codable {
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case visibleToHomeManagers = "visible_to_home_managers"
+        case contractorId = "contractor_id"
+        case invoiceAmount = "invoice_amount"
+        case invoiceDate = "invoice_date"
+        case invoiceNumber = "invoice_number"
+        case invoiceLineItems = "invoice_line_items"
+        case vendorMatchConfidence = "vendor_match_confidence"
     }
 }
 
@@ -433,6 +496,17 @@ struct DocumentUpdate: Codable {
     /// Build 87 (Home Manager expansion): toggled per-document via the
     /// Access pill in `DocumentDetailView` → `DocumentAccessSheet`.
     var visibleToHomeManagers: Bool?
+    /// Phase 58: link/unlink a document to a vendor. Usually set
+    /// automatically by the invoice or email pipelines, but can be edited
+    /// manually via the document detail view.
+    var contractorId: UUID?
+    /// Phase 59: invoice metadata. Usually set by process-invoice but
+    /// editable via document detail for user corrections.
+    var invoiceAmount: Double?
+    var invoiceDate: String?
+    var invoiceNumber: String?
+    var invoiceLineItems: [InvoiceLineItem]?
+    var vendorMatchConfidence: String?
 
     enum CodingKeys: String, CodingKey {
         case title, category, status, notes, tags, metadata
@@ -453,6 +527,12 @@ struct DocumentUpdate: Codable {
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case visibleToHomeManagers = "visible_to_home_managers"
+        case contractorId = "contractor_id"
+        case invoiceAmount = "invoice_amount"
+        case invoiceDate = "invoice_date"
+        case invoiceNumber = "invoice_number"
+        case invoiceLineItems = "invoice_line_items"
+        case vendorMatchConfidence = "vendor_match_confidence"
     }
 }
 
@@ -1120,6 +1200,10 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     /// pre-migration responses still decode cleanly.
     let isArchived: Bool?
     let archivedAt: Date?
+    /// Phase 61: Human-readable archive reason (e.g. `subtype_mismatch:HVAC:ducted`,
+    /// `backfilled_to_bundle:Generator:annual`, `template_retired_p61:<templateKey>`).
+    /// Surfaced in the LegacyTasksView so users can see WHY Haven tidied a task.
+    let archivedReason: String?
     /// Phase 19k: How the task should be presented in the UI.
     /// "personal" → user does it themselves (default for DIY tasks)
     /// "vendor"   → a contractor handles the work, user just confirms/schedules
@@ -1131,6 +1215,25 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     let needsVendor: Bool?
     /// Phase 51: Links this task to a standing appointment for recurring vendor visits.
     let standingAppointmentId: UUID?
+    /// Phase 64: Persisted routing decision — "vendor" | "handyman" | "diy"
+    /// | nil. nil means the TaskRoutingPicker should surface (no
+    /// preference resolved yet). Complements `assignmentType` by tracking
+    /// the user's explicit choice separately from the template default.
+    let assignedRoute: String?
+    /// Phase 66: Links a task to a Routine (active vendor service, pending-
+    /// vendor routine, or the singleton handyman routine). When set on an
+    /// `assignmentType = 'vendor'` task, the task hides from the primary
+    /// "This Season" list and renders under its parent routine instead.
+    /// DIY-default tasks CAN also have parent_routine_id set (to the
+    /// handyman routine) — they hide from This Season but surface under
+    /// "Next Handyman Visit."
+    let parentRoutineId: UUID?
+    /// Phase 66: Runtime bundle grouping. When the RoutineGroupingEngine
+    /// creates a bundle parent task, each child row gets its
+    /// `bundle_parent_task_id` set to the parent's id. Promotes the Phase
+    /// 54A template-time `bundleId` pattern to runtime — existing bundles
+    /// continue to work via `templateId` matching, new ones use this FK.
+    let bundleParentTaskId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -1155,9 +1258,13 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case scheduledDate = "scheduled_date"
         case isArchived = "is_archived"
         case archivedAt = "archived_at"
+        case archivedReason = "archived_reason"
         case assignmentType = "assignment_type"
         case needsVendor = "needs_vendor"
         case standingAppointmentId = "standing_appointment_id"
+        case assignedRoute = "assigned_route"
+        case parentRoutineId = "parent_routine_id"
+        case bundleParentTaskId = "bundle_parent_task_id"
     }
 
     /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
@@ -1206,9 +1313,13 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             scheduledDate: nil,
             isArchived: nil,
             archivedAt: nil,
+            archivedReason: nil,
             assignmentType: nil,
             needsVendor: nil,
-            standingAppointmentId: nil
+            standingAppointmentId: nil,
+            assignedRoute: nil,
+            parentRoutineId: nil,
+            bundleParentTaskId: nil
         )
     }
 
@@ -1248,9 +1359,13 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             scheduledDate: nil,
             isArchived: nil,
             archivedAt: nil,
+            archivedReason: nil,
             assignmentType: nil,
             needsVendor: nil,
-            standingAppointmentId: nil
+            standingAppointmentId: nil,
+            assignedRoute: nil,
+            parentRoutineId: nil,
+            bundleParentTaskId: nil
         )
     }
 }
@@ -1285,6 +1400,16 @@ struct MaintenanceTaskInsert: Codable {
     var scheduledDate: String?
     /// Phase 51: Links to a standing appointment for recurring vendor visits.
     var standingAppointmentId: UUID?
+    /// Phase 64: Persisted routing choice — "vendor" | "handyman" | "diy".
+    var assignedRoute: String?
+    /// Phase 66: Link to parent routine at creation time. Set by
+    /// Day1TaskCurator and RoutineGroupingEngine when a task is routed to
+    /// a vendor routine / pending-vendor routine / handyman routine.
+    var parentRoutineId: UUID?
+    /// Phase 66: Link to bundle parent task at creation time. Set by
+    /// RoutineGroupingEngine when a child row is created under a bundle
+    /// parent. Parent rows leave this nil.
+    var bundleParentTaskId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1308,6 +1433,9 @@ struct MaintenanceTaskInsert: Codable {
         case needsVendor = "needs_vendor"
         case standingAppointmentId = "standing_appointment_id"
         case scheduledDate = "scheduled_date"
+        case assignedRoute = "assigned_route"
+        case parentRoutineId = "parent_routine_id"
+        case bundleParentTaskId = "bundle_parent_task_id"
     }
 }
 
@@ -1336,6 +1464,17 @@ struct MaintenanceTaskUpdate: Codable {
     var needsVendor: Bool?
     /// Phase 51: Links to a standing appointment for recurring vendor visits.
     var standingAppointmentId: UUID?
+    /// Phase 64: Persisted routing choice — "vendor" | "handyman" | "diy" | nil.
+    var assignedRoute: String?
+    /// Phase 66: Link / unlink from a routine. Set by the curator when
+    /// pulling a task out of the handyman visit ("I'll actually do this
+    /// myself"), or by routine activation when matching tasks should be
+    /// grouped under a vendor routine.
+    var parentRoutineId: UUID?
+    /// Phase 66: Link / unlink from a bundle parent row. Runtime bundle
+    /// rearrangement uses this to re-parent a task when the user promotes
+    /// a bundle member to a standalone task.
+    var bundleParentTaskId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1354,6 +1493,9 @@ struct MaintenanceTaskUpdate: Codable {
         case assignmentType = "assignment_type"
         case needsVendor = "needs_vendor"
         case standingAppointmentId = "standing_appointment_id"
+        case assignedRoute = "assigned_route"
+        case parentRoutineId = "parent_routine_id"
+        case bundleParentTaskId = "bundle_parent_task_id"
     }
 }
 

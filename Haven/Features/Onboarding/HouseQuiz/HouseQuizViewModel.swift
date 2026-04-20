@@ -2,8 +2,18 @@ import SwiftUI
 
 @MainActor
 final class HouseQuizViewModel: ObservableObject {
-    let property: PropertyRow
+    /// Phase 60.1: made `@Published` (was `let`) so edits from the new
+    /// `PropertyRecapCard` on the first quiz screen write back through and
+    /// every downstream reader (Q4 prefill, ATTOM-source caption, etc.)
+    /// sees the corrected value immediately without a view rebuild.
+    @Published var property: PropertyRow
     let allQuestions: [HouseQuizQuestion]
+
+    /// Phase 60.1: Home systems detected at property-creation time. Powers
+    /// the "What we detected at your home" list inside the new
+    /// `PropertyRecapCard`. Loaded once on init and refreshed if the view
+    /// re-enters.
+    @Published var detectedSystems: [HomeSystemRow] = []
 
     @Published var state: HouseQuizState
     @Published var currentIndex: Int = 0
@@ -33,6 +43,13 @@ final class HouseQuizViewModel: ObservableObject {
     /// summary. Defaults to `false` so an unfinished quiz never shows stale
     /// numbers.
     @Published var finalReconciliationDidRun: Bool = false
+
+    /// Build 90 fix: handle to the detached completion-time reconciler so
+    /// `loadFinaleTotals()` can await it. Without this the cinematic reveal
+    /// renders before the reconciler writes home_systems / contractors /
+    /// maintenance_tasks rows, and the user sees "$0 protection / 0 tasks
+    /// scheduled / 2 vendors" instead of their actual numbers.
+    private var finalReconcileTask: Task<Void, Never>?
 
     /// Phase 16c — when the user picks an auto carrier that also offers home
     /// insurance (per `bundles_with_home`), we stash the row here so the q27
@@ -69,6 +86,236 @@ final class HouseQuizViewModel: ObservableObject {
     /// resolves; views should fail open and render the spouse / kids form
     /// when the cache hasn't loaded yet.
     @Published var existingFamilyMembers: [FamilyMemberRow] = []
+
+    // MARK: - Phase 60.3: protection meter + chapter state
+
+    /// Phase 60.3: Running total of 10-year protection value the user has
+    /// locked in so far. Accretes per answer according to the delta table
+    /// in `HouseQuizValueMeter`. Starts at $0 on Q1; lands near
+    /// `OnboardingScheduleGenerator.computeValueProtection(from:)` at
+    /// the last question.
+    @Published private(set) var protectedValue: Double = 0
+
+    /// Phase 60.3: Set of chapters the user has already seen the intro
+    /// card for in the current session. Prevents the card from re-firing
+    /// between every question within the same chapter.
+    @Published var shownChapterIntros: Set<HouseQuizChapter> = []
+
+    /// Phase 60.3: Accumulating payload describing questions that were
+    /// auto-skipped since the last user-visible question render. The
+    /// view reads this to show a small toast so the jump never feels
+    /// silent, then clears it on dismiss.
+    @Published var pendingSkipToast: SkipToastPayload?
+
+    /// Phase 60.3: Reasons the quiz can skip a question — drives the
+    /// toast message so the user gets a plain-English explanation.
+    enum SkipReason: Equatable {
+        case attomKnowsIt
+        case previousAnswerMakesItIrrelevant
+        case chipNotApplicable
+    }
+
+    struct SkipToastPayload: Equatable {
+        var skippedCount: Int
+        var reason: SkipReason
+        var message: String {
+            let n = skippedCount
+            let questions = n == 1 ? "question" : "questions"
+            switch reason {
+            case .attomKnowsIt:
+                return "Skipped \(n) \(questions) — your property records already cover this."
+            case .previousAnswerMakesItIrrelevant:
+                return "Skipped \(n) \(questions) based on your earlier answers."
+            case .chipNotApplicable:
+                return "Skipped \(n) \(questions) that didn't apply to your home."
+            }
+        }
+    }
+
+    /// Phase 60.3: The chapter containing the current question. Defaults
+    /// to `.yourHome` when `currentQuestion` is nil (end of quiz / between
+    /// screens).
+    var currentChapter: HouseQuizChapter {
+        currentQuestion?.chapter ?? .yourHome
+    }
+
+    /// Phase 60.3: Count of questions in the given chapter across the
+    /// entire library (including any dynamically-skippable ones — the
+    /// chapter progress pill shows worst-case count so the N/M ratio
+    /// doesn't rearrange mid-chapter).
+    func questionsInChapter(_ chapter: HouseQuizChapter) -> Int {
+        HouseQuizQuestionLibrary.questions(in: chapter).count
+    }
+
+    /// Phase 60.3: 1-indexed position of the current question within its
+    /// chapter. Returns 0 when `currentQuestion` is nil.
+    func positionInCurrentChapter() -> Int {
+        guard let current = currentQuestion else { return 0 }
+        let qs = HouseQuizQuestionLibrary.questions(in: current.chapter)
+        return (qs.firstIndex(where: { $0.id == current.id }) ?? 0) + 1
+    }
+
+    /// Phase 60.3: Approximate protection value the user is about to
+    /// unlock in the upcoming chapter. Shown in the chapter intro card so
+    /// users see the reward before they commit to the work.
+    func expectedValueForChapter(_ chapter: HouseQuizChapter) -> Double {
+        HouseQuizValueMeter.expectedValueForChapter(chapter, property: property)
+    }
+
+    // MARK: - Phase 60.4: personalization tokens
+
+    /// Phase 60.4: Token bundle for personalized question titles. Built
+    /// from the `PropertyRow` (ATTOM-enriched) + the captured roof
+    /// answer. Passed into `HouseQuizQuestion.personalizedTitle(using:)`
+    /// at render time so titles read as "Your 1987 Putnam Park roof —
+    /// what's on top?" instead of "What's your roof made of?" whenever
+    /// ATTOM has the data to ground the question.
+    var propertyFactBundle: PropertyFactBundle {
+        let roofAnswer = state.answers["q1_roof_material"]?.answerId
+        return PropertyFactBundle(property: property, roofAnswerId: roofAnswer)
+    }
+
+    // MARK: - Phase 60.5: end-of-quiz finale totals
+
+    /// Phase 60.5: Counts + examples for the cinematic reveal + summary.
+    /// Populated asynchronously by `loadFinaleTotals()` the moment the
+    /// completion view renders. `hasLoaded` gates the summary's render
+    /// so the user doesn't flash "0 vendors on file" for the half-
+    /// second it takes the contractors fetch to resolve.
+    @Published private(set) var finaleTotals: QuizFinaleTotals = .empty
+
+    /// Phase 60.5: Fetch fresh counts of contractors + home systems,
+    /// merge with `reconciliationTotals.added` (tasks added this quiz
+    /// session), compute the projected protection value, and publish
+    /// the result to `finaleTotals`. Idempotent — the completion view
+    /// calls this in `.task` and we guard against re-firing via
+    /// `finaleTotals.hasLoaded`.
+    func loadFinaleTotals() async {
+        guard !finaleTotals.hasLoaded else { return }
+
+        // Build 90 fix: wait for the detached completion reconciler before
+        // reading any counts. Without this we render "$0 / 0 tasks /
+        // 2 vendors" because the reconciler's writes haven't landed yet.
+        // `finalReconcileTask` is non-nil whenever `state.completedAt`
+        // flipped during this session.
+        await finalReconcileTask?.value
+
+        var totals = QuizFinaleTotals()
+        totals.hasLoaded = true
+
+        // Build 90 fix: refresh the property from DB so any AVM that
+        // ATTOM populated AFTER quiz init lands in `currentEstimatedValue`
+        // for the projection below. The in-memory `property` is the
+        // snapshot that was passed in at quiz start; address-hook
+        // enrichment may have written newer values since.
+        if let fresh = try? await db.fetchProperty(id: property.id) {
+            self.property = fresh
+        }
+
+        // Build 90 fix: count `maintenance_tasks` from the DB rather than
+        // the reconciler's in-session running total. The running total
+        // misses tasks created inline (vehicle maintenance, hardscape, the
+        // Phase 54A auto-created systems) and is empty when the user
+        // resumes a quiz that crossed completion in a prior session.
+        if let tasks = try? await db.fetchMaintenanceTasks(propertyId: property.id) {
+            // `fetchMaintenanceTasks` already filters out archived rows
+            // by default. The remaining set is what the user has on
+            // their schedule going forward.
+            totals.tasksScheduled = tasks.count
+            totals.taskExamples = tasks
+                .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+                .prefix(3)
+                .map(\.title)
+        }
+
+        // Gaps closed — we reuse the reconciler's "preserved" bucket
+        // as a proxy for items the user explicitly confirmed the quiz
+        // accounted for. Not perfect, but the count is a real number
+        // pulled from real data rather than a fabrication.
+        let preservedTitles = reconciliationTotals.preserved
+        totals.gapsClosed = preservedTitles.count
+        totals.gapExamples = Array(preservedTitles.suffix(3).reversed())
+
+        // Vendors on file — fresh snapshot of the household's
+        // contractors table. Captures everything the quiz captured
+        // PLUS anything added before or alongside (e.g. vendor
+        // mirrors from utility captures).
+        if let contractors = try? await db.fetchContractors() {
+            totals.vendorsOnFile = contractors.count
+            totals.vendorExamples = contractors
+                .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+                .prefix(3)
+                .map(\.companyName)
+        }
+
+        // Systems confirmed — same treatment for home_systems. The
+        // reconciler + ensureAutoCreatedSystems collectively populate
+        // this table during the quiz.
+        if let systems = try? await db.fetchHomeSystems(propertyId: property.id) {
+            let topLevel = systems.filter { $0.parentSystemId == nil }
+            totals.systemsConfirmed = topLevel.count
+            totals.systemExamples = topLevel
+                .prefix(3)
+                .map { "\($0.name) · \($0.category)" }
+        }
+
+        // Projected protection value — `estimatedValue × 0.12` per the
+        // Remodeling Magazine + NAR maintenance-vs-neglect study (same
+        // 12% figure codified in
+        // `OnboardingScheduleGenerator.computeValueProtection`). Inlined
+        // here rather than synthesizing a `PropertyLookupResult` since
+        // the struct now has a custom `init(from:)` that suppresses the
+        // memberwise initializer.
+        if let value = property.currentEstimatedValue, value > 0 {
+            totals.projectedValueProtected = value * 0.12
+        } else if let salePrice = property.purchasePrice, salePrice > 0 {
+            // Fallback: project the last sale price forward at ~5%
+            // appreciation/year when the canonical AVM is missing.
+            // Matches the ladder in `computeValueProtection(from:)`.
+            let yearsHeld = Self.yearsSince(property.purchaseDate) ?? 0
+            let projected = salePrice * pow(1.05, Double(yearsHeld))
+            totals.projectedValueProtected = projected * 0.12
+        }
+
+        finaleTotals = totals
+    }
+
+    /// Phase 60.5: Parse a "yyyy-MM-dd" / "MM/dd/yyyy" / "yyyy" date
+    /// string into a full-year delta from today. Mirrors the helper
+    /// on `OnboardingScheduleGenerator`. Used for the value-projection
+    /// fallback when only a last-sale signal is available.
+    private static func yearsSince(_ dateString: String?) -> Int? {
+        guard let dateString else { return nil }
+        let formatter = DateFormatter()
+        for format in ["yyyy-MM-dd", "MM/dd/yyyy", "yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: dateString) {
+                let years = Calendar.current.dateComponents([.year], from: date, to: Date()).year ?? 0
+                return max(0, years)
+            }
+        }
+        return nil
+    }
+
+    /// Phase 60.3: Internal helper called from `persist(...)` right
+    /// after the answer lands in state. Bumps `protectedValue` by the
+    /// per-question delta and fires a soft haptic. SwiftUI animates the
+    /// numeric transition via `.contentTransition(.numericText(...))` in
+    /// the view.
+    fileprivate func accreteValueMeter(for questionId: String, answer: HouseQuizAnswer) {
+        let delta = HouseQuizValueMeter.delta(
+            forQuestion: questionId,
+            answer: answer,
+            property: property,
+            detectedSystems: detectedSystems
+        )
+        // Monotonic increase — never decrement the meter on answer edit.
+        // If a user edits an earlier answer with a smaller delta, the
+        // meter reflects the MAX earned across all answers rather than
+        // the sum of current answers.
+        protectedValue += delta
+        Haptics.light()
+    }
 
     private let mapper: HouseQuizAnswerMapper
     private let db = DatabaseService.shared
@@ -108,6 +355,73 @@ final class HouseQuizViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             await self?.refreshExistingFamilyMembers()
         }
+
+        // Phase 60.1 — load the detected home systems so the new recap
+        // card's "What we detected at your home" list renders without a
+        // second network round trip from the view.
+        Task { @MainActor [weak self] in
+            await self?.loadDetectedSystemsIfNeeded()
+        }
+
+        // Phase 60.3 — restore the protection meter from persisted answers
+        // so save-for-later resume lands the user back at the same value
+        // they saw when they left. Silent (no haptic / animation) since
+        // this is state hydration, not a user action.
+        self.protectedValue = Self.restoreProtectedValue(
+            from: state,
+            property: property
+        )
+    }
+
+    /// Phase 60.3: Sum the `HouseQuizValueMeter.delta` for every answer in
+    /// the persisted state so the running total rehydrates on view
+    /// model init. Called from the designated initializer only — user-
+    /// driven accretion happens via `accreteValueMeter(...)`.
+    private static func restoreProtectedValue(
+        from state: HouseQuizState,
+        property: PropertyRow
+    ) -> Double {
+        guard !state.answers.isEmpty else { return 0 }
+        return state.answers.reduce(0.0) { total, entry in
+            total + HouseQuizValueMeter.delta(
+                forQuestion: entry.key,
+                answer: entry.value,
+                property: property,
+                detectedSystems: []
+            )
+        }
+    }
+
+    /// Phase 60.1: Load (or re-load) the detected home systems for this
+    /// property. Silent failure leaves the array empty, which simply
+    /// suppresses the detected-systems block on the recap card instead
+    /// of blocking the quiz.
+    func loadDetectedSystemsIfNeeded() async {
+        do {
+            detectedSystems = try await db.fetchHomeSystems(propertyId: property.id)
+        } catch {
+            print("[HouseQuiz] Failed to load detected systems: \(error)")
+        }
+    }
+
+    /// Phase 60.1: Re-fetch the `PropertyRow` from the DB. Called by the
+    /// `PropertyRecapEditSheet` after a save so every downstream reader
+    /// (Q4 prefill, source caption, etc.) picks up the corrected value.
+    /// Silent failure leaves the in-memory row untouched — the sheet has
+    /// already surfaced the error if the update itself failed.
+    func reloadProperty() async {
+        do {
+            property = try await db.fetchProperty(id: property.id)
+        } catch {
+            print("[HouseQuiz] Failed to reload property after edit: \(error)")
+        }
+    }
+
+    /// Phase 60.1: Apply a fresh `PropertyRow` that the edit sheet already
+    /// fetched from the DB. Use this when the updater returned the row —
+    /// avoids a second fetch for the same data.
+    func applyUpdatedProperty(_ fresh: PropertyRow) {
+        property = fresh
     }
 
     private func refreshPropertyStateFromDB() async {
@@ -466,6 +780,35 @@ final class HouseQuizViewModel: ObservableObject {
         advance()
     }
 
+    /// Phase 60.4 (F8): Dismiss a per-chip inline feedback pill WITHOUT
+    /// advancing the quiz. Chip toggling on multi-select questions like
+    /// Q15b doesn't advance on its own — the user keeps selecting — so
+    /// the dismiss path must clear the pill and stop there.
+    func dismissChipFeedback() {
+        pendingFeedback = nil
+    }
+
+    /// Phase 60.4 (F8): Surface a per-chip feedback pill from a
+    /// multi-select question. Tracks which chip's feedback is currently
+    /// showing so the view doesn't stack pills when the user fires
+    /// several selections in a row — a new chip selection replaces the
+    /// previous pill instead of queuing.
+    func presentInlineChipFeedback(_ feedback: AnswerFeedback, chipId: String) {
+        pendingFeedback = feedback
+        lastChipFeedbackId = chipId
+        Analytics.track(.quizChipFeedbackShown, [
+            "question_id": currentQuestion?.id ?? "",
+            "chip_id": chipId,
+        ])
+    }
+
+    /// Phase 60.4 (F8): Chip id whose feedback is currently pinned in
+    /// `pendingFeedback`. The view uses this in combination with the
+    /// "current question is a chip question" check to route through
+    /// `dismissChipFeedback` (no advance) instead of `dismissFeedback`
+    /// (advance).
+    @Published var lastChipFeedbackId: String? = nil
+
     func goBack() {
         guard currentIndex > 0 else { return }
         currentIndex -= 1
@@ -488,6 +831,10 @@ final class HouseQuizViewModel: ObservableObject {
     /// question silently disappears from the flow. Marks the question as
     /// skipped (not saved-for-later) so the progress label still totals
     /// correctly and `firstUnresolvedIndex()` doesn't try to resume here.
+    ///
+    /// Phase 60.3: also accumulates a `pendingSkipToast` so the next
+    /// rendered question acknowledges the auto-skip rather than feeling
+    /// like the quiz jumped.
     func skipDynamicallyUnreachableQuestion() {
         guard let q = currentQuestion else { return }
         guard q.kind == .providerSearch, q.dynamicProviderTypes != nil else { return }
@@ -496,6 +843,7 @@ final class HouseQuizViewModel: ObservableObject {
         if !state.skipped.contains(q.id) {
             state.skipped.append(q.id)
         }
+        recordSkipForToast(reason: .previousAnswerMakesItIrrelevant)
         Task { await persistState() }
         advance()
     }
@@ -527,6 +875,13 @@ final class HouseQuizViewModel: ObservableObject {
         state.savedForLater.removeAll { $0 == question.id }
         state.skipped.removeAll { $0 == question.id }
 
+        // Phase 60.3: accrete the protection meter by the per-question
+        // delta. Only fires on FIRST answer (not when the user edits an
+        // answer they've already locked in) so the meter is monotonic.
+        if priorAnswer == nil {
+            accreteValueMeter(for: question.id, answer: answer)
+        }
+
         // 2. Fire the answer mapper for DB side-effects. Capture any
         //    reconciler changes so the completion summary can show real
         //    numbers without faking them.
@@ -544,8 +899,50 @@ final class HouseQuizViewModel: ObservableObject {
         //    plus orphaned legacy tasks. Notification posts so the dashboard
         //    refreshes its task counts.
         if state.completedAt != nil && !finalReconciliationDidRun {
-            await runFinalReconciliation()
-            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            // Build 90: detach the reconciler so the completion screen
+            // appears immediately instead of hanging for 10-15 seconds.
+            //
+            // Build 90 fix: keep a handle on the task (was fire-and-forget)
+            // so `loadFinaleTotals()` can `await` it before reading the
+            // counts that drive the cinematic reveal.
+            finalReconciliationDidRun = true
+            let propId = property.id
+            let hhId = property.householdId
+            finalReconcileTask = Task.detached(priority: .utility) { [weak self] in
+                // Phase 54A: ensure the Vendor-Coverage-known-but-
+                // quiz-silent systems (Handyman, Mosquito & Tick, Pet
+                // Waste / Chimney / Snow Removal where applicable)
+                // exist BEFORE the reconciler runs so their templates
+                // get attached on this same pass.
+                await HouseQuizAnswerMapper.ensureAutoCreatedSystems(
+                    propertyId: propId,
+                    householdId: hhId
+                )
+                let result = await MaintenanceTaskReconciler.reconcileAll(
+                    propertyId: propId,
+                    householdId: hhId
+                )
+                // Phase 66: Day1TaskCurator runs after reconcileAll so it
+                // sees every freshly-seeded template task. Idempotent via
+                // UserDefaults gate (hasRunDay1Curator_<propertyId>_v1) so
+                // back-nav / re-completions don't re-route tasks that
+                // already have a parent routine assigned.
+                let day1 = await Day1TaskCurator.runIfNeeded(
+                    propertyId: propId,
+                    householdId: hhId
+                )
+                await MainActor.run {
+                    guard let self else { return }
+                    if !result.isEmpty {
+                        self.reconciliationTotals = self.reconciliationTotals.merging(result)
+                    }
+                    if !day1.isEmpty {
+                        print("[HouseQuiz] Day1Curator: vendor=\(day1.vendorRouted) pendingVendor=\(day1.pendingVendorRouted) handyman=\(day1.handymanRouted) thisSeason=\(day1.remainingInThisSeason) routinesCreated=\(day1.routinesCreated)")
+                    }
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                    NotificationCenter.default.post(name: .routineChanged, object: nil)
+                }
+            }
         } else if isAnswerChange {
             // Build 82 (Apr 7, 2026): the user changed a previously
             // committed answer. Run the reconciler in the background to
@@ -643,16 +1040,8 @@ final class HouseQuizViewModel: ObservableObject {
     /// `AppState.purgeDroppedTemplatesOnce()` so it runs once per device on
     /// auth resolution, not once per quiz completion. This path is now
     /// purely the reconcile pass.
-    private func runFinalReconciliation() async {
-        let result = await MaintenanceTaskReconciler.reconcileAll(
-            propertyId: property.id,
-            householdId: property.householdId
-        )
-        if !result.isEmpty {
-            reconciliationTotals = reconciliationTotals.merging(result)
-        }
-        finalReconciliationDidRun = true
-    }
+    // Build 90: runFinalReconciliation inlined + detached in persistStateThrowing
+    // to eliminate the 10-15s UI hang on quiz completion.
 
     private func advance() {
         // Show milestone card after questions 5, 10, 15, 20, 25, 30.
@@ -809,6 +1198,9 @@ final class HouseQuizViewModel: ObservableObject {
     /// if it returns true, marks it skipped and advances. Loops via
     /// moveNext() so consecutive skip-eligible questions all flush in one
     /// pass (e.g. Q11b and Q14 after a no_lawn answer).
+    ///
+    /// Phase 60.3: also accumulates a `pendingSkipToast` so the next
+    /// rendered question acknowledges the auto-skip.
     func skipDynamicallyHiddenQuestion() {
         guard let q = currentQuestion else { return }
         guard let skipClosure = q.dynamicSkip else { return }
@@ -816,8 +1208,24 @@ final class HouseQuizViewModel: ObservableObject {
         if !state.skipped.contains(q.id) {
             state.skipped.append(q.id)
         }
+        recordSkipForToast(reason: .previousAnswerMakesItIrrelevant)
         Task { await persistState() }
         moveNext()
+    }
+
+    /// Phase 60.3: Accumulate a skip into `pendingSkipToast` so the next
+    /// question render shows "Skipped N questions" messaging. Merging
+    /// same-reason skips lets consecutive dynamicSkip advances (e.g.
+    /// Q11b + Q14 after no_lawn) surface as one toast instead of two.
+    private func recordSkipForToast(reason: SkipReason) {
+        if let existing = pendingSkipToast, existing.reason == reason {
+            pendingSkipToast = SkipToastPayload(
+                skippedCount: existing.skippedCount + 1,
+                reason: reason
+            )
+        } else {
+            pendingSkipToast = SkipToastPayload(skippedCount: 1, reason: reason)
+        }
     }
 
     private func firstUnresolvedIndex() -> Int {

@@ -25,6 +25,29 @@ enum PropertyDetailTab: String, CaseIterable {
     }
 }
 
+/// Phase 56.1: Filter options for the Contacts sub-tab. Lives at the
+/// top level so it stays stable across SwiftUI redraws and so the
+/// picker chips can iterate `.allCases`.
+enum ContactsFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case serviceBased = "Service-based"
+    case routine = "Routines"
+    case estate = "Estate professionals"
+    case needsAttention = "Needs attention"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all: return "person.2.fill"
+        case .serviceBased: return "wrench.and.screwdriver.fill"
+        case .routine: return "calendar.badge.clock"
+        case .estate: return "building.columns.fill"
+        case .needsAttention: return "exclamationmark.triangle.fill"
+        }
+    }
+}
+
 struct PropertyDetailView: View {
     let propertyID: UUID
     @StateObject private var viewModel = PropertyDetailViewModel()
@@ -39,13 +62,68 @@ struct PropertyDetailView: View {
     @State private var selectedTaskForReminder: MaintenanceTaskDBRow?
     @State private var showReminderPicker = false
     @State private var showVendorAssignment = false
+    @State private var seasonalFindVendorTask: MaintenanceTaskDBRow?
     @State private var selectedTaskForVendor: MaintenanceTaskDBRow?
     @State private var taskForDateEdit: MaintenanceTaskDBRow?
     @State private var taskForLastServiced: MaintenanceTaskDBRow?
     @State private var editedTaskDueDate = Date()
     @State private var selectedMaintenanceTask: MaintenanceTaskDBRow?
     @AppStorage("dismissedSeasonalOverview") private var dismissedSeasonalOverview = ""
+    @State private var showSeasonCompletionBanner = false
+    @State private var completedSeasonForNavigation: SeasonCompletionState?
     @State private var lastServicedTaskDate = Date()
+
+    /// Phase 54B.3: Handyman punch-list row state. Count is loaded on
+    /// appear + on `.maintenanceTaskChanged` notifications so the badge
+    /// stays in sync when items are added from the task detail sheet
+    /// or from the punch list itself.
+    @State private var handymanPunchCount: Int = 0
+    @State private var showHandymanPunchList = false
+
+    /// Phase 54C.3: "Recommended for your home" entry-point state.
+    @State private var showRecommendedServices = false
+
+    /// Phase 55.3: Routines row state. Count loaded on appear so the
+    /// row badge stays in sync. Bootstrap entry point — without this
+    /// row, users have no way to reach RoutinesListView and create
+    /// their first routine (the dashboard banner only surfaces
+    /// already-configured routines). Retains the legacy variable names
+    /// since the row is nested deep in PropertyDetailView and every
+    /// call site already uses these names — internal naming only.
+    @State private var weeklyCadenceCount: Int = 0
+    @State private var showWeeklyCadences = false
+
+    /// Phase 56.1: Direct presentation of AddVendorSheet from the
+    /// Contacts sub-tab. Replaces the navigation-to-ContractorDirectoryView
+    /// pattern that required two extra taps to reach the add form.
+    @State private var showAddVendor = false
+
+    /// Phase 56.1: Picker-mode presentation of ContractorDirectoryView
+    /// from the task action menu's "Assign a Vendor" option. Keeps the
+    /// directory view's picker behavior alive while killing standalone
+    /// destinations of it.
+    @State private var vendorAssignmentTask: MaintenanceTaskDBRow?
+
+    /// Phase 56.1: BrowseSpecialtySystemsSheet presentation from the
+    /// Contacts sub-tab "Add or discover" section. Distinct from
+    /// `showAddSystem` (the freeform custom-system flow) because the
+    /// two serve different discovery intents.
+    @State private var showBrowseSpecialty = false
+
+    /// Phase 56.1: Search + filter state for the Contacts sub-tab. Lives
+    /// on the parent view so it persists across redraws but doesn't
+    /// leak into other sub-tabs. Resets naturally on tab change because
+    /// Contacts is re-rendered from scratch each time it's selected.
+    @State private var contactsSearchText: String = ""
+    @State private var contactsFilter: ContactsFilter = .all
+
+    /// Phase 56.1: Contractor IDs the user has dismissed from the
+    /// "Needs attention" filter (e.g. they don't care that Orkin has
+    /// no email, or this landscaper never gave them a phone). Persisted
+    /// in UserDefaults so dismissals survive relaunch. Per-household
+    /// key so switching households doesn't leak dismissals across.
+    @State private var attentionDismissedIds: Set<UUID> = []
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -97,6 +175,16 @@ struct PropertyDetailView: View {
                     case "maintenance": activeTab = .maintenance
                     case "projects": activeTab = .projects
                     case "contacts": activeTab = .contacts
+                    case "handyman_punch_list":
+                        // Phase 56.4: "Schedule handyman visit" entry
+                        // points (dashboard card, Maintenance "+" menu,
+                        // Maintenance tab HandymanSuggestionCard) route
+                        // here. Land on the maintenance tab and push
+                        // the punch list destination.
+                        activeTab = .maintenance
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            showHandymanPunchList = true
+                        }
                     default: break
                     }
                 }
@@ -104,11 +192,64 @@ struct PropertyDetailView: View {
         }
         .task {
             await viewModel.loadProperty(id: propertyID)
+            loadAttentionDismissals()
+            checkSeasonCompletionBanner()
+        }
+        .onChange(of: viewModel.property?.householdId) { _, _ in
+            // Phase 56.1: refresh dismissals when household resolves
+            // (loadProperty is async; the first render may run before
+            // the household id is known).
+            loadAttentionDismissals()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
+            Task {
+                await viewModel.loadProperty(id: propertyID)
+                checkSeasonCompletionBanner()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .contractorChanged)) { _ in
+            Task {
+                await viewModel.loadProperty(id: propertyID)
+                checkSeasonCompletionBanner()
+            }
+        }
+        .onChange(of: viewModel.seasonCompletionState) { _, newState in
+            if newState.isComplete && newState.totalVendorTasks > 0 {
+                // First time this season completed — record the timestamp
+                SeasonCompletionBannerState.recordCompletion(newState)
+                if SeasonCompletionBannerState.shouldShow(newState) {
+                    withAnimation(HavenTheme.animationCard) {
+                        showSeasonCompletionBanner = true
+                    }
+                    Haptics.success()
+                }
+            } else {
+                // Season is no longer complete (vendor unassigned?)
+                withAnimation(HavenTheme.animationCard) {
+                    showSeasonCompletionBanner = false
+                }
+            }
+        }
+        .navigationDestination(item: $completedSeasonForNavigation) { state in
+            SeasonalTasksDetailView(
+                season: state.season.displayName,
+                tasks: viewModel.currentSeasonTasks,
+                completedCount: state.assignedVendorTasks,
+                nextSeason: viewModel.nextSeason,
+                nextSeasonTasks: viewModel.nextSeasonTasks,
+                systemNameLookup: { viewModel.systemName(for: $0) },
+                contractorNameLookup: { viewModel.contractor(for: $0)?.companyName },
+                onFindVendor: { task in seasonalFindVendorTask = task },
+                propertyId: propertyID
+            )
         }
         .onAppear {
             // Refresh when returning from detail views so edits reflect immediately
             if viewModel.property != nil {
-                Task { await viewModel.loadProperty(id: propertyID) }
+                Task {
+                    await viewModel.loadProperty(id: propertyID)
+                    checkSeasonCompletionBanner()
+                }
             }
         }
         .refreshable {
@@ -251,7 +392,10 @@ struct PropertyDetailView: View {
             .presentationDetents([.medium, .large])
         }
         .navigationDestination(isPresented: $showFullSchedule) {
-            MaintenanceScheduleView(filterPropertyId: propertyID)
+            // Phase 66: the property-scoped Maintenance tab lands on the
+            // new 5-section hub. Timeline is available via the "See full
+            // year ↗" link inside the hub.
+            MaintenanceHubView(filterPropertyId: propertyID)
         }
         .sheet(item: $selectedMaintenanceTask) { task in
             NavigationStack {
@@ -260,6 +404,66 @@ struct PropertyDetailView: View {
                 })
             }
             .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $seasonalFindVendorTask) { task in
+            seasonalFindVendorContent(task: task)
+        }
+        .sheet(isPresented: $showAddVendor) {
+            AddVendorSheet(onComplete: {
+                Task { await viewModel.loadProperty(id: propertyID) }
+            })
+        }
+        .sheet(item: $vendorAssignmentTask) { task in
+            NavigationStack {
+                ContractorDirectoryView(onSelect: { contractor in
+                    Task {
+                        await MaintenanceViewModel.shared.convertToVendorManaged(
+                            taskId: task.id,
+                            contractor: contractor
+                        )
+                        await viewModel.loadProperty(id: propertyID)
+                        vendorAssignmentTask = nil
+                    }
+                })
+            }
+        }
+        .sheet(isPresented: $showBrowseSpecialty) {
+            // Phase 56.1: body-scope sheet so the "Browse specialty
+            // systems" row on the Contacts tab works. The Maintenance
+            // tab's own entry points reuse this same state.
+            if let property = viewModel.property {
+                BrowseSpecialtySystemsSheet(
+                    propertyId: property.id,
+                    householdId: property.householdId,
+                    existingCategories: Set(viewModel.systems.map(\.category)),
+                    onSystemAdded: {
+                        Task { await viewModel.loadProperty(id: propertyID) }
+                    }
+                )
+            }
+        }
+        .navigationDestination(isPresented: $showWeeklyCadences) {
+            // Phase 56.1: hoisted from weeklyCadencesRow so the
+            // Contacts tab's "Add a routine" discovery row can route
+            // here too. The Maintenance tab's row view no longer
+            // needs its own nav destination.
+            if let householdId = viewModel.property?.householdId {
+                RoutinesListView(
+                    householdId: householdId,
+                    propertyId: propertyID
+                )
+            }
+        }
+        .navigationDestination(isPresented: $showRecommendedServices) {
+            // Phase 56.1: hoisted from recommendedServicesRow so the
+            // Contacts tab's "See recommended services" discovery row
+            // can route here too.
+            if let householdId = viewModel.property?.householdId {
+                RecommendedServicesView(
+                    householdId: householdId,
+                    propertyId: propertyID
+                )
+            }
         }
         .confirmationDialog("Delete Property?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
@@ -281,43 +485,29 @@ struct PropertyDetailView: View {
 
     // MARK: - Main Content
 
+    @State private var heroIsVisible = true
+
     private func propertyContent(_ property: PropertyRow) -> some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
                 propertyHeader(property)
-
-                HStack(spacing: 0) {
-                    ForEach(PropertyDetailTab.allCases, id: \.self) { tab in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                activeTab = tab
-                            }
-                            Analytics.track(.propertyTabSelected, ["tab": tab.title, "property_id": propertyID.uuidString])
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 16))
-                                    .symbolRenderingMode(.hierarchical)
-                                Text(tab.title)
-                                    .font(HavenTypography.uiCaption)
-                            }
-                            .foregroundStyle(activeTab == tab ? HavenColors.navy800 : HavenColors.textTertiary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(
-                                activeTab == tab
-                                    ? HavenColors.navy.opacity(0.08)
-                                    : Color.clear
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .onChange(of: geo.frame(in: .named("propertyScroll")).maxY) { _, newValue in
+                                    let shouldShow = newValue > 60
+                                    if heroIsVisible != shouldShow {
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            heroIsVisible = shouldShow
+                                        }
+                                    }
+                                }
                         }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 4)
+                    )
 
-                switch activeTab {
-                case .overview:
+                Section {
+                    switch activeTab {
+                    case .overview:
                     if let prop = viewModel.property {
                         InvestmentSummaryCard(
                             property: prop,
@@ -341,22 +531,44 @@ struct PropertyDetailView: View {
                     if !viewModel.activeWarranties.isEmpty { warrantiesSection }
 
                 case .maintenance:
-                    // Phase 50: Vendor-first reorder. Lead with the
-                    // overdue banner, then upcoming vendor visits, then
-                    // the small DIY task list, then any vendor follow-ups
-                    // (amber accent), then the home systems chip strip.
-                    // The seasonal overview card and service history move
-                    // to the bottom because they're reference, not action.
+                    // Build 90: Simplified layout. Lead with a compact
+                    // maintenance summary card that links to the full
+                    // schedule, then overdue, then DIY tasks, then
+                    // systems, seasonal, and history.
+                    maintenanceSummaryCard
                     if !viewModel.overdueTasks.isEmpty { overdueSection }
-                    if !viewModel.vendorVisitTasks.isEmpty { upcomingVendorVisitsSection }
                     diyTasksSection
                     if !viewModel.vendorFollowUpTasks.isEmpty { vendorFollowUpsSection }
+                    handymanPunchListRow
+                    weeklyCadencesRow
+                    recommendedServicesRow
                     systemsSection
+
+                    // Season completion banner + overview card
+                    if showSeasonCompletionBanner {
+                        SeasonCompletionBanner(
+                            season: viewModel.seasonCompletionState.season,
+                            year: viewModel.seasonCompletionState.year,
+                            vendorCount: viewModel.seasonCompletionState.vendorCount,
+                            onSeeSummary: {
+                                completedSeasonForNavigation = viewModel.seasonCompletionState
+                            },
+                            onDismiss: {
+                                SeasonCompletionBannerState.dismiss(viewModel.seasonCompletionState)
+                                withAnimation(HavenTheme.animationCard) {
+                                    showSeasonCompletionBanner = false
+                                }
+                                Haptics.light()
+                            }
+                        )
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     if (!viewModel.currentSeasonTasks.isEmpty || !viewModel.nextSeasonTasks.isEmpty),
+                       !viewModel.seasonCompletionState.isComplete,
                        dismissedSeasonalOverview != "\(viewModel.currentSeason) \(Calendar.current.component(.year, from: Date()))" {
                         seasonalOverviewCard
                     }
-                    viewFullScheduleLink
                     if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
 
                 case .projects:
@@ -369,10 +581,68 @@ struct PropertyDetailView: View {
                 case .contacts:
                     vendorsSection
                     if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
+                    }
+                } header: {
+                    VStack(spacing: 0) {
+                        // Collapsed header bar — appears when full hero scrolls away
+                        if !heroIsVisible {
+                            HStack(spacing: 8) {
+                                Image(systemName: "house.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(HavenColors.navy)
+                                Text(property.street ?? property.name)
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .lineLimit(1)
+                                Spacer()
+                                if let value = property.currentEstimatedValue, value > 0 {
+                                    Text(value.formattedCompactCurrency())
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                }
+                            }
+                            .padding(.horizontal, HavenTheme.spacing16)
+                            .padding(.vertical, HavenTheme.spacing8)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+
+                        // Tab selector — always visible, pins on scroll
+                        HStack(spacing: 0) {
+                            ForEach(PropertyDetailTab.allCases, id: \.self) { tab in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        activeTab = tab
+                                    }
+                                    Analytics.track(.propertyTabSelected, ["tab": tab.title, "property_id": propertyID.uuidString])
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 16))
+                                            .symbolRenderingMode(.hierarchical)
+                                        Text(tab.title)
+                                            .font(HavenTypography.uiCaption)
+                                    }
+                                    .foregroundStyle(activeTab == tab ? HavenColors.navy800 : HavenColors.textTertiary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        activeTab == tab
+                                            ? HavenColors.navy.opacity(0.08)
+                                            : Color.clear
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                    }
+                    .background(HavenColors.background)
                 }
             }
             .padding()
         }
+        .coordinateSpace(name: "propertyScroll")
         .background(HavenColors.background)
     }
 
@@ -512,7 +782,9 @@ struct PropertyDetailView: View {
 
     private var propertyMaintenanceCard: some View {
         NavigationLink {
-            MaintenanceScheduleView(filterPropertyId: propertyID)
+            // Phase 66: Land in the new 5-section hub from the property
+            // detail. Timeline push from there.
+            MaintenanceHubView(filterPropertyId: propertyID)
         } label: {
             HavenCard {
                 VStack(alignment: .leading, spacing: 10) {
@@ -533,17 +805,17 @@ struct PropertyDetailView: View {
                         maintenanceStat(
                             count: viewModel.overdueTasks.count,
                             label: "Overdue",
-                            color: HavenColors.critical
+                            color: viewModel.overdueTasks.count > 0 ? HavenColors.critical : HavenColors.textPrimary
                         )
                         maintenanceStat(
                             count: viewModel.dueThisMonthTasks.count,
                             label: "This Month",
-                            color: HavenColors.warning
+                            color: HavenColors.textPrimary
                         )
                         maintenanceStat(
                             count: viewModel.upcomingTasks.count,
                             label: "Upcoming",
-                            color: HavenColors.success
+                            color: HavenColors.textPrimary
                         )
                     }
 
@@ -577,7 +849,7 @@ struct PropertyDetailView: View {
         VStack(spacing: 4) {
             Text("\(max(0, count))")
                 .font(HavenTypography.title2)
-                .foregroundStyle(count > 0 ? color : HavenColors.textTertiary)
+                .foregroundStyle(color)
             Text(label)
                 .font(HavenTypography.uiCaption)
                 .foregroundStyle(HavenColors.textSecondary)
@@ -597,13 +869,20 @@ struct PropertyDetailView: View {
                 completedCount: viewModel.currentSeasonCompletedCount,
                 nextSeason: viewModel.nextSeason,
                 nextSeasonTasks: viewModel.nextSeasonTasks,
-                systemNameLookup: { viewModel.systemName(for: $0) }
+                systemNameLookup: { viewModel.systemName(for: $0) },
+                contractorNameLookup: { viewModel.contractor(for: $0)?.companyName },
+                contractorLookup: { viewModel.contractor(for: $0) },
+                onFindVendor: { task in
+                    seasonalFindVendorTask = task
+                },
+                propertyId: propertyID,
+                serviceRecords: viewModel.serviceRecords
             )
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: seasonIcon(season))
-                        .foregroundStyle(seasonColor(season))
+                        .foregroundStyle(HavenColors.navy800)
                     Text("Seasonal Overview")
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.textPrimary)
@@ -615,23 +894,26 @@ struct PropertyDetailView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     let groups = SeasonalTaskGrouper.group(viewModel.currentSeasonTasks, systemNameLookup: { viewModel.systemName(for: $0) })
-                    let groupsDone = groups.filter(\.isComplete).count
+                    let totalVendorTasks = groups.flatMap(\.vendorTasks).count
+                    let assignedVendorTasks = groups.reduce(0) { $0 + $1.vendorAssignedCount }
                     HStack {
                         Text(season)
                             .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
-                        Text("\(groupsDone) of \(groups.count) done")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
+                        if totalVendorTasks > 0 {
+                            Text("\(assignedVendorTasks) of \(totalVendorTasks) vendors assigned")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
                     }
 
-                    if !viewModel.currentSeasonTasks.isEmpty {
+                    if totalVendorTasks > 0 {
                         ProgressView(
-                            value: Double(viewModel.currentSeasonCompletedCount),
-                            total: Double(viewModel.currentSeasonTasks.count)
+                            value: Double(assignedVendorTasks),
+                            total: Double(totalVendorTasks)
                         )
-                        .tint(seasonColor(season))
+                        .tint(HavenColors.action)
                     }
                 }
 
@@ -648,33 +930,12 @@ struct PropertyDetailView: View {
                 }
             }
             .padding(HavenTheme.spacing16)
-            .background(
-                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
-                    .fill(seasonColor(season).opacity(0.08))
-            )
-            .overlay {
-                let icons = seasonBackgroundIcons(season)
-                let color = seasonColor(season).opacity(0.07)
-                ZStack {
-                    Image(systemName: icons[0])
-                        .font(.system(size: 20)).rotationEffect(.degrees(-15)).offset(x: -100, y: -10)
-                    Image(systemName: icons.count > 1 ? icons[1] : icons[0])
-                        .font(.system(size: 14)).rotationEffect(.degrees(20)).offset(x: -60, y: 8)
-                    Image(systemName: icons[0])
-                        .font(.system(size: 24)).rotationEffect(.degrees(10)).offset(x: 40, y: -5)
-                    Image(systemName: icons.count > 1 ? icons[1] : icons[0])
-                        .font(.system(size: 18)).rotationEffect(.degrees(-25)).offset(x: 110, y: 5)
-                    Image(systemName: icons.count > 2 ? icons[2] : icons[0])
-                        .font(.system(size: 16)).rotationEffect(.degrees(35)).offset(x: 80, y: -15)
-                    Image(systemName: icons[0])
-                        .font(.system(size: 12)).rotationEffect(.degrees(-10)).offset(x: -20, y: 15)
-                    Image(systemName: icons.count > 1 ? icons[1] : icons[0])
-                        .font(.system(size: 22)).rotationEffect(.degrees(15)).offset(x: 140, y: 0)
-                }
-                .foregroundStyle(color)
-                .allowsHitTesting(false)
-            }
+            .background(HavenColors.surface)
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .strokeBorder(HavenColors.beige200, lineWidth: 1)
+            }
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -683,6 +944,28 @@ struct PropertyDetailView: View {
             } label: {
                 Label("Dismiss for \(season)", systemImage: "xmark.circle")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func seasonalFindVendorContent(task: MaintenanceTaskDBRow) -> some View {
+        if let property = viewModel.property,
+           let system = viewModel.systems.first(where: { $0.id == task.systemId }) {
+            FindLocalVendorSheet(
+                task: task,
+                householdId: property.householdId,
+                town: property.city ?? "",
+                state: property.state ?? "",
+                systemCategory: system.category,
+                categoryDisplayName: system.category.lowercased(),
+                onComplete: {
+                    Task { await viewModel.loadProperty(id: propertyID) }
+                }
+            )
+        } else {
+            AddVendorSheet(onComplete: {
+                Task { await viewModel.loadProperty(id: propertyID) }
+            })
         }
     }
 
@@ -697,12 +980,19 @@ struct PropertyDetailView: View {
     }
 
     private func seasonIcon(_ season: String) -> String {
-        switch season {
-        case "Spring": return "leaf.fill"
-        case "Summer": return "sun.max.fill"
-        case "Fall": return "wind"
-        case "Winter": return "snowflake"
-        default: return "calendar"
+        Season(rawValue: season)?.icon ?? "calendar"
+    }
+
+    /// Check whether the season completion banner should be visible.
+    /// Called after every data reload so the banner reacts to contractor
+    /// assignments, task changes, and app foregrounding.
+    private func checkSeasonCompletionBanner() {
+        let state = viewModel.seasonCompletionState
+        let shouldShow = SeasonCompletionBannerState.shouldShow(state)
+        if shouldShow != showSeasonCompletionBanner {
+            withAnimation(HavenTheme.animationCard) {
+                showSeasonCompletionBanner = shouldShow
+            }
         }
     }
 
@@ -935,51 +1225,71 @@ struct PropertyDetailView: View {
     /// last cost. Tapping a card opens the maintenance task detail
     /// sheet. The "See full schedule" link at the bottom routes to the
     /// MaintenanceScheduleView.
-    private var upcomingVendorVisitsSection: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-            HStack {
-                Text("UPCOMING SERVICE VISITS")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-                Spacer()
-                Text("\(viewModel.vendorVisitTasks.count)")
-                    .font(HavenTypography.uiLabelSmall)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(HavenColors.navy.opacity(0.08))
-                    .foregroundStyle(HavenColors.navy700)
-                    .clipShape(Capsule())
-            }
-            VStack(spacing: HavenTheme.spacing12) {
-                ForEach(Array(viewModel.vendorVisitTasks.prefix(6))) { task in
-                    let contractor = viewModel.contractor(for: task.assignedContractorId)
-                    VendorVisitCard(
-                        task: task,
-                        vendorName: contractor?.companyName,
-                        vendorLogoURL: contractor?.logoUrl.flatMap { URL(string: $0) },
-                        brandColorHex: contractor?.brandColor,
-                        lastCost: viewModel.recentServiceCost(systemId: task.systemId, contractorId: contractor?.id),
-                        style: .full,
-                        onTap: { selectedMaintenanceTask = task }
-                    )
-                }
-            }
-            if viewModel.vendorVisitTasks.count > 6 {
-                Button {
-                    showFullSchedule = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("See full schedule")
-                            .font(HavenTypography.uiLabelSmall)
+    /// Build 90: Compact summary card replacing the verbose "UPCOMING
+    /// SERVICE VISITS" section. Shows task counts and links to the full
+    /// MaintenanceScheduleView so tasks live in one place.
+    private var maintenanceSummaryCard: some View {
+        let vendorCount = viewModel.vendorVisitTasks.count
+        let diyCount = viewModel.diyTasksForMaintenanceTab.count
+        let overdueCount = viewModel.overdueTasks.count
+        let totalCount = viewModel.maintenanceTasks.filter { $0.vehicleId == nil }.count
+
+        return Button {
+            showFullSchedule = true
+        } label: {
+            HavenCard {
+                VStack(spacing: HavenTheme.spacing12) {
+                    HStack {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy800)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Maintenance Schedule")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("\(totalCount) tasks on your plan")
+                                .font(HavenTypography.uiLabelMedium)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(HavenColors.textTertiary)
                     }
-                    .foregroundStyle(HavenColors.navy700)
+
+                    if vendorCount > 0 || diyCount > 0 || overdueCount > 0 {
+                        HStack(spacing: HavenTheme.spacing8) {
+                            if overdueCount > 0 {
+                                statChip(count: overdueCount, label: "Overdue", color: HavenColors.critical)
+                            }
+                            if vendorCount > 0 {
+                                statChip(count: vendorCount, label: "Vendor", color: HavenColors.navy800)
+                            }
+                            if diyCount > 0 {
+                                statChip(count: diyCount, label: "DIY", color: HavenColors.navy800)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
+        .buttonStyle(.plain)
+    }
+
+    private func statChip(count: Int, label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("\(count)")
+                .font(HavenTypography.uiLabelSmall)
+                .fontWeight(.bold)
+            Text(label)
+                .font(HavenTypography.uiLabelSmall)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.08))
+        .clipShape(Capsule())
     }
 
     // MARK: - Phase 50: DIY Task Section
@@ -1125,6 +1435,212 @@ struct PropertyDetailView: View {
                     )
                 }
             }
+        }
+    }
+
+    // MARK: - Phase 54B.3: Handyman Punch List Row
+
+    /// Compact entry row for the handyman punch list. Shows pending
+    /// count as a badge; tapping opens `HandymanPunchListView`. Always
+    /// renders (even with zero items) because the row doubles as the
+    /// primary "add something" entry point — the empty state lives
+    /// inside the destination view.
+    @ViewBuilder
+    private var handymanPunchListRow: some View {
+        if let householdId = viewModel.property?.householdId {
+            Button {
+                Haptics.light()
+                showHandymanPunchList = true
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    Image(systemName: "hammer.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 36, height: 36)
+                        .background(HavenColors.beige200)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Handyman punch list")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(handymanPunchCount == 0
+                             ? "Add things for your next handyman visit"
+                             : "\(handymanPunchCount) item\(handymanPunchCount == 1 ? "" : "s") waiting")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    if handymanPunchCount > 0 {
+                        Text("\(handymanPunchCount)")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(HavenColors.beige200)
+                            .clipShape(Capsule())
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .navigationDestination(isPresented: $showHandymanPunchList) {
+                HandymanPunchListView(
+                    householdId: householdId,
+                    propertyId: propertyID
+                )
+            }
+            .task {
+                await loadHandymanPunchCount(householdId: householdId)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
+                Task { await loadHandymanPunchCount(householdId: householdId) }
+            }
+        }
+    }
+
+    private func loadHandymanPunchCount(householdId: UUID) async {
+        do {
+            let items = try await DatabaseService.shared
+                .fetchPendingHandymanPunchItems(householdId: householdId)
+            handymanPunchCount = items.count
+        } catch {
+            handymanPunchCount = 0
+        }
+    }
+
+    // MARK: - Phase 55.3: Routines Row
+
+    /// Bootstrap entry point for household routines — trash day,
+    /// biweekly cleaning with Renata, lawn care with Blue Fox, pool
+    /// service, the full set. Destination is `RoutinesListView`.
+    /// Mirrors the HandymanPunchListView row pattern: always renders,
+    /// badge shows count when > 0, destination handles its own empty
+    /// state.
+    @ViewBuilder
+    private var weeklyCadencesRow: some View {
+        if let householdId = viewModel.property?.householdId {
+            Button {
+                Haptics.light()
+                showWeeklyCadences = true
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 36, height: 36)
+                        .background(HavenColors.beige200)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Routines")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(weeklyCadenceCount == 0
+                             ? "Trash day, cleaning, lawn care, pool service"
+                             : "\(weeklyCadenceCount) routine\(weeklyCadenceCount == 1 ? "" : "s") configured")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    if weeklyCadenceCount > 0 {
+                        Text("\(weeklyCadenceCount)")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(HavenColors.beige200)
+                            .clipShape(Capsule())
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .task {
+                await loadWeeklyCadenceCount(householdId: householdId)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .routineChanged)) { _ in
+                Task { await loadWeeklyCadenceCount(householdId: householdId) }
+            }
+        }
+    }
+
+    private func loadWeeklyCadenceCount(householdId: UUID) async {
+        do {
+            let routines = try await DatabaseService.shared
+                .fetchRoutines(householdId: householdId)
+            weeklyCadenceCount = routines.count
+        } catch {
+            weeklyCadenceCount = 0
+        }
+    }
+
+    // MARK: - Phase 54C.3: Recommended for your home row
+
+    /// Low-key entry point into the "Recommended for your home"
+    /// browsing surface. Always visible (no badge count) because the
+    /// destination's empty state handles the zero-recommendation
+    /// case, and the value-preservation templates aren't a backlog
+    /// that needs urgency framing — they're a library.
+    @ViewBuilder
+    private var recommendedServicesRow: some View {
+        if viewModel.property?.householdId != nil {
+            Button {
+                Haptics.light()
+                showRecommendedServices = true
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 36, height: 36)
+                        .background(HavenColors.beige200)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Recommended for your home")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("Value-preservation services to discover")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -1290,81 +1806,117 @@ struct PropertyDetailView: View {
         } // end VStack wrapper
     }
 
-    // MARK: - Vendors
+    // MARK: - Vendors (Phase 56.1 — Contacts Hub)
 
+    /// Apple Contacts / Linear-style contacts directory. Canonical home
+    /// for vendor management. Add button routes directly to
+    /// `AddVendorSheet` (one tap). Search + filter chips live at the top.
+    /// "Add or discover" section at the bottom consolidates the
+    /// discovery actions that used to sit in Vendor Coverage.
     private var vendorsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             HStack {
                 Text("Home & Estate Contacts")
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
-                NavigationLink {
-                    ContractorDirectoryView()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(HavenColors.navy700)
-                            .imageScale(.medium)
-                        Text("Add")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy700)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(HavenColors.navy.opacity(0.08))
-                    .clipShape(Capsule())
-                }
+                addContactButton
             }
 
-            // Show ALL household contractors (not just system-assigned)
-            if viewModel.contractors.isEmpty {
-                HavenCard {
-                    VStack(spacing: 10) {
-                        Image(systemName: "person.2")
-                            .font(.title2)
-                            .foregroundStyle(HavenColors.textSecondary)
-                        Text("Add your trusted contractors and service providers here.")
-                            .font(HavenTypography.bodySmall)
-                            .foregroundStyle(HavenColors.textSecondary)
-                            .multilineTextAlignment(.center)
+            if !viewModel.contractors.isEmpty {
+                searchField
+                filterChipsRow
+            }
 
-                        HStack(spacing: 12) {
-                            NavigationLink {
-                                ContractorDirectoryView()
-                            } label: {
-                                Text("Add a Vendor")
-                                    .font(HavenTypography.uiLabelSmall)
-                                    .foregroundStyle(HavenColors.navy800)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(HavenColors.navy.opacity(0.08))
-                                    .clipShape(Capsule())
-                            }
+            contactsList
 
-                            Button {
-                                Haptics.light()
-                                showAlfredChat = true
-                            } label: {
-                                Text("Ask Alfred to Find One")
-                                    .font(HavenTypography.uiLabelSmall)
-                                    .foregroundStyle(HavenColors.navy700)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .overlay(Capsule().stroke(HavenColors.navy.opacity(0.2), lineWidth: 1))
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+            if !viewModel.contractors.isEmpty {
+                addOrDiscoverSection
+            }
+        }
+    }
+
+    // MARK: Add button
+
+    private var addContactButton: some View {
+        Button {
+            Haptics.light()
+            showAddVendor = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.navy700)
+                    .imageScale(.medium)
+                Text("Add")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(HavenColors.navy.opacity(0.08))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Search + filter chips
+
+    private var searchField: some View {
+        HStack(spacing: HavenTheme.spacing8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
+                .foregroundStyle(HavenColors.textTertiary)
+            TextField("Search by name, company, or specialty", text: $contactsSearchText)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !contactsSearchText.isEmpty {
+                Button {
+                    Haptics.light()
+                    contactsSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
-            } else {
-                ForEach(viewModel.contractors) { contractor in
-                    NavigationLink {
-                        ContractorDetailView(contractor: contractor)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, HavenTheme.spacing12)
+        .padding(.vertical, 10)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    private var filterChipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(ContactsFilter.allCases) { filter in
+                    Button {
+                        Haptics.selection()
+                        contactsFilter = filter
                     } label: {
-                        contractorCardInline(contractor)
+                        HStack(spacing: 4) {
+                            Image(systemName: filter.icon)
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(filter.rawValue)
+                                .font(HavenTypography.uiCaption)
+                        }
+                        .foregroundStyle(
+                            contactsFilter == filter
+                                ? HavenColors.textOnNavy
+                                : HavenColors.navy700
+                        )
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            contactsFilter == filter
+                                ? HavenColors.navy
+                                : HavenColors.navy.opacity(0.08)
+                        )
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -1372,47 +1924,551 @@ struct PropertyDetailView: View {
         }
     }
 
-    private func contractorCardInline(_ contractor: ContractorRow) -> some View {
-        HavenCard(padding: HavenTheme.spacing12) {
-            HStack(spacing: 10) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(HavenColors.navy)
+    // MARK: Contacts list
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(contractor.companyName)
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textPrimary)
-                    if let specialties = contractor.specialties, !specialties.isEmpty {
-                        Text(specialties.joined(separator: ", "))
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                            .lineLimit(1)
-                    } else if let contact = contractor.contactName {
-                        Text(contact)
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
+    @ViewBuilder
+    private var contactsList: some View {
+        if viewModel.contractors.isEmpty {
+            emptyContactsState
+        } else if filteredContacts.isEmpty {
+            noMatchesState
+        } else {
+            VStack(spacing: 6) {
+                ForEach(filteredContacts) { contractor in
+                    NavigationLink {
+                        ContractorDetailView(contractor: contractor)
+                    } label: {
+                        contractorRow(
+                            contractor,
+                            showAttentionReason: contactsFilter == .needsAttention
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
-
-                Spacer()
-
-                if let rating = contractor.rating {
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                            .font(.caption2)
-                            .foregroundStyle(HavenColors.warning)
-                        Text("\(rating)")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(HavenColors.textTertiary)
             }
         }
+    }
+
+    private var emptyContactsState: some View {
+        HavenCard {
+            VStack(spacing: 10) {
+                Image(systemName: "person.2")
+                    .font(.title2)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text("Add your trusted contractors and service providers here.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 12) {
+                    Button {
+                        Haptics.light()
+                        showAddVendor = true
+                    } label: {
+                        Text("Add a Vendor")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy800)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(HavenColors.navy.opacity(0.08))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        Haptics.light()
+                        showAlfredChat = true
+                    } label: {
+                        Text("Ask Alfred to Find One")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .overlay(Capsule().stroke(HavenColors.navy.opacity(0.2), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var noMatchesState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 24))
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("No contacts match")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+            if !contactsSearchText.isEmpty {
+                Button {
+                    Haptics.light()
+                    contactsSearchText = ""
+                } label: {
+                    Text("Clear search")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.navy700)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+
+    // MARK: Row rendering
+
+    /// Apple Contacts-style single-line row with logo, truncated display
+    /// name, primary specialty, optional routine badge, and chevron.
+    /// Replaces the card-chrome `contractorCardInline` for density.
+    ///
+    /// Phase 56.1: when `showAttentionReason` is true (the Needs
+    /// Attention filter is active), the caption swaps from the
+    /// specialty to an amber "Needs phone · email" line and a trailing
+    /// dismiss button replaces part of the chevron track.
+    private func contractorRow(
+        _ contractor: ContractorRow,
+        showAttentionReason: Bool = false
+    ) -> some View {
+        let reason = showAttentionReason ? attentionReason(for: contractor) : nil
+        return HStack(spacing: HavenTheme.spacing12) {
+            VendorLogoView(contractor: contractor, size: 32)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(displayName(for: contractor))
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(1)
+                if let reason {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(HavenColors.warning)
+                        Text(reason)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.warning)
+                            .lineLimit(1)
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        if let specialty = primarySpecialty(for: contractor) {
+                            Text(specialty)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .lineLimit(1)
+                        }
+                        if isRoutineServed(contractor) {
+                            routineBadge
+                        }
+                    }
+                    if let activity = vendorActivitySubtitle(for: contractor) {
+                        Text(activity)
+                            .font(.system(size: 11))
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if showAttentionReason {
+                // Inline dismiss: user marks this vendor's missing
+                // fields as "I don't care" and the row drops from the
+                // Needs Attention filter (persisted per household).
+                Button {
+                    dismissAttention(for: contractor)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .padding(.horizontal, 2)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(.horizontal, HavenTheme.spacing12)
+        .padding(.vertical, 10)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    private var routineBadge: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 8, weight: .semibold))
+            Text("Routine")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundStyle(HavenColors.navy700)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(HavenColors.navy.opacity(0.08))
+        .clipShape(Capsule())
+    }
+
+    private func isRoutineServed(_ contractor: ContractorRow) -> Bool {
+        viewModel.routineVendorIds.contains(contractor.id)
+    }
+
+    /// Phase 58: lightweight activity subtitle that brings Contacts rows
+    /// to life. Priority: (1) next upcoming task within 60 days → "Next:
+    /// {title} · {relative}", (2) most recent service record within 60
+    /// days → "Last: {service type} · {relative}", (3) nil.
+    private func vendorActivitySubtitle(for contractor: ContractorRow) -> String? {
+        let todayStr: String = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: Date())
+        }()
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        let sixtyDaysOut = Calendar.current.date(byAdding: .day, value: 60, to: now) ?? now
+        let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: now) ?? now
+
+        // Next upcoming task within 60 days
+        let next = viewModel.maintenanceTasks
+            .filter { $0.assignedContractorId == contractor.id }
+            .filter { $0.nextDueDate >= todayStr }
+            .compactMap { task -> (MaintenanceTaskDBRow, Date)? in
+                guard let d = fmt.date(from: task.nextDueDate), d <= sixtyDaysOut else { return nil }
+                return (task, d)
+            }
+            .min { $0.1 < $1.1 }
+        if let (task, date) = next {
+            return "Next: \(shortTitle(task.title)) · \(relativeLabel(for: date))"
+        }
+
+        // Most recent service record within 60 days
+        let recent = viewModel.serviceRecords
+            .filter { $0.contractorId == contractor.id }
+            .compactMap { record -> (ServiceRecordRow, Date)? in
+                guard let d = fmt.date(from: record.serviceDate), d >= sixtyDaysAgo else { return nil }
+                return (record, d)
+            }
+            .max { $0.1 < $1.1 }
+        if let (record, date) = recent {
+            return "Last: \(shortTitle(record.description)) · \(relativeLabel(for: date))"
+        }
+
+        return nil
+    }
+
+    private func shortTitle(_ title: String) -> String {
+        // Truncate titles over 24 chars at a natural break point.
+        if title.count <= 24 { return title }
+        let trimmed = String(title.prefix(24))
+        if let lastSpace = trimmed.lastIndex(of: " ") {
+            return String(trimmed[..<lastSpace]) + "…"
+        }
+        return trimmed + "…"
+    }
+
+    private func relativeLabel(for date: Date) -> String {
+        let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+        if days == 0 { return "today" }
+        if days == 1 { return "tomorrow" }
+        if days == -1 { return "yesterday" }
+        if days > 0 {
+            if days < 7 { return "in \(days) days" }
+            if days < 14 { return "next week" }
+            if days < 30 { return "in \(days / 7) weeks" }
+            return "in \(days / 30) month\(days / 30 == 1 ? "" : "s")"
+        }
+        let ago = -days
+        if ago < 7 { return "\(ago) days ago" }
+        if ago < 14 { return "last week" }
+        if ago < 30 { return "\(ago / 7) weeks ago" }
+        return "\(ago / 30) month\(ago / 30 == 1 ? "" : "s") ago"
+    }
+
+    /// Phase 56.1: Display name handling for vendors with very long
+    /// company names. "Tyler Heating, Air Conditioning, Refrigeration..."
+    /// truncates badly in a row UI; show the short form (first
+    /// comma-segment) in the list while `ContractorDetailView` still
+    /// shows the full name.
+    private func displayName(for contractor: ContractorRow) -> String {
+        let full = contractor.companyName
+        if full.count <= 28 && !full.contains(",") { return full }
+        if let firstComma = full.firstIndex(of: ",") {
+            return String(full[..<firstComma])
+                .trimmingCharacters(in: .whitespaces)
+        }
+        return full
+    }
+
+    // MARK: Needs-attention helpers
+
+    /// Phase 56.1: Returns the human-readable list of data-quality
+    /// fields the vendor is missing, in the order we'd want a user to
+    /// fill them in (most impactful first). Used to build the row
+    /// caption when the Needs Attention filter is active.
+    ///
+    /// A non-empty return means the vendor qualifies for the Needs
+    /// Attention filter. When the user dismisses a vendor, we suppress
+    /// the row even though this still returns a non-empty list.
+    private func missingFields(for contractor: ContractorRow) -> [String] {
+        var missing: [String] = []
+
+        let phoneRaw = contractor.phone
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if phoneRaw.isEmpty
+            || phoneRaw.caseInsensitiveCompare("Not provided") == .orderedSame {
+            missing.append("phone")
+        }
+
+        let email = contractor.email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if email.isEmpty {
+            missing.append("email")
+        }
+
+        let hasSpecialty = (contractor.specialties?.isEmpty == false)
+        let hasCategory = (contractor.category?.isEmpty == false)
+        if !hasSpecialty && !hasCategory {
+            missing.append("category")
+        }
+
+        return missing
+    }
+
+    /// Phase 56.1: Amber caption like "Needs phone · email" that
+    /// replaces the specialty line when the Needs Attention filter is
+    /// active. Capitalizes the first word only to keep it readable.
+    private func attentionReason(for contractor: ContractorRow) -> String? {
+        let fields = missingFields(for: contractor)
+        guard !fields.isEmpty else { return nil }
+        let joined = fields.joined(separator: " \u{00B7} ")
+        return "Needs \(joined)"
+    }
+
+    /// Phase 56.1: UserDefaults key for per-household attention
+    /// dismissal persistence. Household-scoped so switching households
+    /// doesn't leak dismissals across.
+    private func attentionDismissalKey(householdId: UUID) -> String {
+        "contacts_attention_dismissed_v1_\(householdId.uuidString)"
+    }
+
+    private func loadAttentionDismissals() {
+        guard let householdId = viewModel.property?.householdId else {
+            attentionDismissedIds = []
+            return
+        }
+        let raw = UserDefaults.standard
+            .stringArray(forKey: attentionDismissalKey(householdId: householdId)) ?? []
+        attentionDismissedIds = Set(raw.compactMap { UUID(uuidString: $0) })
+    }
+
+    private func dismissAttention(for contractor: ContractorRow) {
+        guard let householdId = viewModel.property?.householdId else { return }
+        Haptics.light()
+        attentionDismissedIds.insert(contractor.id)
+        let ids = attentionDismissedIds.map(\.uuidString)
+        UserDefaults.standard.setValue(
+            ids,
+            forKey: attentionDismissalKey(householdId: householdId)
+        )
+    }
+
+    /// Phase 56.1: Render up to two non-estate specialties in the row
+    /// caption so multi-category vendors (e.g. Orkin for Pest Control +
+    /// Mosquito & Tick, a landscaper for Landscaping + Snow Removal)
+    /// are visible at a glance. The data model already supports
+    /// multi-category via `specialties: [String]?`; this just surfaces
+    /// it. When more than two apply, suffix with "+N".
+    private func primarySpecialty(for contractor: ContractorRow) -> String? {
+        guard let specialties = contractor.specialties, !specialties.isEmpty else {
+            return contractor.contactName
+        }
+        let estateLabels: Set<String> = [
+            "Contractor / Service Provider", "Attorney",
+            "Financial Advisor / CPA", "Insurance Agent",
+            "Property Manager", "Other"
+        ]
+        let nonEstate = specialties.filter { !estateLabels.contains($0) }
+        let pool = nonEstate.isEmpty ? specialties : nonEstate
+        let visible = Array(pool.prefix(2))
+        var caption = visible.joined(separator: " \u{00B7} ")
+        let hidden = pool.count - visible.count
+        if hidden > 0 { caption += " +\(hidden)" }
+        return caption.isEmpty ? contractor.contactName : caption
+    }
+
+    // MARK: Filtered list
+
+    /// Apply search + filter to the contractor roster. Search matches
+    /// company name, contact name, or specialty. Filter chips:
+    ///   - All:                  every contact
+    ///   - Service-based:        contractors with vendor-coded specialties
+    ///   - Routines:             vendors linked to an active routine
+    ///   - Estate professionals: attorneys, advisors, insurance, property mgmt
+    ///   - Needs attention:      contacts missing specialty or email
+    private var filteredContacts: [ContractorRow] {
+        var result = viewModel.contractors
+
+        let trimmed = contactsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            let needle = trimmed.lowercased()
+            result = result.filter { contractor in
+                if contractor.companyName.lowercased().contains(needle) { return true }
+                if let name = contractor.contactName?.lowercased(),
+                   name.contains(needle) { return true }
+                if let specialties = contractor.specialties,
+                   specialties.contains(where: { $0.lowercased().contains(needle) }) {
+                    return true
+                }
+                return false
+            }
+        }
+
+        let estateLabels = Set([
+            "Attorney", "Financial Advisor / CPA", "Insurance Agent",
+            "Property Manager"
+        ])
+
+        switch contactsFilter {
+        case .all:
+            break
+        case .serviceBased:
+            result = result.filter { contractor in
+                guard let specialties = contractor.specialties else { return false }
+                return !specialties.contains(where: { estateLabels.contains($0) })
+            }
+        case .routine:
+            let routineVendorIds = viewModel.routineVendorIds
+            result = result.filter { routineVendorIds.contains($0.id) }
+        case .estate:
+            result = result.filter { contractor in
+                guard let specialties = contractor.specialties else { return false }
+                return specialties.contains(where: { estateLabels.contains($0) })
+            }
+        case .needsAttention:
+            // Phase 56.1: flag vendors missing phone, email, or
+            // category — each surfaced as a specific reason ("Needs
+            // phone · email") via the row renderer so the user knows
+            // exactly what to fix, plus a dismiss button for the "I
+            // don't care about this one" case. Dismissals are stored
+            // per-household in UserDefaults.
+            result = result.filter { contractor in
+                guard !attentionDismissedIds.contains(contractor.id) else {
+                    return false
+                }
+                return !missingFields(for: contractor).isEmpty
+            }
+        }
+
+        return result
+    }
+
+    // MARK: Add or discover
+
+    /// Consolidates the vendor/system/routine/recommendation discovery
+    /// actions that previously lived in Vendor Coverage. Section lives
+    /// at the bottom of the Contacts sub-tab so the directory itself
+    /// stays focused while discovery is one scroll away.
+    private var addOrDiscoverSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("ADD OR DISCOVER")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+                .padding(.top, HavenTheme.spacing16)
+
+            addOrDiscoverRow(
+                icon: "person.crop.rectangle.badge.plus",
+                title: "Add a vendor",
+                subtitle: "Contractor, attorney, advisor",
+                action: {
+                    Haptics.light()
+                    showAddVendor = true
+                }
+            )
+
+            addOrDiscoverRow(
+                icon: "magnifyingglass.circle.fill",
+                title: "Browse specialty systems",
+                subtitle: "Pool, spa, EV charger, wine cellar, elevator",
+                action: {
+                    Haptics.light()
+                    showBrowseSpecialty = true
+                }
+            )
+
+            addOrDiscoverRow(
+                icon: "plus.square.on.square",
+                title: "Add a custom system",
+                subtitle: "Something the catalog doesn't cover",
+                action: {
+                    Haptics.light()
+                    showAddSystem = true
+                }
+            )
+
+            addOrDiscoverRow(
+                icon: "calendar.badge.plus",
+                title: "Add a routine",
+                subtitle: "Cleaning, lawn care, pool service, trash day",
+                action: {
+                    Haptics.light()
+                    showWeeklyCadences = true
+                }
+            )
+
+            addOrDiscoverRow(
+                icon: "sparkles",
+                title: "See recommended services",
+                subtitle: "Tree, window washing, power washing, more",
+                action: {
+                    Haptics.light()
+                    showRecommendedServices = true
+                }
+            )
+        }
+    }
+
+    private func addOrDiscoverRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: HavenTheme.spacing12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(width: 32, height: 32)
+                    .background(HavenColors.navy.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text(subtitle)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing12)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .stroke(HavenColors.beige200.opacity(0.6), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Service History
@@ -1555,8 +2611,8 @@ struct PropertyDetailView: View {
             }
 
             if viewModel.vendorName(for: task.systemId) == nil {
-                NavigationLink {
-                    ContractorDirectoryView()
+                Button {
+                    vendorAssignmentTask = task
                 } label: {
                     Label("Assign a Vendor", systemImage: "person.badge.plus")
                 }

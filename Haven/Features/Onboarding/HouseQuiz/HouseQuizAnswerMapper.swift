@@ -274,21 +274,32 @@ final class HouseQuizAnswerMapper {
                         )
                     }
                 }
-                // Build 84: hardscape-heavy outdoor spaces (stone patio, gravel
-                // drive, paver walkways) instead of a traditional lawn. We
-                // create a dedicated "Outdoor Hardscape" system + 4 real
-                // maintenance tasks so HNW homeowners with stone-and-paver
-                // yards see Haven schedule the right upkeep instead of
-                // dropping outdoor maintenance entirely. Q11b is auto-skipped
-                // for hardscape via dynamicSkip — this is the only place
-                // hardscape side-effects are created.
+                // Build 84 / Phase 60.2 (F13): hardscape-heavy outdoor
+                // spaces (stone patio, gravel drive, paver walkways)
+                // instead of a traditional lawn. We create a dedicated
+                // "Outdoor Hardscape" system with subtype "hardscape"
+                // and let the reconciler seed the four hardscape templates
+                // (pressure wash, joint sand, weed treatment, drainage
+                // check) through the standard path. Before Phase 60.2
+                // these tasks were built inline in
+                // `createHardscapeMaintenanceTasks` with three stamped
+                // `.personal` — that made them sticky across Q36
+                // preference tier changes. Now they're `.either` in the
+                // template library and flip correctly.
                 if answer.answerId == "hardscape" {
                     if let hardscapeSystemId = try await ensureHomeSystem(
                         name: "Outdoor Hardscape",
                         category: "Landscaping",
                         subtype: "hardscape"
                     ) {
-                        try await createHardscapeMaintenanceTasks(systemId: hardscapeSystemId)
+                        let hardscapeResult = await MaintenanceTaskReconciler.reconcile(
+                            propertyId: propertyId,
+                            householdId: householdId,
+                            systemId: hardscapeSystemId,
+                            systemCategory: "Landscaping",
+                            confirmedSubtype: "hardscape"
+                        )
+                        reconciliationResult = reconciliationResult.merging(hardscapeResult)
                     }
                 }
 
@@ -744,6 +755,36 @@ final class HouseQuizAnswerMapper {
                         value: selected.joined(separator: ",")
                     )
 
+                    // Phase 63 (+ Bug B5 refinement): derive 3-way handyman
+                    // preference from chip state + existing household state.
+                    // Captured as `properties.attributes.handyman_preference`:
+                    //   - "has_one"    → handyman chip selected with a provider
+                    //                    OR a Handyman-category contractor
+                    //                    already exists in the household
+                    //                    (from a prior quiz / manual add)
+                    //   - "needs_help" → handyman chip selected WITHOUT a
+                    //                    provider and no existing handyman
+                    //   - "does_diy"   → no handyman chip, no existing handyman
+                    // Users can override this later from Settings → Task
+                    // Preferences → Handyman preference.
+                    let handymanSelected = selected.contains("handyman")
+                    let handymanProviderCaptured = (answer.customEntries ?? [])
+                        .compactMap { Self.parseContractorChipEntry($0) }
+                        .contains { $0.chipId == "handyman" }
+                    let preExistingContractors = (try? await db.fetchContractors()) ?? []
+                    let existingHandymanContractor = preExistingContractors.contains {
+                        $0.category?.caseInsensitiveCompare("Handyman") == .orderedSame
+                    }
+                    let handymanPreference: String
+                    if (handymanSelected && handymanProviderCaptured) || existingHandymanContractor {
+                        handymanPreference = "has_one"
+                    } else if handymanSelected {
+                        handymanPreference = "needs_help"
+                    } else {
+                        handymanPreference = "does_diy"
+                    }
+                    try await persistAttribute("handyman_preference", value: handymanPreference)
+
                     if let entries = answer.customEntries {
                         let existing = (try? await db.fetchContractors()) ?? []
                         for entry in entries {
@@ -781,7 +822,58 @@ final class HouseQuizAnswerMapper {
                             // contractors table has no rating/review/certified
                             // columns yet — when we add them, this can move.
                             insert.notes = parsed.attributionNotes()
-                            _ = try? await db.createContractor(insert)
+                            let createdContractor = try? await db.createContractor(insert)
+
+                            // Phase 63: the handyman chip is special — when
+                            // the user provides a named handyman, link them
+                            // to the household as the preferred one. Used by
+                            // the routing affordance ("Add to Mike's list"),
+                            // Alfred context, and the FindHandymanCard.
+                            if chipId == "handyman", let contractor = createdContractor {
+                                var update = HouseholdUpdate()
+                                update.preferredHandymanContractorId = contractor.id
+                                _ = try? await db.updateHousehold(id: householdId, update)
+                            }
+
+                            // Phase 66: create an ACTIVE routine for this
+                            // category with the captured contractor as
+                            // vendor_id. Day1TaskCurator finds active
+                            // routines here when routing vendor tasks —
+                            // creating the routine at Q15b means the
+                            // curator routes into it instead of falling
+                            // back to a pending-vendor routine.
+                            //
+                            // The handyman chip is intentionally excluded:
+                            // handyman routines are on-demand singletons
+                            // created lazily by `fetchOrCreateHandymanRoutine`
+                            // (with the preferred handyman vendor linked
+                            // via the household's preferred_handyman_contractor_id
+                            // that we just stamped above).
+                            if let contractor = createdContractor,
+                               chipId != "handyman",
+                               let kind = RoutineGroupingEngine.routineKindFor(systemCategory: category) {
+                                await ensureVendorRoutineForCategory(
+                                    kind: kind,
+                                    category: category,
+                                    contractor: contractor
+                                )
+                            }
+
+                            // Phase 60.2 (F2): flip any already-materialized
+                            // maintenance tasks in this category to vendor-
+                            // managed now that the contractor is captured.
+                            // Most categories create tasks AFTER Q15b (via
+                            // reconcileAll at quiz completion) so this flip
+                            // is typically a no-op during the first quiz
+                            // pass. But on re-entry / back-nav / quiz-resume
+                            // when tasks already exist, this catches them.
+                            // The reconciler's `.vendor`-template path
+                            // handles the auto-link case on fresh task
+                            // creation via `matchingContractor`.
+                            await flipCategoryTasksToVendor(
+                                systemCategory: category,
+                                providerName: providerName
+                            )
                         }
                     }
 
@@ -1478,11 +1570,161 @@ final class HouseQuizAnswerMapper {
         case "roofer":             return "Roofing"
         case "septic_pumper":      return "Septic System"
         case "well_water_service": return "Well System"
-        case "chimney_sweep":      return "Fire Protection"
-        case "tree_service":       return "Landscaping"
-        case "handyman":           return nil
+        // Phase 60.6: chimney_sweep now maps to the "Chimney" registry
+        // category (Tier 2, showInVendorCoverage: true). The previous
+        // "Fire Protection" mapping pointed at a sub-system category
+        // with `showInVendorCoverage: false`, so every chimney_sweep
+        // chip the user picked was captured as a contractor but never
+        // visible in Vendor Coverage. `canonicalizeContractorCategoriesOnceIfNeeded`
+        // heals pre-60.6 rows by migrating "Fire Protection" → "Chimney".
+        case "chimney_sweep":      return "Chimney"
+        // Phase 60.6: tree_service maps to the dedicated "Tree Service"
+        // Tier 2 registry category so arborist vendors show up on their
+        // own row in Vendor Coverage instead of collapsing into
+        // Landscaping. The `canonicalizeContractorCategoriesOnceIfNeeded`
+        // backfill also migrates legacy "Landscaping"-stamped tree rows
+        // only when specialties explicitly mention tree/arborist.
+        case "tree_service":       return "Tree Service"
+        // Phase 60.6: new chips. hardscape maps to Landscaping because
+        // masonry/paver pros are usually Landscaping-category contractors
+        // (and the Outdoor Hardscape system is created with subtype
+        // "hardscape" under Landscaping). generator_service maps to
+        // Generator so the backup-generator service vendor shows up in
+        // Vendor Coverage instead of orphaning on "Electrical".
+        case "hardscape":          return "Landscaping"
+        case "generator_service":  return "Generator"
+        // Phase 60.2 (F1): Handyman is a Tier 1 category post-Phase-58 with
+        // spring/fall punch-list bundles. This mapping was silently nil for
+        // weeks — users who picked a handyman at Q15b had their vendor
+        // captured but zero handyman tasks were flipped to vendor-managed
+        // (because flipCategoryTasksToVendor also didn't know about this
+        // category; see flipCategoryTasksToVendor for the companion fix).
+        case "handyman":           return "Handyman"
+        // Phase 60.2 (F5): new vendor categories with RoutineSeeder wiring.
+        // Each chip id maps to the canonical SystemCategoryRegistry key so
+        // a contractor mirror lands with a recognized category string and
+        // the matching RoutineSeeder archetype fires automatically (on
+        // DatabaseService.createContractor → seedIfNeeded).
+        case "cleaning":           return "Cleaning Service"
+        case "snow_removal":       return "Snow Removal"
+        case "mosquito_tick":      return "Mosquito & Tick"
+        case "pet_waste":          return "Pet Waste"
         default:                   return nil
         }
+    }
+
+    /// Phase 66: Ensure an ACTIVE vendor routine exists for a category
+    /// after Q15b captures a contractor. Idempotent — if a routine with
+    /// this `(household, property, routine_kind)` is already active, we
+    /// just update its vendor_id to point at the newly-captured contractor.
+    ///
+    /// This is what lets Day1TaskCurator route vendor tasks into the
+    /// routine at quiz completion. Without an active routine for the
+    /// category, the curator falls back to a pending-vendor routine —
+    /// correct behavior, but we can do better when Q15b gave us the vendor.
+    ///
+    /// The handyman chip is excluded by the caller because the handyman
+    /// routine is a lazy-created singleton managed by
+    /// `fetchOrCreateHandymanRoutine` (seeded from the household's
+    /// `preferred_handyman_contractor_id`).
+    private func ensureVendorRoutineForCategory(
+        kind: RoutineKind,
+        category: String,
+        contractor: ContractorRow
+    ) async {
+        do {
+            let allRoutines = (try? await db.fetchRoutines(householdId: householdId)) ?? []
+            // Find an existing routine of this kind for this property. If
+            // the user re-enters the quiz with a different vendor pick,
+            // update the existing routine's vendor_id in place.
+            if let existing = allRoutines.first(where: {
+                $0.typedKind == kind
+                    && $0.typedScope == .property
+                    && ($0.propertyId == propertyId || $0.propertyId == nil)
+                    && $0.archivedAt == nil
+            }) {
+                // Only update if the vendor actually changed.
+                if existing.vendorId != contractor.id || existing.typedSetupState != .active {
+                    var update = RoutineUpdate()
+                    update.vendorId = contractor.id
+                    update.setupState = "active"
+                    _ = try? await db.updateRoutine(id: existing.id, update)
+                }
+                return
+            }
+
+            // No existing routine — create one. Default cadence comes
+            // from the routine kind's expected rhythm. The user can
+            // refine later via the setup sheet.
+            let (cadenceType, cadenceInterval, activeMonths) = defaultCadenceForQuizRoutine(kind: kind)
+            var insert = RoutineInsert(
+                householdId: householdId,
+                propertyId: propertyId,
+                label: routineLabel(kind: kind, vendor: contractor),
+                routineKind: kind.rawValue,
+                cadenceType: cadenceType.rawValue
+            )
+            if cadenceType == .customDays {
+                insert.cadenceIntervalDays = cadenceInterval
+            }
+            insert.vendorId = contractor.id
+            insert.icon = kind.icon
+            insert.setupState = "active"
+            insert.activeMonths = activeMonths
+            let created = try? await db.createRoutine(insert)
+            Analytics.track(.routineActivated, [
+                "source": "q15b",
+                "routine_kind": kind.rawValue,
+                "category": category
+            ])
+
+            // Phase 66: run the grouping engine so any pre-existing
+            // vendor tasks in this category get linked to the new
+            // routine. Day1TaskCurator handles fresh reconcile-created
+            // tasks; this covers the back-nav / re-answer case where
+            // tasks already existed before the routine.
+            if let routine = created {
+                _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                    routine,
+                    in: householdId,
+                    propertyId: propertyId
+                )
+            }
+        }
+    }
+
+    /// Phase 66: Default cadence per routine kind for routines created at
+    /// Q15b. Matches Day1TaskCurator.defaultCadence but has category-
+    /// specific active_months overrides for seasonal services (snow
+    /// removal December-April, lawn care April-November, etc.).
+    private func defaultCadenceForQuizRoutine(
+        kind: RoutineKind
+    ) -> (RoutineCadenceType, Int, [Int]) {
+        let yearRound = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        switch kind {
+        case .cleaning: return (.biweekly, 14, yearRound)
+        case .landscaping: return (.weekly, 7, [4, 5, 6, 7, 8, 9, 10, 11])
+        case .poolService: return (.weekly, 7, [5, 6, 7, 8, 9])
+        case .pestControl: return (.quarterly, 91, yearRound)
+        case .petWaste: return (.weekly, 7, yearRound)
+        case .mosquitoTick: return (.monthly, 30, [4, 5, 6, 7, 8, 9, 10])
+        case .snowRemoval: return (.annual, 365, [12, 1, 2, 3, 4])
+        case .gutterCleaning: return (.semiannual, 182, yearRound)
+        case .windowCleaning: return (.semiannual, 182, yearRound)
+        case .treeService: return (.annual, 365, yearRound)
+        case .handymanRecurring: return (.customDays, 9999, yearRound)
+        default: return (.annual, 365, yearRound)
+        }
+    }
+
+    /// Phase 66: Human-readable routine label for the Your Services card.
+    /// Format: "Landscaping · Blue Fox" — reads naturally in the routines
+    /// list and the services section.
+    private func routineLabel(kind: RoutineKind, vendor: ContractorRow) -> String {
+        let vendorLabel = vendor.companyName.isEmpty
+            ? (vendor.contactName ?? kind.displayLabel)
+            : vendor.companyName
+        return "\(kind.displayLabel) · \(vendorLabel)"
     }
 
     /// Phase 19k / 54E.3: Mirrors a quiz-captured service vendor into
@@ -1599,113 +1841,15 @@ final class HouseQuizAnswerMapper {
         s.filter { $0.isNumber }
     }
 
-    /// Build 84: Hardscape maintenance set. Q11 = "hardscape" routes here to
-    /// create 4 real maintenance tasks tied to the new "Outdoor Hardscape"
-    /// system so HNW homeowners with paver/stone/gravel yards aren't dropped
-    /// off the maintenance schedule entirely. Created directly here (not
-    /// via MaintenanceTemplates) because these are one-off branch tasks
-    /// that don't need template reconciliation. `createMaintenanceTask`
-    /// already dedups by title within property/system, so re-running the
-    /// quiz won't create duplicates.
-    ///
-    /// Build 84 polish (Tom's Item 3 call): pressure washing is now
-    /// `either` so the post-quiz vendor delegation sheet (Phase 19l) can
-    /// offer to flip it to vendor-managed when a landscaping or
-    /// pressure-wash contractor is added later. The other three (joint
-    /// sand, weed treatment, drainage check) stay `personal` because
-    /// they're DIY-only by nature for HNW homeowners.
-    private func createHardscapeMaintenanceTasks(systemId: UUID) async throws {
-        let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-
-        struct HardscapeTaskSpec {
-            let title: String
-            let description: String
-            let frequency: String
-            let monthsUntilDue: Int
-            let priority: String
-            let seasonalTiming: String?
-            let templateKey: String
-            let diyEffortLabel: String
-            let assignmentType: String
-        }
-
-        let specs: [HardscapeTaskSpec] = [
-            HardscapeTaskSpec(
-                title: "Pressure wash patio and walkways",
-                description: "Pressure wash stone, paver, and concrete hardscape surfaces to clear winter grime, mildew, and algae. Use a fan tip and avoid stripping joint sand.",
-                frequency: "Annually",
-                monthsUntilDue: 1,
-                priority: "Medium",
-                seasonalTiming: "Spring",
-                templateKey: "landscaping:hardscape_pressure_wash",
-                diyEffortLabel: "About 2 hours",
-                // Build 84 polish: flippable via the Phase 19l delegation
-                // sheet so a landscaping contractor on file can take it
-                // over without forcing the user to recreate the task.
-                assignmentType: "either"
-            ),
-            HardscapeTaskSpec(
-                title: "Top up joint sand in pavers",
-                description: "Sweep polymeric joint sand into paver gaps where it has washed out. Mist lightly to set the polymer. Prevents weed germination and keeps pavers locked.",
-                frequency: "Every 2 years",
-                monthsUntilDue: 4,
-                priority: "Low",
-                seasonalTiming: "Summer",
-                templateKey: "landscaping:hardscape_joint_sand",
-                diyEffortLabel: "About 1 hour",
-                assignmentType: "personal"
-            ),
-            HardscapeTaskSpec(
-                title: "Treat weeds between pavers",
-                description: "Spot-treat weeds growing between pavers and along hardscape edges. Pull large clumps by hand first, then apply a targeted herbicide or boiling water.",
-                frequency: "Quarterly",
-                monthsUntilDue: 1,
-                priority: "Low",
-                seasonalTiming: "Spring",
-                templateKey: "landscaping:hardscape_weed_treatment",
-                diyEffortLabel: "About 30 minutes",
-                assignmentType: "personal"
-            ),
-            HardscapeTaskSpec(
-                title: "Check hardscape drainage and grading",
-                description: "Walk hardscape edges after a rain to confirm water is moving away from the house. Look for sunken pavers, ponding, and drainage swales that have silted in.",
-                frequency: "Annually",
-                monthsUntilDue: 7,
-                priority: "Medium",
-                seasonalTiming: "Fall",
-                templateKey: "landscaping:hardscape_drainage_check",
-                diyEffortLabel: "About 30 minutes",
-                assignmentType: "personal"
-            ),
-        ]
-
-        for spec in specs {
-            let nextDue = calendar.date(byAdding: .month, value: spec.monthsUntilDue, to: now) ?? now
-            var insert = MaintenanceTaskInsert(
-                householdId: householdId,
-                title: spec.title,
-                frequency: spec.frequency,
-                nextDueDate: formatter.string(from: nextDue)
-            )
-            insert.propertyId = propertyId
-            insert.systemId = systemId
-            insert.description = spec.description
-            insert.priority = spec.priority
-            insert.isTemplateBased = true
-            insert.templateId = spec.templateKey
-            insert.seasonalTiming = spec.seasonalTiming
-            insert.isDiy = true
-            insert.professionalRequired = false
-            insert.costRange = "$0 (DIY)"
-            insert.assignmentType = spec.assignmentType
-            insert.needsVendor = false
-            insert.notes = spec.diyEffortLabel
-            _ = try? await db.createMaintenanceTask(insert)
-        }
-    }
+    // Phase 60.2 (F13): `createHardscapeMaintenanceTasks` was deleted.
+    // Hardscape tasks now live in `MaintenanceTemplates.swift` with
+    // `requiredSubtypes: ["hardscape"]` so they flow through the normal
+    // reconciler path — dedup by templateKey, honor Q36 preference tier,
+    // interpolate city/state, and flip to vendor cleanly when a
+    // landscaping contractor is captured. The Q11 hardscape branch in
+    // `apply(question:answer:)` now calls `MaintenanceTaskReconciler.reconcile`
+    // directly with `confirmedSubtype: "hardscape"` instead of constructing
+    // the four tasks inline.
 
     // MARK: - Phase 54A: Missing-system auto-create
 
@@ -1802,8 +1946,16 @@ final class HouseQuizAnswerMapper {
             .init(category: "Pet Waste", subtype: nil, shouldCreate: hasPets),
             .init(category: "Chimney", subtype: chimneySubtype, shouldCreate: hasChimney),
             .init(category: "Snow Removal", subtype: nil, shouldCreate: isSnow),
-            // Phase 57: Air Quality for Northeast properties.
-            .init(category: "Air Quality", subtype: nil, shouldCreate: isNortheast),
+            // Phase 67 fix: Air Quality is NOT a primary system that needs
+            // its own dedicated vendor. The annual radon test can be
+            // handled by the household's handyman (it's a 2-7 day DIY kit
+            // + placement). Radon mitigation fan verification already
+            // lives as a Handyman:fall bundle child. We keep the Air
+            // Quality category + template available via "Recommended for
+            // your home" browse, but we no longer auto-create it as a
+            // primary system that triggers "you need an Air Quality
+            // vendor" coverage gaps.
+            // .init(category: "Air Quality", subtype: nil, shouldCreate: isNortheast), // REMOVED
         ]
 
         for rule in rules {

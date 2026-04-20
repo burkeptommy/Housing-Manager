@@ -51,6 +51,10 @@ enum AnalyticsEvent: String {
     // Build 85 (Apr 8, 2026): Saved-for-later review flow
     case quizSavedResumed = "quiz_saved_resumed"
     case quizSavedSkippedAll = "quiz_saved_skipped_all"
+    // Phase 60.3: chapter restructure — intro card + skip toast
+    case quizChapterIntroConfirmed = "quiz_chapter_intro_confirmed"
+    // Phase 60.4: per-chip feedback on Q15b (F8) + title personalization
+    case quizChipFeedbackShown = "quiz_chip_feedback_shown"
 
     // MARK: - Tab Navigation
     case tabSelected = "tab_selected"
@@ -90,6 +94,31 @@ enum AnalyticsEvent: String {
     /// Phase 57 — "What's New" HNW review card.
     case whatsNewPhase57Opened = "whats_new_phase57_opened"
     case whatsNewPhase57Dismissed = "whats_new_phase57_dismissed"
+    /// Phase 61 — Legacy task cleanup notification card.
+    case legacyTasksCleanupCardViewed = "legacy_tasks_cleanup_card_viewed"
+    case legacyTasksCleanupCardDismissed = "legacy_tasks_cleanup_card_dismissed"
+    case legacyTasksCleanupCardOpened = "legacy_tasks_cleanup_card_opened"
+    /// Phase 63 — Handyman preference captured at quiz + Settings override.
+    case handymanPreferenceChanged = "handyman_preference_changed"
+    case findHandymanCardTapped = "find_handyman_card_tapped"
+    /// Phase 64 — Task routing picker.
+    case taskRouteChanged = "task_route_changed"
+    case taskRoutePickerOpened = "task_route_picker_opened"
+    /// Phase 65 — Sticky routing preferences.
+    case routingPreferenceSet = "routing_preference_set"
+    case routingPreferenceUpdated = "routing_preference_updated"
+    case routingPreferenceResetAll = "routing_preference_reset_all"
+    case routingPreferencesConfirmedAnnually = "routing_preferences_confirmed_annually"
+    case routingPreferencesCardDismissed = "routing_preferences_card_dismissed"
+    /// Phase 67 — Handyman visit intelligence.
+    case handymanVisitOpened = "handyman_visit_opened"
+    case handymanVisitItemClaimedDIY = "handyman_visit_item_claimed_diy"
+    case handymanVisitItemUnclaimed = "handyman_visit_item_unclaimed"
+    case handymanVisitUpsellAdded = "handyman_visit_upsell_added"
+    case handymanVisitCustomAdded = "handyman_visit_custom_added"
+    case handymanVisitScheduled = "handyman_visit_scheduled"
+    case handymanVisitCompleted = "handyman_visit_completed"
+    case handymanVisitSkipped = "handyman_visit_skipped"
     /// Phase 54D — Household cadences (trash day, recycling, etc.).
     case householdCadenceSaved = "household_cadence_saved"
     case householdCadenceDeleted = "household_cadence_deleted"
@@ -98,6 +127,30 @@ enum AnalyticsEvent: String {
     case duplicateDetected = "duplicate_detected"
     case duplicateResolved = "duplicate_resolved"
     case duplicatePreventionWarned = "duplicate_prevention_warned"
+
+    /// Phase 66 — Routines as first-class Services.
+    case routineVendorTasksLinked = "routine_vendor_tasks_linked"
+    case vehicleRoutineTasksLinked = "vehicle_routine_tasks_linked"
+    case routineActivated = "routine_activated"
+    case routineArchivedFromServices = "routine_archived_from_services"
+    case pendingVendorRoutineCreated = "pending_vendor_routine_created"
+    case day1CuratorRan = "day1_curator_ran"
+    case day1CuratorTaskRoutedHandyman = "day1_curator_task_routed_handyman"
+    case day1CuratorTaskRoutedVendor = "day1_curator_task_routed_vendor"
+    case day1CuratorTaskRoutedPendingVendor = "day1_curator_task_routed_pending_vendor"
+    case maintenanceReorganizedCardViewed = "maintenance_reorganized_card_viewed"
+    case maintenanceReorganizedCardDismissed = "maintenance_reorganized_card_dismissed"
+    case yourServicesOpened = "your_services_opened"
+    case nextHandymanVisitOpened = "next_handyman_visit_opened"
+    case vehicleRoutineOpened = "vehicle_routine_opened"
+    case routineDetailOpened = "routine_detail_opened"
+    case seeFullYearTapped = "see_full_year_tapped"
+    /// Phase 58 — Vendor orchestration + routine seeder.
+    case vendorDetailOpened = "vendor_detail_opened"
+    case vendorBillScanStarted = "vendor_bill_scan_started"
+    case vendorBillUploaded = "vendor_bill_uploaded"
+    case vendorForwardEmailCopied = "vendor_forward_email_copied"
+    case routineSeededFromContractor = "routine_seeded_from_contractor"
 
     // MARK: - Property
     case propertyViewed = "property_viewed"

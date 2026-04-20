@@ -86,7 +86,10 @@ final class AppState: ObservableObject {
 
             if isAuthenticated {
                 PushNotificationService.shared.ensureTokenStored()
+                RealtimeService.shared.subscribe()
                 Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
+                Task { await MaintenanceTemplates.migrateTaskTitlesToActionFirst() }
+                Task { await MaintenanceTemplates.cleanupTaskTitlesP54A() }
                 Task { await Self.migrateVehicleMaintenanceTasks() }
                 Task { await Self.reconcileAllPropertiesOnce() }
                 Task { await Self.backfillUtilityAccountSnapshotsOnce() }
@@ -95,7 +98,49 @@ final class AppState: ObservableObject {
                 Task { await Self.migratePoolTasksToVendorOnce() }
                 Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                 Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
+                Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
+                Task {
+                    // Phase 54A: order matters — reseed first so bundle backfill
+                    // lands on seasonally-distributed anchor dates; missing-system
+                    // backfill last so the reconciler has somewhere to hang templates.
+                    await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
+                    await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                    await Self.backfillMissingSystemsOnceIfNeeded()
+                    // Phase 54E.3: mirror existing waste haulers +
+                    // service utilities to the contractors table.
+                    await Self.backfillUtilityContractorMirrorOnceIfNeeded()
+                    // Phase 60.6: canonicalize `contractors.category`
+                    // strings so vendor-coverage matching resolves
+                    // legacy rows (e.g. "Plumbing & Heating", "Fire
+                    // Protection" from the old chimney_sweep chip).
+                    await Self.canonicalizeContractorCategoriesOnceIfNeeded()
+                    // Phase 55.2: repair air-filter tasks that
+                    // drifted to vendor under the 54A assignment
+                    // leak. Runs AFTER the other backfills so any
+                    // reconciler-created row lands first.
+                    await MaintenanceTaskReconciler.fixAirFilterAssignmentP55()
+                    // Phase 58: archive tasks whose templates were
+                    // killed or demoted during the task library purge.
+                    // Runs LAST so earlier backfills have landed before
+                    // the orphan pass evaluates what to prune.
+                    await Self.archivePhase58OrphanedTasksOnceIfNeeded()
+                    // Phase 67: materialize bundle child rows for
+                    // existing Handyman:spring / Handyman:fall parents.
+                    // Runs AFTER the orphan pass so new children land
+                    // on a clean library. Idempotent.
+                    await MaintenanceTaskReconciler.materializeHandymanBundleChildrenOnceIfNeeded()
+                    // Phase 66: Day1TaskCurator backfill for existing
+                    // TestFlight users. Runs the four-way router (vendor
+                    // / pending-vendor / handyman / This Season) for
+                    // every property whose curator flag is unset, so
+                    // existing installs get the new five-section layout
+                    // populated on first launch without re-running the
+                    // quiz. Idempotent per-property via the standard
+                    // curator UserDefaults gate.
+                    await Self.runDay1CuratorForExistingPropertiesOnceIfNeeded()
+                }
                 Task { await Self.archivePreQuizChoreTasksOnce() }
+                Task { await Self.backfillUniversalSystemsOnce() }
                 Task { await Self.ensurePropertyValuesAreFresh() }
                 Task { await refreshPrimaryProperty() }
             } else {
@@ -103,11 +148,25 @@ final class AppState: ObservableObject {
             }
 
             // Continue listening for future auth state changes (sign out, sign in, etc.)
+            // Phase 60.1 trust fix (2026-04-20): read `needsOnboarding`
+            // atomically alongside `isAuthenticated` so ContentView never
+            // sees the transient state `isAuthenticated=true,
+            // needsOnboarding=false` on a fresh signup. The previous
+            // split-observer setup let `$isAuthenticated.values` fire
+            // first, route briefly through MainTabView/DashboardView
+            // (which kicked off merge-households + property fetches),
+            // then re-route to OnboardingView when the separate
+            // `$needsOnboarding.values` loop caught up — cancelling all
+            // the in-flight requests and tearing down the onboarding
+            // `.task` before `runComplete()` could create the property.
             for await isAuth in authService.$isAuthenticated.values {
                 isAuthenticated = isAuth
+                needsOnboarding = authService.needsOnboarding
                 if isAuth {
                     PushNotificationService.shared.ensureTokenStored()
+                    RealtimeService.shared.subscribe()
                     Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
+                    Task { await MaintenanceTemplates.cleanupTaskTitlesP54A() }
                     Task { await Self.migrateVehicleMaintenanceTasks() }
                     Task { await Self.reconcileAllPropertiesOnce() }
                     Task { await Self.backfillUtilityAccountSnapshotsOnce() }
@@ -116,10 +175,20 @@ final class AppState: ObservableObject {
                     Task { await Self.migratePoolTasksToVendorOnce() }
                     Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                     Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
+                    Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
+                    Task {
+                        await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
+                        await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                        await Self.backfillMissingSystemsOnceIfNeeded()
+                        // Phase 58 orphan archive pass.
+                        await Self.archivePhase58OrphanedTasksOnceIfNeeded()
+                    }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
+                    Task { await Self.backfillUniversalSystemsOnce() }
                     Task { await Self.ensurePropertyValuesAreFresh() }
                     Task { await refreshPrimaryProperty() }
                 } else {
+                    RealtimeService.shared.unsubscribe()
                     primaryProperty = nil
                     hasCheckedPrimaryProperty = false
                 }
@@ -131,6 +200,223 @@ final class AppState: ObservableObject {
                 needsOnboarding = onboarding
             }
         }
+    }
+
+    /// Phase 54A: One-time backfill that walks every property and creates
+    /// the `home_systems` rows the Vendor Coverage registry knows about
+    /// but the quiz didn't directly seed for existing TestFlight users —
+    /// Handyman, Mosquito & Tick, Pet Waste (if has_pets),
+    /// Chimney (if fireplace system exists), Snow Removal (if Northeast
+    /// state). Matches `HouseQuizAnswerMapper.ensureAutoCreatedSystems`
+    /// so first-launch quiz users and existing users end up with the
+    /// same system footprint.
+    ///
+    /// Runs the reconciler against each property afterward so the new
+    /// rows pick up their applicable templates. Gated on a UserDefaults
+    /// key so it only runs once per install.
+    @MainActor
+    static func backfillMissingSystemsOnceIfNeeded() async {
+        // Phase 54E.3: bumped to _v2 so TestFlight users whose v1 pass
+        // already completed re-run the auto-create rules and pick up
+        // the new "Trash & Recycling" universal system. The underlying
+        // ensureAutoCreatedSystems is idempotent (dedups by category)
+        // so re-running on fully-set-up users is a no-op.
+        let key = "hasRunMissingSystemBackfillP54A_v2"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+        for property in properties {
+            await HouseQuizAnswerMapper.ensureAutoCreatedSystems(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+            _ = await MaintenanceTaskReconciler.reconcileAll(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+        }
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 66: One-time Day1TaskCurator backfill for existing
+    /// TestFlight users. Walks every property that doesn't have a
+    /// curator flag yet and runs the four-way router (vendor routine /
+    /// pending-vendor routine / handyman routine / This Season) so the
+    /// new Maintenance hub renders correctly on first launch. Existing
+    /// properties that already ran the curator inside the quiz-completion
+    /// flow skip this pass via the per-property UserDefaults gate.
+    ///
+    /// Idempotent at both the household-wide and per-property level:
+    /// `Day1TaskCurator.runIfNeeded` checks its own gate before doing
+    /// any work, and the outer flag here prevents re-walking the
+    /// property list unnecessarily.
+    @MainActor
+    static func runDay1CuratorForExistingPropertiesOnceIfNeeded() async {
+        let key = "hasRunDay1CuratorBackfillP66_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            print("[AppState] Day1Curator backfill: fetchProperties failed: \(error)")
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        for property in properties {
+            // Skip properties where the quiz isn't complete yet. Running
+            // the curator on an in-progress quiz would route the
+            // partially-seeded tasks incorrectly; the quiz-completion
+            // flow calls the curator itself when the user finishes.
+            guard property.houseQuizState?.completedAt != nil else { continue }
+            _ = await Day1TaskCurator.runIfNeeded(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+        }
+
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 54E.3: One-time backfill that walks every existing
+    /// utility_account with a service-type provider (landscaping, pool,
+    /// pest control, trash, recycling, compost, yard waste, etc.) and
+    /// creates a matching `contractors` row if one doesn't exist yet.
+    /// Fixes the gap where users who added Redding Sanitation before
+    /// the 54E.3 mirror shipped couldn't link it from the cadence
+    /// vendor picker.
+    @MainActor
+    static func backfillUtilityContractorMirrorOnceIfNeeded() async {
+        // Build 90 fix: bumped to v2 because v1 ran on every install
+        // BEFORE the `contractors_source_check` constraint bug was
+        // discovered. v1 silently failed every mirror insert (the
+        // CHECK only allows manual/quiz/find_vendor and the mirror was
+        // sending "utility_mirror"), then flipped the gate to true so
+        // it never re-ran. v2 forces a fresh pass on next launch with
+        // the fixed source value, healing every existing user's
+        // captured-but-unmirrored vendors without re-running the quiz.
+        let key = "hasRunUtilityContractorMirrorBackfill_v2"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        // Collect every utility account across properties, then resolve
+        // each one to a catalog row (when possible) for richer
+        // brand-identity snapshotting.
+        var accounts: [UtilityAccountRow] = []
+        for property in properties {
+            if let rows = try? await db.fetchUtilityAccounts(propertyId: property.id) {
+                accounts.append(contentsOf: rows)
+            }
+        }
+
+        for account in accounts {
+            let providerType = account.providerType
+            guard UtilityContractorMirror.serviceCategory(forProviderType: providerType) != nil else {
+                continue
+            }
+            var catalogProvider: UtilityProviderRow? = nil
+            if let providerId = account.providerId {
+                catalogProvider = try? await db.fetchUtilityProvider(id: providerId)
+            }
+            _ = try? await UtilityContractorMirror.mirrorIfNeeded(
+                name: account.providerName,
+                providerType: providerType,
+                catalogProvider: catalogProvider,
+                householdId: account.householdId,
+                db: db
+            )
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 60.6: canonicalize every `contractors.category` value in the
+    /// household so the vendor-coverage matcher picks them up. Earlier
+    /// save paths (pre-60.6 `VendorReviewForm`, raw manual inserts, quiz
+    /// `householdContractorCategoryFor` when it still mapped
+    /// `chimney_sweep → "Fire Protection"`) stored non-canonical strings
+    /// that the exact-string match in `SystemCategoryRegistry.vendorCoverageItems`
+    /// silently skipped. The 60.6 match reads canonical on both sides, so
+    /// this backfill is technically optional — but it stops the
+    /// `specialties` pill rendering "Fire Protection" when the user meant
+    /// a chimney sweep, and it keeps the category column human-readable.
+    ///
+    /// Walks every contractor row, computes `canonical(category:)`, and
+    /// rewrites the column only when it changed. Specialties are
+    /// similarly canonicalized if any entry wasn't already canonical.
+    /// Gated on a UserDefaults key so it only runs once per install.
+    @MainActor
+    static func canonicalizeContractorCategoriesOnceIfNeeded() async {
+        let key = "hasRunContractorCategoryCanonicalizationP60_6_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let contractors: [ContractorRow]
+        do {
+            contractors = try await db.fetchContractors()
+        } catch {
+            return
+        }
+        guard !contractors.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        for contractor in contractors {
+            let oldCategory = contractor.category
+            let newCategory = SystemCategoryRegistry.canonical(category: oldCategory)
+
+            let oldSpecialties = contractor.specialties ?? []
+            // Only canonicalize specialties that round-trip through the
+            // registry. Estate-type labels ("Attorney", "Financial Advisor
+            // / CPA", etc.) are not registry keys and must pass through
+            // untouched so the Contacts filter can still find them.
+            let newSpecialties = oldSpecialties.map { s -> String in
+                if let canonical = SystemCategoryRegistry.canonical(category: s),
+                   SystemCategoryRegistry.byCategoryKey[canonical] != nil {
+                    return canonical
+                }
+                return s
+            }
+
+            let categoryChanged = (oldCategory ?? "") != (newCategory ?? "")
+            let specialtiesChanged = oldSpecialties != newSpecialties
+            guard categoryChanged || specialtiesChanged else { continue }
+
+            var update = ContractorUpdate()
+            if categoryChanged { update.category = newCategory }
+            if specialtiesChanged { update.specialties = newSpecialties }
+            _ = try? await db.updateContractor(id: contractor.id, update)
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     /// Phase 17b — one-time legacy cleanup. Properties created before the
@@ -216,6 +502,11 @@ final class AppState: ObservableObject {
                       let value = lookup.estimatedValue else { continue }
                 var update = PropertyUpdate()
                 update.currentEstimatedValue = value
+                // Phase 56.2: stash the ATTOM range alongside the midpoint
+                // so the card can render an honest band without synthesizing
+                // ±5%. When the lookup didn't supply a range, leave both nil.
+                update.currentEstimatedValueLow = lookup.estimatedValueLow
+                update.currentEstimatedValueHigh = lookup.estimatedValueHigh
                 update.estimatedValueSource = lookup.estimatedValueSource
                 update.estimatedValueConfidence = lookup.estimatedValueConfidence
                 update.estimatedValueReasoning = lookup.estimatedValueReasoning
@@ -301,6 +592,10 @@ final class AppState: ObservableObject {
 
                 var update = PropertyUpdate()
                 update.currentEstimatedValue = estimatedValue
+                // Phase 56.2: preserve the AVM range so the property card
+                // can show it instead of a synthetic ±5% band.
+                update.currentEstimatedValueLow = lookup.estimatedValueLow
+                update.currentEstimatedValueHigh = lookup.estimatedValueHigh
                 update.estimatedValueSource = lookup.estimatedValueSource
                     ?? (estimatedValue != nil ? "computed" : nil)
                 update.estimatedValueConfidence = lookup.estimatedValueConfidence
@@ -553,11 +848,11 @@ final class AppState: ObservableObject {
                     let template = MaintenanceTemplates.template(forKey: templateId)
                     let originalTitle = template?.title ?? task.title
                     let originalDescription = template?.description ?? task.description ?? ""
-                    update.title = "Schedule \(contractor.companyName): \(originalTitle.lowercased())"
+                    update.title = originalTitle
                     if originalDescription.isEmpty {
-                        update.description = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work."
+                        update.description = "\(contractor.companyName) will handle the work."
                     } else {
-                        update.description = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
+                        update.description = "\(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
                     }
                     update.assignedContractorId = contractor.id
                 }
@@ -722,6 +1017,152 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(true, forKey: key)
     }
 
+    /// Phase 58 cleanup pass. Users on TestFlight during the Phase 58
+    /// ship still have tasks from templates that were killed or demoted
+    /// (Check generator oil level, Verify generator test cycle, Check
+    /// drain field for wet spots, Inspect washing machine supply hoses,
+    /// Crawl Space:quarterly bundle, etc.). The original Phase 58 note
+    /// said "don't worry about existing users, we're testing" — but that
+    /// left the TestFlight account littered with fossilized rows because
+    /// `reconcileAllPropertiesOnce` is already UserDefaults-gated as
+    /// `reconcileAllPropertiesV1Done = true`, so it never re-runs.
+    ///
+    /// This helper walks every property once and re-runs
+    /// `MaintenanceTaskReconciler.reconcileAll` in `.full` mode. The
+    /// reconciler archives any task whose `template_id` no longer maps
+    /// to a current template — and preserves user-touched tasks
+    /// (completed, assigned, notes, scheduled_date) untouched, so
+    /// history isn't destroyed. Safe to re-run thanks to the gate.
+    @MainActor
+    static func archivePhase58OrphanedTasksOnceIfNeeded() async {
+        // v2 — the v1 run relied on the pre-fix reconciler which wouldn't
+        // archive fossils whose titles were no longer in the template
+        // library (the "is this template-managed?" guard used title
+        // matching, not template_id). After bumping the reconciler to
+        // trust is_template_based + template_id first, this needs to
+        // re-run on every already-gated install.
+        let key = "hasRunPhase58OrphanPass_v2"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var totalRemoved = 0
+        var totalAdded = 0
+        for property in properties {
+            let result = await MaintenanceTaskReconciler.reconcileAll(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+            totalRemoved += result.removed.count
+            totalAdded += result.added.count
+        }
+
+        if totalRemoved > 0 || totalAdded > 0 {
+            print("[Phase58OrphanPass] Archived \(totalRemoved), added \(totalAdded) across \(properties.count) properties")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 52: Archives orphaned individual tasks that were consolidated
+    /// into bundled service visits (Generator:annual, Garage Door:annual,
+    /// Septic System:triennial, Pool/Spa:opening, Pool/Spa:closing).
+    /// Runs once per install. Marks orphans as completed with a note
+    /// explaining the consolidation so service history is preserved.
+    @MainActor
+    static func migrateBundleConsolidationOnceIfNeeded() async {
+        let key = "hasMigratedBundleConsolidation_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        // Map of bundleId -> individual templateKeys that were folded in
+        let bundleOrphans: [String: Set<String>] = [
+            "Generator:annual": [
+                "Generator:Change generator oil",
+                "Generator:Replace spark plugs",
+                "Generator:Professional generator service",
+                "Generator:Test automatic transfer switch",
+            ],
+            "Garage Door:annual": [
+                "Garage Door:Test garage door auto-reverse",
+                "Garage Door:Lubricate garage door tracks and hardware",
+                "Garage Door:Professional garage door tune-up",
+            ],
+            "Septic System:triennial": [
+                "Septic System:Septic tank pumping",
+                "Septic System:Inspect septic baffles",
+            ],
+            "Pool/Spa:opening": [
+                "Pool/Spa:Professional pool opening",
+                "Pool/Spa:Inspect pool equipment",
+            ],
+            "Pool/Spa:closing": [
+                "Pool/Spa:Professional pool closing/winterization",
+            ],
+        ]
+        let allOrphanKeys = bundleOrphans.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+
+        var archivedCount = 0
+        for property in properties {
+            let tasks: [MaintenanceTaskDBRow]
+            do {
+                tasks = try await db.fetchMaintenanceTasks(propertyId: property.id)
+            } catch {
+                continue
+            }
+
+            for task in tasks {
+                guard let templateId = task.templateId,
+                      allOrphanKeys.contains(templateId),
+                      task.lastCompletedDate == nil  // preserve completed tasks
+                else { continue }
+
+                var update = MaintenanceTaskUpdate()
+                update.isArchived = true
+                update.notes = (task.notes ?? "") + "\nConsolidated into bundled service visit (Phase 52)."
+                _ = try? await db.updateMaintenanceTask(id: task.id, update)
+                archivedCount += 1
+            }
+        }
+
+        if archivedCount > 0 {
+            print("[Phase52] Archived \(archivedCount) orphaned task\(archivedCount == 1 ? "" : "s") after bundle consolidation")
+            // Re-run the reconciler on every property so the bundle tasks
+            // that replace the archived individuals get created immediately.
+            // Without this the Maintenance list reads as sparse until
+            // something else (a quiz edit, a system add, etc.) kicks the
+            // reconciler. Runs per-property so each household gets the
+            // correct list even when a user owns multiple homes.
+            for property in properties {
+                _ = await MaintenanceTaskReconciler.reconcileAll(
+                    propertyId: property.id,
+                    householdId: property.householdId
+                )
+            }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
     /// Build 87: removes existing in-flight "Check for leaks under sinks"
     /// tasks for users who completed the quiz on Build 86 or earlier. The
     /// template was deleted from `MaintenanceTemplates.swift` per Tom's
@@ -840,6 +1281,96 @@ final class AppState: ObservableObject {
         if archivedCount > 0 {
             print("[archivePreQuizChoreTasks] archived \(archivedCount) chore-tracker task\(archivedCount == 1 ? "" : "s")")
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    // MARK: - Phase 50: Backfill Universal (Tier 1) Systems
+
+    /// One-time backfill that adds missing Tier 1 systems to properties
+    /// that completed the house quiz. Ensures every property has Plumbing,
+    /// Electrical, and Cleaning Service even if those weren't part of the
+    /// original quiz flow. Systems are added in "needs a vendor" state
+    /// (no contractor, no service dates).
+    static func backfillUniversalSystemsOnce() async {
+        let key = "hasBackfilledUniversalSystems_v2"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var createdCount = 0
+        var cleanedCount = 0
+        for property in properties {
+            // Only backfill properties that completed the quiz
+            guard property.houseQuizState?.completedAt != nil else { continue }
+
+            let existingSystems: [HomeSystemRow]
+            do {
+                existingSystems = try await db.fetchHomeSystems(propertyId: property.id)
+            } catch {
+                continue
+            }
+
+            // V2 cleanup: remove duplicate systems created by v1.
+            // Group by category, keep the oldest (quiz-created), delete the backfill duplicate.
+            let byCategory = Dictionary(grouping: existingSystems.filter { $0.parentSystemId == nil }) { $0.category }
+            for (_, dupes) in byCategory where dupes.count > 1 {
+                // Sort by creation date, keep the first (oldest), delete the rest
+                let sorted = dupes.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
+                for dupe in sorted.dropFirst() {
+                    // Only delete if it has no preferred contractor and no service dates
+                    // (i.e., it's a bare backfill row, not user-enriched)
+                    if dupe.preferredContractorId == nil && dupe.lastServiceDate == nil {
+                        try? await db.deleteHomeSystem(id: dupe.id)
+                        cleanedCount += 1
+                    }
+                }
+            }
+
+            // Now check what's actually still there after cleanup
+            let remainingSystems: [HomeSystemRow]
+            do {
+                remainingSystems = try await db.fetchHomeSystems(propertyId: property.id)
+            } catch {
+                continue
+            }
+
+            let existingCategories = Set(remainingSystems.map(\.category))
+            let existingNames = Set(remainingSystems.map { $0.name.lowercased() })
+
+            for meta in SystemCategoryRegistry.universal {
+                // Skip if category OR name already exists
+                guard !existingCategories.contains(meta.categoryKey),
+                      !existingNames.contains(meta.displayName.lowercased())
+                else { continue }
+
+                let insert = HomeSystemInsert(
+                    propertyId: property.id,
+                    householdId: property.householdId,
+                    name: meta.displayName,
+                    category: meta.categoryKey
+                )
+                do {
+                    _ = try await db.createHomeSystem(insert)
+                    createdCount += 1
+                } catch {
+                    // Swallow individual failures
+                }
+            }
+        }
+
+        if createdCount > 0 || cleanedCount > 0 {
+            print("[backfillUniversalSystems] created \(createdCount), cleaned \(cleanedCount) duplicate(s)")
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
         }
         UserDefaults.standard.set(true, forKey: key)
     }

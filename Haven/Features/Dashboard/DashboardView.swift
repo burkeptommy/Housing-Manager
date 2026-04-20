@@ -45,6 +45,10 @@ struct DashboardView: View {
     @AppStorage(PendingInviteKeys.needsPersonalQuiz) private var needsPersonalQuiz = false
     @State private var showPersonalQuiz = false
 
+    /// Phase 61: Presents the LegacyTasksView in a sheet. Opened from the
+    /// "View details" button on LegacyTasksNotificationCard.
+    @State private var showLegacyTasks = false
+
     /// Phase 56.4: Session-only dismissal flag for the
     /// HandymanSuggestionCard. Intentionally not persisted — the punch
     /// list is real work that needs scheduling, so "Not now" comes back
@@ -104,6 +108,26 @@ struct DashboardView: View {
                         // the two-line "Good evening" / weekday-date
                         // view. Saves ~32pt vertical.
                         compactGreeting
+
+                        // Phase 66: One-time "We reorganized your
+                        // maintenance" card for existing TestFlight
+                        // users. Dismisses permanently via @AppStorage.
+                        // Gated on hasCompletedAnyQuiz so fresh signups
+                        // (who land on the new hub from the start) don't
+                        // see a "we reorganized" message about a tab
+                        // they've never seen the old version of.
+                        if viewModel.hasCompletedAnyQuiz {
+                            MaintenanceReorganizedCard(
+                                onLearnMore: {
+                                    NotificationCenter.default.post(
+                                        name: .switchToTab,
+                                        object: nil,
+                                        userInfo: ["tab": 1]
+                                    )
+                                },
+                                onDismiss: {}
+                            )
+                        }
 
                         // 2. Getting Started / Quiz hero — Day 0 focal point.
                         // Phase 50 (sub-phase B first-login): only renders
@@ -218,6 +242,43 @@ struct DashboardView: View {
                                 property: primaryProperty,
                                 onReviewComplete: {
                                     Task { await viewModel.refresh() }
+                                }
+                            )
+                        }
+
+                        // Phase 61: Legacy task cleanup notification.
+                        // Renders only when the household has archived tasks
+                        // AND the user hasn't dismissed. Tapping opens the
+                        // LegacyTasksView sheet directly from the Dashboard.
+                        if viewModel.hasCompletedAnyQuiz {
+                            LegacyTasksNotificationCard(
+                                legacyCount: viewModel.legacyTaskCount,
+                                onViewDetails: { showLegacyTasks = true }
+                            )
+                        }
+
+                        // Phase 63: FindHandymanCard surfaces for users whose
+                        // Q15b answer captured "I need help finding a handyman"
+                        // AND the household still doesn't have a handyman
+                        // contractor on file. Tap opens Alfred with a vetting
+                        // prompt. Snoozes 30 days on "Later".
+                        if viewModel.hasCompletedAnyQuiz,
+                           viewModel.propertyAttributes["handyman_preference"]?.stringValue == "needs_help",
+                           !viewModel.dashboardContractors.contains(where: {
+                               $0.category?.caseInsensitiveCompare("Handyman") == .orderedSame
+                           }) {
+                            FindHandymanCard(
+                                onFindOptions: {
+                                    // ChatView.onReceive reads "message" from
+                                    // the userInfo — use the same key.
+                                    NotificationCenter.default.post(
+                                        name: .openAlfredWithContext,
+                                        object: nil,
+                                        userInfo: [
+                                            "message": "I need help finding a reliable handyman for routine small-fixes work around the house. What should I look for and what questions should I ask when vetting candidates?"
+                                        ]
+                                    )
+                                    Analytics.track(.findHandymanCardTapped)
                                 }
                             )
                         }
@@ -416,6 +477,11 @@ struct DashboardView: View {
                         .environmentObject(appState)
                 }
             }
+            .sheet(isPresented: $showLegacyTasks) {
+                NavigationStack {
+                    LegacyTasksView()
+                }
+            }
             .sheet(isPresented: $showUploadDocument) {
                 DocumentUploadView(onComplete: {
                     Task { await viewModel.refresh() }
@@ -442,11 +508,18 @@ struct DashboardView: View {
                 } else if destination == "security" {
                     SecurityDashboardView()
                 } else if destination == "maintenance" {
-                    MaintenanceScheduleView()
+                    // Phase 66: Default Maintenance tab lands on the new
+                    // 5-section hub (Your Services / Handyman / Vehicles /
+                    // This Season / Upcoming Scheduled). The older
+                    // MaintenanceScheduleView is the Timeline push
+                    // destination accessed via "See full year ↗" inside
+                    // the hub.
+                    MaintenanceHubView()
                 } else if destination == "maintenance_calendar" {
                     // Phase 54A: "View full schedule" on the dashboard
                     // lands users in the Calendar layout of the canonical
                     // maintenance view — no more parallel ScheduleCalendarView.
+                    // Phase 66: kept as the Timeline push destination.
                     MaintenanceScheduleView(initialLayout: .calendar)
                 } else if destination == "recommended_services" {
                     // Phase 54C.3: Dashboard "Discover more" link.
@@ -1506,7 +1579,7 @@ struct DashboardView: View {
         let title = "Start Quiz for \(property.name)"
         let progressLabel = isResume
             ? "\(answered) of \(total) done · \(saved) saved for later"
-            : "30 quick questions, about 4 minutes."
+            : "\(total) quick questions, about 5 minutes."
 
         return HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {

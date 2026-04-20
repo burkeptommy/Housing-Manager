@@ -1,6 +1,40 @@
 import SwiftUI
 import UserNotifications
 
+/// Time-of-day slot for scheduling vendor visits.
+/// Matches how real vendor calls end: "We'll come Thursday morning."
+enum ScheduleTimeSlot: String, CaseIterable {
+    case morning = "Morning"
+    case afternoon = "Afternoon"
+    case allDay = "All Day"
+
+    var label: String { rawValue }
+}
+
+/// Phase 56.4: Reminder offset options. Replaces the 5 separate `@State`
+/// bools (`reminder1Day`, `reminder3Days`, etc.) so the summary + expand
+/// UI can read from a single source. Raw value serializes to the
+/// user-facing label; `daysBefore` is the offset used for scheduling.
+enum ReminderTiming: String, CaseIterable {
+    case oneDay = "1 day before"
+    case threeDays = "3 days before"
+    case oneWeek = "1 week before"
+    case twoWeeks = "2 weeks before"
+    case oneMonth = "1 month before"
+
+    var daysBefore: Int {
+        switch self {
+        case .oneDay: return 1
+        case .threeDays: return 3
+        case .oneWeek: return 7
+        case .twoWeeks: return 14
+        case .oneMonth: return 30
+        }
+    }
+
+    var sortOrder: Int { daysBefore }
+}
+
 struct MaintenanceTaskDetailSheet: View {
     let task: MaintenanceTaskDBRow
     var onTaskCompleted: (() -> Void)?
@@ -20,11 +54,37 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var showScheduledPicker = false
     @State private var scheduledPickerDate = Date()
 
+    /// Phase 56.3+: Inline rename state. Tap the title → TextField takes
+    /// over in place; Return / outside tap commits, empty / unchanged
+    /// reverts. Vendor-reframed titles ("Schedule Tyler Heating: …")
+    /// drop the prefix when the user starts typing so they edit the
+    /// real task, not the reframing.
+    @State private var isEditingTitle = false
+    @State private var editedTitle: String = ""
+    @FocusState private var titleFieldFocused: Bool
+
+    // Phase 51B: Inline schedule visit
+    @State private var showScheduleVisit = false
+    @State private var scheduleDate = Date()
+    @State private var scheduleTimeSlot: ScheduleTimeSlot = .allDay
+    @State private var makeRecurring = false
+    @State private var recurringCadence = "monthly"
+    @State private var isScheduling = false
+
     // Vendor state
     @State private var assignedContractor: ContractorRow?
     @State private var systemCategory: String?
     @State private var vendorLoaded = false
     @State private var showVendorAssignedToast = false
+
+    // Phase 64: routing picker state. currentRoute mirrors task.assignedRoute
+    // so the picker re-renders after a tap without waiting for a DB round-trip.
+    @State private var currentRoute: String?
+    @State private var preferredHandyman: ContractorRow?
+    // Phase 65: toast shown after the first pick per category ("We'll remember
+    // this for future Plumbing tasks").
+    @State private var showRoutingRememberedToast = false
+    @State private var rememberedToastCategory: String?
 
     // User assignment state
     @State private var householdUsers: [UserRow] = []
@@ -40,12 +100,33 @@ struct MaintenanceTaskDetailSheet: View {
     /// taps "I'll do this myself" on a vendor-managed task.
     @State private var showConvertToPersonalConfirm = false
 
-    // Reminder state
-    @State private var reminder1Day = false
-    @State private var reminder3Days = false
-    @State private var reminder1Week = false
-    @State private var reminder2Weeks = false
-    @State private var reminder1Month = false
+    // Phase 56.4: Reminder state consolidated into `activeReminders` above.
+
+    /// Phase 54B.3: Add-to-handyman-punch-list flow. The "Add to handyman
+    /// list" button appears for personal/either tasks where the matched
+    /// template's DIY effort is under an hour — bigger jobs aren't a fit
+    /// for a handyman punch list.
+    @State private var showAddedToPunchListToast = false
+    @State private var isAddingToPunchList = false
+
+    /// Phase 56.4: Confirmation dialog for "Add to handyman list" when
+    /// the task is already vendor-assigned. Offers Just this time /
+    /// From now on / Cancel so the user can choose whether the vendor
+    /// keeps future instances or the series flips back to flexible
+    /// assignment.
+    @State private var showHandymanReassignConfirm = false
+
+    /// Phase 56.4: Smart reminder state. Replaces the 5-toggle block
+    /// with a single summary row + "Adjust" expansion. `remindersLoaded`
+    /// prevents the smart default from overwriting user-set values.
+    @State private var remindersExpanded = false
+    @State private var remindersLoaded = false
+
+    /// Phase 56.4: Unified reminder set. Replaces the 5 @State bools —
+    /// one set of active timings means the view can render either the
+    /// summary row ("Reminding you 1 week before") or the expanded
+    /// 5-toggle grid without splitting state across two sources.
+    @State private var activeReminders: Set<ReminderTiming> = []
 
     private let db = DatabaseService.shared
     private let dateFormatter: DateFormatter = {
@@ -80,10 +161,29 @@ struct MaintenanceTaskDetailSheet: View {
                     assignToSection
                 }
 
+                // Phase 64: Routing picker surfaces ONLY when a routing
+                // decision is genuinely outstanding — task.assignedRoute
+                // is nil AND no contractor is assigned. In any other case
+                // the existing vendorSection below already shows the
+                // vendor / "I'll do this myself" controls, so a second
+                // picker would be redundant chrome. Vehicle tasks use
+                // a separate vehicle-side flow, so they're skipped too.
+                if task.vehicleId == nil
+                    && task.assignedRoute == nil
+                    && task.assignedContractorId == nil {
+                    routingPickerSection
+                }
+
                 // Vendor / Scheduling
                 if vendorLoaded {
                     vendorSection
                 }
+
+                // Schedule Visit (when vendor assigned but not yet scheduled)
+                scheduleVisitSection
+
+                // Recurring service details (Phase 51B)
+                recurringServiceSection
 
                 // Reminders
                 remindersSection
@@ -111,9 +211,25 @@ struct MaintenanceTaskDetailSheet: View {
                 .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
                 .padding()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if showAddedToPunchListToast {
+                HStack(spacing: 10) {
+                    Image(systemName: "hammer.fill")
+                        .foregroundStyle(HavenColors.navy700)
+                    Text("Added to your handyman punch list")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                }
+                .padding()
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .padding()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.easeInOut, value: showVendorAssignedToast)
+        .animation(.easeInOut, value: showAddedToPunchListToast)
         .onChange(of: showVendorAssignedToast) { _, showing in
             if showing {
                 Task {
@@ -121,6 +237,26 @@ struct MaintenanceTaskDetailSheet: View {
                     withAnimation { showVendorAssignedToast = false }
                 }
             }
+        }
+        // Phase 56.4: Confirmation dialog for "Add to handyman list" on
+        // a vendor-assigned task. Offers the user a choice between
+        // Just this time (leave vendor on future instances) and From
+        // now on (strip vendor from the series). DIY tasks never
+        // trigger this — they add directly.
+        .confirmationDialog(
+            "\(assignedContractor?.companyName ?? "Your vendor") usually does this.",
+            isPresented: $showHandymanReassignConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Just this time") {
+                Task { await addToPunchListJustThisTime() }
+            }
+            Button("From now on, handyman does this") {
+                Task { await addToPunchListReassignSeries() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("What should happen with future visits?")
         }
         // Phase 19l: confirmation before flipping a vendor-managed task back
         // to personal. Restoring the original template title is irreversible
@@ -194,7 +330,212 @@ struct MaintenanceTaskDetailSheet: View {
             await loadVendorInfo()
             await loadExistingReminders()
             await loadHouseholdUsers()
+            await loadUpcomingVisits()
         }
+        .sheet(isPresented: $showPauseFromDetail) {
+            if let appointment = appointmentToPauseFromDetail {
+                PauseAppointmentSheet(
+                    appointment: appointment,
+                    contractor: assignedContractor,
+                    categoryDefault: nil,
+                    onPause: { reason, resumeDate in
+                        Task {
+                            try? await StandingAppointmentViewModel.shared.pauseAppointment(
+                                id: appointment.id,
+                                reason: reason,
+                                autoResumeDate: resumeDate
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Phase 54B.3 / 56.4: Add-to-handyman helpers
+
+    /// Phase 54B.3 / 56.4: Visible when the matched template has
+    /// `diyEffortMinutes` set and it's under an hour. Phase 56.4 dropped
+    /// the hard `assignmentType != "vendor"` gate — vendor-assigned
+    /// small jobs CAN go to the handyman, we just need to ask the user
+    /// what to do with the recurring series (see the confirmation
+    /// dialog in Step 56.4.13). Anything bigger than an hour stays on
+    /// the schedule — handing a multi-hour project to a handyman isn't
+    /// a handyman job.
+    private var showAddToHandymanButton: Bool {
+        guard task.vehicleId == nil else { return false }
+        guard let templateKey = task.templateId,
+              let template = MaintenanceTemplates.template(forKey: templateKey),
+              let minutes = template.diyEffortMinutes else {
+            return false
+        }
+        return minutes <= 60
+    }
+
+    /// Phase 56.4: Entry point for the handyman add flow. Vendor-assigned
+    /// tasks route through a confirmation dialog so the user can
+    /// choose whether THIS instance or the WHOLE series moves. DIY
+    /// tasks skip the dialog and add directly.
+    private func handleAddToHandymanList() {
+        if assignedContractor != nil {
+            showHandymanReassignConfirm = true
+        } else {
+            Task { await addToPunchListJustThisTime() }
+        }
+    }
+
+    /// Phase 56.4: Handyman add — this instance only. Creates the punch
+    /// item, marks the current instance complete (so it stops surfacing
+    /// for the original vendor), and leaves the recurring series
+    /// assigned to the vendor for future instances.
+    private func addToPunchListJustThisTime() async {
+        guard !isAddingToPunchList else { return }
+        isAddingToPunchList = true
+        defer { isAddingToPunchList = false }
+
+        // Phase 56.6: Guard against double-add. If a pending punch item
+        // already exists for this source task (user tapped the card's
+        // inline quick-add, then opened the detail sheet and tapped
+        // again), surface the toast and exit rather than inserting a
+        // duplicate. Matches the `HandymanPunchListView` load-time
+        // dedup by sourceTaskId.
+        let existing = (try? await db.fetchPendingHandymanPunchItems(householdId: task.householdId)) ?? []
+        if existing.contains(where: { $0.sourceTaskId == task.id }) {
+            Haptics.light()
+            withAnimation { showAddedToPunchListToast = true }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                await MainActor.run {
+                    withAnimation { showAddedToPunchListToast = false }
+                }
+            }
+            return
+        }
+
+        let insert = buildPunchItemInsert()
+        do {
+            _ = try await db.createHandymanPunchItem(insert)
+            // When a vendor was assigned, mark THIS instance complete so
+            // the original vendor stops seeing it. Recurring schedule
+            // advances normally.
+            if assignedContractor != nil {
+                await MaintenanceViewModel.shared.completeTask(task)
+            }
+            // Phase 66: also link the task to the handyman routine via
+            // `parent_routine_id` so it surfaces under "Next Handyman
+            // Visit" on the new Maintenance hub and hides from the
+            // Scheduled/To-Schedule buckets in MaintenanceScheduleView.
+            // Errors swallowed — the punch item is the canonical action.
+            _ = try? await db.assignTaskToHandymanRoutine(task: task)
+            Analytics.track(.handymanPunchItemAdded, [
+                "source": "maintenance_task",
+                "task_id": task.id.uuidString,
+                "vendor_was_assigned": assignedContractor != nil,
+                "intent": "just_this_time",
+            ])
+            Haptics.success()
+            withAnimation { showAddedToPunchListToast = true }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                await MainActor.run {
+                    withAnimation { showAddedToPunchListToast = false }
+                }
+            }
+        } catch {
+            print("[MaintenanceTaskDetailSheet] addToPunchListJustThisTime failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Phase 56.4: Handyman add — reassign the whole series. Strips the
+    /// vendor from the task, flips `assignmentType` to "either", creates
+    /// the punch item, and completes this instance. Future instances
+    /// won't auto-assign back to the vendor.
+    ///
+    /// Bug fix: the contractor clear has to go through
+    /// `clearMaintenanceTaskContractor` rather than a
+    /// `MaintenanceTaskUpdate` with `assignedContractorId = nil`.
+    /// Swift's Codable encodes optional fields with `encodeIfPresent`,
+    /// so a `nil` on an Optional field gets dropped from the PATCH
+    /// body entirely — Supabase treats the missing column as "don't
+    /// touch" and the vendor stays linked. The dedicated helper writes
+    /// an explicit `{"assigned_contractor_id": null}` which actually
+    /// clears the column.
+    private func addToPunchListReassignSeries() async {
+        guard !isAddingToPunchList else { return }
+        isAddingToPunchList = true
+        defer { isAddingToPunchList = false }
+
+        do {
+            // 1. Clear the contractor explicitly (the Optional.nil
+            // trick doesn't survive Codable's encodeIfPresent).
+            try await db.clearMaintenanceTaskContractor(id: task.id)
+
+            // 2. Flip the assignment type so future instances don't
+            // auto-assign back to the vendor.
+            var update = MaintenanceTaskUpdate()
+            update.assignmentType = "either"
+            _ = try await db.updateMaintenanceTask(id: task.id, update)
+
+            // 3. Create the punch item and complete this instance.
+            // Phase 56.6: skip the insert when one already exists for
+            // this source task. We still run the series reassignment
+            // (user explicitly chose "from now on") + mark the current
+            // instance complete; just no duplicate punch item.
+            let existing = (try? await db.fetchPendingHandymanPunchItems(householdId: task.householdId)) ?? []
+            if !existing.contains(where: { $0.sourceTaskId == task.id }) {
+                let insert = buildPunchItemInsert()
+                _ = try await db.createHandymanPunchItem(insert)
+            }
+            await MaintenanceViewModel.shared.completeTask(task)
+
+            // 4. Reflect the change in local UI state so the vendor
+            // section disappears immediately instead of waiting for
+            // the next sheet presentation.
+            await MainActor.run { assignedContractor = nil }
+
+            // Phase 66: Link the task to the handyman routine via
+            // `parent_routine_id` so it surfaces under "Next Handyman
+            // Visit" on the new Maintenance hub.
+            _ = try? await db.assignTaskToHandymanRoutine(task: task)
+
+            Analytics.track(.handymanPunchItemAdded, [
+                "source": "maintenance_task",
+                "task_id": task.id.uuidString,
+                "vendor_was_assigned": true,
+                "intent": "reassign_series",
+            ])
+            Haptics.success()
+            withAnimation { showAddedToPunchListToast = true }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                await MainActor.run {
+                    withAnimation { showAddedToPunchListToast = false }
+                    dismiss()
+                }
+            }
+        } catch {
+            print("[MaintenanceTaskDetailSheet] addToPunchListReassignSeries failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Shared builder — same insert body whether the user chose Just
+    /// this time or From now on.
+    private func buildPunchItemInsert() -> HandymanPunchItemInsert {
+        var insert = HandymanPunchItemInsert(
+            householdId: task.householdId,
+            propertyId: task.propertyId,
+            title: task.title
+        )
+        insert.description = task.description
+        insert.source = "maintenance_task"
+        insert.sourceTaskId = task.id
+        if let templateKey = task.templateId,
+           let template = MaintenanceTemplates.template(forKey: templateKey) {
+            insert.estimatedMinutes = template.diyEffortMinutes
+        }
+        return insert
     }
 
     // MARK: - Vendor Loading
@@ -229,11 +570,21 @@ struct MaintenanceTaskDetailSheet: View {
         vendorLoaded = true
     }
 
+    private func loadUpcomingVisits() async {
+        guard let appointmentId = task.standingAppointmentId else { return }
+        let visits = (try? await db.fetchVisits(appointmentId: appointmentId, limit: 10)) ?? []
+        upcomingVisits = visits.filter { $0.status == "upcoming" }.sorted { $0.scheduledDate < $1.scheduledDate }
+    }
+
     private func assignContractorToTask(_ contractor: ContractorRow) async {
         do {
+            // Clear needsVendor flag alongside setting the contractor
             _ = try await db.updateMaintenanceTask(
                 id: task.id,
-                MaintenanceTaskUpdate(assignedContractorId: contractor.id)
+                MaintenanceTaskUpdate(
+                    assignedContractorId: contractor.id,
+                    needsVendor: false
+                )
             )
             await MainActor.run {
                 assignedContractor = contractor
@@ -253,6 +604,10 @@ struct MaintenanceTaskDetailSheet: View {
                     HomeSystemUpdate(preferredContractorId: contractor.id)
                 )
             }
+
+            // Notify dashboard and other views to refresh coverage
+            NotificationCenter.default.post(name: .contractorChanged, object: nil)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         } catch {
             print("[TaskDetail] Failed to assign contractor: \(error)")
             Haptics.error()
@@ -274,33 +629,77 @@ struct MaintenanceTaskDetailSheet: View {
         }
     }
 
+    /// Phase 56.4: Load existing scheduled reminders into the unified
+    /// `activeReminders` set. If nothing is scheduled yet, seed with the
+    /// smart default for the task's frequency so the summary row
+    /// renders "Reminding you 1 week before" instead of "No reminders
+    /// set" on first open.
     private func loadExistingReminders() async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         let taskPrefix = "task-reminder-\(task.id.uuidString)-"
         let ids = Set(pending.filter { $0.identifier.hasPrefix(taskPrefix) }.map(\.identifier))
 
-        reminder1Day = ids.contains("\(taskPrefix)1d")
-        reminder3Days = ids.contains("\(taskPrefix)3d")
-        reminder1Week = ids.contains("\(taskPrefix)7d")
-        reminder2Weeks = ids.contains("\(taskPrefix)14d")
-        reminder1Month = ids.contains("\(taskPrefix)30d")
+        var timings: Set<ReminderTiming> = []
+        for timing in ReminderTiming.allCases {
+            if ids.contains("\(taskPrefix)\(timing.daysBefore)d") {
+                timings.insert(timing)
+            }
+        }
+        // Phase 56.4: If the user has no scheduled reminders yet, seed
+        // the smart default and schedule it so the list arrives
+        // non-empty. Respects existing user selections — we only seed
+        // when the set is truly empty.
+        if timings.isEmpty, let smart = defaultReminderForFrequency {
+            timings.insert(smart)
+            setReminder(timing: smart, isEnabled: true)
+        }
+        await MainActor.run {
+            activeReminders = timings
+            remindersLoaded = true
+        }
     }
 
-    private func toggleReminder(daysBefore: Int, isEnabled: Bool) {
+    /// Phase 56.4: Reminder timing default based on the task's
+    /// frequency. Annual/semi-annual → 1 week. Monthly/quarterly →
+    /// 3 days. Weekly/biweekly → 1 day. Falls back to 3 days for any
+    /// frequency we can't parse.
+    private var defaultReminderForFrequency: ReminderTiming? {
+        let freq = task.frequency.lowercased()
+        if freq.contains("annual") || freq.contains("yearly")
+            || freq.contains("semi") || freq.contains("twice") {
+            return .oneWeek
+        }
+        if freq.contains("monthly") || freq.contains("quarterly") {
+            return .threeDays
+        }
+        if freq.contains("weekly") {
+            return .oneDay
+        }
+        return .threeDays
+    }
+
+    /// Phase 56.4: Schedule or cancel a single reminder. Replaces the
+    /// raw-int `toggleReminder(daysBefore:isEnabled:)` — callers pass
+    /// the strongly-typed `ReminderTiming`.
+    private func setReminder(timing: ReminderTiming, isEnabled: Bool) {
         guard let dueDate = dateFormatter.date(from: task.nextDueDate) else { return }
-        Analytics.track(.maintenanceTaskReminderSet, ["task_id": task.id.uuidString, "days_before": daysBefore, "enabled": isEnabled])
+        Analytics.track(.maintenanceTaskReminderSet, [
+            "task_id": task.id.uuidString,
+            "days_before": timing.daysBefore,
+            "enabled": isEnabled,
+        ])
 
         let center = UNUserNotificationCenter.current()
-        let notificationId = "task-reminder-\(task.id.uuidString)-\(daysBefore)d"
+        let notificationId = "task-reminder-\(task.id.uuidString)-\(timing.daysBefore)d"
 
         if isEnabled {
-            guard let alertDate = Calendar.current.date(byAdding: .day, value: -daysBefore, to: dueDate),
+            guard let alertDate = Calendar.current.date(byAdding: .day, value: -timing.daysBefore, to: dueDate),
                   alertDate > .now else { return }
 
             let content = UNMutableNotificationContent()
             content.title = "Maintenance Reminder"
-            content.body = "\(task.title) is due in \(daysBefore) day\(daysBefore == 1 ? "" : "s")."
+            content.body = "\(task.title) is due in \(timing.daysBefore) day\(timing.daysBefore == 1 ? "" : "s")."
             content.sound = .default
 
             let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: alertDate)
@@ -314,12 +713,157 @@ struct MaintenanceTaskDetailSheet: View {
 
     // MARK: - Header
 
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            Text(task.title)
+    /// Phase 56.3+: inline-editable title. Tap the text → turns into a
+    /// TextField in the same spot; Return or outside-tap commits. No
+    /// modal sheet, no edit-mode toggle button — matches the rest of
+    /// the app's direct-manipulation feel.
+    @ViewBuilder
+    private var editableTitle: some View {
+        if isEditingTitle {
+            TextField("Task title", text: $editedTitle, axis: .vertical)
                 .font(HavenTypography.title2)
                 .foregroundStyle(HavenColors.textPrimary)
-                .lineLimit(3)
+                .lineLimit(1...3)
+                .focused($titleFieldFocused)
+                .submitLabel(.done)
+                .onSubmit { commitTitleEdit() }
+                .onChange(of: titleFieldFocused) { _, focused in
+                    if !focused { commitTitleEdit() }
+                }
+        } else {
+            Button {
+                editedTitle = task.title
+                isEditingTitle = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    titleFieldFocused = true
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 6) {
+                    Text(task.title)
+                        .font(HavenTypography.title2)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .padding(.top, 6)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func commitTitleEdit() {
+        let trimmed = editedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        isEditingTitle = false
+        titleFieldFocused = false
+        guard !trimmed.isEmpty, trimmed != task.title else { return }
+        Task {
+            do {
+                _ = try await DatabaseService.shared.updateMaintenanceTask(
+                    id: task.id,
+                    MaintenanceTaskUpdate(title: trimmed)
+                )
+                Haptics.success()
+                NotificationCenter.default.post(
+                    name: .maintenanceTaskChanged,
+                    object: nil,
+                    userInfo: ["action": "title_updated", "id": task.id.uuidString]
+                )
+            } catch {
+                Haptics.error()
+            }
+        }
+    }
+
+    /// Phase 56.4: Single contextual date line. Scheduled takes precedence
+    /// (that's the actual next event); otherwise the next-due date is
+    /// what surfaces. Uses relative time so "in 15 days" or "3 days
+    /// overdue" reads naturally. Pencil affordance for inline editing.
+    @ViewBuilder
+    private var nextActionLine: some View {
+        let displayFormatter = DateFormatter()
+        let _ = (displayFormatter.dateStyle = .long)
+
+        Button {
+            if let date = dateFormatter.date(from: task.nextDueDate) {
+                editedDueDate = date
+            }
+            showEditDueDate = true
+        } label: {
+            HStack {
+                if let scheduled = task.scheduledDate,
+                   let date = dateFormatter.date(from: scheduled) {
+                    let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+                    let relative = relativeTimeLabel(days: days, overdue: false)
+                    Image(systemName: "calendar.badge.checkmark")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.success)
+                    Text("Next visit:")
+                        .font(HavenTypography.uiLabelMedium)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Text(displayFormatter.string(from: date))
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("(\(relative))")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11))
+                        .foregroundStyle(HavenColors.navy700)
+                } else if let date = dateFormatter.date(from: task.nextDueDate) {
+                    let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+                    let isOverdue = days < 0
+                    let relative = relativeTimeLabel(days: days, overdue: isOverdue)
+                    Image(systemName: isOverdue ? "exclamationmark.circle" : "calendar")
+                        .font(.system(size: 12))
+                        .foregroundStyle(isOverdue ? HavenColors.critical : HavenColors.textSecondary)
+                    Text("Due:")
+                        .font(HavenTypography.uiLabelMedium)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Text(displayFormatter.string(from: date))
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("(\(relative))")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(isOverdue ? HavenColors.critical : HavenColors.textTertiary)
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11))
+                        .foregroundStyle(HavenColors.navy700)
+                } else {
+                    Text("Due:")
+                        .font(HavenTypography.uiLabelMedium)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Text(task.nextDueDate.havenDateFormatted)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Phase 56.4: Relative-time label matching the rest of Haven's
+    /// voice — "today", "tomorrow", "in 15 days", or "3 days overdue".
+    private func relativeTimeLabel(days: Int, overdue: Bool) -> String {
+        if overdue {
+            return "\(abs(days)) days overdue"
+        }
+        if days == 0 { return "today" }
+        if days == 1 { return "tomorrow" }
+        return "in \(days) days"
+    }
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            editableTitle
 
             HStack(spacing: HavenTheme.spacing12) {
                 Button {
@@ -358,33 +902,14 @@ struct MaintenanceTaskDetailSheet: View {
     private var detailsSection: some View {
         HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                // Due date — tappable to edit
-                Button {
-                    if let date = dateFormatter.date(from: task.nextDueDate) {
-                        editedDueDate = date
-                    }
-                    showEditDueDate = true
-                } label: {
-                    HStack {
-                        Text("Next Due")
-                            .font(HavenTypography.uiLabelMedium)
-                            .foregroundStyle(HavenColors.textSecondary)
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Text(task.nextDueDate.havenDateFormatted)
-                                .font(HavenTypography.body)
-                                .foregroundStyle(HavenColors.textPrimary)
-                            Text(daysUntilDue < 0 ? "(\(-daysUntilDue)d overdue)" : "(\(daysUntilDue)d)")
-                                .font(HavenTypography.uiLabelSmall)
-                                .foregroundStyle(dueColor)
-                            Image(systemName: "pencil")
-                                .font(.system(size: 11))
-                                .foregroundStyle(HavenColors.navy700)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                // Phase 56.4: Single contextual date line replaces the
+                // old "Next Due" + "Scheduled" dual rows. When both
+                // dates existed and disagreed (scheduled April 30 /
+                // next due May 11), users read the cards as "am I
+                // overdue?" This collapses to one line: the scheduled
+                // date when a visit is booked, otherwise the next-due
+                // date.
+                nextActionLine
 
                 if let lastCompleted = task.lastCompletedDate {
                     HStack {
@@ -395,23 +920,6 @@ struct MaintenanceTaskDetailSheet: View {
                         Text(lastCompleted.havenDateFormatted)
                             .font(HavenTypography.body)
                             .foregroundStyle(HavenColors.textPrimary)
-                    }
-                }
-
-                if let scheduled = task.scheduledDate {
-                    HStack {
-                        Text("Scheduled")
-                            .font(HavenTypography.uiLabelMedium)
-                            .foregroundStyle(HavenColors.textSecondary)
-                        Spacer()
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar.badge.checkmark")
-                                .font(.system(size: 12))
-                                .foregroundStyle(HavenColors.success)
-                            Text(scheduled.havenDateFormatted)
-                                .font(HavenTypography.body)
-                                .foregroundStyle(HavenColors.success)
-                        }
                     }
                 }
 
@@ -498,7 +1006,7 @@ struct MaintenanceTaskDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showEditDueDate = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -728,6 +1236,183 @@ struct MaintenanceTaskDetailSheet: View {
         }
     }
 
+    // MARK: - Routing Picker (Phase 64 + 65)
+
+    /// Resolve the picker mode from the task's template + active contract.
+    /// Uses `TaskRoutingMode.derive(...)` from TaskRoutingPicker.swift.
+    private var routingPickerMode: TaskRoutingMode {
+        // Active service contract → readOnly. We treat a linked contractor on
+        // the task as the proxy for "contract active" since ServiceContractRow
+        // has no is_active column.
+        if assignedContractor != nil && task.assignmentType?.lowercased() == "vendor" {
+            return .readOnly
+        }
+        let template = task.templateId.flatMap { MaintenanceTemplates.template(forKey: $0) }
+        return TaskRoutingMode.derive(
+            templateRouting: template?.routing,
+            safetyFloor: template?.safetyFloor ?? false,
+            hasActiveContract: false
+        )
+    }
+
+    @ViewBuilder
+    private var routingPickerSection: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                TaskRoutingPicker(
+                    mode: routingPickerMode,
+                    currentRoute: currentRoute.flatMap { TaskAssignedRoute(rawValue: $0) },
+                    safetyFloor: task.templateId
+                        .flatMap { MaintenanceTemplates.template(forKey: $0) }?
+                        .safetyFloor ?? false,
+                    assignedVendorName: assignedContractor?.companyName,
+                    preferredHandymanName: preferredHandyman?.contactName ?? preferredHandyman?.companyName,
+                    onSelectVendor: { Task { await selectRoute("vendor") } },
+                    onSelectHandyman: { Task { await selectRoute("handyman") } },
+                    onSelectDIY: { Task { await selectRoute("diy") } }
+                )
+
+                if showRoutingRememberedToast, let cat = rememberedToastCategory {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundStyle(HavenColors.navy700)
+                        Text("We'll remember this for future \(cat) tasks.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Spacer()
+                    }
+                    .padding(HavenTheme.spacing8)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                    .transition(.opacity)
+                }
+            }
+        }
+        .task(id: task.id) {
+            await loadRoutingContext()
+        }
+    }
+
+    /// Loads the household's preferred handyman once so the picker can
+    /// render "Add to [Name]'s next visit" without an extra fetch per tap.
+    private func loadRoutingContext() async {
+        currentRoute = task.assignedRoute
+        guard preferredHandyman == nil else { return }
+        if let household = try? await DatabaseService.shared.fetchHousehold(id: task.householdId),
+           let handymanId = household.preferredHandymanContractorId {
+            let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
+            preferredHandyman = contractors.first { $0.id == handymanId }
+        }
+    }
+
+    /// Phase 64 + 65 write path:
+    /// 1. Persist `assigned_route` via `setTaskRoute` (handles punch-list sync).
+    /// 2. Stamp / upsert a category-level `routing_preferences` row on first
+    ///    pick per category; stamp a template-level override when the user
+    ///    deviates from an existing category preference.
+    /// 3. Show the "we'll remember this" toast on first-pick.
+    private func selectRoute(_ route: String) async {
+        let previous = currentRoute
+        currentRoute = route
+        Haptics.light()
+
+        let category = resolvedCategory ?? "Other"
+        Analytics.track(.taskRouteChanged, [
+            "task_id": task.id.uuidString,
+            "from": previous ?? "unset",
+            "to": route,
+            "category": category,
+            "picker_mode": String(describing: routingPickerMode)
+        ])
+
+        do {
+            _ = try await DatabaseService.shared.setTaskRoute(
+                taskId: task.id,
+                route: route,
+                task: task
+            )
+        } catch {
+            Haptics.error()
+            currentRoute = previous
+            return
+        }
+
+        await persistRoutingPreference(route: route, category: category)
+        Haptics.success()
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+    }
+
+    /// Category for the current task — resolves via the system if present,
+    /// otherwise from the template key prefix ("HVAC:Replace air filters" →
+    /// "HVAC"). Falls back to "Other" upstream.
+    private var resolvedCategory: String? {
+        if let category = systemCategory { return category }
+        if let key = task.templateId, let colon = key.firstIndex(of: ":") {
+            return String(key[..<colon])
+        }
+        return nil
+    }
+
+    private func persistRoutingPreference(route: String, category: String) async {
+        guard let propertyId = task.propertyId else { return }
+        let householdId = task.householdId
+        let existing = (try? await DatabaseService.shared.fetchRoutingPreferences(
+            householdId: householdId,
+            propertyId: propertyId
+        )) ?? []
+
+        if let templateId = task.templateId,
+           let categoryPref = existing.first(where: {
+               $0.scopeType == "category" && $0.taskCategory == category
+           }),
+           categoryPref.preferredRoute != route {
+            // Deviating from the category preference → template-level override.
+            let insert = RoutingPreferenceInsert(
+                householdId: householdId,
+                propertyId: propertyId,
+                taskCategory: templateId,
+                scopeType: "template",
+                preferredRoute: route,
+                preferredVendorId: route == "vendor" ? assignedContractor?.id : nil
+            )
+            _ = try? await DatabaseService.shared.upsertRoutingPreference(insert)
+            Analytics.track(.routingPreferenceUpdated, [
+                "category": category,
+                "from_route": categoryPref.preferredRoute,
+                "to_route": route
+            ])
+            return
+        }
+
+        if existing.first(where: {
+            $0.scopeType == "category" && $0.taskCategory == category
+        }) == nil {
+            // First pick in this category → create category preference + toast.
+            let insert = RoutingPreferenceInsert(
+                householdId: householdId,
+                propertyId: propertyId,
+                taskCategory: category,
+                scopeType: "category",
+                preferredRoute: route,
+                preferredVendorId: route == "vendor" ? assignedContractor?.id : nil
+            )
+            _ = try? await DatabaseService.shared.upsertRoutingPreference(insert)
+            Analytics.track(.routingPreferenceSet, [
+                "category": category,
+                "route": route,
+                "scope": "category"
+            ])
+            await MainActor.run {
+                rememberedToastCategory = category
+                withAnimation { showRoutingRememberedToast = true }
+            }
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            await MainActor.run {
+                withAnimation { showRoutingRememberedToast = false }
+            }
+        }
+    }
+
     // MARK: - Vendor / Scheduling
 
     private var vendorSection: some View {
@@ -856,8 +1541,320 @@ struct MaintenanceTaskDetailSheet: View {
         }
     }
 
+    // MARK: - Phase 51B: Schedule Visit (inline on detail sheet)
+
+    /// Shows when vendor is assigned but no scheduledDate or standingAppointment.
+    /// This is the "on the phone with vendor" workflow.
+    @ViewBuilder
+    private var scheduleVisitSection: some View {
+        let isVendor = task.assignmentType?.lowercased() == "vendor"
+        let hasContractor = task.assignedContractorId != nil
+        let notScheduled = task.scheduledDate == nil && task.standingAppointmentId == nil
+
+        if isVendor && hasContractor && notScheduled {
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    // Header with expand toggle
+                    Button {
+                        withAnimation(HavenTheme.animationStandard) {
+                            showScheduleVisit.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "calendar.badge.plus")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(HavenColors.navy700)
+                            Text("Schedule Visit")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                            Image(systemName: showScheduleVisit ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if showScheduleVisit {
+                        Divider().foregroundStyle(HavenColors.beige200)
+
+                        // Date picker
+                        DatePicker("Date", selection: $scheduleDate, displayedComponents: .date)
+                            .font(HavenTypography.body)
+                            .tint(HavenColors.navy800)
+
+                        // Time slot
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("TIME")
+                                .font(HavenTypography.uiSectionHeader)
+                                .tracking(1.5)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Picker("Time", selection: $scheduleTimeSlot) {
+                                ForEach(ScheduleTimeSlot.allCases, id: \.self) { slot in
+                                    Text(slot.label).tag(slot)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+
+                        // Make recurring toggle
+                        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                            Toggle(isOn: $makeRecurring) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Make this recurring")
+                                        .font(HavenTypography.headline)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Text("Set up a regular schedule with this vendor")
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                            .tint(HavenColors.navy800)
+
+                            if makeRecurring {
+                                Picker("Frequency", selection: $recurringCadence) {
+                                    Text("Weekly").tag("weekly")
+                                    Text("Every 2 weeks").tag("biweekly")
+                                    Text("Monthly").tag("monthly")
+                                    Text("Quarterly").tag("quarterly")
+                                    Text("Semi-annually").tag("semiannual")
+                                    Text("Annually").tag("annual")
+                                }
+                                .pickerStyle(.menu)
+                                .tint(HavenColors.navy800)
+                            }
+                        }
+
+                        // Confirm button
+                        Button {
+                            confirmScheduledVisit()
+                        } label: {
+                            HStack {
+                                if isScheduling {
+                                    ProgressView().controlSize(.small).tint(.white)
+                                }
+                                Text("Confirm Visit")
+                                    .font(HavenTypography.uiButton)
+                            }
+                            .foregroundStyle(HavenColors.textOnNavy)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(HavenColors.navy800)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isScheduling)
+                    }
+                }
+            }
+        }
+    }
+
+    private func confirmScheduledVisit() {
+        isScheduling = true
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: scheduleDate)
+
+        Task {
+            do {
+                // 1. Set scheduledDate on the task → moves to the "Scheduled" bucket
+                _ = try await db.updateMaintenanceTask(
+                    id: task.id,
+                    MaintenanceTaskUpdate(scheduledDate: dateStr)
+                )
+
+                // 2. If recurring, create a standing appointment
+                if makeRecurring, let systemId = task.systemId {
+                    let user = try await db.fetchCurrentUser()
+                    if let householdId = user.householdId {
+                        _ = try await StandingAppointmentViewModel.shared.createAppointment(
+                            householdId: householdId,
+                            propertyId: task.propertyId,
+                            vendorId: task.assignedContractorId,
+                            systemId: systemId,
+                            cadenceType: recurringCadence,
+                            cadenceIntervalDays: nil,
+                            cadenceSource: "user_set",
+                            serviceDescription: "\(assignedContractor?.companyName ?? "Vendor") \(recurringCadence) \(systemCategory ?? "service")",
+                            startDate: dateStr
+                        )
+
+                        // Link the task to the standing appointment
+                        let appointments = try await db.fetchStandingAppointments(householdId: householdId)
+                        if let appt = appointments.first(where: { $0.systemId == systemId && $0.archivedAt == nil }) {
+                            _ = try await db.updateMaintenanceTask(
+                                id: task.id,
+                                MaintenanceTaskUpdate(standingAppointmentId: appt.id)
+                            )
+                        }
+                    }
+                }
+
+                await MainActor.run {
+                    isScheduling = false
+                    Haptics.success()
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                    NotificationCenter.default.post(name: .standingAppointmentChanged, object: nil)
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isScheduling = false
+                    Haptics.error()
+                }
+            }
+        }
+    }
+
+    // MARK: - Phase 51B: Recurring Service Section
+
+    @ViewBuilder
+    private var recurringServiceSection: some View {
+        if task.standingAppointmentId != nil {
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    Text("RECURRING SERVICE")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+
+                    // Cadence + status
+                    if let appt = linkedAppointment {
+                        HStack(spacing: HavenTheme.spacing8) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(HavenColors.navy700)
+                            Text(appt.cadenceLabel)
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                            if appt.isPaused {
+                                Text("Paused")
+                                    .font(HavenTypography.badgeLabel)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(HavenColors.warning.opacity(0.12))
+                                    .foregroundStyle(HavenColors.warning)
+                                    .clipShape(Capsule())
+                            }
+                        }
+
+                        // Next 4 upcoming visits
+                        if !upcomingVisits.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("UPCOMING VISITS")
+                                    .font(HavenTypography.uiSectionHeader)
+                                    .tracking(1.5)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                    .padding(.top, 4)
+
+                                ForEach(upcomingVisits, id: \.id) { visit in
+                                    HStack(spacing: HavenTheme.spacing8) {
+                                        Circle()
+                                            .fill(visitStatusColor(visit.status))
+                                            .frame(width: 6, height: 6)
+                                        Text(visit.scheduledDate.havenDateCompact)
+                                            .font(HavenTypography.bodySmall)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                        Text(visit.status.capitalized)
+                                            .font(HavenTypography.caption)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                        Spacer()
+                                    }
+                                }
+                            }
+                        }
+
+                        // Last confirmed
+                        if let lastDate = appt.lastConfirmedDate {
+                            HStack(spacing: HavenTheme.spacing8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(HavenColors.success)
+                                Text("Last confirmed: \(lastDate.havenDateCompact)")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .padding(.top, 4)
+                        }
+
+                        Divider().foregroundStyle(HavenColors.beige200)
+
+                        // Actions
+                        if appt.isPaused {
+                            Button {
+                                Task { try? await StandingAppointmentViewModel.shared.resumeAppointment(id: appt.id) }
+                                Haptics.medium()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "play.fill")
+                                    Text("Resume Service")
+                                }
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy800)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button {
+                                appointmentToPauseFromDetail = appt
+                                showPauseFromDetail = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "pause.circle")
+                                    Text("Pause Service")
+                                }
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button {
+                            Task {
+                                try? await StandingAppointmentViewModel.shared.archiveAppointment(id: appt.id)
+                                Haptics.medium()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "xmark.circle")
+                                Text("End Service")
+                            }
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.critical)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var linkedAppointment: StandingAppointmentRow? {
+        guard let id = task.standingAppointmentId else { return nil }
+        return StandingAppointmentViewModel.shared.appointments.first { $0.id == id }
+    }
+
+    @State private var upcomingVisits: [StandingAppointmentVisitRow] = []
+    @State private var appointmentToPauseFromDetail: StandingAppointmentRow?
+    @State private var showPauseFromDetail = false
+
+    private func visitStatusColor(_ status: String) -> Color {
+        switch status {
+        case "confirmed": return HavenColors.success
+        case "upcoming": return HavenColors.navy800
+        case "skipped": return HavenColors.textTertiary
+        case "assumed": return HavenColors.warning
+        default: return HavenColors.textTertiary
+        }
+    }
+
     // MARK: - Reminders
 
+    /// Phase 56.4: Smart reminder defaults. Collapsed summary row shows
+    /// the active reminder(s); "Adjust" expands into the full 5-toggle
+    /// grid. Replaces the pre-56.4 always-visible toggle block which
+    /// made the user choose between 5 options with zero guidance.
     private var remindersSection: some View {
         HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
@@ -866,38 +1863,93 @@ struct MaintenanceTaskDetailSheet: View {
                     .tracking(1.5)
                     .foregroundStyle(HavenColors.textTertiary)
 
-                Toggle("1 day before", isOn: $reminder1Day)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-                    .onChange(of: reminder1Day) { _, newValue in
-                        toggleReminder(daysBefore: 1, isEnabled: newValue)
-                    }
-                Toggle("3 days before", isOn: $reminder3Days)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-                    .onChange(of: reminder3Days) { _, newValue in
-                        toggleReminder(daysBefore: 3, isEnabled: newValue)
-                    }
-                Toggle("1 week before", isOn: $reminder1Week)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-                    .onChange(of: reminder1Week) { _, newValue in
-                        toggleReminder(daysBefore: 7, isEnabled: newValue)
-                    }
-                Toggle("2 weeks before", isOn: $reminder2Weeks)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-                    .onChange(of: reminder2Weeks) { _, newValue in
-                        toggleReminder(daysBefore: 14, isEnabled: newValue)
-                    }
-                Toggle("1 month before", isOn: $reminder1Month)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-                    .onChange(of: reminder1Month) { _, newValue in
-                        toggleReminder(daysBefore: 30, isEnabled: newValue)
-                    }
+                if remindersExpanded {
+                    expandedRemindersBody
+                } else {
+                    collapsedRemindersRow
+                }
             }
         }
+    }
+
+    /// Summary row: either "Reminding you X before" (when at least one
+    /// is set) or "No reminders set" with an Add affordance.
+    @ViewBuilder
+    private var collapsedRemindersRow: some View {
+        let earliest = activeReminders.sorted { $0.sortOrder < $1.sortOrder }.first
+        if let primary = earliest {
+            HStack {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(HavenColors.navy700)
+                Text("Reminding you \(primary.rawValue.lowercased())")
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                if activeReminders.count > 1 {
+                    Text("+\(activeReminders.count - 1)")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                Spacer()
+                Button("Adjust") {
+                    Haptics.light()
+                    withAnimation(HavenTheme.animationStandard) {
+                        remindersExpanded = true
+                    }
+                }
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.navy700)
+            }
+        } else {
+            HStack {
+                Image(systemName: "bell.slash")
+                    .font(.system(size: 14))
+                    .foregroundStyle(HavenColors.textTertiary)
+                Text("No reminders set")
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Button("Add") {
+                    Haptics.light()
+                    withAnimation(HavenTheme.animationStandard) {
+                        remindersExpanded = true
+                    }
+                }
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.navy700)
+            }
+        }
+    }
+
+    /// Expanded 5-toggle grid. Same reminders the pre-56.4 UI exposed
+    /// but hidden by default behind the summary row.
+    @ViewBuilder
+    private var expandedRemindersBody: some View {
+        ForEach(ReminderTiming.allCases, id: \.self) { timing in
+            Toggle(timing.rawValue, isOn: Binding(
+                get: { activeReminders.contains(timing) },
+                set: { isOn in
+                    if isOn {
+                        activeReminders.insert(timing)
+                    } else {
+                        activeReminders.remove(timing)
+                    }
+                    setReminder(timing: timing, isEnabled: isOn)
+                }
+            ))
+            .font(HavenTypography.bodySmall)
+            .tint(HavenColors.navy800)
+        }
+
+        Button("Done adjusting") {
+            Haptics.light()
+            withAnimation(HavenTheme.animationStandard) {
+                remindersExpanded = false
+            }
+        }
+        .font(HavenTypography.uiCaption)
+        .foregroundStyle(HavenColors.navy700)
+        .padding(.top, 4)
     }
 
     // MARK: - Assign To
@@ -1023,22 +2075,10 @@ struct MaintenanceTaskDetailSheet: View {
 
     private var actionsSection: some View {
         VStack(spacing: HavenTheme.spacing12) {
-            Button {
-                Haptics.light()
-                Analytics.track(.maintenanceTaskCompleted, ["task_id": task.id.uuidString, "source": "button"])
-                showCompleteForm = true
-            } label: {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Mark as Complete")
-                }
-                .font(HavenTypography.uiButton)
-                .foregroundStyle(HavenColors.textOnNavy)
-                .frame(maxWidth: .infinity)
-                .frame(height: HavenTheme.buttonHeight)
-                .background(HavenColors.navy)
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
-            }
+            // Phase 56.4: "Mark as Complete" removed — "I already did
+            // this" under the date line is the friendlier HNW-voice
+            // equivalent and handles the common case (user did it
+            // off-app) more naturally.
 
             Button {
                 Haptics.light()
@@ -1082,6 +2122,39 @@ struct MaintenanceTaskDetailSheet: View {
                         .stroke(HavenColors.beige300, lineWidth: 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+
+            // Phase 54B.3 / 56.4: Add-to-handyman entry point. Visible
+            // when the matched template has DIY effort under an hour.
+            // Vendor-assigned tasks route through the "Just this time /
+            // From now on" confirmation dialog attached to `body`.
+            if showAddToHandymanButton {
+                Button {
+                    Haptics.light()
+                    handleAddToHandymanList()
+                } label: {
+                    HStack {
+                        if isAddingToPunchList {
+                            ProgressView()
+                                .tint(HavenColors.navy800)
+                                .scaleEffect(0.85)
+                        } else {
+                            Image(systemName: "hammer.fill")
+                        }
+                        Text("Add to handyman list")
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.navy800)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: HavenTheme.buttonHeight)
+                    .background(HavenColors.creamLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .stroke(HavenColors.beige300, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .disabled(isAddingToPunchList)
             }
 
             Button {
