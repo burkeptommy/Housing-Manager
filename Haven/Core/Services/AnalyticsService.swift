@@ -145,6 +145,13 @@ enum AnalyticsEvent: String {
     case vehicleRoutineOpened = "vehicle_routine_opened"
     case routineDetailOpened = "routine_detail_opened"
     case seeFullYearTapped = "see_full_year_tapped"
+
+    /// Phase 67 — Year at a Glance + unified routing + orchestration.
+    case yearAtAGlanceSeasonOpened = "year_at_a_glance_season_opened"
+    case unifiedRoutingPickerOpened = "unified_routing_picker_opened"
+    case unifiedRoutingPickerChose = "unified_routing_picker_chose"
+    case stickyRoutingPreferenceSaved = "sticky_routing_preference_saved"
+    case thisSeasonOrchestrationChipTapped = "this_season_orchestration_chip_tapped"
     /// Phase 58 — Vendor orchestration + routine seeder.
     case vendorDetailOpened = "vendor_detail_opened"
     case vendorBillScanStarted = "vendor_bill_scan_started"

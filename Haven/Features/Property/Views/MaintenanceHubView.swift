@@ -28,6 +28,12 @@ struct MaintenanceHubView: View {
     @StateObject private var viewModel = MaintenanceHubViewModel()
     @State private var showAddRoutineSheet = false
     @State private var editingRoutine: RoutineRow?
+    /// Phase 67C: Season selected from Year at a Glance — opens a
+    /// season-scoped list sheet. Nil when not looking at a specific season.
+    @State private var expandedSeason: YearAtAGlanceCard.Season?
+    /// Phase 67D: Task selected for orchestration — presents the unified
+    /// routing menu in a sheet. Nil when not routing.
+    @State private var orchestratingTask: MaintenanceTaskDBRow?
 
     var body: some View {
         ScrollView {
@@ -38,6 +44,21 @@ struct MaintenanceHubView: View {
             } else {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing32) {
                     seeFullYearLink
+
+                    // Phase 67C: Year at a Glance — solves the
+                    // "spring looks empty" complaint by showing the
+                    // full year's maintenance load upfront. Users can
+                    // tap any season to drill in.
+                    YearAtAGlanceCard(
+                        seasons: viewModel.seasonSummaries,
+                        onTapSeason: { season in
+                            expandedSeason = season
+                            Analytics.track(.yearAtAGlanceSeasonOpened, [
+                                "season": season.rawValue,
+                                "count": viewModel.seasonSummaries.first(where: { $0.season == season })?.count ?? 0
+                            ])
+                        }
+                    )
 
                     YourServicesSection(
                         activeRoutines: viewModel.activeRoutines,
@@ -87,7 +108,10 @@ struct MaintenanceHubView: View {
 
                     ThisSeasonSection(
                         tasks: viewModel.thisSeasonTasks,
-                        onTapTask: { viewModel.openTask($0) }
+                        onTapTask: { viewModel.openTask($0) },
+                        onRouteTask: { task in
+                            orchestratingTask = task
+                        }
                     )
 
                     UpcomingScheduledSection(
@@ -151,6 +175,109 @@ struct MaintenanceHubView: View {
                 )
             }
         }
+        .sheet(item: $expandedSeason) { season in
+            NavigationStack {
+                SeasonTasksSheet(
+                    season: season,
+                    tasks: viewModel.tasksForSeason(season),
+                    routines: viewModel.routinesForSeason(season)
+                )
+            }
+        }
+        .sheet(item: $orchestratingTask) { task in
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(task.title)
+                                .font(HavenTypography.headline)
+                            Text("Due \(task.nextDueDate)")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+
+                        UnifiedRoutingMenu(
+                            task: task,
+                            taskCategory: viewModel.categoryForTask(task),
+                            handymanVendor: viewModel.preferredHandyman,
+                            categoryVendorRoutine: viewModel.vendorRoutineForCategory(
+                                viewModel.categoryForTask(task)
+                            ),
+                            categoryVendor: viewModel.vendorForCategory(
+                                viewModel.categoryForTask(task)
+                            ),
+                            onRouteToHandyman: {
+                                Task {
+                                    try? await UnifiedRoutingActions.routeToHandyman(
+                                        task: task,
+                                        category: viewModel.categoryForTask(task)
+                                    )
+                                    orchestratingTask = nil
+                                }
+                            },
+                            onRouteToVendor: {
+                                Task {
+                                    guard let routine = viewModel.vendorRoutineForCategory(
+                                        viewModel.categoryForTask(task)
+                                    ) else {
+                                        orchestratingTask = nil
+                                        return
+                                    }
+                                    try? await UnifiedRoutingActions.routeToVendor(
+                                        task: task,
+                                        routine: routine,
+                                        category: viewModel.categoryForTask(task)
+                                    )
+                                    orchestratingTask = nil
+                                }
+                            },
+                            onFindDifferentVendor: {
+                                orchestratingTask = nil
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("requestFindVendor"),
+                                    object: nil,
+                                    userInfo: ["taskId": task.id.uuidString]
+                                )
+                            },
+                            onDIYMyself: {
+                                Task {
+                                    try? await UnifiedRoutingActions.markDIY(
+                                        task: task,
+                                        category: viewModel.categoryForTask(task)
+                                    )
+                                    orchestratingTask = nil
+                                }
+                            },
+                            onAskAlfred: {
+                                orchestratingTask = nil
+                                NotificationCenter.default.post(
+                                    name: .openAlfredWithContext,
+                                    object: nil,
+                                    userInfo: [
+                                        "message": "Who should handle this task: \(task.title)?"
+                                    ]
+                                )
+                            }
+                        )
+                    }
+                    .padding(HavenTheme.spacing20)
+                }
+                .navigationTitle("Route task")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Cancel") { orchestratingTask = nil }
+                    }
+                }
+                .onAppear {
+                    Analytics.track(.unifiedRoutingPickerOpened, [
+                        "task_id": task.id.uuidString,
+                        "source": "this_season_chip"
+                    ])
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 
     private var seeFullYearLink: some View {
@@ -195,8 +322,115 @@ final class MaintenanceHubViewModel: ObservableObject {
     @Published var allRoutinesById: [UUID: RoutineRow] = [:]
     @Published var householdId: UUID?
     @Published var resolvedPropertyId: UUID?
+    /// Phase 67C: All tasks for the current property (parented + unparented
+    /// + vehicle) combined, used by Year at a Glance aggregation.
+    @Published var allTaskList: [MaintenanceTaskDBRow] = []
+    /// Phase 67C: Tasks grouped by their parent routine. Used to attribute
+    /// routine-linked tasks to the routine's seasonal active_months.
+    @Published var tasksByRoutine: [UUID: [MaintenanceTaskDBRow]] = [:]
 
     private let db = DatabaseService.shared
+
+    /// Phase 67C: Seasonal aggregation for the Year at a Glance card.
+    /// Recomputes cheaply from already-loaded state.
+    var seasonSummaries: [YearAtAGlanceCard.SeasonSummary] {
+        let allRoutines = Array(allRoutinesById.values)
+        return YearAtAGlanceAggregator.summarize(
+            tasks: allTaskList,
+            routines: allRoutines,
+            routineTasks: tasksByRoutine
+        )
+    }
+
+    /// Phase 67C: Surface the list of tasks for a single season when the
+    /// user taps a season tile. Rolls up the same pool Year at a Glance
+    /// counts.
+    func tasksForSeason(_ season: YearAtAGlanceCard.Season) -> [MaintenanceTaskDBRow] {
+        var seen: Set<UUID> = []
+        var result: [MaintenanceTaskDBRow] = []
+
+        // Tasks via routines
+        for (routineId, routineTasks) in tasksByRoutine {
+            guard let routine = allRoutinesById[routineId] else { continue }
+            let months = Set(routine.activeMonths)
+            if !months.isDisjoint(with: season.months) {
+                for task in routineTasks where !seen.contains(task.id) && task.isArchived != true {
+                    seen.insert(task.id)
+                    result.append(task)
+                }
+            }
+        }
+
+        // Unparented tasks
+        for task in allTaskList where !seen.contains(task.id) && task.isArchived != true {
+            seen.insert(task.id)
+            let taskSeason = inferSeason(for: task)
+            if taskSeason == season {
+                result.append(task)
+            }
+        }
+
+        return result.sorted { $0.nextDueDate < $1.nextDueDate }
+    }
+
+    /// Phase 67C: Routines active in the given season, surfaced as part
+    /// of the season-drilldown sheet.
+    func routinesForSeason(_ season: YearAtAGlanceCard.Season) -> [RoutineRow] {
+        allRoutinesById.values.filter { routine in
+            !Set(routine.activeMonths).isDisjoint(with: season.months)
+        }.sorted { $0.label < $1.label }
+    }
+
+    /// Phase 67B: Resolve a task's category for routing-menu context.
+    /// Walks template id → "Category:title" prefix, then falls back to
+    /// the system's canonical category, then nil.
+    func categoryForTask(_ task: MaintenanceTaskDBRow) -> String? {
+        if let templateId = task.templateId,
+           let prefix = templateId.split(separator: ":").first {
+            return SystemCategoryRegistry.canonical(category: String(prefix))
+                ?? String(prefix)
+        }
+        return nil
+    }
+
+    /// Phase 67B: Find an active vendor routine for a category — what
+    /// the UnifiedRoutingMenu presents as "Assign to [Tyler]". Returns
+    /// nil when the user has no vendor on file for this category.
+    func vendorRoutineForCategory(_ category: String?) -> RoutineRow? {
+        guard let category else { return nil }
+        guard let canonical = SystemCategoryRegistry.canonical(category: category) else { return nil }
+        guard let kind = RoutineGroupingEngine.routineKindFor(systemCategory: canonical) else { return nil }
+        return allRoutinesById.values.first { routine in
+            routine.typedKind == kind
+                && routine.typedSetupState == .active
+                && routine.vendorId != nil
+        }
+    }
+
+    func vendorForCategory(_ category: String?) -> ContractorRow? {
+        guard let routine = vendorRoutineForCategory(category),
+              let vendorId = routine.vendorId
+        else { return nil }
+        return vendorsById[vendorId]
+    }
+
+    private func inferSeason(for task: MaintenanceTaskDBRow) -> YearAtAGlanceCard.Season {
+        if let timing = task.seasonalTiming?.lowercased() {
+            if timing.contains("spring") { return .spring }
+            if timing.contains("summer") { return .summer }
+            if timing.contains("fall") { return .fall }
+            if timing.contains("winter") { return .winter }
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        if let date = formatter.date(from: task.nextDueDate) {
+            let month = Calendar.current.component(.month, from: date)
+            for season in YearAtAGlanceCard.Season.allCases where season.months.contains(month) {
+                return season
+            }
+        }
+        return .current
+    }
 
     var hasNoContent: Bool {
         activeRoutines.isEmpty
@@ -274,6 +508,21 @@ final class MaintenanceHubViewModel: ObservableObject {
         // This Season: property tasks with no parent_routine_id, no
         // vehicle_id, due within 90 days.
         thisSeasonTasks = await loadThisSeasonTasks(propertyId: propertyId)
+
+        // Phase 67C: Year at a Glance aggregation source — all property
+        // tasks (parented + unparented) + tasks linked per routine.
+        if let propertyId {
+            let everything = (try? await db.fetchMaintenanceTasks(propertyId: propertyId)) ?? []
+            allTaskList = everything.filter { $0.isArchived != true }
+        } else {
+            allTaskList = []
+        }
+        var perRoutineTasks: [UUID: [MaintenanceTaskDBRow]] = [:]
+        for routine in allRoutinesById.values {
+            let tasks = (try? await db.fetchTasksForRoutine(routineId: routine.id)) ?? []
+            perRoutineTasks[routine.id] = tasks.filter { $0.isArchived != true }
+        }
+        tasksByRoutine = perRoutineTasks
 
         // Scheduled visits
         scheduledVisits = (try? await db.fetchScheduledVisitsForHousehold(householdId: hhId)) ?? []

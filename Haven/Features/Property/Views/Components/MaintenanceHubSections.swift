@@ -438,6 +438,11 @@ struct VehiclesSection: View {
 struct ThisSeasonSection: View {
     let tasks: [MaintenanceTaskDBRow]
     let onTapTask: (MaintenanceTaskDBRow) -> Void
+    /// Phase 67D: Orchestration chip callback — when the user taps
+    /// "Route" on a task row, present the unified routing menu so they
+    /// can delegate to handyman / existing vendor / find vendor / DIY /
+    /// Alfred without opening the full detail sheet first.
+    var onRouteTask: ((MaintenanceTaskDBRow) -> Void)? = nil
 
     var body: some View {
         if tasks.isEmpty {
@@ -490,29 +495,62 @@ struct ThisSeasonSection: View {
     }
 
     private func taskRow(_ task: MaintenanceTaskDBRow) -> some View {
-        Button {
-            onTapTask(task)
-        } label: {
-            HStack(alignment: .top, spacing: HavenTheme.spacing12) {
-                Circle()
-                    .strokeBorder(HavenColors.textTertiary, lineWidth: 1.5)
-                    .frame(width: 18, height: 18)
-                    .offset(y: 1)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(task.title)
-                        .font(HavenTypography.body)
-                        .foregroundStyle(HavenColors.textPrimary)
-                    if !task.nextDueDate.isEmpty {
-                        Text("Due \(task.nextDueDate)")
-                            .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.textSecondary)
+        HStack(alignment: .top, spacing: HavenTheme.spacing12) {
+            Button {
+                onTapTask(task)
+            } label: {
+                HStack(alignment: .top, spacing: HavenTheme.spacing12) {
+                    Circle()
+                        .strokeBorder(HavenColors.textTertiary, lineWidth: 1.5)
+                        .frame(width: 18, height: 18)
+                        .offset(y: 1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(task.title)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        if !task.nextDueDate.isEmpty {
+                            Text("Due \(task.nextDueDate)")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, HavenTheme.spacing4)
+            .buttonStyle(.plain)
+
+            // Phase 67D: Orchestration chip. Lets the user route this
+            // task to handyman / vendor / self / Alfred without opening
+            // the full detail sheet. Only renders when the callback is
+            // wired (the parent hub provides it; other call sites can
+            // pass nil to suppress).
+            if let onRouteTask {
+                Button {
+                    onRouteTask(task)
+                    Analytics.track(.thisSeasonOrchestrationChipTapped, [
+                        "task_id": task.id.uuidString
+                    ])
+                    Haptics.selection()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Route")
+                            .font(HavenTypography.uiLabelSmall)
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .overlay(
+                        Capsule()
+                            .stroke(HavenColors.navy.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, HavenTheme.spacing4)
     }
 }
 
