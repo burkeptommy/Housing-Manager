@@ -307,6 +307,7 @@
 		CBDF628112334992EFDA96C4 /* PropertyRecapEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */; };
 		CC76A07844A54D041CF717AA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463255AA4F73B60AC3C7ED12 /* ContentView.swift */; };
 		CD4742A566468641096EA249 /* FiduciaryRoleCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C377408651C672C529BF6445 /* FiduciaryRoleCard.swift */; };
+		CE906811F6BDAE0BB0DAE413 /* VehicleProgramSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49D3108EC0097CE38B95B253 /* VehicleProgramSetupSheet.swift */; };
 		CF5F43382C818085844EC5D8 /* SecurityDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA558B3CCF8FD03A1DB1B36 /* SecurityDashboardView.swift */; };
 		CFB6815B74786B7545C83C4C /* InvoiceLineItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D64C4BB072879F1D5DAD7AB /* InvoiceLineItem.swift */; };
 		D12133529ACC9510A79311A7 /* ScreenshotPrevention.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C817E777D24E732912FBCA /* ScreenshotPrevention.swift */; };
@@ -509,6 +510,7 @@
 		46905EFC24FB1AD4C663EE7E /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		49355CE5CE47932E71D7ED0A /* RoutineEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineEditSheet.swift; sourceTree = "<group>"; };
 		49BADD595B4C622795B9566D /* AddVehicleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddVehicleView.swift; sourceTree = "<group>"; };
+		49D3108EC0097CE38B95B253 /* VehicleProgramSetupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleProgramSetupSheet.swift; sourceTree = "<group>"; };
 		4A49265B02B1FE4943D13DEE /* DocumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDetailView.swift; sourceTree = "<group>"; };
 		4A6E8DFBC88AF3D120717F2F /* DocumentAccessDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentAccessDefaults.swift; sourceTree = "<group>"; };
 		4AD2F4AD6AD8E86D93DEA55A /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
@@ -1393,6 +1395,7 @@
 				9A01411F71C6512A63FA44FC /* UpdateHomeDetailsSheet.swift */,
 				6DF7A5BC749EE76956FF9449 /* UtilityAccountsSection.swift */,
 				C97D2B0FAFB54FF91648CA17 /* VehicleDetailView.swift */,
+				49D3108EC0097CE38B95B253 /* VehicleProgramSetupSheet.swift */,
 				F9A1E64945F0A863947B24B9 /* VendorReviewForm.swift */,
 				E6966723A75149E0AA831822 /* WarrantyTrackerView.swift */,
 				CA0B114520C474E97EDD2DE8 /* WebsiteImportView.swift */,
@@ -2049,6 +2052,7 @@
 				26043ACF0D900C38B606A985 /* VehicleDetailView.swift in Sources */,
 				53ABF776341026EA7DAD20C3 /* VehicleDetailViewModel.swift in Sources */,
 				353BDE111D27138F76DFEC06 /* VehicleLookupService.swift in Sources */,
+				CE906811F6BDAE0BB0DAE413 /* VehicleProgramSetupSheet.swift in Sources */,
 				635FEA32AD3A53DF6F89A1A8 /* VendorCoveragePickerSheet.swift in Sources */,
 				05407F100AA750C7E5A913AF /* VendorCoverageSheet.swift in Sources */,
 				FA43E1224FC4C151E2FB7F66 /* VendorLogoView.swift in Sources */,

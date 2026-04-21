@@ -34,6 +34,9 @@ struct MaintenanceHubView: View {
     /// Phase 67D: Task selected for orchestration — presents the unified
     /// routing menu in a sheet. Nil when not routing.
     @State private var orchestratingTask: MaintenanceTaskDBRow?
+    /// BUG-013 fix: Vehicle pending shop setup. Was previously a dead
+    /// notification post that nothing observed.
+    @State private var setupVehicle: VehicleRow?
 
     var body: some View {
         ScrollView {
@@ -98,11 +101,11 @@ struct MaintenanceHubView: View {
                                     "routine_id": routine.id.uuidString
                                 ])
                             } else {
-                                viewModel.openVehicleSetup(vehicle: vehicle)
+                                setupVehicle = vehicle
                             }
                         },
                         onSetupVehicle: { vehicle in
-                            viewModel.openVehicleSetup(vehicle: vehicle)
+                            setupVehicle = vehicle
                         }
                     )
 
@@ -183,6 +186,17 @@ struct MaintenanceHubView: View {
                     routines: viewModel.routinesForSeason(season)
                 )
             }
+        }
+        .sheet(item: $setupVehicle, onDismiss: {
+            Task { await viewModel.load(filterPropertyId: filterPropertyId) }
+        }) { vehicle in
+            VehicleProgramSetupSheet(
+                vehicle: vehicle,
+                householdId: viewModel.householdId ?? vehicle.householdId,
+                onSaved: {
+                    Task { await viewModel.load(filterPropertyId: filterPropertyId) }
+                }
+            )
         }
         .sheet(item: $orchestratingTask) { task in
             NavigationStack {
@@ -345,28 +359,35 @@ final class MaintenanceHubViewModel: ObservableObject {
     /// Phase 67C: Surface the list of tasks for a single season when the
     /// user taps a season tile. Rolls up the same pool Year at a Glance
     /// counts.
+    /// BUG-008 second-pass fix: drop tasks whose `nextDueDate` month
+    /// doesn't match the requested season. Previously the function
+    /// included every task parented to a routine whose active_months
+    /// overlapped the season — which bled snow-removal tasks (Oct due
+    /// date) into Summer. Using `inferSeason` (which reads the task's
+    /// own due date) keeps each task in exactly one bucket, matching
+    /// the user's "what's happening this season?" mental model.
     func tasksForSeason(_ season: YearAtAGlanceCard.Season) -> [MaintenanceTaskDBRow] {
         var seen: Set<UUID> = []
         var result: [MaintenanceTaskDBRow] = []
 
-        // Tasks via routines
-        for (routineId, routineTasks) in tasksByRoutine {
-            guard let routine = allRoutinesById[routineId] else { continue }
-            let months = Set(routine.activeMonths)
-            if !months.isDisjoint(with: season.months) {
-                for task in routineTasks where !seen.contains(task.id) && task.isArchived != true {
-                    seen.insert(task.id)
-                    result.append(task)
-                }
+        // Unparented + parented — same rule: include when the task's
+        // actual due date falls in this season.
+        for task in allTaskList where !seen.contains(task.id) && task.isArchived != true {
+            seen.insert(task.id)
+            if inferSeason(for: task) == season {
+                result.append(task)
             }
         }
 
-        // Unparented tasks
-        for task in allTaskList where !seen.contains(task.id) && task.isArchived != true {
-            seen.insert(task.id)
-            let taskSeason = inferSeason(for: task)
-            if taskSeason == season {
-                result.append(task)
+        // Defensive: fold in parented tasks that weren't in allTaskList
+        // (edge cases where RoutineGroupingEngine and the main fetch
+        // diverge). Same due-date filter.
+        for (_, routineTasks) in tasksByRoutine {
+            for task in routineTasks where !seen.contains(task.id) && task.isArchived != true {
+                seen.insert(task.id)
+                if inferSeason(for: task) == season {
+                    result.append(task)
+                }
             }
         }
 
@@ -626,25 +647,27 @@ final class MaintenanceHubViewModel: ObservableObject {
     }
 
     func openFindHandyman() {
-        // Surfaces the existing FindHandymanCard / Alfred flow.
+        // BUG-017 fix: Switch to Alfred tab first so the context message
+        // actually lands in a visible chat composer (not a background tab).
+        NotificationCenter.default.post(
+            name: .switchToTab,
+            object: nil,
+            userInfo: ["tab": 3]
+        )
         NotificationCenter.default.post(
             name: .openAlfredWithContext,
             object: nil,
             userInfo: [
-                "message": "Help me find a handyman"
+                "message": "I need a handyman for routine home maintenance. Can you help me find a vetted local pro?"
             ]
         )
     }
 
+    /// Deprecated: the vehicle card in MaintenanceHubView now drives the
+    /// sheet directly via @State. Kept as a no-op for any stragglers that
+    /// still post the dead notification.
     func openVehicleSetup(vehicle: VehicleRow) {
-        // Deferred to a shared vehicle-program setup sheet. For now the
-        // edit routine sheet handles it (RoutineEditSheet is scope-aware
-        // once we extend it in a subsequent pass).
-        NotificationCenter.default.post(
-            name: Notification.Name("requestVehicleProgramSetup"),
-            object: nil,
-            userInfo: ["vehicleId": vehicle.id.uuidString]
-        )
+        // No-op. The caller should set `setupVehicle` on the view instead.
     }
 
     func openTask(_ task: MaintenanceTaskDBRow) {

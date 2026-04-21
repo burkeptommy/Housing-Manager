@@ -273,7 +273,7 @@ struct MaintenanceScheduleView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(HavenColors.success)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(toast.taskTitle) — done!")
+                        Text("\(toast.taskTitle) · done!")
                             .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textPrimary)
                         Text("Next due: \(toast.nextDueDate)")
@@ -1923,10 +1923,18 @@ struct MaintenanceScheduleView: View {
                 Image(systemName: routine.resolvedIcon)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(HavenColors.navy700)
+                // BUG-014 fix: `.truncationMode(.tail)` forces ellipsis
+                // on overflow instead of mid-word cutoff. Prior render
+                // showed "Pick a pro for mosquito and tick sprayir"
+                // with no indication the label was truncated. Also caps
+                // the pill's width so long routine labels don't push
+                // subsequent pills off-screen.
                 Text(routine.label)
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textPrimary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 180, alignment: .leading)
                 if let contractor = linkedContractor {
                     Text(contractor.companyName.prefix(1).uppercased())
                         .font(.system(size: 9, weight: .bold))

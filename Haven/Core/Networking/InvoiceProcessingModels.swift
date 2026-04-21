@@ -19,6 +19,15 @@ struct InvoiceProcessingResult: Codable {
     /// suggestion card so the user can confirm and update the linked
     /// system's `service_interval_days`.
     let cadenceDetected: InvoiceCadenceDetected?
+    /// Phase 52b: When the invoice implies a specialty system the household
+    /// hasn't registered (e.g. a pool heater invoice when no Pool system
+    /// exists), the server returns this suggestion for one-tap confirmation.
+    let specialtySystemSuggestion: SpecialtySystemSuggestion?
+    /// Phase 59: Structured vendor match. When confidence is "high" the
+    /// iOS client silently files the document. When medium/low/ambiguous,
+    /// the invoice review surface offers candidate chips so the user can
+    /// pick the right vendor without typing.
+    let vendorMatch: InvoiceVendorMatch?
 
     enum CodingKeys: String, CodingKey {
         case vendor
@@ -33,6 +42,36 @@ struct InvoiceProcessingResult: Codable {
         case mileageReported = "mileage_reported"
         case nextServiceSuggestions = "next_service_suggestions"
         case cadenceDetected = "cadence_detected"
+        case specialtySystemSuggestion = "specialty_system_suggestion"
+        case vendorMatch = "vendor_match"
+    }
+}
+
+/// Phase 59: vendor match metadata returned by process-invoice.
+struct InvoiceVendorMatch: Codable {
+    let contractorId: String?
+    let confidence: String // "high" | "medium" | "low" | "ambiguous"
+    let extractedName: String?
+    let candidates: [InvoiceVendorCandidate]?
+
+    enum CodingKeys: String, CodingKey {
+        case contractorId = "contractor_id"
+        case confidence
+        case extractedName = "extracted_name"
+        case candidates
+    }
+}
+
+struct InvoiceVendorCandidate: Codable, Identifiable {
+    var id: String { contractorId }
+    let contractorId: String
+    let name: String
+    let score: Double
+
+    enum CodingKeys: String, CodingKey {
+        case contractorId = "contractor_id"
+        case name
+        case score
     }
 }
 
@@ -139,5 +178,23 @@ struct InvoiceFollowUp: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case description, urgency
         case suggestedDueDate = "suggested_due_date"
+    }
+}
+
+/// Phase 52b: Specialty system suggestion surfaced by the server when an
+/// invoice or document implies a system the household hasn't registered.
+struct SpecialtySystemSuggestion: Codable {
+    let category: String
+    let displayName: String
+    let subtypeHint: String?
+    let evidence: String
+    let source: String  // "invoice" | "document"
+
+    enum CodingKeys: String, CodingKey {
+        case category
+        case displayName = "display_name"
+        case subtypeHint = "subtype_hint"
+        case evidence
+        case source
     }
 }

@@ -2237,7 +2237,7 @@ Add anything you've been meaning to get to.
                 isDIY: true,
                 seasonalTiming: nil,
                 professionalRequired: false,
-                notes: "NH, CT, and much of the surrounding Northeast are in the granite belt — one of the highest radon zones in the country.",
+                notes: "NH, CT, and much of the surrounding Northeast are in the granite belt, one of the highest radon zones in the country.",
                 isEssential: false,
                 assignmentType: .either,
                 diyEffortMinutes: 20,

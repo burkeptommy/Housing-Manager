@@ -186,7 +186,7 @@ struct FrequencyPickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {

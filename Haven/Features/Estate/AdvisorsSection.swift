@@ -58,15 +58,9 @@ struct AdvisorsSection: View {
                 }
             }
 
-            // "Find" recommendation cards for missing advisors
-            let missingTypes = defaultTypes.filter { slot in
-                !advisors.contains { $0.advisorType == slot.type }
-            }
-            if !missingTypes.isEmpty {
-                ForEach(missingTypes, id: \.type) { slot in
-                    findAdvisorCard(type: slot.type, label: slot.label, icon: slot.icon)
-                }
-            }
+            // Build 90: standalone "Find" cards removed. The "Find vetted
+            // pros near you" button now lives inside the picker sheet's
+            // sticky footer so there's one entry point, not two.
         }
         .sheet(isPresented: $showAdvisorPicker) {
             NavigationStack {
@@ -79,6 +73,15 @@ struct AdvisorsSection: View {
                     onSelect: { provider in
                         recordFromCatalog(type: pickerAdvisorType, provider: provider)
                         showAdvisorPicker = false
+                    },
+                    onFindNearMe: {
+                        // Dismiss the catalog picker, then open the Google
+                        // Places local advisor sheet so both don't stack.
+                        showAdvisorPicker = false
+                        findAdvisorType = pickerAdvisorType
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            showFindAdvisorSheet = true
+                        }
                     }
                 )
                 .navigationTitle(typeLabel(for: pickerAdvisorType))
@@ -86,7 +89,7 @@ struct AdvisorsSection: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") { showAdvisorPicker = false }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
             }
@@ -103,6 +106,8 @@ struct AdvisorsSection: View {
                 advisorType: findAdvisorType,
                 advisorLabel: typeLabel(for: findAdvisorType),
                 householdId: householdId,
+                town: propertyCity,
+                state: propertyState,
                 onAdopt: { result in
                     recordFromLocalResult(type: findAdvisorType, result: result)
                     showFindAdvisorSheet = false
@@ -117,7 +122,7 @@ struct AdvisorsSection: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("Cancel") { showCustomForm = false }
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
                     }
             }
@@ -132,7 +137,7 @@ struct AdvisorsSection: View {
             if let advisor {
                 // Brand color accent bar
                 let brandColor = advisor.brandColor.map { Color(hex: $0) } ?? HavenColors.navy700
-                brandColor
+                HavenColors.navy800.opacity(0.15)
                     .frame(height: 3)
                     .frame(maxWidth: .infinity)
 
@@ -161,12 +166,12 @@ struct AdvisorsSection: View {
                 if let subtitle = advisor.displaySubtitle {
                     Text(subtitle)
                         .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(brandColor)
+                        .foregroundStyle(HavenColors.textSecondary)
                         .lineLimit(1)
                 } else {
                     Text(label)
                         .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(brandColor)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
 
                 Spacer(minLength: 4)
@@ -192,7 +197,7 @@ struct AdvisorsSection: View {
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         .overlay {
             let borderColor: Color = advisor != nil
-                ? (advisor?.brandColor.map { Color(hex: $0) } ?? HavenColors.navy700).opacity(0.2)
+                ? HavenColors.border
                 : HavenColors.navy.opacity(0.06)
             RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                 .strokeBorder(borderColor, lineWidth: 1)

@@ -300,8 +300,25 @@ struct SystemGroupListView: View {
         }
     }
 
-    /// Derive a specific subtype label from the system name (e.g., "Dishwasher" instead of "Appliance")
+    /// Derive a specific subtype label for a system row. Build 94
+    /// reordered this to prefer the stored `home_systems.subtype`
+    /// column when it's non-empty — that's the canonical source now
+    /// that `AddSystemView` stamps the catalog category into subtype
+    /// on photo/identify adds (e.g. "Refrigerator"). The keyword-match
+    /// pass stays as a fallback for legacy rows written before the
+    /// fix landed, and the final fallback to `category` stays put for
+    /// totally uncategorized rows.
     private func systemSubtype(_ system: HomeSystemRow) -> String {
+        // Prefer the stored subtype — canonical source for catalog
+        // / photo adds. Trim + non-empty check because some pre-fix
+        // rows landed with a whitespace-only subtype.
+        if let stored = system.subtype?.trimmingCharacters(in: .whitespaces), !stored.isEmpty {
+            return stored.capitalized
+        }
+
+        // Legacy fallback: keyword-match against the system name.
+        // Covers rows manually named "Wall Oven" / "Kitchen Dishwasher"
+        // before subtype was being stamped at insert.
         let name = system.name.lowercased()
         let subtypes = [
             "dishwasher", "refrigerator", "fridge", "oven", "range", "cooktop",

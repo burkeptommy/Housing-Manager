@@ -1,31 +1,60 @@
-/* Haven Website — Cream Canvas + Navy Ink */
+/* Haven Website — Pearl White + Cosmic Indigo + Deepened Salmon */
 
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap');
 
 :root {
-  --cream: #F2EEE5;
-  --cream-light: #F8F6F1;
-  --cream-white: #FAF7F2;
-  --beige-200: #F0EBE1;
-  --beige-300: #E3D9C6;
-  --beige-400: #D4C5A9;
-  --navy-900: #0F1A2E;
-  --navy: #1B2A4A;
-  --navy-700: #243660;
-  --navy-600: #2E4376;
-  --navy-500: #3A5290;
-  --champagne: #C4A574;
-  --champagne-light: #D4BA91;
-  --champagne-dark: #A8895D;
-  --text-primary: #1B2A4A;
-  --text-secondary: #5A6A7A;
-  --text-tertiary: #8A9AAA;
-  --text-on-navy: #FAF7F2;
+  /* Surface — Pearl White background, Pure White cards */
+  --cream: #F8F9FA;
+  --cream-light: #FCFCFD;
+  --cream-white: #FFFFFF;
+  --pearl: #F8F9FA;
+  --pearl-light: #FCFCFD;
+  --pearl-white: #FFFFFF;
+
+  /* Neutral borders */
+  --beige-200: #EDEEF0;
+  --beige-300: #D8DADF;
+  --beige-400: #B8BBC2;
+  --neutral-200: #EDEEF0;
+  --neutral-300: #D8DADF;
+  --neutral-400: #B8BBC2;
+
+  /* Ink — Cosmic Indigo scale (legacy --navy names remap to indigo) */
+  --navy-900: #2A2252;
+  --navy: #453A70;
+  --navy-700: #524580;
+  --navy-600: #5D4C8F;
+  --navy-500: #6B5AA0;
+  --indigo-900: #2A2252;
+  --indigo: #453A70;
+  --indigo-700: #524580;
+  --indigo-600: #5D4C8F;
+  --indigo-500: #6B5AA0;
+
+  /* Salmon — actions & accents (legacy --champagne names remap to salmon) */
+  --champagne: #ED6955;
+  --champagne-light: #F4877B;
+  --champagne-dark: #D14E3E;
+  --salmon: #ED6955;
+  --salmon-dark: #D14E3E;
+  --salmon-light: #F4877B;
+  --salmon-pale: #FFE8E2;
+
+  /* Text */
+  --text-primary: #453A70;
+  --text-secondary: #6F6A88;
+  --text-tertiary: #9C98AD;
+  --text-on-navy: #FFFFFF;
+  --text-on-indigo: #FFFFFF;
+  --text-on-salmon: #FFFFFF;
+
+  /* Semantic */
   --success: #5DCAA5;
   --warning: #EF9F27;
   --critical: #E85D5D;
   --sage: #4A7C59;
   --sage-light: #5A9466;
+
   --max-width: 1120px;
   --page-margin: 24px;
   --radius: 16px;
@@ -112,8 +141,8 @@ body {
 .icon-circle {
   width: 56px;
   height: 56px;
-  background: rgba(27, 42, 74, 0.05);
-  border: 1px solid rgba(27, 42, 74, 0.08);
+  background: rgba(69, 58, 112, 0.05);
+  border: 1px solid rgba(69, 58, 112, 0.08);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -135,7 +164,7 @@ body {
 .sec-icon-box {
   width: 48px;
   height: 48px;
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -183,7 +212,7 @@ nav {
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(242, 238, 229, 0.92);
+  background: rgba(248, 249, 250, 0.9);
   border-bottom: 1px solid var(--beige-300);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -251,18 +280,20 @@ nav .nav-inner {
   font-family: var(--font-sans) !important;
   font-size: 14px !important;
   font-weight: 600 !important;
-  color: var(--text-on-navy) !important;
-  background: var(--navy);
+  color: var(--text-on-salmon) !important;
+  background: var(--salmon);
   padding: 10px 24px;
   border-radius: 10px;
   text-decoration: none;
-  transition: background 0.2s, transform 0.15s;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(237, 105, 85, 0.22);
 }
 
 .nav-cta:hover {
-  background: var(--navy-700) !important;
-  color: var(--text-on-navy) !important;
+  background: var(--salmon-dark) !important;
+  color: var(--text-on-salmon) !important;
   transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(237, 105, 85, 0.32);
 }
 
 /* ============ LAYOUT ============ */
@@ -294,9 +325,9 @@ section {
   font-weight: 600;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: #9a4e00;
-  background: linear-gradient(135deg, #fff3e6, #ffe8cc);
-  border: 1px solid #ffd6a3;
+  color: var(--salmon-dark);
+  background: linear-gradient(135deg, #FFF0EC, #FFE0D8);
+  border: 1px solid #FBC9BE;
   padding: 9px 22px;
   border-radius: 100px;
   margin-bottom: 32px;
@@ -306,14 +337,14 @@ section {
 }
 
 .hero-badge:hover {
-  background: linear-gradient(135deg, #ffe8cc, #ffddb3);
+  background: linear-gradient(135deg, #FFE0D8, #FFD0C4);
 }
 
 .hero-badge::before {
   content: '';
   width: 7px;
   height: 7px;
-  background: #f5920a;
+  background: var(--salmon);
   border-radius: 50%;
   animation: pulse-dot 2s ease-in-out infinite;
 }
@@ -350,20 +381,20 @@ section {
   font-family: var(--font-sans);
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-on-navy);
-  background: var(--navy);
+  color: var(--text-on-salmon);
+  background: var(--salmon);
   padding: 16px 36px;
   border-radius: 12px;
   text-decoration: none;
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-  box-shadow: 0 4px 16px rgba(27, 42, 74, 0.15);
+  box-shadow: 0 6px 22px rgba(237, 105, 85, 0.28);
   animation: fadeInUp 0.8s ease 0.2s both;
 }
 
 .hero-cta:hover {
-  background: var(--navy-700);
+  background: var(--salmon-dark);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(27, 42, 74, 0.2);
+  box-shadow: 0 10px 30px rgba(237, 105, 85, 0.38);
 }
 
 .hero-note {
@@ -399,8 +430,8 @@ section {
   border-radius: 36px;
   padding: 10px;
   box-shadow:
-    0 24px 60px rgba(15, 26, 46, 0.18),
-    0 6px 20px rgba(15, 26, 46, 0.08),
+    0 24px 60px rgba(42, 34, 82, 0.18),
+    0 6px 20px rgba(42, 34, 82, 0.08),
     inset 0 1px 0 rgba(255,255,255,0.05);
   position: relative;
   transition: transform 0.4s ease;
@@ -619,7 +650,7 @@ section {
 .screen-scenario-icon-box {
   width: 30px;
   height: 30px;
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -1088,7 +1119,7 @@ section {
 .screen-project-icon {
   width: 20px;
   height: 20px;
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1553,7 +1584,7 @@ section {
   font-size: 7px !important;
   font-weight: 600;
   color: var(--navy) !important;
-  background: rgba(27, 42, 74, 0.08);
+  background: rgba(69, 58, 112, 0.08);
   padding: 1px 6px;
   border-radius: 8px;
   flex: none !important;
@@ -1564,7 +1595,7 @@ section {
   font-size: 7px !important;
   font-weight: 500;
   color: var(--navy-700) !important;
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   padding: 1px 6px;
   border-radius: 8px;
   flex: none !important;
@@ -1594,7 +1625,7 @@ section {
   left: -40px;
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(196, 165, 116, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(237, 105, 85, 0.06) 0%, transparent 70%);
   border-radius: 50%;
 }
 
@@ -1606,7 +1637,7 @@ section {
 .alfred-monogram {
   width: 72px;
   height: 72px;
-  background: rgba(250, 247, 242, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1633,7 +1664,7 @@ section {
 
 .alfred-banner-content > p {
   font-size: 16px;
-  color: rgba(250, 247, 242, 0.7);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.65;
   max-width: 520px;
   margin-bottom: 28px;
@@ -1651,7 +1682,7 @@ section {
   gap: 10px;
   font-family: var(--font-sans);
   font-size: 13px;
-  color: rgba(250, 247, 242, 0.7);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
 }
 
@@ -1748,7 +1779,7 @@ section {
 
 .pillar-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 16px 48px rgba(27, 42, 74, 0.08);
+  box-shadow: 0 16px 48px rgba(69, 58, 112, 0.08);
 }
 
 .pillar-card h3 {
@@ -1847,7 +1878,7 @@ section {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(27, 42, 74, 0.04);
+  box-shadow: 0 4px 16px rgba(69, 58, 112, 0.04);
 }
 
 .step-connector {
@@ -1893,7 +1924,7 @@ section {
 
 .feature-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px rgba(27, 42, 74, 0.06);
+  box-shadow: 0 8px 32px rgba(69, 58, 112, 0.06);
 }
 
 .feature-card h3 {
@@ -1931,7 +1962,7 @@ section {
   right: -20%;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(196, 165, 116, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(237, 105, 85, 0.08) 0%, transparent 70%);
   border-radius: 50%;
 }
 
@@ -1950,7 +1981,7 @@ section {
 
 .security-banner-text p {
   font-size: 16px;
-  color: rgba(250, 247, 242, 0.7);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.6;
   max-width: 480px;
 }
@@ -2087,7 +2118,7 @@ footer {
 .footer-links a {
   font-family: var(--font-sans);
   font-size: 13px;
-  color: rgba(250, 247, 242, 0.55);
+  color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -2099,7 +2130,7 @@ footer {
 .footer-copy {
   font-family: var(--font-sans);
   font-size: 12px;
-  color: rgba(250, 247, 242, 0.3);
+  color: rgba(255, 255, 255, 0.3);
   margin-top: 32px;
   text-align: center;
 }
@@ -2183,7 +2214,7 @@ footer {
   transform: translateX(-50%);
   width: 600px;
   height: 300px;
-  background: radial-gradient(ellipse, rgba(196, 165, 116, 0.1) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(237, 105, 85, 0.1) 0%, transparent 70%);
 }
 
 .security-promise h2 {
@@ -2197,7 +2228,7 @@ footer {
 
 .security-promise p {
   font-size: 17px;
-  color: rgba(250, 247, 242, 0.7);
+  color: rgba(255, 255, 255, 0.7);
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.65;
@@ -2491,7 +2522,7 @@ footer {
 .mini-doc-icon {
   width: 32px;
   height: 32px;
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -2525,7 +2556,7 @@ footer {
   font-family: var(--font-sans);
   font-size: 10px;
   color: var(--navy);
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   padding: 3px 8px;
   border-radius: 6px;
 }
@@ -2544,7 +2575,7 @@ footer {
 .mini-vendor-icon {
   width: 32px;
   height: 32px;
-  background: rgba(27, 42, 74, 0.06);
+  background: rgba(69, 58, 112, 0.06);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -2763,7 +2794,7 @@ footer {
 
 .security-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px rgba(27, 42, 74, 0.06);
+  box-shadow: 0 8px 32px rgba(69, 58, 112, 0.06);
 }
 
 .security-card h3 {
@@ -2824,7 +2855,7 @@ footer {
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--champagne-dark);
-  background: rgba(196, 165, 116, 0.12);
+  background: rgba(237, 105, 85, 0.12);
   padding: 4px 10px;
   border-radius: 4px;
 }

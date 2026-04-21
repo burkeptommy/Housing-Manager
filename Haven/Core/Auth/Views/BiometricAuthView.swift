@@ -28,8 +28,8 @@ struct BiometricAuthView: View {
                     .font(HavenTypography.uiButton)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(HavenColors.navy)
-                    .foregroundStyle(HavenColors.textOnNavy)
+                    .background(HavenColors.action)
+                    .foregroundStyle(HavenColors.textOnAction)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.cornerRadius))
             }
             .padding(.horizontal, HavenTheme.padding)

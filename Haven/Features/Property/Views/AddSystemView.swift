@@ -23,6 +23,14 @@ struct AddSystemView: View {
     @State private var subtype: String? = nil
     @State private var customCategoryName: String = ""
 
+    // Standing appointment prompt (after vendor match)
+    @State private var showRecurringPrompt = false
+    @State private var showVendorInfoNote = false
+    @State private var matchedContractorName: String?
+    @State private var matchedContractor: ContractorRow?
+    @State private var createdSystemForRecurring: HomeSystemRow?
+    @State private var showRecurringServiceSheet = false
+
     // Warranty fields
     @State private var addWarranty = false
     @State private var warrantyProvider = ""
@@ -182,10 +190,58 @@ struct AddSystemView: View {
                     }
                     // Cache catalog enrichment data for the selected result
                     selectedCatalogResult = result
+                    // Build 94: Stamp the catalog category as the system
+                    // subtype so "Refrigerator" / "Dishwasher" / "Wall
+                    // Oven" survive on the list + detail surfaces. Before
+                    // this the subtype stayed nil for photo/catalog adds
+                    // and the list row fell back to the parent category
+                    // ("Appliance"), leaving the user no way to tell a
+                    // fridge from an oven at a glance.
+                    let trimmedCategory = result.category.name.trimmingCharacters(in: .whitespaces)
+                    if !trimmedCategory.isEmpty {
+                        subtype = trimmedCategory
+                    }
                     // Map catalog category to our SystemCategory
                     if let catName = SystemCategory.allCases.first(where: { $0.rawValue.lowercased().contains(result.category.name.lowercased()) })?.rawValue {
                         category = catName
                     }
+                }
+            }
+            .confirmationDialog(
+                "\(matchedContractorName ?? "Your vendor") handles this",
+                isPresented: $showRecurringPrompt,
+                titleVisibility: .visible
+            ) {
+                Button("Set up recurring visits") {
+                    showRecurringServiceSheet = true
+                }
+                Button("Not now", role: .cancel) {
+                    completeAndDismiss()
+                }
+            } message: {
+                Text("Want to set up recurring visits so you can track when they come?")
+            }
+            .alert(
+                "\(matchedContractorName ?? "Your vendor") is linked",
+                isPresented: $showVendorInfoNote
+            ) {
+                Button("Got it") {
+                    completeAndDismiss()
+                }
+            } message: {
+                Text("They already manage visits for your \(category). The new system's tasks are assigned to them.")
+            }
+            .sheet(isPresented: $showRecurringServiceSheet) {
+                if let system = createdSystemForRecurring {
+                    AddRecurringServiceSheet(
+                        propertyId: propertyID,
+                        householdId: system.householdId,
+                        preselectedSystem: system,
+                        preselectedContractor: matchedContractor,
+                        onComplete: {
+                            completeAndDismiss()
+                        }
+                    )
                 }
             }
         }
@@ -258,34 +314,51 @@ struct AddSystemView: View {
                 _ = try await DatabaseService.shared.createWarranty(warrantyInsert)
             }
 
-            // Add maintenance templates
+            // Route through the reconciler so tasks get proper vendor
+            // matching, bundle grouping, and preference tier resolution.
+            // This matches the pattern used by EditSystemSheet (line 285)
+            // and the quiz path (HouseQuizAnswerMapper).
             if addMaintenanceTemplates {
-                let activeSubs = MaintenanceTemplates.activeSubtypes(
-                    category: category,
-                    subtype: subtype,
+                let result = await MaintenanceTaskReconciler.reconcile(
+                    propertyId: propertyID,
+                    householdId: householdId,
+                    systemId: system.id,
+                    systemCategory: category,
+                    confirmedSubtype: subtype,
                     fuelType: selectedCatalogResult?.specs.fuelType
                 )
-                let templates = MaintenanceTemplates.templates(for: category, activeSubtypes: activeSubs)
-                for template in templates {
-                    let nextDue = Calendar.current.date(byAdding: template.interval, to: .now)!
-                    let taskInsert = MaintenanceTaskInsert(
-                        propertyId: propertyID,
-                        householdId: householdId,
-                        title: template.title,
-                        frequency: template.frequency,
-                        nextDueDate: formatter.string(from: nextDue),
-                        systemId: system.id,
-                        description: template.description,
-                        priority: template.priority,
-                        isTemplateBased: true,
-                        templateId: template.systemCategory + ":" + template.title,
-                        seasonalTiming: template.seasonalTiming,
-                        isDiy: template.isDIY,
-                        professionalRequired: template.professionalRequired,
-                        costRange: template.estimatedCostRange,
-                        recurrenceRule: template.frequency
-                    )
-                    _ = try await DatabaseService.shared.createMaintenanceTask(taskInsert)
+                if result.totalChanged > 0 {
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                }
+
+                // Check if the reconciler linked a vendor — if so, offer
+                // to set up recurring visits (standing appointment).
+                let newTasks = (try? await DatabaseService.shared.fetchMaintenanceTasks(systemId: system.id)) ?? []
+                if let vendorTask = newTasks.first(where: { $0.assignedContractorId != nil }),
+                   let contractorId = vendorTask.assignedContractorId {
+                    let appointments = (try? await DatabaseService.shared.fetchStandingAppointments(householdId: householdId)) ?? []
+                    let hasCoverage = appointments.contains { $0.systemId == system.id && $0.archivedAt == nil }
+                    let hasSameVendorAppointment = appointments.contains {
+                        $0.vendorId == contractorId && $0.archivedAt == nil
+                    }
+
+                    if !hasCoverage {
+                        let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
+                        let contractor = contractors.first { $0.id == contractorId }
+
+                        if hasSameVendorAppointment {
+                            // Part C: Same vendor already has visits on a different system
+                            matchedContractorName = contractor?.companyName
+                            showVendorInfoNote = true
+                        } else {
+                            // Part B: Offer to set up recurring visits
+                            matchedContractorName = contractor?.companyName
+                            matchedContractor = contractor
+                            createdSystemForRecurring = system
+                            showRecurringPrompt = true
+                            return // Don't dismiss yet — wait for user response
+                        }
+                    }
                 }
             }
 
@@ -320,6 +393,19 @@ struct AddSystemView: View {
             Haptics.error()
         }
         isSaving = false
+    }
+
+    /// Finishes the save flow after the user responds to the recurring
+    /// service prompt (or the info note). Posts notifications and dismisses.
+    private func completeAndDismiss() {
+        if let system = createdSystemForRecurring {
+            Haptics.success()
+            Analytics.track(.systemCreated, ["category": category, "system_id": system.id.uuidString, "has_warranty": addWarranty])
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil,
+                userInfo: ["action": "created", "id": system.id.uuidString])
+            onComplete?(system)
+        }
+        dismiss()
     }
 }
 

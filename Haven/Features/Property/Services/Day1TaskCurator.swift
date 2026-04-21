@@ -394,6 +394,13 @@ enum Day1TaskCurator {
         }
         insert.icon = kind.icon
         insert.setupState = "pending_vendor"
+        // BUG-008 related: pending-vendor routines need seasonal active_months
+        // too. Without these, the default [1...12] lit every season as
+        // "active" for every routine, so snow-removal showed up under
+        // Summer's "Routines active in Summer" list. Matches the seasonal
+        // defaults `HouseQuizAnswerMapper.defaultCadenceForQuizRoutine`
+        // applies to Q15b-created active routines.
+        insert.activeMonths = defaultActiveMonths(for: kind)
         insert.notes = "Auto-created so Day 1 tasks in this category have a home. Assign a vendor from Your Services to activate."
 
         let created = try await db.createRoutine(insert)
@@ -414,12 +421,27 @@ enum Day1TaskCurator {
         case .pestControl: return (.quarterly, 91)
         case .petWaste: return (.weekly, 7)
         case .mosquitoTick: return (.monthly, 30)
-        case .snowRemoval: return (.annual, 365)  // Seasonal contract — renewed annually
+        case .snowRemoval: return (.annual, 365)  // Seasonal contract, renewed annually
         case .gutterCleaning: return (.semiannual, 182)
         case .windowCleaning: return (.semiannual, 182)
         case .treeService: return (.annual, 365)
         case .handymanRecurring: return (.customDays, 9999)  // On-demand
         default: return (.annual, 365)
+        }
+    }
+
+    /// Seasonal active_months per routine kind. Mirrors
+    /// `HouseQuizAnswerMapper.defaultCadenceForQuizRoutine`. Keeps the two
+    /// creation paths consistent so a snow-removal routine created by the
+    /// curator has the same Dec-Apr window as one captured via Q15b.
+    private static func defaultActiveMonths(for kind: RoutineKind) -> [Int] {
+        let yearRound = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        switch kind {
+        case .landscaping: return [4, 5, 6, 7, 8, 9, 10, 11]
+        case .poolService: return [5, 6, 7, 8, 9]
+        case .mosquitoTick: return [4, 5, 6, 7, 8, 9, 10]
+        case .snowRemoval: return [12, 1, 2, 3, 4]
+        default: return yearRound
         }
     }
 }

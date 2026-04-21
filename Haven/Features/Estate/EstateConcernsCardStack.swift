@@ -45,7 +45,7 @@ struct EstateConcernsCardStack: View {
                         .fill(HavenColors.beige200)
                         .frame(height: 4)
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(HavenColors.navy700)
+                        .fill(HavenColors.action)
                         .frame(width: geo.size.width * (CGFloat(currentIndex) / CGFloat(Self.concerns.count)), height: 4)
                         .animation(.easeOut(duration: 0.3), value: currentIndex)
                 }

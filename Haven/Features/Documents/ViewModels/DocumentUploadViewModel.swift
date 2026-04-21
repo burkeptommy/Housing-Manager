@@ -48,6 +48,10 @@ final class DocumentUploadViewModel: ObservableObject {
     @Published var selectedFamilyMemberIds: Set<UUID> = []
     @Published var selectedPropertyId: UUID?
     @Published var selectedProjectId: UUID?
+    /// Phase 58: when set (e.g. uploading from a vendor detail view),
+    /// stamps the created document with `contractor_id` so it shows up
+    /// in that vendor's activity timeline.
+    @Published var selectedContractorId: UUID?
 
     // Reference data
     @Published var familyMembers: [FamilyMemberRow] = []
@@ -337,6 +341,8 @@ final class DocumentUploadViewModel: ObservableObject {
             // resolves to visible — analyze-document overrides this when
             // it stamps the real category server-side.
             insert.visibleToHomeManagers = DocumentAccessDefaults.visibleToHomeManagers(for: insert.category)
+            // Phase 58: vendor context pre-link.
+            insert.contractorId = selectedContractorId
 
             let doc = try await db.createDocument(insert)
             uploadedDocumentId = doc.id
@@ -622,6 +628,8 @@ final class DocumentUploadViewModel: ObservableObject {
                     // category resolves to visible — analyze-document
                     // overrides this when it stamps the real category.
                     insert.visibleToHomeManagers = DocumentAccessDefaults.visibleToHomeManagers(for: insert.category)
+                    // Phase 58: vendor context pre-link for batch uploads.
+                    insert.contractorId = selectedContractorId
 
                     let doc = try await db.createDocument(insert)
                     uploadItems[i].uploadedDocumentId = doc.id

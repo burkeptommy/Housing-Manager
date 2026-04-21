@@ -19,6 +19,8 @@ struct HouseQuizView: View {
     /// records, ATTOM's AVM, or wasn't possible at all. Reset whenever
     /// `currencyText` is cleared.
     @State private var currencyPrefillSource: CurrencyPrefillSource = .none
+    /// Build 90: Two-step currency flow -- user selects option, then taps Continue.
+    @State private var selectedCurrencyOptionId: String? = nil
     @State private var multiSelectIds: Set<String> = []
     @State private var multiSelectCustomDraft: String = ""
     @State private var multiSelectCustomEntries: [String] = []
@@ -121,6 +123,37 @@ struct HouseQuizView: View {
     @State private var showDelegationSheet: Bool = false
     @State private var delegationDidLoad: Bool = false
 
+    /// Phase 60.6 — post-quiz vendor coverage sweep state. Loaded on the
+    /// completion view alongside finaleTotals. Fires the reusable
+    /// `VendorCoverageSheet` (same one PropertyDetailView's "Vendor
+    /// Coverage" button opens) so the user can close the 13-of-18
+    /// category gap Tom flagged on Build 93 before landing on the
+    /// dashboard. Order of presentation: sweep first, then delegation.
+    @State private var coverageUncovered: [VendorCoverageItem] = []
+    @State private var coverageTotal: Int = 0
+    @State private var coverageDidLoad: Bool = false
+    @State private var showCoverageSweep: Bool = false
+    /// Category passed into the downstream FindLocalVendorSheet /
+    /// AddVendorSheet so the caller's chosen gap seeds the form. Both
+    /// sheets are presented over the sweep sheet via `.sheet(item:)` on
+    /// a typed wrapper so only one fires at a time.
+    @State private var sweepSheetTarget: SweepSheetTarget? = nil
+
+    /// Phase 60.6: routes the two per-gap actions ("Find a pro" / "I
+    /// have one") through a single `.sheet(item:)` binding. Identifiable
+    /// via a composite id so swapping between Find-a-pro and I-have-one
+    /// for the same category doesn't collide with the sheet diff.
+    enum SweepSheetTarget: Identifiable {
+        case findVendor(category: String)
+        case addVendor(category: String)
+        var id: String {
+            switch self {
+            case .findVendor(let c): return "find:\(c)"
+            case .addVendor(let c): return "add:\(c)"
+            }
+        }
+    }
+
     /// Phase 19m — Q15b household contractors. Multiple pieces of state
     /// captured across the screen: the set of selected chip IDs (e.g.
     /// "hvac_service", "plumber") and the optional provider picked for each
@@ -146,6 +179,21 @@ struct HouseQuizView: View {
     /// dialog itself is mounted on `savedReviewView`.
     @State private var showSkipAllSavedConfirm: Bool = false
 
+    /// Phase 60.1 — gates Q1 rendering behind the new `PropertyRecapCard`
+    /// on fresh quiz starts. True once the user confirms the recap OR when
+    /// a resumed quiz is loaded with one or more existing answers (we don't
+    /// re-show the trust screen mid-quiz). Kept as view-local state so it
+    /// resets naturally on next NavigationStack presentation.
+    @State private var recapConfirmed: Bool = false
+
+    /// Phase 60.1 — field the user tapped to edit on the recap card. Drives
+    /// `.sheet(item:)` which routes to `PropertyRecapEditSheet`.
+    @State private var editingRecapField: PropertyRecapCard.PropertyEditField? = nil
+
+    /// Phase 60.3 — auto-dismiss the skip toast after ~3s. View-local so
+    /// cancelling on disappear is trivial.
+    @State private var skipToastDismissWorkItem: DispatchWorkItem? = nil
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -163,10 +211,21 @@ struct HouseQuizView: View {
                     // `advance()` when the user walks off the end of the
                     // fresh question list with saved items still parked.
                     savedReviewView
+                } else if shouldShowRecap {
+                    // Phase 60.1 — "Here's what we found" trust anchor.
+                    // First screen a new-quiz user sees so they can
+                    // correct any pre-filled ATTOM value before
+                    // investing in the questions.
+                    propertyRecapScreen
+                } else if shouldShowChapterIntro {
+                    // Phase 60.3 — chapter boundary pause. Each chapter
+                    // renders its intro card on first entry so the user
+                    // knows where they are and how long this leg takes.
+                    chapterIntroScreen
                 } else if viewModel.showMilestoneCard {
                     milestoneCard
                 } else if let q = viewModel.currentQuestion {
-                    questionScreen(q)
+                    questionScreenWithMeter(q)
                 } else if viewModel.hasUnresolvedSavedQuestions {
                     // Build 85: dead-end fallback. If `currentQuestion`
                     // is nil and saved items remain, route to the
@@ -218,18 +277,55 @@ struct HouseQuizView: View {
                 // insight, the screen dims and the insight floats in the
                 // center for ~4 seconds before auto-advancing. Replaces the
                 // previous inline feedback card that required scrolling.
+                //
+                // Phase 60.4 — 95% of insights now demote to an inline
+                // pill (`InlineInsightPill`). The full-screen overlay is
+                // reserved for the milestone allowlist (see
+                // `isMilestoneFeedbackQuestion`). Duolingo pattern: XP
+                // floats for routine answers, full-screen for unit
+                // completion. The same `pendingFeedback` state drives
+                // both surfaces — we branch on the current question id.
                 if let feedback = viewModel.pendingFeedback {
-                    HouseQuizInsightOverlay(
-                        feedback: feedback,
-                        city: viewModel.property.city,
-                        state: viewModel.property.state,
-                        onDismiss: {
-                            viewModel.dismissFeedback()
-                            resetEntryState()
+                    let currentQuestionId = viewModel.currentQuestion?.id
+                    if let qid = currentQuestionId, isMilestoneFeedbackQuestion(qid) {
+                        HouseQuizInsightOverlay(
+                            feedback: feedback,
+                            city: viewModel.property.city,
+                            state: viewModel.property.state,
+                            onDismiss: {
+                                viewModel.dismissFeedback()
+                                resetEntryState()
+                            }
+                        )
+                        .zIndex(10)
+                        .transition(.opacity)
+                    } else {
+                        VStack {
+                            Spacer()
+                            InlineInsightPill(
+                                feedback: feedback,
+                                city: viewModel.property.city,
+                                state: viewModel.property.state,
+                                onDismiss: {
+                                    // Phase 60.4 (F8): chip-question pills
+                                    // (Q15b) dismiss without advancing —
+                                    // the user keeps selecting. Everything
+                                    // else routes through the regular
+                                    // dismissFeedback advance path.
+                                    if viewModel.lastChipFeedbackId != nil {
+                                        viewModel.dismissChipFeedback()
+                                        viewModel.lastChipFeedbackId = nil
+                                    } else {
+                                        viewModel.dismissFeedback()
+                                        resetEntryState()
+                                    }
+                                }
+                            )
+                            .padding(.bottom, HavenTheme.spacing24)
                         }
-                    )
-                    .zIndex(10)
-                    .transition(.opacity)
+                        .zIndex(9)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                 }
 
                 // Phase 19 — brief "saved" toast on successful save-and-exit.
@@ -349,6 +445,17 @@ struct HouseQuizView: View {
                     )
                 }
             }
+            // Phase 60.1 — edit sheet for the recap card's tap-to-correct
+            // affordance. `.sheet(item:)` presents on non-nil field.
+            .sheet(item: $editingRecapField) { field in
+                PropertyRecapEditSheet(
+                    property: viewModel.property,
+                    field: field,
+                    onSaved: { fresh in
+                        viewModel.applyUpdatedProperty(fresh)
+                    }
+                )
+            }
         }
         .task {
             Analytics.track(.quizStarted, ["property_id": viewModel.property.id.uuidString])
@@ -363,6 +470,14 @@ struct HouseQuizView: View {
             // reveal renders without a loading state. Silent fail — falls
             // back to the generic milestone variant if the fetch errors.
             await viewModel.loadForwardingEmailIfNeeded()
+            // Phase 60.1 — resumed quizzes skip the recap card entirely.
+            // The card is a first-impression trust anchor; users who are
+            // mid-quiz have already committed. Without this, back-navigation
+            // or cold resume would re-land users on the recap between
+            // answers.
+            if !viewModel.state.answers.isEmpty {
+                recapConfirmed = true
+            }
         }
         // Apr 7, 2026 (build 82): re-hydrate when the user navigates between
         // questions (back arrow or auto-advance). Without this, going back
@@ -373,6 +488,211 @@ struct HouseQuizView: View {
                 hydrateEntryState(for: q)
             }
         }
+    }
+
+    // MARK: - Property Recap (Phase 60.1)
+
+    /// Phase 60.1: true when the quiz should show "Here's what we found" as
+    /// the first screen. Gated on (1) the user not having confirmed yet AND
+    /// (2) no quiz answers on file (fresh quiz, not a mid-quiz resume).
+    private var shouldShowRecap: Bool {
+        !recapConfirmed && viewModel.state.answers.isEmpty
+    }
+
+    /// Phase 60.1: "Here's what we found" trust surface. Shows the
+    /// persisted `PropertyRow` values alongside the detected systems so the
+    /// user can see what Haven pulled from ATTOM and correct anything
+    /// before committing to the quiz. Reference patterns: Zillow's
+    /// post-address landing card, Betterment's net-worth anchor before
+    /// goal-setting, TurboTax's prior-year return summary.
+    private var propertyRecapScreen: some View {
+        PropertyRecapCard(
+            property: viewModel.property,
+            detectedSystems: viewModel.detectedSystems,
+            lookupSource: viewModel.property.estimatedValueSource,
+            onEdit: { field in
+                editingRecapField = field
+            },
+            onConfirm: {
+                withAnimation(HavenTheme.animationStandard) {
+                    recapConfirmed = true
+                }
+                Analytics.track(.quizStarted, [
+                    "property_id": viewModel.property.id.uuidString,
+                    "recap_confirmed": true
+                ])
+            }
+        )
+    }
+
+    // MARK: - Phase 60.4: Milestone allowlist
+
+    /// Phase 60.4: The explicit allowlist of questions that keep the
+    /// full-screen `HouseQuizInsightOverlay` treatment. Every other
+    /// question demotes to the inline pill.
+    ///
+    /// WHY EACH MAKES THE CUT:
+    /// - `q4_purchase`: When ATTOM nailed the sale price, the reveal
+    ///   is a genuine trust-building moment that earns the stop.
+    /// - `q28_household`: The Q28 caretakers + home manager sub-flow
+    ///   is where users name the people who run the home. Demoting
+    ///   that beat to a pill undersells the commitment.
+    /// - `q36_diy_vs_vendor`: The preference-tier decision opens
+    ///   Chapter 2 and determines how every downstream `.either`
+    ///   task is routed. Worth the pause.
+    ///
+    /// DO NOT add to this set without weighing against the cost of
+    /// another full-screen interruption. Every addition makes every
+    /// other milestone feel less earned. The Q17 forwarding-email
+    /// reveal lives in its own milestone CARD (not in this feedback
+    /// overlay path) — see the Q17 milestone card in
+    /// `forwardingEmailMilestoneCard(email:)` for the gold-standard
+    /// full-screen moment pattern.
+    private static let milestoneFeedbackQuestionIds: Set<String> = [
+        "q4_purchase",
+        "q28_household",
+        "q36_diy_vs_vendor",
+    ]
+
+    private func isMilestoneFeedbackQuestion(_ questionId: String) -> Bool {
+        Self.milestoneFeedbackQuestionIds.contains(questionId)
+    }
+
+    // MARK: - Phase 60.3: Chapter intro + meter-wrapped question screen
+
+    /// Phase 60.3: show the chapter intro card when the quiz is about to
+    /// present the first question of a chapter AND we haven't already
+    /// shown the intro for that chapter this session.
+    private var shouldShowChapterIntro: Bool {
+        guard !viewModel.isComplete,
+              !viewModel.showSavedReviewScreen,
+              !shouldShowRecap,
+              !viewModel.showMilestoneCard,
+              let current = viewModel.currentQuestion
+        else { return false }
+        return !viewModel.shownChapterIntros.contains(current.chapter)
+    }
+
+    /// Phase 60.3: the pause-between-sections card. Auto-advances after
+    /// ~3.5s or on Continue tap.
+    private var chapterIntroScreen: some View {
+        ChapterIntroCard(
+            chapter: viewModel.currentChapter,
+            questionCount: viewModel.questionsInChapter(viewModel.currentChapter),
+            valuePreview: viewModel.expectedValueForChapter(viewModel.currentChapter),
+            onContinue: {
+                withAnimation(HavenTheme.animationStandard) {
+                    viewModel.shownChapterIntros.insert(viewModel.currentChapter)
+                }
+                Analytics.track(.quizChapterIntroConfirmed, [
+                    "chapter": viewModel.currentChapter.rawValue
+                ])
+            }
+        )
+    }
+
+    /// Phase 60.3: question screen wrapped with the persistent meter
+    /// header and a dynamic-skip toast overlay. The meter sits above
+    /// the question so the user sees their protection accreting with
+    /// every answer; the toast surfaces when auto-skips just fired so
+    /// the jump never feels silent.
+    ///
+    /// Phase 60.4: wrapped the question content with
+    /// `houseQuizAdvanceTransition()` and `.id(q.id)` so every question
+    /// advance uses the signature spring slide-plus-fade instead of
+    /// instantly swapping.
+    @ViewBuilder
+    private func questionScreenWithMeter(_ q: HouseQuizQuestion) -> some View {
+        VStack(spacing: 0) {
+            protectionMeterHeader
+            questionScreen(q)
+                .id(q.id)
+                .houseQuizAdvanceTransition()
+        }
+        .animation(HavenTheme.animationStandard, value: q.id)
+        .overlay(alignment: .top) {
+            if let toast = viewModel.pendingSkipToast {
+                SkipToastView(payload: toast)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onAppear { scheduleSkipToastDismiss() }
+            }
+        }
+        .animation(HavenTheme.animationStandard, value: viewModel.pendingSkipToast)
+    }
+
+    /// Phase 60.3: persistent "YOUR PROTECTION SO FAR" pill + chapter
+    /// progress pill. Rendered above the question content on every
+    /// post-recap question screen. Reference: Betterment / Wealthfront
+    /// goal meter during account setup.
+    private var protectionMeterHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 6) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+                Text("YOUR PROTECTION SO FAR")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .tracking(1.3)
+                Spacer()
+                chapterPill
+            }
+            Text(formattedMeterCurrency(viewModel.protectedValue))
+                .font(HavenTypography.title2)
+                .foregroundStyle(HavenColors.navy800)
+                .contentTransition(.numericText(value: viewModel.protectedValue))
+                .animation(.spring(response: 0.55, dampingFraction: 0.75), value: viewModel.protectedValue)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, HavenTheme.pageMargin)
+        .padding(.top, HavenTheme.spacing8)
+        .padding(.bottom, HavenTheme.spacing12)
+        .background(
+            HavenColors.background
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(HavenColors.beige200)
+                        .frame(height: 0.5)
+                }
+        )
+    }
+
+    /// Phase 60.3: chapter progress pill rendered inside the meter
+    /// header. Shows "Ch 2 · Your Pros · 3/9" so the user keeps a
+    /// sense of where they are in the longer arc.
+    private var chapterPill: some View {
+        HStack(spacing: 4) {
+            Image(systemName: viewModel.currentChapter.icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text("Ch \(viewModel.currentChapter.chapterNumber) · \(viewModel.currentChapter.title) · \(viewModel.positionInCurrentChapter())/\(viewModel.questionsInChapter(viewModel.currentChapter))")
+                .font(HavenTypography.uiCaption)
+        }
+        .foregroundStyle(HavenColors.textSecondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(HavenColors.navy.opacity(0.06))
+        )
+    }
+
+    private func scheduleSkipToastDismiss() {
+        skipToastDismissWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak viewModel] in
+            withAnimation {
+                viewModel?.pendingSkipToast = nil
+            }
+        }
+        skipToastDismissWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)
+    }
+
+    private func formattedMeterCurrency(_ value: Double) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.maximumFractionDigits = 0
+        f.currencyCode = "USD"
+        return f.string(from: NSNumber(value: value)) ?? "$0"
     }
 
     // MARK: - Question Screen
@@ -387,8 +707,12 @@ struct HouseQuizView: View {
                     .tracking(1.4)
                     .foregroundStyle(HavenColors.textTertiary)
 
-                // Title
-                Text(q.title)
+                // Title — Phase 60.4: personalized with ATTOM tokens
+                // (yearBuilt / street / city / state / roofType / sqft).
+                // Falls back to the question's fallbackTitle when any
+                // token can't be resolved. Tokens are never shipped as
+                // literal braces to the UI.
+                Text(q.personalizedTitle(using: viewModel.propertyFactBundle))
                     .font(HavenTypography.fraunces(size: 24, weight: 600))
                     .foregroundStyle(HavenColors.navy800)
                     .fixedSize(horizontal: false, vertical: true)
@@ -798,14 +1122,83 @@ struct HouseQuizView: View {
         .padding(.bottom, HavenTheme.spacing4)
     }
 
+    @ViewBuilder
     private func multiSelectBody(_ q: HouseQuizQuestion) -> some View {
+        // Phase 60.4: Q10 (appliances) uses a pictogram grid. SF-Symbol-
+        // backed tiles give the question visual weight and make "scan
+        // and tap what I have" materially faster than reading 8 labels.
+        // Every other multi-select question keeps the legacy flat-chip
+        // body via `legacyMultiSelectBody`.
+        if q.id == "q10_appliances" {
+            appliancePictogramBody(q)
+        } else {
+            legacyMultiSelectBody(q)
+        }
+    }
+
+    /// Phase 60.4: pictogram body for Q10 only.
+    @ViewBuilder
+    private func appliancePictogramBody(_ q: HouseQuizQuestion) -> some View {
         VStack(spacing: HavenTheme.spacing12) {
-            // Build 86: opt-in "Select all" / "Deselect all" fast-path. Tom
-            // flagged that asking users to individually pick every appliance
-            // they own was friction when "all of them" is the common case for
-            // Q10. Gated on `q.supportsSelectAll` so other multi-selects are
-            // unaffected. The pill skips "Other" (custom input) and "None of
-            // these" (mutual-exclusion) options.
+            if q.supportsSelectAll {
+                selectAllPill(for: q)
+            }
+            AppliancePictogramGrid(
+                options: q.answerOptions,
+                selectedIds: Binding(
+                    get: { multiSelectIds },
+                    set: { multiSelectIds = $0 }
+                ),
+                onToggle: { _, _ in },
+                customDraft: $multiSelectCustomDraft,
+                customEntries: $multiSelectCustomEntries,
+                onCommitCustom: { commitCustomEntryDraft() }
+            )
+            multiSelectContinueButton(q)
+        }
+    }
+
+    /// Continue button factored out so both the pictogram and legacy
+    /// bodies can reuse it. Matches the existing commit-on-tap semantics.
+    @ViewBuilder
+    private func multiSelectContinueButton(_ q: HouseQuizQuestion) -> some View {
+        Button {
+            Haptics.medium()
+            Task {
+                let entries = multiSelectCustomEntriesForCommit()
+                await viewModel.recordMultiSelect(
+                    Array(multiSelectIds),
+                    customEntries: entries.isEmpty ? nil : entries,
+                    secondaryFuelProvider: nil
+                )
+                multiSelectIds = []
+                multiSelectCustomDraft = ""
+                multiSelectCustomEntries = []
+            }
+        } label: {
+            Text("Continue")
+                .font(HavenTypography.uiButton)
+                .foregroundStyle(HavenColors.textOnNavy)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(
+                    multiSelectIds.isEmpty
+                        ? HavenColors.navy800.opacity(0.3)
+                        : HavenColors.navy800
+                )
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+        }
+        .buttonStyle(.plain)
+        .disabled(multiSelectIds.isEmpty)
+    }
+
+    /// Legacy multi-select render preserved for every non-pictogram
+    /// multi-select question. Q10 routes through `AppliancePictogramGrid`
+    /// above; everything else continues through this original body.
+    @ViewBuilder
+    private func legacyMultiSelectBody(_ q: HouseQuizQuestion) -> some View {
+        VStack(spacing: HavenTheme.spacing12) {
+            // Build 86: opt-in "Select all" / "Deselect all" fast-path.
             if q.supportsSelectAll {
                 selectAllPill(for: q)
             }
@@ -1135,24 +1528,34 @@ struct HouseQuizView: View {
         // would need a schema/model change to surface here.
         let prefill = Self.bestKnownPurchasePrice(for: viewModel.property)
         let inferredOwnership = Self.inferredPurchaseKind(for: viewModel.property)
+        // Phase 60.1: Branch the render so "ATTOM has no sale on record" is
+        // visually distinct from the generic empty state. Before this, a
+        // land purchase or tear-down looked identical to a decoder failure —
+        // the user couldn't tell if Haven broke or if there genuinely was
+        // no record. Branched on the actual `purchasePrice` signal (not the
+        // prefill ladder) so AVM-only prefill still lands in State A.
+        let hasSaleOnRecord = (viewModel.property.purchasePrice ?? 0) > 0
         return VStack(spacing: HavenTheme.spacing12) {
-            // Allow user to pick the entry type first
+            // Phase 60.1 — state-aware trust header.
+            if hasSaleOnRecord, let prefillAmount = prefill?.amount {
+                q4SaleOnRecordHeader(amount: prefillAmount)
+            } else {
+                q4NoSaleOnRecordHeader()
+            }
+            // Build 90: Two-step flow -- tap to select, then Continue to advance
             ForEach(q.answerOptions) { option in
                 let isSuggested = inferredOwnership == option.id
+                let isSelected = selectedCurrencyOptionId == option.id
                 Button {
                     Haptics.selection()
-                    Task {
-                        let amount = Double(currencyText.filter { $0.isNumber }) ?? 0
-                        await viewModel.recordCurrencyAnswer(answerId: option.id, amount: amount)
-                        currencyText = ""
-                        currencyPrefilledForPropertyId = nil
-                        currencyPrefillSource = .none
+                    withAnimation(HavenTheme.animationQuick) {
+                        selectedCurrencyOptionId = option.id
                     }
                 } label: {
                     HStack {
                         Text(option.label)
                             .font(HavenTypography.body)
-                        if isSuggested {
+                        if isSuggested && !isSelected {
                             Text("Suggested")
                                 .font(HavenTypography.uiLabelSmall)
                                 .foregroundStyle(HavenColors.navy)
@@ -1162,13 +1565,16 @@ struct HouseQuizView: View {
                                 .clipShape(Capsule())
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(HavenColors.textOnNavy)
+                        }
                     }
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(isSelected ? HavenColors.textOnNavy : HavenColors.navy800)
                     .padding(HavenTheme.spacing16)
                     .frame(minHeight: 56)
-                    .background(HavenColors.creamLight)
+                    .background(isSelected ? HavenColors.navy800 : HavenColors.creamLight)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 }
                 .buttonStyle(.plain)
@@ -1200,10 +1606,64 @@ struct HouseQuizView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            // Continue button -- only enabled after selecting an option
+            Button {
+                Haptics.medium()
+                guard let answerId = selectedCurrencyOptionId else { return }
+                Task {
+                    let amount = Double(currencyText.filter { $0.isNumber }) ?? 0
+                    await viewModel.recordCurrencyAnswer(answerId: answerId, amount: amount)
+                    currencyText = ""
+                    currencyPrefilledForPropertyId = nil
+                    currencyPrefillSource = .none
+                    selectedCurrencyOptionId = nil
+                }
+            } label: {
+                Text("Continue")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textOnNavy)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(selectedCurrencyOptionId != nil ? HavenColors.navy800 : HavenColors.navy800.opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedCurrencyOptionId == nil)
+
+            // Phase 60.1 — "Skip for now" secondary action, only visible
+            // when ATTOM didn't find a sale on record (land purchase,
+            // tear-down, inherited home). Routes through `saveForLater`
+            // so the question reappears in the saved-review list and
+            // the quiz can still complete without a purchase price.
+            if !hasSaleOnRecord {
+                Button {
+                    Haptics.selection()
+                    viewModel.saveForLater()
+                    currencyText = ""
+                    currencyPrefilledForPropertyId = nil
+                    currencyPrefillSource = .none
+                    selectedCurrencyOptionId = nil
+                } label: {
+                    Text("Skip for now")
+                        .font(HavenTypography.uiLabel.weight(.medium))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .onAppear {
             guard currencyPrefilledForPropertyId != viewModel.property.id else { return }
-            if let prefill, currencyText.isEmpty {
+            // Phase 60.1 trust fix: only prefill from a REAL sale record.
+            // The AVM is current market value, not a purchase price —
+            // prefilling it anchors financial math on a fabricated baseline
+            // (the "No sale on record" info card then visually contradicts
+            // the filled field). State A still auto-fills from the actual
+            // sale; State B leaves the field empty so the user types what
+            // they paid.
+            if let prefill, prefill.source == .sale, currencyText.isEmpty {
                 currencyText = String(Int(prefill.amount))
                 currencyPrefilledForPropertyId = viewModel.property.id
                 currencyPrefillSource = prefill.source
@@ -1223,6 +1683,92 @@ struct HouseQuizView: View {
                 ])
             }
         }
+    }
+
+    // MARK: - Q4 state-aware headers (Phase 60.1)
+
+    /// Phase 60.1 — State A: ATTOM returned a sale price for this home.
+    /// Header declares what we found so the user can scan-and-trust or
+    /// tap-to-correct without wondering whether Haven failed or ATTOM
+    /// had nothing on file.
+    @ViewBuilder
+    private func q4SaleOnRecordHeader(amount: Double) -> some View {
+        let street = viewModel.property.street?.trimmingCharacters(in: .whitespaces) ?? ""
+        let headline: String = {
+            if !street.isEmpty {
+                return "\(street): \(Self.formatCurrencyCompact(amount))"
+            }
+            return Self.formatCurrencyCompact(amount)
+        }()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.success)
+                Text("From public records")
+                    .font(HavenTypography.uiCaption)
+                    .tracking(1.1)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            Text(headline)
+                .font(HavenTypography.title3)
+                .foregroundStyle(HavenColors.navy800)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Not right? Edit the field below.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.success.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    /// Phase 60.1 — State B: ATTOM legitimately has no sale on record.
+    /// Common for land purchases, tear-downs, and inherited homes.
+    /// Explicit messaging + "Skip for now" below the Continue button
+    /// means the user can always tell the difference between "Haven
+    /// failed" and "ATTOM just doesn't have this."
+    private func q4NoSaleOnRecordHeader() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.info)
+                Text("No sale on record")
+                    .font(HavenTypography.uiCaption)
+                    .tracking(1.1)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            Text("We couldn't find a sale on record for this home.")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.navy800)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Common for land purchases, tear-downs, or homes passed through family. Enter what you paid, or skip for now.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.info.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    /// Phase 60.1 — compact currency for the State A headline ($660K / $1.2M).
+    private static func formatCurrencyCompact(_ value: Double) -> String {
+        if value >= 1_000_000 {
+            let millions = value / 1_000_000
+            if millions.truncatingRemainder(dividingBy: 1) == 0 {
+                return String(format: "$%.0fM", millions)
+            }
+            return String(format: "$%.1fM", millions)
+        }
+        if value >= 1_000 {
+            let thousands = value / 1_000
+            return String(format: "$%.0fK", thousands)
+        }
+        return "$\(Int(value))"
     }
 
     /// Build 83 (Apr 7, 2026): Pick the best known purchase price for the
@@ -1766,7 +2312,7 @@ struct HouseQuizView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, HavenTheme.spacing16)
                     .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(HavenColors.navy)
+                    .background(HavenColors.action)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
                 .buttonStyle(.plain)
@@ -1979,6 +2525,11 @@ struct HouseQuizView: View {
     /// only see chips that apply to their home. The conditional checks fail
     /// open — when a prior answer hasn't been captured yet (e.g. on first
     /// pass before Q20), the chip stays visible so users can still add it.
+    ///
+    /// Phase 60.2 (F5): added snow_removal (state-gated) + pet_waste
+    /// (has_pets-gated). Both fail closed — when the signal isn't there,
+    /// the chip stays hidden. snow_removal is specifically a cold-climate
+    /// lifestyle service with no meaning in FL/TX/CA.
     private func visibleContractorChips(for q: HouseQuizQuestion) -> [AnswerOption] {
         let answers = viewModel.state.answers
         return q.answerOptions.filter { option in
@@ -2011,6 +2562,41 @@ struct HouseQuizView: View {
                 }
                 let fireplaceSignals: Set<String> = ["wood_logs", "wood_pellets", "propane_fireplace"]
                 return !q20Answer.isEmpty && q20Answer.contains(where: { fireplaceSignals.contains($0) })
+            case "snow_removal":
+                // Phase 60.2 (F5): snow plowing is a cold-climate winter
+                // contract decision. Uses the same state set as
+                // `HouseQuizAnswerMapper.snowStates` so a single source of
+                // truth drives both the chip visibility and the auto-create
+                // of the Snow Removal system.
+                return HouseQuizAnswerMapper.isSnowState(viewModel.property.state)
+            case "pet_waste":
+                // Phase 60.2 (F5): only surface pet waste removal when the
+                // user has pets. Q28b_pets is in section 6 (after Q15b), so
+                // on the first pass the flag lives only in
+                // properties.attributes["has_pets"] if a prior quiz pass /
+                // external source already flagged pets. On first-pass
+                // onboarding, this chip is hidden — the user can still add
+                // a pet waste vendor later from Property → Contacts after
+                // Q28b has fired.
+                return viewModel.property.attributes?["has_pets"]?.stringValue == "true"
+            case "hardscape":
+                // Phase 60.6: hardscape vendor chip only for Q11 = hardscape.
+                // A masonry/paver pro is a meaningful line item only when
+                // the user's primary landscape signal is hardscape; for
+                // lawn-dominant properties a Landscaping vendor covers
+                // the same ground and the extra chip dilutes the list.
+                return viewModel.state.answers["q11_lawn"]?.answerId == "hardscape"
+            case "generator_service":
+                // Phase 60.6: generator service chip only when Q22 captured
+                // a non-"none" generator. Q22 kind is `.generatorAdd` which
+                // persists as either a single answer ("none" when the user
+                // picked none) or with type + fuel + provider. Treat any
+                // answer id other than "none" as presence. Q22 lives in
+                // section 5 (after Q15b on the default order), so hide
+                // the chip on first pass and rely on post-Q22 flows to
+                // offer a generator-service vendor later.
+                let q22 = viewModel.state.answers["q22_generator"]?.answerId
+                return q22 != nil && q22 != "none"
             default:
                 return true
             }
@@ -2047,6 +2633,16 @@ struct HouseQuizView: View {
                     Analytics.track(.quizContractorChipExpanded, [
                         "chip_id": option.id,
                     ])
+                    // Phase 60.4 (F8): surface per-chip feedback on SELECT
+                    // only. Deselect stays silent — no "congrats on not
+                    // having a plumber anymore." The pill route kicks in
+                    // since q15b is not on the milestone allowlist.
+                    if let chipFeedback = HouseQuizFeedbackLibrary.chipFeedback(
+                        questionId: "q15b_household_contractors",
+                        chipId: option.id
+                    ) {
+                        viewModel.presentInlineChipFeedback(chipFeedback, chipId: option.id)
+                    }
                 }
             } label: {
                 HStack(spacing: 12) {
@@ -2878,51 +3474,128 @@ struct HouseQuizView: View {
     // MARK: - Completion view
 
     private var completionView: some View {
-        ScrollView {
-            VStack(spacing: HavenTheme.spacing20) {
-                Spacer().frame(height: HavenTheme.spacing24)
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(HavenColors.success)
+        // Phase 60.5: replaces the legacy "Quiz complete" surface with
+        // the cinematic reveal + scrollable summary. The user just spent
+        // 8-12 minutes walking Haven through their home. The legacy
+        // "Added X, Removed Y" diff read like a changelog — the new
+        // reveal reads like a moment. Reference: Opendoor offer reveal,
+        // Zillow Zestimate card, Wealthfront year-end summary.
+        //
+        // Phase 19l delegation sheet machinery is preserved exactly as
+        // it was — it still fires over this view once the candidates
+        // load.
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                QuizCinematicReveal(
+                    protectionValue: viewModel.finaleTotals.projectedValueProtected,
+                    yearsProjected: 10
+                )
 
-                Text("Quiz complete")
-                    .font(HavenTypography.largeTitle)
-                    .foregroundStyle(HavenColors.navy800)
-
-                completionSummaryCard
-
-                Text("You're more prepared than 87% of homeowners.")
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, HavenTheme.pageMargin)
-
-                VStack(spacing: HavenTheme.spacing12) {
-                    HavenButton(title: "View my maintenance plan") {
-                        navigateToMaintenancePlan()
-                    }
-                    Button {
+                QuizCompletionSummary(
+                    totals: viewModel.finaleTotals,
+                    onContinue: {
+                        // Dismiss the quiz. Dashboard is the parent view
+                        // — ContentView routes there once onboarding is
+                        // complete and `pendingQuizProperty` is cleared
+                        // by MainTabView / AppState.
                         dismiss()
-                    } label: {
-                        Text("Done")
-                            .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.textTertiary)
                     }
-                    .padding(.top, HavenTheme.spacing4)
-                }
-                .padding(.horizontal, HavenTheme.pageMargin)
-
-                Spacer().frame(height: HavenTheme.spacing24)
+                )
             }
-            .frame(maxWidth: .infinity)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .background(HavenColors.background.ignoresSafeArea())
         // Phase 19l: load eligible vendor/either-task pairs once the quiz
         // is done, then surface the bulk delegation sheet over this view.
         // The sheet defaults to all vendors selected so the primary path
         // is one tap. Skip-for-now records a timestamp so we don't re-fire
         // the same set on the next launch.
+        //
+        // Phase 60.5: also load the finaleTotals so QuizCompletionSummary
+        // shows real counts and example entries. Idempotent via
+        // `finaleTotals.hasLoaded` inside the view model.
+        //
+        // Phase 60.6: load the vendor-coverage gap list too. If 2+
+        // categories are uncovered, surface the sweep sheet first and
+        // defer the delegation sheet until the sweep dismisses. 2 is the
+        // threshold because a single gap is rarely worth interrupting
+        // the reveal — users can close it from Contacts later. Multi-gap
+        // households (most post-quiz) benefit from a focused sweep.
         .task {
+            await viewModel.loadFinaleTotals()
+            await loadCoverageGaps()
+            // Delegation loads regardless — but only FIRES when the
+            // sweep isn't already going to show, so the two sheets
+            // don't collide on first reveal. If the sweep will show,
+            // delegation fires after sweep's onChange(of: false).
             await loadDelegationCandidates()
+            if coverageUncovered.count >= 2 {
+                showCoverageSweep = true
+            } else if !delegationCandidates.isEmpty {
+                showDelegationSheet = true
+            }
+        }
+        .sheet(isPresented: $showCoverageSweep, onDismiss: {
+            // Phase 60.6: after the sweep closes, reveal the delegation
+            // sheet (if we have candidates). Also refresh coverage so
+            // the property detail and dashboard see the freshly-linked
+            // vendors without requiring a pull-to-refresh.
+            Task {
+                await refreshCoverageGaps()
+                if !delegationCandidates.isEmpty {
+                    showDelegationSheet = true
+                }
+            }
+        }) {
+            VendorCoverageSheet(
+                uncoveredItems: coverageUncovered,
+                totalSystemCount: coverageTotal,
+                onFindVendor: { category in
+                    sweepSheetTarget = .findVendor(category: category)
+                },
+                onAddVendor: { category in
+                    sweepSheetTarget = .addVendor(category: category)
+                },
+                onDismissItem: { item in
+                    // Optimistic local dismissal handled inside
+                    // VendorCoverageSheet; we also need to remove it
+                    // from our state so re-renders don't bring it back.
+                    coverageUncovered.removeAll { $0.id == item.id }
+                },
+                onManageVendors: nil // Completion view is modal —
+                                      // routing to Contacts mid-reveal
+                                      // would leave the user stranded.
+            )
+            .sheet(item: $sweepSheetTarget) { target in
+                switch target {
+                case .findVendor(let category):
+                    // Pass `task: nil` so the sheet's adoption pass walks
+                    // every matching needs_vendor task in the household
+                    // (Phase 56.1 variant). Property town/state drive the
+                    // Google Places search; when either is empty the
+                    // sheet falls back to catalog-only results.
+                    FindLocalVendorSheet(
+                        task: nil,
+                        householdId: viewModel.property.householdId,
+                        town: viewModel.property.city ?? "",
+                        state: viewModel.property.state ?? "",
+                        systemCategory: category,
+                        categoryDisplayName: category,
+                        onComplete: {
+                            sweepSheetTarget = nil
+                            Task { await refreshCoverageGaps() }
+                        }
+                    )
+                case .addVendor(let category):
+                    AddVendorSheet(
+                        onComplete: {
+                            sweepSheetTarget = nil
+                            Task { await refreshCoverageGaps() }
+                        },
+                        prefilledCategory: category
+                    )
+                }
+            }
         }
         .sheet(isPresented: $showDelegationSheet) {
             PostQuizVendorDelegationSheet(
@@ -2938,6 +3611,53 @@ struct HouseQuizView: View {
         }
     }
 
+    /// Phase 60.6: load the vendor-coverage gap list for the quiz's
+    /// property. Idempotent via `coverageDidLoad`. Errors are swallowed
+    /// — a missing coverage load falls back to "no gaps" which skips
+    /// the sweep sheet, matching the original behavior.
+    private func loadCoverageGaps() async {
+        guard !coverageDidLoad else { return }
+        coverageDidLoad = true
+        await refreshCoverageGaps()
+    }
+
+    /// Phase 60.6: refreshes the coverage gap list. Called from
+    /// `loadCoverageGaps` on first appear AND from the sweep's post-link
+    /// callbacks so each "I have one" / "Find a pro" resolution
+    /// optimistically drops the gap from the visible list without
+    /// closing the sheet. Analytics fires once per load so funnels can
+    /// attribute the sweep-presented / sweep-resolved split.
+    private func refreshCoverageGaps() async {
+        let db = DatabaseService.shared
+        do {
+            async let systemsTask = db.fetchHomeSystems(propertyId: viewModel.property.id)
+            async let contractorsTask = db.fetchContractors()
+            async let tasksTask = db.fetchMaintenanceTasks(propertyId: viewModel.property.id)
+
+            let systems = try await systemsTask
+            let contractors = try await contractorsTask
+            let tasks = try await tasksTask
+            let vendorTasks = tasks.filter { $0.assignmentType?.lowercased() == "vendor" }
+
+            let result = SystemCategoryRegistry.vendorCoverageItems(
+                existingSystems: systems,
+                contractors: contractors,
+                vendorTasks: vendorTasks
+            )
+            await MainActor.run {
+                coverageUncovered = result.uncovered
+                coverageTotal = result.uncovered.count + result.covered.count
+            }
+        } catch {
+            // Swallow — sweep just won't show. The user can still close
+            // the coverage gap later from Property → Contacts.
+            await MainActor.run {
+                coverageUncovered = []
+                coverageTotal = 0
+            }
+        }
+    }
+
     /// Phase 19l: build the contractor → 'either'-task list join. Runs once
     /// when the completion view appears. Vendors with no matching tasks are
     /// excluded; if every vendor has at least one matching task selected the
@@ -2948,11 +3668,16 @@ struct HouseQuizView: View {
 
         let db = DatabaseService.shared
         do {
-            let contractors = try await db.fetchContractors()
+            // Build 90: parallelize DB fetches to eliminate 10-15s hang
+            async let contractorsTask = db.fetchContractors()
+            async let tasksTask = db.fetchMaintenanceTasks(propertyId: viewModel.property.id)
+            async let systemsTask = db.fetchHomeSystems(propertyId: viewModel.property.id)
+
+            let contractors = try await contractorsTask
             guard !contractors.isEmpty else { return }
 
-            let tasks = try await db.fetchMaintenanceTasks(propertyId: viewModel.property.id)
-            let systems = try await db.fetchHomeSystems(propertyId: viewModel.property.id)
+            let tasks = try await tasksTask
+            let systems = try await systemsTask
             let systemsById = Dictionary(uniqueKeysWithValues: systems.map { ($0.id, $0) })
 
             // For each task, look up its system's category and compare against
@@ -3242,6 +3967,9 @@ struct HouseQuizView: View {
                 multiSelectCustomEntries = entries
             }
         case .currency:
+            if let answerId = prior.answerId {
+                selectedCurrencyOptionId = answerId
+            }
             if let custom = prior.customText {
                 currencyText = custom
             }

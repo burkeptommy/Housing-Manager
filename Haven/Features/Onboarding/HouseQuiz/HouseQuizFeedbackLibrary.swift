@@ -13,6 +13,15 @@ enum HouseQuizFeedbackLibrary {
         feedbackByQuestion[questionId]?[answerId]
     }
 
+    /// Phase 60.4 (F8): Returns feedback for a chip-toggle question where
+    /// every chip id gets its own insight. Used by Q15b
+    /// (`q15b_household_contractors`) — the single most important chip
+    /// question in the quiz. Before Phase 60.4 the library returned nil
+    /// for every chip and the user heard silence on selection.
+    static func chipFeedback(questionId: String, chipId: String) -> AnswerFeedback? {
+        chipFeedbackByQuestion[questionId]?[chipId]
+    }
+
     private static let feedbackByQuestion: [String: [String: AnswerFeedback]] = [
 
         // MARK: Q1 — Roof material
@@ -129,11 +138,18 @@ enum HouseQuizFeedbackLibrary {
                 subhead: "Buyers form opinions in the first 8 seconds, so curb appeal compounds.",
                 citationName: "Virginia Tech Curb Appeal Study"
             ),
+            // Phase 60.2 (F9): rewritten to align with Phase 58 vendor-
+            // orchestration positioning. The previous copy celebrated DIY
+            // with a "$1,800/yr saves" pricing claim that directly
+            // contradicts Haven's value proposition — Haven coordinates
+            // the pros, it is not a DIY savings calculator. The new copy
+            // validates the user's choice without cheerleading, and
+            // emphasizes coordination of the work they do delegate.
             "diy": AnswerFeedback(
-                badge: "Insight",
-                title: "DIY lawn care saves $1,800/yr on average vs. pro service.",
-                subhead: "Tracking aeration and overseeding keeps quality high.",
-                citationName: "TurfTime Equipment Annual Report"
+                badge: "Good to know",
+                title: "You'll stay on top of the lawn yourself.",
+                subhead: "Haven will handle the stuff you delegate: tree work, irrigation blowouts, and the seasonal pros you already use.",
+                citationName: nil
             ),
         ],
 
@@ -282,6 +298,97 @@ enum HouseQuizFeedbackLibrary {
                 title: "Tracking pickup days and renewals saves the average household $120/yr.",
                 subhead: "Late-fee surprises are the #1 utility billing complaint.",
                 citationName: "Waste Business Journal"
+            ),
+        ],
+    ]
+
+    /// Phase 60.4 (F8): Per-chip feedback for Q15b
+    /// (`q15b_household_contractors`). Every chip in Q15b's answerOptions
+    /// has an entry celebrating the pro-team-building pattern — never
+    /// DIY cheerleading, never dollar-savings claims more specific than
+    /// rough magnitudes. No em dashes in user-facing copy.
+    ///
+    /// Lookup is keyed by chip id (the `AnswerOption.id` value), NOT by
+    /// answer id (chip toggling doesn't set a single answer id).
+    private static let chipFeedbackByQuestion: [String: [String: AnswerFeedback]] = [
+        "q15b_household_contractors": [
+            "handyman": AnswerFeedback(
+                badge: "Good call",
+                title: "A good handyman is the glue of a well-kept home.",
+                subhead: "We'll bundle small tasks into their spring and fall visits so nothing leaks through.",
+                citationName: nil
+            ),
+            "cleaning": AnswerFeedback(
+                badge: "Good call",
+                title: "A standing cleaner is the biggest weekly time-giver in a busy home.",
+                subhead: "We'll track their cadence so you know when to leave a key and when to restock supplies.",
+                citationName: nil
+            ),
+            "hvac_service": AnswerFeedback(
+                badge: "Good call",
+                title: "Annual HVAC tune-ups keep systems running 15% more efficiently.",
+                subhead: "We'll remind you before heating season and cooling season.",
+                citationName: "ENERGY STAR Maintenance Guide"
+            ),
+            "plumber": AnswerFeedback(
+                badge: "Good call",
+                title: "A plumber you trust is worth naming before you need one.",
+                subhead: "We'll have their number ready when a water line chooses the worst possible moment.",
+                citationName: nil
+            ),
+            "electrician": AnswerFeedback(
+                badge: "Good call",
+                title: "Panel walkthroughs every few years catch the issues insurers flag later.",
+                subhead: "Knob-and-tube, aluminum wiring, loose breakers: worth a set of professional eyes.",
+                citationName: nil
+            ),
+            "roofer": AnswerFeedback(
+                badge: "Good call",
+                title: "A roofer on retainer beats scrambling after the next storm.",
+                subhead: "Post-storm inspections from a trusted pro cost nothing and catch small damage early.",
+                citationName: nil
+            ),
+            "tree_service": AnswerFeedback(
+                badge: "Good call",
+                title: "Tree work is one of the few jobs where pro vs DIY is life-or-limb.",
+                subhead: "We'll schedule seasonal walkthroughs so dead limbs don't find your roof.",
+                citationName: nil
+            ),
+            "mosquito_tick": AnswerFeedback(
+                badge: "Good call",
+                title: "Tick prevention is one of the few line items that can keep a family member out of the ER.",
+                subhead: "Tri-weekly treatments run April through October in most of the Northeast.",
+                citationName: nil
+            ),
+            "snow_removal": AnswerFeedback(
+                badge: "Good call",
+                title: "Snow pros beat you to the driveway and handle the liability of a slipped mailman.",
+                subhead: "We'll remind you to renew their contract before the first fall cold snap.",
+                citationName: nil
+            ),
+            "pet_waste": AnswerFeedback(
+                badge: "Good call",
+                title: "Weekly yard cleanup. One of the quiet luxuries of having a service on file.",
+                subhead: nil,
+                citationName: nil
+            ),
+            "septic_pumper": AnswerFeedback(
+                badge: "Good call",
+                title: "Septic pumping every 3-5 years costs $400 and saves a $10K drain-field replacement.",
+                subhead: "We'll track the interval from the date of the last pump on file.",
+                citationName: "EPA SepticSmart Guide"
+            ),
+            "well_water_service": AnswerFeedback(
+                badge: "Good call",
+                title: "Annual well water testing catches bacteria and nitrate shifts before anyone notices.",
+                subhead: "We'll schedule the lab test yearly and file the results.",
+                citationName: "EPA Private Well Owner's Guide"
+            ),
+            "chimney_sweep": AnswerFeedback(
+                badge: "Good call",
+                title: "Annual chimney sweeps are the cheapest insurance against a flue fire.",
+                subhead: "Creosote buildup is the cause in 1 in 4 residential fires. We'll remind you every fall.",
+                citationName: "National Fire Protection Association"
             ),
         ],
     ]

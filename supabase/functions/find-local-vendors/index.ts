@@ -46,28 +46,35 @@ const MAX_RESULTS = 4;
 // `searchTerm` is the human phrase fed into Google Places Text Search.
 const CATEGORY_SEARCH_TERMS: Record<string, string> = {
   // Q15b chip ids
-  hvac_service: "HVAC service",
+  hvac_service: "HVAC heating and cooling service repair",
   plumber: "plumber",
   electrician: "electrician",
   roofer: "roofer",
-  septic_pumper: "septic tank service",
-  well_water_service: "well water service",
+  septic_pumper: "septic tank pumping service",
+  well_water_service: "well water pump service",
   chimney_sweep: "chimney sweep",
   tree_service: "tree service",
   handyman: "handyman",
   // home_systems.category strings (lowercased before lookup)
-  hvac: "HVAC service",
+  hvac: "HVAC heating and cooling service repair",
   plumbing: "plumber",
   electrical: "electrician",
   roofing: "roofer",
-  "septic system": "septic tank service",
-  "well system": "well water service",
+  "septic system": "septic tank pumping service",
+  "well system": "well water pump service",
   "fire protection": "chimney sweep",
   landscaping: "landscaping company",
   "pool/spa": "pool service",
   pool: "pool service",
-  irrigation: "irrigation contractor",
+  irrigation: "sprinkler irrigation system repair service",
   "garage door": "garage door repair",
+  // Build 90: categories that were falling through to raw search
+  generator: "generator repair service technician",
+  "crawl space": "crawl space encapsulation service",
+  "water heater": "water heater repair plumber",
+  "siding/exterior": "siding repair contractor",
+  security: "home security system service",
+  solar: "solar panel service repair",
 };
 
 // Common chain indicators we filter out of "Haven Certified". Heuristic — the
@@ -102,6 +109,63 @@ const CHAIN_INDICATORS = [
   "weed man",
   "lawn doctor",
   "ne raymond",
+  // Build 90: retailers and non-service businesses
+  "p.c. richard",
+  "pc richard",
+  "costco",
+  "walmart",
+  "target",
+  "sears",
+  "menards",
+  "tractor supply",
+  "northern tool",
+  "harbor freight",
+  "autozone",
+  "o'reilly",
+  "advance auto",
+  "napa auto",
+  "caraluzzi",
+  "shoprite",
+  "stop & shop",
+  "stop and shop",
+  "whole foods",
+  "trader joe",
+];
+
+// Build 90: Exclude results that look like retailers or food businesses
+// rather than service providers. Applied to ALL results (not just Haven
+// Certified) because a grocery store should never appear for irrigation.
+const RETAILER_INDICATORS = [
+  "market",
+  "supermarket",
+  "grocery",
+  "deli",
+  "restaurant",
+  "pizza",
+  "cafe",
+  "bakery",
+  "catering",
+  "caterer",
+  "food service",
+  "liquor",
+  "wine",
+  "beer",
+  "furniture",
+  "mattress",
+  "flooring store",
+  "appliance store",
+  "rental",
+  "car wash",
+  "gas station",
+  "storage",
+  "self storage",
+  "u-haul",
+  "salon",
+  "barber",
+  "spa ",
+  "nail ",
+  "dry clean",
+  "laundromat",
 ];
 
 interface VendorCandidate {
@@ -300,10 +364,18 @@ serve(async (req: Request) => {
       return CHAIN_INDICATORS.some((token) => lower.includes(token));
     }
 
-    // Haven Certified candidates: 4.7+ stars, 25+ reviews, not a chain.
+    function isRetailer(name: string): boolean {
+      const lower = name.toLowerCase();
+      return RETAILER_INDICATORS.some((token) => lower.includes(token));
+    }
+
+    // Build 90: filter out obvious non-service businesses before ranking
+    const serviceProviders = normalized.filter((p) => !isRetailer(p.name) && !isChain(p.name));
+
+    // Haven Certified candidates: 4.7+ stars, 25+ reviews, service providers only.
     // Take top 2 by rating then review count.
-    const havenCertified = normalized
-      .filter((p) => p.rating >= 4.7 && p.reviewCount >= 25 && !isChain(p.name))
+    const havenCertified = serviceProviders
+      .filter((p) => p.rating >= 4.7 && p.reviewCount >= 25)
       .sort((a, b) => {
         if (b.rating !== a.rating) return b.rating - a.rating;
         return b.reviewCount - a.reviewCount;
@@ -312,9 +384,9 @@ serve(async (req: Request) => {
 
     const havenCertifiedIds = new Set(havenCertified.map((p) => p.googlePlaceId));
 
-    // Suggested candidates: 4.5+ stars, 15+ reviews. Skip rows already
-    // selected as Haven Certified. Take next 2.
-    const suggested = normalized
+    // Suggested candidates: 4.5+ stars, 15+ reviews, service providers only.
+    // Skip rows already selected as Haven Certified. Take next 2.
+    const suggested = serviceProviders
       .filter(
         (p) =>
           !havenCertifiedIds.has(p.googlePlaceId) &&

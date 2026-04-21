@@ -279,7 +279,7 @@ struct EquipmentIdentifySheet: View {
                     .background(HavenColors.beige100)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
-                    Text("Not found in our catalog — try searching by name instead")
+                    Text("Not found in our catalog. Try searching by name instead.")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
                 }

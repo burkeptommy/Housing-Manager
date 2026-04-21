@@ -37,9 +37,23 @@ struct SeasonTasksSheet: View {
                 }
             }
         }
-        .navigationTitle(season.displayLabel)
+        // BUG-007 fix: sheet header now shows the season icon (leaf /
+        // sun / tree / snowflake) + label so the sheet reads as a
+        // continuation of the Year-at-a-Glance tile the user tapped.
+        // Before, the header was just "Spring" text with no icon and
+        // felt disconnected from the tile's visual language.
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 6) {
+                    Image(systemName: season.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(season.iconColor)
+                    Text(season.displayLabel)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }
             }

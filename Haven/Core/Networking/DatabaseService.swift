@@ -1211,6 +1211,32 @@ final class DatabaseService {
             .execute()
     }
 
+    /// BUG-020 fix: counterpart to `archiveMaintenanceTask`. Lets users
+    /// un-archive a task when the reconciler's heuristic was wrong (e.g.
+    /// they added a hot tub later and want the hot-tub tasks back). Clears
+    /// `is_archived`, `archived_at`, `archived_reason` in one update.
+    func unarchiveMaintenanceTask(id: UUID) async throws {
+        struct UnarchivePayload: Encodable {
+            let isArchived: Bool
+            let archivedAt: String?
+            let archivedReason: String?
+            enum CodingKeys: String, CodingKey {
+                case isArchived = "is_archived"
+                case archivedAt = "archived_at"
+                case archivedReason = "archived_reason"
+            }
+        }
+        let payload = UnarchivePayload(
+            isArchived: false,
+            archivedAt: nil,
+            archivedReason: nil
+        )
+        try await from("maintenance_tasks")
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     // MARK: - Handyman Punch Items (Phase 54B)
 
     // MARK: - Routing Preferences (Phase 65)

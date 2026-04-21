@@ -55,6 +55,10 @@ struct UtilityProviderSearchPicker: View {
     /// row to start over. Parents wire this to a viewmodel `clearAnswer`
     /// helper that drops the prior `HouseQuizAnswer` from `state.answers`.
     let onDeselect: (() -> Void)?
+    /// Build 90: When non-nil, the picker shows a "Find vetted pros near
+    /// you" button so users can discover local advisors via Google Places
+    /// without leaving the picker flow.
+    let onFindNearMe: (() -> Void)?
 
     init(
         providerTypes: [String],
@@ -65,7 +69,8 @@ struct UtilityProviderSearchPicker: View {
         renderAsStandaloneSheet: Bool = false,
         onSelect: @escaping (UtilityProviderRow) -> Void,
         onCustomCreated: ((UtilityProviderRow) -> Void)? = nil,
-        onDeselect: (() -> Void)? = nil
+        onDeselect: (() -> Void)? = nil,
+        onFindNearMe: (() -> Void)? = nil
     ) {
         self.providerTypes = providerTypes
         self.state = state
@@ -76,6 +81,7 @@ struct UtilityProviderSearchPicker: View {
         self.onSelect = onSelect
         self.onCustomCreated = onCustomCreated
         self.onDeselect = onDeselect
+        self.onFindNearMe = onFindNearMe
     }
 
     /// Canonical "primary" type the custom-add sheet uses when persisting a
@@ -179,10 +185,8 @@ struct UtilityProviderSearchPicker: View {
                     .padding(.bottom, HavenTheme.spacing16)
             }
 
-            // Sticky "Can't find yours? Add it" footer. Edge-to-edge surface
-            // background with a top border and bottom safe-area padding so
-            // it doesn't clash with the home indicator.
-            stickyCustomAddFooter
+            // Sticky footer with optional "Find near me" + "Can't find yours?"
+            stickyFooter
         }
     }
 
@@ -221,7 +225,11 @@ struct UtilityProviderSearchPicker: View {
             emptyStateView
         } else {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                ForEach(filteredProviders.prefix(20)) { provider in
+                // Phase 50 (advisor picker fix): advisors get a 30-row cap
+                // so the three-bucket sort (national → closest →
+                // alphabetical) can render all three tiers. Utilities keep
+                // the existing 20-row cap because they only have one bucket.
+                ForEach(filteredProviders.prefix(isAdvisorPicker ? 30 : 20)) { provider in
                     providerRow(provider)
                 }
             }
@@ -488,23 +496,55 @@ struct UtilityProviderSearchPicker: View {
         .buttonStyle(.plain)
     }
 
-    /// Build 88 redesign: sticky footer used in the standalone-sheet body.
-    /// Edge-to-edge surface background with a 0.5pt top border separating it
-    /// from the scrolling provider list above, and a bottom safe-area
-    /// background extension so the home indicator doesn't visually clash
-    /// with the button content.
-    private var stickyCustomAddFooter: some View {
-        Button {
-            showCustomAdd = true
-        } label: {
-            customAddButtonContent
-                .padding(.horizontal, HavenTheme.pageMargin)
-                .padding(.vertical, HavenTheme.spacing16)
+    /// Build 90: combined sticky footer with prominent action buttons.
+    private var stickyFooter: some View {
+        VStack(spacing: HavenTheme.spacing12) {
+            if onFindNearMe != nil {
+                Button {
+                    Haptics.light()
+                    onFindNearMe?()
+                } label: {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "location.magnifyingglass")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Find vetted pros near you")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                showCustomAdd = true
+            } label: {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Add your own")
+                        .font(HavenTypography.uiButton)
+                }
+                .foregroundStyle(HavenColors.navy800)
                 .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                        .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, HavenTheme.pageMargin)
+        .padding(.top, HavenTheme.spacing16)
+        .padding(.bottom, HavenTheme.spacing8)
         .background(
-            HavenColors.surface
+            HavenColors.cream
                 .ignoresSafeArea(.container, edges: .bottom)
         )
         .overlay(alignment: .top) {
@@ -512,6 +552,13 @@ struct UtilityProviderSearchPicker: View {
                 .fill(HavenColors.border)
                 .frame(height: 0.5)
         }
+    }
+
+    /// Legacy alias kept so the embedded-body variant (House Quiz) still
+    /// compiles unchanged. The embedded layout never shows the find-near-me
+    /// button since it is only used for utility pickers, not advisor pickers.
+    private var stickyCustomAddFooter: some View {
+        stickyFooter
     }
 
     // MARK: - Computed
@@ -543,6 +590,44 @@ struct UtilityProviderSearchPicker: View {
         return 0
     }
 
+    /// Phase 50 (advisor picker fix): The Life tab advisor picker needs a
+    /// different ordering than utilities — users want the biggest national
+    /// brands at the top, then the closest local firms, then everything
+    /// else alphabetical. Detect the advisor categories so we can branch
+    /// the sort logic in `filteredProviders` without disturbing the
+    /// existing utility flow.
+    private static let advisorProviderTypes: Set<String> = [
+        "estate_attorney",
+        "cpa_tax",
+        "financial_advisor",
+        "life_insurance"
+    ]
+
+    private var isAdvisorPicker: Bool {
+        providerTypes.contains(where: { Self.advisorProviderTypes.contains($0) })
+    }
+
+    /// Phase 50: Proximity score for advisor sorting. Returns a small
+    /// integer where lower = closer. Town hit beats state hit beats
+    /// nothing. Used to pick the "10 closest to me" bucket — distinct
+    /// from `relevanceScore` which conflates US-national with state
+    /// match (intentional for utilities, wrong for advisors).
+    ///   0 = exact town match
+    ///   1 = exact state match
+    ///   2 = no proximity signal
+    private func proximityScore(for provider: UtilityProviderRow) -> Int {
+        let regions = provider.regions ?? []
+        if let town = city, !town.isEmpty,
+           regions.contains(where: { $0.caseInsensitiveCompare(town) == .orderedSame }) {
+            return 0
+        }
+        if let st = state, !st.isEmpty,
+           regions.contains(where: { $0.caseInsensitiveCompare(st) == .orderedSame }) {
+            return 1
+        }
+        return 2
+    }
+
     private var filteredProviders: [UtilityProviderRow] {
         let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let base: [UtilityProviderRow]
@@ -566,6 +651,18 @@ struct UtilityProviderSearchPicker: View {
                     }()
             }
         }
+
+        // Phase 50 (advisor picker fix): when the picker is rendering an
+        // advisor category AND the user hasn't typed a search query, use
+        // the three-bucket sort: top 10 by prominence_rank ascending,
+        // then top 10 closest to the user, then top 10 alphabetical.
+        // Active search queries fall through to the existing relevance
+        // sort so name matches still surface immediately regardless of
+        // bucket.
+        if isAdvisorPicker && needle.isEmpty {
+            return advisorBucketedSort(base)
+        }
+
         // Stable sort: relevance score descending, then alphabetical.
         return base.sorted { a, b in
             let sa = relevanceScore(for: a)
@@ -573,6 +670,78 @@ struct UtilityProviderSearchPicker: View {
             if sa != sb { return sa > sb }
             return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
+    }
+
+    /// Phase 50 (advisor picker fix): three-bucket sort for the Life tab
+    /// advisor picker. Returns up to 30 rows in this order:
+    ///   1. Top 10 by `prominence_rank` ascending (the biggest national
+    ///      brands — MetLife, Morgan Stanley, Deloitte, Day Pitney, etc.)
+    ///   2. Top 10 by proximity to the user's primary property (town hit
+    ///      beats state hit; alphabetical tiebreak within the same tier)
+    ///   3. Top 10 alphabetical from whatever's left
+    /// Each bucket is deduped against the previous ones so a row never
+    /// appears twice. If a bucket runs short, the next bucket pulls from
+    /// its own remaining pool — buckets don't backfill from above so the
+    /// "national" bucket stays purely national.
+    private func advisorBucketedSort(_ pool: [UtilityProviderRow]) -> [UtilityProviderRow] {
+        var seen: Set<UUID> = []
+        var result: [UtilityProviderRow] = []
+        result.reserveCapacity(30)
+
+        // Bucket 1 — top 10 by prominence_rank ascending. Rows without a
+        // rank are skipped here and picked up by the alphabetical bucket
+        // below if proximity didn't grab them first.
+        let nationals = pool
+            .filter { $0.prominenceRank != nil }
+            .sorted { a, b in
+                let ra = a.prominenceRank ?? Int.max
+                let rb = b.prominenceRank ?? Int.max
+                if ra != rb { return ra < rb }
+                return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+        for provider in nationals.prefix(10) {
+            if seen.insert(provider.id).inserted {
+                result.append(provider)
+            }
+        }
+
+        // Bucket 2 — top 10 closest to the user's primary property. Skip
+        // anything already in the nationals bucket. Any provider with a
+        // proximity score of 2 (no town or state hit) is excluded from
+        // this bucket — those land in alphabetical instead so the
+        // "closest" tier is honest about being local matches only.
+        let locals = pool
+            .filter { !seen.contains($0.id) }
+            .filter { proximityScore(for: $0) < 2 }
+            .sorted { a, b in
+                let pa = proximityScore(for: a)
+                let pb = proximityScore(for: b)
+                if pa != pb { return pa < pb }
+                return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+        for provider in locals.prefix(10) {
+            if seen.insert(provider.id).inserted {
+                result.append(provider)
+            }
+        }
+
+        // Bucket 3 — top 10 alphabetical from the remainder. Includes
+        // any provider that didn't make it into the first two buckets,
+        // sorted by name. This catches the long tail of mid-size firms
+        // and out-of-region brands so users still have a meaningful
+        // backup before they reach for the custom-add path.
+        let remainder = pool
+            .filter { !seen.contains($0.id) }
+            .sorted { a, b in
+                a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+        for provider in remainder.prefix(10) {
+            if seen.insert(provider.id).inserted {
+                result.append(provider)
+            }
+        }
+
+        return result
     }
 
     // MARK: - Loading

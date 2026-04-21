@@ -150,13 +150,18 @@ struct AddressAutocompleteField: View {
     }
 
     private var doneEditingButton: some View {
+        // Phase 60.1 trust fix (2026-04-20): renamed "Confirm Address" to
+        // "Done" so users don't mistake the mode-exit toggle for the
+        // primary CTA. The salmon "Find My Home" / "Continue" button below
+        // is the real submit — this one just collapses the detailed
+        // fields back to the compact search row.
         Button {
             isEditing = false
             suggestions = []
         } label: {
-            Text("Confirm Address")
+            Text("Done")
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textSecondary)
         }
         .disabled(street.isEmpty || city.isEmpty || state.isEmpty)
     }

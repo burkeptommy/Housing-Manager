@@ -72,12 +72,26 @@ struct AddMaintenanceTaskSheet: View {
     @State private var notes = ""
     @State private var followUpReason = ""
     @State private var isSaving = false
+    /// Phase 60: optional confirmed visit date. When the user ticks
+    /// "Visit already scheduled" we stamp `scheduled_date` on the task
+    /// so it lands in the Maintenance tab's "Scheduled" bucket instead
+    /// of "To Schedule". The due-date field stays the reminder anchor
+    /// (e.g. "remind me 3 days before the visit").
+    @State private var hasScheduledVisit = false
+    @State private var scheduledVisitDate = Date()
+
+    /// Phase 56.5: Duplicate-prevention context. Loaded on appear so
+    /// we can surface an inline warning when the user picks a vendor
+    /// + system combination that matches an existing routine. Falls
+    /// silent on failure so the form never breaks over detection.
+    @State private var loadedRoutines: [RoutineRow] = []
+    @State private var preventionMatch: (kind: DuplicateDetector.EntityKind, ref: DuplicateDetector.EntityRef)?
 
     private let db = DatabaseService.shared
 
     private let frequencies = [
-        "Once", "Monthly", "Quarterly", "Semi-Annually", "Annually",
-        "Every 2 Years", "Every 5 Years", "Seasonal"
+        "Once", "Weekly", "Every 2 Weeks", "Monthly", "Quarterly",
+        "Semi-Annually", "Annually", "Every 2 Years", "Every 5 Years", "Seasonal"
     ]
 
     private let priorities = ["low", "medium", "high", "urgent"]
@@ -162,8 +176,28 @@ struct AddMaintenanceTaskSheet: View {
                     // task with a past due date (overdue backfill) or any
                     // future date. Validation happens at save time, not
                     // on the picker.
-                    DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
+                    DatePicker("Due date", selection: $dueDate, displayedComponents: .date)
                         .tint(HavenColors.navy800)
+
+                    // Phase 60: optional confirmed visit date. Keeps
+                    // Due Date as the reminder anchor while letting
+                    // the user mark a visit as already booked — the
+                    // task then lands in the Maintenance tab's
+                    // "Scheduled" bucket instead of "To Schedule".
+                    Toggle("Visit already scheduled", isOn: $hasScheduledVisit.animation())
+                        .tint(HavenColors.action)
+
+                    if hasScheduledVisit {
+                        DatePicker(
+                            "Visit date",
+                            selection: $scheduledVisitDate,
+                            displayedComponents: .date
+                        )
+                        .tint(HavenColors.navy800)
+                        Text("The task will show up under \"Scheduled\" on the Maintenance tab. Your due date remains the reminder anchor.")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
 
                     Picker("Frequency", selection: $frequency) {
                         ForEach(frequencies, id: \.self) { f in
@@ -201,6 +235,37 @@ struct AddMaintenanceTaskSheet: View {
                     }
                 }
 
+                // Phase 56.5: Duplicate-prevention inline warning.
+                // Surfaces when the vendor + system category combo
+                // already has a matching routine. Non-blocking — save
+                // still works, the warning just asks the user to
+                // consider editing the existing entity first.
+                if let match = preventionMatch {
+                    Section {
+                        HStack(alignment: .top, spacing: HavenTheme.spacing8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(HavenColors.warning)
+                                .font(.system(size: 14))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("You already have \"\(match.ref.displayName)\"")
+                                    .font(HavenTypography.uiLabel.weight(.semibold))
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text("Edit the existing \(match.kind == .routine ? "routine" : "task") instead of creating a duplicate?")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(HavenTheme.spacing12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(HavenColors.warning.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
                 Section("Notes") {
                     TextField("Optional notes", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
@@ -211,7 +276,7 @@ struct AddMaintenanceTaskSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
@@ -226,7 +291,58 @@ struct AddMaintenanceTaskSheet: View {
                 if selectedPropertyId == nil {
                     selectedPropertyId = properties.first?.id
                 }
+                await loadDuplicateContext()
             }
+            .onChange(of: selectedContractorId) { _, _ in checkForDuplicates() }
+            .onChange(of: selectedSystemId) { _, _ in checkForDuplicates() }
+            // Phase 56.5 patch: title similarity is part of the gate
+            // now, so re-evaluate when the user edits the task title.
+            .onChange(of: title) { _, _ in checkForDuplicates() }
+        }
+    }
+
+    /// Phase 56.5: Hydrate the routines list for prevention checks.
+    /// We already have `systems` + `contractors` from the parent so
+    /// the only fetch needed is routines scoped to the active
+    /// household. Silent failure → no warning (fail open).
+    private func loadDuplicateContext() async {
+        guard let propertyId = selectedPropertyId,
+              let prop = properties.first(where: { $0.id == propertyId }) else {
+            loadedRoutines = []
+            return
+        }
+        let routines = (try? await DatabaseService.shared.fetchRoutines(householdId: prop.householdId)) ?? []
+        await MainActor.run {
+            self.loadedRoutines = routines
+            self.checkForDuplicates()
+        }
+    }
+
+    /// Phase 56.5: Run the prevention check when vendor or system
+    /// changes. No-op for vehicle tasks (vehicles don't have
+    /// routine-kind families).
+    private func checkForDuplicates() {
+        guard targetType == .property else { preventionMatch = nil; return }
+        guard let vendorId = selectedContractorId else { preventionMatch = nil; return }
+
+        let systemCategory = selectedSystemId.flatMap { sid in
+            systems.first(where: { $0.id == sid })?.category
+        }
+
+        let match = DuplicateDetector.preventionCheckForTask(
+            newSystemCategory: systemCategory,
+            newTemplateId: nil,
+            newTitle: title,
+            newVendorId: vendorId,
+            existingRoutines: loadedRoutines,
+            contractors: contractors
+        )
+        preventionMatch = match
+        if match != nil {
+            Analytics.track(.duplicatePreventionWarned, [
+                "surface": "add_task_sheet",
+                "system_category": systemCategory ?? "",
+            ])
         }
     }
 
@@ -305,6 +421,13 @@ struct AddMaintenanceTaskSheet: View {
         insert.priority = priority
         insert.assignedToUserId = assignedUserId
         insert.assignedContractorId = selectedContractorId
+
+        // Phase 60: if the user marked the visit as already scheduled,
+        // stamp `scheduled_date` so the task lands in "Scheduled" not
+        // "To Schedule". The due date stays the reminder anchor.
+        if hasScheduledVisit {
+            insert.scheduledDate = formatter.string(from: scheduledVisitDate)
+        }
 
         // Phase 50: stamp metadata so the maintenance UI can route the
         // task to the right surface. Vendor visits and follow-ups

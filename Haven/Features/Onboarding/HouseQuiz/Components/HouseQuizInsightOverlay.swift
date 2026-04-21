@@ -20,12 +20,16 @@ struct HouseQuizInsightOverlay: View {
     /// hook lives behind this so the same advance path runs in both cases.
     let onDismiss: () -> Void
 
-    /// Total auto-advance duration. Tom asked for ~4 seconds.
-    private let autoDismissAfter: TimeInterval = 4.0
+    /// Total auto-advance duration. Originally 4.0s, bumped to 6.0s on
+    /// 2026-04-20 after Tom flagged the milestone copy felt too quick to
+    /// read — full-screen overlays carry more text than inline pills
+    /// (title + subhead + body paragraph + citation on some) and HNW
+    /// users want to absorb the number, not watch it blink.
+    private let autoDismissAfter: TimeInterval = 6.0
 
     @State private var hasAppeared = false
     @State private var didDismiss = false
-    @State private var secondsRemaining: Int = 4
+    @State private var secondsRemaining: Int = 6
 
     var body: some View {
         ZStack {
@@ -67,10 +71,13 @@ struct HouseQuizInsightOverlay: View {
                             .multilineTextAlignment(.leading)
                     }
 
-                    // Source citation
-                    Text("Source: \(feedback.citationName)")
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textTertiary)
+                    // Source citation — Phase 60.2: optional now, some
+                    // feedback entries legitimately have no cited study.
+                    if let citation = feedback.citationName, !citation.isEmpty {
+                        Text("Source: \(citation)")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
 
                     // Divider before the auto-advance row
                     Rectangle()

@@ -38,6 +38,48 @@ struct PropertyLookupResult: Codable {
     let ownerInfo: OwnerInfo?
     let dataSource: String?  // "attom" or "rentcast"
 
+    enum CodingKeys: String, CodingKey {
+        case yearBuilt, squareFootage, lotSize, bedrooms, bathrooms
+        case propertyType, lastSaleDate, lastSalePrice
+        case estimatedValue, estimatedValueLow, estimatedValueHigh
+        case estimatedValueConfidence, estimatedValueSource, estimatedValueReasoning
+        case features, taxAssessment, ownerInfo, dataSource
+    }
+
+    /// Phase 60.1: Resilient decoder. Every field wrapped in `try?` so a
+    /// single unexpected field (new ATTOM field, numeric-as-string,
+    /// unexpected null) only takes itself down — not the entire struct.
+    /// Matches the in-codebase pattern on `PropertyRow`, `UtilityAccountRow`,
+    /// `HouseholdAdvisorRow`, `VehicleRow`, and `ProjectAIResearch`. Before
+    /// this fix, any type-mismatch threw from the synthesized decoder and
+    /// silently dropped the whole lookup, taking the $660K sale price with
+    /// it — the onboarding trust bug Tom reported in April 2026.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        yearBuilt = try? c.decodeIfPresent(Int.self, forKey: .yearBuilt)
+        squareFootage = try? c.decodeIfPresent(Int.self, forKey: .squareFootage)
+        lotSize = try? c.decodeIfPresent(Int.self, forKey: .lotSize)
+        bedrooms = try? c.decodeIfPresent(Int.self, forKey: .bedrooms)
+        bathrooms = try? c.decodeIfPresent(Double.self, forKey: .bathrooms)
+        propertyType = try? c.decodeIfPresent(String.self, forKey: .propertyType)
+        lastSaleDate = try? c.decodeIfPresent(String.self, forKey: .lastSaleDate)
+        lastSalePrice = try? c.decodeIfPresent(Double.self, forKey: .lastSalePrice)
+        estimatedValue = try? c.decodeIfPresent(Double.self, forKey: .estimatedValue)
+        estimatedValueLow = try? c.decodeIfPresent(Double.self, forKey: .estimatedValueLow)
+        estimatedValueHigh = try? c.decodeIfPresent(Double.self, forKey: .estimatedValueHigh)
+        estimatedValueConfidence = try? c.decodeIfPresent(Int.self, forKey: .estimatedValueConfidence)
+        estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
+        estimatedValueReasoning = try? c.decodeIfPresent(String.self, forKey: .estimatedValueReasoning)
+        features = try? c.decodeIfPresent(PropertyFeatures.self, forKey: .features)
+        taxAssessment = try? c.decodeIfPresent(TaxAssessment.self, forKey: .taxAssessment)
+        ownerInfo = try? c.decodeIfPresent(OwnerInfo.self, forKey: .ownerInfo)
+        dataSource = try? c.decodeIfPresent(String.self, forKey: .dataSource)
+    }
+
+    // NOTE: do NOT add a custom encode(to:). The synthesized encoder is
+    // correct and we rely on it for UserDefaults round-tripping in
+    // AddressHookViewModel.cacheToUserDefaults().
+
     struct PropertyFeatures: Codable {
         let roofType: String?
         let heatingType: String?
@@ -57,6 +99,36 @@ struct PropertyLookupResult: Codable {
         let basementSize: Int?
         let constructionCondition: String?
         let qualityRating: String?
+
+        enum CodingKeys: String, CodingKey {
+            case roofType, heatingType, heatingFuel, coolingType
+            case foundationType, exteriorType, architectureType
+            case pool, poolType, garage, garageType, garageSpaces
+            case stories, fireplace, fireplaceType, basementSize
+            case constructionCondition, qualityRating
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            roofType = try? c.decodeIfPresent(String.self, forKey: .roofType)
+            heatingType = try? c.decodeIfPresent(String.self, forKey: .heatingType)
+            heatingFuel = try? c.decodeIfPresent(String.self, forKey: .heatingFuel)
+            coolingType = try? c.decodeIfPresent(String.self, forKey: .coolingType)
+            foundationType = try? c.decodeIfPresent(String.self, forKey: .foundationType)
+            exteriorType = try? c.decodeIfPresent(String.self, forKey: .exteriorType)
+            architectureType = try? c.decodeIfPresent(String.self, forKey: .architectureType)
+            pool = try? c.decodeIfPresent(Bool.self, forKey: .pool)
+            poolType = try? c.decodeIfPresent(String.self, forKey: .poolType)
+            garage = try? c.decodeIfPresent(Bool.self, forKey: .garage)
+            garageType = try? c.decodeIfPresent(String.self, forKey: .garageType)
+            garageSpaces = try? c.decodeIfPresent(Int.self, forKey: .garageSpaces)
+            stories = try? c.decodeIfPresent(Int.self, forKey: .stories)
+            fireplace = try? c.decodeIfPresent(Bool.self, forKey: .fireplace)
+            fireplaceType = try? c.decodeIfPresent(String.self, forKey: .fireplaceType)
+            basementSize = try? c.decodeIfPresent(Int.self, forKey: .basementSize)
+            constructionCondition = try? c.decodeIfPresent(String.self, forKey: .constructionCondition)
+            qualityRating = try? c.decodeIfPresent(String.self, forKey: .qualityRating)
+        }
     }
 
     struct TaxAssessment: Codable {
@@ -67,12 +139,37 @@ struct PropertyLookupResult: Codable {
         let taxPerSqFt: Double?
         // Backward compat with old cached RentCast data
         let value: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case year, assessedValue, marketValue, taxAmount, taxPerSqFt, value
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            year = try? c.decodeIfPresent(Int.self, forKey: .year)
+            assessedValue = try? c.decodeIfPresent(Double.self, forKey: .assessedValue)
+            marketValue = try? c.decodeIfPresent(Double.self, forKey: .marketValue)
+            taxAmount = try? c.decodeIfPresent(Double.self, forKey: .taxAmount)
+            taxPerSqFt = try? c.decodeIfPresent(Double.self, forKey: .taxPerSqFt)
+            value = try? c.decodeIfPresent(Double.self, forKey: .value)
+        }
     }
 
     struct OwnerInfo: Codable {
         let ownerName: String?
         let absenteeOwner: Bool?
         let mailingAddress: String?
+
+        enum CodingKeys: String, CodingKey {
+            case ownerName, absenteeOwner, mailingAddress
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            ownerName = try? c.decodeIfPresent(String.self, forKey: .ownerName)
+            absenteeOwner = try? c.decodeIfPresent(Bool.self, forKey: .absenteeOwner)
+            mailingAddress = try? c.decodeIfPresent(String.self, forKey: .mailingAddress)
+        }
     }
 }
 

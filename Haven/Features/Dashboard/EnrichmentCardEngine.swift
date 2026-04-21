@@ -221,6 +221,65 @@ struct EnrichmentEngine {
             ))
         }
 
+        // Phase 62 — 4 new enrichment questions driving new HNW templates.
+
+        // 11. Mature trees near the house (drives arborist inspection).
+        if propertyAttributes["has_mature_trees"] == nil {
+            questions.append(EnrichmentQuestion(
+                id: "has_mature_trees",
+                title: "Do you have large trees near the house?",
+                subtitle: "We'll add annual arborist check reminders",
+                icon: "tree.fill",
+                priority: 42,
+                inputType: .yesNo
+            ))
+        }
+
+        // 12. Driveway material (asphalt drives biennial seal coat).
+        if propertyAttributes["driveway_material"] == nil {
+            questions.append(EnrichmentQuestion(
+                id: "driveway_material",
+                title: "What's your driveway made of?",
+                subtitle: "Asphalt driveways need sealing every few years",
+                icon: "road.lanes",
+                priority: 43,
+                inputType: .singleChoice([
+                    ChoiceOption("asphalt", label: "Asphalt"),
+                    ChoiceOption("concrete", label: "Concrete"),
+                    ChoiceOption("paver", label: "Paver / Stone"),
+                    ChoiceOption("gravel", label: "Gravel"),
+                    ChoiceOption("other", label: "Other"),
+                ])
+            ))
+        }
+
+        // 13. Fridge water / ice dispenser (drives semi-annual filter swap).
+        if propertyAttributes["has_fridge_water_dispenser"] == nil {
+            questions.append(EnrichmentQuestion(
+                id: "has_fridge_water_dispenser",
+                title: "Does your fridge have a water or ice dispenser?",
+                subtitle: "We'll remind you to swap the filter every 6 months",
+                icon: "refrigerator.fill",
+                priority: 44,
+                inputType: .yesNo
+            ))
+        }
+
+        // 14. Sump battery backup (conditional on existing sump pump system).
+        let hasSumpPump = homeSystems.contains { system in
+            system.category == "Plumbing" && (system.subtype?.lowercased().contains("sump") ?? false)
+        }
+        if hasSumpPump && propertyAttributes["has_sump_battery_backup"] == nil {
+            questions.append(EnrichmentQuestion(
+                id: "has_sump_battery_backup",
+                title: "Does your sump pump have a battery backup?",
+                subtitle: "We'll add semi-annual backup battery tests",
+                icon: "battery.100",
+                priority: 46,
+                inputType: .yesNo
+            ))
+        }
+
         // MARK: - Project Suggestions (ROI-based)
 
         // Suggest projects based on property age and systems

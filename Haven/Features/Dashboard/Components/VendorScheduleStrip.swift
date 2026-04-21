@@ -89,7 +89,7 @@ struct VendorScheduleStrip: View {
                         .font(HavenTypography.title3)
                         .foregroundStyle(HavenColors.textPrimary)
                 }
-                Text("Upload an invoice or add a vendor to start tracking who handles what — and when they're next on site.")
+                Text("Upload an invoice or add a vendor to start tracking who handles what, and when they're next on site.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

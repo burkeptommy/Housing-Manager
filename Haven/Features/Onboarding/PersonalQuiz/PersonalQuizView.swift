@@ -22,7 +22,7 @@ struct PersonalQuizView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     ProgressView(value: viewModel.progress)
-                        .tint(HavenColors.navy)
+                        .tint(HavenColors.action)
                         .frame(width: 140)
                 }
                 ToolbarItem(placement: .topBarTrailing) {

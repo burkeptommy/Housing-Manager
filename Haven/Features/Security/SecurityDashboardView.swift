@@ -285,7 +285,7 @@ struct SecurityDashboardView: View {
                 Image(systemName: "lock.doc.fill")
                     .foregroundStyle(HavenColors.warning)
                 Text("\(viewModel.vaultLockedDocuments.count) documents currently Vault Locked")
-                    .font(Font.custom("Inter", size: 13).weight(.medium))
+                    .font(Font.system(size: 13, weight: .medium))
                 Spacer()
                 if !viewModel.vaultLockedDocuments.isEmpty {
                     Image(systemName: "chevron.right")
@@ -331,7 +331,7 @@ struct SecurityDashboardView: View {
                 HStack {
                     Image(systemName: "trash.fill")
                     Text(chatDeleteComplete ? "Chat History Deleted" : "Delete All Chat History")
-                        .font(Font.custom("Inter", size: 13).weight(.medium))
+                        .font(Font.system(size: 13, weight: .medium))
                 }
                 .foregroundStyle(chatDeleteComplete ? HavenColors.success : HavenColors.critical)
                 .frame(maxWidth: .infinity)
@@ -492,7 +492,7 @@ private struct DataMapRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(Font.custom("Inter", size: 13).weight(.medium))
+                    .font(Font.system(size: 13, weight: .medium))
                     .foregroundStyle(HavenColors.textPrimary)
                 Text(detail)
                     .font(HavenTypography.caption)

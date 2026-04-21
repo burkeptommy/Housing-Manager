@@ -88,6 +88,16 @@ struct QuizLocalContractorPicker: View {
     /// filtered locally against the pre-loaded Google Places list once
     /// the user types 2+ characters.
     @State private var searchText: String = ""
+    /// Phase 60.1 trust fix (2026-04-20): ALSO search the persisted
+    /// utility_providers catalog so regional brands the user has heard
+    /// of (Tyler Heating, Petro Home Services, Hocon Gas, etc.) show up
+    /// in the Q15b chip search even when Google Places hasn't returned
+    /// them for the current town. Previously the picker only filtered
+    /// `vendors` (Google Places results) — users typing "Tyler" or
+    /// "Petro" on HVAC hit "No matches" despite the catalog carrying
+    /// both providers tagged for HVAC. Merged into the filtered results
+    /// so a single row can come from either source.
+    @State private var catalogProviders: [UtilityProviderRow] = []
     /// Build 86 — id of the vendor row the user just tapped. Drives the
     /// navy tint + checkmark + dim-others visual feedback that mirrors
     /// `singleChoiceBody` from Build 81 and the parallel pattern in
@@ -315,10 +325,51 @@ struct QuizLocalContractorPicker: View {
     }
 
     /// Build 87: locally filtered vendor results for search-first mode.
+    /// Phase 60.1 trust fix (2026-04-20): merge in catalog matches from
+    /// `utility_providers` so household-name regional brands (Tyler,
+    /// Petro, Hocon) show up even when Google Places misses them. Catalog
+    /// rows are converted to `LocalVendorResult` on the fly so the UI
+    /// only has to render one row shape. De-duped by lowercased name so a
+    /// provider in both sources doesn't appear twice.
     private var searchFilteredVendors: [HavenSupabase.LocalVendorResult] {
         let needle = searchNeedle
         guard needle.count >= 2 else { return [] }
-        return vendors.filter { $0.name.localizedCaseInsensitiveContains(needle) }
+        let placesMatches = vendors.filter { $0.name.localizedCaseInsensitiveContains(needle) }
+        let catalogMatches = catalogProviders
+            .filter { $0.name.localizedCaseInsensitiveContains(needle) }
+            .map { Self.catalogToLocalVendor($0) }
+
+        var seen = Set<String>()
+        var merged: [HavenSupabase.LocalVendorResult] = []
+        for vendor in placesMatches + catalogMatches {
+            let key = vendor.name.lowercased()
+            if seen.insert(key).inserted {
+                merged.append(vendor)
+            }
+        }
+        return merged
+    }
+
+    /// Converts a persisted `UtilityProviderRow` into a `LocalVendorResult`
+    /// so the search-first list can render it alongside Google Places
+    /// rows without a second UI path. Rating / reviewCount are nil for
+    /// catalog rows since utility_providers doesn't persist those. The
+    /// `googlePlaceId` is salted with a `catalog_` prefix so the downstream
+    /// identifier never collides with a real Places id.
+    private static func catalogToLocalVendor(
+        _ row: UtilityProviderRow
+    ) -> HavenSupabase.LocalVendorResult {
+        HavenSupabase.LocalVendorResult(
+            name: row.name,
+            address: nil,
+            phone: row.phone,
+            website: row.website,
+            rating: nil,
+            reviewCount: nil,
+            googlePlaceId: "catalog_\(row.id.uuidString)",
+            isHavenCertified: false,
+            rankPosition: 999
+        )
     }
 
     /// Build 87: computed results view for search-first mode. Shows loading,
@@ -596,9 +647,25 @@ struct QuizLocalContractorPicker: View {
         case "roofer":             return "Roofing"
         case "septic_pumper":      return "Septic System"
         case "well_water_service": return "Well System"
-        case "chimney_sweep":      return "Fire Protection"
-        case "tree_service":       return "Landscaping"
+        // Phase 60.6: aligned with HouseQuizAnswerMapper.householdContractorCategoryFor
+        // so the find-local-vendors Google Places filter searches the
+        // same trade vocabulary the contractor mirror stamps. "Chimney"
+        // replaces "Fire Protection" (which was an unrelated sub-system
+        // key); "Tree Service" replaces "Landscaping" so arborist
+        // searches aren't diluted by lawn-mower results.
+        case "chimney_sweep":      return "Chimney"
+        case "tree_service":       return "Tree Service"
         case "handyman":           return "Handyman"
+        // Phase 60.6: match the chip additions in HouseQuizQuestionLibrary.
+        case "hardscape":          return "Landscaping"
+        case "generator_service":  return "Generator"
+        // Phase 60.2 (F5): four new chip types. Category strings match
+        // SystemCategoryRegistry keys so find-local-vendors can filter
+        // Google Places results by the right trade.
+        case "cleaning":           return "Cleaning Service"
+        case "snow_removal":       return "Snow Removal"
+        case "mosquito_tick":      return "Mosquito & Tick"
+        case "pet_waste":          return "Pet Waste"
         default:                   return chipId
         }
     }
@@ -607,21 +674,81 @@ struct QuizLocalContractorPicker: View {
         guard !town.isEmpty, !state.isEmpty else {
             isLoading = false
             loadError = nil
+            // Phase 60.1 trust fix: still load the catalog even without
+            // a town — the catalog search doesn't depend on location.
+            await loadCatalogProviders()
             return
         }
         isLoading = true
         loadError = nil
-        do {
-            let response = try await HavenSupabase.findLocalVendors(
-                town: town,
-                state: state,
-                category: categoryParam
-            )
-            vendors = response.vendors
-        } catch {
-            loadError = error.localizedDescription
-            vendors = []
-        }
+        async let placesTask: Void = {
+            do {
+                let response = try await HavenSupabase.findLocalVendors(
+                    town: town,
+                    state: state,
+                    category: categoryParam
+                )
+                await MainActor.run { vendors = response.vendors }
+            } catch {
+                await MainActor.run {
+                    loadError = error.localizedDescription
+                    vendors = []
+                }
+            }
+        }()
+        async let catalogTask: Void = loadCatalogProviders()
+        _ = await (placesTask, catalogTask)
         isLoading = false
+    }
+
+    /// Phase 60.1 trust fix (2026-04-20): load utility_providers rows
+    /// matching the chip category so regional HNW brands (Tyler, Petro,
+    /// Hocon) show up in the Q15b search even when Google Places misses
+    /// them. Includes adjacent types (heating-fuel providers often also
+    /// do HVAC work) so brands tagged under `oil` / `propane` still
+    /// surface on the HVAC chip. Silent on failure — the Google Places
+    /// path is still the primary source and a catalog miss shouldn't
+    /// block the picker.
+    private func loadCatalogProviders() async {
+        let types = catalogProviderTypes
+        guard !types.isEmpty else { return }
+        do {
+            // Load the category-scoped slice first (fast, narrows the
+            // search to plausible candidates for this chip).
+            let scoped = try await DatabaseService.shared.fetchUtilityProviders(types: types)
+            await MainActor.run { catalogProviders = scoped }
+        } catch {
+            // Intentional silent fallback — Google Places already populated.
+        }
+    }
+
+    /// Maps Q15b chip ids to `utility_providers.provider_type` values so
+    /// the catalog fetch returns the right slice. Values match the
+    /// `provider_type` column verbatim (verified against the live
+    /// catalog 2026-04-20): the DB uses `chimney_sweep`, `septic_pumper`,
+    /// `well_water_service`, `tree_service` as the full tokens, not the
+    /// shortened forms. Multiple types per chip are allowed — HVAC
+    /// legitimately covers heating-fuel brands that also install systems
+    /// (Petro Home Services), and Tree Service covers general landscaping
+    /// companies that do arborist work. Chips with no catalog analog
+    /// (handyman / cleaning / pet_waste) return [] and fall through to
+    /// Google Places only, which is how it used to work for all chips.
+    private var catalogProviderTypes: [String] {
+        switch chipId {
+        case "hvac_service":       return ["hvac", "oil", "propane", "natural_gas"]
+        case "plumber":            return ["plumbing"]
+        case "electrician":        return ["electrical"]
+        case "roofer":             return ["roofing"]
+        case "septic_pumper":      return ["septic_pumper"]
+        case "well_water_service": return ["well_water_service"]
+        case "chimney_sweep":      return ["chimney_sweep"]
+        case "tree_service":       return ["tree_service", "landscaping"]
+        case "handyman":           return []
+        case "cleaning":           return []
+        case "snow_removal":       return ["landscaping"]
+        case "mosquito_tick":      return ["pest_control"]
+        case "pet_waste":          return []
+        default:                   return []
+        }
     }
 }

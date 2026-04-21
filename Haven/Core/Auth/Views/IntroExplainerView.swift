@@ -34,10 +34,10 @@ struct IntroExplainerView: View {
                     } label: {
                         Text("Get Started")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(HavenColors.textOnNavy)
+                            .foregroundStyle(HavenColors.textOnAction)
                             .frame(maxWidth: .infinity)
                             .frame(height: HavenTheme.buttonHeight)
-                            .background(HavenColors.navy800)
+                            .background(HavenColors.action)
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                     }
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -48,10 +48,10 @@ struct IntroExplainerView: View {
                     } label: {
                         Text("Next")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(HavenColors.textOnNavy)
+                            .foregroundStyle(HavenColors.textOnAction)
                             .frame(maxWidth: .infinity)
                             .frame(height: HavenTheme.buttonHeight)
-                            .background(HavenColors.navy800)
+                            .background(HavenColors.action)
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                     }
                 }

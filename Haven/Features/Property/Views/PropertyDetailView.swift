@@ -1108,7 +1108,7 @@ struct PropertyDetailView: View {
                         Text("What systems does your home have?")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
-                        Text("Add your HVAC, plumbing, electrical and more — Haven will track maintenance for you.")
+                        Text("Add your HVAC, plumbing, electrical and more. Haven will track maintenance for you.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textTertiary)
                             .multilineTextAlignment(.center)
@@ -1244,7 +1244,7 @@ struct PropertyDetailView: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(HavenColors.navy800)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Maintenance Schedule")
+                            Text("Maintenance")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.textPrimary)
                             Text("\(totalCount) tasks on your plan")

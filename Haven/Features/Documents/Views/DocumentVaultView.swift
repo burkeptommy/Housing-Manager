@@ -22,6 +22,13 @@ struct DocumentVaultView: View {
     // snapshot view.
     @State private var showEstateSnapshot = false
 
+    // Build 90 — Household strip (migrated from Dashboard)
+    @State private var showFamilyMemberChooser = false
+    @State private var familyMemberFormMode: AddFamilyMemberMode?
+    @State private var selectedMemberForProfile: FamilyMemberRow?
+    @State private var showSettings = false
+    @State private var householdStaff: [FamilyMemberRow] = []
+
     enum LifeTab: String, CaseIterable {
         case documents = "Documents"
         case family = "Family"
@@ -47,8 +54,45 @@ struct DocumentVaultView: View {
                 }
 
                 if lifeTab == .family {
-                    // Family tab — NOT inside ScrollView (it has its own List)
-                    FamilyInboxView()
+                    // Family tab — Build 90: Household strips migrated from
+                    // Dashboard sit above the family inbox content.
+                    VStack(spacing: 0) {
+                        // Household strip
+                        if !viewModel.familyMembers.isEmpty {
+                            HouseholdStrip(
+                                members: viewModel.familyMembers,
+                                currentUserName: nil,
+                                onMemberTapped: { member in
+                                    selectedMemberForProfile = member
+                                },
+                                onAddTapped: {
+                                    showFamilyMemberChooser = true
+                                },
+                                onManageTapped: {
+                                    showSettings = true
+                                }
+                            )
+                            .padding(.horizontal, HavenTheme.pageMargin)
+                            .padding(.vertical, HavenTheme.spacing8)
+                        }
+
+                        // Staff strip
+                        if !householdStaff.isEmpty {
+                            HouseholdStaffStrip(
+                                staff: householdStaff,
+                                onMemberTapped: { member in
+                                    selectedMemberForProfile = member
+                                },
+                                onAddTapped: {
+                                    showSettings = true
+                                }
+                            )
+                            .padding(.horizontal, HavenTheme.pageMargin)
+                            .padding(.bottom, HavenTheme.spacing8)
+                        }
+
+                        FamilyInboxView()
+                    }
                 } else {
                     // Documents tab — inside ScrollView
                     ScrollView {
@@ -174,6 +218,8 @@ struct DocumentVaultView: View {
             }
             .task {
                 await viewModel.loadData()
+                // Build 90: load household staff for the Life tab strip
+                householdStaff = (try? await DatabaseService.shared.fetchHouseholdStaff()) ?? []
             }
             .onAppear {
                 // Refresh on return from detail view (e.g. after deletion)
@@ -236,6 +282,31 @@ struct DocumentVaultView: View {
             .sheet(isPresented: $showEstateSnapshot) {
                 if let hid = viewModel.properties.first?.householdId {
                     EstateSnapshotView(householdId: hid)
+                }
+            }
+            // Build 90 — Household strip sheets (migrated from Dashboard)
+            .sheet(isPresented: $showFamilyMemberChooser) {
+                AddFamilyMemberChooserSheet { mode in
+                    familyMemberFormMode = mode
+                }
+                .presentationDetents([.medium])
+            }
+            .sheet(item: $familyMemberFormMode) { mode in
+                NavigationStack {
+                    FamilyMemberFormView(initialMode: mode, onSave: {
+                        Task { await viewModel.loadData() }
+                    })
+                }
+            }
+            .sheet(item: $selectedMemberForProfile) { member in
+                NavigationStack {
+                    FamilyMemberProfileView(member: member)
+                }
+                .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showSettings) {
+                NavigationStack {
+                    SettingsView()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .popToRoot)) { notification in

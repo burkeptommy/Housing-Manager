@@ -513,7 +513,7 @@ struct EstateIntakeFormView: View {
                     .fill(HavenColors.beige200)
                     .frame(height: 3)
                 Rectangle()
-                    .fill(HavenColors.navy700)
+                    .fill(HavenColors.action)
                     .frame(width: geo.size.width * viewModel.progress, height: 3)
                     .animation(.easeOut(duration: 0.3), value: viewModel.progress)
             }
@@ -1407,18 +1407,18 @@ struct EstateIntakeFormView: View {
             } label: {
                 if viewModel.isCompleting {
                     ProgressView()
-                        .tint(HavenColors.textOnNavy)
+                        .tint(HavenColors.textOnAction)
                         .frame(height: 50)
                         .frame(maxWidth: .infinity)
-                        .background(HavenColors.navy)
+                        .background(HavenColors.action)
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 } else {
                     Text(viewModel.isLastSection ? "Complete" : "Continue")
                         .font(HavenTypography.uiButton)
-                        .foregroundStyle(HavenColors.textOnNavy)
+                        .foregroundStyle(HavenColors.textOnAction)
                         .frame(height: 50)
                         .frame(maxWidth: .infinity)
-                        .background(HavenColors.navy)
+                        .background(HavenColors.action)
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
             }

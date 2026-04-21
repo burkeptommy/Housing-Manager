@@ -188,13 +188,23 @@ enum MaintenanceTaskReconciler {
             "has_humidifier", "has_ev_charger", "has_radon_mitigation",
             "has_central_vacuum", "has_leak_detector", "has_whole_house_filter",
             "has_built_in_grill", "has_outdoor_lighting", "has_pool_safety_fence",
-            "has_pets"
+            "has_pets",
+            // Phase 62 additions
+            "has_mature_trees", "has_fridge_water_dispenser", "has_sump_battery_backup"
         ]
         var mergedFlags = flags
         for key in propertyFlagKeys where mergedFlags[key] == nil {
             if property?.attributes?[key]?.stringValue == "true" {
                 mergedFlags[key] = true
             }
+        }
+        // Phase 62: driveway_material is a single-choice attribute (not
+        // yes/no), so translate "asphalt" → driveway_asphalt flag. All
+        // other values (concrete / paver / gravel / other) leave the flag
+        // unset so the seal-coat template stays gated to asphalt homes.
+        if mergedFlags["driveway_asphalt"] == nil,
+           property?.attributes?["driveway_material"]?.stringValue == "asphalt" {
+            mergedFlags["driveway_asphalt"] = true
         }
 
         // 1. Compute the correct set of templates for the confirmed subtype.
@@ -309,6 +319,18 @@ enum MaintenanceTaskReconciler {
                 }
             }()
 
+            // Phase 65 read path: fetch routing_preferences for this
+            // (household, property) once, then apply per-template within the
+            // loop. Template-level overrides beat category-level, which in
+            // turn beats the Q36 tier fallback. Nil if fetch fails — no
+            // preferences applied in that case, existing behavior preserved.
+            let routingPrefs: [RoutingPreferenceRow] = (try? await DatabaseService.shared.fetchRoutingPreferences(
+                householdId: householdId,
+                propertyId: propertyId
+            )) ?? []
+            // Phase 63 handyman preference for .diyDefault default-routing.
+            let handymanPreference = property?.attributes?["handyman_preference"]?.stringValue
+
             // Partition templates into standalone vs bundled.
             var standaloneIndices: [Int] = []
             // bundleId → [(rawIndex, rawTemplate, interpolatedTemplate)]
@@ -355,28 +377,48 @@ enum MaintenanceTaskReconciler {
                 insert.assignedContractorId = result.contractorId
                 insert.assignmentType = result.assignmentType
                 insert.needsVendor = result.needsVendor
+                // Phase 64 + 65 route resolution: template-level override →
+                // category-level preference → active contract → handyman-
+                // preference default for .diyDefault → nil (picker shows).
+                insert.assignedRoute = resolveAssignedRoute(
+                    template: template,
+                    templateKey: templateKey,
+                    category: systemCategory,
+                    preferences: routingPrefs,
+                    matchingContractor: matchingContractor,
+                    handymanPreference: handymanPreference,
+                    assignmentType: result.assignmentType
+                )
                 if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
                     added.append(result.title)
                 }
             }
 
             // --- Bundled templates ---
-            // Each bundle creates ONE task. The templateId is the bundleId
-            // so dedup works at the bundle level. If the bundle already
-            // exists (any individual template key OR the bundleId itself is
-            // in existingTemplateIds), skip the whole bundle.
+            // Each bundle creates ONE parent task. The templateId is the bundleId
+            // so dedup works at the bundle level.
+            //
+            // Phase 67 refactor: parent and child creation are now decoupled.
+            // The parent is created when neither the bundleId nor any pre-
+            // bundle member already exists. Children are created per-member
+            // regardless of parent state, so existing bundles from Phase 58
+            // get their Phase 67 children materialized on the next reconcile.
             for (bundleId, members) in bundleGroups {
-                // Skip if the bundle task already exists.
-                if existingTemplateIds.contains(bundleId) { continue }
-                // Also skip if ANY individual template in the bundle already
-                // exists as a standalone task (from a pre-bundle build).
-                let anyMemberExists = members.contains { (_, raw, _) in
+                let parentExists = existingTemplateIds.contains(bundleId)
+                // "Pre-bundle member exists" = some user has a legacy
+                // standalone task for one of the bundle children from
+                // before the bundle was introduced. In that case we skip
+                // parent creation to avoid a duplicate visit, but we STILL
+                // iterate children for per-member materialization below.
+                let anyPreBundleMemberExists = members.contains { (_, raw, _) in
                     existingTemplateIds.contains(raw.templateKey)
                 }
-                if anyMemberExists { continue }
 
                 guard let firstMember = members.first else { continue }
                 let (_, _, firstTemplate) = firstMember
+
+                // Only create parent when it's genuinely new.
+                let shouldCreateParent = !parentExists && !anyPreBundleMemberExists
 
                 // Resolve the bundle title from the first member that has one.
                 let title = members.compactMap({ $0.2.bundleTitle }).first
@@ -406,28 +448,81 @@ enum MaintenanceTaskReconciler {
                 }
 
                 let nextDue = initialDueDate(for: firstTemplate)
-                var insert = MaintenanceTaskInsert(
-                    householdId: householdId,
-                    title: bundleTitle,
-                    frequency: firstTemplate.frequency,
-                    nextDueDate: formatter.string(from: nextDue)
-                )
-                insert.propertyId = propertyId
-                insert.systemId = systemId
-                insert.description = bundleDescription
-                insert.priority = firstTemplate.priority
-                insert.isTemplateBased = true
-                insert.templateId = bundleId
-                insert.seasonalTiming = firstTemplate.seasonalTiming
-                insert.isDiy = false
-                insert.professionalRequired = true
-                insert.costRange = firstTemplate.estimatedCostRange
-                insert.assignedContractorId = contractorId
-                insert.assignmentType = "vendor"
-                insert.needsVendor = needsVendor
-                insert.notes = bundleNotes
-                if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
-                    added.append(bundleTitle)
+                if shouldCreateParent {
+                    var insert = MaintenanceTaskInsert(
+                        householdId: householdId,
+                        title: bundleTitle,
+                        frequency: firstTemplate.frequency,
+                        nextDueDate: formatter.string(from: nextDue)
+                    )
+                    insert.propertyId = propertyId
+                    insert.systemId = systemId
+                    insert.description = bundleDescription
+                    insert.priority = firstTemplate.priority
+                    insert.isTemplateBased = true
+                    insert.templateId = bundleId
+                    insert.seasonalTiming = firstTemplate.seasonalTiming
+                    insert.isDiy = false
+                    insert.professionalRequired = true
+                    insert.costRange = firstTemplate.estimatedCostRange
+                    insert.assignedContractorId = contractorId
+                    insert.assignmentType = "vendor"
+                    insert.needsVendor = needsVendor
+                    insert.notes = bundleNotes
+                    // Phase 64: bundle tasks are always vendor-routed. Category
+                    // preferences still apply (user may have overridden the
+                    // category to handyman for small-bundle work).
+                    insert.assignedRoute = resolveAssignedRoute(
+                        template: firstTemplate,
+                        templateKey: bundleId,
+                        category: systemCategory,
+                        preferences: routingPrefs,
+                        matchingContractor: matchingContractor,
+                        handymanPreference: handymanPreference,
+                        assignmentType: "vendor"
+                    )
+                    if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
+                        added.append(bundleTitle)
+                    }
+                }
+
+                // Phase 67: materialize each bundle MEMBER as its own
+                // maintenance_tasks row so HandymanVisitDetailView can
+                // query and render claims / upsells individually. Member
+                // rows carry the bundleId, `.bundledIntoParent` routing
+                // (hides from main lists until claimed), and default to
+                // assigned_route="handyman" so the visit detail's
+                // "What's included" section picks them up.
+                //
+                // Dedup: skip member insert if a row with that templateKey
+                // already exists for this property OR if its stableId
+                // conflicts. Reconciler's existing templateKey-based
+                // matching handles re-runs cleanly.
+                for (_, _, memberTemplate) in members {
+                    let memberKey = memberTemplate.templateKey
+                    if existingTemplateIds.contains(memberKey) { continue }
+                    var childInsert = MaintenanceTaskInsert(
+                        householdId: householdId,
+                        title: memberTemplate.title,
+                        frequency: memberTemplate.frequency,
+                        nextDueDate: formatter.string(from: nextDue)
+                    )
+                    childInsert.propertyId = propertyId
+                    childInsert.systemId = systemId
+                    childInsert.description = memberTemplate.description
+                    childInsert.priority = memberTemplate.priority
+                    childInsert.isTemplateBased = true
+                    childInsert.templateId = memberKey
+                    childInsert.seasonalTiming = memberTemplate.seasonalTiming
+                    childInsert.isDiy = memberTemplate.isDIY
+                    childInsert.professionalRequired = memberTemplate.professionalRequired
+                    childInsert.costRange = memberTemplate.estimatedCostRange
+                    childInsert.assignmentType = "vendor"
+                    childInsert.needsVendor = needsVendor
+                    childInsert.assignedContractorId = contractorId
+                    // Child is in the bundle → handyman route by default.
+                    childInsert.assignedRoute = "handyman"
+                    _ = try? await DatabaseService.shared.createMaintenanceTask(childInsert)
                 }
             }
         }
@@ -447,10 +542,22 @@ enum MaintenanceTaskReconciler {
                 if let tid = task.templateId, correctTemplateKeys.contains(tid) {
                     continue
                 }
-                // Skip rows that aren't template-managed at all (custom user task
-                // whose title doesn't match anything Haven knows about).
-                let isKnownTemplate = knownTitlesForCategory.contains(task.title.lowercased())
-                guard isKnownTemplate else {
+                // Phase 58 fix: previously this guard checked whether the
+                // task's title was in the CURRENT template library for the
+                // category — which meant fossils from deleted templates
+                // (Phase 58 kills/demotes) and bundle parents whose DB
+                // title is a bundleTitle not a template title, all got
+                // skipped as "custom user tasks." Actual custom user tasks
+                // never have `is_template_based = true` or a `template_id`,
+                // so trust those flags first and fall back to title
+                // matching only for pre-Phase-14 legacy rows that have
+                // neither set.
+                let isTemplateManaged: Bool = {
+                    if task.isTemplateBased == true { return true }
+                    if task.templateId != nil { return true }
+                    return knownTitlesForCategory.contains(task.title.lowercased())
+                }()
+                guard isTemplateManaged else {
                     preserved.append(task.title)
                     continue
                 }
@@ -793,6 +900,99 @@ enum MaintenanceTaskReconciler {
         let assignmentType: String
         let contractorId: UUID?
         let needsVendor: Bool
+    }
+
+    /// Phase 67: One-time backfill that materializes bundle child rows for
+    /// existing TestFlight users whose Handyman:spring / Handyman:fall parent
+    /// tasks were created BEFORE children-as-rows shipped. Walks every
+    /// property, re-runs `reconcileAll` which now creates bundle children
+    /// alongside parents. The reconciler's templateKey dedup short-circuits
+    /// on second-pass runs so this is idempotent.
+    ///
+    /// Gated via UserDefaults so it runs exactly once per install.
+    @MainActor
+    static func materializeHandymanBundleChildrenOnceIfNeeded() async {
+        // v2: v1 shipped with a reconciler that skipped child creation when
+        // the bundle parent already existed, so TestFlight users never got
+        // their children materialized. Bumping the key force-runs the
+        // fixed reconciler on every install to backfill.
+        let key = "hasRunPhase67BundleChildBackfill_v2"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var addedTotal = 0
+        for property in properties {
+            let result = await reconcileAll(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+            addedTotal += result.added.count
+        }
+
+        if addedTotal > 0 {
+            print("[Phase67Backfill] Materialized \(addedTotal) bundle children across \(properties.count) properties.")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 64 + 65 read path: resolves the assigned_route for a new task
+    /// at creation time. Precedence (highest → lowest):
+    ///   1. Template-level override (`scope_type = 'template'`, category = templateKey).
+    ///   2. Category-level preference (`scope_type = 'category'`).
+    ///   3. Active service contract → 'vendor' (implicit via `matchingContractor`).
+    ///   4. Handyman preference for `.diyDefault` templates (`has_one` → 'handyman', `does_diy` → 'diy').
+    ///   5. Template assignment type → 'vendor' / 'diy' (either → nil).
+    ///   6. nil — picker surfaces on the task.
+    static func resolveAssignedRoute(
+        template: MaintenanceTemplate,
+        templateKey: String,
+        category: String,
+        preferences: [RoutingPreferenceRow],
+        matchingContractor: ContractorRow?,
+        handymanPreference: String?,
+        assignmentType: String
+    ) -> String? {
+        // 1. Template override.
+        if let templatePref = preferences.first(where: {
+            $0.scopeType == "template" && $0.taskCategory == templateKey
+        }) {
+            return templatePref.preferredRoute
+        }
+        // 2. Category preference.
+        if let categoryPref = preferences.first(where: {
+            $0.scopeType == "category" && $0.taskCategory.caseInsensitiveCompare(category) == .orderedSame
+        }) {
+            return categoryPref.preferredRoute
+        }
+        // 3. Active contract via matchingContractor.
+        if matchingContractor != nil && assignmentType == "vendor" {
+            return "vendor"
+        }
+        // 4. Handyman-preference default for Bucket 3.
+        if template.routing == .diyDefault {
+            switch handymanPreference {
+            case "has_one": return "handyman"
+            case "does_diy": return "diy"
+            default: break
+            }
+        }
+        // 5. Template assignment type.
+        switch assignmentType {
+        case "vendor": return "vendor"
+        case "personal": return "diy"
+        default: return nil  // either → let picker show
+        }
     }
 
     private static func createTaskFields(

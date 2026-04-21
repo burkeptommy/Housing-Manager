@@ -6,6 +6,9 @@ struct DocumentUploadView: View {
     var preselectedCategory: DocumentCategory?
     var preselectedPropertyId: UUID?
     var preselectedProjectId: UUID?
+    /// Phase 58: pre-link the uploaded document to a contractor. Used by
+    /// ContractorDetailView's "Add a Bill" → Scan/Upload entry points.
+    var preselectedContractorId: UUID?
     var onComplete: (() -> Void)?
 
     @StateObject private var viewModel = DocumentUploadViewModel()
@@ -51,6 +54,9 @@ struct DocumentUploadView: View {
                 }
                 if let projId = preselectedProjectId {
                     viewModel.selectedProjectId = projId
+                }
+                if let contractorId = preselectedContractorId {
+                    viewModel.selectedContractorId = contractorId
                 }
             }
             .sheet(isPresented: $viewModel.showScanner) {
@@ -183,7 +189,7 @@ struct DocumentUploadView: View {
                         .foregroundStyle(HavenColors.navy)
                     Text("Upload a Document")
                         .font(HavenTypography.title)
-                    Text("Just pick your file — Alfred will automatically categorize it, extract dates, identify people, and fill everything in for you.")
+                    Text("Just pick your file. Alfred will automatically categorize it, extract dates, identify people, and fill everything in for you.")
                         .font(HavenTypography.subheadline)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)

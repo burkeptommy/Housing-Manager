@@ -10,6 +10,13 @@ struct HouseholdAccessView: View {
     @State private var isLoading = true
     @State private var pendingInvitations: [HouseholdInvitationRow] = []
 
+    /// Linked user the homeowner has tapped "Remove access" for. Drives
+    /// the confirmation dialog so the destructive write never fires
+    /// without an explicit second tap.
+    @State private var pendingAccessRemoval: UserRow?
+    @State private var isRemovingAccess = false
+    @State private var removalError: String?
+
     private let db = DatabaseService.shared
 
     var body: some View {
@@ -38,6 +45,13 @@ struct HouseholdAccessView: View {
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen("HouseholdAccessView")
         .task { await loadData() }
+        .modifier(RemoveAccessDialogModifier(
+            pendingRemoval: $pendingAccessRemoval,
+            removalError: $removalError,
+            onConfirm: { user in
+                Task { await removeAccess(for: user) }
+            }
+        ))
     }
 
     // MARK: - Linked Accounts
@@ -153,12 +167,48 @@ struct HouseholdAccessView: View {
 
             Spacer()
 
-            Image(systemName: "link.circle.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(HavenColors.success)
+            if isMe {
+                Image(systemName: "link.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(HavenColors.success)
+            } else {
+                Menu {
+                    Button(role: .destructive) {
+                        pendingAccessRemoval = user
+                    } label: {
+                        Label("Remove access", systemImage: "person.fill.xmark")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .disabled(isRemovingAccess)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    /// Revokes a non-self linked user's access and reloads the view.
+    /// Gated behind the `.confirmationDialog` above so the user has
+    /// already opted in before this fires. Posts no notifications yet —
+    /// the accessing device's state will refresh on next auth/session
+    /// tick and the removed user will be bounced to the address hook
+    /// the next time their app re-evaluates auth.
+    @MainActor
+    private func removeAccess(for user: UserRow) async {
+        isRemovingAccess = true
+        defer { isRemovingAccess = false }
+        do {
+            try await db.removeHouseholdAccess(userId: user.id)
+            Analytics.track(.householdAccessRevoked, [
+                "removed_user_id": user.id.uuidString,
+            ])
+            await loadData()
+        } catch {
+            removalError = error.localizedDescription
+        }
     }
 
     // MARK: - Trusted Access
@@ -350,5 +400,59 @@ struct HouseholdAccessView: View {
             print("[HouseholdAccess] Load failed: \(error)")
         }
         isLoading = false
+    }
+}
+
+/// Extracted so the confirmation-dialog + error-alert wiring doesn't push
+/// the main view body past SwiftUI's type-checker complexity limit. The
+/// pair is logically one action (remove household access + surface any
+/// failure) so they're grouped here behind a single `.modifier` call.
+private struct RemoveAccessDialogModifier: ViewModifier {
+    @Binding var pendingRemoval: UserRow?
+    @Binding var removalError: String?
+    let onConfirm: (UserRow) -> Void
+
+    private var dialogTitle: String {
+        guard let user = pendingRemoval else { return "Remove access?" }
+        let name = user.fullName?.trimmingCharacters(in: .whitespaces) ?? ""
+        return name.isEmpty ? "Remove access?" : "Remove \(name)?"
+    }
+
+    private var dialogMessage: String {
+        let name = pendingRemoval?.fullName?.trimmingCharacters(in: .whitespaces) ?? ""
+        let subject = name.isEmpty ? "This person" : name
+        return "\(subject) will lose access to every document, property, and task in this household. Their profile stays so you can invite them again later."
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog(
+                dialogTitle,
+                isPresented: Binding(
+                    get: { pendingRemoval != nil },
+                    set: { if !$0 { pendingRemoval = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                if let user = pendingRemoval {
+                    Button("Remove access", role: .destructive) {
+                        onConfirm(user)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(dialogMessage)
+            }
+            .alert(
+                "Couldn't remove access",
+                isPresented: Binding(
+                    get: { removalError != nil },
+                    set: { if !$0 { removalError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(removalError ?? "")
+            }
     }
 }

@@ -18,6 +18,14 @@ final class PropertyDetailViewModel: ObservableObject {
     @Published var justCompletedTaskId: UUID?
     @Published var isRefreshingValue = false
 
+    /// Phase 56.1: IDs of contractors linked to at least one active
+    /// routine. Used by the Contacts sub-tab's "Routines" filter chip
+    /// and the per-row "Routine" badge. Recomputed on every
+    /// `loadProperty` alongside the other fetches.
+    @Published private(set) var routineVendorIds: Set<UUID> = []
+
+    /// Guards auto-refresh so it only fires once per VM lifecycle.
+    private var hasAttemptedAutoRefresh = false
     private let db = DatabaseService.shared
 
     var systemsByCategory: [(String, [HomeSystemRow])] {
@@ -89,7 +97,7 @@ final class PropertyDetailViewModel: ObservableObject {
                 // V1: only the bare DIY tier opts every diyCapable template
                 // into the personal section. Future: per-category opt-in.
                 return vendorPreferenceTier == .diy
-            case .vendorDefault, .bundledIntoParent:
+            case .vendorDefault, .vendorOnly, .bundledIntoParent:
                 return false
             }
         }
@@ -285,23 +293,20 @@ final class PropertyDetailViewModel: ObservableObject {
             .reduce(0.0) { $0 + (($1.actualSpend ?? 0) > 0 ? $1.actualSpend! : ($1.estimatedBudget ?? 0)) }
     }
 
-    var currentSeason: String {
-        let month = Calendar.current.component(.month, from: .now)
-        switch month {
-        case 3...5: return "Spring"
-        case 6...8: return "Summer"
-        case 9...11: return "Fall"
-        default: return "Winter"
-        }
-    }
+    var currentSeason: String { Season.current().displayName }
+    var nextSeason: String { Season.current().next.displayName }
 
-    var nextSeason: String {
-        switch currentSeason {
-        case "Spring": return "Summer"
-        case "Summer": return "Fall"
-        case "Fall": return "Winter"
-        default: return "Spring"
-        }
+    /// Structured completion state for the current season.
+    /// Recomputes whenever maintenanceTasks changes (which happens on
+    /// .maintenanceTaskChanged notification via loadProperty).
+    var seasonCompletionState: SeasonCompletionState {
+        let season = Season.current()
+        let groups = SeasonalTaskGrouper.group(currentSeasonTasks, systemNameLookup: { self.systemName(for: $0) })
+        return SeasonCompletionState(
+            season: season,
+            year: Season.year(for: season),
+            groups: groups
+        )
     }
 
     var currentSeasonTasks: [MaintenanceTaskDBRow] {
@@ -319,7 +324,9 @@ final class PropertyDetailViewModel: ObservableObject {
     }
 
     var currentSeasonCompletedCount: Int {
-        currentSeasonTasks.filter { $0.lastCompletedDate != nil }.count
+        currentSeasonTasks.filter {
+            $0.lastCompletedDate != nil || $0.assignedContractorId != nil
+        }.count
     }
 
     /// Refresh the property's estimated value via ATTOM/RentCast lookup
@@ -432,6 +439,11 @@ final class PropertyDetailViewModel: ObservableObject {
 
             var update = PropertyUpdate()
             update.currentEstimatedValue = attomEstimatedValue
+            // Phase 56.2: retain the AVM range for the honest-band card
+            // treatment. When the source didn't supply a range, both stay
+            // nil and the card falls back to the point value.
+            update.currentEstimatedValueLow = result.estimatedValueLow
+            update.currentEstimatedValueHigh = result.estimatedValueHigh
             update.estimatedValueSource = result.estimatedValueSource
                 ?? (attomEstimatedValue != nil ? "computed" : nil)
             update.purchasePrice = result.lastSalePrice
@@ -491,10 +503,27 @@ final class PropertyDetailViewModel: ObservableObject {
             // Fetch projects for investment dashboard
             allProjects = (try? await db.fetchProjects(propertyId: id)) ?? []
             completedProjects = allProjects.filter { $0.status == "completed" }
+
+            // Phase 56.1: contractor ids referenced by any active routine.
+            // Powers the Contacts sub-tab "Routines" filter and the
+            // per-row "Routine" badge.
+            if let householdId = property?.householdId {
+                let routines = (try? await db.fetchRoutines(householdId: householdId)) ?? []
+                routineVendorIds = Set(routines.compactMap { $0.vendorId })
+            } else {
+                routineVendorIds = []
+            }
         } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
+
+        // Auto-fetch value from public records if the property has no
+        // estimated value yet (e.g. onboarding lookup returned nil).
+        if property?.currentEstimatedValue == nil, !hasAttemptedAutoRefresh {
+            hasAttemptedAutoRefresh = true
+            await refreshFromPublicRecords()
+        }
     }
 
     func deleteSystem(_ system: HomeSystemRow) async {

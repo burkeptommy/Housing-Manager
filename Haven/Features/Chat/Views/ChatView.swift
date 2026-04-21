@@ -217,7 +217,13 @@ struct ChatView: View {
                         .padding(.horizontal, HavenTheme.spacing24)
                 }
 
-                // Horizontal scrollable chips
+                // BUG-023 fix: `.fixedSize(horizontal: true)` locks each
+                // chip to its intrinsic width so labels never truncate
+                // mid-word ("Summarize my estate pla..." was the old
+                // render). Chips that extend past the viewport scroll
+                // into view cleanly. Also swapped to SwiftUI's native
+                // `.contentMargins` so the last chip breathes at the
+                // trailing edge, hinting scrollability.
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: HavenTheme.spacing8) {
                         ForEach(suggestedChips, id: \.self) { chip in
@@ -229,6 +235,8 @@ struct ChatView: View {
                                 Text(chip)
                                     .font(HavenTypography.bodySmall)
                                     .foregroundStyle(HavenColors.textSecondary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                                     .padding(.horizontal, HavenTheme.spacing12)
                                     .padding(.vertical, HavenTheme.spacing8)
                                     .background(HavenColors.creamLight)

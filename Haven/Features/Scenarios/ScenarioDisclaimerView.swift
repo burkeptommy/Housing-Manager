@@ -17,7 +17,7 @@ struct ScenarioDisclaimerView: View {
                     .font(HavenTypography.title2)
                     .foregroundStyle(HavenColors.textPrimary)
 
-                Text("The Scenario Studio uses AI to simulate financial, estate, and home-related scenarios based on the data you've provided.\n\nThese analyses are **for educational and informational purposes only** and do not constitute legal, financial, or tax advice.\n\nAlways consult qualified professionals — an estate attorney, financial advisor, or CPA — before making decisions based on these results.")
+                Text("The Scenario Studio uses AI to simulate financial, estate, and home-related scenarios based on the data you've provided.\n\nThese analyses are **for educational and informational purposes only** and do not constitute legal, financial, or tax advice.\n\nAlways consult qualified professionals (an estate attorney, financial advisor, or CPA) before making decisions based on these results.")
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)

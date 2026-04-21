@@ -121,7 +121,7 @@ private struct SecurityExplainerPageView: View {
 
                 // Body — Georgia Regular 15pt centered max-width 280pt
                 Text(page.body)
-                    .font(Font.custom("Inter", size: 15))
+                    .font(Font.system(size: 15))
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)

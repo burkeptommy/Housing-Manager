@@ -248,6 +248,154 @@ enum SystemCategoryRegistry {
         return all.first { $0.categoryKey.caseInsensitiveCompare(category) == .orderedSame }
     }
 
+    /// Phase 60.6: Normalize a raw category string into the registry's
+    /// canonical `categoryKey` form so vendor-coverage matching survives
+    /// case drift, verbose labels, and legacy variants.
+    ///
+    /// Why: `contractors.category` is stamped from many sources —
+    /// `HouseQuizAnswerMapper.householdContractorCategoryFor` (canonical),
+    /// `UtilityContractorMirror.serviceCategoryByProviderType` (canonical),
+    /// `VendorReviewForm.matchServiceToCategory` (close but not identical —
+    /// uses "Painting/Exterior" / "General Handyman"), and manual free-text
+    /// at creation time. `home_systems.category` is similarly user-authored
+    /// for custom systems. An exact-string match at read time (the old
+    /// `vendorCoverageItems` line 358 behavior) silently drops contractors
+    /// whose stored category differs by a space, a suffix, or a case.
+    ///
+    /// The resolution order:
+    /// 1. Trim + exact key match (fastest path — most quiz-written rows).
+    /// 2. Case-insensitive key match.
+    /// 3. Known-variant map (verbose labels, legacy forms, partial trades).
+    /// 4. Prefix-match: take everything before the first " & ", " / ", or
+    ///    comma and retry — "Plumbing & Heating" → "Plumbing".
+    /// 5. Return the trimmed original so custom user categories pass through.
+    ///
+    /// Returns nil only when the input is nil/empty after trimming.
+    static func canonical(category raw: String?) -> String? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+
+        // 1. Exact match
+        if byCategoryKey[raw] != nil { return raw }
+
+        // 2. Case-insensitive match
+        if let hit = all.first(where: { $0.categoryKey.caseInsensitiveCompare(raw) == .orderedSame }) {
+            return hit.categoryKey
+        }
+
+        // 3. Known-variant map. Keys are lowercased; values are canonical
+        //    registry keys. Covers: legacy form-strings from VendorReviewForm,
+        //    common verbose free-text ("Plumbing & Heating"), abbreviated
+        //    trades ("Security" → "Security System", "Well" → "Well System"),
+        //    chimney alias ("Fire Protection" pre-Phase-60.6 → "Chimney"),
+        //    and pool variants ("Pool" / "Pool Service" → "Pool/Spa").
+        let lower = raw.lowercased()
+        let variantMap: [String: String] = [
+            // Legacy VendorReviewForm.matchServiceToCategory strings
+            "painting/exterior":      "Painting",
+            "general handyman":       "Handyman",
+            // Phase 60.6 verbose / HNW free-text
+            "plumbing & heating":     "Plumbing",
+            "heating & plumbing":     "Plumbing",
+            "plumbing and heating":   "Plumbing",
+            "heating & cooling":      "HVAC",
+            "heating and cooling":    "HVAC",
+            "heating":                "HVAC",
+            "cooling":                "HVAC",
+            "ac":                     "HVAC",
+            "air conditioning":       "HVAC",
+            "hvac service":           "HVAC",
+            "boiler service":         "HVAC",
+            // Abbreviated trades (system category has a suffix we drop)
+            "security":               "Security System",
+            "well":                   "Well System",
+            "septic":                 "Septic System",
+            "pool":                   "Pool/Spa",
+            "pool service":           "Pool/Spa",
+            "spa":                    "Pool/Spa",
+            // Chimney alias — chimney_sweep chip used to map to Fire
+            // Protection (a sub-system with showInVendorCoverage=false).
+            // Phase 60.6 remaps the chip to "Chimney"; this entry catches
+            // already-saved rows on the old mapping.
+            "fire protection":        "Chimney",
+            "chimney sweep":          "Chimney",
+            "chimney service":        "Chimney",
+            // Trash & Recycling — common aliases
+            "trash":                  "Trash & Recycling",
+            "recycling":              "Trash & Recycling",
+            "trash and recycling":    "Trash & Recycling",
+            "waste":                  "Trash & Recycling",
+            "waste removal":          "Trash & Recycling",
+            // Pest/mosquito — common aliases
+            "pest":                   "Pest Control",
+            "extermination":          "Pest Control",
+            "mosquito":               "Mosquito & Tick",
+            "tick":                   "Mosquito & Tick",
+            "mosquito and tick":      "Mosquito & Tick",
+            // Generator — "Backup Generator" is the display name, "Generator"
+            // is the registry key.
+            "backup generator":       "Generator",
+            "generator service":      "Generator",
+            // Cleaning — common aliases
+            "cleaning":               "Cleaning Service",
+            "house cleaner":          "Cleaning Service",
+            "housekeeping":           "Cleaning Service",
+            "maid":                   "Cleaning Service",
+            "maid service":           "Cleaning Service",
+            // Landscaping aliases
+            "lawn":                   "Landscaping",
+            "lawn care":              "Landscaping",
+            "lawn service":           "Landscaping",
+            "landscaper":             "Landscaping",
+            "hardscape":              "Landscaping",
+            "masonry":                "Landscaping",
+            // Tree service
+            "arborist":               "Tree Service",
+            "tree":                   "Tree Service",
+            // Snow / winter
+            "snow":                   "Snow Removal",
+            "snow plow":              "Snow Removal",
+            "snow plowing":           "Snow Removal",
+            "plowing":                "Snow Removal",
+            // Pet waste
+            "pet waste removal":      "Pet Waste",
+            "dog waste":              "Pet Waste",
+            "dog poop":               "Pet Waste",
+        ]
+        if let mapped = variantMap[lower] {
+            return mapped
+        }
+
+        // 4. Prefix split. "Plumbing & Heating" / "Plumbing / Heating" /
+        //    "Plumbing, Heating" → try the lead segment.
+        let splitters = [" & ", " / ", ", ", " and "]
+        for splitter in splitters {
+            if let range = lower.range(of: splitter) {
+                let lead = String(lower[..<range.lowerBound])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let mapped = variantMap[lead] { return mapped }
+                if let hit = all.first(where: { $0.categoryKey.caseInsensitiveCompare(lead) == .orderedSame }) {
+                    return hit.categoryKey
+                }
+            }
+        }
+
+        // 5. Unknown — return trimmed original so custom user categories
+        //    still work in downstream equality checks (a user-authored
+        //    category will equal itself on both sides).
+        return raw
+    }
+
+    /// Phase 60.6: canonical equality. Both sides normalized via
+    /// `canonical(category:)` so "Plumbing" matches "plumbing", "Plumbing
+    /// & Heating", and "PLUMBING" alike. Nil handling: two nils are not
+    /// equal (a contractor with no category isn't a match for anything).
+    static func categoriesMatch(_ a: String?, _ b: String?) -> Bool {
+        guard let ca = canonical(category: a),
+              let cb = canonical(category: b) else { return false }
+        return ca == cb
+    }
+
     /// Whether a system category should appear in the Vendor Coverage list.
     /// Sub-systems and child systems (parentSystemId != nil) are excluded.
     static func showInVendorCoverage(category: String, parentSystemId: UUID?) -> Bool {
@@ -304,15 +452,31 @@ enum SystemCategoryRegistry {
         // Step 1: Build a map of category -> coverage info from existing systems
         var categoryCoverage: [String: VendorCoverageItem] = [:]
 
-        // Related categories (contractor for one covers related systems)
+        // Related categories (contractor for one covers related systems).
+        // Phase 60.6: keys and values here are canonical registry keys
+        // (or intentional aliases like "Heating"/"Air Conditioning" for
+        // legacy system rows whose category didn't canonicalize to "HVAC").
         let relatedCategories: [String: Set<String>] = [
             "Landscaping": ["Irrigation"],
             "HVAC": ["Water Heater", "Heating", "Air Conditioning"],
             "Plumbing": ["Water Heater"],
             "Electrical": ["Generator", "EV Charger"],
-            "Roofing": ["Gutters"],
+            "Roofing": ["Gutters", "Gutter Cleaning"],
         ]
-        let directCategories = Set(contractors.compactMap(\.category))
+        // Phase 60.6: canonicalize every contractor category before
+        // matching so "Plumbing & Heating" / "plumbing" / nil-vs-set
+        // variants all collapse to a single registry key. Contractors
+        // with a nil category (never stamped at save time) are excluded
+        // from category-based matching here; they can still cover a
+        // system via `preferredContractorId` (path 1) or an explicit
+        // task assignment (path 2) above.
+        let canonicalContractorCategories: [UUID: String] = Dictionary(
+            uniqueKeysWithValues: contractors.compactMap { c in
+                guard let canonical = SystemCategoryRegistry.canonical(category: c.category) else { return nil }
+                return (c.id, canonical)
+            }
+        )
+        let directCategories = Set(canonicalContractorCategories.values)
         var expandedContractorCategories = directCategories
         for cat in directCategories {
             if let related = relatedCategories[cat] {
@@ -353,9 +517,24 @@ enum SystemCategoryRegistry {
                 vendorLogoURL = contractor.logoUrl
                 vendorBrandColor = contractor.brandColor
             }
-            // Check if household has a contractor whose category matches
-            else if expandedContractorCategories.contains(system.category),
-                    let contractor = contractors.first(where: { $0.category == system.category }) {
+            // Check if household has a contractor whose category matches.
+            // Phase 60.6: both the system category and the contractor
+            // category are canonicalized before comparison. The system
+            // side uses `canonical(category:)` so legacy verbose system
+            // names ("Security" on an old row) collapse to the registry
+            // key ("Security System"). The contractor side uses the
+            // pre-canonicalized map built above. Expansion runs on the
+            // canonical system key so Water Heater systems match a
+            // Plumbing-category contractor via `relatedCategories`.
+            else if
+                let canonicalSystemCategory = SystemCategoryRegistry.canonical(category: system.category),
+                expandedContractorCategories.contains(canonicalSystemCategory),
+                let match = canonicalContractorCategories.first(where: { entry in
+                    entry.value == canonicalSystemCategory
+                        || (relatedCategories[entry.value]?.contains(canonicalSystemCategory) ?? false)
+                }),
+                let contractor = contractorById[match.key]
+            {
                 isCovered = true
                 vendorName = contractor.companyName
                 vendorLogoURL = contractor.logoUrl

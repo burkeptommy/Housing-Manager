@@ -794,34 +794,51 @@ enum HavenSupabase {
         let propertyId: String?
         let householdId: String
         let vehicleId: String?
+        /// Phase 59: optional vendor hint. When present (e.g. user uploads
+        /// from ContractorDetailView), process-invoice skips vendor matching
+        /// and stamps this contractor with "high" confidence.
+        let preferredContractorId: String?
 
         enum CodingKeys: String, CodingKey {
             case documentId = "document_id"
             case propertyId = "property_id"
             case householdId = "household_id"
             case vehicleId = "vehicle_id"
+            case preferredContractorId = "preferred_contractor_id"
         }
     }
 
     /// Process a home service invoice via AI to extract completed tasks, new systems, and service details.
-    static func processInvoice(documentId: String, propertyId: String, householdId: String) async throws -> InvoiceProcessingResult {
+    static func processInvoice(
+        documentId: String,
+        propertyId: String,
+        householdId: String,
+        preferredContractorId: String? = nil
+    ) async throws -> InvoiceProcessingResult {
         let body = ProcessInvoiceRequest(
             documentId: documentId,
             propertyId: propertyId,
             householdId: householdId,
-            vehicleId: nil
+            vehicleId: nil,
+            preferredContractorId: preferredContractorId
         )
         let data = try await callEdgeFunction(name: "process-invoice", body: body, timeoutSeconds: 120)
         return try JSONDecoder().decode(InvoiceProcessingResult.self, from: data)
     }
 
     /// Process a vehicle service invoice via AI to extract completed tasks, mileage, and service details.
-    static func processVehicleInvoice(documentId: String, vehicleId: String, householdId: String) async throws -> InvoiceProcessingResult {
+    static func processVehicleInvoice(
+        documentId: String,
+        vehicleId: String,
+        householdId: String,
+        preferredContractorId: String? = nil
+    ) async throws -> InvoiceProcessingResult {
         let body = ProcessInvoiceRequest(
             documentId: documentId,
             propertyId: nil,
             householdId: householdId,
-            vehicleId: vehicleId
+            vehicleId: vehicleId,
+            preferredContractorId: preferredContractorId
         )
         let data = try await callEdgeFunction(name: "process-invoice", body: body, timeoutSeconds: 120)
         return try JSONDecoder().decode(InvoiceProcessingResult.self, from: data)
@@ -867,6 +884,38 @@ enum HavenSupabase {
             timeoutSeconds: 15
         )
         return try JSONDecoder().decode(BrandLogoResponse.self, from: data)
+    }
+
+    /// Two-step brand logo lookup: try domain first, fall back to name search.
+    /// Returns a response with logoUrl if found, nil if both attempts fail.
+    static func fetchBrandLogoWithFallback(domain: String?, companyName: String) async -> BrandLogoResponse? {
+        // Step 1: Try domain lookup if we have a website
+        if let domain, !domain.isEmpty {
+            let cleanDomain = domain
+                .replacingOccurrences(of: "https://", with: "")
+                .replacingOccurrences(of: "http://", with: "")
+                .components(separatedBy: "/").first ?? domain
+            if let response = try? await fetchBrandLogo(domain: cleanDomain),
+               response.logoUrl != nil {
+                return response
+            }
+        }
+        // Step 2: Fall back to company name search (full name)
+        if let response = try? await fetchBrandLogo(query: companyName),
+           response.logoUrl != nil {
+            return response
+        }
+        // Step 3: Try shortened name (strip LLC, Inc, suffixes, and text after commas)
+        let shortened = companyName
+            .components(separatedBy: ",").first?
+            .trimmingCharacters(in: .whitespaces) ?? companyName
+        if shortened != companyName, shortened.count >= 3 {
+            if let response = try? await fetchBrandLogo(query: shortened),
+               response.logoUrl != nil {
+                return response
+            }
+        }
+        return nil
     }
 
     // MARK: - Phase 19n: Find Local Vendors

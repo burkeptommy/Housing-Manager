@@ -37,6 +37,8 @@ struct UpdateHomeDetailsSheet: View {
     @State private var hasRadonMitigation = false
     @State private var hasPoolSafetyFence = false
     @State private var hasScheduledValuables = false
+    @State private var hasHeatCables = false
+    @State private var hasDehumidifier = false
 
     /// Snapshot of every flag at load time. Used to compute the diff on save
     /// so the confirmation sheet only shows what actually changed.
@@ -63,14 +65,15 @@ struct UpdateHomeDetailsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
-                    introCard
+                    introHeader
 
                     if regionalPack == .northeast {
-                        northeastRecommendationsCard
+                        northeastSection
                     }
 
-                    systemsCard
-                    valuablesCard
+                    systemsSection
+                    valuablesSection
+                    recommendedServicesLink
 
                     if let error {
                         Text(error)
@@ -78,34 +81,38 @@ struct UpdateHomeDetailsSheet: View {
                             .foregroundStyle(HavenColors.critical)
                     }
                 }
-                .padding(.horizontal, HavenTheme.spacing20)
-                .padding(.vertical, HavenTheme.spacing20)
+                .padding(.horizontal, HavenTheme.spacing16)
+                .padding(.vertical, HavenTheme.spacing16)
             }
             .background(HavenColors.background.ignoresSafeArea())
-            .navigationTitle("Update home details")
+            .navigationTitle("Home Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(HavenColors.action)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { prepareSave() }
+                        .foregroundStyle(HavenColors.action)
                         .disabled(isLoading || isSaving)
                 }
             }
-            .overlay(alignment: .bottom) {
+            .overlay(alignment: .top) {
                 if let toast = confirmationToast {
                     Text(toast)
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textOnNavy)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(HavenColors.navy800)
-                        .clipShape(Capsule())
-                        .padding(.bottom, 32)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .padding(.horizontal, HavenTheme.spacing16)
+                        .padding(.vertical, HavenTheme.spacing8)
+                        .background(HavenColors.creamLight)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        .havenShadow()
+                        .padding(.top, HavenTheme.spacing8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
+            .animation(.easeInOut, value: confirmationToast)
             .task { await load() }
             .sheet(isPresented: $showDiffSheet) {
                 if let diff = pendingDiff {
@@ -122,92 +129,185 @@ struct UpdateHomeDetailsSheet: View {
 
     // MARK: - Sections
 
-    private var introCard: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                Text("Tell Haven what applies to your home.")
-                    .font(HavenTypography.title3)
-                    .foregroundStyle(HavenColors.textPrimary)
-                Text("Toggle anything you have. Haven will add the right vendor tasks to your schedule — nothing changes until you save.")
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textSecondary)
-            }
-        }
+    /// Top-of-screen intro, styled like the subtitle paragraph at the top
+    /// of `RecommendedServicesView.mainList`.
+    private var introHeader: some View {
+        Text("Toggle anything you have. Haven will add the right vendor tasks to your schedule. Nothing changes until you save.")
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, HavenTheme.spacing8)
+            .padding(.bottom, HavenTheme.spacing8)
     }
 
-    private var northeastRecommendationsCard: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                HStack(spacing: 6) {
-                    Image(systemName: "location.fill")
-                        .foregroundStyle(HavenColors.navy800)
-                    Text("Recommended for Northeast homes")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textPrimary)
-                }
-                Text("Your property is in the granite belt / cold-climate region. These are common for HNW homes in CT, NH, MA, and surrounding states.")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.textSecondary)
-
-                Toggle("Radon mitigation fan installed", isOn: $hasRadonMitigation)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-                Toggle("Whole-home humidifier on HVAC", isOn: $hasHumidifier)
-                    .font(HavenTypography.bodySmall)
-                    .tint(HavenColors.navy800)
-
-                Text("Your annual radon test will auto-schedule since you're in the Northeast. Turn on a mitigation fan here to add the fall verification.")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.textTertiary)
-            }
-        }
-    }
-
-    private var systemsCard: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                Text("SYSTEMS")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-
-                Toggle("EV charger (Level 2)", isOn: $hasEVCharger)
-                    .tint(HavenColors.navy800)
-                Toggle("Smart water leak detector (Moen Flo, Phyn, etc.)", isOn: $hasLeakDetector)
-                    .tint(HavenColors.navy800)
-                Toggle("Central vacuum system", isOn: $hasCentralVacuum)
-                    .tint(HavenColors.navy800)
-                Toggle("Built-in outdoor grill", isOn: $hasBuiltinGrill)
-                    .tint(HavenColors.navy800)
-                Toggle("Landscape / outdoor lighting", isOn: $hasOutdoorLighting)
-                    .tint(HavenColors.navy800)
-                Toggle("Whole-house water filter", isOn: $hasWholeHouseFilter)
-                    .tint(HavenColors.navy800)
-                Toggle("Pool safety fence with self-closing gate", isOn: $hasPoolSafetyFence)
-                    .tint(HavenColors.navy800)
-                    .disabled(!hasPool)
-                if !hasPool {
-                    Text("Add a pool system first to enable the safety fence inspection.")
+    private var northeastSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            sectionHeader(icon: "location.fill",
+                          title: "Recommended for Northeast Homes")
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    Text("Your property is in the granite belt and cold-climate region. These are common for HNW homes in CT, NH, MA, and surrounding states.")
                         .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.textTertiary)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    toggleRow(title: "Radon mitigation fan",
+                              subtitle: "Adds a fall verification check during your handyman visit.",
+                              isOn: $hasRadonMitigation)
+                    Divider()
+                    toggleRow(title: "Whole-home humidifier on HVAC",
+                              subtitle: "Adds an annual humidifier service visit.",
+                              isOn: $hasHumidifier)
                 }
             }
         }
     }
 
-    private var valuablesCard: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                Text("VALUABLES")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-                Toggle("Scheduled valuables rider (jewelry, art, wine)", isOn: $hasScheduledValuables)
-                    .tint(HavenColors.navy800)
-                Text("Turning this on surfaces a periodic appraisal recommendation in the Life tab's estate readiness scorecard.")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.textTertiary)
+    private var systemsSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            sectionHeader(icon: "wrench.and.screwdriver.fill", title: "Systems")
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    toggleRow(title: "EV charger (Level 2)",
+                              subtitle: "Adds an annual inspection of the charger and dedicated circuit.",
+                              isOn: $hasEVCharger)
+                    Divider()
+                    toggleRow(title: "Smart water leak detector",
+                              subtitle: "Moen Flo, Phyn, or similar. Tested during your spring handyman visit.",
+                              isOn: $hasLeakDetector)
+                    Divider()
+                    toggleRow(title: "Central vacuum system",
+                              subtitle: "Serviced during your fall handyman visit.",
+                              isOn: $hasCentralVacuum)
+                    Divider()
+                    toggleRow(title: "Built-in outdoor grill",
+                              subtitle: "Adds an annual grill service before grilling season.",
+                              isOn: $hasBuiltinGrill)
+                    Divider()
+                    toggleRow(title: "Landscape / outdoor lighting",
+                              subtitle: "Adds an annual lighting specialist visit.",
+                              isOn: $hasOutdoorLighting)
+                    Divider()
+                    toggleRow(title: "Whole-house water filter",
+                              subtitle: "Filter swap folded into your handyman visits.",
+                              isOn: $hasWholeHouseFilter)
+                    Divider()
+                    toggleRow(title: "Pool safety fence",
+                              subtitle: hasPool
+                                  ? "Adds an annual safety fence and gate inspection."
+                                  : "Add a pool system first to enable.",
+                              isOn: $hasPoolSafetyFence,
+                              disabled: !hasPool)
+                    Divider()
+                    toggleRow(title: "Heat cables on roof or gutters",
+                              subtitle: "Adds a fall-tested inspection so cables are ready before freeze-up.",
+                              isOn: $hasHeatCables)
+                    Divider()
+                    toggleRow(title: "Whole-home dehumidifier",
+                              subtitle: "Adds an annual dehumidifier service visit in spring.",
+                              isOn: $hasDehumidifier)
+                }
             }
+        }
+    }
+
+    private var valuablesSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            sectionHeader(icon: "sparkles", title: "Valuables")
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    toggleRow(title: "Scheduled valuables rider",
+                              subtitle: "Jewelry, art, or wine. Surfaces a periodic appraisal recommendation in your estate readiness scorecard.",
+                              isOn: $hasScheduledValuables)
+                }
+            }
+        }
+    }
+
+    /// Phase 59: cross-link to Recommended for You so users who toggle on
+    /// new systems can immediately see what services Haven suggests as a
+    /// consequence. Matches the row styling used inside
+    /// `RecommendedServicesView`.
+    private var recommendedServicesLink: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            sectionHeader(icon: "sparkles.rectangle.stack.fill",
+                          title: "Explore Recommended Services")
+            NavigationLink {
+                RecommendedServicesView(
+                    householdId: property.householdId,
+                    propertyId: property.id
+                )
+            } label: {
+                HavenCard {
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(width: 36, height: 36)
+                            .background(HavenColors.beige200)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Recommended for your home")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Browse services Haven thinks your home could benefit from.")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .multilineTextAlignment(.leading)
+                        }
+
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Reusable section header — mirrors the pattern in
+    /// `RecommendedServicesView.mainList` so both screens share a visual
+    /// rhythm (SF icon in navy + CAPS title with letter tracking).
+    private func sectionHeader(icon: String, title: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundStyle(HavenColors.navy700)
+                .font(.caption)
+            Text(title.uppercased())
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textTertiary)
+                .tracking(1.5)
+            Spacer()
+        }
+        .padding(.leading, HavenTheme.spacing8)
+    }
+
+    /// Single toggle row with a primary label + secondary explainer
+    /// beneath. Gives each toggle the same visual weight as a
+    /// `RecommendedServicesView` card row.
+    private func toggleRow(title: String,
+                           subtitle: String?,
+                           isOn: Binding<Bool>,
+                           disabled: Bool = false) -> some View {
+        HStack(alignment: .center, spacing: HavenTheme.spacing12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(disabled ? HavenColors.textTertiary : HavenColors.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(HavenColors.action)
+                .disabled(disabled)
         }
     }
 
@@ -246,6 +346,8 @@ struct UpdateHomeDetailsSheet: View {
         hasRadonMitigation = readFlag("has_radon_mitigation")
         hasPoolSafetyFence = readFlag("has_pool_safety_fence")
         hasScheduledValuables = readFlag("has_scheduled_valuables")
+        hasHeatCables = readFlag("has_heat_cables")
+        hasDehumidifier = readFlag("has_dehumidifier")
 
         initialFlags = [
             "has_humidifier": hasHumidifier,
@@ -257,7 +359,9 @@ struct UpdateHomeDetailsSheet: View {
             "has_whole_house_filter": hasWholeHouseFilter,
             "has_radon_mitigation": hasRadonMitigation,
             "has_pool_safety_fence": hasPoolSafetyFence,
-            "has_scheduled_valuables": hasScheduledValuables
+            "has_scheduled_valuables": hasScheduledValuables,
+            "has_heat_cables": hasHeatCables,
+            "has_dehumidifier": hasDehumidifier
         ]
     }
 
@@ -292,7 +396,9 @@ struct UpdateHomeDetailsSheet: View {
             "has_whole_house_filter": hasWholeHouseFilter,
             "has_radon_mitigation": hasRadonMitigation,
             "has_pool_safety_fence": hasPoolSafetyFence,
-            "has_scheduled_valuables": hasScheduledValuables
+            "has_scheduled_valuables": hasScheduledValuables,
+            "has_heat_cables": hasHeatCables,
+            "has_dehumidifier": hasDehumidifier
         ]
     }
 
@@ -341,7 +447,7 @@ struct UpdateHomeDetailsSheet: View {
         let changes = result.added.count + result.removed.count
         let message: String
         if changes == 0 {
-            message = "Saved — no new tasks"
+            message = "Saved. No new tasks."
         } else if result.removed.isEmpty {
             message = "Added \(result.added.count) task\(result.added.count == 1 ? "" : "s")"
         } else if result.added.isEmpty {
@@ -402,7 +508,9 @@ struct SubtypeReviewDiffSheet: View {
         "has_whole_house_filter": "Whole-house water filter",
         "has_radon_mitigation": "Radon mitigation fan",
         "has_pool_safety_fence": "Pool safety fence",
-        "has_scheduled_valuables": "Scheduled valuables rider"
+        "has_scheduled_valuables": "Scheduled valuables rider",
+        "has_heat_cables": "Heat cables on roof or gutters",
+        "has_dehumidifier": "Whole-home dehumidifier"
     ]
 
     private static let previewByKey: [String: String] = [
@@ -415,7 +523,9 @@ struct SubtypeReviewDiffSheet: View {
         "has_whole_house_filter": "Adds the filter swap to your handyman visits.",
         "has_radon_mitigation": "Adds the fall fan verification + annual radon test.",
         "has_pool_safety_fence": "Adds the annual safety fence inspection.",
-        "has_scheduled_valuables": "Surfaces the appraisal recommendation in the Life tab."
+        "has_scheduled_valuables": "Surfaces the appraisal recommendation in the Life tab.",
+        "has_heat_cables": "Adds a fall inspection so cables are ready before freeze-up.",
+        "has_dehumidifier": "Adds an annual dehumidifier service in spring."
     ]
 
     var body: some View {

@@ -38,15 +38,27 @@ struct ValuationRange {
 
     // MARK: - Compute from PropertyRow (post-save path)
 
-    /// Build a range from a saved property row. PropertyRow only persists
-    /// the conservative single number, so the high end is always
-    /// synthesized by widening the value upward. Confidence (when set)
-    /// controls how aggressively to widen.
+    /// Build a range from a saved property row. Phase 56.2: when the
+    /// ATTOM fallback ladder persisted a real AVM band
+    /// (`currentEstimatedValueLow` / `currentEstimatedValueHigh`), return
+    /// it verbatim — no more synthesizing. Only fall back to the
+    /// confidence-widened synthesis when the band is missing (legacy
+    /// rows, or sources that didn't supply a range).
     static func compute(for property: PropertyRow) -> ValuationRange? {
-        // Manual override: respect the user's value verbatim.
+        // Manual override: respect the user's value verbatim. The
+        // persisted band (if any) is ignored so we never bracket a
+        // user-typed number with a stale machine range.
         if property.estimatedValueSource == "manual",
            let value = property.currentEstimatedValue, value > 0 {
             return ValuationRange(low: value, high: value, isSynthesized: false, isManual: true)
+        }
+
+        // Phase 56.2: real ATTOM band persisted — use it. Honest range,
+        // no synthesis. Guard against sentinel / degenerate values.
+        if let low = property.currentEstimatedValueLow,
+           let high = property.currentEstimatedValueHigh,
+           low > 0, high > low {
+            return ValuationRange(low: low, high: high, isSynthesized: false, isManual: false)
         }
 
         guard let value = property.currentEstimatedValue, value > 0 else { return nil }
@@ -55,9 +67,16 @@ struct ValuationRange {
             source: property.estimatedValueSource,
             confidence: property.estimatedValueConfidence
         )
+        // Phase 56.2: centered synthesis. The stored `currentEstimatedValue`
+        // is the midpoint (from the Build 84 ATTOM ladder), so treating it
+        // as the low end and widening upward made "$955K" look like a
+        // floor instead of a center. Now we spread ±halfBand around the
+        // midpoint so "$860K to $1.05M" reads correctly as a confidence
+        // interval around a $955K best guess.
+        let halfBand = max(0, (widening - 1.0) / 2)
         return ValuationRange(
-            low: value,
-            high: value * widening,
+            low: max(0, value * (1 - halfBand)),
+            high: value * (1 + halfBand),
             isSynthesized: true,
             isManual: false
         )
@@ -84,9 +103,14 @@ struct ValuationRange {
             source: lookup.estimatedValueSource,
             confidence: lookup.estimatedValueConfidence
         )
+        // Phase 56.2: centered synthesis around the midpoint — see the
+        // matching comment in `compute(for:)`. Keeps hook-screen and
+        // saved-card rendering consistent when no actual AVM band is
+        // available.
+        let halfBand = max(0, (widening - 1.0) / 2)
         return ValuationRange(
-            low: value,
-            high: value * widening,
+            low: max(0, value * (1 - halfBand)),
+            high: value * (1 + halfBand),
             isSynthesized: true,
             isManual: false
         )
@@ -122,6 +146,14 @@ struct ValuationRange {
 
     /// "$1,050,000" — the optimistic high end formatted as full currency.
     var formattedHigh: String { Self.formatFull(high) }
+
+    /// "$962,500" — the midpoint of the range, formatted as full currency.
+    /// Phase 60.1 trust fix: used by PropertyHookView Page 1 AND
+    /// PropertyRecapCard as the shared hero value so both surfaces agree.
+    /// Previously Page 1 used `formattedHigh` while the recap used the
+    /// persisted midpoint, which made the same property appear to change
+    /// value mid-funnel (a $570K swing on HNW homes, HNW users notice).
+    var formattedMidpoint: String { Self.formatFull(midpoint) }
 
     /// "$875K" — the low end in compact form for caption rows.
     var formattedLowCompact: String { low.formattedCompactCurrency() }

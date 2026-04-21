@@ -43,13 +43,37 @@ final class ChatViewModel: ObservableObject {
 
             let rows = try await db.fetchChatMessages(limit: 50)
             // Decrypt messages (backwards compat: plaintext messages pass through unchanged)
-            messages = rows.reversed().map { row in
+            let decrypted: [ChatMessage] = rows.reversed().map { row in
                 if let hhId = householdId {
                     let decryptedContent = DocumentEncryption.shared.decryptString(row.content, householdId: hhId)
                     return ChatMessage(from: row, decryptedContent: decryptedContent)
                 }
                 return ChatMessage(from: row)
             }
+            // Bug B4 fix: after a fresh install the per-device key is lost
+            // and ALL historical messages decrypt to the "🔒 This message
+            // was encrypted with a key that's no longer on this device…"
+            // placeholder. Instead of rendering 40 identical bubbles that
+            // look like a system glitch, collapse consecutive placeholders
+            // into ONE sentinel bubble the UI renders as a single
+            // explanatory card. Plaintext + successfully-decrypted messages
+            // pass through untouched.
+            let encryptedPlaceholderPrefix = "🔒 This message was encrypted"
+            var collapsed: [ChatMessage] = []
+            var lastWasPlaceholder = false
+            for message in decrypted {
+                let isPlaceholder = message.content.hasPrefix(encryptedPlaceholderPrefix)
+                if isPlaceholder {
+                    if !lastWasPlaceholder {
+                        collapsed.append(message)
+                    }
+                    lastWasPlaceholder = true
+                } else {
+                    collapsed.append(message)
+                    lastWasPlaceholder = false
+                }
+            }
+            messages = collapsed
         } catch {
             self.error = error.localizedDescription
         }

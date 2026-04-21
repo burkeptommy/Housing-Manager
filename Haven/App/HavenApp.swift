@@ -9,9 +9,9 @@ struct HavenApp: App {
 
     init() {
         configureNavigationBarAppearance()
-        // Cream canvas everywhere — prevent white flashes during transitions
+        // Pearl white canvas everywhere — prevent flashes during transitions
         UIWindow.appearance().backgroundColor = UIColor(
-            red: 0.949, green: 0.933, blue: 0.898, alpha: 1.0
+            red: 0.973, green: 0.976, blue: 0.980, alpha: 1.0
         )
         #if DEBUG
         // TEMPORARY: verify font PostScript names after bundling Fraunces + Inter.
@@ -29,7 +29,7 @@ struct HavenApp: App {
             ContentView()
                 .environmentObject(appState)
                 .background(HavenColors.cream)
-                .tint(HavenColors.navy800)
+                .tint(HavenColors.action)
                 .task {
                     appState.initialize()
                     performSecurityChecks()
@@ -154,11 +154,11 @@ struct HavenApp: App {
     }
 
     private func configureNavigationBarAppearance() {
-        // Standard appearance — opaque cream background
+        // Standard appearance — opaque pearl white background
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Color.havenCream)
-        appearance.shadowColor = UIColor(red: 0.890, green: 0.851, blue: 0.776, alpha: 0.3)
+        appearance.shadowColor = UIColor(red: 0.847, green: 0.855, blue: 0.875, alpha: 0.3)
 
         // Large title: Fraunces Bold (WONK=0 via HavenTypography helper so
         // the decorative "f" glyph never bleeds into nav titles).

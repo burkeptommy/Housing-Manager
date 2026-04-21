@@ -23,7 +23,7 @@ struct HouseQuizProgressBar: View {
                         .fill(HavenColors.beige200)
                         .frame(height: 10)
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(HavenColors.navy800)
+                        .fill(HavenColors.action)
                         .frame(width: max(0, geo.size.width * progress), height: 10)
                         .animation(HavenTheme.animationStandard, value: progress)
                 }

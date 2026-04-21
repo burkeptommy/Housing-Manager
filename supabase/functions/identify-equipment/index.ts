@@ -400,6 +400,13 @@ Respond with ONLY valid JSON in this exact format:
         manufacturer: extracted.manufacturer,
         model_number: extracted.model_number,
         serial_number: extracted.serial_number,
+        // Build 94: Forward the extracted product_type so no-catalog-match
+        // cases still hand iOS a subtype hint ("Refrigerator" / "Wall
+        // Oven"). When a catalog match exists, iOS still prefers
+        // `catalog_match.category.name` because it's been through the
+        // normalized equipment_categories table — this is the fallback
+        // for photo-identified items that don't hit the catalog.
+        product_type: extracted.product_type ?? null,
         confidence: extracted.confidence,
         raw_text: extracted.raw_text,
         catalog_match: catalogMatch,

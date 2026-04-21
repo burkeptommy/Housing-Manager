@@ -240,7 +240,7 @@ final class AuthService: ObservableObject {
     /// let the user fix their profile later from settings. The household
     /// link is the critical write that has to happen here — losing the
     /// email/name on a brand-new account row is recoverable.
-    func completeOnboarding(householdId: UUID) async throws {
+    func completeOnboarding(householdId: UUID, fullName overrideName: String? = nil) async throws {
         guard let userId = currentUserId else {
             throw NSError(domain: "AuthService", code: 0, userInfo: [NSLocalizedDescriptionKey: "No authenticated user found."])
         }
@@ -249,7 +249,11 @@ final class AuthService: ObservableObject {
         // we get nil after 3 seconds and proceed without email/fullName.
         let session = await HavenSupabase.safeSession(timeout: 3.0)
         let email = session?.user.email ?? ""
-        let fullName = session?.user.userMetadata["full_name"]?.value as? String
+        let sessionName = session?.user.userMetadata["full_name"]?.value as? String
+        // Prefer the name passed from the ViewModel (which has the validated
+        // onboarding fields) over the session metadata, which can be nil when
+        // the session refresh times out.
+        let fullName = overrideName ?? sessionName
 
         // Ensure the user row exists, then update it.
         // The row may be missing if a prior signup had its INSERT rolled back by
@@ -266,7 +270,7 @@ final class AuthService: ObservableObject {
                 role: "member"
             ))
         }
-        _ = try await DatabaseService.shared.updateUser(id: userId, UserUpdate(householdId: householdId))
+        _ = try await DatabaseService.shared.updateUser(id: userId, UserUpdate(householdId: householdId, fullName: fullName))
         // Apr 7, 2026 (build 80): DO NOT flip `needsOnboarding = false` here.
         // This used to fire mid-chain, which caused ContentView to re-route
         // OUT of OnboardingView before `OnboardingViewModel.complete()` had

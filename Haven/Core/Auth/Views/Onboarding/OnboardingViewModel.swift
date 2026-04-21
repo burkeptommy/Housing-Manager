@@ -260,15 +260,56 @@ final class OnboardingViewModel: ObservableObject {
         }
     }
 
-    /// Accept the pending invitation — skip household creation
-    func acceptInvitation(authService: AuthService) async {
+    /// True when the accepting user's auth session email differs from the
+    /// invitation's `invited_email`. Used by `OnboardingView` to surface a
+    /// soft-confirm banner so couples that share one physical inbox but
+    /// different login identities (e.g. invite sent to
+    /// `godelmelinda@gmail.com`, user signs in with
+    /// `mindy.burke@icloud.com`) know they're joining the intended
+    /// household instead of silently creating a new one.
+    var invitationEmailMismatch: Bool {
+        guard let invitation = pendingInvitation else { return false }
+        let invited = invitation.invitedEmail.trimmingCharacters(in: .whitespaces).lowercased()
+        let session = primaryEmail.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !invited.isEmpty, !session.isEmpty else { return false }
+        return invited != session
+    }
+
+    /// Accept the pending invitation and join the inviter's household.
+    ///
+    /// Build 94 rewrite: the old version only updated `users.household_id`
+    /// and flipped the invitation status. It never wrote `users.full_name`
+    /// and never linked `family_members.linked_user_id`, which is why
+    /// invited spouses showed up as "Member" in task assignment and the
+    /// dashboard greeted them with the homeowner's name. It also didn't
+    /// refresh `AppState.primaryProperty`, so `ContentView` bounced the
+    /// accepting user to `AddressConfirmationIntercept` until they
+    /// relaunched the app.
+    ///
+    /// New flow:
+    /// 1. Route the household-link write through `AuthService.completeOnboarding`
+    ///    so `users.full_name` is populated on the same code path new signups
+    ///    use. Name sourced from `primaryFirstName`/`primaryLastName`, which
+    ///    `prefillFromAuth` has already loaded from UserDefaults / session
+    ///    metadata.
+    /// 2. Call the extended `DatabaseService.acceptInvitation` which flips
+    ///    the invitation status AND stamps `family_members.linked_user_id`
+    ///    when the invitation row carries a `family_member_id`.
+    /// 3. Post-accept, reconcile the user / family_member name pair so
+    ///    whichever side had a value backfills the empty one. Covers the
+    ///    edge case where Apple Sign In returned no name but the homeowner
+    ///    had already typed the invitee's name into the family card.
+    /// 4. Hydrate `AppState.primaryProperty` before flipping
+    ///    `needsOnboarding = false` so `ContentView` routes straight to
+    ///    `MainTabView`.
+    func acceptInvitation(authService: AuthService, appState: AppState? = nil) async {
         guard let invitation = pendingInvitation else { return }
         isLoading = true
         errorMessage = nil
 
         do {
-            // Apr 7, 2026: bounded session lookup so a stalled refresh
-            // can't trap the invited-user flow.
+            // Bounded session lookup so a stalled refresh can't trap the
+            // invited-user flow.
             guard let session = await HavenSupabase.safeSession(timeout: 3.0) else {
                 errorMessage = "Authentication is taking too long. Please try again."
                 isLoading = false
@@ -276,17 +317,50 @@ final class OnboardingViewModel: ObservableObject {
             }
             let userId = session.user.id
 
-            // Link user to the existing household
-            _ = try await DatabaseService.shared.updateUser(
-                id: userId,
-                UserUpdate(householdId: invitation.householdId)
+            // Build the fullName we know locally. AccountCreationStep
+            // stashes first/last in UserDefaults before auth, and
+            // prefillFromAuth loads it into primaryFirstName/primaryLastName.
+            // For Apple users who skipped that flow and whose Apple Sign In
+            // returned no name, both are empty here and the post-accept
+            // reconcile step below will fill users.full_name from the
+            // family_member row Tom already typed.
+            let trimmedFirst = primaryFirstName.trimmingCharacters(in: .whitespaces)
+            let trimmedLast = primaryLastName.trimmingCharacters(in: .whitespaces)
+            let localFullName = [trimmedFirst, trimmedLast]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+
+            setupProgress = "Linking your account..."
+            try await authService.completeOnboarding(
+                householdId: invitation.householdId,
+                fullName: localFullName.isEmpty ? nil : localFullName
             )
 
-            // Mark invitation as accepted
+            setupProgress = "Joining the household..."
             try await DatabaseService.shared.acceptInvitation(
                 invitationId: invitation.id,
-                userId: userId
+                userId: userId,
+                familyMemberId: invitation.familyMemberId
             )
+
+            // Post-accept name reconcile — fills whichever side is empty
+            // from whichever side has a value. Tolerates failure because
+            // the accept has already committed; a name gap is recoverable
+            // from Settings, a blocked accept is not.
+            await reconcileNameWithFamilyMember(
+                userId: userId,
+                invitation: invitation,
+                localFullName: localFullName
+            )
+
+            // Hydrate the joined household's property so ContentView's
+            // `primaryProperty == nil` guard doesn't briefly route to
+            // AddressConfirmationIntercept between `needsOnboarding=false`
+            // and the next auth-state refresh.
+            if let appState {
+                setupProgress = "Loading your home..."
+                await appState.refreshPrimaryProperty()
+            }
 
             // Phase 9 will read this flag from UserDefaults to surface the
             // 5-question personal quiz on the dashboard. We set it here at
@@ -304,19 +378,74 @@ final class OnboardingViewModel: ObservableObject {
             Analytics.track(.householdInviteAccepted, [
                 "invitation_id": invitation.id.uuidString,
                 "via_cached_code": defaults.string(forKey: PendingInviteKeys.code) != nil,
+                "email_mismatch": invitationEmailMismatch,
             ])
             Analytics.track(.householdJoined, [
                 "had_personal_quiz": true,
                 "time_from_invite_to_join_seconds": Int(timeFromInviteSeconds),
             ])
 
-            // Complete — skip all onboarding
-            authService.needsOnboarding = false
             setupProgress = "Welcome to the family!"
+            authService.needsOnboarding = false
         } catch {
             errorMessage = "Failed to join household: \(error.localizedDescription)"
         }
         isLoading = false
+    }
+
+    /// After the user is linked to the household, sync the name between
+    /// `users.full_name` and the linked `family_members` row. Runs in a
+    /// do/catch wrapper so a network hiccup doesn't undo a successful
+    /// accept — the row writes are idempotent and can be retried next
+    /// launch by the name-fallback path in the dashboard greeting.
+    private func reconcileNameWithFamilyMember(
+        userId: UUID,
+        invitation: HouseholdInvitationRow,
+        localFullName: String
+    ) async {
+        do {
+            let members = try await DatabaseService.shared.fetchFamilyMembers(
+                householdId: invitation.householdId
+            )
+            let linkedMember: FamilyMemberRow?
+            if let memberId = invitation.familyMemberId {
+                linkedMember = members.first { $0.id == memberId }
+            } else {
+                linkedMember = members.first { $0.linkedUserId == userId }
+            }
+            guard let member = linkedMember else { return }
+
+            let memberFirst = member.firstName.trimmingCharacters(in: .whitespaces)
+            let memberLast = (member.lastName).trimmingCharacters(in: .whitespaces)
+            let memberFullName = [memberFirst, memberLast]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+
+            // Backfill users.full_name from the family_member row when
+            // local name was empty (Apple Sign In without cached name).
+            if localFullName.isEmpty, !memberFullName.isEmpty {
+                _ = try? await DatabaseService.shared.updateUser(
+                    id: userId,
+                    UserUpdate(fullName: memberFullName)
+                )
+            }
+
+            // Backfill family_member names when the homeowner invited by
+            // email alone. Uses the local name because that's what the
+            // invitee actually typed during signup.
+            if memberFirst.isEmpty, memberLast.isEmpty, !localFullName.isEmpty {
+                let parts = localFullName.split(separator: " ", maxSplits: 1)
+                var update = FamilyMemberUpdate()
+                update.firstName = parts.first.map(String.init)
+                if parts.count > 1 { update.lastName = String(parts[1]) }
+                _ = try? await DatabaseService.shared.updateFamilyMember(
+                    id: member.id,
+                    update
+                )
+            }
+        } catch {
+            print("[Invites] reconcileNameWithFamilyMember failed: \(error)")
+        }
     }
 
     /// Look up an invite code manually
@@ -418,7 +547,13 @@ final class OnboardingViewModel: ObservableObject {
 
             print("[Onboarding] runComplete: STEP completeOnboarding")
             setupProgress = "Linking your account..."
-            try await authService.completeOnboarding(householdId: householdId)
+            let trimmedFirst = primaryFirstName.trimmingCharacters(in: .whitespaces)
+            let trimmedLast = primaryLastName.trimmingCharacters(in: .whitespaces)
+            let onboardingFullName = [trimmedFirst, trimmedLast].filter { !$0.isEmpty }.joined(separator: " ")
+            try await authService.completeOnboarding(
+                householdId: householdId,
+                fullName: onboardingFullName.isEmpty ? nil : onboardingFullName
+            )
             print("[Onboarding] runComplete: completeOnboarding OK")
 
             print("[Onboarding] runComplete: STEP createFamilyMember")
@@ -487,8 +622,17 @@ final class OnboardingViewModel: ObservableObject {
                 // range only, or returned data the ladder should have caught.
                 print("[Onboarding] ATTOM persistence: estValue=\(attomEstimatedValue?.description ?? "nil") lastSale=\(propertyLookupResult?.lastSalePrice?.description ?? "nil") range=\(propertyLookupResult?.estimatedValueLow?.description ?? "nil")-\(propertyLookupResult?.estimatedValueHigh?.description ?? "nil") taxAssessed=\(propertyLookupResult?.taxAssessment?.assessedValue?.description ?? "nil") source=\(propertyLookupResult?.estimatedValueSource ?? "nil")")
 
+                // Phase 60.1: log the PropertyInsert right before the DB
+                // write so we can see exactly what made it to the server.
+                print("[ATTOM persist] PropertyInsert built: purchasePrice=\(propertyInsert.purchasePrice?.description ?? "nil") currentEstimatedValue=\(propertyInsert.currentEstimatedValue?.description ?? "nil") source=\(propertyInsert.estimatedValueSource ?? "nil")")
+
                 let property = try await DatabaseService.shared.createProperty(propertyInsert)
                 print("[Onboarding] runComplete: createProperty OK id=\(property.id)")
+
+                // Phase 60.1: verify the server round-tripped the numbers
+                // faithfully. Any mismatch here points at RLS, triggers, or
+                // server-side coercion rather than the iOS pipeline.
+                print("[ATTOM persist] PropertyRow after insert: purchasePrice=\(property.purchasePrice?.description ?? "nil") currentEstimatedValue=\(property.currentEstimatedValue?.description ?? "nil")")
 
                 // Apr 7, 2026 (build 79): write the just-created property
                 // DIRECTLY to AppState. Previously we tried to re-fetch via

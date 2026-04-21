@@ -16,7 +16,14 @@ import SwiftUI
 ///      delegation sheet for any 'either' tasks the new vendor could also
 ///      take over.
 struct FindLocalVendorSheet: View {
-    let task: MaintenanceTaskDBRow
+    /// Phase 56.1: task is now optional so the Vendor Coverage sheet can
+    /// present this view directly even when no "Find a contractor for:"
+    /// task exists yet. When nil, the adoption pass walks every matching
+    /// `needs_vendor` task in the household and converts each.
+    let task: MaintenanceTaskDBRow?
+    /// Phase 56.1: required so we can create the contractor without a
+    /// triggering task. Pass the current property or household's id.
+    let householdId: UUID
     let town: String
     let state: String
     let systemCategory: String
@@ -30,6 +37,11 @@ struct FindLocalVendorSheet: View {
     @State private var loadError: String? = nil
     @State private var pendingAdoption: HavenSupabase.LocalVendorResult? = nil
     @State private var isAdding: Bool = false
+
+    /// Guard against `.onAppear` firing twice (which SwiftUI can do during
+    /// sheet presentation animations) from triggering two network calls.
+    /// Reset only by the explicit "Try again" path.
+    @State private var hasStartedLoading: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -88,8 +100,18 @@ struct FindLocalVendorSheet: View {
                 }
             }
         }
-        .task {
-            await loadVendors()
+        .onAppear {
+            // Fire the load off of the view's Task lifecycle so the
+            // request isn't cancelled mid-flight by SwiftUI's sheet
+            // presentation transition (the old `.task` pattern
+            // consistently surfaced "cancelled" as an error state on
+            // first open, forcing the user to tap "Try again"). The
+            // unstructured Task survives view churn; the
+            // `hasStartedLoading` guard prevents a double fire on a
+            // second `.onAppear`.
+            guard !hasStartedLoading else { return }
+            hasStartedLoading = true
+            Task { await loadVendors() }
         }
     }
 
@@ -340,19 +362,40 @@ struct FindLocalVendorSheet: View {
     // MARK: - Loading
 
     private func loadVendors() async {
-        isLoading = true
-        loadError = nil
+        await MainActor.run {
+            isLoading = true
+            loadError = nil
+        }
         do {
             let response = try await HavenSupabase.findLocalVendors(
                 town: town,
                 state: state,
                 category: systemCategory
             )
-            vendors = response.vendors
+            await MainActor.run {
+                vendors = response.vendors
+                isLoading = false
+            }
         } catch {
-            loadError = error.localizedDescription
+            // Cancellation (`URLError.cancelled` / Swift
+            // `CancellationError`) never happens because of user
+            // intent here — it's either sheet-transition churn or the
+            // user dismissing. Don't paint it as an error. We clear
+            // the guard so the "Try again" button can re-fire if the
+            // view is still on screen; if the view is truly gone, the
+            // state writes become no-ops on a torn-down view.
+            let isCancel = (error as? URLError)?.code == .cancelled || error is CancellationError
+            if isCancel {
+                await MainActor.run {
+                    hasStartedLoading = false
+                }
+                return
+            }
+            await MainActor.run {
+                loadError = error.localizedDescription
+                isLoading = false
+            }
         }
-        isLoading = false
     }
 
     // MARK: - Adopt
@@ -362,7 +405,6 @@ struct FindLocalVendorSheet: View {
         defer { isAdding = false }
 
         let db = DatabaseService.shared
-        let householdId = task.householdId
 
         // 1. Create the contractor row, marked as find_vendor sourced.
         var insert = ContractorInsert(
@@ -390,6 +432,7 @@ struct FindLocalVendorSheet: View {
         // viewmodel first so its in-memory tasks are current; otherwise the
         // conversion would only see whatever was loaded earlier.
         await MaintenanceViewModel.shared.loadTasks()
+        let triggeringTaskId = task?.id
         let candidates = MaintenanceViewModel.shared.tasks.filter { row in
             guard row.vehicleId == nil else { return false }
             guard row.assignmentType?.lowercased() == "vendor" else { return false }
@@ -401,7 +444,12 @@ struct FindLocalVendorSheet: View {
             else {
                 // Fall back to the triggering task's systemId so the user
                 // always sees at least the task they tapped get converted.
-                return row.id == task.id
+                // Phase 56.1: skip this fallback when no triggering task
+                // exists (Vendor Coverage entry point).
+                if let triggeringTaskId {
+                    return row.id == triggeringTaskId
+                }
+                return false
             }
             return system.category.lowercased() == systemCategory.lowercased()
         }

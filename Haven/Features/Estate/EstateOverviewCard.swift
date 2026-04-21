@@ -120,8 +120,8 @@ struct EstateOverviewCard: View {
                             .minimumScaleFactor(0.85)
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
-                            .background(HavenColors.navy)
-                            .foregroundStyle(HavenColors.textOnNavy)
+                            .background(HavenColors.action)
+                            .foregroundStyle(HavenColors.textOnAction)
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                     }
                     .buttonStyle(HavenButtonPressStyle())
@@ -141,7 +141,7 @@ struct EstateOverviewCard: View {
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                             .overlay {
                                 RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
-                                    .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                                    .strokeBorder(HavenColors.navy, lineWidth: 1)
                             }
                     }
                     .buttonStyle(HavenButtonPressStyle())
@@ -184,8 +184,8 @@ struct EstateOverviewCard: View {
                         .font(HavenTypography.uiButton)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
-                        .background(HavenColors.navy)
-                        .foregroundStyle(HavenColors.textOnNavy)
+                        .background(HavenColors.action)
+                        .foregroundStyle(HavenColors.textOnAction)
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
                 .buttonStyle(HavenButtonPressStyle())

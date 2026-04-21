@@ -14,6 +14,18 @@ The `--no-verify-jwt` flag is critical. Without it, functions reject requests.
 
 Link first if not already: `supabase link --project-ref jsucwnkntdrxhysojgri`
 
+## Cache Version Token (MANDATORY for hash-keyed caches)
+
+Every edge function that caches by hashed key (e.g. `property_lookups.address_hash`) MUST declare a module-level `const CACHE_VERSION = N;` at the top of the file and fold it into the hash at BOTH the read and the write sites:
+
+```typescript
+const CACHE_VERSION = 2;
+// ...
+const addressHash = `${trimmedAddress.toLowerCase().replace(/\s+/g, " ")}|v${CACHE_VERSION}`;
+```
+
+Bumping the constant is the one-line, zero-migration invalidate-every-row lever whenever response shape changes (new fields, renamed fields, type widening like Phase 20's `bathrooms: Int → Double`). Pre-bump rows become unreachable under the new key and refetch fresh. Old rows self-prune when a TTL job is added later; a few orphaned rows cost nothing. Reference: `supabase/functions/property-lookup/index.ts`.
+
 ## Standard Pattern (Every Function)
 
 ```typescript

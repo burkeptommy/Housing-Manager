@@ -110,57 +110,73 @@ struct YearAtAGlanceCard: View {
 
     @ViewBuilder
     private func seasonTile(_ summary: SeasonSummary) -> some View {
+        // BUG-001/002/003 fix: redesigned tile.
+        // - Icon+label in vertical stack (label gets full tile width — no
+        //   more "SPRIN G" wrap).
+        // - Mixed case "Spring" not SHOUTING UPPERCASE — reads cleaner.
+        // - Dropped the cryptic 12-char task previews ("Renew s...",
+        //   "Termite i...") in favor of a "Today" badge on the current
+        //   tile + an inviting "Tap to see" caption. The full task list
+        //   lives inside SeasonTasksSheet where it has room to breathe.
+        // - Current-season highlight bumped from opacity 0.06→0.14 +
+        //   stroke 0.3→0.6 so the coral tint actually reads as "active"
+        //   instead of a barely-there tint.
         let isCurrent = summary.season == Season.current
         Button {
             onTapSeason(summary.season)
         } label: {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                HStack(spacing: 6) {
-                    Image(systemName: summary.season.icon)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(summary.season.iconColor)
-                    Text(summary.season.displayLabel.uppercased())
-                        .font(HavenTypography.uiLabelSmall)
-                        .foregroundStyle(isCurrent ? HavenColors.navy800 : HavenColors.textSecondary)
-                    Spacer(minLength: 0)
-                }
+                Image(systemName: summary.season.icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(summary.season.iconColor)
+                    .frame(width: 24, height: 20, alignment: .leading)
+
+                Text(summary.season.displayLabel)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(isCurrent ? HavenColors.navy800 : HavenColors.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
                 Text("\(summary.count)")
                     .font(HavenTypography.title2)
                     .foregroundStyle(HavenColors.textPrimary)
                     .contentTransition(.numericText(value: Double(summary.count)))
 
-                if summary.previewTitles.isEmpty {
-                    Text("Nothing planned")
+                // Short caption that fits in ~8 chars of the tile's
+                // content width. Longer alternatives like "Tap to view"
+                // or "You're here" still truncated after the BUG-001
+                // label redesign. Keeping captions short is the
+                // compromise for tile-width math on iPhone 17 Pro.
+                if summary.count == 0 {
+                    Text("Empty")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                } else if isCurrent {
+                    Text("Now")
+                        .font(HavenTypography.caption.weight(.semibold))
+                        .foregroundStyle(HavenColors.action)
+                        .lineLimit(1)
                 } else {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(summary.previewTitles.prefix(2), id: \.self) { title in
-                            Text(title)
-                                .font(HavenTypography.caption)
-                                .foregroundStyle(HavenColors.textSecondary)
-                                .lineLimit(1)
-                        }
-                        if summary.previewTitles.count > 2 {
-                            Text("+ \(summary.count - 2) more")
-                                .font(HavenTypography.caption)
-                                .foregroundStyle(HavenColors.textTertiary)
-                        }
-                    }
+                    Text("View")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(HavenTheme.spacing12)
             .background(
                 isCurrent
-                ? HavenColors.action.opacity(0.06)
+                ? HavenColors.action.opacity(0.14)
                 : HavenColors.creamLight
             )
             .overlay(
                 RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                     .stroke(
-                        isCurrent ? HavenColors.action.opacity(0.3) : Color.clear,
-                        lineWidth: 1
+                        isCurrent ? HavenColors.action.opacity(0.6) : HavenColors.beige200,
+                        lineWidth: isCurrent ? 1.5 : 1
                     )
             )
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
@@ -186,20 +202,16 @@ enum YearAtAGlanceAggregator {
             .spring: [], .summer: [], .fall: [], .winter: []
         ]
 
-        // 1. Tasks linked to routines inherit the routine's season(s)
-        for (routineId, linkedTasks) in routineTasks {
-            guard let routine = routines.first(where: { $0.id == routineId }) else { continue }
-            let seasons = seasonsFor(routine: routine)
-            for task in linkedTasks {
-                guard !seenTaskIds.contains(task.id) else { continue }
-                seenTaskIds.insert(task.id)
-                for season in seasons {
-                    seasonTitles[season]?.append(task.title)
-                }
-            }
-        }
-
-        // 2. Unparented tasks fall back to their seasonalTiming or nextDueDate
+        // BUG-008 second-pass fix: every task (parented or not) lands in
+        // exactly ONE bucket — the season of its `nextDueDate`. Previously
+        // routine-parented tasks inherited EVERY season their routine was
+        // active in (`seasonsFor(routine:)`), which bled snow-removal
+        // tasks into Summer. Summer showed "Renew snow plowing contract
+        // — Due 2026-10-01" because the parent routine was (incorrectly)
+        // marked active year-round. Using the task's own due-date month
+        // sidesteps any routine-level active_months data bugs and matches
+        // the user's mental model: "what's happening this season?" = "what
+        // will I actually do in these three months?"
         for task in tasks {
             guard !seenTaskIds.contains(task.id) else { continue }
             if task.isArchived == true { continue }
@@ -208,8 +220,27 @@ enum YearAtAGlanceAggregator {
             seasonTitles[season]?.append(task.title)
         }
 
+        // Also fold in routine-linked tasks that weren't in the main
+        // `tasks` list (defensive — parented tasks normally also appear
+        // in the flat list, but RoutineGroupingEngine edge cases can
+        // leave them out).
+        for (_, linkedTasks) in routineTasks {
+            for task in linkedTasks {
+                guard !seenTaskIds.contains(task.id) else { continue }
+                if task.isArchived == true { continue }
+                seenTaskIds.insert(task.id)
+                let season = seasonFor(task: task)
+                seasonTitles[season]?.append(task.title)
+            }
+        }
+
+        // BUG-012 fix: sort titles alphabetically per season so preview
+        // order is stable across re-renders. Dictionary iteration is
+        // nondeterministic; without a deterministic sort the tile flickered
+        // between "Renew s... / Termite i..." and "Termite i... / Sign up f..."
+        // every time the view reloaded.
         return YearAtAGlanceCard.Season.allCases.map { season in
-            let titles = seasonTitles[season] ?? []
+            let titles = (seasonTitles[season] ?? []).sorted()
             return YearAtAGlanceCard.SeasonSummary(
                 season: season,
                 count: titles.count,
@@ -233,15 +264,15 @@ enum YearAtAGlanceAggregator {
         return result.isEmpty ? [YearAtAGlanceCard.Season.current] : result
     }
 
-    /// Fall through from `seasonalTiming` (template) → `nextDueDate`
-    /// (ISO `yyyy-MM-dd`) → current season.
+    /// BUG-008 fix: use `nextDueDate` month → season as the PRIMARY
+    /// signal. The old logic preferred `seasonalTiming`, which caused
+    /// tasks with `seasonal_timing = "spring"` but a July due date to
+    /// land in Spring's bucket — confusing because the user asks "what's
+    /// happening in spring?" and expects tasks actually due in spring,
+    /// not tasks whose ideal timing is spring but were rescheduled.
+    /// Falls back to `seasonalTiming` only when no due date parses, and
+    /// to `.current` as a final catch.
     private static func seasonFor(task: MaintenanceTaskDBRow) -> YearAtAGlanceCard.Season {
-        if let timing = task.seasonalTiming?.lowercased() {
-            if timing.contains("spring") { return .spring }
-            if timing.contains("summer") { return .summer }
-            if timing.contains("fall") { return .fall }
-            if timing.contains("winter") { return .winter }
-        }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         if let date = formatter.date(from: task.nextDueDate) {
@@ -249,6 +280,12 @@ enum YearAtAGlanceAggregator {
             for season in YearAtAGlanceCard.Season.allCases where season.months.contains(month) {
                 return season
             }
+        }
+        if let timing = task.seasonalTiming?.lowercased() {
+            if timing.contains("spring") { return .spring }
+            if timing.contains("summer") { return .summer }
+            if timing.contains("fall") { return .fall }
+            if timing.contains("winter") { return .winter }
         }
         return .current
     }

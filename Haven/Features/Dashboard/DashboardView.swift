@@ -14,6 +14,9 @@ struct DashboardView: View {
     @State private var showUploadDocument = false
     @State private var showAddProperty = false
     @State private var showSecurityDashboard = false
+    /// BUG-022 fix: dashboard "Add Vendor" chip should open AddVendorSheet
+    /// directly instead of silently switching to the Property tab.
+    @State private var showDashboardAddVendor = false
     @State private var navigationPath = NavigationPath()
     @State private var showScenarioStudio = false
     @State private var hasAppeared = false
@@ -195,7 +198,7 @@ struct DashboardView: View {
                                     Analytics.track(.scenarioStudioOpened, ["source": "dashboard_quick_action"])
                                 },
                                 onAddVendor: {
-                                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+                                    showDashboardAddVendor = true
                                 }
                             )
                             } // end hero + quick actions VStack
@@ -484,6 +487,11 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showUploadDocument) {
                 DocumentUploadView(onComplete: {
+                    Task { await viewModel.refresh() }
+                })
+            }
+            .sheet(isPresented: $showDashboardAddVendor) {
+                AddVendorSheet(onComplete: {
                     Task { await viewModel.refresh() }
                 })
             }
@@ -1073,10 +1081,15 @@ struct DashboardView: View {
     /// Phase 56.2: trailing "View full schedule →" link. Extracted from
     /// the inline block inside `body` so the 0/1/2+ conditional UP NEXT
     /// branches can all reuse it.
+    ///
+    /// NAV-001 fix: routes to MaintenanceHubView (destination "maintenance")
+    /// instead of MaintenanceScheduleView so the primary Phase 66 surface
+    /// is one tap from Dashboard. The hub's "See full year ↗" link pushes
+    /// to Timeline for users who want the flat month-by-month view.
     private var viewFullScheduleLink: some View {
         Button {
             Haptics.light()
-            navigationPath.append("maintenance_calendar")
+            navigationPath.append("maintenance")
         } label: {
             HStack(spacing: 4) {
                 Text("View full schedule")
@@ -1421,7 +1434,7 @@ struct DashboardView: View {
                         Text("Scenario Planning")
                             .font(HavenTypography.fraunces(size: 18, weight: 700))
                             .foregroundStyle(HavenColors.navy800)
-                        Text("Explore what-if questions with your real data — estate, taxes, home, wealth")
+                        Text("Explore what-if questions with your real data: estate, taxes, home, wealth")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                             .lineLimit(2)

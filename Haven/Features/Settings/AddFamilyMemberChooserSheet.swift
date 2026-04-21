@@ -51,7 +51,7 @@ struct AddFamilyMemberChooserSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
             }
             .trackScreen("AddFamilyMemberChooserSheet")

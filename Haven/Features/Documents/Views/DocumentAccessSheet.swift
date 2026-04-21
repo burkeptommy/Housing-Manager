@@ -149,7 +149,7 @@ struct DocumentAccessSheet: View {
                 Spacer()
                 Toggle("", isOn: $visibleToHomeManagers)
                     .labelsHidden()
-                    .tint(HavenColors.navy)
+                    .tint(HavenColors.action)
             }
         }
     }

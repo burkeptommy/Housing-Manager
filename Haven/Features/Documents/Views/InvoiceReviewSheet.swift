@@ -8,6 +8,7 @@ struct InvoiceReviewSheet: View {
     @State private var showNewParentAlert = false
     @State private var newParentName = ""
     @State private var pendingNewParentSystemId: String?
+    @State private var suggestionDismissed = false
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,13 @@ struct InvoiceReviewSheet: View {
                 Button("Cancel", role: .cancel) { newParentName = "" }
             } message: {
                 Text("Enter a name for the new parent system")
+            }
+            .sheet(isPresented: $viewModel.showVendorPicker) {
+                NavigationStack {
+                    ContractorDirectoryView(onSelect: { contractor in
+                        Task { await viewModel.assignVendorMatch(contractorId: contractor.id.uuidString) }
+                    })
+                }
             }
         }
     }
@@ -105,6 +113,15 @@ struct InvoiceReviewSheet: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing24) {
                     headerSection(result)
 
+                    // Phase 59: vendor match picker surfaces when
+                    // confidence is medium/low/ambiguous. User picks from
+                    // candidate chips or "None of these".
+                    if let match = result.vendorMatch,
+                       match.confidence != "high",
+                       !viewModel.vendorMatchResolved {
+                        vendorMatchSection(match)
+                    }
+
                     if !result.completedTasks.isEmpty {
                         completedTasksSection(result.completedTasks)
                     }
@@ -115,6 +132,10 @@ struct InvoiceReviewSheet: View {
 
                     if let followUps = result.followUpNeeded, !followUps.isEmpty {
                         followUpSection(followUps)
+                    }
+
+                    if let suggestion = result.specialtySystemSuggestion, !suggestionDismissed {
+                        specialtySuggestionSection(suggestion)
                     }
 
                     if let parts = result.partsAndMaterials, !parts.isEmpty {
@@ -178,6 +199,75 @@ struct InvoiceReviewSheet: View {
     }
 
     // MARK: - Completed Tasks
+
+    // MARK: - Phase 59 Vendor Match Picker
+
+    private func vendorMatchSection(_ match: InvoiceVendorMatch) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack(spacing: 6) {
+                Image(systemName: "questionmark.circle.fill")
+                    .foregroundStyle(HavenColors.warning)
+                    .font(.system(size: 16))
+                Text("WHICH VENDOR IS THIS?")
+                    .font(HavenTypography.uiSectionHeader)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .tracking(1.5)
+            }
+
+            if let extractedName = match.extractedName, !extractedName.isEmpty {
+                Text("Extracted: \(extractedName)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+
+            if let candidates = match.candidates, !candidates.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(candidates) { candidate in
+                        Button {
+                            Haptics.selection()
+                            Task { await viewModel.assignVendorMatch(contractorId: candidate.contractorId) }
+                        } label: {
+                            HStack {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundStyle(HavenColors.navy700)
+                                Text(candidate.name)
+                                    .font(HavenTypography.body)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                    .font(.caption)
+                            }
+                            .padding(12)
+                            .background(HavenColors.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Button {
+                Haptics.light()
+                viewModel.showVendorPicker = true
+            } label: {
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                    Text("None of these. Pick another vendor.")
+                        .font(HavenTypography.uiLabel)
+                    Spacer()
+                }
+                .padding(12)
+                .foregroundStyle(HavenColors.navy800)
+                .background(HavenColors.beige200.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.warning.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+    }
 
     private func completedTasksSection(_ tasks: [InvoiceCompletedTask]) -> some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
@@ -449,6 +539,42 @@ struct InvoiceReviewSheet: View {
                 break
             }
         }
+    }
+
+    // MARK: - Specialty System Suggestion (Phase 52b)
+
+    private func specialtySuggestionSection(_ suggestion: SpecialtySystemSuggestion) -> some View {
+        SpecialtySuggestionCard(
+            suggestion: suggestion,
+            onAccept: {
+                Task {
+                    guard let propertyId = viewModel.propertyId else { return }
+                    let insert = HomeSystemInsert(
+                        propertyId: propertyId,
+                        householdId: viewModel.householdId,
+                        name: suggestion.displayName,
+                        category: suggestion.category,
+                        status: "good",
+                        subtype: suggestion.subtypeHint
+                    )
+                    _ = try? await DatabaseService.shared.createHomeSystem(insert)
+                    NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+                    suggestionDismissed = true
+                    Haptics.success()
+                }
+            },
+            onDismiss: {
+                Task {
+                    try? await DatabaseService.shared.dismissSpecialtySuggestion(
+                        householdId: viewModel.householdId,
+                        category: suggestion.category,
+                        evidence: suggestion.evidence
+                    )
+                    suggestionDismissed = true
+                    Haptics.light()
+                }
+            }
+        )
     }
 
     // MARK: - Follow-ups

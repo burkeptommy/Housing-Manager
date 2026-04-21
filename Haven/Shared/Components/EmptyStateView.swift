@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Branded empty state — warm and helpful, never blank.
-/// Relevant SF Symbol + Georgia title + description + primary CTA.
+/// Relevant SF Symbol + Fraunces title + description + primary CTA.
 struct EmptyStateView: View {
     let title: String
     let message: String
@@ -21,6 +21,7 @@ struct EmptyStateView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text(title)
                     .font(HavenTypography.title3)
+                    
                     .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
 

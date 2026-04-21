@@ -19,6 +19,15 @@ const corsHeaders = {
 const ATTOM_BASE = "https://api.gateway.attomdata.com/propertyapi/v1.0.0";
 const RENTCAST_BASE = "https://api.rentcast.io/v1";
 
+// Phase 60.1: cache version token. Every cached row in property_lookups is
+// keyed on `${normalizedAddress}|v${CACHE_VERSION}`. Bump this constant
+// whenever the response shape changes (new fields, renamed fields, type
+// changes) so every stale row becomes a miss and refetches fresh data from
+// ATTOM. Phase 20 shipped a bathrooms Int -> Double type change with no
+// cache bust, leaving pre-Phase-20 rows poisoning the iOS decoder
+// indefinitely. This constant prevents that class of bug going forward.
+const CACHE_VERSION = 2;
+
 interface PropertyResult {
   yearBuilt: number | null;
   squareFootage: number | null;
@@ -104,7 +113,11 @@ serve(async (req: Request) => {
 
     if (supabaseUrl && serviceRoleKey) {
       supabase = createClient(supabaseUrl, serviceRoleKey);
-      const addressHash = trimmedAddress.toLowerCase().replace(/\s+/g, " ");
+      // Phase 60.1: version the cache key so rows written before a
+      // response-shape change (e.g. Phase 20's bathrooms Int -> Double
+      // widening) become cache-misses on the next lookup and refetch
+      // fresh data from ATTOM.
+      const addressHash = `${trimmedAddress.toLowerCase().replace(/\s+/g, " ")}|v${CACHE_VERSION}`;
 
       const { data: cached } = await supabase
         .from("property_lookups")
@@ -113,7 +126,7 @@ serve(async (req: Request) => {
         .single();
 
       if (cached?.lookup_data) {
-        console.log("[property-lookup] Cache hit");
+        console.log(`[property-lookup] Cache hit (v${CACHE_VERSION})`);
         return new Response(
           JSON.stringify({ success: true, property: cached.lookup_data, cached: true }),
           { status: 200, headers }
@@ -275,7 +288,9 @@ serve(async (req: Request) => {
 
     // --- CACHE RESULT ---
     if (supabase) {
-      const addressHash = trimmedAddress.toLowerCase().replace(/\s+/g, " ");
+      // Phase 60.1: matches the versioned read-side hash so writes never
+      // land under a key that future reads can't find.
+      const addressHash = `${trimmedAddress.toLowerCase().replace(/\s+/g, " ")}|v${CACHE_VERSION}`;
       supabase
         .from("property_lookups")
         .upsert(

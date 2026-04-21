@@ -59,7 +59,7 @@ struct QuoteUploadEntryView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
             }
             .tint(HavenColors.navy)

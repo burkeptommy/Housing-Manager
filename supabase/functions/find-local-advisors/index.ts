@@ -9,7 +9,7 @@
 //      professionals matching the advisor type near (town, state).
 //   3. Filter into "Haven Certified" (rating >= 4.8, >= 10 reviews, no
 //      chain indicators — top 2) and "Suggested" (rating >= 4.5, >= 5
-//      reviews — next 2). Softer thresholds than vendors because professional
+//      reviews — next 5). Softer thresholds than vendors because professional
 //      services typically have fewer reviews.
 //   4. Cache the top 4 in local_vendor_results.
 //   5. Return them ranked.
@@ -33,7 +33,9 @@ const corsHeaders = {
 
 const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 const CACHE_TTL_DAYS = 30;
-const MAX_RESULTS = 4;
+// Build 90: bumped from 4 to 7 so the sheet shows 2 Haven Certified + 5
+// Suggested, giving users a meaningful list of local options.
+const MAX_RESULTS = 7;
 
 // Advisor types the iOS client passes in, mapped to Google Places search terms.
 const ADVISOR_SEARCH_TERMS: Record<string, string> = {
@@ -268,6 +270,7 @@ serve(async (req: Request) => {
     const havenCertifiedIds = new Set(havenCertified.map((p) => p.googlePlaceId));
 
     // Suggested: 4.5+ stars, 5+ reviews. No chain filter.
+    // Build 90: bumped from 2 to 5 so users see a meaningful list.
     const suggested = normalized
       .filter(
         (p) =>
@@ -279,7 +282,7 @@ serve(async (req: Request) => {
         if (b.rating !== a.rating) return b.rating - a.rating;
         return b.reviewCount - a.reviewCount;
       })
-      .slice(0, 2);
+      .slice(0, 5);
 
     const finalAdvisors: AdvisorCandidate[] = [];
     let rank = 1;

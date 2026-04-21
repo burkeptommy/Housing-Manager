@@ -343,16 +343,24 @@ actor HouseholdInviteCoordinator {
         }
 
         // Step 4 — generate a code (retry on collision), create the invitation row.
-        let currentUser: UserRow
-        do {
-            currentUser = try await db.fetchCurrentUser()
-        } catch {
+        // Build 90: fall back to auth session when `users` table SELECT fails
+        // (RLS "permission denied for table users" on fresh accounts).
+        let inviterUserId: UUID
+        let inviterName: String
+        if let currentUser = try? await db.fetchCurrentUser() {
+            inviterUserId = currentUser.id
+            inviterName = currentUser.fullName ?? "Someone on Haven"
+        } else if let session = await HavenSupabase.safeSession(timeout: 3.0) {
+            inviterUserId = session.user.id
+            inviterName = (session.user.userMetadata["full_name"]?.value as? String)
+                ?? "Someone on Haven"
+        } else {
             return AddPersonResult(
                 familyMember: familyMember,
                 invitation: nil,
                 inviteCode: nil,
                 existingUser: nil,
-                trustMoment: .addedButInviteFailed(name: trimmedFirstName, reason: error.localizedDescription)
+                trustMoment: .addedButInviteFailed(name: trimmedFirstName, reason: "Could not authenticate. Please try again.")
             )
         }
 
@@ -362,7 +370,7 @@ actor HouseholdInviteCoordinator {
             let candidate = DatabaseService.generateInviteCode()
             let invitationInsert = HouseholdInvitationInsert(
                 householdId: request.householdId,
-                invitedBy: currentUser.id,
+                invitedBy: inviterUserId,
                 invitedEmail: inviteEmail,
                 inviteCode: candidate,
                 familyMemberId: familyMember.id,
@@ -407,7 +415,7 @@ actor HouseholdInviteCoordinator {
                 inviteEmail: inviteEmail,
                 request: request,
                 householdId: request.householdId,
-                inviterUser: currentUser
+                inviterName: inviterName
             )
             Analytics.track(.householdInviteSent, [
                 "source": request.source.rawValue,
@@ -501,16 +509,23 @@ actor HouseholdInviteCoordinator {
         }
 
         let db = DatabaseService.shared
-        let currentUser: UserRow
-        do {
-            currentUser = try await db.fetchCurrentUser()
-        } catch {
+        // Build 90: same session fallback as addPersonToHousehold
+        let inviterUserId2: UUID
+        let inviterName2: String
+        if let currentUser = try? await db.fetchCurrentUser() {
+            inviterUserId2 = currentUser.id
+            inviterName2 = currentUser.fullName ?? "Someone on Haven"
+        } else if let session = await HavenSupabase.safeSession(timeout: 3.0) {
+            inviterUserId2 = session.user.id
+            inviterName2 = (session.user.userMetadata["full_name"]?.value as? String)
+                ?? "Someone on Haven"
+        } else {
             return AddPersonResult(
                 familyMember: member,
                 invitation: nil,
                 inviteCode: nil,
                 existingUser: nil,
-                trustMoment: .addedButInviteFailed(name: member.firstName, reason: error.localizedDescription)
+                trustMoment: .addedButInviteFailed(name: member.firstName, reason: "Could not authenticate. Please try again.")
             )
         }
 
@@ -520,7 +535,7 @@ actor HouseholdInviteCoordinator {
             let candidate = DatabaseService.generateInviteCode()
             let invitationInsert = HouseholdInvitationInsert(
                 householdId: member.householdId,
-                invitedBy: currentUser.id,
+                invitedBy: inviterUserId2,
                 invitedEmail: normalizedEmail,
                 inviteCode: candidate,
                 familyMemberId: member.id,
@@ -576,7 +591,7 @@ actor HouseholdInviteCoordinator {
                     source: source
                 ),
                 householdId: member.householdId,
-                inviterUser: currentUser
+                inviterName: inviterName2
             )
             Analytics.track(.householdInviteSent, [
                 "source": source.rawValue,
@@ -607,7 +622,7 @@ actor HouseholdInviteCoordinator {
         inviteEmail: String,
         request: AddPersonRequest,
         householdId: UUID,
-        inviterUser: UserRow
+        inviterName: String
     ) async throws {
         let db = DatabaseService.shared
 
@@ -634,7 +649,7 @@ actor HouseholdInviteCoordinator {
             to: inviteEmail,
             inviteCode: inviteCode,
             inviteUrl: "https://havenhome.dev/join/\(inviteCode)",
-            inviterName: inviterUser.fullName ?? "Someone on Haven",
+            inviterName: inviterName,
             inviterAvatarUrl: nil,
             householdName: household?.name,
             householdAddress: address,

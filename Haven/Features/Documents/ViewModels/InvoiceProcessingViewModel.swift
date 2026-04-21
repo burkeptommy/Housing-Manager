@@ -63,6 +63,14 @@ class InvoiceProcessingViewModel: ObservableObject {
     /// confirmation card.
     @Published var pendingCadenceSuggestion: InvoiceCadenceSuggestion?
 
+    /// Phase 59: Tracks whether the user has resolved a medium/low/ambiguous
+    /// vendor match (via candidate picker or "None of these" full picker).
+    /// Flips to true after selection so the vendor-match section hides.
+    @Published var vendorMatchResolved = false
+    /// Phase 59: triggers presentation of a full contractor picker when
+    /// candidate chips don't include the right vendor.
+    @Published var showVendorPicker = false
+
     init(documentId: UUID, propertyId: UUID, householdId: UUID) {
         self.documentId = documentId
         self.propertyId = propertyId
@@ -82,18 +90,31 @@ class InvoiceProcessingViewModel: ObservableObject {
         error = nil
 
         do {
+            // Phase 59: if the document was uploaded from a vendor context
+            // (ContractorDetailView "Add a bill"), the row already has
+            // contractor_id set by DocumentUploadViewModel. Read it here
+            // so process-invoice can skip vendor matching and stamp this
+            // contractor with "high" confidence.
+            var preferredContractorId: String? = nil
+            if let doc = try? await DatabaseService.shared.fetchDocument(id: documentId),
+               let cid = doc.contractorId {
+                preferredContractorId = cid.uuidString
+            }
+
             let response: InvoiceProcessingResult
             if let vehicleId {
                 response = try await HavenSupabase.processVehicleInvoice(
                     documentId: documentId.uuidString,
                     vehicleId: vehicleId.uuidString,
-                    householdId: householdId.uuidString
+                    householdId: householdId.uuidString,
+                    preferredContractorId: preferredContractorId
                 )
             } else if let propertyId {
                 response = try await HavenSupabase.processInvoice(
                     documentId: documentId.uuidString,
                     propertyId: propertyId.uuidString,
-                    householdId: householdId.uuidString
+                    householdId: householdId.uuidString,
+                    preferredContractorId: preferredContractorId
                 )
             } else {
                 error = "No property or vehicle selected"
@@ -151,6 +172,22 @@ class InvoiceProcessingViewModel: ObservableObject {
         }
 
         isProcessing = false
+    }
+
+    /// Phase 59: write the selected contractor back to the document row
+    /// and flip vendor_match_confidence to "high". Called from the
+    /// InvoiceReviewSheet candidate picker (chip tap or full-picker result).
+    func assignVendorMatch(contractorId: String) async {
+        guard let cid = UUID(uuidString: contractorId) else { return }
+        var update = DocumentUpdate()
+        update.contractorId = cid
+        update.vendorMatchConfidence = "high"
+        _ = try? await DatabaseService.shared.updateDocument(id: documentId, update)
+        await MainActor.run {
+            vendorMatchResolved = true
+            showVendorPicker = false
+        }
+        NotificationCenter.default.post(name: .documentChanged, object: nil)
     }
 
     func applyChanges() async {
@@ -432,6 +469,17 @@ class InvoiceProcessingViewModel: ObservableObject {
                     userInfo: ["suggestion_id": suggestion.id.uuidString]
                 )
                 InvoiceCadenceCoordinator.shared.publish(suggestion)
+            }
+
+            // Phase 51: Auto-confirm standing appointment visits when invoice
+            // service date matches a scheduled visit (within +/- 3 days).
+            if let contractorIdStr = result.vendor?.matchedContractorId,
+               let vendorUUID = UUID(uuidString: contractorIdStr),
+               let serviceDate = result.invoiceDate {
+                await StandingAppointmentViewModel.shared.autoConfirmFromInvoice(
+                    vendorId: vendorUUID,
+                    serviceDate: serviceDate
+                )
             }
 
             applySuccess = true
@@ -785,11 +833,160 @@ final class InvoiceCadenceCoordinator: ObservableObject {
             }
             NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+
+            // Phase 51: Also create a standing appointment if one doesn't exist yet
+            await createStandingAppointmentIfNeeded(for: suggestion, systemId: systemId)
+
             current = nil
             return true
         } catch {
             print("[InvoiceCadence] Apply failed: \(error)")
             return false
+        }
+    }
+
+    // MARK: - Phase 51: Standing Appointment Creation
+
+    /// After a cadence suggestion is accepted, create a standing appointment
+    /// for the vendor + system pair if one doesn't already exist.
+    private func createStandingAppointmentIfNeeded(for suggestion: InvoiceCadenceSuggestion, systemId: UUID) async {
+        let db = DatabaseService.shared
+        do {
+            // Look up the system to get householdId and propertyId
+            let allSystems = try await db.fetchHomeSystems()
+            guard let system = allSystems.first(where: { $0.id == systemId }) else {
+                print("[InvoiceCadence] System \(systemId) not found")
+                return
+            }
+
+            // Check if a standing appointment already exists for this system
+            let existingAppointments = try await db.fetchStandingAppointments(householdId: system.householdId)
+            let alreadyExists = existingAppointments.contains { $0.systemId == systemId && $0.archivedAt == nil }
+            guard !alreadyExists else {
+                print("[InvoiceCadence] Standing appointment already exists for system \(systemId)")
+                return
+            }
+
+            // Resolve contractor ID from the suggestion's vendor name
+            var vendorId: UUID?
+            if let vendorName = suggestion.vendorName {
+                let contractors = try await db.fetchContractors()
+                vendorId = contractors.first(where: {
+                    $0.companyName.localizedCaseInsensitiveCompare(vendorName) == .orderedSame
+                })?.id
+            }
+
+            let cadenceType = cadenceTypeFromDays(suggestion.intervalDays)
+            let score: Double? = nil
+            _ = try await StandingAppointmentViewModel.shared.createAppointment(
+                householdId: system.householdId,
+                propertyId: system.propertyId,
+                vendorId: vendorId,
+                systemId: systemId,
+                cadenceType: cadenceType,
+                cadenceIntervalDays: cadenceType == "custom_days" ? suggestion.intervalDays : nil,
+                cadenceSource: "ai_inferred",
+                confidenceScore: score,
+                serviceDescription: suggestion.vendorName.map { "\(cadenceLabelFromDays(suggestion.intervalDays)) service by \($0)" }
+            )
+            print("[InvoiceCadence] Created standing appointment for system \(systemId)")
+        } catch {
+            print("[InvoiceCadence] Failed to create standing appointment: \(error)")
+        }
+    }
+
+    private func cadenceTypeFromDays(_ days: Int) -> String {
+        switch days {
+        case 5...9: return "weekly"
+        case 12...16: return "biweekly"
+        case 19...23: return "triweekly"
+        case 26...35: return "monthly"
+        case 55...65: return "bimonthly"
+        case 80...100: return "quarterly"
+        case 170...195: return "semiannual"
+        case 350...380: return "annual"
+        default: return "custom_days"
+        }
+    }
+
+    private func cadenceLabelFromDays(_ days: Int) -> String {
+        switch cadenceTypeFromDays(days) {
+        case "weekly": return "Weekly"
+        case "biweekly": return "Biweekly"
+        case "triweekly": return "Every 3 weeks"
+        case "monthly": return "Monthly"
+        case "bimonthly": return "Every 2 months"
+        case "quarterly": return "Quarterly"
+        case "semiannual": return "Semiannual"
+        case "annual": return "Annual"
+        default: return "Every \(days) days"
+        }
+    }
+
+    // MARK: - Phase 51: Vendor Cadence Analysis (Soft Migration)
+
+    /// Analyzes a vendor's completed task history to detect a recurring cadence pattern.
+    /// Called when user opens vendor detail and no standing appointment exists.
+    /// Returns a proposal if 3+ tasks show a consistent interval pattern.
+    struct CadenceProposal {
+        let intervalDays: Int
+        let cadenceType: String
+        let confidence: Double
+        let taskCount: Int
+    }
+
+    func analyzeVendorCadence(vendorId: UUID, householdId: UUID) async -> CadenceProposal? {
+        let db = DatabaseService.shared
+        do {
+            let allTasks = try await db.fetchAllMaintenanceTasks()
+            let vendorTasks = allTasks.filter {
+                $0.assignedContractorId == vendorId && $0.lastCompletedDate != nil
+            }
+
+            guard vendorTasks.count >= 3 else { return nil }
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let dates = vendorTasks
+                .compactMap { $0.lastCompletedDate.flatMap { formatter.date(from: $0) } }
+                .sorted()
+
+            guard dates.count >= 3 else { return nil }
+
+            // Compute intervals between consecutive completion dates
+            var intervals: [Int] = []
+            for i in 1..<dates.count {
+                let days = Calendar.current.dateComponents([.day], from: dates[i-1], to: dates[i]).day ?? 0
+                if days > 0 { intervals.append(days) }
+            }
+
+            guard intervals.count >= 2 else { return nil }
+
+            // Cluster into cadence buckets
+            let buckets: [(name: String, center: Int, tolerance: Int)] = [
+                ("weekly", 7, 2), ("biweekly", 14, 3), ("monthly", 30, 5),
+                ("bimonthly", 60, 8), ("quarterly", 91, 10), ("semiannual", 182, 15),
+                ("annual", 365, 20)
+            ]
+
+            for bucket in buckets {
+                let matching = intervals.filter { abs($0 - bucket.center) <= bucket.tolerance }
+                let ratio = Double(matching.count) / Double(intervals.count)
+                if ratio >= 0.8 {
+                    let confidence = dates.count >= 5 ? min(0.85 + ratio * 0.1, 0.95) : min(0.7 + ratio * 0.15, 0.85)
+                    return CadenceProposal(
+                        intervalDays: bucket.center,
+                        cadenceType: bucket.name,
+                        confidence: confidence,
+                        taskCount: dates.count
+                    )
+                }
+            }
+
+            return nil
+        } catch {
+            print("[InvoiceCadence] Vendor cadence analysis failed: \(error)")
+            return nil
         }
     }
 }

@@ -91,7 +91,7 @@ struct WarrantyTrackerView: View {
                 }
 
                 HStack {
-                    Text("\(warranty.startDate) — \(warranty.endDate)")
+                    Text("\(warranty.startDate) to \(warranty.endDate)")
                         .font(HavenTypography.uiLabelSmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }

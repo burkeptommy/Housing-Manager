@@ -175,7 +175,7 @@ struct FamilyMemberFormView: View {
                             .textInputAutocapitalization(.words)
                     }
 
-                    Text("Don't have a name yet? Use a nickname — you can change it later.")
+                    Text("Don't have a name yet? Use a nickname. You can change it later.")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textTertiary)
                 } else {
@@ -308,31 +308,6 @@ struct FamilyMemberFormView: View {
                 } header: {
                     Text("CONTACT").font(HavenTypography.uiSectionHeader).tracking(1.5)
                 }
-            }
-
-            // Avatar color
-            Section {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-                    ForEach(AvatarColor.allCases) { ac in
-                        Button {
-                            Haptics.light()
-                            avatarColor = ac
-                        } label: {
-                            ZStack {
-                                Circle().fill(ac.color).frame(width: 40, height: 40)
-                                if avatarColor == ac {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("AVATAR COLOR").font(HavenTypography.uiSectionHeader).tracking(1.5)
             }
 
             Section {
@@ -720,9 +695,20 @@ struct FamilyMemberFormView: View {
     }
 
     private func deleteMember() async {
-        guard let memberId = existingMember?.id else { return }
+        guard let member = existingMember else { return }
         do {
-            try await DatabaseService.shared.deleteFamilyMember(id: memberId)
+            // When the member has a linked auth user, the copy on the
+            // delete button promises to "revoke their access to this
+            // household" — back that with an actual `users.household_id`
+            // null first so the auth user can't keep reading household
+            // data via RLS after the family_member row is gone. Runs
+            // first because the household-access write targets the user
+            // by id, not by family_member_id, so it's unaffected by the
+            // subsequent delete.
+            if let linkedUserId = member.linkedUserId {
+                try await DatabaseService.shared.removeHouseholdAccess(userId: linkedUserId)
+            }
+            try await DatabaseService.shared.deleteFamilyMember(id: member.id)
             Analytics.track(.familyMemberDeleted)
             Haptics.success()
             await onSave?()

@@ -26,6 +26,12 @@ Every Supabase table has three types in `Core/Networking/DatabaseModels.swift`:
 
 All use `CodingKeys` for snake_case <-> camelCase mapping. Use resilient decoding (`try?`) for optional fields that Claude might omit or return in unexpected formats.
 
+**Resilient `init(from decoder:)` is mandatory for every externally-fed struct.** Any Codable type whose JSON originates outside the app (edge function response, UserDefaults blob, ATTOM / RentCast / Claude passthrough, JSONB column, cached lookup) MUST have a custom `init(from decoder: Decoder) throws` that wraps every field in `try? c.decodeIfPresent(...)`. One bad or new field should only take itself down, never the whole struct. Reference implementations: `PropertyRow`, `UtilityAccountRow`, `HouseholdAdvisorRow`, `VehicleRow`, `ProjectAIResearch`, `PropertyLookupResult` + its nested `PropertyFeatures` / `TaxAssessment` / `OwnerInfo`. The Phase 60.1 trust bug (Tom's $660K dropping silently) traced to the one struct — `PropertyLookupResult` — that skipped this discipline and used the compiler-synthesized decoder instead.
+
+**Task assignment type stamping rules (Phase 60.2).** `.either` is the default on every `MaintenanceTemplate` (`var assignmentType: TaskAssignmentType = .either`). Quiz answer paths that construct tasks MUST stamp `.either` too, never `.personal`, so Q36's preference tier resolver can flip them later. `.vendor` stamping is reserved for templates/tasks where the work is always pro (gas service, panel work, roof, septic pumping) or where the user has explicitly hired a pro for the category. `.personal` stamping is reserved for templates with `routingOverride: .diyDefault` (they have a hard-floor in `MaintenanceTaskReconciler.resolveAssignment`) — nothing else. Pre-stamping `.personal` elsewhere makes tasks sticky across Q36 changes, which is the bug F6 addressed.
+
+**Template library is the single source of truth for task shape.** Never build `MaintenanceTaskInsert` inline in `HouseQuizAnswerMapper` or any quiz answer handler. Tasks belong in `MaintenanceTemplates.swift` with `requiredSubtypes:` gates; answer handlers create (or reconcile) the `home_systems` row and call `MaintenanceTaskReconciler.reconcile(...)` which seeds the templates. Inline-task helpers (Phase 60.2 migrated the last one — hardscape) bypass dedup-by-templateKey, can't be flipped by Q36, skip city/state interpolation, and lose reconciler coverage. For new quiz-driven task shapes, add templates to the library and gate them on a new subtype.
+
 ## Edge Function Calls
 
 All go through `HavenSupabase` in `Core/Networking/SupabaseClient.swift`:
@@ -43,15 +49,22 @@ Under the hood, `callEdgeFunction()` handles auth token refresh, URL constructio
 
 ### Colors -- Always use `HavenColors.*`
 ```swift
-HavenColors.cream          // #F2EEE5 -- screen backgrounds
-HavenColors.creamLight     // #F8F6F1 -- cards, elevated surfaces
-HavenColors.navy800        // #1B2A4A -- primary text, buttons, icons
-HavenColors.navy700        // #243660 -- pressed states
-HavenColors.beige200       // #F0EBE1 -- borders, input backgrounds
-HavenColors.beige300       // #E3D9C6 -- dividers
-HavenColors.textPrimary    // adaptive (navy in light, cream in dark)
+// Canvas
+HavenColors.cream          // #F8F9FA -- pearl white screen backgrounds
+HavenColors.creamLight     // #FFFFFF -- pure white cards, elevated surfaces
+// Ink (Cosmic Indigo -- text, structure, hero surfaces)
+HavenColors.navy800        // #453A70 -- primary text, icons, inactive borders
+HavenColors.navy700        // #524580 -- pressed states
+// Action (Deepened Salmon -- CTAs only, never for small text)
+HavenColors.action         // #ED6955 -- buttons, progress bars, active tab, FAB
+HavenColors.textOnAction   // white text on salmon surfaces
+// Structure
+HavenColors.beige200       // #EDEEF0 -- borders, input backgrounds
+HavenColors.beige300       // #D8DADF -- dividers
+// Adaptive
+HavenColors.textPrimary    // adaptive (indigo in light, white in dark)
 HavenColors.textSecondary  // muted
-HavenColors.textOnNavy     // text on navy surfaces
+HavenColors.textOnNavy     // white text on indigo surfaces
 HavenColors.background     // adaptive screen background
 HavenColors.surface        // adaptive card surface
 HavenColors.border         // adaptive border

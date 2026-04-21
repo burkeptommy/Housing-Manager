@@ -51,6 +51,7 @@ struct InviteToHavenSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundColor(HavenColors.textSecondary)
                 }
             }
             .onAppear {

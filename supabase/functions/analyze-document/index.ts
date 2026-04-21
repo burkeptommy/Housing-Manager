@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -375,6 +376,37 @@ Return ONLY JSON. No markdown. No explanation.`,
     }
 
     console.log(`[analyze] Success! Category: ${analysis.category_suggestion}`);
+
+    // --- SPECIALTY SYSTEM INFERENCE (Phase 52b) ---
+    try {
+      const { data: existingSystems } = await supabase
+        .from("home_systems")
+        .select("category")
+        .eq("household_id", household_id);
+      const existingCategories = new Set((existingSystems ?? []).map((s: any) => s.category));
+
+      const { data: dismissals } = await supabase
+        .from("household_dismissed_suggestions")
+        .select("category")
+        .eq("household_id", household_id);
+      const dismissedCategories = new Set((dismissals ?? []).map((d: any) => d.category));
+
+      // Build combined text from document analysis fields
+      const title = (analysis as any).summary ?? "";
+      const docCategory = (analysis as any).category_suggestion ?? "";
+      const vendors = (analysis as any).vendor_info?.name ?? "";
+      const parties = ((analysis as any).key_parties ?? []).map((p: any) => `${p.name} ${p.role}`).join(" ");
+      const systems = ((analysis as any).home_systems ?? []).map((s: any) => `${s.name} ${s.category}`).join(" ");
+      const combinedText = [title, docCategory, vendors, parties, systems].join(" ");
+
+      const suggestion = inferSpecialtyCategory(combinedText, existingCategories, dismissedCategories);
+      if (suggestion) {
+        (analysis as any).specialty_system_suggestion = { ...suggestion, source: "document" };
+        console.log(`[analyze-document] Specialty suggestion: ${suggestion.category} (evidence: "${suggestion.evidence}")`);
+      }
+    } catch (err) {
+      console.warn("[analyze-document] Specialty inference failed:", (err as Error).message);
+    }
 
     // --- RETURN IMMEDIATELY ---
     // Send the analysis back to the client NOW. DB operations happen after.

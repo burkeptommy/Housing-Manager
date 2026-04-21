@@ -58,6 +58,21 @@ enum SeasonalTaskGrouper {
     /// Groups seasonal tasks into 4-5 homeowner-friendly categories.
     /// Tasks that don't match a known group get folded into the closest match.
     static func group(_ tasks: [MaintenanceTaskDBRow], systemNameLookup: @escaping (UUID?) -> String?) -> [SeasonalTaskGroup] {
+        // Deduplicate by templateId first (bundled tasks share the same key),
+        // then by title for tasks without a templateId. Keeps the first
+        // occurrence (which is the vendor-assigned one if it exists, since
+        // assigned tasks sort before unassigned in the fetch).
+        var seenTemplateIds = Set<String>()
+        var seenTitles = Set<String>()
+        let dedupedTasks = tasks.filter { task in
+            if let templateId = task.templateId, !templateId.isEmpty {
+                return seenTemplateIds.insert(templateId).inserted
+            }
+            let normalizedTitle = task.title.lowercased()
+                .replacingOccurrences(of: "schedule ", with: "")
+            return seenTitles.insert(normalizedTitle).inserted
+        }
+
         // Classify each task by examining its system name, title, and category
         var landscaping: [MaintenanceTaskDBRow] = []
         var exterior: [MaintenanceTaskDBRow] = []
@@ -65,7 +80,7 @@ enum SeasonalTaskGrouper {
         var hvacMechanical: [MaintenanceTaskDBRow] = []
         var waterFoundation: [MaintenanceTaskDBRow] = []
 
-        for task in tasks {
+        for task in dedupedTasks {
             let title = task.title.lowercased()
             let system = (systemNameLookup(task.systemId) ?? "").lowercased()
 
@@ -140,17 +155,25 @@ struct SeasonalTasksDetailView: View {
     let nextSeasonTasks: [MaintenanceTaskDBRow]
     let systemNameLookup: (UUID?) -> String?
     var contractorNameLookup: ((UUID?) -> String?)? = nil
+    var contractorLookup: ((UUID?) -> ContractorRow?)? = nil
     var onFindVendor: ((MaintenanceTaskDBRow) -> Void)? = nil
+    var propertyId: UUID? = nil
+    var serviceRecords: [ServiceRecordRow] = []
 
     @State private var expandedGroupId: String?
     @State private var selectedTask: MaintenanceTaskDBRow?
+    @State private var liveTasks: [MaintenanceTaskDBRow]?
+    @State private var liveNextTasks: [MaintenanceTaskDBRow]?
+
+    private var effectiveTasks: [MaintenanceTaskDBRow] { liveTasks ?? tasks }
+    private var effectiveNextTasks: [MaintenanceTaskDBRow] { liveNextTasks ?? nextSeasonTasks }
 
     private var groups: [SeasonalTaskGroup] {
-        SeasonalTaskGrouper.group(tasks, systemNameLookup: systemNameLookup)
+        SeasonalTaskGrouper.group(effectiveTasks, systemNameLookup: systemNameLookup)
     }
 
     private var nextGroups: [SeasonalTaskGroup] {
-        SeasonalTaskGrouper.group(nextSeasonTasks, systemNameLookup: systemNameLookup)
+        SeasonalTaskGrouper.group(effectiveNextTasks, systemNameLookup: systemNameLookup)
     }
 
     private var vendorCoveredCount: Int {
@@ -165,72 +188,35 @@ struct SeasonalTasksDetailView: View {
         groups.reduce(0) { $0 + $1.vendorAssignedCount }
     }
 
+    /// Season is fully complete when all vendor tasks have assigned contractors.
+    private var isSeasonComplete: Bool {
+        totalVendorTasks > 0 && assignedVendorTasks == totalVendorTasks
+    }
+
+    private var seasonYear: Int {
+        Season(rawValue: season).map { Season.year(for: $0) } ?? Calendar.current.component(.year, from: .now)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Progress header — vendor assignment focus
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        if totalVendorTasks > 0 {
-                            Text("\(assignedVendorTasks) of \(totalVendorTasks) vendors assigned")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(HavenColors.textSecondary)
-                        } else {
-                            Text("\(completedCount) of \(tasks.count) done")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(HavenColors.textSecondary)
-                        }
-                        Spacer()
-                        Text("\(vendorCoveredCount)/\(groups.count) groups ready")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(HavenColors.textTertiary)
-                    }
+                if effectiveTasks.isEmpty {
+                    emptySeasonContent
+                } else {
+                    // Progress header
+                    progressHeader
 
-                    if totalVendorTasks > 0 {
-                        ProgressView(value: Double(assignedVendorTasks), total: Double(max(totalVendorTasks, 1)))
-                            .tint(vendorProgressColor)
+                    if isSeasonComplete {
+                        completedSeasonContent
                     } else {
-                        ProgressView(value: Double(completedCount), total: Double(max(tasks.count, 1)))
-                            .tint(progressColor)
-                    }
-                }
-                .padding()
-                .background(HavenColors.surface)
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
-                .havenShadow()
-
-                // Current season groups
-                if !groups.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(season.uppercased())
-                            .font(HavenTypography.uiSectionHeader)
-                            .tracking(1.5)
-                            .foregroundStyle(HavenColors.textTertiary)
-
-                        ForEach(groups) { group in
-                            groupCard(group)
-                        }
-                    }
-                }
-
-                // Next season preview
-                if !nextGroups.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("COMING UP: \(nextSeason.uppercased())")
-                            .font(HavenTypography.uiSectionHeader)
-                            .tracking(1.5)
-                            .foregroundStyle(HavenColors.textTertiary)
-
-                        ForEach(nextGroups) { group in
-                            groupCardPreview(group)
-                        }
+                        activeSeasonContent
                     }
                 }
             }
             .padding()
         }
         .background(HavenColors.background)
-        .navigationTitle("\(season) Tasks")
+        .navigationTitle(isSeasonComplete ? "\(season) \(String(seasonYear)) \u{00B7} Complete" : "\(season) \(String(seasonYear))")
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen("SeasonalTasksDetailView", properties: ["season": season])
         .sheet(item: $selectedTask) { task in
@@ -255,21 +241,290 @@ struct SeasonalTasksDetailView: View {
             }
             .presentationDetents([.large])
         }
+        .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
+            Task { await reloadTasks() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .contractorChanged)) { _ in
+            Task { await reloadTasks() }
+        }
     }
 
-    private var progressColor: Color {
-        let progress = tasks.isEmpty ? 0.0 : Double(completedCount) / Double(tasks.count)
-        if progress >= 0.75 { return HavenColors.success }
-        if progress >= 0.4 { return HavenColors.warning }
-        return HavenColors.critical
+    private var progressColor: Color { HavenColors.navy }
+    private var vendorProgressColor: Color { HavenColors.navy }
+
+    private func reloadTasks() async {
+        guard let propertyId else { return }
+        guard let allTasks = try? await DatabaseService.shared.fetchMaintenanceTasks(propertyId: propertyId) else { return }
+        let seasonLower = season.lowercased()
+        let nextSeasonLower = nextSeason.lowercased()
+        liveTasks = allTasks.filter { $0.seasonalTiming?.lowercased().contains(seasonLower) == true }
+        liveNextTasks = allTasks.filter { $0.seasonalTiming?.lowercased().contains(nextSeasonLower) == true }
     }
 
-    private var vendorProgressColor: Color {
-        if totalVendorTasks == 0 { return HavenColors.success }
-        let ratio = Double(assignedVendorTasks) / Double(totalVendorTasks)
-        if ratio >= 0.75 { return HavenColors.success }
-        if ratio >= 0.4 { return HavenColors.warning }
-        return HavenColors.critical
+    // MARK: - Progress Header
+
+    @ViewBuilder
+    private var progressHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isSeasonComplete {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.success)
+                    Text("All \(assignedVendorTasks) vendors handled")
+                        .font(HavenTypography.title3)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        
+                }
+                ProgressView(value: 1.0)
+                    .tint(HavenColors.success)
+            } else {
+                HStack {
+                    if totalVendorTasks > 0 {
+                        Text("\(assignedVendorTasks) of \(totalVendorTasks) vendors assigned")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    } else {
+                        Text("\(completedCount) of \(effectiveTasks.count) done")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Spacer()
+                }
+                if totalVendorTasks > 0 {
+                    ProgressView(value: Double(assignedVendorTasks), total: Double(max(totalVendorTasks, 1)))
+                        .tint(vendorProgressColor)
+                } else {
+                    ProgressView(value: Double(completedCount), total: Double(max(effectiveTasks.count, 1)))
+                        .tint(progressColor)
+                }
+            }
+        }
+        .padding()
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .havenShadow()
+    }
+
+    // MARK: - Empty Season Content
+
+    @ViewBuilder
+    private var emptySeasonContent: some View {
+        VStack(spacing: 16) {
+            Spacer().frame(height: 40)
+
+            Image(systemName: Season(rawValue: season)?.icon ?? "calendar")
+                .font(.system(size: 36))
+                .foregroundStyle(HavenColors.textTertiary)
+
+            Text("No tasks scheduled for \(season) yet")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+                
+                .multilineTextAlignment(.center)
+
+            Text("Seasonal tasks will appear here as your maintenance plan builds out through the quiz, invoices, and vendor assignments.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Active Season Content
+
+    @ViewBuilder
+    private var activeSeasonContent: some View {
+        // Current season groups
+        if !groups.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("CATEGORIES")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                ForEach(groups) { group in
+                    groupCard(group)
+                }
+            }
+        }
+
+        // Next season preview
+        if !nextGroups.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("COMING UP: \(nextSeason.uppercased())")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                ForEach(nextGroups) { group in
+                    groupCardPreview(group)
+                }
+            }
+        }
+    }
+
+    // MARK: - Completed Season Content
+
+    @ViewBuilder
+    private var completedSeasonContent: some View {
+        // Season Summary
+        if !serviceRecords.isEmpty {
+            seasonSummarySection
+        }
+
+        // Categories (all complete)
+        if !groups.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("CATEGORIES")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                ForEach(groups) { group in
+                    groupCard(group)
+                }
+            }
+        }
+
+        // Next Up CTA
+        nextUpSection
+    }
+
+    // MARK: - Season Summary (Completed State)
+
+    @ViewBuilder
+    private var seasonSummarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("SEASON SUMMARY")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            VStack(spacing: 0) {
+                summaryRow(label: "Visits completed", value: "\(serviceRecords.count)")
+
+                if let firstDate = serviceRecords.compactMap({ $0.serviceDate }).sorted().first,
+                   let lastDate = serviceRecords.compactMap({ $0.serviceDate }).sorted().last {
+                    Divider().overlay(HavenColors.beige200)
+                    summaryRow(label: "First visit", value: formatShortDate(firstDate))
+                    Divider().overlay(HavenColors.beige200)
+                    summaryRow(label: "Last visit", value: formatShortDate(lastDate))
+                }
+
+                if let maxTier = maxCostTier {
+                    Divider().overlay(HavenColors.beige200)
+                    HStack {
+                        Text("Estimated cost tier")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Spacer()
+                        CostTierView(tier: maxTier)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                }
+            }
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private func summaryRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+            Spacer()
+            Text(value)
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+                
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+    }
+
+    private var maxCostTier: CostTier? {
+        effectiveTasks.compactMap { CostTier.from(averageCost: $0.estimatedCost) }.max()
+    }
+
+    private func formatShortDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        guard let date = formatter.date(from: dateString) else {
+            // Try other common formats
+            let fallback = DateFormatter()
+            fallback.dateFormat = "yyyy-MM-dd"
+            guard let d = fallback.date(from: String(dateString.prefix(10))) else { return dateString }
+            let display = DateFormatter()
+            display.dateFormat = "MMM d"
+            return display.string(from: d)
+        }
+        let display = DateFormatter()
+        display.dateFormat = "MMM d"
+        return display.string(from: date)
+    }
+
+    // MARK: - Next Up Section
+
+    @ViewBuilder
+    private var nextUpSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("NEXT UP")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            NavigationLink {
+                SeasonalTasksDetailView(
+                    season: nextSeason,
+                    tasks: effectiveNextTasks,
+                    completedCount: 0,
+                    nextSeason: Season(rawValue: nextSeason)?.next.displayName ?? "",
+                    nextSeasonTasks: [],
+                    systemNameLookup: systemNameLookup,
+                    contractorNameLookup: contractorNameLookup,
+                    contractorLookup: contractorLookup,
+                    onFindVendor: onFindVendor,
+                    propertyId: propertyId,
+                    serviceRecords: []
+                )
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(nextSeason) \(String(seasonYear))")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            
+                        if !nextGroups.isEmpty {
+                            Text("\(nextGroups.flatMap(\.vendorTasks).count) vendors typically needed")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("Plan \(nextSeason)")
+                            .font(HavenTypography.uiLabel)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .padding(14)
+                .background(HavenColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Group Card
@@ -278,15 +533,15 @@ struct SeasonalTasksDetailView: View {
         VStack(spacing: 0) {
             // Header row
             HStack(spacing: 12) {
-                Image(systemName: group.isFullyCovered ? "checkmark.circle.fill" : group.icon)
+                Image(systemName: groupStatusIcon(group))
                     .font(.system(size: 18))
-                    .foregroundStyle(group.isFullyCovered ? HavenColors.success : HavenColors.navy800)
+                    .foregroundStyle(groupStatusColor(group))
                     .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(group.name)
                         .font(HavenTypography.body)
-                        .foregroundStyle(group.isFullyCovered ? HavenColors.textTertiary : HavenColors.textPrimary)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                     // Vendor status subtitle
                     if !group.vendorTasks.isEmpty {
@@ -371,11 +626,13 @@ struct SeasonalTasksDetailView: View {
 
         return VStack(spacing: 0) {
             HStack(spacing: 10) {
-                // Status icon
-                if isVendor {
-                    Image(systemName: hasVendor ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.questionmark")
+                // Status icon: VendorLogoView for assigned vendors, SF Symbols for others
+                if isVendor, hasVendor, let contractor = contractorLookup?(task.assignedContractorId) {
+                    VendorLogoView(contractor: contractor, size: 24)
+                } else if isVendor {
+                    Image(systemName: "circle")
                         .font(.system(size: 14))
-                        .foregroundStyle(hasVendor ? HavenColors.success : HavenColors.warning)
+                        .foregroundStyle(HavenColors.warning)
                 } else {
                     Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 14))
@@ -385,14 +642,13 @@ struct SeasonalTasksDetailView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(task.title)
                         .font(HavenTypography.bodySmall)
-                        .foregroundStyle(isCompleted ? HavenColors.textTertiary : HavenColors.textPrimary)
-                        .strikethrough(isCompleted)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(2)
 
                     if isVendor, hasVendor, let name = contractorNameLookup?(task.assignedContractorId) {
                         Text(name)
                             .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.success)
+                            .foregroundStyle(HavenColors.textSecondary)
                     } else if let systemName = systemNameLookup(task.systemId) {
                         Text(systemName)
                             .font(HavenTypography.uiCaption)
@@ -428,6 +684,30 @@ struct SeasonalTasksDetailView: View {
                 selectedTask = task
                 Haptics.selection()
             }
+        }
+    }
+
+    // MARK: - Group Status Helpers
+
+    /// 3-state icon for category row: complete, partial, or empty
+    private func groupStatusIcon(_ group: SeasonalTaskGroup) -> String {
+        if group.isFullyCovered {
+            return "checkmark.circle.fill"
+        } else if group.vendorAssignedCount > 0 || group.completedCount > 0 {
+            return "circle.lefthalf.filled"
+        } else {
+            return "circle"
+        }
+    }
+
+    /// Color matching the 3-state icon
+    private func groupStatusColor(_ group: SeasonalTaskGroup) -> Color {
+        if group.isFullyCovered {
+            return HavenColors.success
+        } else if group.vendorAssignedCount > 0 || group.completedCount > 0 {
+            return HavenColors.navy500
+        } else {
+            return HavenColors.textTertiary
         }
     }
 

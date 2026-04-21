@@ -13,6 +13,9 @@ struct ScenarioStudioView: View {
     @State private var activeTab: ScenarioTab = .explore
     @AppStorage("hasAcknowledgedScenarioDisclaimer") private var hasAcknowledgedDisclaimer = false
     @State private var showDisclaimer = false
+    /// Bug B2 fix: loaded on appear so scenario input views can pre-fill
+    /// property-derived params (sale_price, mortgage balance, etc.).
+    @State private var primaryProperty: PropertyRow?
 
     enum ScenarioTab: String, CaseIterable {
         case explore = "Explore"
@@ -113,6 +116,13 @@ struct ScenarioStudioView: View {
                 if let scenario = selectedScenario {
                     ScenarioInputView(
                         scenario: scenario,
+                        // Bug B2 fix: wire the primary property's estimated
+                        // value through as a contextual default for the
+                        // sale_price field. The scenario input view layers
+                        // this over each field's static defaultValue so
+                        // "What if I sold my house today?" opens with the
+                        // current home value pre-populated.
+                        contextDefaults: scenarioContextDefaults(),
                         onSubmit: { params in
                             showInput = false
                             viewModel.runScenario(id: scenario.id, params: params)
@@ -151,6 +161,13 @@ struct ScenarioStudioView: View {
                 Analytics.track(.scenarioStudioOpened)
                 await viewModel.loadHousehold()
                 await viewModel.loadRecentScenarios()
+                // Bug B2 fix: resolve the primary property so scenario
+                // input views can pre-fill property-derived parameters
+                // (sale_price for "What if I sold my house today?").
+                if let props = try? await DatabaseService.shared.fetchProperties(),
+                   let primary = props.first {
+                    primaryProperty = primary
+                }
                 if !hasAcknowledgedDisclaimer {
                     showDisclaimer = true
                 }
@@ -211,7 +228,7 @@ struct ScenarioStudioView: View {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
                     .foregroundStyle(HavenColors.navy700)
-                Text("Scenario submitted — we'll notify you when it's ready")
+                Text("Scenario submitted. We'll notify you when it's ready.")
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.navy800)
             }
@@ -581,6 +598,19 @@ struct ScenarioStudioView: View {
         selectedScenario = nil
         viewModel.runCustomScenario(query: customQuery)
         showSubmittedBanner(andDismiss: true)
+    }
+
+    /// Bug B2 fix: builds the context-defaults dict passed into
+    /// ScenarioInputView. Currently populates `sale_price` from the
+    /// primary property's ATTOM-derived estimated value. When more
+    /// scenarios take property-derived parameters (mortgage balance,
+    /// etc.), add them here.
+    private func scenarioContextDefaults() -> [String: String] {
+        var defaults: [String: String] = [:]
+        if let value = primaryProperty?.currentEstimatedValue, value > 0 {
+            defaults["sale_price"] = String(format: "%.0f", value)
+        }
+        return defaults
     }
 
     private func showSubmittedBanner(andDismiss: Bool) {

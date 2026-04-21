@@ -14,7 +14,7 @@ enum HookContent {
     enum Page1 {
         // Hero
         static let titleTemplate = "Your home in {city}, {state}"
-        static let valueRangeCaption = "We estimate optimistically. Most property apps undervalue."
+        static let valueRangeCaption = "Estimated from public records. You can edit it if you know a more recent number."
 
         // Equity-protected anchor
         static let equityHeadline = "Homes maintained well sell for ~7.4% more."

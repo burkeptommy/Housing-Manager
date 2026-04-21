@@ -30,7 +30,7 @@ struct HouseholdStaffView: View {
                         showAddSheet = true
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(HavenColors.navy)
+                    .tint(HavenColors.action)
                 }
             } else {
                 staffList

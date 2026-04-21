@@ -55,7 +55,7 @@ struct HavenButton: View {
 
     private var backgroundColor: Color {
         switch style {
-        case .primary: return HavenColors.navy
+        case .primary: return HavenColors.action
         case .secondary: return HavenColors.creamLight
         case .destructive: return HavenColors.critical.opacity(0.1)
         }
@@ -63,8 +63,8 @@ struct HavenButton: View {
 
     private var foregroundColor: Color {
         switch style {
-        case .primary: return HavenColors.textOnNavy
-        case .secondary: return HavenColors.navy
+        case .primary: return HavenColors.textOnAction
+        case .secondary: return HavenColors.action
         case .destructive: return HavenColors.critical
         }
     }

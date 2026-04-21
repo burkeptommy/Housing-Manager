@@ -19,6 +19,17 @@ extension Notification.Name {
     static let documentChanged = Notification.Name("documentChanged")
     static let propertyChanged = Notification.Name("propertyChanged")
     static let projectChanged = Notification.Name("projectChanged")
+    /// Phase 51: Posted when a standing appointment is created, updated, paused, or archived.
+    static let standingAppointmentChanged = Notification.Name("standingAppointmentChanged")
+    /// Phase 54E: Posted when a household cadence is created, updated, or deleted.
+    /// Property and Maintenance surfaces listen for this to refresh count badges
+    /// and virtual-occurrence rows without manual pull-to-refresh.
+    static let householdCadenceChanged = Notification.Name("householdCadenceChanged")
+    /// Phase 55: Posted when a routine is created, updated, archived, or deleted.
+    /// Replaces `.householdCadenceChanged` once Section 55.3 repoints the last
+    /// legacy writer; for 55.1/55.2 both names coexist so readers don't miss
+    /// updates during the transition.
+    static let routineChanged = Notification.Name("routineChanged")
     static let inboxItemUpdated = Notification.Name("inboxItemUpdated")
     static let navigateToVehicle = Notification.Name("navigateToVehicle")
     static let navigateToInboxItem = Notification.Name("navigateToInboxItem")
@@ -175,7 +186,7 @@ struct MainTabView: View {
                 Text(label)
                     .font(.system(size: 10, weight: selectedTab == tag ? .semibold : .medium))
             }
-            .foregroundStyle(selectedTab == tag ? HavenColors.navy800 : Color(red: 0.71, green: 0.69, blue: 0.65))
+            .foregroundStyle(selectedTab == tag ? HavenColors.action : HavenColors.tabInactive)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
@@ -200,7 +211,7 @@ struct MainTabView: View {
                 Text("Alfred")
                     .font(.system(size: 10, weight: selectedTab == 3 ? .semibold : .medium))
             }
-            .foregroundStyle(selectedTab == 3 ? HavenColors.navy800 : Color(red: 0.71, green: 0.69, blue: 0.65))
+            .foregroundStyle(selectedTab == 3 ? HavenColors.action : HavenColors.tabInactive)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
@@ -210,7 +221,7 @@ struct MainTabView: View {
     private var alfredIcon: some View {
         ZStack {
             Circle()
-                .fill(selectedTab == 3 ? HavenColors.navy800 : Color(red: 0.71, green: 0.69, blue: 0.65))
+                .fill(selectedTab == 3 ? HavenColors.action : HavenColors.tabInactive)
                 .frame(width: 22, height: 22)
             Text("A")
                 .font(HavenTypography.fraunces(size: 13, weight: 700))

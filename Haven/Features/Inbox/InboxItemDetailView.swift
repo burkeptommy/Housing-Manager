@@ -32,6 +32,23 @@ struct InboxItemDetailView: View {
     @State private var showCategoryPicker = false
     @State private var showLinkToProject = false
     @State private var linkedToProject = false
+    /// Phase 55.X: Inline error surface for the post-save Create-Project
+    /// flow. Populated when the direct edge-function call fails so the
+    /// user sees WHY (vs the prior silent print-then-dismiss path).
+    @State private var postSaveError: String?
+
+    /// Build 91 — snapshot of the item's action type captured on first
+    /// appear. Background refreshes (fired by `.maintenanceTaskChanged`,
+    /// `.documentChanged`, etc.) can rewrite `item.actionType` after
+    /// `receive-email` or `process-inbox-item` runs server-side, which
+    /// would otherwise flip the "Add to project" quote prompt off mid-view.
+    /// Capturing it here keeps the prompt stable as long as the sheet is
+    /// open — the user still sees the CTA they walked in on.
+    @State private var initialActionType: String?
+    /// Similarly snapshot the item's type so the quote CTA branch doesn't
+    /// collapse if the server rewrites `item.type` from `contractor_quote`
+    /// to something less specific after processing.
+    @State private var initialItemType: String?
 
     var body: some View {
         ScrollView {
@@ -72,6 +89,14 @@ struct InboxItemDetailView: View {
                 // Actions
                 if item.isPending {
                     actionSection
+                } else if showsPostSaveQuoteActions {
+                    // Phase 55.X: Persistent quote actions for items
+                    // that have already been marked "Saved". Without
+                    // this, the Link to Project / Create Project
+                    // affordances disappear the moment the user taps
+                    // any CTA — leaving no way to route an already-
+                    // saved quote into a project from the inbox.
+                    postSaveQuoteActionSection
                 }
 
                 Spacer().frame(height: 20)
@@ -216,6 +241,10 @@ struct InboxItemDetailView: View {
             if let suggested = item.metadata?.suggestedCategory, !suggested.isEmpty {
                 selectedCategory = suggested
             }
+            // Build 91: capture the item's action+type on first appear so
+            // background refreshes don't flip the quote CTA branch off.
+            if initialActionType == nil { initialActionType = item.actionType }
+            if initialItemType == nil { initialItemType = item.type }
         }
         .task {
             // Auto-present invoice choice for bills with a linked document
@@ -637,6 +666,20 @@ struct InboxItemDetailView: View {
                 }
             }
 
+            // TODO: Phase 52b — Wire SpecialtySuggestionCard here once
+            // InboxMetadata is extended with a `specialtySystemSuggestion`
+            // field. The suggestion is currently only available on
+            // InvoiceProcessingResult (returned by process-invoice), not on
+            // the inbox item's metadata (populated by receive-email /
+            // analyze-document). To surface it here:
+            //   1. Add `specialtySystemSuggestion: SpecialtySystemSuggestion?`
+            //      to InboxMetadata and its CodingKeys/init.
+            //   2. Have analyze-document write the suggestion into the inbox
+            //      item's metadata JSON.
+            //   3. Render SpecialtySuggestionCard with the same accept/dismiss
+            //      handlers as InvoiceReviewSheet (create HomeSystemInsert on
+            //      accept, call dismissSpecialtySuggestion on dismiss).
+
             // Action buttons -- all use HavenButton for uniform sizing
             VStack(spacing: HavenTheme.spacing8) {
                 if item.actionType == "add_utility_provider" && !utilityAdded {
@@ -816,6 +859,155 @@ struct InboxItemDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - Post-save quote actions
+
+    /// True when the user has already processed a quote-type inbox
+    /// item (tapped "Just Save Document", "New Project", etc.) AND
+    /// we still need to expose project-routing affordances. Captures
+    /// the initial item type via `initialItemType` so a background
+    /// refresh that rewrites `item.type` to `document_stored` after
+    /// save doesn't hide the section. Shows for any saved quote
+    /// regardless of whether `related_document_id` was stamped — if
+    /// the document-link button has nothing to link, it's omitted,
+    /// but the create-project button still works via the standard
+    /// `process_quote` pipeline on the server.
+    private var showsPostSaveQuoteActions: Bool {
+        let itemType = initialItemType ?? item.type
+        let wasQuote = itemType == "contractor_quote"
+            || itemType == "project_created"
+            || (initialActionType ?? item.actionType) == "quote_received"
+        guard wasQuote else { return false }
+        guard !linkedToProject else { return false }
+        // Suppress if there's truly nothing to do — no projects to
+        // link against AND no attachment/document to feed the create
+        // flow. Safety against a dead-end CTA stack.
+        let hasDocument = item.relatedDocumentId != nil
+        let hasAttachment = item.attachmentPath != nil
+        return !projects.isEmpty || hasDocument || hasAttachment
+    }
+
+    /// Persistent Link-to-Project + Create-Project affordances for
+    /// quotes that are already saved. Matches the existing
+    /// `actionSection` visual idiom (muted navy card) so the
+    /// post-save state reads as "saved AND still actionable" rather
+    /// than a second primary CTA stack.
+    ///
+    /// Create-Project calls `HavenSupabase.processInboxItem` directly
+    /// (not through the viewModel's fire-and-forget `processItem`) so
+    /// the user sees a real loading state and any server error surfaces
+    /// inline instead of vanishing into a console log.
+    private var postSaveQuoteActionSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            HStack(spacing: 6) {
+                Image(systemName: "folder.badge.plus")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.navy700)
+                Text("Still need to route this quote?")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+
+            Text("The email's saved. Link it to an existing project or spin up a new one whenever you're ready.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            // Property picker surfaces only when the user has more
+            // than one and nothing is preselected. Server-side
+            // `process_quote` requires property_id, so without a
+            // selection the call 400s silently — which is what Tom
+            // hit before. Explicit picker here makes the requirement
+            // legible instead of a hidden failure mode.
+            if properties.count > 1 {
+                Picker("Property", selection: $selectedPropertyId) {
+                    Text("Select property").tag(nil as UUID?)
+                    ForEach(properties) { property in
+                        Text(property.name).tag(property.id as UUID?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(HavenColors.navy700)
+            }
+
+            // Link-to-Project only surfaces when we have both a
+            // document row to link AND projects to link against.
+            if !projects.isEmpty, item.relatedDocumentId != nil {
+                HavenButton(
+                    title: "Link to Project",
+                    action: { showLinkToProject = true },
+                    icon: "folder.badge.plus"
+                )
+            }
+
+            // Create Project works for any saved quote — the server
+            // handles document creation from the attachment when no
+            // related_document_id exists yet.
+            HavenButton(
+                title: "Create Project from this Quote",
+                action: { Task { await createProjectFromSavedQuote() } },
+                style: projects.isEmpty || item.relatedDocumentId == nil ? .primary : .secondary,
+                icon: "hammer.fill",
+                isLoading: isProcessing,
+                isDisabled: isProcessing || resolvedPropertyIdForQuote == nil
+            )
+
+            if let postSaveError {
+                Text(postSaveError)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.critical)
+            }
+        }
+        .padding(HavenTheme.spacing16)
+        .background(HavenColors.navy.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Resolves the property_id for the Create-Project flow. Prefers
+    /// explicit selection; falls back to the sole property when
+    /// there's only one. Returns nil when we can't make a safe
+    /// assumption — the button disables in that case so the user
+    /// picks explicitly.
+    private var resolvedPropertyIdForQuote: UUID? {
+        if let selected = selectedPropertyId { return selected }
+        if properties.count == 1 { return properties.first?.id }
+        return nil
+    }
+
+    /// Phase 55.X: Direct-call path for Create-Project from a saved
+    /// quote. Bypasses `onProcess` (fire-and-forget) so we can `await`
+    /// the edge function, render a loading state, and surface errors
+    /// inline. On success the sheet dismisses and posts a
+    /// `.projectChanged` notification so Property → Projects picks
+    /// up the new row.
+    private func createProjectFromSavedQuote() async {
+        guard !isProcessing else { return }
+        guard let propId = resolvedPropertyIdForQuote else {
+            postSaveError = "Pick a property first."
+            return
+        }
+        isProcessing = true
+        postSaveError = nil
+        defer { isProcessing = false }
+
+        do {
+            _ = try await HavenSupabase.processInboxItem(
+                inboxItemId: item.id.uuidString,
+                propertyId: propId.uuidString,
+                action: "process_quote",
+                documentCategory: nil,
+                targetProjectId: nil,
+                vehicleId: nil
+            )
+            Haptics.success()
+            NotificationCenter.default.post(name: .projectChanged, object: nil)
+            NotificationCenter.default.post(name: .inboxItemUpdated, object: nil)
+            dismiss()
+        } catch {
+            Haptics.error()
+            postSaveError = "Couldn't create the project: \(error.localizedDescription)"
+            print("[InboxItemDetail] process_quote failed: \(error)")
+        }
+    }
+
     // MARK: - Utility Provider Prompt
 
     private var utilityProviderPrompt: some View {
@@ -954,7 +1146,16 @@ struct InboxItemDetailView: View {
     }
 
     private var isQuoteAction: Bool {
-        item.actionType == "quote_received" || item.type == "contractor_quote" || (item.type == "project_created" && item.isPending)
+        // Build 91: prefer the snapshotted values captured on first appear
+        // so a background refresh rewriting `item.actionType` from
+        // "quote_received" to "review" (or `item.type` from
+        // "contractor_quote" to "document_stored") doesn't make the
+        // "Add to project" / "New Project" buttons vanish mid-view.
+        let actionType = initialActionType ?? item.actionType
+        let itemType = initialItemType ?? item.type
+        return actionType == "quote_received"
+            || itemType == "contractor_quote"
+            || (itemType == "project_created" && item.isPending)
     }
 
     private var primaryActionTitle: String {

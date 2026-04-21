@@ -375,7 +375,7 @@ struct FamilyItemDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Close") { dismiss() }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textSecondary)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -432,7 +432,7 @@ struct FamilyItemDetailView: View {
                 VStack(spacing: 0) {
                     DatePicker("Date", selection: $rescheduleDate, displayedComponents: .date)
                         .datePickerStyle(.graphical)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .padding(.horizontal)
 
                     Divider().padding(.horizontal)
@@ -449,7 +449,7 @@ struct FamilyItemDetailView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") { showReschedule = false }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Save") {
@@ -496,7 +496,7 @@ struct FamilyItemDetailView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") { showTagging = false }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Save") {
@@ -595,7 +595,7 @@ struct FamilyItemDetailView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") { showSaveAsDocument = false }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
                 .task {

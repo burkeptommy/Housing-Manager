@@ -140,6 +140,24 @@ enum EnrichmentActions {
                 )
             }
 
+        // Phase 62 — four new enrichment answers that each drive a
+        // template via the reconciler. The attribute itself has already
+        // been written by the dashboard answer handler before this
+        // switch fires. All we do here is re-run the reconciler so the
+        // activeSubtypes recomputation picks up the new flag and seeds
+        // the matching gated template. Per CLAUDE.md: "Template library
+        // is the single source of truth for task shape" — no inline
+        // task creation in answer handlers.
+        case "has_mature_trees",
+             "driveway_material",
+             "has_fridge_water_dispenser",
+             "has_sump_battery_backup":
+            _ = await MaintenanceTaskReconciler.reconcileAll(
+                propertyId: propertyId,
+                householdId: householdId
+            )
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+
         default:
             break
         }

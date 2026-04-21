@@ -1303,6 +1303,9 @@ Respond with ONLY valid JSON:
               ai_summary: classification.summary,
               visible_to_home_managers: visibleToHomeManagers(docCategory),
               ...(docContentHash ? { content_hash: docContentHash } : {}),
+              // Phase 58: stamp vendor FK when STEP 1 matched an existing
+              // contractor or auto-created one from the sender's email.
+              ...(createdContractorId ? { contractor_id: createdContractorId } : {}),
             };
             if (property) {
               docInsert.property_id = property.id;
@@ -1401,6 +1404,8 @@ Respond with ONLY valid JSON:
                 ai_summary: classification.summary,
                 visible_to_home_managers: visibleToHomeManagers(docCategory),
                 ...(vehContentHash ? { content_hash: vehContentHash } : {}),
+                // Phase 58: vendor FK if one was matched / created above.
+                ...(createdContractorId ? { contractor_id: createdContractorId } : {}),
               })
               .select("id")
               .single();
@@ -1510,6 +1515,10 @@ Respond with ONLY valid JSON:
                 ai_summary: classification.summary,
                 visible_to_home_managers: visibleToHomeManagers(docCategory),
                 ...(billContentHash ? { content_hash: billContentHash } : {}),
+                // Phase 58: bills usually get their contractor_id stamped
+                // later by process-invoice, but carry one through if a
+                // match was already made.
+                ...(createdContractorId ? { contractor_id: createdContractorId } : {}),
               })
               .select("id")
               .single();
@@ -1621,6 +1630,8 @@ Respond with ONLY valid JSON:
               notes: `Additional attachment from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
               ai_summary: `Attachment: ${att.filename || "unnamed file"}`,
               visible_to_home_managers: visibleToHomeManagers(attachmentCategory),
+              // Phase 58: carry vendor FK through to additional attachments.
+              ...(createdContractorId ? { contractor_id: createdContractorId } : {}),
             }).select("id").single();
             if (doc) {
               actions.push(`stored_additional_attachment:${att.filename}`);

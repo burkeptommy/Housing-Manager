@@ -297,12 +297,17 @@ final class AddressHookViewModel: ObservableObject {
 
             let response = try JSONDecoder().decode(LookupResponse.self, from: responseData)
             if response.success, let property = response.property {
+                // Phase 60.1: instrument every hand-off point of the ATTOM
+                // pipeline. If a field drops, the logs show exactly where.
+                print("[ATTOM persist] edge-function decode: lastSalePrice=\(property.lastSalePrice?.description ?? "nil") estimatedValue=\(property.estimatedValue?.description ?? "nil") source=\(property.estimatedValueSource ?? "nil") yearBuilt=\(property.yearBuilt?.description ?? "nil") sqft=\(property.squareFootage?.description ?? "nil")")
                 propertyLookupResult = property
             } else {
+                print("[ATTOM persist] edge-function decode: no property (success=\(response.success))")
                 propertyLookupResult = nil
             }
         } catch {
             print("[AddressHook] Property lookup failed: \(error)")
+            print("[ATTOM persist] edge-function decode FAILED: \(error)")
             propertyLookupResult = nil
         }
 
@@ -334,6 +339,11 @@ final class AddressHookViewModel: ObservableObject {
         if let result = propertyLookupResult,
            let data = try? JSONEncoder().encode(result) {
             defaults.set(data, forKey: "addressHook_propertyResult")
+            // Phase 60.1: log the UserDefaults write so post-auth read
+            // mismatches are traceable end-to-end.
+            print("[ATTOM persist] UserDefaults write: lastSalePrice=\(result.lastSalePrice?.description ?? "nil") estimatedValue=\(result.estimatedValue?.description ?? "nil") fieldCount=\(data.count) bytes")
+        } else if propertyLookupResult == nil {
+            print("[ATTOM persist] UserDefaults write: no lookup result cached (propertyLookupResult is nil)")
         }
 
         defaults.set(true, forKey: "addressHook_hasData")
@@ -350,6 +360,16 @@ final class AddressHookViewModel: ObservableObject {
         var propertyResult: PropertyLookupResult?
         if let data = defaults.data(forKey: "addressHook_propertyResult") {
             propertyResult = try? JSONDecoder().decode(PropertyLookupResult.self, from: data)
+            // Phase 60.1: post-auth UserDefaults read log. If the decoder
+            // fails, propertyResult stays nil and we log that explicitly
+            // so a post-auth trace shows exactly which leg dropped the data.
+            if let cached = propertyResult {
+                print("[ATTOM persist] UserDefaults read (post-auth): lastSalePrice=\(cached.lastSalePrice?.description ?? "nil") estimatedValue=\(cached.estimatedValue?.description ?? "nil")")
+            } else {
+                print("[ATTOM persist] UserDefaults read (post-auth): decoder returned nil for \(data.count) bytes of cached data")
+            }
+        } else {
+            print("[ATTOM persist] UserDefaults read (post-auth): no cached propertyResult data")
         }
 
         return (

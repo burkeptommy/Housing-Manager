@@ -356,7 +356,7 @@ struct FamilyInboxView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close") { showAllUpcoming = false }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
             }
@@ -452,7 +452,7 @@ struct FamilyInboxView: View {
                     if let date = event.eventDate {
                         HStack(spacing: 4) {
                             if event.isAllDay {
-                                Text("\(date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())) — All Day")
+                                Text("\(date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())) · All Day")
                                     .font(HavenTypography.uiCaption)
                                     .foregroundStyle(HavenColors.textSecondary)
                             } else {
@@ -820,7 +820,7 @@ struct FamilyInboxView: View {
             VStack(spacing: 0) {
                 DatePicker("Date", selection: $rescheduleDate, displayedComponents: .date)
                     .datePickerStyle(.graphical)
-                    .tint(HavenColors.navy800)
+                    .tint(HavenColors.action)
                     .padding(.horizontal)
 
                 Divider().padding(.horizontal)
@@ -837,7 +837,7 @@ struct FamilyInboxView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { showReschedule = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
@@ -898,7 +898,7 @@ struct FamilyInboxView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { showTagging = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {

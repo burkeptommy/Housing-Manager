@@ -90,7 +90,7 @@ struct EditProjectSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {

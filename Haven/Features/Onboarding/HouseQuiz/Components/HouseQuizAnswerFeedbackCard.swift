@@ -32,9 +32,12 @@ struct HouseQuizAnswerFeedbackCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("Source: \(feedback.citationName)")
-                .font(HavenTypography.uiCaption)
-                .foregroundStyle(HavenColors.textTertiary)
+            // Phase 60.2: citation is optional now.
+            if let citation = feedback.citationName, !citation.isEmpty {
+                Text("Source: \(citation)")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
 
             HavenButton(title: "Continue") {
                 onContinue()

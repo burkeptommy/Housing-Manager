@@ -46,6 +46,17 @@ actor PropertyCreationService {
         }
         let lookupSucceeded = resolvedLookup != nil
 
+        // Phase 60.1: log the resolved lookup when PropertyCreationService is
+        // the ingress point (AddPropertyFlow / AddressConfirmationIntercept).
+        // Mirrors the `[ATTOM persist]` trace from the OnboardingViewModel
+        // path so a single search surfaces the whole pipeline regardless of
+        // which entry point created the property.
+        if let lookup = resolvedLookup {
+            print("[ATTOM persist] PropertyCreationService.resolvedLookup: lastSalePrice=\(lookup.lastSalePrice?.description ?? "nil") estimatedValue=\(lookup.estimatedValue?.description ?? "nil")")
+        } else {
+            print("[ATTOM persist] PropertyCreationService.resolvedLookup: nil (ATTOM/RentCast/AI all returned no data)")
+        }
+
         // 2. Build the property insert. ATTOM-enriched values fall back to
         // the user's typed values when ATTOM has nothing.
         let propertyName = [address.street, address.city]
@@ -74,13 +85,25 @@ actor PropertyCreationService {
         // dashboard never has to render "Add estimated value" for an address
         // we just enriched.
         insert.currentEstimatedValue = resolvedLookup?.estimatedValue
+        // Phase 56.2 — preserve the ATTOM AVM band alongside the midpoint so
+        // the property card can render "$908K–$1.0M" instead of a false-
+        // precision point estimate. Both stay nil when the lookup source
+        // didn't supply a range (the card falls back to the point value).
+        insert.currentEstimatedValueLow = resolvedLookup?.estimatedValueLow
+        insert.currentEstimatedValueHigh = resolvedLookup?.estimatedValueHigh
         insert.estimatedValueSource = resolvedLookup?.estimatedValueSource
         insert.estimatedValueConfidence = resolvedLookup?.estimatedValueConfidence
         // Phase 18g — surface the AI reasoning paragraph when the lookup
         // chain fell through to Claude's web search comps layer.
         insert.estimatedValueReasoning = resolvedLookup?.estimatedValueReasoning
 
+        // Phase 60.1: log the PropertyInsert right before the DB write.
+        print("[ATTOM persist] PropertyInsert built: purchasePrice=\(insert.purchasePrice?.description ?? "nil") currentEstimatedValue=\(insert.currentEstimatedValue?.description ?? "nil") source=\(insert.estimatedValueSource ?? "nil")")
+
         let property = try await DatabaseService.shared.createProperty(insert)
+
+        // Phase 60.1: verify the server round-tripped the numbers faithfully.
+        print("[ATTOM persist] PropertyRow after insert: purchasePrice=\(property.purchasePrice?.description ?? "nil") currentEstimatedValue=\(property.currentEstimatedValue?.description ?? "nil")")
 
         // 3. Auto-create home systems. Universal systems (HVAC, Roof, Water
         // Heater, Electrical Panel) are always created so the Maintenance tab

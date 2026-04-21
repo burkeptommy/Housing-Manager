@@ -40,17 +40,16 @@ struct AddPropertyFlow: View {
                     addressStep
                         .tag(AddPropertyFlowStep.address)
 
-                    OnboardingSchedulePreviewStep(
-                        street: viewModel.street,
-                        city: viewModel.city,
-                        state: viewModel.state,
-                        propertyResult: $viewModel.propertyLookupResult,
-                        scheduleItems: $viewModel.schedulePreview,
-                        isLoading: viewModel.isLookingUpProperty,
-                        onPropertyEdited: { viewModel.regenerateSchedule() }
-                    )
-                    .tag(AddPropertyFlowStep.preview)
-
+                    // Phase 60.1: Removed the legacy `OnboardingSchedulePreviewStep`
+                    // entirely. The preview step used to show a 12-month
+                    // DIY maintenance list under "$967 estimated annual cost" —
+                    // the same framing Phase 20 called out as wrong for HNW
+                    // users. The review-before-commit affordance now lives
+                    // in two better places: `PropertyHookView` (shown as a
+                    // fullScreenCover on confirmation) gives the value +
+                    // coverage anchor, and `PropertyRecapCard` on the first
+                    // quiz screen lets the user correct any ATTOM field
+                    // inline before investing in the questions.
                     confirmationStep
                         .tag(AddPropertyFlowStep.confirmation)
                 }
@@ -252,30 +251,26 @@ struct AddPropertyFlow: View {
         VStack(spacing: HavenTheme.spacing12) {
             switch viewModel.currentStep {
             case .address:
-                HavenButton(title: "Find My Home") {
-                    Task {
-                        viewModel.currentStep = .preview
-                        await viewModel.lookupProperty()
-                    }
-                }
-                .disabled(!viewModel.canProceedFromAddress)
-
-            case .preview:
-                if !viewModel.isLookingUpProperty {
-                    HavenButton(
-                        title: viewModel.isCreating ? "Adding..." : "Add \(viewModel.previewActionLabel)",
-                        action: {
-                            Task { await viewModel.createProperty() }
+                // Phase 60.1: Find My Home now runs the ATTOM lookup AND
+                // creates the property in one go. The review-before-commit
+                // affordance moved to `PropertyRecapCard` (the first quiz
+                // screen) so users can correct any ATTOM field inline
+                // after creation but before they invest in the questions.
+                HavenButton(
+                    title: viewModel.isCreating || viewModel.isLookingUpProperty
+                        ? "Setting up your home..."
+                        : "Find My Home",
+                    action: {
+                        Task {
+                            await viewModel.lookupProperty()
+                            await viewModel.createProperty()
                         }
-                    )
-                    .disabled(viewModel.isCreating)
-
-                    Button("Back to address") {
-                        viewModel.currentStep = .address
-                    }
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textTertiary)
-                }
+                    },
+                    isLoading: viewModel.isLookingUpProperty || viewModel.isCreating,
+                    isDisabled: !viewModel.canProceedFromAddress
+                        || viewModel.isLookingUpProperty
+                        || viewModel.isCreating
+                )
 
             case .confirmation:
                 // Phase 20a: the confirmation step now auto-presents
@@ -297,8 +292,10 @@ struct AddPropertyFlow: View {
 
 enum AddPropertyFlowStep: Int, CaseIterable {
     case address = 0
-    case preview
     case confirmation
+    // Phase 60.1: `.preview` step deleted alongside the legacy
+    // `OnboardingSchedulePreviewStep`. Review now lives on `PropertyRecapCard`
+    // at the start of the House Quiz.
 }
 
 // MARK: - View Model
@@ -324,7 +321,6 @@ final class AddPropertyFlowViewModel: ObservableObject {
     @Published var zipCode = ""
 
     @Published var propertyLookupResult: PropertyLookupResult?
-    @Published var schedulePreview: [SchedulePreviewItem] = []
     @Published var isLookingUpProperty = false
 
     @Published var isCreating = false
@@ -343,7 +339,6 @@ final class AddPropertyFlowViewModel: ObservableObject {
     var navigationTitle: String {
         switch currentStep {
         case .address: return "Add Property"
-        case .preview: return "Confirm Details"
         case .confirmation: return ""
         }
     }
@@ -412,18 +407,7 @@ final class AddPropertyFlowViewModel: ObservableObject {
             propertyLookupResult = nil
         }
 
-        schedulePreview = OnboardingScheduleGenerator.generate(
-            from: propertyLookupResult,
-            state: state
-        )
         isLookingUpProperty = false
-    }
-
-    func regenerateSchedule() {
-        schedulePreview = OnboardingScheduleGenerator.generate(
-            from: propertyLookupResult,
-            state: state
-        )
     }
 
     func createProperty() async {

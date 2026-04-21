@@ -62,10 +62,8 @@ struct OverdueTasksDetailView: View {
                                     .font(HavenTypography.uiCaption)
                                     .foregroundStyle(HavenColors.critical)
 
-                                if let costRange = task.costRange {
-                                    Text("Est. \(costRange)")
-                                        .font(HavenTypography.uiCaption)
-                                        .foregroundStyle(HavenColors.textTertiary)
+                                if let tier = CostTier.fromLegacyString(task.costRange) {
+                                    CostTierView(tier: tier)
                                 }
                             }
 

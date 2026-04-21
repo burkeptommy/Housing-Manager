@@ -250,6 +250,14 @@ struct OnboardingView: View {
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
 
+            if viewModel.invitationEmailMismatch,
+               let invitation = viewModel.pendingInvitation {
+                emailMismatchBanner(
+                    invitedEmail: invitation.invitedEmail,
+                    sessionEmail: viewModel.primaryEmail
+                )
+            }
+
             if let error = viewModel.errorMessage {
                 Text(error)
                     .font(HavenTypography.caption)
@@ -257,7 +265,7 @@ struct OnboardingView: View {
             }
 
             HavenButton(title: viewModel.isLoading ? "Joining..." : "Join Household") {
-                Task { await viewModel.acceptInvitation(authService: appState.authService) }
+                Task { await viewModel.acceptInvitation(authService: appState.authService, appState: appState) }
             }
             .disabled(viewModel.isLoading)
 
@@ -273,5 +281,42 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding()
+    }
+
+    /// Surfaces an email-mismatch warning inside `invitedView` when the
+    /// user's auth session email differs from the invitation's
+    /// `invited_email`. Common case: invite sent to a Gmail account but
+    /// the recipient signs in with Apple / a different address. Before
+    /// build 94 the app silently accepted anyway, which worked — but
+    /// only when Apple happened to return the same email. When it
+    /// didn't, the user landed in their own new household instead of
+    /// the inviter's. This banner makes the mismatch visible so the
+    /// user can decide whether to continue; tapping Join still runs the
+    /// normal accept path. We intentionally don't hard-block because
+    /// couples with shared access plans but separate Apple IDs are a
+    /// real scenario.
+    private func emailMismatchBanner(invitedEmail: String, sessionEmail: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.warning)
+                Text("Different email address")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+            Text("This invitation was sent to **\(invitedEmail)**, but you're signed in as **\(sessionEmail)**. You can still join this household — just confirm it's the right one.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.warning.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                .stroke(HavenColors.warning.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
     }
 }

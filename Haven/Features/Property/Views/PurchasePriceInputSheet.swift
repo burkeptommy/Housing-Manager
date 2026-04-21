@@ -277,6 +277,13 @@ struct PurchasePriceInputSheet: View {
         }
         if showEstimatedValueField, let value = parsedEstimatedValue {
             update.currentEstimatedValue = value
+            // Phase 56.2: flag this write as user-provided so the
+            // property card's range renderer knows to suppress any
+            // stale ATTOM band bracketing a number the user just typed.
+            // Source takes precedence over the stored band at display
+            // time — cleaner than trying to force-null the band via
+            // optional-nil encoding, which PostgREST may treat as omit.
+            update.estimatedValueSource = "manual"
         }
         await onSave(update)
         Haptics.success()

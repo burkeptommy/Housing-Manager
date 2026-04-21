@@ -232,7 +232,7 @@ struct InvestmentSummaryCard: View {
                         .font(HavenTypography.uiLabelMedium)
                         .foregroundStyle(HavenColors.textSecondary)
 
-                    Text("We estimate optimistically. Most property apps undervalue.")
+                    Text("Range based on comparable sales and public market data.")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textTertiary)
                         .multilineTextAlignment(.center)
@@ -270,7 +270,7 @@ struct InvestmentSummaryCard: View {
                             .foregroundStyle(gainLoss >= 0 ? HavenColors.success : HavenColors.critical)
                         Text(String(format: "%+.1f%%", gainLossPercent * 100))
                             .font(HavenTypography.uiLabelMedium)
-                            .foregroundStyle(gainLoss >= 0 ? HavenColors.success : HavenColors.critical)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("vs. total invested")
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textTertiary)
@@ -397,11 +397,11 @@ struct InvestmentSummaryCard: View {
 
                     HStack(spacing: 0) {
                         RoundedRectangle(cornerRadius: 0)
-                            .fill(HavenColors.success)
+                            .fill(HavenColors.navy800)
                             .frame(width: width * purchaseFrac)
                         if totalProjectSpend > 0 {
                             RoundedRectangle(cornerRadius: 0)
-                                .fill(HavenColors.success.opacity(0.4))
+                                .fill(HavenColors.navy800.opacity(0.4))
                                 .frame(width: width * projectFrac)
                         }
                         if hasEstimatedValue && gapFrac > 0 {
@@ -418,9 +418,9 @@ struct InvestmentSummaryCard: View {
 
                 // Legend
                 HStack(spacing: HavenTheme.spacing12) {
-                    legendItem(color: HavenColors.success, label: "Purchase \(formatCurrencyCompact(purchasePrice))")
+                    legendItem(color: HavenColors.navy800, label: "Purchase \(formatCurrencyCompact(purchasePrice))")
                     if totalProjectSpend > 0 {
-                        legendItem(color: HavenColors.success.opacity(0.4), label: "Projects \(formatCurrencyCompact(totalProjectSpend))")
+                        legendItem(color: HavenColors.navy800.opacity(0.4), label: "Projects \(formatCurrencyCompact(totalProjectSpend))")
                     }
                     if hasEstimatedValue {
                         legendItem(
@@ -472,7 +472,7 @@ struct InvestmentSummaryCard: View {
                 Spacer()
                 Text(formatCurrency(abs(gainLoss)))
                     .font(HavenTypography.uiLabelMedium)
-                    .foregroundStyle(gainLoss >= 0 ? HavenColors.success : HavenColors.critical)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
     }
@@ -504,11 +504,11 @@ struct InvestmentSummaryCard: View {
 
     private var waterfallBreakdown: some View {
         VStack(spacing: 0) {
-            flowItem(label: "Purchase price", value: formatCurrency(purchasePrice), barColor: HavenColors.success)
+            flowItem(label: "Purchase price", value: formatCurrency(purchasePrice), barColor: HavenColors.navy800)
 
             if totalProjectSpend > 0 {
                 dashedConnector
-                flowItem(label: "+ Project spend", value: formatCurrency(totalProjectSpend), barColor: HavenColors.success.opacity(0.5))
+                flowItem(label: "+ Project spend", value: formatCurrency(totalProjectSpend), barColor: HavenColors.navy800.opacity(0.5))
             }
 
             dashedConnector
@@ -588,11 +588,11 @@ struct InvestmentSummaryCard: View {
                     .foregroundStyle(HavenColors.textSecondary)
                 Text(formatCurrency(abs(gainLoss)))
                     .font(HavenTypography.title3)
-                    .foregroundStyle(gainLoss >= 0 ? HavenColors.success : HavenColors.critical)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .padding(HavenTheme.spacing12)
-        .background((gainLoss >= 0 ? HavenColors.success : HavenColors.critical).opacity(0.08))
+        .background(HavenColors.navy.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
     }
 

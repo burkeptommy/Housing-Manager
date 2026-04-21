@@ -2,10 +2,17 @@ import SwiftUI
 
 struct ScenarioInputView: View {
     let scenario: ScenarioDefinition
+    /// Contextual defaults layered on top of each field's static `defaultValue`.
+    /// Keys match `ParamField.key` (e.g. "sale_price" → formatted home value
+    /// pulled from the primary property's ATTOM-derived estimate). Used so
+    /// "What if I sold my house today?" opens with the current estimated
+    /// value pre-filled instead of an empty field.
+    var contextDefaults: [String: String] = [:]
     let onSubmit: ([String: String]) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var paramValues: [String: String] = [:]
+    @State private var showEmptyFieldAlert = false
 
     var body: some View {
         ScrollView {
@@ -40,6 +47,22 @@ struct ScenarioInputView: View {
 
                 // Run button
                 Button {
+                    // Bug B3 fix: validate required fields aren't empty
+                    // before submitting. The previous behavior silently
+                    // dismissed the sheet when sale_price was blank — users
+                    // had no idea the scenario actually still ran in the
+                    // background with fallback defaults. Surface an alert
+                    // instead so the empty input is explicit.
+                    if let fields = scenario.paramFields {
+                        for field in fields {
+                            let raw = paramValues[field.key] ?? ""
+                            if raw.trimmingCharacters(in: .whitespaces).isEmpty {
+                                showEmptyFieldAlert = true
+                                Haptics.error()
+                                return
+                            }
+                        }
+                    }
                     Haptics.medium()
                     Analytics.track(.scenarioSubmitted, ["type": "preset_with_params", "scenario_id": scenario.id])
                     onSubmit(paramValues)
@@ -51,6 +74,11 @@ struct ScenarioInputView: View {
                         .padding(.vertical, 14)
                         .background(HavenColors.navy800)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .alert("Please fill in all fields", isPresented: $showEmptyFieldAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("One of the scenario parameters is empty. Fill it in so Haven can give you an accurate analysis.")
                 }
             }
             .padding(.horizontal, HavenTheme.pageMargin)
@@ -68,10 +96,15 @@ struct ScenarioInputView: View {
         }
         .trackScreen("ScenarioInputView")
         .onAppear {
-            // Set defaults
+            // Set defaults: contextual (property-derived) takes priority
+            // over the field's static defaultValue so "What if I sold my
+            // house today?" opens with the current estimated value
+            // already populated (Bug B2 fix).
             if let fields = scenario.paramFields {
                 for field in fields {
-                    if let defaultVal = field.defaultValue {
+                    if let contextVal = contextDefaults[field.key] {
+                        paramValues[field.key] = contextVal
+                    } else if let defaultVal = field.defaultValue {
                         paramValues[field.key] = defaultVal
                     }
                 }

@@ -303,7 +303,7 @@ struct QuoteComparisonView: View {
                         .fontWeight(.semibold)
                         .tracking(1)
 
-                    Text("Items included by some contractors but not others — ask missing contractors to clarify if these are included in their price or excluded from scope.")
+                    Text("Items included by some contractors but not others. Ask missing contractors to clarify whether these are included in their price or excluded from scope.")
                         .font(.system(size: 11))
                         .foregroundStyle(HavenColors.textSecondary)
 

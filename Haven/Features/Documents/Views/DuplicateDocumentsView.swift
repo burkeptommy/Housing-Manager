@@ -68,7 +68,7 @@ struct DuplicateDocumentsView: View {
                             HStack {
                                 Image(systemName: "doc.on.doc.fill")
                                     .foregroundStyle(Color.havenWarning)
-                                Text("Group \(index + 1) — \(group.count) copies")
+                                Text("Group \(index + 1) · \(group.count) copies")
                             }
                             .font(HavenTypography.uiSectionHeader)
                         }

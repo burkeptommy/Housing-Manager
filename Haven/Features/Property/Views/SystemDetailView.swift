@@ -314,6 +314,18 @@ struct SystemDetailRowView: View {
                                 .font(HavenTypography.title2)
                                 .foregroundStyle(HavenColors.navy800)
                             HStack(spacing: 6) {
+                                // Build 94: Surface the appliance type
+                                // ("Refrigerator" / "Dishwasher" / "Wall
+                                // Oven") right under the brand name. The
+                                // nav-bar title is the model number, so
+                                // without this caption the user has no
+                                // way to tell a fridge from an oven at a
+                                // glance on the detail screen either.
+                                if let subtype = system.subtype?.trimmingCharacters(in: .whitespaces), !subtype.isEmpty {
+                                    Text(subtype.capitalized)
+                                        .font(HavenTypography.uiLabelMedium)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
                                 if let series {
                                     Text(series)
                                         .font(HavenTypography.uiLabelMedium)

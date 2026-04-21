@@ -37,7 +37,7 @@ struct CalendarSyncSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
             }
         }
@@ -251,7 +251,7 @@ struct CalendarSyncSheet: View {
                 }
             ))
             .labelsHidden()
-            .tint(HavenColors.navy)
+            .tint(HavenColors.action)
         }
         .padding(.vertical, 2)
     }

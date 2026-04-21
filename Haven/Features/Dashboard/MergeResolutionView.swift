@@ -268,7 +268,7 @@ struct MergeResolutionView: View {
 
                 let items = autoKeptItems
                 if items.isEmpty {
-                    Text("No additional items to bring over — everything matched.")
+                    Text("No additional items to bring over. Everything matched.")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textTertiary)
                 } else {

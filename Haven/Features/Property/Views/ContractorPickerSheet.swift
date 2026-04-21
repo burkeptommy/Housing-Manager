@@ -68,7 +68,12 @@ struct ContractorPickerSheet: View {
                 await loadContractors()
             }
             .sheet(isPresented: $showAddContractor) {
-                ContractorDirectoryView()
+                // Phase 56.1: direct to AddVendorSheet so the "+" button
+                // inside the picker lands the user on the add form
+                // immediately instead of routing through the directory.
+                AddVendorSheet(onComplete: {
+                    Task { await loadContractors() }
+                })
             }
         }
     }

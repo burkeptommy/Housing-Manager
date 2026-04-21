@@ -14,10 +14,66 @@ import Foundation
 /// Tom can edit copy here without touching view code.
 enum HouseQuizQuestionLibrary {
 
-    static let allQuestions: [HouseQuizQuestion] = section1 + section2 + section3 + section4 + section5 + section6
+    /// Phase 60.3: quiz now renders in chapter order rather than section
+    /// order. The chapter grouping was introduced in Phase 60.3 as a
+    /// higher-order abstraction above section — sections still exist for
+    /// legacy reasons (UI section-header rendering in older flows), but
+    /// `allQuestions` reflects the chapter flow.
+    ///
+    /// Chapter 1 "Your Home" (14 questions):
+    ///   Section 1 (Q1-Q5) + Section 2 (Q6-Q10) + homeSystemsQuestions (Q20, Q21, Q22)
+    ///
+    /// Chapter 2 "Your Pros" (9 questions):
+    ///   Q36 preference tier (MOVED from end of quiz to chapter opener so
+    ///   it runs BEFORE Q11/Q13/Q14/Q15 vendor branches — reconciler
+    ///   needs the tier set before those questions persist `.either`
+    ///   tasks) + Section 3 (Q11-Q15b)
+    ///
+    /// Chapter 3 "Your People" (14 questions):
+    ///   providerQuestions (Q16-Q19) + vehiclesQuestions (Q23-Q25b) +
+    ///   insuranceQuestions (Q26-Q27) + peopleQuestions (Q28-Q30 minus Q36)
+    static let allQuestions: [HouseQuizQuestion] = {
+        // Carve the original section 4 / 5 / 6 into chapter-aligned
+        // sub-arrays without mutating the legacy static definitions —
+        // the lookup `question(byId:)` keeps working on the whole set.
+        let section4Providers = section4.filter { $0.id != "q20_other_fuels" }
+        let section4HomeSystems = section4.filter { $0.id == "q20_other_fuels" }
+        let section5HomeSystems = section5.filter {
+            $0.id == "q21_solar" || $0.id == "q22_generator"
+        }
+        let section5Vehicles = section5.filter {
+            $0.id != "q21_solar" && $0.id != "q22_generator"
+        }
+        let section6Tier = section6.filter { $0.id == "q36_diy_vs_vendor" }
+        let section6Insurance = section6.filter {
+            $0.id == "q26_auto_insurance" || $0.id == "q27_homeowners_insurance"
+        }
+        let section6People = section6.filter {
+            $0.id != "q36_diy_vs_vendor"
+                && $0.id != "q26_auto_insurance"
+                && $0.id != "q27_homeowners_insurance"
+        }
+
+        return section1
+            + section2
+            + section4HomeSystems       // Q20 fits Chapter 1 — home systems
+            + section5HomeSystems       // Q21/Q22 — solar + generator
+            + section6Tier              // Q36 MOVED: opens Chapter 2
+            + section3                  // Q11-Q15b outside pros
+            + section4Providers         // Q16-Q19 utility providers
+            + section5Vehicles          // Q23-Q25b
+            + section6Insurance         // Q26-Q27
+            + section6People            // Q28-Q30
+    }()
 
     static func question(byId id: String) -> HouseQuizQuestion? {
         allQuestions.first { $0.id == id }
+    }
+
+    /// Phase 60.3: All questions in a given chapter, preserving the
+    /// `allQuestions` order.
+    static func questions(in chapter: HouseQuizChapter) -> [HouseQuizQuestion] {
+        allQuestions.filter { $0.chapter == chapter }
     }
 
     /// Indices in `allQuestions` after which a milestone fun-fact card should appear.
@@ -42,7 +98,16 @@ enum HouseQuizQuestionLibrary {
     ///   Section 4: 5 → cumulative 24 → milestone after index 23
     ///   Section 5: 6 → cumulative 30 → milestone after index 29
     ///   Section 6: 7 → cumulative 37 → milestone after index 36
-    static let milestoneIndices: Set<Int> = [5, 10, 18, 23, 29, 36]
+    ///
+    /// Phase 60.3: These indices refer to POSITIONS in `allQuestions` as
+    /// it was before the chapter restructure. The chapter intro card now
+    /// carries the section-transition moment (intro appears at chapter
+    /// boundaries) so these legacy milestones are NO LONGER consulted —
+    /// the set is kept for backward-compat with any persisted state that
+    /// still references them. `HouseQuizViewModel.isAtMilestone` now
+    /// returns false for every index so the old milestone card never
+    /// fires alongside the new chapter intros.
+    static let milestoneIndices: Set<Int> = []
 
     // MARK: - Section 1 — Your Home Basics
 
@@ -50,7 +115,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q1_roof_material",
             section: .homeBasics,
-            title: "What kind of roof do you have?",
+            title: "Your {yearBuilt} {street} roof: what's on top?",
+            fallbackTitle: "What kind of roof do you have?",
             subtitle: "We'll set the right inspection cadence for your material.",
             kind: .singleChoice,
             answerOptions: [
@@ -82,7 +148,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q3_heating_fuel",
             section: .homeBasics,
-            title: "How do you heat your home?",
+            title: "Heat in a {state} home: what's yours running on?",
+            fallbackTitle: "How do you heat your home?",
             subtitle: "We use this to schedule fuel deliveries and tank inspections.",
             kind: .singleChoice,
             answerOptions: [
@@ -202,7 +269,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q10_appliances",
             section: .inside,
-            title: "Which major appliances do you have?",
+            title: "What's in your {street} kitchen and laundry?",
+            fallbackTitle: "Which major appliances do you have?",
             subtitle: "We'll track manuals, maintenance, and recalls for each, and let you know when anything is still under warranty.",
             kind: .multiSelect,
             answerOptions: [
@@ -228,7 +296,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q11_lawn",
             section: .outside,
-            title: "Do you have a lawn?",
+            title: "Keeping up the {street} yard: you or a pro?",
+            fallbackTitle: "Do you have a lawn?",
             kind: .singleChoice,
             answerOptions: [
                 AnswerOption(id: "diy", label: "Yes, I maintain it"),
@@ -315,7 +384,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q13_pest",
             section: .outside,
-            title: "Pest control?",
+            title: "Pest pressure in {state}: who's on it?",
+            fallbackTitle: "Pest control?",
             kind: .singleChoice,
             answerOptions: [
                 // Build 86: label changed from "Quarterly pro service" to
@@ -392,16 +462,35 @@ enum HouseQuizQuestionLibrary {
             title: "Got any pros on speed dial?",
             subtitle: "Tell us who handles your HVAC, plumbing, electrical, and other home services so we can plan tasks around their schedule, not yours.",
             kind: .householdContractors,
+            // Phase 60.3 (F3): reordered so Handyman is first. Post-Phase-58
+            // Handyman is the "catcher" category for DIY-delegators with
+            // spring/fall punch-list bundles; putting it first in the grid
+            // reflects its primacy in the vendor-orchestration model rather
+            // than burying it at position 9.
             answerOptions: [
+                AnswerOption(id: "handyman", label: "Handyman", icon: "wrench.fill"),
+                AnswerOption(id: "cleaning", label: "House cleaner", icon: "sparkles"),
                 AnswerOption(id: "hvac_service", label: "HVAC service", icon: "thermometer.medium"),
                 AnswerOption(id: "plumber", label: "Plumber", icon: "drop.fill"),
                 AnswerOption(id: "electrician", label: "Electrician", icon: "bolt.fill"),
                 AnswerOption(id: "roofer", label: "Roofer", icon: "house.fill"),
+                AnswerOption(id: "tree_service", label: "Tree service", icon: "tree.fill"),
+                AnswerOption(id: "mosquito_tick", label: "Mosquito & tick", icon: "ladybug.fill"),
+                AnswerOption(id: "snow_removal", label: "Snow removal", icon: "snowflake"),
+                AnswerOption(id: "pet_waste", label: "Pet waste", icon: "pawprint.circle.fill"),
                 AnswerOption(id: "septic_pumper", label: "Septic pumper", icon: "circle.dashed"),
                 AnswerOption(id: "well_water_service", label: "Well water service", icon: "drop.degreesign"),
                 AnswerOption(id: "chimney_sweep", label: "Chimney sweep", icon: "flame.fill"),
-                AnswerOption(id: "tree_service", label: "Tree service", icon: "tree.fill"),
-                AnswerOption(id: "handyman", label: "Handyman", icon: "wrench.fill"),
+                // Phase 60.6: new chips to close the Q15b coverage gap Tom
+                // flagged on Build 93. `hardscape` surfaces only for
+                // properties whose Q11 answer was "hardscape" — the pro
+                // is a masonry/paver contractor, mirrored to the
+                // Landscaping category. `generator_service` surfaces only
+                // when Q22 confirmed a whole-home or portable generator —
+                // the annual load-test vendor is separate from the fuel
+                // supplier captured inline on Q22.
+                AnswerOption(id: "hardscape", label: "Hardscape / masonry", icon: "square.grid.2x2.fill"),
+                AnswerOption(id: "generator_service", label: "Generator service", icon: "bolt.batteryblock.fill"),
             ],
             dynamicSkip: { _ in false }  // never skip — empty answers are allowed
         ),
@@ -469,6 +558,11 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q20_other_fuels",
             section: .energyServices,
+            // Phase 60.3: overridden to yourHome — Q20 is "what fuel do
+            // you use in your house" (fireplace, stove, wood, pellets),
+            // which is a structural home fact, not a vendor-service
+            // question.
+            chapter: .yourHome,
             title: "Any other fuel sources?",
             // Phase 19i: generator moved to Q22's dedicated inline form so
             // we can capture its fuel type and provider separately. Q20 now
@@ -503,7 +597,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q22_generator",
             section: .backupEnergy,
-            title: "Whole-home generator?",
+            title: "Power outages in {state}: are you ready?",
+            fallbackTitle: "Whole-home generator?",
             // Phase 19i: dedicated inline form. Captures generator type +
             // fuel + provider in one screen so we can correctly model
             // households with a different fuel/provider for backup vs HVAC.
@@ -613,7 +708,13 @@ enum HouseQuizQuestionLibrary {
             id: "q28b_pets",
             section: .protectionPeople,
             title: "Any pets in the household?",
-            subtitle: "We tune some maintenance tasks (like turf sanitization and HVAC filter swaps) based on this.",
+            // Phase 60.2 (F7): rewritten subtitle. The previous copy
+            // ("We tune some maintenance tasks like turf sanitization and
+            // HVAC filter swaps based on this") referenced templates that
+            // were deleted in Phase 58. Today the pet flag powers (a) the
+            // pet_waste chip on Q15b and (b) gating recurring services so
+            // vendors know when the household has animals on-site.
+            subtitle: "So your vendors know, and so we can suggest recurring services that keep pets safe.",
             kind: .singleChoice,
             answerOptions: [
                 AnswerOption(id: "dogs", label: "Dogs", icon: "pawprint.fill"),
@@ -661,6 +762,11 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q36_diy_vs_vendor",
             section: .protectionPeople,
+            // Phase 60.3: overridden to yourPros and repositioned to the
+            // FIRST question of Chapter 2 so the tier is captured before
+            // Q11/Q13/Q14/Q15 vendor branches run. The reconciler's
+            // `.either` flip logic depends on the tier being set.
+            chapter: .yourPros,
             title: "How do you want to handle home maintenance?",
             subtitle: "This shapes your entire task list. You can change it anytime in Settings.",
             kind: .singleChoice,

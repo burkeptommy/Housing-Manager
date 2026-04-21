@@ -364,7 +364,7 @@ struct InboxItemCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(HavenColors.navy)
+                    .background(HavenColors.action)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
                 .disabled(isProcessing)
@@ -691,7 +691,7 @@ struct InboxItemCard: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, HavenTheme.spacing12)
                             .padding(.vertical, 8)
-                            .background(HavenColors.navy)
+                            .background(HavenColors.action)
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                         }
                         .disabled(isProcessing)

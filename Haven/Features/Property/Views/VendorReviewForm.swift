@@ -10,6 +10,14 @@ struct VendorReviewForm: View {
     @State private var showSystemAssignment = false
     @State private var savedContractorId: UUID?
 
+    // Phase 60.6: explicit category picker. Populated on appear from the
+    // detected services (website import) or `matchServiceToCategory` on
+    // the company name, else the user picks it themselves before save.
+    // Stored pre-canonicalization so the picker shows the exact string the
+    // user selected; canonicalization happens at the insert site so the
+    // DB value is always a registry-recognized key.
+    @State private var selectedCategory: String?
+
     // System assignment after save
     @State private var systems: [HomeSystemRow] = []
     @State private var selectedSystemIds: Set<UUID> = []
@@ -22,6 +30,23 @@ struct VendorReviewForm: View {
         "Property Manager",
         "Other"
     ]
+
+    /// Phase 60.6: canonical category list for the picker. Pulls from
+    /// `SystemCategoryRegistry` so the exact strings match what the
+    /// vendor-coverage matcher looks for. Tier 1 + Tier 2 + user-relevant
+    /// specialty vendors. Sub-systems are intentionally excluded — a
+    /// contractor assigned to "Garage Door" should pick "Garage Door"
+    /// under its parent, which isn't a category that shows in coverage.
+    private var pickerCategories: [String] {
+        let tier1 = SystemCategoryRegistry.universal.map(\.categoryKey)
+        let tier2 = SystemCategoryRegistry.conditional.map(\.categoryKey)
+        let vendorSpecialty = SystemCategoryRegistry.specialty
+            .filter { ["Pool/Spa", "Hot Tub", "Solar", "Water Treatment",
+                       "Painting", "Siding/Exterior", "Driveway Sealcoating",
+                       "Pressure Washing", "EV Charger"].contains($0.categoryKey) }
+            .map(\.categoryKey)
+        return tier1 + tier2 + vendorSpecialty
+    }
 
     var body: some View {
         NavigationStack {
@@ -47,6 +72,25 @@ struct VendorReviewForm: View {
                     Picker("Vendor Type", selection: $vendor.contactType) {
                         ForEach(contactTypes, id: \.self) { Text($0).tag($0) }
                     }
+                    // Phase 60.6: specialty category picker. Only surfaces
+                    // for the "Contractor / Service Provider" path — the
+                    // estate labels (Attorney, Financial Advisor, etc.)
+                    // already encode their specialty in the contactType
+                    // row itself and don't map to a home_system category.
+                    // Without this picker, manually-added service
+                    // contractors landed with `category = nil` and never
+                    // matched any vendor-coverage entry.
+                    if vendor.contactType == "Contractor / Service Provider" {
+                        Picker("Primary specialty", selection: Binding(
+                            get: { selectedCategory ?? "" },
+                            set: { selectedCategory = $0.isEmpty ? nil : $0 }
+                        )) {
+                            Text("Select a specialty").tag("")
+                            ForEach(pickerCategories, id: \.self) { cat in
+                                Text(cat).tag(cat)
+                            }
+                        }
+                    }
                 }
 
                 Section("Contact Information") {
@@ -61,66 +105,10 @@ struct VendorReviewForm: View {
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                     TextField("Address", text: $vendor.address)
-                    if !vendor.website.isEmpty {
-                        HStack {
-                            Text("Website")
-                                .foregroundStyle(HavenColors.textSecondary)
-                            Spacer()
-                            Text(vendor.website)
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.navy700)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-
-                // Services / Specialties
-                if vendor.contactType == "Contractor / Service Provider" {
-                    Section("Services") {
-                        // Show AI-detected services first (from website)
-                        if !vendor.detectedServices.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Detected from website:")
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                                FlowLayout(spacing: 6) {
-                                    ForEach(vendor.detectedServices, id: \.self) { service in
-                                        let isSelected = vendor.specialties.contains(service) ||
-                                            vendor.specialties.contains(where: { matchServiceToCategory(service) == $0 })
-                                        Text(service)
-                                            .font(.system(size: 12, weight: .medium))
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 5)
-                                            .background(isSelected ? HavenColors.navy.opacity(0.12) : HavenColors.beige200)
-                                            .foregroundStyle(isSelected ? HavenColors.navy : HavenColors.textSecondary)
-                                            .clipShape(Capsule())
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-
-                        // Standard category picker
-                        ForEach(allServiceCategories, id: \.self) { cat in
-                            Button {
-                                if vendor.specialties.contains(cat) {
-                                    vendor.specialties.remove(cat)
-                                } else {
-                                    vendor.specialties.insert(cat)
-                                }
-                            } label: {
-                                HStack {
-                                    Text(cat)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                    Spacer()
-                                    if vendor.specialties.contains(cat) {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(HavenColors.navy)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    TextField("Website (optional)", text: $vendor.website)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                 }
 
                 Section("License (Optional)") {
@@ -154,6 +142,33 @@ struct VendorReviewForm: View {
             }
             .tint(HavenColors.navy)
             .trackScreen("VendorReviewForm")
+            .onAppear {
+                // Phase 60.6: seed the picker. Precedence:
+                // (1) explicit prefill from caller (post-quiz sweep /
+                //     vendor-coverage "I have one" — they already know
+                //     what gap this vendor fills),
+                // (2) detected services from website import,
+                // (3) company name keyword match.
+                // All routed through `SystemCategoryRegistry.canonical(category:)`
+                // so the suggestion matches the registry vocabulary.
+                guard selectedCategory == nil else { return }
+                if let prefill = vendor.prefilledCategory,
+                   let canonical = SystemCategoryRegistry.canonical(category: prefill) {
+                    selectedCategory = canonical
+                    return
+                }
+                for service in vendor.detectedServices {
+                    if let cat = matchServiceToCategory(service),
+                       let canonical = SystemCategoryRegistry.canonical(category: cat) {
+                        selectedCategory = canonical
+                        return
+                    }
+                }
+                if let fromName = matchServiceToCategory(vendor.companyName),
+                   let canonical = SystemCategoryRegistry.canonical(category: fromName) {
+                    selectedCategory = canonical
+                }
+            }
             .sheet(isPresented: $showSystemAssignment) {
                 SystemAssignmentSheet(
                     systems: systems,
@@ -169,18 +184,31 @@ struct VendorReviewForm: View {
 
     private var allServiceCategories: [String] {
         ["HVAC", "Plumbing", "Electrical", "Roofing", "Landscaping", "Pest Control",
-         "Siding/Exterior", "Pool/Spa", "Septic System", "Well System", "Generator",
-         "Security System", "Solar", "Fire Protection", "Garage Door", "Windows",
-         "Appliance", "Flooring", "Insulation", "Crawl Space", "General Handyman", "Other"]
+         "Pool/Spa", "Septic System", "Well System", "Generator", "Security System",
+         "Solar", "Garage Door", "Painting/Exterior", "Flooring", "General Handyman", "Other"]
     }
 
     private func matchServiceToCategory(_ service: String) -> String? {
         let lower = service.lowercased()
-        if lower.contains("hvac") || lower.contains("heating") || lower.contains("cooling") { return "HVAC" }
+        if lower.contains("hvac") || lower.contains("heating") || lower.contains("cooling")
+            || lower.contains("air condition") || lower.contains("furnace") || lower.contains("boiler")
+            || lower.contains("water heater") || lower.contains("refrigerat") { return "HVAC" }
         if lower.contains("plumb") { return "Plumbing" }
-        if lower.contains("electric") { return "Electrical" }
+        if lower.contains("electric") || lower.contains("wiring") { return "Electrical" }
         if lower.contains("roof") { return "Roofing" }
-        if lower.contains("landscap") || lower.contains("lawn") { return "Landscaping" }
+        if lower.contains("landscap") || lower.contains("lawn") || lower.contains("tree")
+            || lower.contains("mowing") { return "Landscaping" }
+        if lower.contains("pest") || lower.contains("termite") || lower.contains("extermina") { return "Pest Control" }
+        if lower.contains("pool") || lower.contains("spa") || lower.contains("hot tub") { return "Pool/Spa" }
+        if lower.contains("septic") { return "Septic System" }
+        if lower.contains("well") && lower.contains("water") { return "Well System" }
+        if lower.contains("generator") { return "Generator" }
+        if lower.contains("security") || lower.contains("alarm") { return "Security System" }
+        if lower.contains("solar") { return "Solar" }
+        if lower.contains("garage door") { return "Garage Door" }
+        if lower.contains("paint") || lower.contains("siding") || lower.contains("exterior") { return "Painting/Exterior" }
+        if lower.contains("floor") || lower.contains("carpet") || lower.contains("tile") { return "Flooring" }
+        if lower.contains("handyman") || lower.contains("general") { return "General Handyman" }
         return nil
     }
 
@@ -197,12 +225,46 @@ struct VendorReviewForm: View {
                 return
             }
 
-            var allSpecialties = Array(vendor.specialties)
-            if vendor.contactType != "Contractor / Service Provider" && !allSpecialties.contains(vendor.contactType) {
-                allSpecialties.insert(vendor.contactType, at: 0)
+            // Phase 60.6: resolve the category from the user's picker choice
+            // first, falling back to detected services or a keyword match
+            // on the company name. Every path runs through
+            // `SystemCategoryRegistry.canonical(category:)` so the stored
+            // value is a registry-recognized key. Without this, manually-
+            // added service contractors landed with `category = nil` and
+            // the vendor-coverage matcher silently skipped them — the
+            // Groton Plumbing & Heating bug Tom flagged on Build 93.
+            let pickedCategory = selectedCategory.flatMap {
+                SystemCategoryRegistry.canonical(category: $0)
+            }
+            let autoCategory: String? = {
+                for service in vendor.detectedServices {
+                    if let cat = matchServiceToCategory(service),
+                       let canonical = SystemCategoryRegistry.canonical(category: cat) {
+                        return canonical
+                    }
+                }
+                if let fromName = matchServiceToCategory(vendor.companyName),
+                   let canonical = SystemCategoryRegistry.canonical(category: fromName) {
+                    return canonical
+                }
+                return nil
+            }()
+            let resolvedCategory: String? = pickedCategory ?? autoCategory
+
+            var allSpecialties: [String] = []
+            if vendor.contactType != "Contractor / Service Provider" {
+                allSpecialties = [vendor.contactType]
+            } else if let cat = resolvedCategory {
+                // Service providers get their canonical category mirrored
+                // into `specialties` too so the Contacts row subtitle ("…
+                // · Plumbing") reads correctly and the Phase 19l
+                // delegation fallback (`specialties.contains(category)`)
+                // keeps working for contractors without preferred-contractor
+                // system links.
+                allSpecialties = [cat]
             }
 
-            let insert = ContractorInsert(
+            var insert = ContractorInsert(
                 householdId: householdId,
                 companyName: vendor.companyName,
                 phone: vendor.phone,
@@ -212,8 +274,22 @@ struct VendorReviewForm: View {
                 address: vendor.address.isEmpty ? nil : vendor.address,
                 licenseNumber: vendor.licenseNumber.isEmpty ? nil : vendor.licenseNumber
             )
+            insert.website = vendor.website.isEmpty ? nil : vendor.website
+            insert.category = resolvedCategory
 
-            let contractor = try await DatabaseService.shared.createContractor(insert)
+            var contractor = try await DatabaseService.shared.createContractor(insert)
+
+            // Fetch brand logo: try domain first, fall back to company name search
+            let websiteForLookup = vendor.website.isEmpty ? nil : vendor.website
+            if let response = await HavenSupabase.fetchBrandLogoWithFallback(
+                domain: websiteForLookup,
+                companyName: vendor.companyName
+            ) {
+                var logoUpdate = ContractorUpdate()
+                logoUpdate.logoUrl = response.logoUrl
+                logoUpdate.brandColor = response.brandColor
+                contractor = (try? await DatabaseService.shared.updateContractor(id: contractor.id, logoUpdate)) ?? contractor
+            }
             savedContractorId = contractor.id
             Analytics.track(.contractorCreated, ["contractor_id": contractor.id.uuidString, "source": vendor.source == .manual ? "manual" : vendor.source == .contacts ? "contacts" : "website"])
             Haptics.success()
@@ -237,12 +313,61 @@ struct VendorReviewForm: View {
 
     private func assignSystems() async {
         guard let contractorId = savedContractorId else { return }
+
+        // Assign contractor to each selected system
         for systemId in selectedSystemIds {
             _ = try? await DatabaseService.shared.updateHomeSystem(
                 id: systemId,
                 HomeSystemUpdate(preferredContractorId: contractorId)
             )
         }
+
+        // Derive category and specialties from assigned systems.
+        // Phase 60.6: canonicalize both. A system row created pre-Phase-60.6
+        // might carry a free-text category (e.g. "Heating") that needs
+        // collapsing to the registry key ("HVAC") before storing. If the
+        // user already picked a category on the form, we preserve it — the
+        // picker choice wins because the system-assignment step is optional.
+        let assignedSystems = systems.filter { selectedSystemIds.contains($0.id) }
+        let rawCategories = Set(assignedSystems.map(\.category))
+        let canonicalCategories = Set(rawCategories.compactMap { SystemCategoryRegistry.canonical(category: $0) })
+        if !canonicalCategories.isEmpty {
+            var update = ContractorUpdate()
+            // Prefer the picker-derived category if set; otherwise first
+            // canonical from the assigned systems.
+            update.category = selectedCategory
+                .flatMap { SystemCategoryRegistry.canonical(category: $0) }
+                ?? canonicalCategories.first
+            update.specialties = Array(canonicalCategories)
+            _ = try? await DatabaseService.shared.updateContractor(id: contractorId, update)
+        }
+
+        // Convert needs_vendor tasks for the assigned systems to vendor-managed.
+        // Query the DB directly instead of relying on the MaintenanceViewModel
+        // singleton which may not have the right tasks loaded.
+        let contractorRow = try? await DatabaseService.shared.fetchContractor(id: contractorId)
+        if let contractor = contractorRow {
+            for systemId in selectedSystemIds {
+                let tasks = (try? await DatabaseService.shared.fetchMaintenanceTasks(systemId: systemId)) ?? []
+                let candidates = tasks.filter { $0.needsVendor == true && $0.vehicleId == nil }
+                for task in candidates {
+                    let originalTitle = task.templateId
+                        .flatMap { MaintenanceTemplates.template(forKey: $0) }?.title
+                        ?? task.title
+                    var update = MaintenanceTaskUpdate()
+                    update.title = originalTitle
+                    update.description = "\(contractor.companyName) will handle the work."
+                    update.assignedContractorId = contractor.id
+                    update.assignmentType = "vendor"
+                    update.needsVendor = false
+                    _ = try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)
+                }
+            }
+        }
+
+        NotificationCenter.default.post(name: .contractorChanged, object: nil)
+        NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         onSave?()
         dismiss()
     }

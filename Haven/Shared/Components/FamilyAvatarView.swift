@@ -22,13 +22,13 @@ struct AvatarStyle {
             return AvatarStyle(
                 icon: isFemale ? "person.crop.circle.fill" : "person.crop.square.fill",
                 badge: "star.fill",
-                defaultColor: .navy
+                defaultColor: .navy   // primary indigo
             )
         case "spouse/partner", "spouse", "partner":
             return AvatarStyle(
                 icon: isFemale ? "person.crop.circle.fill" : "person.crop.square.fill",
                 badge: "heart.fill",
-                defaultColor: .sage
+                defaultColor: .sage   // primary indigo (same tier as self)
             )
         case "child":
             return childStyle(age: age, isFemale: isFemale)
@@ -38,43 +38,43 @@ struct AvatarStyle {
             return AvatarStyle(
                 icon: isFemale ? "person.crop.circle.fill" : "person.crop.square.fill",
                 badge: "house.fill",
-                defaultColor: .amber
+                defaultColor: .amber  // extended family indigo
             )
         case "sibling":
             return AvatarStyle(
                 icon: isFemale ? "person.crop.circle.fill" : "person.crop.square.fill",
                 badge: "person.2.fill",
-                defaultColor: .teal
+                defaultColor: .teal   // extended family indigo
             )
         case "guardian":
             return AvatarStyle(
                 icon: "checkmark.shield.fill",
                 badge: nil,
-                defaultColor: .slate
+                defaultColor: .slate  // staff/other neutral
             )
         case "trustee":
             return AvatarStyle(
                 icon: "building.columns.fill",
                 badge: nil,
-                defaultColor: .plum
+                defaultColor: .plum   // trustee indigo
             )
         case "executor":
             return AvatarStyle(
                 icon: "doc.text.fill",
                 badge: "checkmark.seal.fill",
-                defaultColor: .coral
+                defaultColor: .coral  // child-tier indigo
             )
         case "beneficiary":
             return AvatarStyle(
                 icon: isFemale ? "person.crop.circle.fill" : "person.crop.square.fill",
                 badge: "gift.fill",
-                defaultColor: .rose
+                defaultColor: .rose   // child-tier indigo
             )
         default:
             return AvatarStyle(
                 icon: isFemale ? "person.crop.circle.fill" : "person.crop.square.fill",
                 badge: nil,
-                defaultColor: .navy
+                defaultColor: .navy   // primary indigo
             )
         }
     }
@@ -162,7 +162,8 @@ struct GenderBadge: View {
 
 // MARK: - Avatar Colors
 
-/// The available avatar accent colors users can pick from.
+/// Avatar accent colors derived from the brand indigo scale.
+/// Legacy stored values still decode but all render on-palette.
 enum AvatarColor: String, CaseIterable, Identifiable {
     case navy = "navy"
     case sage = "sage"
@@ -175,16 +176,17 @@ enum AvatarColor: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// All cases now resolve to the brand indigo scale.
     var color: Color {
         switch self {
-        case .navy:  return Color(red: 0.106, green: 0.165, blue: 0.290)
-        case .sage:  return Color(red: 0.40, green: 0.55, blue: 0.42)
-        case .coral: return Color(red: 0.85, green: 0.45, blue: 0.35)
-        case .plum:  return Color(red: 0.55, green: 0.35, blue: 0.55)
-        case .amber: return Color(red: 0.80, green: 0.60, blue: 0.25)
-        case .teal:  return Color(red: 0.20, green: 0.55, blue: 0.55)
-        case .rose:  return Color(red: 0.78, green: 0.40, blue: 0.50)
-        case .slate: return Color(red: 0.45, green: 0.48, blue: 0.52)
+        case .navy:  return HavenColors.navy800  // primary
+        case .sage:  return HavenColors.navy800  // spouse
+        case .coral: return HavenColors.navy500  // child
+        case .plum:  return HavenColors.navy700  // trustee
+        case .amber: return HavenColors.navy600  // parent
+        case .teal:  return HavenColors.navy600  // sibling
+        case .rose:  return HavenColors.navy500  // beneficiary/expecting
+        case .slate: return HavenColors.beige400 // staff/other
         }
     }
 

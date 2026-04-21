@@ -52,7 +52,7 @@ struct ScenarioLoadingView: View {
             // Status message
             VStack(spacing: 12) {
                 Text("\(loadingMessages[currentMessageIndex])\(String(repeating: ".", count: dotCount))")
-                    .font(Font.custom("Inter", size: 16))
+                    .font(Font.system(size: 16))
                     .foregroundStyle(HavenColors.navy800)
                     .animation(.easeInOut(duration: 0.3), value: currentMessageIndex)
 

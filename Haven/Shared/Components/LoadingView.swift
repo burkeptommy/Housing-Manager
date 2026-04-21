@@ -8,20 +8,20 @@ struct LoadingView: View {
         VStack(spacing: HavenTheme.spacing16) {
             Text("H")
                 .font(HavenTypography.fraunces(size: 56, weight: 400))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.creamLight)
 
             ProgressView()
                 .controlSize(.regular)
-                .tint(HavenColors.navy)
+                .tint(HavenColors.creamLight.opacity(0.6))
 
             if !message.isEmpty {
                 Text(message)
                     .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textSecondary)
+                    .foregroundStyle(HavenColors.creamLight.opacity(0.7))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HavenColors.background)
+        .background(HavenColors.navy800)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(message.isEmpty ? "Loading" : message)
     }

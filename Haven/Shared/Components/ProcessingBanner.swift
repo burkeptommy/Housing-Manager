@@ -12,7 +12,7 @@ struct ProcessingBanner: View {
                     if manager.isProcessing {
                         ProgressView()
                             .controlSize(.small)
-                            .tint(HavenColors.navy)
+                            .tint(HavenColors.action)
                     } else if manager.failedCount > 0 {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(HavenColors.warning)
@@ -57,7 +57,7 @@ struct ProcessingBanner: View {
 
                 if manager.isProcessing {
                     ProgressView(value: manager.progress)
-                        .tint(HavenColors.navy)
+                        .tint(HavenColors.action)
                         .padding(.horizontal, 16)
                 }
 

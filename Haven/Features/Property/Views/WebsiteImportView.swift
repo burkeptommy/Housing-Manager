@@ -1,12 +1,22 @@
 import SwiftUI
 
 struct WebsiteImportView: View {
+    var prefilledUrl: String?
     var onResult: (ImportedVendorData) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var url = ""
+    @State private var url: String
     @State private var isLoading = false
     @State private var error: String?
+
+    /// Phase 56.1: Optional `prefilledUrl` lets callers (notably the
+    /// clipboard-aware AddVendorSheet banner) pre-populate the URL
+    /// field so the user only has to tap Extract instead of re-paste.
+    init(prefilledUrl: String? = nil, onResult: @escaping (ImportedVendorData) -> Void) {
+        self.prefilledUrl = prefilledUrl
+        self.onResult = onResult
+        _url = State(initialValue: prefilledUrl ?? "")
+    }
 
     var body: some View {
         NavigationStack {

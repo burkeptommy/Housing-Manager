@@ -302,6 +302,53 @@ enum HouseQuizSection: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Phase 60.3 Chapters
+
+/// Phase 60.3: Three-chapter grouping over the 37 quiz questions. Drives
+/// the chapter intro card, the chapter progress pill, and determines
+/// where Q36 (preference tier) lands so it fires BEFORE Q11/Q13/Q14/Q15
+/// vendor branches. The underlying `HouseQuizSection` enum stays —
+/// chapters are a higher-order grouping that doesn't replace it.
+enum HouseQuizChapter: String, Codable, CaseIterable, Identifiable {
+    case yourHome   = "your_home"
+    case yourPros   = "your_pros"
+    case yourPeople = "your_people"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .yourHome:   return "Your Home"
+        case .yourPros:   return "Your Pros"
+        case .yourPeople: return "Your People"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .yourHome:   return "The bones, the systems, the facts."
+        case .yourPros:   return "Who helps you keep it running."
+        case .yourPeople: return "The folks this home protects."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .yourHome:   return "house.fill"
+        case .yourPros:   return "person.2.wave.2.fill"
+        case .yourPeople: return "heart.circle.fill"
+        }
+    }
+
+    var chapterNumber: Int {
+        switch self {
+        case .yourHome:   return 1
+        case .yourPros:   return 2
+        case .yourPeople: return 3
+        }
+    }
+}
+
 enum HouseQuizQuestionKind: String, Codable {
     case singleChoice
     case multiSelect
@@ -334,6 +381,11 @@ enum HouseQuizQuestionKind: String, Codable {
 struct HouseQuizQuestion: Identifiable, Hashable {
     let id: String
     let section: HouseQuizSection
+    /// Phase 60.3: higher-order grouping used for chapter intro cards,
+    /// chapter progress pill, and Q36 repositioning. Every question in
+    /// the library must declare a chapter; Section 1/2 → yourHome,
+    /// Q36 + Section 3/4 → yourPros, Section 5/6 → yourPeople.
+    let chapter: HouseQuizChapter
     let title: String
     let subtitle: String?
     let kind: HouseQuizQuestionKind
@@ -388,10 +440,19 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     let sliderLeftLabel: String?
     let sliderRightLabel: String?
 
+    /// Phase 60.4: Generic fallback title used when `title` contains
+    /// personalization tokens (`{yearBuilt}`, `{street}`, etc.) and the
+    /// token can't be resolved against the current property. Nil for
+    /// questions that don't use tokens. The resolver NEVER ships literal
+    /// braces to the UI.
+    let fallbackTitle: String?
+
     init(
         id: String,
         section: HouseQuizSection,
+        chapter: HouseQuizChapter? = nil,
         title: String,
+        fallbackTitle: String? = nil,
         subtitle: String? = nil,
         kind: HouseQuizQuestionKind,
         answerOptions: [AnswerOption] = [],
@@ -409,7 +470,12 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     ) {
         self.id = id
         self.section = section
+        // Phase 60.3: derive chapter from section when not supplied so
+        // existing call sites keep compiling. New call sites should pass
+        // chapter explicitly.
+        self.chapter = chapter ?? Self.defaultChapter(for: section)
         self.title = title
+        self.fallbackTitle = fallbackTitle
         self.subtitle = subtitle
         self.kind = kind
         self.answerOptions = answerOptions
@@ -447,6 +513,26 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+
+    /// Phase 60.3: Default chapter derivation used when an existing
+    /// `HouseQuizQuestion` initializer didn't pass a chapter explicitly.
+    /// The Phase 60.3 reorder moves Q36 into yourPros explicitly so
+    /// the default here is never consulted for it.
+    ///
+    /// - homeBasics / inside → yourHome
+    /// - outside / energyServices → yourPros
+    /// - backupEnergy → yourHome (generator + solar are home systems)
+    /// - vehicles / protectionPeople → yourPeople
+    static func defaultChapter(for section: HouseQuizSection) -> HouseQuizChapter {
+        switch section {
+        case .homeBasics, .inside, .backupEnergy:
+            return .yourHome
+        case .outside, .energyServices:
+            return .yourPros
+        case .vehicles, .protectionPeople:
+            return .yourPeople
+        }
+    }
 }
 
 struct AnswerOption: Identifiable, Hashable {
@@ -472,7 +558,10 @@ struct AnswerFeedback: Hashable {
     let badge: String
     let title: String
     let subhead: String?
-    let citationName: String
+    /// Phase 60.2: made optional so entries without a cited study (e.g.
+    /// the Q11 DIY feedback that no longer cheerleads with pricing
+    /// claims) can omit the "Source:" line entirely.
+    let citationName: String?
 
     /// Render the title with `{city}` / `{state}` substitutions populated.
     func renderedTitle(city: String?, state: String?) -> String {

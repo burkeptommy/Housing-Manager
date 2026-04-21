@@ -21,6 +21,41 @@ final class MaintenanceViewModel: ObservableObject {
     @Published var filterStatus: TaskFilterStatus = .all
     @Published var recentlyCompletedIds: Set<UUID> = []
     @Published var completionToast: CompletionToast?
+    /// Phase 66: The household's preferred handyman contractor, resolved
+    /// from `households.preferred_handyman_contractor_id` (Phase 63). Used
+    /// by the Maintenance tab's ownership sub-groups and the
+    /// `TaskRoutingPicker` to render "Add to [Name]'s next visit" copy.
+    @Published var preferredHandyman: ContractorRow?
+
+    // MARK: - Phase 66 route sub-group computeds
+    //
+    // These are the ownership lenses Phase 66 renders inside the
+    // Phase 56.5 state buckets. They read from the existing `tasks`
+    // array and filter by `assignedRoute`. Empty arrays mean the
+    // sub-section renders nothing (the Phase 66 layout hides empty
+    // sub-sections to avoid chrome noise).
+
+    /// Tasks with `assigned_route == 'vendor'` — vendor visits.
+    var vendorRoutedTasks: [MaintenanceTaskDBRow] {
+        baseFiltered.filter { $0.assignedRoute == "vendor" }
+    }
+
+    /// Tasks with `assigned_route == 'handyman'` — on the handyman list.
+    var handymanRoutedTasks: [MaintenanceTaskDBRow] {
+        baseFiltered.filter { $0.assignedRoute == "handyman" }
+    }
+
+    /// Tasks with `assigned_route == 'diy'` — personal to-dos.
+    var diyRoutedTasks: [MaintenanceTaskDBRow] {
+        baseFiltered.filter { $0.assignedRoute == "diy" }
+    }
+
+    /// Tasks with no assigned_route yet — picker should surface. These
+    /// are typically vendor/either tasks waiting for the user or the
+    /// reconciler to resolve routing.
+    var unroutedTasks: [MaintenanceTaskDBRow] {
+        baseFiltered.filter { $0.assignedRoute == nil }
+    }
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -99,6 +134,21 @@ final class MaintenanceViewModel: ObservableObject {
         tasks.filter { task in
             // Hide recently completed tasks until next refresh
             guard !recentlyCompletedIds.contains(task.id) else { return false }
+            // Phase 67: hide bundle children from the main task list. They
+            // render only inside the parent bundle's HandymanVisitDetailView
+            // (or other bundle detail surface). Detected via the template's
+            // `.bundledIntoParent` routing — a child template always has a
+            // non-nil bundleId which makes its `routing` getter return this
+            // value. Tasks without a template_id (custom tasks) are never
+            // bundled and pass through. Once a user claims a child as DIY
+            // (assigned_route == "diy"), the child escapes the bundle and
+            // surfaces in main lists.
+            if task.assignedRoute != "diy",
+               let templateId = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateId),
+               template.routing == .bundledIntoParent {
+                return false
+            }
             let matchesProperty = filterPropertyId == nil || task.propertyId == filterPropertyId
             let matchesCategory: Bool = {
                 guard let cat = filterCategory else { return true }
@@ -219,6 +269,18 @@ final class MaintenanceViewModel: ObservableObject {
                 allSystems.append(contentsOf: sys)
             }
             systems = allSystems
+
+            // Phase 66: resolve the preferred handyman so every
+            // route-picker surface can render "Add to [Name]'s next
+            // visit" without a separate fetch. Ignores fetch failures
+            // silently — the Maintenance tab should render regardless.
+            if let primary = p.first,
+               let household = try? await db.fetchHousehold(id: primary.householdId),
+               let handymanId = household.preferredHandymanContractorId {
+                preferredHandyman = c.first { $0.id == handymanId }
+            } else {
+                preferredHandyman = nil
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -260,6 +322,14 @@ final class MaintenanceViewModel: ObservableObject {
     func systemName(for id: UUID?) -> String? {
         guard let id else { return nil }
         return systems.first { $0.id == id }?.name
+    }
+
+    /// Build 90: Resolve the system's category string (e.g. "HVAC",
+    /// "Landscaping") for vendor card branding. Used by UnifiedTaskCard
+    /// to pick trade-specific accent colors when no vendor brand is set.
+    func systemCategory(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return systems.first { $0.id == id }?.category
     }
 
     func vehicleName(for id: UUID?) -> String? {
@@ -533,6 +603,23 @@ final class MaintenanceViewModel: ObservableObject {
     /// rather than the live row, so a previous reframe doesn't pollute the
     /// new one. If the task has no template, falls back to the row's title
     /// (lowercased) so user-added custom tasks still flip cleanly.
+    /// Short display name for task titles — strips suffixes like LLC, Inc, and
+    /// truncates after the first comma if the result is still over 25 chars.
+    static func vendorDisplayName(_ fullName: String) -> String {
+        var name = fullName
+        // Strip common legal suffixes
+        for suffix in [" LLC", " Inc.", " Inc", " Corp.", " Corp", " Co.", " Ltd.", " Ltd", " LP", " LLP"] {
+            if name.hasSuffix(suffix) {
+                name = String(name.dropLast(suffix.count))
+            }
+        }
+        // If still long, truncate at first comma
+        if name.count > 25, let commaIdx = name.firstIndex(of: ",") {
+            name = String(name[name.startIndex..<commaIdx])
+        }
+        return name.trimmingCharacters(in: .whitespaces)
+    }
+
     func convertToVendorManaged(taskId: UUID, contractor: ContractorRow) async {
         guard let task = tasks.first(where: { $0.id == taskId }) else { return }
 
@@ -540,12 +627,12 @@ final class MaintenanceViewModel: ObservableObject {
         let originalTitle = originalTemplate?.title ?? task.title
         let originalDescription = originalTemplate?.description ?? task.description ?? ""
 
-        let newTitle = "Schedule \(contractor.companyName): \(originalTitle.lowercased())"
+        let newTitle = originalTitle
         let newDescription: String = {
             if originalDescription.isEmpty {
-                return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work."
+                return "\(contractor.companyName) will handle the work."
             }
-            return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
+            return "\(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
         }()
 
         var update = MaintenanceTaskUpdate()
@@ -606,6 +693,9 @@ final class MaintenanceViewModel: ObservableObject {
     private func calculateNextDueDate(frequency: String, from date: Date) -> Date {
         let cal = Calendar.current
         switch frequency.lowercased() {
+        case "weekly": return cal.date(byAdding: .day, value: 7, to: date)!
+        case "every 2 weeks", "biweekly": return cal.date(byAdding: .day, value: 14, to: date)!
+        case "every 3 weeks": return cal.date(byAdding: .day, value: 21, to: date)!
         case "monthly": return cal.date(byAdding: .month, value: 1, to: date)!
         case "every 2 months": return cal.date(byAdding: .month, value: 2, to: date)!
         case "quarterly": return cal.date(byAdding: .month, value: 3, to: date)!

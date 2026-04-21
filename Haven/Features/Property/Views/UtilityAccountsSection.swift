@@ -121,12 +121,7 @@ struct UtilityAccountsSection: View {
 
         return VStack(spacing: 5) {
             if let account {
-                // Brand color accent bar at top
-                brandColor
-                    .frame(height: 3)
-                    .frame(maxWidth: .infinity)
-
-                Spacer(minLength: 2)
+                Spacer(minLength: 4)
 
                 // Phase 18e: try the snapshot logo first (set when the user
                 // picked from the quiz picker), then the cached catalog logo,
@@ -161,7 +156,7 @@ struct UtilityAccountsSection: View {
 
                 Text(meta.label)
                     .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(brandColor)
+                    .foregroundStyle(HavenColors.textSecondary)
 
                 Spacer(minLength: 2)
             } else {
@@ -185,10 +180,7 @@ struct UtilityAccountsSection: View {
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         .overlay {
             RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                .strokeBorder(
-                    account != nil ? brandColor.opacity(0.2) : HavenColors.navy.opacity(0.06),
-                    lineWidth: 1
-                )
+                .strokeBorder(HavenColors.beige200, lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
     }
@@ -587,6 +579,24 @@ struct AddUtilitySheet: View {
                 onAdd(account)
                 Haptics.success()
 
+                // Phase 54E.3: mirror waste haulers and service vendors
+                // into the `contractors` table so Tom can link them from
+                // weekly cadences and the contractor directory. Runs in
+                // a detached Task so UI dismissal isn't blocked on a
+                // second DB round-trip. Idempotent — skipped when a
+                // contractor already exists with this name.
+                let resolvedType = preselectedType ?? providerType
+                let resolvedName = providerName
+                let catalogRow = selectedProvider
+                Task.detached {
+                    _ = try? await UtilityContractorMirror.mirrorIfNeeded(
+                        name: resolvedName,
+                        providerType: resolvedType,
+                        catalogProvider: catalogRow,
+                        householdId: householdId
+                    )
+                }
+
                 // Persist brand info for custom providers (not from pre-populated list)
                 if selectedProvider == nil && !providerName.isEmpty {
                     Task {
@@ -704,7 +714,7 @@ struct UtilityDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

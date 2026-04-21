@@ -1,47 +1,56 @@
 import SwiftUI
 
 extension Color {
-    // MARK: - Cream — The Canvas
-    // Cream is the dominant color. Every background is cream.
+    // MARK: - Pearl White — The Canvas
+    // Pearl white is the dominant color. Every background is pearl white.
 
-    /// #F2EEE5 — THE main background for every screen
-    static let havenCream = Color(red: 0.949, green: 0.933, blue: 0.898)
+    /// #F8F9FA — THE main background for every screen
+    static let havenCream = Color(red: 0.973, green: 0.976, blue: 0.980)
 
-    /// #F8F6F1 — Cards, elevated surfaces, tab bar, AI chat bubbles
-    static let havenCreamLight = Color(red: 0.973, green: 0.965, blue: 0.945)
+    /// #FFFFFF — Cards, elevated surfaces, tab bar, AI chat bubbles
+    static let havenCreamLight = Color.white
 
-    /// #FAF7F2 — Sheets, modals, popovers — brightest surface (still warm, never white)
-    static let havenCreamWhite = Color(red: 0.980, green: 0.969, blue: 0.949)
+    /// #FFFFFF — Sheets, modals, popovers
+    static let havenCreamWhite = Color.white
 
-    // MARK: - Beige — Structure
+    // MARK: - Neutral — Structure
     // Borders, dividers, input backgrounds. Never draws attention.
 
-    /// #F0EBE1 — Subtle borders, input field backgrounds
-    static let havenBeige200 = Color(red: 0.941, green: 0.922, blue: 0.882)
+    /// #EDEEF0 — Subtle borders, input field backgrounds
+    static let havenBeige200 = Color(red: 0.929, green: 0.933, blue: 0.941)
 
-    /// #E3D9C6 — Stronger borders, dividers, inactive elements
-    static let havenBeige300 = Color(red: 0.890, green: 0.851, blue: 0.776)
+    /// #D8DADF — Stronger borders, dividers, inactive elements
+    static let havenBeige300 = Color(red: 0.847, green: 0.855, blue: 0.875)
 
-    /// #D4C5A9 — Progress bar fills (neutral), placeholder-weight elements
-    static let havenBeige400 = Color(red: 0.831, green: 0.773, blue: 0.663)
+    /// #BFC2C8 — Progress bar fills (neutral), placeholder-weight elements
+    static let havenBeige400 = Color(red: 0.749, green: 0.761, blue: 0.784)
 
-    // MARK: - Navy — The Ink
-    // All text. All buttons. All interactive elements. The only dark color.
+    // MARK: - Cosmic Indigo — The Ink
+    // All text. Structure. Inactive borders. The primary dark color.
 
-    /// #0F1A2E — Darkest navy, pressed states, deepest contrast
-    static let havenNavy900 = Color(red: 0.059, green: 0.102, blue: 0.180)
+    /// #332860 — Darkest indigo, pressed states, deepest contrast
+    static let havenNavy900 = Color(red: 0.200, green: 0.157, blue: 0.376)
 
-    /// #1B2A4A — PRIMARY: body text, primary buttons, CTAs, icons, FAB, hero card
-    static let havenNavy = Color(red: 0.106, green: 0.165, blue: 0.290)
+    /// #453A70 — PRIMARY: body text, icons, inactive borders, hero card
+    static let havenNavy = Color(red: 0.271, green: 0.227, blue: 0.439)
 
-    /// #243660 — Pressed button states, active tab icons
-    static let havenNavy700 = Color(red: 0.141, green: 0.212, blue: 0.376)
+    /// #524580 — Pressed button states, active tab icons
+    static let havenNavy700 = Color(red: 0.322, green: 0.271, blue: 0.502)
 
-    /// #2E4376 — Secondary interactive elements
-    static let havenNavy600 = Color(red: 0.180, green: 0.263, blue: 0.463)
+    /// #60558E — Secondary interactive elements
+    static let havenNavy600 = Color(red: 0.376, green: 0.333, blue: 0.557)
 
-    /// #3A5290 — Links, tertiary interactive, "View all" text
-    static let havenNavy500 = Color(red: 0.227, green: 0.322, blue: 0.565)
+    /// #70669D — Links, tertiary interactive, "View all" text
+    static let havenNavy500 = Color(red: 0.439, green: 0.400, blue: 0.616)
+
+    // MARK: - Deepened Salmon — Action / CTA
+    // Primary calls-to-action, buttons, progress bars, active nav states.
+
+    /// #ED6955 — Primary CTA: buttons, FAB, progress bars, active nav
+    static let havenSalmon = Color(red: 0.929, green: 0.412, blue: 0.333)
+
+    /// Pressed state for salmon action elements
+    static let havenSalmonPressed = Color(red: 0.839, green: 0.345, blue: 0.267)
 
     // MARK: - Semantic Status Colors (softened, warm)
 
@@ -52,68 +61,68 @@ extension Color {
 
     // MARK: - Text Colors
 
-    /// Primary text — navy800 in light, creamWhite in dark
+    /// Primary text — indigo in light, white in dark
     static let havenTextPrimary = Color(
-        light: Color(red: 0.106, green: 0.165, blue: 0.290),
-        dark: Color(red: 0.980, green: 0.969, blue: 0.949)
+        light: Color(red: 0.271, green: 0.227, blue: 0.439),
+        dark: Color.white
     )
 
-    /// Secondary text — muted navy in light, beige300 in dark
+    /// Secondary text — muted indigo in light, neutral300 in dark
     static let havenTextSecondary = Color(
-        light: Color(red: 0.353, green: 0.400, blue: 0.471),
-        dark: Color(red: 0.890, green: 0.851, blue: 0.776)
+        light: Color(red: 0.420, green: 0.396, blue: 0.541),
+        dark: Color(red: 0.847, green: 0.855, blue: 0.875)
     )
 
     /// Tertiary text — placeholders, metadata labels
     static let havenTextTertiary = Color(
-        light: Color(red: 0.541, green: 0.576, blue: 0.659),
-        dark: Color(red: 0.831, green: 0.773, blue: 0.663)
+        light: Color(red: 0.561, green: 0.537, blue: 0.659),
+        dark: Color(red: 0.749, green: 0.761, blue: 0.784)
     )
 
-    /// Text on navy surfaces — buttons, hero card, user chat bubbles
-    static let havenTextOnNavy = Color(red: 0.980, green: 0.969, blue: 0.949)
+    /// Text on indigo surfaces — buttons, hero card, user chat bubbles
+    static let havenTextOnNavy = Color.white
 
     // MARK: - Dark Mode Surfaces
 
-    /// #0A1220
-    static let havenDarkBg = Color(red: 0.039, green: 0.071, blue: 0.125)
-    /// #12203A
-    static let havenDarkSurface = Color(red: 0.071, green: 0.125, blue: 0.227)
-    /// #1A2D50
-    static let havenDarkElevated = Color(red: 0.102, green: 0.176, blue: 0.314)
-    /// #2A3F65
-    static let havenDarkBorder = Color(red: 0.165, green: 0.247, blue: 0.396)
+    /// #0E0B1A
+    static let havenDarkBg = Color(red: 0.055, green: 0.043, blue: 0.102)
+    /// #1A1530
+    static let havenDarkSurface = Color(red: 0.102, green: 0.082, blue: 0.188)
+    /// #252040
+    static let havenDarkElevated = Color(red: 0.145, green: 0.125, blue: 0.251)
+    /// #3A3060
+    static let havenDarkBorder = Color(red: 0.227, green: 0.188, blue: 0.376)
 
     // MARK: - Adaptive Surface Colors
 
-    /// Screen background — cream in light, darkBg in dark
+    /// Screen background — pearl white in light, darkBg in dark
     static let havenBackground = Color(
-        light: Color(red: 0.949, green: 0.933, blue: 0.898),
-        dark: Color(red: 0.039, green: 0.071, blue: 0.125)
+        light: Color(red: 0.973, green: 0.976, blue: 0.980),
+        dark: Color(red: 0.055, green: 0.043, blue: 0.102)
     )
 
-    /// Card / elevated surface — creamLight in light, darkElevated in dark
+    /// Card / elevated surface — white in light, darkElevated in dark
     static let havenSurface = Color(
-        light: Color(red: 0.973, green: 0.965, blue: 0.945),
-        dark: Color(red: 0.102, green: 0.176, blue: 0.314)
+        light: Color.white,
+        dark: Color(red: 0.145, green: 0.125, blue: 0.251)
     )
 
-    /// Sheet / modal background — creamWhite in light, darkSurface in dark
+    /// Sheet / modal background — white in light, darkSurface in dark
     static let havenSurfaceSecondary = Color(
-        light: Color(red: 0.980, green: 0.969, blue: 0.949),
-        dark: Color(red: 0.071, green: 0.125, blue: 0.227)
+        light: Color.white,
+        dark: Color(red: 0.102, green: 0.082, blue: 0.188)
     )
 
-    /// Card border — beige200 in light, darkBorder in dark
+    /// Card border — neutral200 in light, darkBorder in dark
     static let havenBorder = Color(
-        light: Color(red: 0.941, green: 0.922, blue: 0.882),
-        dark: Color(red: 0.165, green: 0.247, blue: 0.396)
+        light: Color(red: 0.929, green: 0.933, blue: 0.941),
+        dark: Color(red: 0.227, green: 0.188, blue: 0.376)
     )
 
-    /// Input field background — beige200 in light, darkSurface in dark
+    /// Input field background — neutral200 in light, darkSurface in dark
     static let havenInputBackground = Color(
-        light: Color(red: 0.941, green: 0.922, blue: 0.882),
-        dark: Color(red: 0.071, green: 0.125, blue: 0.227)
+        light: Color(red: 0.929, green: 0.933, blue: 0.941),
+        dark: Color(red: 0.102, green: 0.082, blue: 0.188)
     )
 
     // MARK: - Helpers

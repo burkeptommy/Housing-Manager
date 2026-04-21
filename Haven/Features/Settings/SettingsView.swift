@@ -208,6 +208,25 @@ struct SettingsView: View {
                     Label("Maintenance Preferences", systemImage: "slider.horizontal.3")
                         .font(HavenTypography.body)
                 }
+
+                // Phase 63: handyman-specific preference, distinct from the
+                // global vendor tier. Captured at Q15b, editable here.
+                NavigationLink {
+                    HandymanPreferenceView()
+                } label: {
+                    Label("Handyman Preference", systemImage: "hammer.fill")
+                        .font(HavenTypography.body)
+                }
+
+                // Phase 65: per-category routing overrides that stack on
+                // top of the Q36 tier. Empty list most of the time; fills
+                // in as users start routing tasks from the Maintenance tab.
+                NavigationLink {
+                    RoutingPreferencesView()
+                } label: {
+                    Label("Task Routing", systemImage: "arrow.triangle.branch")
+                        .font(HavenTypography.body)
+                }
             } header: {
                 Text("PREFERENCES")
                     .font(HavenTypography.uiSectionHeader)
@@ -239,19 +258,19 @@ struct SettingsView: View {
                         .foregroundStyle(HavenColors.textSecondary)
                 }
 
-                Link(destination: URL(string: "https://havenhome.app/privacy")!) {
+                Link(destination: URL(string: "https://havenhome.dev/privacy")!) {
                     Label("Privacy Policy", systemImage: "hand.raised.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
                 }
 
-                Link(destination: URL(string: "https://havenhome.app/terms")!) {
+                Link(destination: URL(string: "https://havenhome.dev/terms")!) {
                     Label("Terms of Service", systemImage: "doc.text.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
                 }
 
-                Link(destination: URL(string: "mailto:support@havenhome.app")!) {
+                Link(destination: URL(string: "mailto:tom@havenhome.dev")!) {
                     Label("Contact Support", systemImage: "envelope.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
@@ -330,7 +349,7 @@ struct SettingsView: View {
                 showDeleteAccountStep2 = true
             }
         } message: {
-            Text("This will permanently delete your account and ALL your data — documents, properties, projects, chat history, and everything else. This cannot be undone.")
+            Text("This will permanently delete your account and ALL your data: documents, properties, projects, chat history, and everything else. This cannot be undone.")
         }
         .alert("Type DELETE to confirm", isPresented: $showDeleteAccountStep2) {
             TextField("Type DELETE", text: $deleteConfirmText)

@@ -49,6 +49,15 @@ enum SystemCategory: String, Codable, CaseIterable {
     case garage = "Garage Door"
     case landscaping = "Landscaping"
     case pest = "Pest Control"
+    case cleaningService = "Cleaning Service"
+    case gutterCleaning = "Gutter Cleaning"
+    case chimney = "Chimney"
+    case treeService = "Tree Service"
+    case windowCleaning = "Window Cleaning"
+    case snowRemoval = "Snow Removal"
+    case waterTreatment = "Water Treatment"
+    case painting = "Painting"
+    case pressureWashing = "Pressure Washing"
     case other = "Other"
 }
 

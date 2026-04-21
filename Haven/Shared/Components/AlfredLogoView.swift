@@ -11,7 +11,7 @@ struct AlfredLogoView: View {
             Circle()
                 .fill(color)
             Text("A")
-                .font(HavenTypography.fraunces(size: size * 0.5, weight: 400))
+                .font(.system(size: size * 0.5, weight: .regular, design: .serif))
                 .foregroundStyle(HavenColors.cream)
         }
         .frame(width: size, height: size)

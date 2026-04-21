@@ -27,7 +27,7 @@ struct NotificationSettingsView: View {
                 } else if notifService.isAuthorized {
                     Toggle("Notifications Enabled", isOn: $prefs.isEnabled)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.isEnabled) { _, _ in saveAndReschedule() }
                 } else {
                     HStack {
@@ -44,11 +44,11 @@ struct NotificationSettingsView: View {
                 Section {
                     Toggle("Document Expirations", isOn: $prefs.documentExpirations)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.documentExpirations) { _, _ in saveAndReschedule() }
                     Toggle("Insurance Renewals", isOn: $prefs.insuranceRenewals)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.insuranceRenewals) { _, _ in saveAndReschedule() }
                 } header: {
                     Text("DOCUMENT REMINDERS")
@@ -64,15 +64,15 @@ struct NotificationSettingsView: View {
                 Section {
                     Toggle("Maintenance Due Dates", isOn: $prefs.maintenanceDue)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.maintenanceDue) { _, _ in saveAndReschedule() }
                     Toggle("Overdue Items", isOn: $prefs.overdueItems)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.overdueItems) { _, _ in saveAndReschedule() }
                     Toggle("Warranty Expirations", isOn: $prefs.warrantyExpirations)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.warrantyExpirations) { _, _ in saveAndReschedule() }
                 } header: {
                     Text("PROPERTY REMINDERS")
@@ -84,7 +84,7 @@ struct NotificationSettingsView: View {
                 Section {
                     Toggle("Morning Digest (8:00 AM)", isOn: $prefs.morningDigest)
                         .font(HavenTypography.body)
-                        .tint(HavenColors.navy800)
+                        .tint(HavenColors.action)
                         .onChange(of: prefs.morningDigest) { _, _ in saveAndReschedule() }
                 } header: {
                     Text("DIGEST")

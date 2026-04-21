@@ -108,7 +108,14 @@ struct PropertyHookView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let valuation {
-                        Text(valuation.formattedHigh)
+                        // Phase 60.1 trust fix (2026-04-20): use midpoint
+                        // so Page 1 agrees with PropertyRecapCard + every
+                        // dashboard card. Previously `formattedHigh` here
+                        // and `currentEstimatedValue` (midpoint) on the
+                        // recap card disagreed by ~$570K on HNW homes —
+                        // the same property appeared to change value
+                        // mid-funnel.
+                        Text(valuation.formattedMidpoint)
                             .font(HavenTypography.fraunces(size: 38, weight: 700))
                             .foregroundStyle(HavenColors.navy800)
                             .lineLimit(1)
@@ -290,7 +297,7 @@ struct PropertyHookView: View {
 
                 // Bridge text
                 Text(HookContent.Page2.bridgeText)
-                    .font(Font.custom("Inter", size: 16).italic())
+                    .font(Font.system(size: 16).italic())
                     .foregroundStyle(HavenColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, HavenTheme.spacing8)
@@ -312,7 +319,7 @@ struct PropertyHookView: View {
 
                 // Legacy line
                 Text(HookContent.Page2.legacyLine)
-                    .font(Font.custom("Inter", size: 15).italic())
+                    .font(Font.system(size: 15).italic())
                     .foregroundStyle(HavenColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, HavenTheme.spacing4)

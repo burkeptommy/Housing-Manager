@@ -72,7 +72,7 @@ struct YourServicesSection: View {
                 Text("No services set up yet")
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Lawn, HVAC, pool, cleaning — anyone you pay regularly. Haven tracks visits and groups the tasks under them.")
+                Text("Lawn, HVAC, pool, cleaning, anyone you pay regularly. Haven tracks visits and groups the tasks under them.")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
             }
@@ -293,12 +293,12 @@ struct NextHandymanVisitSection: View {
         Button(action: action) {
             Text(label)
                 .font(HavenTypography.uiLabelSmall.weight(.semibold))
-                .foregroundStyle(filled ? HavenColors.textOnNavy : HavenColors.navy700)
+                .foregroundStyle(filled ? HavenColors.textOnAction : HavenColors.navy700)
                 .padding(.horizontal, HavenTheme.spacing16)
                 .padding(.vertical, HavenTheme.spacing8)
                 .background(
                     filled
-                    ? HavenColors.navy
+                    ? HavenColors.action
                     : Color.clear
                 )
                 .overlay(
@@ -536,12 +536,18 @@ struct ThisSeasonSection: View {
                     HStack(spacing: 4) {
                         Text("Route")
                             .font(HavenTypography.uiLabelSmall)
-                        Image(systemName: "arrow.triangle.branch")
+                        // BUG-004 fix: swap filter-style `arrow.triangle.branch`
+                        // for a clear arrow so the chip reads as "route this
+                        // somewhere" not "filter this." Also bumps vertical
+                        // padding from 4 to 8 so the chip meets iOS HIG's
+                        // 44pt tap-target minimum (was ~32pt before — test
+                        // plan G8 called this out).
+                        Image(systemName: "arrow.right")
                             .font(.caption.weight(.semibold))
                     }
                     .foregroundStyle(HavenColors.navy700)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .overlay(
                         Capsule()
                             .stroke(HavenColors.navy.opacity(0.3), lineWidth: 1)

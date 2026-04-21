@@ -40,7 +40,7 @@ struct CompletionScorecard: View {
                             .foregroundStyle(HavenColors.beige300)
                             .contentTransition(.numericText(value: animatedProgress))
                     } else {
-                        Text("Max Level — The Legacy!")
+                        Text("Max Level: The Legacy!")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(HavenColors.beige300)
                     }

@@ -545,6 +545,25 @@ async function buildSystemPrompt(
       if (attrs.has_ev_charger === true || attrs.has_ev_charger === "true") attrParts.push("EV charger");
       if (attrs.deck_material && attrs.deck_material !== "none") attrParts.push(`${attrs.deck_material} deck`);
       if (attrs.fence_material && attrs.fence_material !== "none") attrParts.push(`${attrs.fence_material} fence`);
+      // Phase 63: 3-way handyman preference captured at Q15b.
+      // Surfaces as a distinct clause so Claude can key behavioral
+      // guidance off it ("reference the handyman by name" / "respect
+      // DIY preference" / "offer to help vet candidates").
+      if (attrs.handyman_preference === "has_one") {
+        const h = contractors.find((c: any) =>
+          (c.category ?? "").toLowerCase() === "handyman"
+        );
+        if (h) {
+          const name = h.contact_name ?? h.company_name ?? "their handyman";
+          attrParts.push(`uses handyman ${name}`);
+        } else {
+          attrParts.push("has a preferred handyman");
+        }
+      } else if (attrs.handyman_preference === "does_diy") {
+        attrParts.push("prefers DIY for small tasks");
+      } else if (attrs.handyman_preference === "needs_help") {
+        attrParts.push("looking for a handyman");
+      }
       const attrStr = attrParts.length > 0 ? `, ${attrParts.join(", ")}` : "";
 
       // Service contracts for this property
@@ -753,6 +772,11 @@ YOUR ROLE:
 - When document content is provided above, use it to give specific, accurate answers
 - Be warm, professional, and reassuring — these are sensitive topics
 - Sound like a trusted private advisor, not a chatbot
+
+HANDYMAN AWARENESS (Phase 63):
+- If the property attributes say "uses handyman [Name]", reference that handyman by name when suggesting small-fix routine work ("You could add this to [Name]'s next visit").
+- If it says "prefers DIY for small tasks", do NOT reflexively recommend hiring someone for routine work — respect the preference and offer DIY guidance instead.
+- If it says "looking for a handyman", you may offer to help the user vet candidates (what to ask, what to check) when the topic comes up naturally. Don't push it if they don't ask.
 
 CRITICAL CONVERSATION RULE:
 - You MUST ONLY respond to the user's MOST RECENT message (the last message in the conversation)
