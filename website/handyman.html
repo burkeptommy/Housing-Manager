@@ -10,28 +10,56 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="chez-handyman-logo.png">
   <style>
-    /* Chez Handyman brand mark — added in the rebrand. The logo is the
-     * salmon variant of the Chez wordmark with a hammer + nail above the
-     * "h"/"e" instead of the homeowner-side house roof. */
+    /* Chez Handyman compact topbar (auth mode) and grid placement.
+     *
+     * Layout goals:
+     *   1. Compact topbar in auth mode — no marketing H1/lede above the fold.
+     *      The H1 + lede stay in the DOM (handyman.js writes role-specific
+     *      copy to them) but are CSS-hidden until the user is authenticated.
+     *   2. Auth-card first in DOM so mobile (single-column) shows the login
+     *      form before the hero/invite preview.
+     *   3. Desktop visual order preserved (hero left, auth right) via grid
+     *      column placement that doesn't depend on DOM order.
+     */
     .chez-brand-block {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 18px;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
     }
     .chez-brand-block img {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      border-radius: 9px;
       object-fit: cover;
       box-shadow: 0 4px 12px rgba(42, 34, 82, 0.18);
+      flex-shrink: 0;
     }
     .chez-brand-block .chez-brand-text {
       font-family: ui-serif, "New York", Georgia, serif;
       font-weight: 500;
-      font-size: 22px;
-      letter-spacing: -0.015em;
+      font-size: 20px;
+      letter-spacing: -0.012em;
       color: #2A2252;
+    }
+    /* Auth-mode: compact topbar — hide the marketing pitch entirely.
+     * It re-appears once the workspace is authenticated. */
+    body:not(.workspace-authenticated) .topbar-pitch { display: none; }
+    body:not(.workspace-authenticated) .topbar {
+      align-items: center;
+      margin-bottom: 32px;
+    }
+    /* Workspace mode: keep the brand mark visible alongside the editorial H1. */
+    body.workspace-authenticated .chez-brand-block { margin-bottom: 14px; }
+
+    /* Desktop auth panel: render hero (col 1) + auth (col 2) using grid
+     * column placement, regardless of DOM order. This lets us put the
+     * auth-card first in the DOM for mobile while keeping the desktop
+     * pitch-left / login-right layout. */
+    @media (min-width: 900px) {
+      body:not(.workspace-authenticated) .auth-panel > .auth-card { grid-column: 2; grid-row: 1; }
+      body:not(.workspace-authenticated) .auth-panel > .hero-card { grid-column: 1; grid-row: 1; }
     }
   </style>
 </head>
@@ -39,13 +67,14 @@
   <div class="provider-page">
     <header class="topbar">
       <div>
-        <a href="/" class="chez-brand-block" aria-label="Chez home" style="text-decoration: none;">
-          <img src="chez-handyman-logo.png" alt="Chez Handyman">
+        <a href="/" class="chez-brand-block" aria-label="Chez Handyman home">
+          <img src="chez-handyman-logo.png" alt="">
           <span class="chez-brand-text">chez handyman</span>
         </a>
-        <p class="eyebrow">Chez Handyman</p>
-        <h1 id="experience-title">Run the company. Keep every home moving.</h1>
-        <p class="lede" id="experience-lede">Owners and dispatchers manage routing, calendars, crew assignments, quotes, and home history while each technician gets a focused workspace for visits, messaging, systems capture, and execution.</p>
+        <div class="topbar-pitch">
+          <h1 id="experience-title">Run the company. Keep every home moving.</h1>
+          <p class="lede" id="experience-lede">Owners and dispatchers manage routing, calendars, crew assignments, quotes, and home history while each technician gets a focused workspace for visits, messaging, systems capture, and execution.</p>
+        </div>
       </div>
       <div class="topbar-actions">
         <span class="status-pill mode-pill" id="workspace-mode-pill">Secure access</span>
@@ -56,35 +85,6 @@
 
     <main class="page-grid" id="page-grid">
       <section class="auth-panel" id="auth-panel">
-        <article class="hero-card" id="invite-preview-card">
-          <div class="section-row">
-            <div>
-              <p class="section-eyebrow" id="invite-kicker">Secure access</p>
-              <h2 id="invite-title">Claim this Chez workspace</h2>
-            </div>
-            <span class="section-chip" id="invite-status">Ready</span>
-          </div>
-          <p class="card-copy" id="invite-summary">Create your Chez Handyman account to confirm visits, coordinate with homeowners, build quotes, and keep the home record sharper after every stop.</p>
-          <dl class="invite-grid">
-            <div>
-              <dt id="invite-label-a">Home</dt>
-              <dd id="invite-home">Loading</dd>
-            </div>
-            <div>
-              <dt id="invite-label-b">Requested date</dt>
-              <dd id="invite-date">Loading</dd>
-            </div>
-            <div>
-              <dt id="invite-label-c">Company</dt>
-              <dd id="invite-company">Loading</dd>
-            </div>
-            <div>
-              <dt id="invite-label-d">Workspace</dt>
-              <dd><a id="invite-field-link" href="#" target="_blank" rel="noreferrer">Preview linked visit workspace</a></dd>
-            </div>
-          </dl>
-        </article>
-
         <article class="auth-card">
           <div class="auth-card-header">
             <p class="section-eyebrow">Secure Company Access</p>
@@ -146,6 +146,35 @@
 
           <p class="helper-copy" id="auth-helper-copy">Owners, dispatchers, and field technicians log into the same secure workspace, with each role seeing the right mix of visits, homes, messages, crew tools, and quoting.</p>
           <p class="feedback-copy" id="auth-feedback"></p>
+        </article>
+
+        <article class="hero-card" id="invite-preview-card">
+          <div class="section-row">
+            <div>
+              <p class="section-eyebrow" id="invite-kicker">Why Chez Handyman</p>
+              <h2 id="invite-title">Run the company. Keep every home moving.</h2>
+            </div>
+            <span class="section-chip" id="invite-status">Ready</span>
+          </div>
+          <p class="card-copy" id="invite-summary">Owners and dispatchers manage routing, calendars, crew assignments, quotes, and home history. Technicians get a focused workspace for visits, messaging, system capture, and execution. One workspace, four roles, every home.</p>
+          <dl class="invite-grid">
+            <div>
+              <dt id="invite-label-a">Home</dt>
+              <dd id="invite-home">Loading</dd>
+            </div>
+            <div>
+              <dt id="invite-label-b">Requested date</dt>
+              <dd id="invite-date">Loading</dd>
+            </div>
+            <div>
+              <dt id="invite-label-c">Company</dt>
+              <dd id="invite-company">Loading</dd>
+            </div>
+            <div>
+              <dt id="invite-label-d">Workspace</dt>
+              <dd><a id="invite-field-link" href="#" target="_blank" rel="noreferrer">Preview linked visit workspace</a></dd>
+            </div>
+          </dl>
         </article>
       </section>
 
