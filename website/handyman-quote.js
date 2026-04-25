@@ -94,7 +94,7 @@ function renderQuote() {
 
   dom.quoteTitle.textContent = quote.title || "Handyman quote";
   dom.quoteLede.textContent = quote.recipient?.kind === "linked_home"
-    ? "Review the scope, approve it, ask a question, or decline it. Haven will keep the collaboration trail clean."
+    ? "Review the scope, approve it, ask a question, or decline it. Chez will keep the collaboration trail clean."
     : "Review the scope, approve it, ask a question, or decline it from the same secure quote link.";
   dom.heroChips.innerHTML = [
     chip(quote.statusLabel, quote.status === "approved" ? "success" : quote.status === "declined" ? "accent" : quote.status === "viewed" ? "warning" : ""),
@@ -120,7 +120,7 @@ function renderQuote() {
     quote.recipient?.email || "",
     quote.recipient?.address || "",
   ].filter(Boolean).join(" · ");
-  dom.quoteCompany.textContent = quote.workspace?.companyName || "Haven Handyman";
+  dom.quoteCompany.textContent = quote.workspace?.companyName || "Chez Handyman";
   dom.quoteProperty.textContent = quote.property?.name
     ? `${quote.property.name}${quote.property.address ? ` · ${quote.property.address}` : ""}`
     : quote.recipient?.address || "Standalone quote";

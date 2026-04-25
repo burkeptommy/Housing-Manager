@@ -3,16 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Haven Handyman Quote</title>
-  <meta name="description" content="Review and respond to your Haven Handyman quote.">
-  <meta name="theme-color" content="#2A2252">
+  <title>Chez Handyman Quote</title>
+  <meta name="description" content="Review and respond to your Chez Handyman quote.">
+  <meta name="theme-color" content="#ED6955">
   <link rel="stylesheet" href="handyman-quote.css?v=20260423-quote1">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="chez-handyman-logo.png">
+  <style>
+    /* Chez Handyman brand mark for the homeowner-facing quote review. */
+    .chez-brand-block {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .chez-brand-block img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      object-fit: cover;
+      box-shadow: 0 4px 12px rgba(42, 34, 82, 0.18);
+      flex-shrink: 0;
+    }
+    .chez-brand-text {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 500;
+      font-size: 22px;
+      letter-spacing: -0.015em;
+      color: #2A2252;
+    }
+  </style>
 </head>
 <body>
   <main class="quote-page">
     <section class="quote-shell">
       <header class="quote-hero">
-        <p class="eyebrow">Haven Handyman</p>
+        <a href="/" class="chez-brand-block" aria-label="Chez home">
+          <img src="chez-handyman-logo.png" alt="Chez Handyman">
+          <span class="chez-brand-text">chez handyman</span>
+        </a>
+        <p class="eyebrow">Chez Handyman</p>
         <h1 id="quote-title">Loading your quote</h1>
         <p class="lede" id="quote-lede">Review the scope, ask a question, approve it, or decline it.</p>
         <div class="hero-chips" id="quote-hero-chips"></div>

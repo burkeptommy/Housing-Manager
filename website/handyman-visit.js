@@ -57,7 +57,11 @@ const dom = {
 };
 
 const token = new URLSearchParams(window.location.search).get("token");
-const draftKey = `haven-handyman-portal:${token || "demo"}`;
+// Storage key was renamed in the Chez rebrand. Existing offline drafts under
+// the old "haven-handyman-portal:*" key will be ignored; given how transient
+// these drafts are, we accept the one-time loss rather than carrying a
+// migration shim forward.
+const draftKey = `chez-handyman-portal:${token || "demo"}`;
 
 const demoSession = {
   id: "demo-session",
@@ -132,7 +136,7 @@ const demoSession = {
       {
         id: "inventory",
         title: "Inventory major systems and appliances",
-        detail: "Add anything Haven is still missing so future visits start with the right context.",
+        detail: "Add anything Chez is still missing so future visits start with the right context.",
         category: "inventory",
         isRequired: true,
       },
@@ -141,7 +145,7 @@ const demoSession = {
       status: "sent_to_handyman",
       status_label: "Sent to handyman",
       intro: "Confirm the requested date or suggest another option before starting the visit.",
-      last_message: "Haven prepared the visit link for the handyman.",
+      last_message: "Chez prepared the visit link for the handyman.",
       scheduled_date: "2026-05-14",
       needs_homeowner_reply: false,
     },
@@ -448,7 +452,7 @@ async function identifyEquipmentFromFile(file, categoryHint) {
   });
 
   if (!response.ok) {
-    throw new Error("Haven could not identify the equipment label");
+    throw new Error("Chez could not identify the equipment label");
   }
 
   return response.json();
@@ -474,8 +478,8 @@ async function identifyExistingSystem(index, file) {
       key,
       result.catalog_match ? "success" : "warning",
       result.catalog_match
-        ? "Catalog match found. Haven filled in the system details."
-        : "Label captured. Haven filled in the details, but this model is not in the catalog yet.",
+        ? "Catalog match found. Chez filled in the system details."
+        : "Label captured. Chez filled in the details, but this model is not in the catalog yet.",
     );
     markDirty("System identified from label photo");
     render();
@@ -522,7 +526,7 @@ async function addSystemFromPhoto(file) {
       result.catalog_match ? "success" : "warning",
       result.catalog_match
         ? "New system added from the label photo."
-        : "New system added from the label photo. Haven did not find a catalog match yet.",
+        : "New system added from the label photo. Chez did not find a catalog match yet.",
     );
     clearSystemIdentify("new-system");
     markDirty("Added a system from a label photo");
@@ -633,7 +637,10 @@ function render() {
   dom.messageList.innerHTML = "";
   messages.forEach((message) => {
     const node = dom.messageTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".message-role").textContent = message.sender_role.replaceAll("_", " ");
+    // Display label only — the underlying sender_role value stays "haven"
+    // so server-side filtering and DB CHECK constraints keep working.
+    node.querySelector(".message-role").textContent =
+      message.sender_role === "haven" ? "Chez" : message.sender_role.replaceAll("_", " ");
     node.querySelector(".message-time").textContent = new Date(
       message.created_at || Date.now(),
     ).toLocaleString();
@@ -744,13 +751,13 @@ function render() {
     const hasCatalogMatch = Boolean(compactString(system.catalog_entry_id));
     const hasModelData = Boolean(compactString(system.model_number) || compactString(system.serial_number));
     const captureCopy = system.photo_captured_at
-      ? "Retake the label photo any time you want Haven to refresh the equipment match and cached service details."
-      : "Take a photo of the model and serial plate. Haven will match it to the equipment catalog and fill in the details for you.";
+      ? "Retake the label photo any time you want Chez to refresh the equipment match and cached service details."
+      : "Take a photo of the model and serial plate. Chez will match it to the equipment catalog and fill in the details for you.";
     captureTitle.textContent = hasCatalogMatch
       ? "Refresh this system from a label photo"
       : hasModelData
         ? "Capture the label to enrich this system"
-        : "Let Haven identify this system";
+        : "Let Chez identify this system";
     captureDetail.textContent = captureCopy;
     photoButton.textContent = identifyStatus?.tone === "working"
       ? "Analyzing label..."
@@ -793,8 +800,8 @@ function render() {
     matchPill.classList.toggle("is-neutral", !hasCatalogMatch && !hasModelData);
 
     detailNote.textContent = hasCatalogMatch
-      ? "Haven filled these in from the equipment catalog. Adjust anything manually only if the label photo needs a correction."
-      : "Haven will fill these in from the label photo. Adjust anything manually only if it needs a correction.";
+      ? "Chez filled these in from the equipment catalog. Adjust anything manually only if the label photo needs a correction."
+      : "Chez will fill these in from the label photo. Adjust anything manually only if it needs a correction.";
 
     if (identifyStatus?.message) {
       feedback.textContent = identifyStatus.message;

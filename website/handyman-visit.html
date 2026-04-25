@@ -3,19 +3,49 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Haven Handyman Visit</title>
-  <meta name="description" content="Offline-ready field microsite for Haven handyman visits.">
-  <meta name="theme-color" content="#2A2252">
+  <title>Chez Handyman Visit</title>
+  <meta name="description" content="Offline-ready field microsite for Chez handyman visits.">
+  <meta name="theme-color" content="#ED6955">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="handyman-visit.webmanifest">
   <link rel="stylesheet" href="handyman-visit.css?v=20260423-collab1">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="chez-handyman-logo.png">
+  <style>
+    /* Chez Handyman brand mark in the field PWA hero. */
+    .chez-brand-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .chez-brand-block img {
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
+      object-fit: cover;
+      box-shadow: 0 4px 12px rgba(42, 34, 82, 0.18);
+      flex-shrink: 0;
+    }
+    .chez-brand-text {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -0.012em;
+      color: #2A2252;
+    }
+  </style>
 </head>
 <body>
   <main class="page-shell">
     <section class="hero-card">
       <div class="hero-topline">
-        <span class="eyebrow">Haven field visit</span>
+        <a href="/" class="chez-brand-block" aria-label="Chez home">
+          <img src="chez-handyman-logo.png" alt="Chez Handyman">
+          <span class="chez-brand-text">chez handyman</span>
+        </a>
         <span class="status-pill" id="connectivity-pill">Checking connection</span>
       </div>
       <div class="hero-grid">
@@ -32,7 +62,7 @@
           <div class="meta-card">
             <span class="meta-label">Handyman</span>
             <strong id="contractor-name">Unassigned</strong>
-            <span id="contractor-contact">Add a preferred handyman in Haven</span>
+            <span id="contractor-contact">Add a preferred handyman in Chez</span>
           </div>
         </div>
       </div>
@@ -54,7 +84,7 @@
             </div>
             <span class="section-chip" id="coordination-status">Loading</span>
           </div>
-          <p class="hero-copy compact-copy" id="coordination-summary">Loading the Haven coordination state.</p>
+          <p class="hero-copy compact-copy" id="coordination-summary">Loading the Chez coordination state.</p>
           <div class="message-list" id="message-list"></div>
           <label class="input-label" for="coordination-note">Coordination note</label>
           <textarea id="coordination-note" rows="4" placeholder="Examples: We can do Friday afternoon instead, can the homeowner confirm if the side gate is still sticking, or we need to decline this week."></textarea>
@@ -152,13 +182,13 @@
           <div class="section-header">
             <div>
               <p class="section-eyebrow">Notes</p>
-              <h2>What should Haven remember?</h2>
+              <h2>What should Chez remember?</h2>
             </div>
           </div>
           <label class="input-label" for="field-notes">Field notes</label>
           <textarea id="field-notes" rows="7" placeholder="Examples: brought two 16x25x1 filters, loose upstairs hall handrail, homeowner wants quote for shelving in mudroom."></textarea>
           <label class="input-label" for="homeowner-notes">Homeowner notes</label>
-          <textarea id="homeowner-notes" rows="4" placeholder="Anything passed from the homeowner or Haven will appear here."></textarea>
+          <textarea id="homeowner-notes" rows="4" placeholder="Anything passed from the homeowner or Chez will appear here."></textarea>
         </article>
 
         <article class="surface-card summary-card">
@@ -231,8 +261,8 @@
       <div class="system-capture-card">
         <div class="system-capture-copy">
           <p class="system-capture-eyebrow">Equipment label</p>
-          <strong class="system-capture-title">Let Haven identify this system</strong>
-          <p class="system-capture-detail">Take a photo of the model and serial plate. Haven will match it to the equipment catalog and fill in the details for you.</p>
+          <strong class="system-capture-title">Let Chez identify this system</strong>
+          <p class="system-capture-detail">Take a photo of the model and serial plate. Chez will match it to the equipment catalog and fill in the details for you.</p>
         </div>
         <div class="system-capture-actions">
           <button class="primary-button small-button system-photo-button" type="button">Take label photo</button>
@@ -248,7 +278,7 @@
         <span class="system-pill system-match-pill">Needs label</span>
       </div>
       <p class="system-feedback hidden"></p>
-      <p class="system-detail-note">Haven will fill these in from the label photo. Adjust anything manually only if it needs a correction.</p>
+      <p class="system-detail-note">Chez will fill these in from the label photo. Adjust anything manually only if it needs a correction.</p>
       <div class="system-grid">
         <label class="system-field">
           <span>Name</span>

@@ -3,16 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Haven Handyman</title>
-  <meta name="description" content="Secure desktop and field workspace for Haven handyman companies and technicians.">
-  <meta name="theme-color" content="#2A2252">
+  <title>Chez Handyman</title>
+  <meta name="description" content="Secure desktop and field workspace for Chez handyman companies and technicians.">
+  <meta name="theme-color" content="#ED6955">
   <link rel="stylesheet" href="handyman.css?v=20260423-provider-delivery1">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="chez-handyman-logo.png">
+  <style>
+    /* Chez Handyman brand mark — added in the rebrand. The logo is the
+     * salmon variant of the Chez wordmark with a hammer + nail above the
+     * "h"/"e" instead of the homeowner-side house roof. */
+    .chez-brand-block {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .chez-brand-block img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      object-fit: cover;
+      box-shadow: 0 4px 12px rgba(42, 34, 82, 0.18);
+    }
+    .chez-brand-block .chez-brand-text {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 500;
+      font-size: 22px;
+      letter-spacing: -0.015em;
+      color: #2A2252;
+    }
+  </style>
 </head>
 <body>
   <div class="provider-page">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Haven Handyman</p>
+        <a href="/" class="chez-brand-block" aria-label="Chez home" style="text-decoration: none;">
+          <img src="chez-handyman-logo.png" alt="Chez Handyman">
+          <span class="chez-brand-text">chez handyman</span>
+        </a>
+        <p class="eyebrow">Chez Handyman</p>
         <h1 id="experience-title">Run the company. Keep every home moving.</h1>
         <p class="lede" id="experience-lede">Owners and dispatchers manage routing, calendars, crew assignments, quotes, and home history while each technician gets a focused workspace for visits, messaging, systems capture, and execution.</p>
       </div>
@@ -29,11 +60,11 @@
           <div class="section-row">
             <div>
               <p class="section-eyebrow" id="invite-kicker">Secure access</p>
-              <h2 id="invite-title">Claim this Haven workspace</h2>
+              <h2 id="invite-title">Claim this Chez workspace</h2>
             </div>
             <span class="section-chip" id="invite-status">Ready</span>
           </div>
-          <p class="card-copy" id="invite-summary">Create your Haven Handyman account to confirm visits, coordinate with homeowners, build quotes, and keep the home record sharper after every stop.</p>
+          <p class="card-copy" id="invite-summary">Create your Chez Handyman account to confirm visits, coordinate with homeowners, build quotes, and keep the home record sharper after every stop.</p>
           <dl class="invite-grid">
             <div>
               <dt id="invite-label-a">Home</dt>
@@ -57,7 +88,7 @@
         <article class="auth-card">
           <div class="auth-card-header">
             <p class="section-eyebrow">Secure Company Access</p>
-            <h2>Sign in to the full Haven Handyman desk.</h2>
+            <h2>Sign in to the full Chez Handyman desk.</h2>
             <p class="card-copy">Owners and dispatchers run routing, calendars, crew assignments, quotes, and home history here while technicians stay focused on visits, systems capture, and execution.</p>
             <div class="auth-capability-row">
               <span class="data-chip">Dispatch</span>
@@ -80,7 +111,7 @@
               <span>Password</span>
               <input id="sign-in-password" type="password" autocomplete="current-password" required>
             </label>
-            <button class="primary-button" type="submit">Sign in to Haven Handyman</button>
+            <button class="primary-button" type="submit">Sign in to Chez Handyman</button>
           </form>
 
           <form class="auth-form hidden" id="sign-up-form">
@@ -122,7 +153,7 @@
         <aside class="workspace-sidebar">
           <div class="workspace-card">
             <p class="section-eyebrow">Workspace</p>
-            <h2 id="workspace-name">Haven Handyman</h2>
+            <h2 id="workspace-name">Chez Handyman</h2>
             <p class="card-copy" id="workspace-meta">Loading workspace</p>
             <div class="workspace-tags" id="workspace-tags"></div>
           </div>
@@ -156,7 +187,7 @@
             <div>
               <p class="section-eyebrow">Operations</p>
               <h3>Own the queue, route the field team, and keep every home moving forward.</h3>
-              <p class="card-copy">Plan the week, route jobs, manage the crew, and build quotes from one Haven Handyman workspace.</p>
+              <p class="card-copy">Plan the week, route jobs, manage the crew, and build quotes from one Chez Handyman workspace.</p>
             </div>
             <div class="control-actions">
               <button class="secondary-button" id="quick-open-my-day" type="button">Open my day</button>
@@ -442,7 +473,7 @@
 
       <form class="quote-form" id="quote-form">
         <div class="quote-kind-toggle" id="quote-kind-toggle">
-          <button class="toggle-chip active" id="quote-kind-linked" type="button">Haven client request</button>
+          <button class="toggle-chip active" id="quote-kind-linked" type="button">Chez client request</button>
           <button class="toggle-chip" id="quote-kind-prospect" type="button">Standalone prospect</button>
         </div>
 
@@ -491,7 +522,7 @@
             <input id="quote-title" type="text" required>
           </label>
           <div class="quote-context-note">
-            <p class="helper-copy" id="quote-context-helper">Choose a Haven client request or switch to a standalone prospect quote. Either way, Haven will keep the scope, messages, and approval trail together.</p>
+            <p class="helper-copy" id="quote-context-helper">Choose a Chez client request or switch to a standalone prospect quote. Either way, Chez will keep the scope, messages, and approval trail together.</p>
           </div>
         </div>
 

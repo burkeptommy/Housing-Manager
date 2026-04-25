@@ -274,7 +274,7 @@ function syncExperienceMode() {
     : `${state.dashboard.workspace.companyName} operations desk`;
   dom.experienceLede.textContent = permissions.isFieldTechnician
     ? "See assigned work, homeowner context, home systems, and visit details in one place."
-    : "Route visits, manage the crew, plan the calendar, and build quotes from one Haven Handyman workspace.";
+    : "Route visits, manage the crew, plan the calendar, and build quotes from one Chez Handyman workspace.";
 }
 
 function workspaceSeed() {
@@ -363,7 +363,7 @@ async function loadInvitePreview() {
       dom.inviteTitle.textContent = `Join ${payload.teamInvite.workspace.companyName}`;
       dom.inviteStatus.textContent = payload.teamInvite.member.roleLabel;
       dom.inviteSummary.textContent =
-        "Create your secure login to see your assigned visits, route, homes, messages, and field workspaces from Haven Handyman.";
+        "Create your secure login to see your assigned visits, route, homes, messages, and field workspaces from Chez Handyman.";
       dom.inviteLabelA.textContent = "Company";
       dom.inviteLabelB.textContent = "Role";
       dom.inviteLabelC.textContent = "Invitee";
@@ -373,7 +373,7 @@ async function loadInvitePreview() {
       dom.inviteCompany.textContent = payload.teamInvite.member.fullName;
       dom.inviteFieldLink.href = payload.teamInvite.inviteUrl || "#";
       dom.inviteFieldLink.textContent = "Open secure team invite";
-      dom.authHelperCopy.textContent = "This invite attaches you to an existing Haven Handyman company account. Once you log in, the workspace will open with the visits, homes, messages, and tools that match your role.";
+      dom.authHelperCopy.textContent = "This invite attaches you to an existing Chez Handyman company account. Once you log in, the workspace will open with the visits, homes, messages, and tools that match your role.";
       dom.companyField.classList.add("hidden");
       dom.signUpCompany.value = payload.teamInvite.workspace.companyName || "";
       dom.signUpName.value = payload.teamInvite.member.fullName || "";
@@ -387,10 +387,10 @@ async function loadInvitePreview() {
     if (!payload?.invite) throw new Error("Missing invite");
     state.invitePreview = payload.invite;
     dom.inviteKicker.textContent = "Visit invite";
-    dom.inviteTitle.textContent = payload.invite.title || "Claim this Haven visit";
+    dom.inviteTitle.textContent = payload.invite.title || "Claim this Chez visit";
     dom.inviteStatus.textContent = payload.invite.requestStatusLabel || "Secure link";
     dom.inviteSummary.textContent =
-      "Create your Haven Handyman account to confirm this visit, route future work, and keep every home's systems record sharper after each stop.";
+      "Create your Chez Handyman account to confirm this visit, route future work, and keep every home's systems record sharper after each stop.";
     dom.inviteLabelA.textContent = "Home";
     dom.inviteLabelB.textContent = "Requested date";
     dom.inviteLabelC.textContent = "Company";
@@ -436,7 +436,7 @@ async function refreshWorkspace() {
         action: "bootstrap_workspace",
         ...seed,
       });
-      setFeedback(dom.authFeedback, "Workspace ready. Loading your Haven Handyman desk.");
+      setFeedback(dom.authFeedback, "Workspace ready. Loading your Chez Handyman desk.");
     } else {
       dom.authPanel.classList.remove("hidden");
       dom.workspacePanel.classList.add("hidden");
@@ -554,7 +554,7 @@ function renderWorkspaceHeader() {
   } else {
     dom.controlBar.querySelector(".section-eyebrow").textContent = "Operations";
     dom.controlBar.querySelector("h3").textContent = "Own the queue, route the field team, and keep every home moving forward.";
-    dom.controlBar.querySelector(".card-copy").textContent = "Plan the week, route jobs, manage the crew, and build quotes from one Haven Handyman workspace.";
+    dom.controlBar.querySelector(".card-copy").textContent = "Plan the week, route jobs, manage the crew, and build quotes from one Chez Handyman workspace.";
     dom.quickOpenMyDay.textContent = "Open my day";
     dom.quickNewQuote.textContent = "New quote";
   }
@@ -1231,7 +1231,7 @@ function renderHomes() {
             <div class="chip-row">
               ${statusChip(`${home.systemCount} systems`)}
               ${statusChip(`${home.openRequests} open requests`)}
-              ${home.lastCompletedVisit ? statusChip(`Last visit ${shortDate(home.lastCompletedVisit)}`, "success") : statusChip("No completed Haven visit yet", "warning")}
+              ${home.lastCompletedVisit ? statusChip(`Last visit ${shortDate(home.lastCompletedVisit)}`, "success") : statusChip("No completed Chez visit yet", "warning")}
             </div>
           </div>
           ${home.assignedMembers?.length ? `<div class="chip-row">${home.assignedMembers.map((name) => statusChip(name)).join("")}</div>` : ""}
@@ -1264,7 +1264,7 @@ function renderHomes() {
                     `)
                     .join("")}
                 </div>
-              ` : `<p class="card-copy">Completed Haven visits at this home will show up here.</p>`}
+              ` : `<p class="card-copy">Completed Chez visits at this home will show up here.</p>`}
             </section>
           </div>
           ${latestThreadVisit ? `
@@ -1317,7 +1317,7 @@ function renderQuotes() {
           <div class="chip-row">
             ${statusChip(`${quote.itemCount} line item${quote.itemCount === 1 ? "" : "s"}`)}
             ${quote.lastSentAt ? statusChip(`Sent ${shortDate(quote.lastSentAt)}`, "success") : statusChip(`Updated ${shortDate(quote.updatedAt)}`)}
-            ${quote.recipientKind === "prospect" ? statusChip("Prospect", "warning") : statusChip("Haven home")}
+            ${quote.recipientKind === "prospect" ? statusChip("Prospect", "warning") : statusChip("Chez home")}
           </div>
         </div>
         ${quote.latestMessage ? `
@@ -1360,7 +1360,7 @@ function renderSavedItems() {
 function renderRecentWork() {
   const recentWork = state.dashboard.recentWork || [];
   if (!recentWork.length) {
-    dom.recentWorkList.innerHTML = `<div class="mini-row">Completed Haven visits will show up here.</div>`;
+    dom.recentWorkList.innerHTML = `<div class="mini-row">Completed Chez visits will show up here.</div>`;
     return;
   }
   dom.recentWorkList.innerHTML = recentWork
@@ -1441,7 +1441,7 @@ function renderMessageThreadDetail() {
               `)
               .join("")}
           </div>
-        ` : `<p class="card-copy">No messages have been sent yet. Your update here will start the Haven thread for this home.</p>`}
+        ` : `<p class="card-copy">No messages have been sent yet. Your update here will start the Chez thread for this home.</p>`}
       </section>
       <section class="detail-block">
         <p class="section-eyebrow">Recent visits at this home</p>
@@ -1622,7 +1622,7 @@ function syncQuoteContextUI(existingQuote = null) {
       </article>
     `;
     dom.quoteContextHelper.textContent = selectedContext.quoteStatus
-      ? "This request already has quote activity. Updating and sending here will refresh the homeowner's Haven thread."
+      ? "This request already has quote activity. Updating and sending here will refresh the homeowner's Chez thread."
       : "Tie the quote to the homeowner request so messaging, approvals, visit planning, and follow-up stay in one clean thread.";
     wireRequestActionButtons(dom.quoteContextSummary);
   } else if (linkedMode && existingQuote && state.quoteDraft?.householdId) {
@@ -1639,13 +1639,13 @@ function syncQuoteContextUI(existingQuote = null) {
         </div>
       </article>
     `;
-    dom.quoteContextHelper.textContent = "Drafts without a homeowner request can still be saved here. To send through Haven messaging, choose an active client request.";
+    dom.quoteContextHelper.textContent = "Drafts without a homeowner request can still be saved here. To send through Chez messaging, choose an active client request.";
   } else if (linkedMode) {
     dom.quoteRequestTitle.value = "";
     dom.quoteContextSummary.innerHTML = `
       <article class="empty-state-panel">
         <p class="visit-title">No client request selected yet</p>
-        <p class="card-copy">Pick the homeowner request you are pricing. Haven will keep the quote, the communication thread, and the related visit history together.</p>
+        <p class="card-copy">Pick the homeowner request you are pricing. Chez will keep the quote, the communication thread, and the related visit history together.</p>
       </article>
     `;
     dom.quoteContextHelper.textContent = contexts.length
@@ -1680,10 +1680,10 @@ function syncQuoteContextUI(existingQuote = null) {
       : `
         <article class="empty-state-panel">
           <p class="visit-title">Standalone prospect quote</p>
-          <p class="card-copy">Use this for a quick walk-up quote, an inbound lead, or a client who is not set up in Haven yet. Save the draft or send it by email with a secure share link.</p>
+          <p class="card-copy">Use this for a quick walk-up quote, an inbound lead, or a client who is not set up in Chez yet. Save the draft or send it by email with a secure share link.</p>
         </article>
       `;
-    dom.quoteContextHelper.textContent = "Standalone quotes can be saved without a Haven home. Add an email when you are ready to send a secure share link.";
+    dom.quoteContextHelper.textContent = "Standalone quotes can be saved without a Chez home. Add an email when you are ready to send a secure share link.";
     dom.quoteProspectSummary.querySelectorAll(".copy-quote-link").forEach((button) => {
       button.addEventListener("click", () => {
         copyText(button.dataset.quoteLink);
@@ -1767,7 +1767,7 @@ function renderWorkspace() {
   renderTodayBoard();
   renderCrewWorkload();
   renderQuotePipeline();
-  renderThreads(dom.overviewMessages, dashboard.messages.slice(0, 6), "When homeowners message your company through Haven, the latest threads will show up here.");
+  renderThreads(dom.overviewMessages, dashboard.messages.slice(0, 6), "When homeowners message your company through Chez, the latest threads will show up here.");
   renderDispatchBoard();
   renderCalendar();
   renderRoutes();
@@ -1950,7 +1950,7 @@ async function submitQuote(sendNow) {
     if (payload.quote?.id) {
       state.quoteDraft.quoteId = payload.quote.id;
       state.quoteDraft.publicShareUrl = payload.quote.public_share_token
-        ? `https://havenhome.dev/handyman-quote?quote=${encodeURIComponent(payload.quote.public_share_token)}`
+        ? `https://www.getchez.com/handyman-quote?quote=${encodeURIComponent(payload.quote.public_share_token)}`
         : state.quoteDraft.publicShareUrl;
     }
     const deliveryMessage = sendNow
@@ -2010,7 +2010,7 @@ async function sendMessage(event) {
       dom.authFeedback,
       payload.delivery?.sent
         ? "Update sent to the homeowner."
-        : `Update saved in Haven, but outbound delivery needs attention: ${payload.delivery?.error || "No email was sent."}`,
+        : `Update saved in Chez, but outbound delivery needs attention: ${payload.delivery?.error || "No email was sent."}`,
       Boolean(payload.delivery && payload.delivery.sent === false),
     );
   } catch (error) {
@@ -2087,7 +2087,7 @@ async function signUp(event) {
     action: "bootstrap_workspace",
     ...payload,
   });
-  setFeedback(dom.authFeedback, "Account created. Loading your Haven Handyman workspace.");
+  setFeedback(dom.authFeedback, "Account created. Loading your Chez Handyman workspace.");
   await refreshWorkspace();
 }
 
