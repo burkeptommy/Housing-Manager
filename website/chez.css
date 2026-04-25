@@ -1515,14 +1515,137 @@ a:focus-visible, button:focus-visible {
   .phone { transform: scale(0.84); }
 }
 
-/* Phone — secondary smaller scale (for inline mockups in feature rows) */
+/* Phone — secondary smaller scale (for inline mockups in feature rows).
+ * Bumped from 240px to 296px (matching the hero phone size) so the
+ * mockups feel substantial in the 2-column theme rows. */
 .phone-sm {
+  width: 296px;
+}
+.phone-sm .phone-notch { width: 100px; height: 26px; top: 12px; }
+.phone-sm .phone-statusbar { height: 48px; font-size: 12px; padding: 0 26px 8px; }
+.phone-sm .phone-content { padding: 8px 16px 16px; gap: 11px; }
+.phone-sm .phone-tabbar { height: 52px; }
+
+/* Even smaller scale for multi-phone gallery layouts (4 phones in a row) */
+.phone-xs {
   width: 240px;
 }
-.phone-sm .phone-notch { width: 80px; height: 22px; top: 10px; }
-.phone-sm .phone-statusbar { height: 42px; font-size: 11px; padding: 0 22px 6px; }
-.phone-sm .phone-content { padding: 6px 14px 14px; gap: 10px; }
-.phone-sm .phone-tabbar { height: 48px; }
+.phone-xs .phone-notch { width: 82px; height: 22px; top: 10px; }
+.phone-xs .phone-statusbar { height: 40px; font-size: 10px; padding: 0 22px 6px; }
+.phone-xs .phone-content { padding: 6px 13px 13px; gap: 10px; }
+.phone-xs .phone-tabbar { height: 46px; }
+.phone-xs .ui-greeting { font-size: 14px; }
+.phone-xs .ui-section-label { font-size: 8px; }
+
+/* ---- Multi-phone gallery (Apple-style "look at the app" section) ---- */
+
+.phone-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+  align-items: start;
+  justify-items: center;
+  margin-top: 24px;
+}
+
+.phone-gallery-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.phone-gallery-caption {
+  max-width: 220px;
+}
+
+.phone-gallery-caption-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: -0.012em;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.phone-gallery-caption-sub {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1100px) {
+  .phone-gallery {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 48px 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  .phone-gallery {
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+}
+
+/* ---- Cross-audience callout (For Handymen on the homeowner page) ---- */
+
+.cross-audience-callout {
+  background: var(--indigo-900);
+  color: var(--text-on-indigo);
+  border-radius: var(--radius-xl);
+  padding: 56px 56px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 40px;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.cross-audience-callout::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(50% 60% at 100% 50%, rgba(237, 105, 85, 0.22) 0%, transparent 70%),
+    radial-gradient(40% 60% at 0% 100%, rgba(139, 125, 186, 0.32) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.cross-audience-callout .eyebrow {
+  color: var(--salmon-light);
+  margin-bottom: 12px;
+}
+
+.cross-audience-callout h2 {
+  color: var(--text-on-indigo);
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+
+.cross-audience-callout p {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 16px;
+  line-height: 1.55;
+  max-width: 540px;
+}
+
+@media (max-width: 760px) {
+  .cross-audience-callout {
+    grid-template-columns: 1fr;
+    padding: 40px 28px;
+    gap: 24px;
+    text-align: center;
+  }
+}
 
 /* ---- IN-PHONE PRODUCT UI PRIMITIVES ---- */
 
@@ -1950,7 +2073,8 @@ a:focus-visible, button:focus-visible {
   justify-content: center;
   align-items: center;
   position: relative;
-  min-height: 540px;
+  /* No min-height — let the mockup determine the size so we don't get
+   * dead whitespace around small phones. */
 }
 
 .feature-row-v2-visual::before {
