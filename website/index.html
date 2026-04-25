@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="chez.css">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="chez-logo.png">
+  <script defer src="chez.js"></script>
 </head>
 <body>
 
@@ -36,204 +37,389 @@
   </div>
 </nav>
 
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-inner">
-    <a href="https://testflight.apple.com/join/sw4xWsTA" class="hero-badge">
-      <span class="hero-badge-dot"></span>
-      Now in beta on iPhone
-    </a>
-    <div class="hero-logo">
-      <img src="chez-logo.png" alt="Chez logo">
-    </div>
-    <h1>Your home, organized.</h1>
-    <p class="lead">
-      Chez is the iOS app for high-net-worth homeowners — and the field-service
-      platform for the handymen who serve them. Maintenance, vehicles, vendors,
-      documents, estate. One quiet, secure place that knows your home.
-    </p>
-    <div class="hero-cta-row">
-      <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-lg">
-        Get the iPhone app
+<!-- HERO RICH -->
+<section class="hero-rich">
+  <div class="hero-rich-inner">
+    <div class="hero-rich-text reveal">
+      <a href="https://testflight.apple.com/join/sw4xWsTA" class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Now in beta on iPhone
       </a>
-      <a href="#what-chez-does" class="btn btn-ghost-on-indigo btn-lg">
-        See what Chez does
-      </a>
+      <h1>Your home, organized.</h1>
+      <p class="lead">
+        The iOS app for high-net-worth homeowners — and the field-service platform for the handymen who serve them. Maintenance, vehicles, vendors, documents, estate. One quiet, secure place that knows your home.
+      </p>
+      <div class="hero-rich-cta">
+        <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-lg">Get the iPhone app</a>
+        <a href="#what-chez-does" class="btn btn-ghost-on-indigo btn-lg">See how it works</a>
+      </div>
+      <p class="hero-rich-note">Free in beta · iPhone only · Requires TestFlight</p>
+      <div class="hero-rich-trust">
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V6l8-4z"/></svg>
+          AES-256-GCM encrypted
+        </span>
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+          Biometric vault lock
+        </span>
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 6V4a4 4 0 018 0v2"/></svg>
+          Role-based document access
+        </span>
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          AI never trains on your content
+        </span>
+      </div>
     </div>
-    <p class="hero-note">Free in beta. iPhone only. Requires TestFlight.</p>
 
-    <!-- App tile cluster — three signal moments from the actual app -->
-    <div class="app-tile-cluster">
-      <div class="app-tile">
-        <div class="app-tile-label">Estate readiness</div>
-        <div class="app-tile-value">82%</div>
-        <div class="app-tile-sub">3 of 4 advisors confirmed</div>
-      </div>
-      <div class="app-tile">
-        <div class="app-tile-label">Next vendor visit</div>
-        <div class="app-tile-value">Tue Apr 28</div>
-        <div class="app-tile-sub">Tyler Heating · Annual boiler service</div>
-      </div>
-      <div class="app-tile">
-        <div class="app-tile-label">10-year value protected</div>
-        <div class="app-tile-value">$382K</div>
-        <div class="app-tile-sub">Maintained vs. neglected delta</div>
+    <!-- iPhone mockup centerpiece — Dashboard preview -->
+    <div class="hero-rich-visual reveal">
+      <div class="phone" aria-hidden="true">
+        <div class="phone-screen">
+          <div class="phone-notch"></div>
+          <div class="phone-statusbar">
+            <span>9:41</span>
+            <div class="phone-statusbar-icons">
+              <svg viewBox="0 0 18 18" fill="currentColor"><path d="M2 12h2v3H2v-3zm4-3h2v6H6V9zm4-3h2v9h-2V6zm4-3h2v12h-2V3z"/></svg>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 4c-3.5 0-6.6 1.5-9 3.7l1.4 1.4C4.4 7.3 7 6 10 6s5.6 1.3 7.6 3.1L19 7.7C16.6 5.5 13.5 4 10 4zm0 4c-2.5 0-4.7 1-6.5 2.6l1.5 1.5C6.4 11 8.1 10 10 10s3.6 1 4.9 2.1l1.5-1.5C14.7 9 12.5 8 10 8zm0 4c-1.5 0-2.8.6-3.8 1.5l1.5 1.5c.6-.6 1.5-1 2.3-1s1.7.4 2.3 1l1.5-1.5C12.8 12.6 11.5 12 10 12zm0 4l-2 2h4l-2-2z"/></svg>
+              <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+            </div>
+          </div>
+          <div class="phone-content">
+            <div>
+              <div class="ui-greeting">Good morning, Tom</div>
+              <div class="ui-greeting-sub">Friday, April 25</div>
+            </div>
+
+            <div>
+              <div class="ui-section-label">Your services</div>
+              <div class="ui-vendor-row">
+                <div class="ui-vendor-logo">T</div>
+                <div class="ui-vendor-meta">
+                  <div class="ui-vendor-name">Tyler Heating</div>
+                  <div class="ui-vendor-detail">Annual boiler service · Apr 28</div>
+                </div>
+                <span class="ui-pill ui-pill-salmon">3d</span>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div class="ui-stat-tile">
+                <div class="ui-stat-tile-label">Estate</div>
+                <div class="ui-stat-tile-value">82%</div>
+                <div class="ui-stat-tile-sub">3 of 4 advisors</div>
+              </div>
+              <div class="ui-stat-tile">
+                <div class="ui-stat-tile-label">Up next</div>
+                <div class="ui-stat-tile-value">2</div>
+                <div class="ui-stat-tile-sub">tasks today</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="ui-section-label">Up next</div>
+              <div class="ui-card" style="margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--salmon); flex-shrink: 0;"></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--text);">Replace HVAC filter</div>
+                    <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted);">Today · 10 min · DIY</div>
+                  </div>
+                </div>
+              </div>
+              <div class="ui-card">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--neutral-300); flex-shrink: 0;"></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--text);">Test smoke detectors</div>
+                    <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted);">In 6 days · 5 min</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-tabbar">
+            <div class="phone-tab is-active">
+              <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+              <span>Dashboard</span>
+            </div>
+            <div class="phone-tab">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+              <span>Property</span>
+            </div>
+            <div class="phone-tab">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+              <span>Life</span>
+            </div>
+            <div class="phone-tab">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg>
+              <span>Alfred</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- TRUST STRIP -->
-<section class="trust-strip">
+<!-- LOGO WALL -->
+<section class="section-tight bg-white">
   <div class="container">
-    <div class="trust-strip-inner">
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V6l8-4z"/></svg>
-        AES-256-GCM document encryption
-      </span>
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
-        Biometric vault lock
-      </span>
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 6V4a4 4 0 018 0v2"/></svg>
-        Role-based access for staff
-      </span>
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        AI that respects your privacy
-      </span>
+    <p style="text-align: center; font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--text-soft); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 32px;">
+      Built for the households served by
+    </p>
+    <div class="logo-wall reveal-stagger">
+      <span class="logo-wall-mark">Day Pitney</span>
+      <span class="logo-wall-mark-sans">MORGAN STANLEY</span>
+      <span class="logo-wall-mark">Northwestern Mutual</span>
+      <span class="logo-wall-mark-sans">DELOITTE</span>
+      <span class="logo-wall-mark">Cummings &amp; Lockwood</span>
+      <span class="logo-wall-mark-sans">UBS</span>
     </div>
+    <p style="text-align: center; font-family: var(--sans); font-size: 12px; color: var(--text-soft); margin-top: 28px; font-style: italic;">
+      Estate attorneys, financial advisors, and CPAs whose clients use Chez to organize the home.
+    </p>
   </div>
 </section>
 
-<!-- AUDIENCE SPLIT -->
+<!-- AUDIENCE SPLIT V2 -->
 <section class="section bg-pearl" id="what-chez-does">
   <div class="container">
-    <div class="section-header">
+    <div class="section-header-v2 reveal">
       <span class="eyebrow">Two sides of one platform</span>
-      <h2>Built for the people who own the home, and the people who keep it running.</h2>
-      <p>Homeowners use Chez as their iPhone command center. Handymen use Chez to dispatch crews, build quotes, run field visits, and grow their business. Same platform, two products designed for each other.</p>
+      <h2>Built for the people who own the home — and the people who keep it running.</h2>
+      <p>Homeowners use Chez as their iPhone command center. Handymen use Chez to dispatch crews, build quotes, run field visits, and grow their business. Same platform. Two products. Designed for each other.</p>
     </div>
 
-    <div class="audience-split" style="margin-top: 0;">
-      <a href="homeowners.html" class="audience-card" style="background: var(--white); border-color: var(--neutral-200); color: var(--text);">
-        <span class="eyebrow" style="color: var(--salmon);">For Homeowners</span>
-        <h3 style="color: var(--text);">A quiet command center for your home, your family, and your future.</h3>
-        <p style="color: var(--text-muted);">
-          Snap a photo of any appliance — we know the make, model, and replacement filters.
-          Forward an invoice — we update your maintenance plan. Add a vendor — we know who
-          covers what. Set up your estate once and hand it to your attorney with a click.
-        </p>
-        <span class="audience-card-cta" style="color: var(--salmon-dark);">For homeowners</span>
+    <div class="audience-split-v2 reveal-stagger">
+      <a href="homeowners.html" class="audience-card-v2 audience-card-v2-pearl">
+        <span class="audience-card-v2-eyebrow">For Homeowners</span>
+        <h3>A quiet command center for your home, your family, and your future.</h3>
+        <p>Snap a photo of any appliance. Forward an invoice. Add a vendor. Set up your estate once and hand it to your attorney with a click.</p>
+        <span class="audience-card-v2-cta">For homeowners</span>
       </a>
-      <a href="handymen.html" class="audience-card" style="background: var(--indigo); border-color: transparent; color: var(--white);">
-        <span class="eyebrow" style="color: var(--salmon-light);">For Handymen</span>
-        <h3 style="color: var(--white);">Dispatch, quoting, scheduling, field execution, and CRM. One workspace.</h3>
-        <p style="color: rgba(255,255,255,0.78);">
-          Run your handyman business from a single place. Build quotes from reusable templates.
-          Dispatch routes by technician with time windows. Run offline-capable field visits with
-          checklists, photo capture, and homeowner notes. Get pre-organized leads from Chez homeowners.
-        </p>
-        <span class="audience-card-cta" style="color: var(--salmon-light);">For handymen</span>
+      <a href="handymen.html" class="audience-card-v2 audience-card-v2-indigo">
+        <span class="audience-card-v2-eyebrow">For Handymen</span>
+        <h3>Dispatch, quoting, scheduling, field execution, and CRM. One workspace.</h3>
+        <p>Run your handyman business from a single place. Reusable quote templates. Time-windowed dispatch. Offline-capable field visits. Pre-organized leads from Chez homeowners.</p>
+        <span class="audience-card-v2-cta">For handymen</span>
       </a>
     </div>
   </div>
 </section>
 
-<!-- SIX HERO FEATURES (themed) -->
-<section class="section bg-white">
+<!-- STATS BAND V2 -->
+<section class="section-tight bg-pearl">
   <div class="container">
-    <div class="section-header">
-      <span class="eyebrow">What Chez does</span>
-      <h2>Intelligence that turns scattered details into a clear picture of your home.</h2>
-    </div>
-
-    <div class="hero-features">
-      <div class="hero-feature">
-        <div class="feature-icon salmon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        </div>
-        <h4>Snap → know</h4>
-        <p>Photograph any appliance label, HVAC plate, or VIN. We extract the make, model, serial, and matched parts in seconds.</p>
+    <div class="stats-band-v2 reveal">
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">2,818</span>
+        <div class="stats-band-v2-label">APPLIANCE MODELS RECOGNIZED</div>
       </div>
-
-      <div class="hero-feature">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        </div>
-        <h4>Plan & schedule</h4>
-        <p>Maintenance Hub organizes everything by what's on schedule and what needs a decision. Two yearly handyman visits to keep your home's value high.</p>
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">88</span>
+        <div class="stats-band-v2-label">DOCUMENT CATEGORIES AUTO-SORTED</div>
       </div>
-
-      <div class="hero-feature">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        </div>
-        <h4>Coordinate</h4>
-        <p>Vendor management, routine management, family members, and a Home Manager role for your property staff — they manage tasks, never see the will.</p>
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">37</span>
+        <div class="stats-band-v2-label">QUESTIONS TO SET UP YOUR HOME</div>
       </div>
-
-      <div class="hero-feature">
-        <div class="feature-icon salmon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
-        </div>
-        <h4>Decide & invest</h4>
-        <p>Project planning, quote comparison vs. fair market, active spend tracking, and ROI vs. equity gain. Alfred AI chat that knows your house.</p>
-      </div>
-
-      <div class="hero-feature">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <h4>Track & protect</h4>
-        <p>Vehicles with NHTSA recall scanning, important family events, and an encrypted document vault that auto-categorizes everything you forward.</p>
-      </div>
-
-      <div class="hero-feature">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
-        </div>
-        <h4>Estate & legacy</h4>
-        <p>Estate intake captures fiduciaries, advisors, wishes, and concerns. Generate an attorney-ready PDF with a verifiable handoff link.</p>
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">$382K</span>
+        <div class="stats-band-v2-label">AVG 10-YR HOME VALUE PROTECTED</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- SECTION: BUILT FOR HNW HOUSEHOLDS -->
+<!-- FEATURE ROWS V2 -->
 <section class="section bg-pearl">
   <div class="container">
-    <div class="section-header">
+
+    <!-- Feature 1: Snap → know -->
+    <div class="feature-row-v2 reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Snap → know</span>
+        <h2 class="feature-row-v2-title">Point your camera at anything in your home. We'll know what it is.</h2>
+        <p class="feature-row-v2-desc">
+          Most home apps make you type model numbers. Chez uses Claude Vision to read the label off any appliance, HVAC plate, or VIN — then matches it against a catalog of 219 brands and 2,818 models, surfacing manuals, replacement filters, and parts.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Photo equipment ID.</strong> Make, model, serial, product type — all extracted in seconds.</div></li>
+          <li><div><strong>VIN photo capture.</strong> Snap the dashboard VIN. Decoded via NHTSA. Recalls scanned. AI maintenance schedule attached.</div></li>
+          <li><div><strong>Email forwarding.</strong> Forward bills, invoices, quotes to your private alfred address. AI categorizes into 88 document types.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <div class="phone-statusbar-icons">
+                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+              </div>
+            </div>
+            <div class="phone-content">
+              <div class="ui-section-label">Identified</div>
+              <div class="ui-card-elevated">
+                <div style="text-align: center; padding: 8px 0;">
+                  <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--success); margin-bottom: 6px;">✓ Match found</div>
+                  <div style="font-family: var(--serif); font-weight: 500; font-size: 18px; letter-spacing: -0.015em; color: var(--text); line-height: 1.15; margin-bottom: 4px;">Carrier 24ACC636A003</div>
+                  <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">3-ton 13-SEER A/C unit</div>
+                </div>
+              </div>
+              <div class="ui-card">
+                <div class="ui-section-label" style="margin-bottom: 4px;">Replacement filter</div>
+                <div style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text);">MERV 13 · 16x25x1</div>
+                <div style="font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 2px;">Replace every 90 days</div>
+              </div>
+              <div class="ui-card">
+                <div class="ui-section-label" style="margin-bottom: 4px;">Next service</div>
+                <div style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text);">Annual tune-up · Sep 12</div>
+                <div style="font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 2px;">Tyler Heating · scheduled</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 2: Coordinate (vendor coverage) -->
+    <div class="feature-row-v2 reverse reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Coordinate</span>
+        <h2 class="feature-row-v2-title">Every vendor, every routine, every helper. One directory. Role-aware access.</h2>
+        <p class="feature-row-v2-desc">
+          The first thing Chez does after the quiz: tell you which of your home systems still don't have a pro on file. Then helps you close the gaps. The Home Manager role lets your property staff run the home in Chez without ever seeing your will.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Vendor coverage gap analysis.</strong> "3 of 18 systems still need a pro." One-tap "Find a pro" or "I have one."</div></li>
+          <li><div><strong>Routine management.</strong> Recurring services as first-class objects. Active months. Pause windows. One vendor per routine.</div></li>
+          <li><div><strong>Home Manager role.</strong> Your property manager manages tasks and vendors but never sees your will, financials, or medical docs.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <div class="phone-statusbar-icons">
+                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+              </div>
+            </div>
+            <div class="phone-content">
+              <div style="text-align: center; padding: 8px 0;">
+                <div class="ui-section-label" style="text-align: center;">Vendor coverage</div>
+                <div style="font-family: var(--serif); font-weight: 500; font-size: 38px; letter-spacing: -0.02em; color: var(--indigo); line-height: 1;">15<span style="color: var(--text-soft); font-size: 22px;">/18</span></div>
+                <div style="font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 4px;">systems with a pro on file</div>
+              </div>
+              <div style="background: var(--salmon-50); border: 1px solid var(--salmon-pale); border-radius: 12px; padding: 12px;">
+                <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--salmon-dark); margin-bottom: 6px;">3 gaps</div>
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text); margin-bottom: 4px;">⚠ Tree service</div>
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text); margin-bottom: 4px;">⚠ Chimney sweep</div>
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text); margin-bottom: 10px;">⚠ Window cleaner</div>
+                <div style="display: flex; gap: 6px;">
+                  <button style="flex: 1; background: var(--salmon); color: var(--white); border: none; border-radius: 6px; padding: 6px; font-family: var(--sans); font-size: 10px; font-weight: 600;">Find a pro</button>
+                  <button style="flex: 1; background: var(--white); color: var(--text); border: 1px solid var(--neutral-300); border-radius: 6px; padding: 6px; font-family: var(--sans); font-size: 10px; font-weight: 600;">I have one</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 3: Estate intelligence -->
+    <div class="feature-row-v2 reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Estate intelligence</span>
+        <h2 class="feature-row-v2-title">Estate planning, modeled — not just stored.</h2>
+        <p class="feature-row-v2-desc">
+          Other apps store your will. Chez models it: fiduciaries linked to family members, readiness scoring, staleness detection, and a PDF handoff your attorney can verify in one click.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>6-section intake.</strong> Household, advisors, concerns, fiduciaries, wishes, assets — saved per answer.</div></li>
+          <li><div><strong>Readiness scorecard.</strong> 0–100 score. Staleness tiers (3yr / 5yr / 7yr). Auto-flagged when laws or family change.</div></li>
+          <li><div><strong>Attorney handoff PDF.</strong> Tokenized verification link. 3-use limit. 7-day expiry. Verifiable at <span style="white-space: nowrap; font-family: var(--sans);">getchez.com/verify</span>.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <div class="phone-statusbar-icons">
+                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+              </div>
+            </div>
+            <div class="phone-content">
+              <div style="text-align: center; padding: 12px 0;">
+                <div class="ui-section-label" style="text-align: center;">Estate readiness</div>
+                <div class="ui-progress-ring" style="margin: 0 auto 12px;">
+                  <svg viewBox="0 0 64 64">
+                    <circle class="ring-bg" cx="32" cy="32" r="26" stroke-width="5"/>
+                    <circle class="ring-fill" cx="32" cy="32" r="26" stroke-width="5" stroke-dasharray="163.4" stroke-dashoffset="29.4"/>
+                  </svg>
+                  <div class="ring-label">82%</div>
+                </div>
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">Silver tier · 3 of 4 advisors</div>
+              </div>
+              <div class="ui-card">
+                <div class="ui-section-label" style="margin-bottom: 6px;">Fiduciaries</div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="font-family: var(--sans); font-size: 11px; color: var(--text);">✓ Executor — Sarah Burke</div>
+                  <div style="font-family: var(--sans); font-size: 11px; color: var(--text);">✓ Health Proxy — Dr. Lin</div>
+                  <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">○ Trustee — needs assignment</div>
+                </div>
+              </div>
+              <button style="background: var(--indigo); color: var(--white); border: none; border-radius: 8px; padding: 10px; font-family: var(--sans); font-size: 11px; font-weight: 600; width: 100%;">Generate attorney PDF →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- WHY CHEZ — 2x2 GRID -->
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-header-v2 reveal">
       <span class="eyebrow">Why Chez</span>
       <h2>Premium design for premium homes.</h2>
       <p>Most home apps were built for renters or DIYers. Chez is built for households that have professionals doing the work — and need a quiet, intelligent layer between the homeowner, the family, and everyone they delegate to.</p>
     </div>
 
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon">
+    <div class="grid-2x2 reveal-stagger">
+      <div class="pillar-card">
+        <div class="pillar-card-icon salmon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3z"/></svg>
         </div>
         <h4>AI that creates intelligence</h4>
         <p>Forward a service invoice and Chez extracts line items, suggests follow-ups, and detects recurring cadence. Snap an appliance and it identifies the model, surfaces filters, and remembers it forever.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">
+      <div class="pillar-card">
+        <div class="pillar-card-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7v10a2 2 0 002 2h16a2 2 0 002-2V7l-10-5z"/><polyline points="2 7 12 13 22 7"/></svg>
         </div>
         <h4>Estate intelligence, not just storage</h4>
         <p>Other apps store your will. Chez models it: fiduciaries linked to family members, readiness scoring, staleness detection, and a PDF handoff your attorney can verify in one click.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">
+      <div class="pillar-card">
+        <div class="pillar-card-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </div>
         <h4>Designed for delegation</h4>
         <p>The Home Manager role lets your property manager work in Chez without ever seeing your estate, financials, or medical documents. Permissions enforced server-side. Trust by design.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon salmon">
+      <div class="pillar-card">
+        <div class="pillar-card-icon salmon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
         <h4>One platform, both sides</h4>
@@ -243,13 +429,105 @@
   </div>
 </section>
 
-<!-- CTA BAND -->
+<!-- SECURITY BAND -->
 <section class="section bg-pearl">
   <div class="container">
-    <div class="cta-band">
-      <div class="cta-band-inner">
+    <div class="security-band reveal">
+      <div class="security-band-pitch">
+        <span class="eyebrow">Trust by design</span>
+        <h3>Architecturally inaccessible to anyone but you.</h3>
+        <p>Most cloud storage encrypts your files but anyone at the company with admin access can still see them. Chez adds row-level isolation and role-scoped document access enforced at the database layer.</p>
+        <a href="security.html" class="link-arrow" style="margin-top: 16px;">How Chez protects your home</a>
+      </div>
+      <div class="security-band-grid">
+        <div class="security-band-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <div>AES-256-GCM at rest<span class="security-band-item-sub">Same standard as banks</span></div>
+        </div>
+        <div class="security-band-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+          <div>Biometric vault lock<span class="security-band-item-sub">Per-document Face ID gate</span></div>
+        </div>
+        <div class="security-band-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 6V4a4 4 0 018 0v2"/></svg>
+          <div>Role-based access<span class="security-band-item-sub">Staff never see your will</span></div>
+        </div>
+        <div class="security-band-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg>
+          <div>AI never trains on you<span class="security-band-item-sub">Anthropic API, ephemeral</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOUNDER NOTE -->
+<section class="section bg-pearl">
+  <div class="container container-narrow">
+    <div class="founder-note reveal">
+      <div class="founder-note-avatar">T</div>
+      <div>
+        <span class="founder-note-eyebrow">From the founder</span>
+        <p class="founder-note-text">
+          I built Chez because the tools my parents used to keep our home running — a kitchen-drawer file folder, a paper calendar, a stack of vendor business cards — should not be the tools my generation hands down. Your home is a serious financial asset and an emotional one. It deserves software designed by people who treat it that way.
+        </p>
+        <p class="founder-note-attr"><strong>Tom Burke</strong> · Founder, Chez · Westchester, NY</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS (placeholder — beta tester quotes anonymized) -->
+<section class="section bg-white">
+  <div class="container">
+    <div class="section-header-v2 reveal">
+      <span class="eyebrow">From the beta</span>
+      <h2>What early households are saying.</h2>
+      <p>We're collecting stories from the families who've set up their homes in Chez. Names withheld at their request — direct quotes verbatim.</p>
+    </div>
+
+    <div class="testimonial-grid reveal-stagger">
+      <div class="testimonial">
+        <p class="testimonial-quote">"I forwarded six months of HVAC invoices in an evening and woke up to a complete service history with the next due dates already on the calendar. That's the moment it clicked."</p>
+        <div class="testimonial-attr">
+          <div class="testimonial-avatar">M</div>
+          <div class="testimonial-meta">
+            <span class="testimonial-name">M. — Beta tester</span>
+            <span class="testimonial-role">Homeowner · Greenwich, CT</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial">
+        <p class="testimonial-quote">"My property manager has Chez now. She schedules the routine stuff. I never have to be the bottleneck for the gardener's invoice or the chimney sweep again."</p>
+        <div class="testimonial-attr">
+          <div class="testimonial-avatar">D</div>
+          <div class="testimonial-meta">
+            <span class="testimonial-name">D. — Beta tester</span>
+            <span class="testimonial-role">Homeowner · Bedford, NY</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial">
+        <p class="testimonial-quote">"The estate readiness score finally got me to finish what my attorney has been asking about for two years. Generated the PDF, sent the link, done."</p>
+        <div class="testimonial-attr">
+          <div class="testimonial-avatar">J</div>
+          <div class="testimonial-meta">
+            <span class="testimonial-name">J. — Beta tester</span>
+            <span class="testimonial-role">Homeowner · Darien, CT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND V2 -->
+<section class="section bg-pearl">
+  <div class="container">
+    <div class="cta-band-v2 reveal">
+      <div class="cta-band-v2-inner">
         <h2>Make yourself at home.</h2>
-        <p>Chez is in private beta on iPhone. Free to use. iPhone only. Takes about 20 minutes to set up your home.</p>
+        <p>Chez is in private beta on iPhone. Free to use. iPhone only. Takes about 20 minutes to set up your home — and once it's set up, it stays set up.</p>
         <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-lg">
           Join the iPhone beta
         </a>

@@ -10,17 +10,18 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="chez-handyman-logo.png">
   <style>
-    /* Chez Handyman compact topbar (auth mode) and grid placement.
+    /* Chez Handyman workspace login — premium left-side pitch + right-side auth.
      *
-     * Layout goals:
-     *   1. Compact topbar in auth mode — no marketing H1/lede above the fold.
-     *      The H1 + lede stay in the DOM (handyman.js writes role-specific
-     *      copy to them) but are CSS-hidden until the user is authenticated.
-     *   2. Auth-card first in DOM so mobile (single-column) shows the login
-     *      form before the hero/invite preview.
-     *   3. Desktop visual order preserved (hero left, auth right) via grid
-     *      column placement that doesn't depend on DOM order.
+     * Layout architecture:
+     *   - Compact topbar in auth mode (brand mark + status pills only)
+     *   - Two-column auth panel on desktop: pitch | auth
+     *   - Auth-card placed first in DOM so mobile shows the login form first
+     *   - Always-visible pitch panel on the left (new in this pass)
+     *   - Invite-preview-card stays in DOM but spans full width below; JS
+     *     auto-hides it when there's no invite token (existing behavior)
      */
+
+    /* ---- Brand mark (compact topbar) ---- */
     .chez-brand-block {
       display: inline-flex;
       align-items: center;
@@ -43,23 +44,226 @@
       letter-spacing: -0.012em;
       color: #2A2252;
     }
-    /* Auth-mode: compact topbar — hide the marketing pitch entirely.
-     * It re-appears once the workspace is authenticated. */
     body:not(.workspace-authenticated) .topbar-pitch { display: none; }
     body:not(.workspace-authenticated) .topbar {
       align-items: center;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
-    /* Workspace mode: keep the brand mark visible alongside the editorial H1. */
     body.workspace-authenticated .chez-brand-block { margin-bottom: 14px; }
 
-    /* Desktop auth panel: render hero (col 1) + auth (col 2) using grid
-     * column placement, regardless of DOM order. This lets us put the
-     * auth-card first in the DOM for mobile while keeping the desktop
-     * pitch-left / login-right layout. */
+    /* ---- Auth panel: 2-column grid on desktop ---- */
     @media (min-width: 900px) {
+      body:not(.workspace-authenticated) .auth-panel {
+        grid-template-columns: minmax(0, 1.05fr) minmax(460px, 540px) !important;
+        gap: 56px !important;
+        align-items: start;
+      }
+      body:not(.workspace-authenticated) .auth-panel > .login-pitch-panel { grid-column: 1; grid-row: 1; }
       body:not(.workspace-authenticated) .auth-panel > .auth-card { grid-column: 2; grid-row: 1; }
-      body:not(.workspace-authenticated) .auth-panel > .hero-card { grid-column: 1; grid-row: 1; }
+      body:not(.workspace-authenticated) .auth-panel > .hero-card {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        margin-top: 12px;
+      }
+    }
+
+    /* ---- Login pitch panel (new) ---- */
+    .login-pitch-panel {
+      padding: 12px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .login-pitch-panel .lp-eyebrow {
+      display: inline-block;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ED6955;
+    }
+    .login-pitch-panel h2 {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 500;
+      font-size: clamp(32px, 4vw, 46px);
+      line-height: 1.05;
+      letter-spacing: -0.022em;
+      color: #2A2252;
+      margin: 8px 0 16px;
+    }
+    .login-pitch-panel .lp-lead {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.55;
+      color: #6F6A88;
+      max-width: 480px;
+    }
+    .lp-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .lp-bullets li {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #2A2252;
+    }
+    .lp-bullets li svg {
+      width: 22px;
+      height: 22px;
+      color: #ED6955;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .lp-bullets li strong { font-weight: 600; }
+    .lp-bullets li span { display: block; color: #6F6A88; font-weight: 400; margin-top: 2px; font-size: 13px; }
+
+    /* ---- Mini operations preview ---- */
+    .lp-mini-preview {
+      background: linear-gradient(155deg, #2A2252 0%, #453A70 100%);
+      border-radius: 18px;
+      padding: 22px;
+      color: #FFFFFF;
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+        0 24px 48px rgba(42, 34, 82, 0.18),
+        0 8px 16px rgba(42, 34, 82, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .lp-mini-preview::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(60% 60% at 80% 20%, rgba(237, 105, 85, 0.22) 0%, transparent 70%),
+        radial-gradient(40% 40% at 20% 100%, rgba(139, 125, 186, 0.32) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .lp-mini-preview > * { position: relative; }
+    .lp-mini-preview-eyebrow {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #F4877B;
+      margin-bottom: 10px;
+    }
+    .lp-mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .lp-mini-cell {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .lp-mini-num {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 500;
+      font-size: 22px;
+      letter-spacing: -0.015em;
+      color: #FFFFFF;
+      line-height: 1;
+    }
+    .lp-mini-label {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.04em;
+      margin-top: 4px;
+    }
+
+    /* ---- Testimonial slot ---- */
+    .lp-testimonial {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid #EDEEF0;
+      border-radius: 14px;
+      padding: 22px 24px;
+      position: relative;
+    }
+    .lp-testimonial::before {
+      content: "\201C";
+      position: absolute;
+      top: 0;
+      left: 14px;
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-size: 64px;
+      line-height: 1;
+      color: #FFE8E2;
+      pointer-events: none;
+    }
+    .lp-testimonial-quote {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.45;
+      letter-spacing: -0.01em;
+      color: #2A2252;
+      margin-bottom: 14px;
+      position: relative;
+      z-index: 1;
+    }
+    .lp-testimonial-attr {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lp-testimonial-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FFE8E2, #E8E4F2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-weight: 500;
+      font-size: 13px;
+      color: #453A70;
+      flex-shrink: 0;
+    }
+    .lp-testimonial-name {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: #2A2252;
+    }
+    .lp-testimonial-role {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 11px;
+      color: #9C98AD;
+    }
+
+    /* ---- Restyle the auth status pills (less dev-flavored) ---- */
+    body:not(.workspace-authenticated) .topbar-actions .mode-pill {
+      display: none;
+    }
+    body:not(.workspace-authenticated) .topbar-actions #auth-status {
+      background: rgba(255, 255, 255, 0.6);
+      color: #6F6A88;
+      border: 1px solid #EDEEF0;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+
+    /* ---- Mobile fallback ---- */
+    @media (max-width: 899px) {
+      .login-pitch-panel { gap: 22px; padding: 8px 0 12px; }
+      .login-pitch-panel h2 { font-size: clamp(28px, 6vw, 36px); }
+      .lp-bullets li { font-size: 14px; }
     }
   </style>
 </head>
@@ -85,6 +289,91 @@
 
     <main class="page-grid" id="page-grid">
       <section class="auth-panel" id="auth-panel">
+
+        <!-- LEFT: Always-visible pitch panel.
+             New in the premium upgrade pass. Sits in col 1 on desktop. -->
+        <div class="login-pitch-panel">
+          <div>
+            <span class="lp-eyebrow">For Handyman Businesses</span>
+            <h2>Run the company. Keep every home moving.</h2>
+            <p class="lp-lead">
+              The operating system for handyman businesses. Dispatch the crew. Build quotes from reusable templates. Run offline-capable field visits. Get pre-organized work from Chez homeowners who arrive ready, not chasing details.
+            </p>
+          </div>
+
+          <ul class="lp-bullets">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <div>
+                <strong>Dispatch board</strong>
+                <span>Assign visits with route date, time window, stop order. Status-aware. Eight-state coordination machine.</span>
+              </div>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="13" y2="18"/></svg>
+              <div>
+                <strong>Quote builder</strong>
+                <span>Reusable line items. Tokenized public share links. Lifecycle tracking from draft to approved.</span>
+              </div>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4-8-12V5l8-3 8 3v5c0 8-8 12-8 12z"/><polyline points="9 12 11 14 15 10"/></svg>
+              <div>
+                <strong>Offline-capable field PWA</strong>
+                <span>Technicians run checklists, photo system capture, and field notes without an internet connection. Sync when back online.</span>
+              </div>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <div>
+                <strong>Pre-organized inbound work</strong>
+                <span>Chez homeowner requests arrive with system context, photos, urgency, and history. No 20-question intake call.</span>
+              </div>
+            </li>
+          </ul>
+
+          <!-- Mini operations preview (a teaser of the workspace) -->
+          <div class="lp-mini-preview" aria-hidden="true">
+            <div class="lp-mini-preview-eyebrow">Today · Apr 25 · Rivera Home Services</div>
+            <div class="lp-mini-grid">
+              <div class="lp-mini-cell">
+                <div class="lp-mini-num">47</div>
+                <div class="lp-mini-label">CUSTOMERS</div>
+              </div>
+              <div class="lp-mini-cell">
+                <div class="lp-mini-num">12</div>
+                <div class="lp-mini-label">QUOTES OPEN</div>
+              </div>
+              <div class="lp-mini-cell">
+                <div class="lp-mini-num">8</div>
+                <div class="lp-mini-label">VISITS THIS WEEK</div>
+              </div>
+              <div class="lp-mini-cell">
+                <div class="lp-mini-num">$18.4K</div>
+                <div class="lp-mini-label">QUOTED MTD</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Testimonial slot (placeholder — beta tester quote, anonymized) -->
+          <div class="lp-testimonial">
+            <p class="lp-testimonial-quote">
+              "I cut my admin time in half the first week. The quotes go out before I leave the driveway, and the customer can approve from their couch."
+            </p>
+            <div class="lp-testimonial-attr">
+              <div class="lp-testimonial-avatar">M</div>
+              <div>
+                <div class="lp-testimonial-name">M. Rivera</div>
+                <div class="lp-testimonial-role">Owner · Rivera Home Services · Beta tester</div>
+              </div>
+            </div>
+          </div>
+
+          <p style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; font-size: 13px; color: #9C98AD; margin: 0;">
+            Want the full tour? <a href="handymen.html" style="color: #D14E3E; font-weight: 600; text-decoration: none;">See what's inside →</a>
+          </p>
+        </div>
+
         <article class="auth-card">
           <div class="auth-card-header">
             <p class="section-eyebrow">Secure Company Access</p>

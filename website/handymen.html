@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="chez.css">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="chez-handyman-logo.png">
+  <script defer src="chez.js"></script>
 </head>
 <body>
 
@@ -32,285 +33,425 @@
   </div>
 </nav>
 
-<!-- PAGE HERO -->
-<section class="page-hero">
-  <div class="page-hero-inner">
-    <span class="eyebrow eyebrow-on-indigo">For Handymen</span>
-    <h1>Run your handyman business from one place.</h1>
-    <p class="lead">
-      Chez is the operating system for modern handyman businesses. Dispatch your crew. Build quotes from reusable templates. Run offline-capable field visits with checklists, photo capture, and system identification. Get pre-organized work from Chez homeowners who arrive ready, not chasing details.
-    </p>
-    <div class="hero-cta-row" style="justify-content: flex-start; margin-top: 32px;">
-      <a href="handyman.html" class="btn btn-salmon btn-lg">Register your business</a>
-      <a href="#capabilities" class="btn btn-ghost-on-indigo btn-lg">See what's inside</a>
+<!-- HERO RICH WITH DESKTOP OPS-CENTER MOCKUP -->
+<section class="hero-rich">
+  <div class="hero-rich-inner">
+    <div class="hero-rich-text reveal">
+      <span class="hero-badge" style="cursor: default;">
+        <span class="hero-badge-dot"></span>
+        For Handymen
+      </span>
+      <h1>Run your handyman business from one place.</h1>
+      <p class="lead">
+        Chez is the operating system for modern handyman businesses. Dispatch your crew. Build quotes from reusable templates. Run offline-capable field visits with checklists, photo capture, and system identification. Get pre-organized work from Chez homeowners who arrive ready, not chasing details.
+      </p>
+      <div class="hero-rich-cta">
+        <a href="handyman.html" class="btn btn-salmon btn-lg">Register your business</a>
+        <a href="#capabilities" class="btn btn-ghost-on-indigo btn-lg">See what's inside</a>
+      </div>
+      <p class="hero-rich-note">Free in beta · 10-minute setup · No credit card</p>
+      <div class="hero-rich-trust">
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
+          4-role workspace
+        </span>
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Offline-capable field PWA
+        </span>
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+          Time-windowed dispatch
+        </span>
+        <span class="hero-rich-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Public quote share links
+        </span>
+      </div>
+    </div>
+
+    <!-- Desktop browser mockup — Operations Center preview -->
+    <div class="hero-rich-visual reveal">
+      <div class="browser" aria-hidden="true">
+        <div class="browser-bar">
+          <div class="browser-dots">
+            <span class="browser-dot"></span>
+            <span class="browser-dot"></span>
+            <span class="browser-dot"></span>
+          </div>
+          <div class="browser-url">getchez.com/handyman</div>
+        </div>
+        <div class="browser-content">
+          <div class="ops-header">
+            <div class="ops-header-brand">
+              <div class="ops-header-brand-dot">c</div>
+              <span>Rivera Home Services</span>
+            </div>
+            <div class="ops-header-meta">Today · Apr 25 · Mike Rivera</div>
+          </div>
+
+          <div class="ops-grid">
+            <div class="ops-card">
+              <div class="ops-card-eyebrow">Customers</div>
+              <div class="ops-card-value">47</div>
+              <div class="ops-card-sub">+3 this month</div>
+            </div>
+            <div class="ops-card">
+              <div class="ops-card-eyebrow">Quotes open</div>
+              <div class="ops-card-value">12</div>
+              <div class="ops-card-sub">$18.4K outstanding</div>
+            </div>
+            <div class="ops-card">
+              <div class="ops-card-eyebrow">Visits this week</div>
+              <div class="ops-card-value">8</div>
+              <div class="ops-card-sub">3 today · 5 upcoming</div>
+            </div>
+            <div class="ops-card">
+              <div class="ops-card-eyebrow">Crew</div>
+              <div class="ops-card-value">4</div>
+              <div class="ops-card-sub">2 in field · 1 dispatch</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="ops-card-eyebrow" style="margin-bottom: 8px;">Today's schedule · Jay Patel</div>
+            <div class="ops-tile-row">
+              <div class="ops-tile-row-time">8:00 AM</div>
+              <div class="ops-tile-row-meta">
+                <div class="ops-tile-row-name">142 Maple Ave · Burke</div>
+                <div class="ops-tile-row-sub">3 punch items · 90 min</div>
+              </div>
+            </div>
+            <div class="ops-tile-row">
+              <div class="ops-tile-row-time">10:30 AM</div>
+              <div class="ops-tile-row-meta">
+                <div class="ops-tile-row-name">88 Riverside Dr · Cohen</div>
+                <div class="ops-tile-row-sub">Quote walkthrough · 60 min</div>
+              </div>
+            </div>
+            <div class="ops-tile-row">
+              <div class="ops-tile-row-time">1:00 PM</div>
+              <div class="ops-tile-row-meta">
+                <div class="ops-tile-row-name">12 Hillcrest Ln · Marin</div>
+                <div class="ops-tile-row-sub">Spring punch list · 120 min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- STAT ROW -->
+<!-- LOGO WALL: COMPATIBLE TOOLS -->
+<section class="section-tight bg-white">
+  <div class="container">
+    <p style="text-align: center; font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--text-soft); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 32px;">
+      Built around the way handyman businesses actually work
+    </p>
+    <div class="logo-wall reveal-stagger">
+      <span class="logo-wall-mark">QuickBooks</span>
+      <span class="logo-wall-mark-sans">SQUARE</span>
+      <span class="logo-wall-mark">Twilio</span>
+      <span class="logo-wall-mark-sans">STRIPE</span>
+      <span class="logo-wall-mark">Apple Pay</span>
+      <span class="logo-wall-mark-sans">GOOGLE</span>
+    </div>
+    <p style="text-align: center; font-family: var(--sans); font-size: 12px; color: var(--text-soft); margin-top: 28px; font-style: italic;">
+      Integrations on the roadmap. Native exports today (CSV, PDF, email).
+    </p>
+  </div>
+</section>
+
+<!-- STATS BAND V2 — REAL stats -->
 <section class="section-tight bg-pearl">
   <div class="container">
-    <div class="stat-row">
-      <div>
-        <span class="stat-num">4</span>
-        <div class="stat-label">TEAM ROLES</div>
+    <div class="stats-band-v2 reveal">
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">$0</span>
+        <div class="stats-band-v2-label">SETUP COST · FREE IN BETA</div>
       </div>
-      <div>
-        <span class="stat-num">∞</span>
-        <div class="stat-label">REUSABLE QUOTE TEMPLATES</div>
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">10 min</span>
+        <div class="stats-band-v2-label">FROM SIGNUP TO FIRST QUOTE</div>
       </div>
-      <div>
-        <span class="stat-num">8</span>
-        <div class="stat-label">VISIT COORDINATION STATES</div>
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">100%</span>
+        <div class="stats-band-v2-label">OFFLINE-CAPABLE FIELD APP</div>
       </div>
-      <div>
-        <span class="stat-num">100%</span>
-        <div class="stat-label">OFFLINE-CAPABLE FIELD APP</div>
+      <div class="stats-band-v2-cell">
+        <span class="stats-band-v2-num">∞</span>
+        <div class="stats-band-v2-label">QUOTES, CUSTOMERS, TEAM SEATS</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- CAPABILITIES — six themed rows -->
+<!-- CAPABILITIES — six themed feature rows -->
 <section class="section bg-pearl" id="capabilities">
   <div class="container">
 
-    <!-- Theme 1: One workspace -->
-    <div class="theme-row">
-      <div class="theme-row-text">
-        <span class="eyebrow">One workspace</span>
-        <h2>Your whole business — owners, dispatchers, and technicians — in a single secure workspace.</h2>
-        <p>Chez is built for the way handyman businesses actually run. Owners and admins manage the company. Dispatchers assign work. Technicians see only their own jobs. Invite your team via secure tokens. Everyone signs in to the same workspace with the right permissions for their role.</p>
-        <ul class="feature-list">
-          <li><strong>Provider workspace.</strong> One company account. Email, phone, website, license number on file. Appears on every quote you send.</li>
-          <li><strong>Four team roles.</strong> Owner, admin, dispatcher, technician — each with permissions scoped to what they need.</li>
-          <li><strong>Secure team invites.</strong> Tokenized links with expirations. Invitee enters email and joins the workspace at the right role.</li>
-          <li><strong>Member status & history.</strong> Invited, active, disabled. Last seen tracked per member.</li>
-          <li><strong>Today board.</strong> Crew workload at a glance — who's assigned to what, where, and when.</li>
+    <!-- 1. One workspace -->
+    <div class="feature-row-v2 reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">One workspace</span>
+        <h2 class="feature-row-v2-title">Your whole business in a single secure workspace.</h2>
+        <p class="feature-row-v2-desc">
+          Chez is built for the way handyman businesses actually run. Owners and admins manage the company. Dispatchers assign work. Technicians see only their own jobs. Invite your team via secure tokens. Everyone signs in to the same workspace with the right permissions for their role.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Provider workspace.</strong> One company account. Email, phone, website, license number on file. Appears on every quote you send.</div></li>
+          <li><div><strong>Four team roles.</strong> Owner, admin, dispatcher, technician — each with permissions scoped to what they need.</div></li>
+          <li><div><strong>Secure team invites.</strong> Tokenized links with expirations. Invitee enters email and joins at the right role.</div></li>
+          <li><div><strong>Today board.</strong> Crew workload at a glance — who's assigned to what, where, and when.</div></li>
         </ul>
       </div>
-      <div class="theme-row-visual">
-        <div style="position: relative; z-index: 2; width: 100%; max-width: 300px;">
-          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--salmon-light); margin-bottom: 16px;">YOUR TEAM</div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--salmon); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--white); font-size: 13px;">M</div>
-            <div style="flex: 1;">
-              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--white);">Mike Rivera</div>
-              <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">Owner · 3 visits today</div>
-            </div>
-          </div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--indigo-500); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--white); font-size: 13px;">S</div>
-            <div style="flex: 1;">
-              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--white);">Sara Cole</div>
-              <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">Dispatcher · 8 routes assigned</div>
-            </div>
-          </div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--indigo-400); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--white); font-size: 13px;">J</div>
-            <div style="flex: 1;">
-              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--white);">Jay Patel</div>
-              <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">Technician · 4 visits today</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme 2: Quote like a pro -->
-    <div class="theme-row reverse">
-      <div class="theme-row-text">
-        <span class="eyebrow">Quote like a pro</span>
-        <h2>Build quotes in minutes from your own line-item library. Send. Track. Get paid faster.</h2>
-        <p>Save the work you do most often as reusable line items. Drop them into new quotes with one click. Send via email with a tokenized public link — no account required for the customer to view, approve, decline, or ask a question. Every status transition timestamped.</p>
-        <ul class="feature-list">
-          <li><strong>Quote builder.</strong> Add title, scope notes, line items with dynamic pricing. Subtotal auto-calculated. Attach to a homeowner request or quote a standalone prospect.</li>
-          <li><strong>Reusable line items.</strong> Per-workspace template library — name, unit (ea/hr/ft), default qty, default price. Auto-insert into new quotes.</li>
-          <li><strong>Public sharing.</strong> Each quote gets a tokenized URL. Customer reviews, approves, declines, or asks questions — no Chez account required.</li>
-          <li><strong>Quote lifecycle tracking.</strong> Draft → sent → viewed → approved / declined / withdrawn. Timestamps on every transition.</li>
-          <li><strong>Email delivery.</strong> Quotes auto-emailed with full line items and public link.</li>
-          <li><strong>Quote messaging thread.</strong> Customer questions land in a dedicated thread separate from the visit conversation.</li>
-        </ul>
-      </div>
-      <div class="theme-row-visual">
-        <div style="position: relative; z-index: 2; width: 100%; max-width: 300px;">
-          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--salmon-light); margin-bottom: 16px;">QUOTE Q-2419</div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 18px; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <span style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.7);">Replace exterior light fixture</span>
-              <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--white);">$185</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <span style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.7);">Caulk bathroom tile (4 hr)</span>
-              <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--white);">$340</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0;">
-              <span style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.7);">Install garage shelving</span>
-              <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--white);">$420</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.18);">
-              <span style="font-family: var(--serif); font-weight: 500; font-size: 16px; color: var(--white); letter-spacing: -0.01em;">Total</span>
-              <span style="font-family: var(--serif); font-weight: 500; font-size: 22px; color: var(--white); letter-spacing: -0.02em;">$945</span>
-            </div>
-          </div>
-          <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(74, 124, 89, 0.2); color: #7DB58E; border-radius: 999px; font-family: var(--sans); font-size: 12px; font-weight: 600;">
-            <span style="width: 6px; height: 6px; border-radius: 50%; background: #7DB58E;"></span>
-            Approved · 2 hours ago
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme 3: Dispatch & schedule -->
-    <div class="theme-row">
-      <div class="theme-row-text">
-        <span class="eyebrow">Dispatch & schedule</span>
-        <h2>Assign visits, sequence routes, lock time windows.</h2>
-        <p>Dispatchers assign each visit to a specific technician with a route date, time window, and stop order. Status-aware: visits only become assignable when they're ready. The calendar shows every upcoming assignment by tech. Customers see proposed dates and confirm — no phone tag.</p>
-        <ul class="feature-list">
-          <li><strong>Dispatch board.</strong> Drag visits onto technician slots with route date, time window, stop order.</li>
-          <li><strong>Status-aware assignment.</strong> Visits only assignable when ready (submitted → scheduled → assignable).</li>
-          <li><strong>Calendar view.</strong> All upcoming visits grouped by date and technician.</li>
-          <li><strong>Time windows.</strong> Set window_start and window_end per assignment so customers know when to expect you.</li>
-          <li><strong>Visit coordination.</strong> Tech can confirm, propose alternate date, or decline before check-in. Eight-state machine drives the full handoff.</li>
-          <li><strong>Two-way messaging.</strong> Provider ↔ homeowner thread per request. All scheduling clarifications live in one place.</li>
-        </ul>
-      </div>
-      <div class="theme-row-visual">
-        <div style="position: relative; z-index: 2; width: 100%; max-width: 300px;">
-          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--salmon-light); margin-bottom: 16px;">TUE APR 28 · JAY PATEL</div>
-          <div style="background: rgba(255,255,255,0.08); border-left: 3px solid var(--salmon); border-radius: 6px; padding: 12px 14px; margin-bottom: 8px;">
-            <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--salmon-light); margin-bottom: 3px;">8:00 – 10:00 AM</div>
-            <div style="font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--white);">142 Maple Ave · Burke</div>
-            <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">3 punch items · 90 min</div>
-          </div>
-          <div style="background: rgba(255,255,255,0.08); border-left: 3px solid var(--indigo-400); border-radius: 6px; padding: 12px 14px; margin-bottom: 8px;">
-            <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--indigo-400); margin-bottom: 3px;">10:30 – 12:00 PM</div>
-            <div style="font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--white);">88 Riverside Dr · Cohen</div>
-            <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">Quote walkthrough · 60 min</div>
-          </div>
-          <div style="background: rgba(255,255,255,0.08); border-left: 3px solid var(--indigo-400); border-radius: 6px; padding: 12px 14px;">
-            <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--indigo-400); margin-bottom: 3px;">1:00 – 3:00 PM</div>
-            <div style="font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--white);">12 Hillcrest Ln · Marin</div>
-            <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">Spring punch list · 120 min</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme 4: Field execution -->
-    <div class="theme-row reverse">
-      <div class="theme-row-text">
-        <span class="eyebrow">Execute in the field</span>
-        <h2>An offline-capable field app that does the paperwork while you do the work.</h2>
-        <p>Open the visit on your phone or tablet — no internet required. Run the checklist your dispatcher built plus the homeowner's punch list. Snap a photo of any HVAC label, water heater plate, or appliance — Chez identifies it and adds it to the customer's record. Capture field notes. Mark complete. Sync drafts when you're back online.</p>
-        <ul class="feature-list">
-          <li><strong>Offline-ready field PWA.</strong> Works without connection. Installs to iOS/Android home screen via web app manifest.</li>
-          <li><strong>Execution checklist.</strong> Tasks from your visit plan, the homeowner's punch list, and DIY items they want help with — all in one list.</li>
-          <li><strong>Photo system capture.</strong> Snap any equipment label — Chez auto-identifies make, model, serial via the same Vision pipeline homeowners use. Adds to the property record.</li>
-          <li><strong>First-visit setup prompts.</strong> Curated tasks for new customers ("set thermostat schedule," "confirm water shutoff location"). Easy onboarding wins.</li>
-          <li><strong>Quick-upsell capture.</strong> Spotted something else that needs work? Add it as a follow-up — becomes a new homeowner request automatically.</li>
-          <li><strong>Field notes & homeowner notes.</strong> Two-way notes per visit, persisted to the customer's permanent record.</li>
-        </ul>
-      </div>
-      <div class="theme-row-visual">
-        <div style="position: relative; z-index: 2; width: 100%; max-width: 300px;">
-          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--salmon-light); margin-bottom: 16px;">CHECKED IN · 142 MAPLE AVE</div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 12px 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 22px; height: 22px; border-radius: 50%; background: var(--success); display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8.5 6.5 12 13 5"/></svg>
-            </div>
-            <div style="font-family: var(--sans); font-size: 14px; color: rgba(255,255,255,0.5); text-decoration: line-through;">Replace dryer vent hose</div>
-          </div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 12px 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 22px; height: 22px; border-radius: 50%; background: var(--success); display: flex; align-items: center; justify-content: center;">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8.5 6.5 12 13 5"/></svg>
-            </div>
-            <div style="font-family: var(--sans); font-size: 14px; color: rgba(255,255,255,0.5); text-decoration: line-through;">Reseal kitchen window</div>
-          </div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);"></div>
-            <div style="font-family: var(--sans); font-size: 14px; color: var(--white);">Identify HVAC system</div>
-          </div>
-          <div style="margin-top: 14px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--salmon); color: var(--white); border-radius: 10px; font-family: var(--sans); font-size: 13px; font-weight: 600;">
-            📷 Capture label
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme 5: Get new clients -->
-    <div class="theme-row">
-      <div class="theme-row-text">
-        <span class="eyebrow">Get new clients</span>
-        <h2>Pre-organized work from Chez homeowners who arrive ready, not chasing details.</h2>
-        <p>Chez homeowners use the app to organize their entire home. When they request a quote, a repair, or a punch-list visit, every relevant detail comes with it: photos, system info, location, urgency, history. You spend less time gathering context and more time billing. Quote standalone prospects too with the same toolkit.</p>
-        <ul class="feature-list">
-          <li><strong>Inbound homeowner requests.</strong> Chez homeowners initiate quote, repair, install, and question requests directly into your workspace.</li>
-          <li><strong>Pre-organized punch lists.</strong> Homeowners accumulate small jobs all year. Spring and fall handyman bundles deliver them in pre-batched, billable visits.</li>
-          <li><strong>System context arrives with the request.</strong> Year built. HVAC type. Vendor history. The homeowner's preferences (DIY vs. hire-out). No 20-question intake call.</li>
-          <li><strong>Prospect quoting.</strong> Quote homeowners not yet on Chez — name, email, phone, address. Same builder. Same public link. Same tracking.</li>
-          <li><strong>Contractor linking.</strong> When a Chez homeowner already has you on file, the app links automatically. Your service history with that household carries forward.</li>
-        </ul>
-      </div>
-      <div class="theme-row-visual">
-        <div style="position: relative; z-index: 2; width: 100%; max-width: 300px;">
-          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--salmon-light); margin-bottom: 12px;">NEW REQUEST</div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 18px;">
-            <div style="font-family: var(--serif); font-weight: 500; font-size: 18px; color: var(--white); margin-bottom: 4px; letter-spacing: -0.01em;">Spring punch list visit</div>
-            <div style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 16px;">Burke household · 142 Maple Ave</div>
-            <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; background: rgba(0,0,0,0.18); border-radius: 10px;">
-              <div style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 4px;">7 INCLUDED ITEMS</div>
-              <div style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.85);">• Replace dryer vent hose</div>
-              <div style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.85);">• Reseal kitchen window</div>
-              <div style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.85);">• Mount garage shelving</div>
-              <div style="font-family: var(--sans); font-size: 13px; color: rgba(255,255,255,0.5);">+ 4 more</div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
-              <span style="font-family: var(--sans); font-size: 12px; color: rgba(255,255,255,0.6);">Est. 90 min</span>
-              <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--salmon-light);">Build quote →</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme 6: CRM & operations -->
-    <div class="theme-row reverse">
-      <div class="theme-row-text">
-        <span class="eyebrow">CRM & operations</span>
-        <h2>Customer history, business profile, and operations in one workspace.</h2>
-        <p>Every property you've serviced lives in your workspace with the full history: visits completed, notes captured, photos taken, quotes sent. Your business profile — company name, license number, contact, website — appears on every quote and customer-facing surface, building your brand with every interaction.</p>
-        <ul class="feature-list">
-          <li><strong>Customer & property directory.</strong> Every household you've serviced, indexed with full history.</li>
-          <li><strong>Service history per property.</strong> Visits completed, notes captured, photos taken — searchable, sortable.</li>
-          <li><strong>Request threads.</strong> Every message between you, the homeowner, and Chez on a given request — chronological, persistent.</li>
-          <li><strong>Business profile.</strong> Company name, primary email, primary phone, website, license number. On every quote you send.</li>
-          <li><strong>Operations Center on desktop.</strong> Today board, crew workload, quote pipeline, dispatch summary, calendar, routes — built for back-office work, not field work.</li>
-          <li><strong>Field-Service mobile app for technicians.</strong> Native mobile experience for your crew, designed alongside the homeowner app and the operations center.</li>
-        </ul>
-      </div>
-      <div class="theme-row-visual">
-        <div style="position: relative; z-index: 2; width: 100%; max-width: 300px;">
-          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--salmon-light); margin-bottom: 16px;">RIVERA HOME SERVICES</div>
-          <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 18px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
-              <div>
-                <div style="font-family: var(--serif); font-weight: 500; font-size: 28px; color: var(--white); letter-spacing: -0.02em;">47</div>
-                <div style="font-family: var(--sans); font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em;">CUSTOMERS</div>
+      <div class="feature-row-v2-visual">
+        <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-lg); width: 100%; max-width: 360px;">
+          <div class="ops-card-eyebrow" style="margin-bottom: 14px;">Your team</div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--pearl); border-radius: 12px;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--salmon); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--white); font-size: 15px;">M</div>
+              <div style="flex: 1;">
+                <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--text);">Mike Rivera</div>
+                <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">Owner · 3 visits today</div>
               </div>
-              <div>
-                <div style="font-family: var(--serif); font-weight: 500; font-size: 28px; color: var(--white); letter-spacing: -0.02em;">12</div>
-                <div style="font-family: var(--sans); font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em;">QUOTES OPEN</div>
+              <span class="ui-pill ui-pill-success">Active</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--pearl); border-radius: 12px;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--indigo); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--white); font-size: 15px;">S</div>
+              <div style="flex: 1;">
+                <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--text);">Sara Cole</div>
+                <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">Dispatcher · 8 routes</div>
               </div>
-              <div>
-                <div style="font-family: var(--serif); font-weight: 500; font-size: 28px; color: var(--white); letter-spacing: -0.02em;">8</div>
-                <div style="font-family: var(--sans); font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em;">VISITS THIS WEEK</div>
+              <span class="ui-pill ui-pill-success">Active</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--pearl); border-radius: 12px;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--indigo-500); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--white); font-size: 15px;">J</div>
+              <div style="flex: 1;">
+                <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--text);">Jay Patel</div>
+                <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">Technician · 4 visits today</div>
               </div>
-              <div>
-                <div style="font-family: var(--serif); font-weight: 500; font-size: 28px; color: var(--white); letter-spacing: -0.02em;">$18.4K</div>
-                <div style="font-family: var(--sans); font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em;">QUOTED MTD</div>
+              <span class="ui-pill ui-pill-success">In field</span>
+            </div>
+            <button style="margin-top: 6px; background: transparent; color: var(--salmon-dark); border: 1px dashed var(--neutral-300); border-radius: 12px; padding: 12px; font-family: var(--sans); font-size: 13px; font-weight: 600;">+ Invite team member</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Quote like a pro -->
+    <div class="feature-row-v2 reverse reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Quote like a pro</span>
+        <h2 class="feature-row-v2-title">Build quotes in minutes from your line-item library. Send. Track. Get paid faster.</h2>
+        <p class="feature-row-v2-desc">
+          Save the work you do most often as reusable line items. Drop them into new quotes with one click. Send via email with a tokenized public link — no account required for the customer to view, approve, decline, or ask a question. Every status transition timestamped.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Quote builder.</strong> Title, scope notes, line items with dynamic pricing. Subtotal auto-calculated. Attach to a homeowner request or quote a standalone prospect.</div></li>
+          <li><div><strong>Reusable line items.</strong> Per-workspace template library — name, unit, default qty, default price. Auto-insert into new quotes.</div></li>
+          <li><div><strong>Public sharing.</strong> Each quote gets a tokenized URL. Customer reviews, approves, declines, or asks questions — no Chez account required.</div></li>
+          <li><div><strong>Lifecycle tracking.</strong> Draft → sent → viewed → approved / declined / withdrawn. Timestamps on every transition.</div></li>
+          <li><div><strong>Quote messaging thread.</strong> Customer questions land in a dedicated thread separate from the visit conversation.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-lg); width: 100%; max-width: 360px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px;">
+            <div class="ops-card-eyebrow" style="margin-bottom: 0;">Quote Q-2419</div>
+            <span class="ui-pill ui-pill-success">Approved</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--neutral-200);">
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text);">Replace exterior light fixture</span>
+            <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text);">$185</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--neutral-200);">
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text);">Caulk bathroom tile (4 hr)</span>
+            <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text);">$340</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0;">
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text);">Install garage shelving</span>
+            <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text);">$420</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 2px solid var(--text);">
+            <span style="font-family: var(--serif); font-weight: 500; font-size: 18px; color: var(--text); letter-spacing: -0.012em;">Total</span>
+            <span style="font-family: var(--serif); font-weight: 500; font-size: 26px; color: var(--text); letter-spacing: -0.02em;">$945</span>
+          </div>
+          <div style="margin-top: 18px; font-family: var(--sans); font-size: 12px; color: var(--text-soft);">Sent 4 hours ago · Approved 2 hours ago</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Dispatch & schedule -->
+    <div class="feature-row-v2 reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Dispatch & schedule</span>
+        <h2 class="feature-row-v2-title">Assign visits, sequence routes, lock time windows.</h2>
+        <p class="feature-row-v2-desc">
+          Dispatchers assign each visit to a specific technician with a route date, time window, and stop order. Status-aware: visits only become assignable when they're ready. The calendar shows every upcoming assignment by tech. Customers see proposed dates and confirm — no phone tag.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Dispatch board.</strong> Drag visits onto technician slots with route date, time window, stop order.</div></li>
+          <li><div><strong>Status-aware assignment.</strong> Visits only assignable when ready (submitted → scheduled → assignable).</div></li>
+          <li><div><strong>Calendar view.</strong> All upcoming visits grouped by date and technician.</div></li>
+          <li><div><strong>Visit coordination.</strong> Tech can confirm, propose alternate date, or decline before check-in. Eight-state machine drives the full handoff.</div></li>
+          <li><div><strong>Two-way messaging.</strong> Provider ↔ homeowner thread per request. All scheduling clarifications live in one place.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-lg); width: 100%; max-width: 360px;">
+          <div class="ops-card-eyebrow" style="margin-bottom: 14px;">Tue Apr 28 · Jay Patel</div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="background: var(--pearl); border-left: 3px solid var(--salmon); border-radius: 8px; padding: 12px 14px;">
+              <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--salmon-dark); margin-bottom: 4px;">8:00 – 10:00 AM</div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--text); letter-spacing: -0.01em; margin-bottom: 2px;">142 Maple Ave · Burke</div>
+              <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">3 punch items · 90 min</div>
+            </div>
+            <div style="background: var(--pearl); border-left: 3px solid var(--indigo-400); border-radius: 8px; padding: 12px 14px;">
+              <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--indigo); margin-bottom: 4px;">10:30 – 12:00 PM</div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--text); letter-spacing: -0.01em; margin-bottom: 2px;">88 Riverside Dr · Cohen</div>
+              <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">Quote walkthrough · 60 min</div>
+            </div>
+            <div style="background: var(--pearl); border-left: 3px solid var(--indigo-400); border-radius: 8px; padding: 12px 14px;">
+              <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--indigo); margin-bottom: 4px;">1:00 – 3:00 PM</div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--text); letter-spacing: -0.01em; margin-bottom: 2px;">12 Hillcrest Ln · Marin</div>
+              <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">Spring punch list · 120 min</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Execute in the field -->
+    <div class="feature-row-v2 reverse reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Execute in the field</span>
+        <h2 class="feature-row-v2-title">An offline-capable field app that does the paperwork while you do the work.</h2>
+        <p class="feature-row-v2-desc">
+          Open the visit on your phone or tablet — no internet required. Run the checklist your dispatcher built plus the homeowner's punch list. Snap a photo of any HVAC label, water heater plate, or appliance — Chez identifies it and adds it to the customer's record. Capture field notes. Mark complete. Sync drafts when you're back online.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Offline-ready field PWA.</strong> Works without connection. Installs to iOS/Android home screen via web app manifest.</div></li>
+          <li><div><strong>Execution checklist.</strong> Tasks from your visit plan, the homeowner's punch list, and DIY items they want help with — all in one list.</div></li>
+          <li><div><strong>Photo system capture.</strong> Snap any equipment label — Chez auto-identifies make, model, serial via the same Vision pipeline homeowners use.</div></li>
+          <li><div><strong>First-visit setup prompts.</strong> Curated tasks for new customers ("set thermostat schedule," "confirm water shutoff location").</div></li>
+          <li><div><strong>Quick-upsell capture.</strong> Spotted something else that needs work? Add it as a follow-up — becomes a new homeowner request automatically.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <div class="phone-statusbar-icons">
+                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
               </div>
+            </div>
+            <div class="phone-content">
+              <div class="ui-section-label">Checked in · 142 Maple Ave</div>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div class="ui-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px;">
+                  <div style="width: 22px; height: 22px; border-radius: 50%; background: var(--success); display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8.5 6.5 12 13 5"/></svg>
+                  </div>
+                  <span style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); text-decoration: line-through;">Replace dryer vent hose</span>
+                </div>
+                <div class="ui-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px;">
+                  <div style="width: 22px; height: 22px; border-radius: 50%; background: var(--success); display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8.5 6.5 12 13 5"/></svg>
+                  </div>
+                  <span style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); text-decoration: line-through;">Reseal kitchen window</span>
+                </div>
+                <div class="ui-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-color: var(--salmon);">
+                  <div style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--salmon); flex-shrink: 0;"></div>
+                  <span style="font-family: var(--sans); font-size: 12px; color: var(--text); font-weight: 600;">Identify HVAC system</span>
+                </div>
+              </div>
+              <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 10px; padding: 10px; font-family: var(--sans); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">📷 Capture label</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Get new clients -->
+    <div class="feature-row-v2 reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Get new clients</span>
+        <h2 class="feature-row-v2-title">Pre-organized work from Chez homeowners who arrive ready, not chasing details.</h2>
+        <p class="feature-row-v2-desc">
+          Chez homeowners use the app to organize their entire home. When they request a quote, a repair, or a punch-list visit, every relevant detail comes with it: photos, system info, location, urgency, history. You spend less time gathering context and more time billing. Quote standalone prospects too with the same toolkit.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Inbound homeowner requests.</strong> Chez homeowners initiate quote, repair, install, and question requests directly into your workspace.</div></li>
+          <li><div><strong>Pre-organized punch lists.</strong> Homeowners accumulate small jobs all year. Spring and fall handyman bundles deliver them in pre-batched, billable visits.</div></li>
+          <li><div><strong>System context arrives with the request.</strong> Year built. HVAC type. Vendor history. The homeowner's preferences. No 20-question intake call.</div></li>
+          <li><div><strong>Prospect quoting.</strong> Quote homeowners not yet on Chez — name, email, phone, address. Same builder. Same public link. Same tracking.</div></li>
+          <li><div><strong>Contractor linking.</strong> When a Chez homeowner already has you on file, the app links automatically. Service history carries forward.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-lg); width: 100%; max-width: 360px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
+            <div class="ops-card-eyebrow" style="margin-bottom: 0;">New request</div>
+            <span class="ui-pill ui-pill-salmon">Inbound</span>
+          </div>
+          <div style="font-family: var(--serif); font-weight: 500; font-size: 22px; color: var(--text); letter-spacing: -0.015em; margin-bottom: 4px;">Spring punch list visit</div>
+          <div style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">Burke household · 142 Maple Ave</div>
+          <div style="background: var(--pearl); border-radius: 12px; padding: 16px;">
+            <div class="ops-card-eyebrow" style="margin-bottom: 8px;">7 included items</div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="font-family: var(--sans); font-size: 13px; color: var(--text);">• Replace dryer vent hose</div>
+              <div style="font-family: var(--sans); font-size: 13px; color: var(--text);">• Reseal kitchen window</div>
+              <div style="font-family: var(--sans); font-size: 13px; color: var(--text);">• Mount garage shelving</div>
+              <div style="font-family: var(--sans); font-size: 13px; color: var(--text-soft);">+ 4 more</div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+            <span style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">Est. 90 min</span>
+            <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--salmon-dark);">Build quote →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. CRM & ops -->
+    <div class="feature-row-v2 reverse reveal">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">CRM & operations</span>
+        <h2 class="feature-row-v2-title">Customer history, business profile, operations — one workspace.</h2>
+        <p class="feature-row-v2-desc">
+          Every property you've serviced lives in your workspace with the full history: visits completed, notes captured, photos taken, quotes sent. Your business profile — company name, license number, contact, website — appears on every quote and customer-facing surface, building your brand with every interaction.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Customer & property directory.</strong> Every household you've serviced, indexed with full history.</div></li>
+          <li><div><strong>Service history per property.</strong> Visits completed, notes captured, photos taken — searchable, sortable.</div></li>
+          <li><div><strong>Request threads.</strong> Every message between you, the homeowner, and Chez on a given request — chronological, persistent.</div></li>
+          <li><div><strong>Business profile.</strong> Company name, primary email, primary phone, website, license number. On every quote you send.</div></li>
+          <li><div><strong>Operations Center on desktop.</strong> Today board, crew workload, quote pipeline, dispatch summary, calendar, routes.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-lg); width: 100%; max-width: 360px;">
+          <div class="ops-card-eyebrow" style="margin-bottom: 14px;">Rivera Home Services</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 32px; color: var(--text); letter-spacing: -0.02em; line-height: 1;">47</div>
+              <div style="font-family: var(--sans); font-size: 11px; color: var(--text-soft); letter-spacing: 0.04em; margin-top: 4px;">CUSTOMERS</div>
+            </div>
+            <div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 32px; color: var(--text); letter-spacing: -0.02em; line-height: 1;">12</div>
+              <div style="font-family: var(--sans); font-size: 11px; color: var(--text-soft); letter-spacing: 0.04em; margin-top: 4px;">QUOTES OPEN</div>
+            </div>
+            <div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 32px; color: var(--text); letter-spacing: -0.02em; line-height: 1;">8</div>
+              <div style="font-family: var(--sans); font-size: 11px; color: var(--text-soft); letter-spacing: 0.04em; margin-top: 4px;">VISITS / WK</div>
+            </div>
+            <div>
+              <div style="font-family: var(--serif); font-weight: 500; font-size: 32px; color: var(--text); letter-spacing: -0.02em; line-height: 1;">$18.4K</div>
+              <div style="font-family: var(--sans); font-size: 11px; color: var(--text-soft); letter-spacing: 0.04em; margin-top: 4px;">QUOTED MTD</div>
             </div>
           </div>
         </div>
@@ -323,39 +464,40 @@
 <!-- HOW IT WORKS -->
 <section class="section bg-white">
   <div class="container">
-    <div class="section-header">
+    <div class="section-header-v2 reveal">
       <span class="eyebrow">How it works</span>
       <h2>Set up your workspace in under 10 minutes.</h2>
+      <p>No phone calls. No demos. No payment info. Sign up, invite your crew, build your line-item library, and quote your first job today.</p>
     </div>
 
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 18px;">1</div>
+    <div class="grid-2x2 reveal-stagger" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="pillar-card">
+        <div class="pillar-card-icon" style="font-family: var(--serif); font-weight: 600; font-size: 22px;">1</div>
         <h4>Register your business</h4>
         <p>Company name, email, phone, license number. Your workspace is ready in seconds. No payment info required.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 18px;">2</div>
+      <div class="pillar-card">
+        <div class="pillar-card-icon" style="font-family: var(--serif); font-weight: 600; font-size: 22px;">2</div>
         <h4>Invite your team</h4>
         <p>Send tokenized invites to dispatchers and technicians. They join with the right role and only see what they need.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 18px;">3</div>
+      <div class="pillar-card">
+        <div class="pillar-card-icon" style="font-family: var(--serif); font-weight: 600; font-size: 22px;">3</div>
         <h4>Build your line-item library</h4>
         <p>The five jobs you do most often, saved with default pricing. Every future quote starts with one click.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 18px;">4</div>
+      <div class="pillar-card">
+        <div class="pillar-card-icon" style="font-family: var(--serif); font-weight: 600; font-size: 22px;">4</div>
         <h4>Quote your first job</h4>
         <p>Attach to a Chez homeowner request or quote a standalone prospect. Public link. Status tracking. Done.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 18px;">5</div>
+      <div class="pillar-card">
+        <div class="pillar-card-icon" style="font-family: var(--serif); font-weight: 600; font-size: 22px;">5</div>
         <h4>Dispatch the visit</h4>
         <p>Assign to a technician with a route date and time window. They get the visit on their phone, offline-capable.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 18px;">6</div>
+      <div class="pillar-card">
+        <div class="pillar-card-icon" style="font-family: var(--serif); font-weight: 600; font-size: 22px;">6</div>
         <h4>Run the visit, capture everything</h4>
         <p>Checklist, photo system capture, field notes, follow-ups. Everything syncs to the customer's permanent record.</p>
       </div>
@@ -363,13 +505,13 @@
   </div>
 </section>
 
-<!-- CTA BAND -->
+<!-- CTA BAND V2 -->
 <section class="section bg-pearl">
   <div class="container">
-    <div class="cta-band">
-      <div class="cta-band-inner">
+    <div class="cta-band-v2 reveal">
+      <div class="cta-band-v2-inner">
         <h2>Run your handyman business better.</h2>
-        <p>Chez is free in private beta. Register your workspace in under 10 minutes. Invite your crew. Quote your first job today.</p>
+        <p>Free in private beta. Register your workspace in under 10 minutes. Invite your crew. Quote your first job today.</p>
         <a href="handyman.html" class="btn btn-salmon btn-lg">
           Register your business
         </a>
