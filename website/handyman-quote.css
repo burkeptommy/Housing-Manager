@@ -1,0 +1,348 @@
+:root {
+  --bg: #f3eee7;
+  --surface: rgba(255, 250, 245, 0.92);
+  --surface-strong: #2a2252;
+  --surface-soft: #4f4388;
+  --accent: #ef6f5d;
+  --accent-dark: #d75949;
+  --success: #2f8b65;
+  --warning: #c98a2b;
+  --border: rgba(42, 34, 82, 0.1);
+  --text: #2a2252;
+  --text-muted: rgba(42, 34, 82, 0.72);
+  --radius-xl: 28px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --shadow: 0 28px 60px rgba(30, 22, 63, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(239, 111, 93, 0.12), transparent 28%),
+    radial-gradient(circle at top left, rgba(74, 62, 136, 0.12), transparent 30%),
+    var(--bg);
+  color: var(--text);
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.quote-page {
+  padding: 36px 18px 64px;
+}
+
+.quote-shell {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+}
+
+.quote-hero,
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.quote-hero {
+  padding: 30px 32px;
+  background: linear-gradient(155deg, rgba(42, 34, 82, 0.98), rgba(74, 62, 136, 0.96));
+  color: #fff;
+}
+
+.eyebrow,
+.section-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.76;
+}
+
+.quote-hero h1,
+.surface-card h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.06;
+}
+
+.quote-hero h1 {
+  font-size: clamp(2.4rem, 4vw, 4rem);
+  max-width: 16ch;
+}
+
+.lede {
+  margin: 14px 0 0;
+  max-width: 62ch;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 1.02rem;
+  line-height: 1.7;
+}
+
+.hero-chips,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-chips {
+  margin-top: 18px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: rgba(42, 34, 82, 0.08);
+  color: var(--surface-strong);
+}
+
+.status-chip.success {
+  background: rgba(47, 139, 101, 0.12);
+  color: var(--success);
+}
+
+.status-chip.warning {
+  background: rgba(201, 138, 43, 0.14);
+  color: var(--warning);
+}
+
+.status-chip.accent {
+  background: rgba(239, 111, 93, 0.14);
+  color: var(--accent-dark);
+}
+
+.surface-card {
+  padding: 24px 26px;
+}
+
+.quote-grid,
+.context-grid,
+.two-up {
+  display: grid;
+  gap: 16px;
+}
+
+.quote-grid,
+.two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.section-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.quote-total-card,
+.quote-note-card,
+.line-item-card,
+.timeline-entry {
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: rgba(42, 34, 82, 0.04);
+}
+
+.quote-total-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.quote-total-card strong {
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1;
+}
+
+.quote-total-card p,
+.quote-note-card p,
+.context-grid strong,
+.context-grid span,
+.line-item-card p,
+.timeline-entry p {
+  margin: 0;
+}
+
+.context-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.context-grid > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(42, 34, 82, 0.08);
+}
+
+.context-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.inline-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--surface-soft);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.response-form,
+.line-item-list,
+.timeline-list {
+  display: grid;
+  gap: 14px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+}
+
+label span {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(42, 34, 82, 0.16);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  font: inherit;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.decline-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.ghost-button:hover,
+.decline-button:hover,
+.inline-link:hover {
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  background: var(--surface-strong);
+  color: #fff;
+}
+
+.ghost-button {
+  background: rgba(42, 34, 82, 0.08);
+  color: var(--surface-strong);
+}
+
+.decline-button {
+  background: rgba(239, 111, 93, 0.1);
+  color: var(--accent-dark);
+  border-color: rgba(239, 111, 93, 0.2);
+}
+
+.line-item-card {
+  display: grid;
+  gap: 10px;
+}
+
+.line-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.line-item-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.line-item-meta,
+.feedback-copy,
+.timeline-meta {
+  color: var(--text-muted);
+}
+
+.line-item-meta,
+.timeline-meta {
+  font-size: 0.92rem;
+}
+
+.feedback-copy:empty {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .quote-page {
+    padding: 18px 14px 48px;
+  }
+
+  .quote-grid,
+  .two-up,
+  .context-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-row,
+  .line-item-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .button-row {
+    flex-direction: column;
+  }
+
+  .secondary-button,
+  .ghost-button,
+  .decline-button {
+    width: 100%;
+  }
+}

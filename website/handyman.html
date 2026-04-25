@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Haven Handyman</title>
+  <meta name="description" content="Secure desktop and field workspace for Haven handyman companies and technicians.">
+  <meta name="theme-color" content="#2A2252">
+  <link rel="stylesheet" href="handyman.css?v=20260423-provider-delivery1">
+</head>
+<body>
+  <div class="provider-page">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Haven Handyman</p>
+        <h1 id="experience-title">Run the company. Keep every home moving.</h1>
+        <p class="lede" id="experience-lede">Owners and dispatchers manage routing, calendars, crew assignments, quotes, and home history while each technician gets a focused workspace for visits, messaging, systems capture, and execution.</p>
+      </div>
+      <div class="topbar-actions">
+        <span class="status-pill mode-pill" id="workspace-mode-pill">Secure access</span>
+        <span class="status-pill" id="auth-status">Checking account</span>
+        <button class="ghost-button hidden" id="sign-out-button" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="page-grid" id="page-grid">
+      <section class="auth-panel" id="auth-panel">
+        <article class="hero-card" id="invite-preview-card">
+          <div class="section-row">
+            <div>
+              <p class="section-eyebrow" id="invite-kicker">Secure access</p>
+              <h2 id="invite-title">Claim this Haven workspace</h2>
+            </div>
+            <span class="section-chip" id="invite-status">Ready</span>
+          </div>
+          <p class="card-copy" id="invite-summary">Create your Haven Handyman account to confirm visits, coordinate with homeowners, build quotes, and keep the home record sharper after every stop.</p>
+          <dl class="invite-grid">
+            <div>
+              <dt id="invite-label-a">Home</dt>
+              <dd id="invite-home">Loading</dd>
+            </div>
+            <div>
+              <dt id="invite-label-b">Requested date</dt>
+              <dd id="invite-date">Loading</dd>
+            </div>
+            <div>
+              <dt id="invite-label-c">Company</dt>
+              <dd id="invite-company">Loading</dd>
+            </div>
+            <div>
+              <dt id="invite-label-d">Workspace</dt>
+              <dd><a id="invite-field-link" href="#" target="_blank" rel="noreferrer">Preview linked visit workspace</a></dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="auth-card">
+          <div class="auth-card-header">
+            <p class="section-eyebrow">Secure Company Access</p>
+            <h2>Sign in to the full Haven Handyman desk.</h2>
+            <p class="card-copy">Owners and dispatchers run routing, calendars, crew assignments, quotes, and home history here while technicians stay focused on visits, systems capture, and execution.</p>
+            <div class="auth-capability-row">
+              <span class="data-chip">Dispatch</span>
+              <span class="data-chip">Calendar</span>
+              <span class="data-chip">Quotes</span>
+              <span class="data-chip">Crew</span>
+            </div>
+          </div>
+          <div class="auth-toggle">
+            <button class="toggle-button active" id="show-sign-in" type="button">Sign in</button>
+            <button class="toggle-button" id="show-sign-up" type="button">Create account</button>
+          </div>
+
+          <form class="auth-form" id="sign-in-form">
+            <label>
+              <span>Email</span>
+              <input id="sign-in-email" type="email" autocomplete="email" required>
+            </label>
+            <label>
+              <span>Password</span>
+              <input id="sign-in-password" type="password" autocomplete="current-password" required>
+            </label>
+            <button class="primary-button" type="submit">Sign in to Haven Handyman</button>
+          </form>
+
+          <form class="auth-form hidden" id="sign-up-form">
+            <label>
+              <span>Your name</span>
+              <input id="sign-up-name" type="text" autocomplete="name" required>
+            </label>
+            <label id="company-field">
+              <span>Business name</span>
+              <input id="sign-up-company" type="text" autocomplete="organization" required>
+            </label>
+            <div class="two-up">
+              <label>
+                <span>Email</span>
+                <input id="sign-up-email" type="email" autocomplete="email" required>
+              </label>
+              <label>
+                <span>Phone</span>
+                <input id="sign-up-phone" type="tel" autocomplete="tel">
+              </label>
+            </div>
+            <label>
+              <span>Website</span>
+              <input id="sign-up-website" type="url" placeholder="https://">
+            </label>
+            <label>
+              <span>Password</span>
+              <input id="sign-up-password" type="password" autocomplete="new-password" minlength="8" required>
+            </label>
+            <button class="primary-button" type="submit">Create secure account</button>
+          </form>
+
+          <p class="helper-copy" id="auth-helper-copy">Owners, dispatchers, and field technicians log into the same secure workspace, with each role seeing the right mix of visits, homes, messages, crew tools, and quoting.</p>
+          <p class="feedback-copy" id="auth-feedback"></p>
+        </article>
+      </section>
+
+      <section class="workspace hidden" id="workspace-panel">
+        <aside class="workspace-sidebar">
+          <div class="workspace-card">
+            <p class="section-eyebrow">Workspace</p>
+            <h2 id="workspace-name">Haven Handyman</h2>
+            <p class="card-copy" id="workspace-meta">Loading workspace</p>
+            <div class="workspace-tags" id="workspace-tags"></div>
+          </div>
+
+          <div class="workspace-card compact-card">
+            <p class="section-eyebrow">Session</p>
+            <h3 class="compact-title" id="current-role-label">Loading role</h3>
+            <p class="card-copy" id="current-role-copy">Permissions and focus areas load here once the workspace is ready.</p>
+            <div class="workspace-tags" id="permission-tags"></div>
+          </div>
+
+          <nav class="workspace-nav" id="workspace-nav">
+            <button class="nav-button active" data-tab="overview" type="button">Overview</button>
+            <button class="nav-button" data-tab="dispatch" type="button">Dispatch</button>
+            <button class="nav-button" data-tab="calendar" type="button">Calendar</button>
+            <button class="nav-button" data-tab="routes" type="button">Routes</button>
+            <button class="nav-button" data-tab="crew" type="button">Crew</button>
+            <button class="nav-button" data-tab="homes" type="button">Homes</button>
+            <button class="nav-button" data-tab="quotes" type="button">Quotes</button>
+            <button class="nav-button" data-tab="messages" type="button">Messages</button>
+          </nav>
+
+          <div class="workspace-card compact-card">
+            <p class="section-eyebrow">Recent work</p>
+            <div class="mini-list" id="recent-work-list"></div>
+          </div>
+        </aside>
+
+        <div class="workspace-content">
+          <section class="control-bar surface-card">
+            <div>
+              <p class="section-eyebrow">Operations</p>
+              <h3>Own the queue, route the field team, and keep every home moving forward.</h3>
+              <p class="card-copy">Plan the week, route jobs, manage the crew, and build quotes from one Haven Handyman workspace.</p>
+            </div>
+            <div class="control-actions">
+              <button class="secondary-button" id="quick-open-my-day" type="button">Open my day</button>
+              <button class="primary-button" id="quick-new-quote" type="button">New quote</button>
+            </div>
+          </section>
+
+          <section class="mobile-snapshot hidden" id="mobile-snapshot">
+            <article class="surface-card mobile-snapshot-card">
+              <div class="section-row">
+                <div>
+                  <p class="section-eyebrow" id="mobile-snapshot-eyebrow">Today</p>
+                  <h3 id="mobile-snapshot-title">Your mobile workspace</h3>
+                </div>
+                <span class="section-chip" id="mobile-snapshot-chip">Live</span>
+              </div>
+              <div class="mobile-kpi-grid" id="mobile-kpi-grid"></div>
+              <div class="mobile-priority-list" id="mobile-priority-list"></div>
+            </article>
+          </section>
+
+          <section class="tab-panel active" data-panel="overview">
+            <div class="stats-grid" id="stats-grid"></div>
+            <div class="panel-grid overview-grid">
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Today</p>
+                    <h3>Field board</h3>
+                  </div>
+                </div>
+                <div class="stack-list" id="today-board"></div>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Crew</p>
+                    <h3>Workload and coverage</h3>
+                  </div>
+                </div>
+                <div class="stack-list" id="crew-workload"></div>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Quotes</p>
+                    <h3>Pipeline</h3>
+                  </div>
+                </div>
+                <div class="stack-list" id="quote-pipeline"></div>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Messages</p>
+                    <h3>Recent homeowner threads</h3>
+                  </div>
+                </div>
+                <div class="thread-list" id="overview-messages"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" data-panel="dispatch">
+            <article class="surface-card">
+              <div class="section-row">
+                <div>
+                  <p class="section-eyebrow">Dispatch</p>
+                  <h3>Assign work, set windows, and shape the route</h3>
+                </div>
+                <span class="section-chip" id="dispatch-summary">Loading</span>
+              </div>
+              <div class="dispatch-list" id="dispatch-board"></div>
+            </article>
+          </section>
+
+          <section class="tab-panel" data-panel="calendar">
+            <article class="surface-card">
+              <div class="section-row">
+                <div>
+                  <p class="section-eyebrow">Calendar</p>
+                  <h3>Upcoming visit schedule</h3>
+                </div>
+              </div>
+              <div class="calendar-list" id="calendar-list"></div>
+            </article>
+          </section>
+
+          <section class="tab-panel" data-panel="routes">
+            <article class="surface-card">
+              <div class="section-row">
+                <div>
+                  <p class="section-eyebrow">Routes</p>
+                  <h3>Daily stop order by technician</h3>
+                </div>
+              </div>
+              <div class="route-list" id="routes-list"></div>
+            </article>
+          </section>
+
+          <section class="tab-panel" data-panel="crew">
+            <div class="panel-grid crew-grid">
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Invite crew</p>
+                    <h3>Add a teammate</h3>
+                  </div>
+                </div>
+                <form class="auth-form" id="team-form">
+                  <label>
+                    <span>Name</span>
+                    <input id="team-name" type="text" required>
+                  </label>
+                  <div class="two-up">
+                    <label>
+                      <span>Email</span>
+                      <input id="team-email" type="email" required>
+                    </label>
+                    <label>
+                      <span>Phone</span>
+                      <input id="team-phone" type="tel">
+                    </label>
+                  </div>
+                  <div class="two-up">
+                    <label>
+                      <span>Role</span>
+                      <select id="team-role">
+                        <option value="technician">Field technician</option>
+                        <option value="dispatcher">Dispatcher</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Title</span>
+                      <input id="team-title" type="text" placeholder="Lead technician">
+                    </label>
+                  </div>
+                  <button class="primary-button" type="submit">Create secure invite</button>
+                </form>
+                <p class="feedback-copy" id="team-feedback"></p>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Crew roster</p>
+                    <h3>Who is doing what</h3>
+                  </div>
+                </div>
+                <div class="crew-list" id="crew-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" data-panel="homes">
+            <article class="surface-card">
+              <div class="section-row">
+                <div>
+                  <p class="section-eyebrow">Homes</p>
+                  <h3>Service history and mapped systems</h3>
+                </div>
+              </div>
+              <div class="home-list" id="homes-list"></div>
+            </article>
+          </section>
+
+          <section class="tab-panel" data-panel="quotes">
+            <div class="panel-grid quotes-grid">
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Quotes</p>
+                    <h3>Draft, send, and track scopes</h3>
+                  </div>
+                  <button class="ghost-button" id="new-quote-button" type="button">New quote</button>
+                </div>
+                <div class="quote-list" id="quotes-list"></div>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Saved line items</p>
+                    <h3>Reuse your common rows</h3>
+                  </div>
+                </div>
+                <form class="line-item-form" id="saved-item-form">
+                  <label>
+                    <span>Name</span>
+                    <input id="saved-item-name" type="text" required>
+                  </label>
+                  <label>
+                    <span>Description</span>
+                    <textarea id="saved-item-description" rows="2"></textarea>
+                  </label>
+                  <div class="three-up">
+                    <label>
+                      <span>Unit</span>
+                      <input id="saved-item-unit" type="text" value="ea">
+                    </label>
+                    <label>
+                      <span>Default qty</span>
+                      <input id="saved-item-quantity" type="number" min="0" step="0.25" value="1">
+                    </label>
+                    <label>
+                      <span>Unit price</span>
+                      <input id="saved-item-price" type="number" min="0" step="0.01" value="0">
+                    </label>
+                  </div>
+                  <button class="secondary-button" type="submit">Save line item</button>
+                </form>
+                <div class="saved-item-list" id="saved-items-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" data-panel="messages">
+            <div class="panel-grid">
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Threads</p>
+                    <h3>Homeowner communication</h3>
+                  </div>
+                </div>
+                <div class="thread-list" id="messages-list"></div>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Selected client</p>
+                    <h3>Keep the homeowner thread and home context close</h3>
+                  </div>
+                </div>
+                <div class="message-thread-detail" id="message-thread-detail"></div>
+                <div class="message-thread-history" id="message-thread-history"></div>
+                <form class="message-form" id="message-form">
+                  <label>
+                    <span>Selected request</span>
+                    <input id="message-request-title" type="text" readonly>
+                  </label>
+                  <label>
+                    <span>Status</span>
+                    <select id="message-status">
+                      <option value="">Keep current status</option>
+                      <option value="sent_to_handyman">Sent to handyman</option>
+                      <option value="alternate_dates_proposed">Propose other dates</option>
+                      <option value="awaiting_homeowner">Await homeowner reply</option>
+                      <option value="confirmed">Confirm visit</option>
+                      <option value="on_my_way">On my way</option>
+                      <option value="checked_in">Checked in</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Message</span>
+                    <textarea id="message-body" rows="6" placeholder="Examples: We can do Friday after 1pm instead, quote attached, or we checked in and started with the gate latch."></textarea>
+                  </label>
+                  <button class="primary-button" id="send-message-button" type="submit">Send update</button>
+                </form>
+              </article>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal hidden" id="quote-modal">
+    <div class="modal-card">
+      <div class="section-row">
+        <div>
+          <p class="section-eyebrow">Quote builder</p>
+          <h2 id="quote-modal-title">New quote</h2>
+        </div>
+        <button class="ghost-button" id="close-quote-modal" type="button">Close</button>
+      </div>
+
+      <form class="quote-form" id="quote-form">
+        <div class="quote-kind-toggle" id="quote-kind-toggle">
+          <button class="toggle-chip active" id="quote-kind-linked" type="button">Haven client request</button>
+          <button class="toggle-chip" id="quote-kind-prospect" type="button">Standalone prospect</button>
+        </div>
+
+        <div class="quote-recipient-mode" id="quote-linked-mode">
+          <div class="two-up">
+            <label>
+              <span>Client request</span>
+              <select id="quote-context-select"></select>
+            </label>
+            <label>
+              <span>Home / request</span>
+              <input id="quote-request-title" type="text" readonly>
+            </label>
+          </div>
+
+          <div class="quote-context-summary" id="quote-context-summary"></div>
+        </div>
+
+        <div class="quote-recipient-mode hidden" id="quote-prospect-mode">
+          <div class="two-up">
+            <label>
+              <span>Client name</span>
+              <input id="quote-prospect-name" type="text" placeholder="Jordan Smith">
+            </label>
+            <label>
+              <span>Email</span>
+              <input id="quote-prospect-email" type="email" placeholder="jordan@example.com">
+            </label>
+          </div>
+          <div class="two-up">
+            <label>
+              <span>Phone</span>
+              <input id="quote-prospect-phone" type="tel" placeholder="(914) 555-0199">
+            </label>
+            <label>
+              <span>Property or address</span>
+              <input id="quote-prospect-address" type="text" placeholder="236 Sarles Street, Mount Kisco">
+            </label>
+          </div>
+          <div class="quote-context-summary" id="quote-prospect-summary"></div>
+        </div>
+
+        <div class="two-up">
+          <label>
+            <span>Quote title</span>
+            <input id="quote-title" type="text" required>
+          </label>
+          <div class="quote-context-note">
+            <p class="helper-copy" id="quote-context-helper">Choose a Haven client request or switch to a standalone prospect quote. Either way, Haven will keep the scope, messages, and approval trail together.</p>
+          </div>
+        </div>
+
+        <label>
+          <span>Homeowner note</span>
+          <textarea id="quote-homeowner-message" rows="2" placeholder="Short note that appears with the quote when it is sent."></textarea>
+        </label>
+
+        <label>
+          <span>Scope notes</span>
+          <textarea id="quote-scope-notes" rows="3" placeholder="Anything the homeowner should know about assumptions, exclusions, or follow-up sequencing."></textarea>
+        </label>
+
+        <div class="quote-toolbar">
+          <button class="secondary-button" id="add-line-item-button" type="button">Add line item</button>
+          <select id="saved-item-picker">
+            <option value="">Insert saved line item</option>
+          </select>
+        </div>
+
+        <div class="line-item-table" id="quote-line-items"></div>
+
+        <div class="quote-totals">
+          <span>Subtotal</span>
+          <strong id="quote-subtotal">$0.00</strong>
+        </div>
+
+        <div class="button-row">
+          <button class="secondary-button" id="save-quote-button" type="button">Save draft</button>
+          <button class="primary-button" id="send-quote-button" type="button">Send quote</button>
+        </div>
+        <p class="feedback-copy" id="quote-feedback"></p>
+      </form>
+    </div>
+  </div>
+
+  <template id="stat-card-template">
+    <article class="stat-card">
+      <span class="stat-label"></span>
+      <strong class="stat-value"></strong>
+      <span class="stat-note"></span>
+    </article>
+  </template>
+
+  <script type="module" src="handyman.js?v=20260423-provider-delivery1"></script>
+</body>
+</html>

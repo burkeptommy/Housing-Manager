@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Haven Handyman Visit</title>
+  <meta name="description" content="Offline-ready field microsite for Haven handyman visits.">
+  <meta name="theme-color" content="#2A2252">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="handyman-visit.webmanifest">
+  <link rel="stylesheet" href="handyman-visit.css?v=20260423-collab1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero-card">
+      <div class="hero-topline">
+        <span class="eyebrow">Haven field visit</span>
+        <span class="status-pill" id="connectivity-pill">Checking connection</span>
+      </div>
+      <div class="hero-grid">
+        <div>
+          <h1 id="visit-title">Preparing visit</h1>
+          <p class="hero-copy" id="visit-subtitle">Loading the visit checklist, property context, and coordination flow.</p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <span class="meta-label">Property</span>
+            <strong id="property-name">Home</strong>
+            <span id="property-address">Waiting for visit details</span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Handyman</span>
+            <strong id="contractor-name">Unassigned</strong>
+            <span id="contractor-contact">Add a preferred handyman in Haven</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button class="primary-button" id="start-visit-button" type="button">Check in</button>
+        <button class="secondary-button" id="sync-button" type="button">Sync now</button>
+        <button class="secondary-button" id="complete-visit-button" type="button">Complete visit</button>
+      </div>
+      <p class="offline-note">This page keeps working offline after the first load. Changes are saved on the device and sync when the connection returns.</p>
+    </section>
+
+    <section class="content-grid">
+      <div class="stack-column">
+        <article class="surface-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">Coordination</p>
+              <h2>Confirm the visit first</h2>
+            </div>
+            <span class="section-chip" id="coordination-status">Loading</span>
+          </div>
+          <p class="hero-copy compact-copy" id="coordination-summary">Loading the Haven coordination state.</p>
+          <div class="message-list" id="message-list"></div>
+          <label class="input-label" for="coordination-note">Coordination note</label>
+          <textarea id="coordination-note" rows="4" placeholder="Examples: We can do Friday afternoon instead, can the homeowner confirm if the side gate is still sticking, or we need to decline this week."></textarea>
+          <label class="input-label" for="proposed-date">Alternate date</label>
+          <input id="proposed-date" type="date">
+          <div class="button-row">
+            <button class="primary-button small-button" id="confirm-date-button" type="button">Confirm date</button>
+            <button class="secondary-button small-button" id="propose-date-button" type="button">Suggest other date</button>
+            <button class="secondary-button small-button" id="ask-question-button" type="button">Ask question</button>
+            <button class="ghost-button small-button" id="decline-button" type="button">Decline</button>
+          </div>
+        </article>
+
+        <article class="surface-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">Checklist</p>
+              <h2>Execute the visit</h2>
+            </div>
+            <span class="section-chip" id="checklist-count">0 items</span>
+          </div>
+          <p class="task-subtitle locked-note" id="execution-lock-note"></p>
+          <div class="task-list" id="checklist-list"></div>
+        </article>
+
+        <article class="surface-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">Recommendations</p>
+              <h2>What else should the homeowner do?</h2>
+            </div>
+          </div>
+          <div class="recommendation-list" id="recommendation-list"></div>
+        </article>
+      </div>
+
+      <div class="stack-column">
+        <article class="surface-card profile-builder-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">House profile</p>
+              <h2>Build the service record while you're here</h2>
+            </div>
+            <span class="section-chip" id="profile-progress-chip">0 profiled</span>
+          </div>
+          <p class="hero-copy compact-copy" id="profile-builder-copy">Capture equipment labels, service details, and practical notes so the next visit starts with the right parts and context.</p>
+          <div class="profile-builder-grid">
+            <div class="profile-builder-stat">
+              <strong id="profile-identified-count">0</strong>
+              <span>identified</span>
+            </div>
+            <div class="profile-builder-stat">
+              <strong id="profile-needs-setup-count">0</strong>
+              <span>still need setup</span>
+            </div>
+            <div class="profile-builder-stat">
+              <strong id="profile-serviced-count">0</strong>
+              <span>serviced today</span>
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="primary-button small-button" id="profile-capture-button" type="button">Capture label photo</button>
+            <button class="secondary-button small-button" id="profile-review-setup-button" type="button">Review setup prompts</button>
+          </div>
+        </article>
+
+        <article class="surface-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">Systems</p>
+              <h2>Capture systems and service details</h2>
+            </div>
+            <span class="section-chip" id="system-count">0 systems</span>
+          </div>
+          <div class="system-list" id="system-list"></div>
+          <div class="system-toolbar">
+            <button class="primary-button small-button" id="add-system-photo-button" type="button">Add system from label photo</button>
+            <button class="secondary-button small-button" id="add-system-button" type="button">Add manually</button>
+            <input id="add-system-photo-input" class="hidden-file-input" type="file" accept="image/*" capture="environment">
+          </div>
+        </article>
+
+        <article class="surface-card" id="first-visit-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">First-visit setup</p>
+              <h2>Leave this home easier to service next time</h2>
+            </div>
+            <span class="section-chip" id="setup-count">0 prompts</span>
+          </div>
+          <div class="setup-list" id="setup-list"></div>
+        </article>
+
+        <article class="surface-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">Notes</p>
+              <h2>What should Haven remember?</h2>
+            </div>
+          </div>
+          <label class="input-label" for="field-notes">Field notes</label>
+          <textarea id="field-notes" rows="7" placeholder="Examples: brought two 16x25x1 filters, loose upstairs hall handrail, homeowner wants quote for shelving in mudroom."></textarea>
+          <label class="input-label" for="homeowner-notes">Homeowner notes</label>
+          <textarea id="homeowner-notes" rows="4" placeholder="Anything passed from the homeowner or Haven will appear here."></textarea>
+        </article>
+
+        <article class="surface-card summary-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">Visit summary</p>
+              <h2>House context</h2>
+            </div>
+          </div>
+          <dl class="summary-grid">
+            <div>
+              <dt>Scheduled</dt>
+              <dd id="scheduled-date">Unscheduled</dd>
+            </div>
+            <div>
+              <dt>Known systems</dt>
+              <dd id="known-systems">Loading</dd>
+            </div>
+            <div>
+              <dt>House type</dt>
+              <dd id="property-type">Loading</dd>
+            </div>
+            <div>
+              <dt>Coordination</dt>
+              <dd id="coordination-state">Loading</dd>
+            </div>
+            <div>
+              <dt>Sync status</dt>
+              <dd id="sync-state">Waiting for draft</dd>
+            </div>
+            <div>
+              <dt>Systems updated</dt>
+              <dd id="system-update-count">0</dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <template id="task-item-template">
+    <label class="task-item">
+      <input type="checkbox" class="task-checkbox">
+      <span class="task-copy">
+        <strong class="task-title"></strong>
+        <span class="task-subtitle"></span>
+      </span>
+      <span class="task-badge"></span>
+    </label>
+  </template>
+
+  <template id="recommendation-item-template">
+    <div class="recommendation-item">
+      <div>
+        <strong class="recommendation-title"></strong>
+        <p class="recommendation-detail"></p>
+      </div>
+      <div class="recommendation-meta">
+        <span class="recommendation-hint"></span>
+        <label class="upsell-toggle">
+          <input type="checkbox" class="recommendation-checkbox">
+          <span>Create follow-up</span>
+        </label>
+      </div>
+    </div>
+  </template>
+
+  <template id="system-item-template">
+    <div class="system-item">
+      <div class="system-capture-card">
+        <div class="system-capture-copy">
+          <p class="system-capture-eyebrow">Equipment label</p>
+          <strong class="system-capture-title">Let Haven identify this system</strong>
+          <p class="system-capture-detail">Take a photo of the model and serial plate. Haven will match it to the equipment catalog and fill in the details for you.</p>
+        </div>
+        <div class="system-capture-actions">
+          <button class="primary-button small-button system-photo-button" type="button">Take label photo</button>
+          <input class="system-photo-input hidden-file-input" type="file" accept="image/*" capture="environment">
+        </div>
+      </div>
+      <div class="system-match-card">
+        <div>
+          <p class="system-match-eyebrow">Catalog status</p>
+          <strong class="system-match-title">No label captured yet</strong>
+          <p class="system-match-subtitle">Use a label photo to preload the brand, model, and service context.</p>
+        </div>
+        <span class="system-pill system-match-pill">Needs label</span>
+      </div>
+      <p class="system-feedback hidden"></p>
+      <p class="system-detail-note">Haven will fill these in from the label photo. Adjust anything manually only if it needs a correction.</p>
+      <div class="system-grid">
+        <label class="system-field">
+          <span>Name</span>
+          <input type="text" class="system-name" placeholder="Main HVAC">
+        </label>
+        <label class="system-field">
+          <span>Category</span>
+          <input type="text" class="system-category" placeholder="HVAC">
+        </label>
+        <label class="system-field">
+          <span>Manufacturer</span>
+          <input type="text" class="system-manufacturer" placeholder="Carrier">
+        </label>
+        <label class="system-field">
+          <span>Model</span>
+          <input type="text" class="system-model" placeholder="24VNA9">
+        </label>
+        <label class="system-field">
+          <span>Serial</span>
+          <input type="text" class="system-serial" placeholder="Serial number">
+        </label>
+        <label class="system-field">
+          <span>Install date</span>
+          <input type="date" class="system-install-date">
+        </label>
+      </div>
+      <label class="system-field">
+        <span>Notes</span>
+        <textarea class="system-notes" rows="3" placeholder="Filter size, shutoff location, battery type, practical service notes."></textarea>
+      </label>
+      <div class="system-flags">
+        <label class="upsell-toggle">
+          <input type="checkbox" class="system-serviced">
+          <span>Serviced during this visit</span>
+        </label>
+        <span class="system-pill system-needs-setup">Needs setup</span>
+      </div>
+    </div>
+  </template>
+
+  <template id="message-item-template">
+    <div class="message-item">
+      <div class="message-meta">
+        <strong class="message-role"></strong>
+        <span class="message-time"></span>
+      </div>
+      <p class="message-body"></p>
+    </div>
+  </template>
+
+  <script src="handyman-visit.js?v=20260423-collab1" defer></script>
+</body>
+</html>

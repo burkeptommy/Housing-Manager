@@ -1,0 +1,16 @@
+{
+  "name": "Haven Handyman Visit",
+  "short_name": "Haven Visit",
+  "start_url": "/handyman-visit",
+  "display": "standalone",
+  "background_color": "#F8F9FA",
+  "theme_color": "#2A2252",
+  "description": "Offline-ready handyman execution microsite for Haven visits.",
+  "icons": [
+    {
+      "src": "/og-image.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

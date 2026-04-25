@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Haven Handyman Quote</title>
+  <meta name="description" content="Review and respond to your Haven Handyman quote.">
+  <meta name="theme-color" content="#2A2252">
+  <link rel="stylesheet" href="handyman-quote.css?v=20260423-quote1">
+</head>
+<body>
+  <main class="quote-page">
+    <section class="quote-shell">
+      <header class="quote-hero">
+        <p class="eyebrow">Haven Handyman</p>
+        <h1 id="quote-title">Loading your quote</h1>
+        <p class="lede" id="quote-lede">Review the scope, ask a question, approve it, or decline it.</p>
+        <div class="hero-chips" id="quote-hero-chips"></div>
+      </header>
+
+      <section class="quote-grid">
+        <article class="surface-card">
+          <div class="section-row">
+            <div>
+              <p class="section-eyebrow">Quote</p>
+              <h2 id="quote-status-title">Review</h2>
+            </div>
+            <span class="status-chip" id="quote-status-chip">Loading</span>
+          </div>
+          <div class="quote-total-card">
+            <span>Total</span>
+            <strong id="quote-total">$0.00</strong>
+            <p id="quote-audience"></p>
+          </div>
+          <div class="context-grid">
+            <div>
+              <span class="context-label">Company</span>
+              <strong id="quote-company">Loading</strong>
+            </div>
+            <div>
+              <span class="context-label">Home</span>
+              <strong id="quote-property">Loading</strong>
+            </div>
+            <div>
+              <span class="context-label">Sent</span>
+              <strong id="quote-sent-at">Loading</strong>
+            </div>
+            <div>
+              <span class="context-label">Share link</span>
+              <button class="inline-link" id="copy-quote-link" type="button">Copy link</button>
+            </div>
+          </div>
+          <div class="quote-note-card hidden" id="quote-note-card">
+            <p class="section-eyebrow">Note</p>
+            <p id="quote-note"></p>
+          </div>
+          <div class="quote-note-card hidden" id="quote-scope-card">
+            <p class="section-eyebrow">Scope notes</p>
+            <p id="quote-scope"></p>
+          </div>
+        </article>
+
+        <article class="surface-card">
+          <div class="section-row">
+            <div>
+              <p class="section-eyebrow">Respond</p>
+              <h2>Keep the job moving</h2>
+            </div>
+          </div>
+          <form class="response-form" id="response-form">
+            <div class="two-up">
+              <label>
+                <span>Your name</span>
+                <input id="response-name" type="text" placeholder="Optional">
+              </label>
+              <label>
+                <span>Email</span>
+                <input id="response-email" type="email" placeholder="Optional">
+              </label>
+            </div>
+            <label>
+              <span>Message</span>
+              <textarea id="response-body" rows="5" placeholder="Ask a question, confirm a detail, or add context for the handyman."></textarea>
+            </label>
+            <div class="button-row">
+              <button class="secondary-button" id="approve-quote" type="button">Approve quote</button>
+              <button class="ghost-button" id="ask-question" type="button">Send question</button>
+              <button class="decline-button" id="decline-quote" type="button">Decline</button>
+            </div>
+            <p class="feedback-copy" id="response-feedback"></p>
+          </form>
+        </article>
+      </section>
+
+      <section class="surface-card">
+        <div class="section-row">
+          <div>
+            <p class="section-eyebrow">Line items</p>
+            <h2>What’s included</h2>
+          </div>
+        </div>
+        <div class="line-item-list" id="line-item-list"></div>
+      </section>
+
+      <section class="surface-card">
+        <div class="section-row">
+          <div>
+            <p class="section-eyebrow">Collaboration</p>
+            <h2>Recent updates</h2>
+          </div>
+        </div>
+        <div class="timeline-list" id="quote-timeline"></div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="handyman-quote.js?v=20260423-quote1"></script>
+</body>
+</html>
