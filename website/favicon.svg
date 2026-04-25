@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Cosmic Indigo background, rounded square -->
+  <rect width="100" height="100" rx="22" fill="#453A70"/>
+  <!-- Salmon house roof + chimney mark, scaled small above the c -->
+  <path d="M30 38 L50 22 L70 38" stroke="#ED6955" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="64" y="28" width="6" height="10" rx="1" fill="#ED6955"/>
+  <!-- Lowercase serif c -->
+  <text x="50" y="84"
+        font-family="Fraunces, Georgia, 'Times New Roman', serif"
+        font-size="62"
+        font-weight="500"
+        fill="#FFFFFF"
+        text-anchor="middle">c</text>
+</svg>

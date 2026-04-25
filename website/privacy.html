@@ -3,185 +3,77 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy | Haven</title>
-  <meta name="description" content="How Haven collects, uses, and protects your information. SMS data handling, opt-out instructions, and data sharing practices.">
-  <meta property="og:title" content="Privacy Policy | Haven">
-  <meta property="og:description" content="How Haven collects, uses, and protects your information.">
-  <meta property="og:image" content="https://havenhome.dev/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://havenhome.dev/og-image.png">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23453A70'/%3E%3Ctext x='50' y='68' font-family='Georgia,serif' font-size='62' font-weight='bold' fill='%23F8F9FA' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <title>Privacy Policy | Chez</title>
+  <meta name="description" content="How Chez collects, uses, and protects your information. SMS data handling, opt-out instructions, and data sharing practices.">
+  <meta property="og:title" content="Privacy Policy | Chez">
+  <meta property="og:description" content="How Chez collects, uses, and protects your information.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://getchez.com/privacy.html">
+  <meta property="og:image" content="https://getchez.com/chez-logo.png">
+  <link rel="stylesheet" href="chez.css">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="chez-logo.png">
   <style>
-    .legal-hero {
-      padding-top: 140px;
-      padding-bottom: 32px;
-      text-align: center;
-    }
-    .legal-hero h1 {
-      font-family: var(--font-serif);
-      font-size: clamp(32px, 4.5vw, 48px);
-      font-weight: 700;
-      color: var(--navy);
-      margin-bottom: 14px;
-      line-height: 1.15;
-    }
-    .legal-hero .legal-updated {
-      font-family: var(--font-sans);
-      font-size: 13px;
-      color: var(--text-tertiary);
-      letter-spacing: 0.3px;
-    }
-    .legal-section {
-      padding: 32px 0 80px;
-    }
-    .legal-container {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 0 var(--page-margin);
-    }
-    .legal-intro {
-      font-family: var(--font-serif);
-      font-size: 18px;
-      line-height: 1.7;
-      color: var(--text-secondary);
-      padding: 24px 0 8px;
-      border-bottom: 1px solid var(--beige-300);
-      margin-bottom: 40px;
-    }
-    .legal-container h2 {
-      font-family: var(--font-serif);
-      font-size: 26px;
-      font-weight: 700;
-      color: var(--navy);
-      margin-top: 40px;
-      margin-bottom: 14px;
-      line-height: 1.25;
-    }
-    .legal-container h2:first-of-type {
-      margin-top: 0;
-    }
-    .legal-container h3 {
-      font-family: var(--font-serif);
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--navy);
-      margin-top: 28px;
-      margin-bottom: 10px;
-    }
-    .legal-container p {
-      font-family: var(--font-serif);
-      font-size: 17px;
-      line-height: 1.75;
-      color: var(--text-primary);
-      margin-bottom: 16px;
-    }
-    .legal-container ul {
-      margin: 0 0 20px 0;
-      padding-left: 22px;
-    }
-    .legal-container ul li {
-      font-family: var(--font-serif);
-      font-size: 17px;
-      line-height: 1.7;
-      color: var(--text-primary);
-      margin-bottom: 10px;
-    }
-    .legal-container strong {
-      color: var(--navy);
-      font-weight: 700;
-    }
-    .legal-container a {
-      color: var(--navy);
-      text-decoration: underline;
-      text-decoration-color: var(--beige-400);
-      text-underline-offset: 3px;
-    }
-    .legal-container a:hover {
-      text-decoration-color: var(--navy);
-    }
     .legal-callout {
-      background: var(--cream-light);
-      border: 1px solid var(--beige-300);
-      border-left: 3px solid var(--navy);
+      background: var(--salmon-50);
+      border: 1px solid var(--salmon-pale);
+      border-left: 3px solid var(--salmon);
       border-radius: var(--radius-sm);
-      padding: 20px 24px;
+      padding: 18px 22px;
       margin: 24px 0;
     }
-    .legal-callout p {
-      margin-bottom: 0;
-    }
-    .legal-footer-note {
-      margin-top: 48px;
-      padding-top: 24px;
-      border-top: 1px solid var(--beige-300);
-      font-family: var(--font-sans);
-      font-size: 14px;
-      color: var(--text-tertiary);
-      font-style: italic;
-    }
-    @media (max-width: 640px) {
-      .legal-hero { padding-top: 120px; }
-      .legal-container h2 { font-size: 22px; }
-      .legal-container h3 { font-size: 18px; }
-      .legal-container p,
-      .legal-container ul li { font-size: 16px; }
-    }
+    .legal-callout p { margin-bottom: 0; color: var(--text); }
   </style>
 </head>
 <body>
 
 <!-- NAV -->
-<nav>
+<nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="38" height="38">
-          <rect width="100" height="100" rx="22" fill="#453A70"/>
-          <text x="50" y="68" font-family="Georgia,serif" font-size="62" font-weight="bold" fill="#F8F9FA" text-anchor="middle">H</text>
-        </svg>
-      </div>
-      <span class="nav-logo-text">Haven</span>
+    <a href="/" class="nav-brand" aria-label="Chez home">
+      <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
+      <span>chez</span>
     </a>
     <div class="nav-links">
-      <a href="/#features" class="nav-link-text">Features</a>
-      <a href="security.html" class="nav-link-text">Security</a>
-      <a href="https://testflight.apple.com/join/sw4xWsTA" class="nav-cta">Download Beta</a>
+      <a href="homeowners.html" class="nav-link nav-link-text-hide">Homeowners</a>
+      <a href="handymen.html" class="nav-link nav-link-text-hide">Handymen</a>
+      <a href="security.html" class="nav-link nav-link-text-hide">Security</a>
+      <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-sm">Get the app</a>
     </div>
   </div>
 </nav>
 
-<!-- HERO -->
-<section class="legal-hero">
-  <div class="container">
-    <div class="section-label">Legal</div>
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="page-hero-inner">
+    <span class="eyebrow eyebrow-on-indigo">Legal</span>
     <h1>Privacy Policy</h1>
-    <p class="legal-updated">Last updated: April 13, 2026</p>
+    <p class="lead" style="margin-top: 8px; font-size: 15px; color: rgba(255,255,255,0.6); letter-spacing: 0.04em; text-transform: uppercase;">Last updated: April 25, 2026</p>
   </div>
 </section>
 
 <!-- CONTENT -->
-<section class="legal-section">
-  <div class="legal-container">
-    <p class="legal-intro">This Privacy Policy describes how Haven ("we", "our", or "us") collects, uses, and protects information when you use the Haven mobile application and related services (the "Service").</p>
+<section class="section bg-white">
+  <div class="prose">
+    <p class="lead" style="border-bottom: 1px solid var(--neutral-200); padding-bottom: 28px; margin-bottom: 36px;">
+      This Privacy Policy describes how Chez ("we", "our", or "us") collects, uses, and protects information when you use the Chez mobile application and related services (the "Service").
+    </p>
 
     <h2>Information we collect</h2>
-    <p>When you use Haven, we collect the following information:</p>
+    <p>When you use Chez, we collect the following information:</p>
     <ul>
       <li><strong>Account information:</strong> name, email address, phone number, and any other information you provide when creating an account.</li>
       <li><strong>Household information:</strong> property addresses, family member details, vendor and contact information, documents, photos, and other content you add to your household.</li>
       <li><strong>Service usage data:</strong> how you interact with the app, features used, and aggregate analytics that help us improve the product.</li>
-      <li><strong>Communications:</strong> when you use Haven's SMS coordination features, we collect and store the content of messages exchanged between you, your service vendors, and the Haven system. This includes phone numbers, message bodies, and any media attachments.</li>
-      <li><strong>Device information:</strong> technical information about the device and operating system you use to access Haven.</li>
+      <li><strong>Communications:</strong> when you use Chez's coordination features (in-app messaging, email forwarding, or SMS where available), we collect and store the content of messages exchanged between you, your service vendors, and the Chez system.</li>
+      <li><strong>Device information:</strong> technical information about the device and operating system you use to access Chez.</li>
     </ul>
 
     <h2>How we use your information</h2>
     <p>We use the information we collect to:</p>
     <ul>
-      <li>Provide, maintain, and improve the Haven Service</li>
-      <li>Process and route SMS communications between you and your service vendors</li>
+      <li>Provide, maintain, and improve the Chez Service</li>
+      <li>Process and route communications between you, your family members, and your service vendors</li>
       <li>Send you notifications about your household, scheduled services, and account activity</li>
       <li>Generate AI-powered insights and recommendations specific to your household</li>
       <li>Respond to your support requests</li>
@@ -189,70 +81,91 @@
     </ul>
 
     <h2>SMS communications</h2>
-    <p>If you enable SMS coordination features, Haven uses your provided phone number and the phone numbers of vendors you add to facilitate two-way text message communication. Information collected from SMS communications, including phone numbers, message content, and consent records, is used solely to provide the requested service.</p>
+    <p>If you enable SMS coordination features (where available), Chez uses your provided phone number and the phone numbers of vendors you add to facilitate two-way text message communication. Information collected from SMS communications, including phone numbers, message content, and consent records, is used solely to provide the requested service.</p>
     <div class="legal-callout">
       <p><strong>We do not share SMS opt-in data, mobile information, or message content with third parties for marketing purposes. We do not sell this information under any circumstances.</strong></p>
     </div>
-    <p>You may opt out of SMS communications at any time by texting <strong>STOP</strong> to the Haven number. You may text <strong>HELP</strong> for assistance.</p>
+    <p>You may opt out of SMS communications at any time by texting <strong>STOP</strong> to the Chez number. You may text <strong>HELP</strong> for assistance.</p>
 
     <h2>Information sharing</h2>
     <p>We do not sell your personal information. We do not share your information with third parties for their marketing purposes.</p>
     <p>We may share information in the following limited circumstances:</p>
     <ul>
       <li><strong>Service providers:</strong> with vendors and partners who help us operate the Service (such as cloud hosting, AI processing, and SMS delivery), bound by confidentiality obligations.</li>
-      <li><strong>Legal compliance:</strong> when required by law, subpoena, or to protect the rights, property, or safety of Haven, our users, or others.</li>
+      <li><strong>Legal compliance:</strong> when required by law, subpoena, or to protect the rights, property, or safety of Chez, our users, or others.</li>
       <li><strong>Business transfers:</strong> in connection with a merger, acquisition, or sale of assets, with notice to affected users.</li>
       <li><strong>With your consent:</strong> when you explicitly authorize sharing for a specific purpose.</li>
     </ul>
 
+    <h2>Role-based document access</h2>
+    <p>Chez supports a Home Manager role for property staff. When you invite someone as a Home Manager, that account can manage tasks, systems, contractors, and vehicles on your behalf, but cannot view documents in restricted categories (estate, financial, medical, legal) unless you explicitly grant access on a per-document basis. This restriction is enforced at the database layer through row-level security policies, not just the user interface.</p>
+
     <h2>Data security</h2>
-    <p>We use industry-standard security measures including encryption in transit and at rest, biometric authentication options, and access controls to protect your information. No system is perfectly secure, and we cannot guarantee absolute security, but we work continuously to protect your data.</p>
+    <p>We use industry-standard security measures including AES-256-GCM encryption at rest, TLS 1.3 in transit, biometric authentication options, and access controls to protect your information. No system is perfectly secure, and we cannot guarantee absolute security, but we work continuously to protect your data. Read more on our <a href="security.html">Security page</a>.</p>
 
     <h2>Your choices</h2>
     <p>You can:</p>
     <ul>
-      <li>Access, update, or delete your account information at any time through the Haven app</li>
+      <li>Access, update, or delete your account information at any time through the Chez app</li>
       <li>Export your household data</li>
       <li>Delete your account, which removes your data from our active systems within 30 days</li>
-      <li>Opt out of SMS communications by texting <strong>STOP</strong> to the Haven number</li>
+      <li>Opt out of SMS communications by texting <strong>STOP</strong> to the Chez number</li>
       <li>Opt out of non-essential email communications via the unsubscribe link in our emails</li>
     </ul>
 
     <h2>Children's privacy</h2>
-    <p>Haven is intended for adults (18+) and is not directed to children under 13. We do not knowingly collect personal information from children under 13.</p>
+    <p>Chez is intended for adults (18+) and is not directed to children under 13. We do not knowingly collect personal information from children under 13. Family member records you create for children in your household are scoped entirely to your household and are not used to create separate accounts for those children.</p>
 
     <h2>Changes to this policy</h2>
     <p>We may update this Privacy Policy from time to time. We will notify users of material changes through the app or via email.</p>
 
     <h2>Contact</h2>
-    <p>For privacy questions or requests, contact: <strong><a href="mailto:support@havenhome.dev">support@havenhome.dev</a></strong></p>
+    <p>For privacy questions or requests, contact: <strong><a href="mailto:tom@getchez.com">tom@getchez.com</a></strong></p>
 
-    <p class="legal-footer-note">Haven is currently in beta. This Privacy Policy will be updated as the Service evolves.</p>
+    <hr>
+    <p style="font-size: 14px; color: var(--text-soft); font-style: italic;">Chez is currently in beta. This Privacy Policy will be updated as the Service evolves.</p>
   </div>
 </section>
 
 <!-- FOOTER -->
-<footer>
+<footer class="footer">
   <div class="footer-inner">
-    <div class="footer-brand">
-      <div class="footer-brand-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="34" height="34">
-          <rect width="100" height="100" rx="22" fill="rgba(255,255,255,0.15)"/>
-          <text x="50" y="68" font-family="Georgia,serif" font-size="62" font-weight="bold" fill="rgba(255,255,255,0.8)" text-anchor="middle">H</text>
-        </svg>
+    <div class="footer-grid">
+      <div class="footer-brand-block">
+        <a href="/" class="nav-brand">
+          <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
+          <span>chez</span>
+        </a>
+        <p>Your home, organized. The iOS app for high-net-worth homeowners and the platform for the handymen who serve them.</p>
       </div>
-      <span class="footer-brand-name">Haven</span>
+      <div class="footer-col">
+        <h5>Product</h5>
+        <ul>
+          <li><a href="homeowners.html">For Homeowners</a></li>
+          <li><a href="handymen.html">For Handymen</a></li>
+          <li><a href="https://testflight.apple.com/join/sw4xWsTA">Join Beta</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Trust</h5>
+        <ul>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="mailto:tom@getchez.com">Contact</a></li>
+        </ul>
+      </div>
     </div>
-    <div class="footer-links">
-      <a href="/">Home</a>
-      <a href="security.html">Security</a>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
-      <a href="mailto:support@havenhome.dev">Contact</a>
-      <a href="https://testflight.apple.com/join/sw4xWsTA">TestFlight</a>
+    <div class="footer-bottom">
+      <span>© 2026 Chez. All rights reserved.</span>
+      <span>Made with care for the people who keep their homes well.</span>
     </div>
   </div>
-  <p class="footer-copy">&copy; 2026 Haven Home. All rights reserved.</p>
 </footer>
 
 </body>

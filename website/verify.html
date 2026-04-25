@@ -3,91 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verify Document | Haven</title>
-  <meta name="description" content="Verify the authenticity of a Haven estate planning summary.">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23453A70'/%3E%3Ctext x='50' y='68' font-family='Georgia,serif' font-size='62' font-weight='bold' fill='%23F8F9FA' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <title>Verify Document | Chez</title>
+  <meta name="description" content="Verify the authenticity of a Chez estate planning summary.">
+  <link rel="stylesheet" href="chez.css">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="chez-logo.png">
   <style>
-    .verify-container {
+    .verify-wrap {
       max-width: 560px;
-      margin: 120px auto 80px;
-      padding: 0 20px;
+      margin: 96px auto 80px;
+      padding: 0 var(--gutter);
       text-align: center;
     }
+    .verify-wrap > h1 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(28px, 4vw, 36px);
+      letter-spacing: -0.02em;
+      color: var(--indigo);
+      margin-bottom: 10px;
+    }
+    .verify-wrap > .lead {
+      font-family: var(--sans);
+      font-size: 16px;
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
     .verify-card {
-      background: var(--cream-light, #FCFCFD);
-      border: 1px solid var(--beige-300, #D8DADF);
-      border-radius: 16px;
-      padding: 40px 32px;
-      margin-top: 32px;
+      background: var(--white);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-lg);
+      padding: 44px 32px;
+      margin-top: 36px;
+      box-shadow: var(--shadow);
     }
     .verify-icon {
-      width: 64px;
-      height: 64px;
+      width: 68px;
+      height: 68px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 20px;
-      font-size: 28px;
+      margin: 0 auto 22px;
+      font-size: 30px;
+      font-weight: 600;
     }
-    .verify-icon.success { background: rgba(34, 139, 34, 0.1); }
-    .verify-icon.error { background: rgba(220, 53, 69, 0.1); }
-    .verify-icon.expired { background: rgba(255, 193, 7, 0.1); }
-    .verify-title {
-      font-family: Georgia, 'Fraunces', serif;
+    .verify-icon.success { background: rgba(74, 124, 89, 0.12); color: var(--success); }
+    .verify-icon.error { background: rgba(232, 93, 93, 0.12); color: #C44545; }
+    .verify-icon.expired { background: rgba(199, 126, 46, 0.14); color: var(--warning); }
+    .verify-card-title {
+      font-family: var(--serif);
+      font-weight: 500;
       font-size: 22px;
-      font-weight: 700;
-      color: var(--navy, #453A70);
+      letter-spacing: -0.015em;
+      color: var(--indigo);
       margin-bottom: 12px;
     }
-    .verify-message {
-      font-family: -apple-system, 'Inter', sans-serif;
+    .verify-card-message {
+      font-family: var(--sans);
       font-size: 15px;
-      color: #666;
+      color: var(--text-muted);
       line-height: 1.6;
       margin-bottom: 20px;
     }
     .verify-meta {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       text-align: left;
-      margin-top: 20px;
-      padding-top: 20px;
-      border-top: 1px solid var(--beige-300, #D8DADF);
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid var(--neutral-200);
     }
     .verify-meta-row {
       display: flex;
       justify-content: space-between;
-      font-family: -apple-system, 'Inter', sans-serif;
+      gap: 16px;
+      font-family: var(--sans);
       font-size: 13px;
     }
-    .verify-meta-label { color: #999; }
-    .verify-meta-value { color: var(--navy, #453A70); font-weight: 500; }
+    .verify-meta-label { color: var(--text-soft); }
+    .verify-meta-value { color: var(--text); font-weight: 500; }
     .verify-loading {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
       padding: 40px;
-      color: #999;
-      font-family: -apple-system, 'Inter', sans-serif;
+      color: var(--text-soft);
+      font-family: var(--sans);
+      font-size: 15px;
     }
     .verify-note {
-      font-family: -apple-system, 'Inter', sans-serif;
+      font-family: var(--sans);
       font-size: 12px;
-      color: #999;
+      color: var(--text-soft);
       margin-top: 16px;
+      line-height: 1.5;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
     .spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid #D8DADF;
-      border-top-color: #453A70;
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--neutral-200);
+      border-top-color: var(--indigo);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -96,28 +117,25 @@
 <body>
 
 <!-- NAV -->
-<nav>
+<nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="38" height="38">
-          <rect width="100" height="100" rx="22" fill="#453A70"/>
-          <text x="50" y="68" font-family="Georgia,serif" font-size="62" font-weight="bold" fill="#F8F9FA" text-anchor="middle">H</text>
-        </svg>
-      </div>
-      <span class="nav-logo-text">Haven</span>
+    <a href="/" class="nav-brand" aria-label="Chez home">
+      <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
+      <span>chez</span>
     </a>
     <div class="nav-links">
-      <a href="/#features" class="nav-link-text">Features</a>
-      <a href="security.html" class="nav-link-text">Security</a>
-      <a href="https://testflight.apple.com/join/sw4xWsTA" class="nav-cta">Download Beta</a>
+      <a href="homeowners.html" class="nav-link nav-link-text-hide">Homeowners</a>
+      <a href="handymen.html" class="nav-link nav-link-text-hide">Handymen</a>
+      <a href="security.html" class="nav-link nav-link-text-hide">Security</a>
+      <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-sm">Get the app</a>
     </div>
   </div>
 </nav>
 
-<div class="verify-container">
-  <h1 class="verify-title" style="font-size: 28px; margin-bottom: 8px;">Document Verification</h1>
-  <p class="verify-message" style="margin-bottom: 0;">Confirm the authenticity of a Haven estate planning summary.</p>
+<div class="verify-wrap">
+  <span class="eyebrow">Document verification</span>
+  <h1>Verify a Chez document</h1>
+  <p class="lead">Confirm the authenticity of a Chez estate planning summary.</p>
 
   <div id="verify-result">
     <div class="verify-loading">
@@ -128,24 +146,44 @@
 </div>
 
 <!-- FOOTER -->
-<footer>
+<footer class="footer">
   <div class="footer-inner">
-    <div class="footer-brand">
-      <div class="footer-brand-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="34" height="34">
-          <rect width="100" height="100" rx="22" fill="rgba(255,255,255,0.15)"/>
-          <text x="50" y="68" font-family="Georgia,serif" font-size="56" font-weight="bold" fill="rgba(255,255,255,0.9)" text-anchor="middle">H</text>
-        </svg>
+    <div class="footer-grid">
+      <div class="footer-brand-block">
+        <a href="/" class="nav-brand">
+          <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
+          <span>chez</span>
+        </a>
+        <p>Your home, organized. The iOS app for high-net-worth homeowners and the platform for the handymen who serve them.</p>
       </div>
-      <span class="footer-brand-name">Haven</span>
+      <div class="footer-col">
+        <h5>Product</h5>
+        <ul>
+          <li><a href="homeowners.html">For Homeowners</a></li>
+          <li><a href="handymen.html">For Handymen</a></li>
+          <li><a href="https://testflight.apple.com/join/sw4xWsTA">Join Beta</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Trust</h5>
+        <ul>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="mailto:tom@getchez.com">Contact</a></li>
+        </ul>
+      </div>
     </div>
-    <div class="footer-links">
-      <a href="/">Home</a>
-      <a href="security.html">Security</a>
-      <a href="mailto:support@havenhome.dev">Contact</a>
+    <div class="footer-bottom">
+      <span>© 2026 Chez. All rights reserved.</span>
+      <span>Made with care for the people who keep their homes well.</span>
     </div>
   </div>
-  <p class="footer-copy">&copy; 2026 Haven Home. All rights reserved.</p>
 </footer>
 
 <script>
@@ -178,7 +216,7 @@
     } else if (data.revoked) {
       container.innerHTML = renderRevoked();
     } else {
-      container.innerHTML = renderError('Invalid verification link.', 'This link does not correspond to any Haven document.');
+      container.innerHTML = renderError('Invalid verification link.', 'This link does not correspond to any Chez document.');
     }
   } catch (err) {
     container.innerHTML = renderError('Unable to verify.', 'Please check your connection and try again.');
@@ -191,39 +229,39 @@ function renderSuccess(data) {
   });
   return '<div class="verify-card">' +
     '<div class="verify-icon success">&#10003;</div>' +
-    '<div class="verify-title">Verified Estate Planning Summary</div>' +
-    '<div class="verify-message">This document was generated through Haven and has not been tampered with.</div>' +
+    '<div class="verify-card-title">Verified estate planning summary</div>' +
+    '<div class="verify-card-message">This document was generated through Chez and has not been tampered with.</div>' +
     '<div class="verify-meta">' +
       '<div class="verify-meta-row"><span class="verify-meta-label">Household</span><span class="verify-meta-value">' + escapeHtml(data.household_name) + '</span></div>' +
       '<div class="verify-meta-row"><span class="verify-meta-label">Generated</span><span class="verify-meta-value">' + date + '</span></div>' +
-      (data.pdf_hash_truncated ? '<div class="verify-meta-row"><span class="verify-meta-label">Document hash</span><span class="verify-meta-value" style="font-family: monospace;">' + data.pdf_hash_truncated + '...</span></div>' : '') +
+      (data.pdf_hash_truncated ? '<div class="verify-meta-row"><span class="verify-meta-label">Document hash</span><span class="verify-meta-value" style="font-family: \'SF Mono\', Menlo, monospace;">' + data.pdf_hash_truncated + '...</span></div>' : '') +
       '<div class="verify-meta-row"><span class="verify-meta-label">Views remaining</span><span class="verify-meta-value">' + data.access_remaining + '</span></div>' +
     '</div>' +
-    '<div class="verify-note">This verification page does not provide access to the document itself.</div>' +
+    '<div class="verify-note">This verification page confirms the document was created by Chez. It does not provide access to the document itself.</div>' +
   '</div>';
 }
 
 function renderExpired(data) {
   return '<div class="verify-card">' +
     '<div class="verify-icon expired">&#9888;</div>' +
-    '<div class="verify-title">Link Expired</div>' +
-    '<div class="verify-message">' + escapeHtml(data.error) + '</div>' +
+    '<div class="verify-card-title">Link expired</div>' +
+    '<div class="verify-card-message">' + escapeHtml(data.error || 'This verification link has expired or reached its view limit.') + '</div>' +
   '</div>';
 }
 
 function renderRevoked() {
   return '<div class="verify-card">' +
     '<div class="verify-icon error">&#10007;</div>' +
-    '<div class="verify-title">Link Revoked</div>' +
-    '<div class="verify-message">This verification link has been revoked by the document owner.</div>' +
+    '<div class="verify-card-title">Link revoked</div>' +
+    '<div class="verify-card-message">This verification link has been revoked by the document owner.</div>' +
   '</div>';
 }
 
 function renderError(title, message) {
   return '<div class="verify-card">' +
     '<div class="verify-icon error">&#10007;</div>' +
-    '<div class="verify-title">' + escapeHtml(title) + '</div>' +
-    '<div class="verify-message">' + escapeHtml(message) + '</div>' +
+    '<div class="verify-card-title">' + escapeHtml(title) + '</div>' +
+    '<div class="verify-card-message">' + escapeHtml(message) + '</div>' +
   '</div>';
 }
 

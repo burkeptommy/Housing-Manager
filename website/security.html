@@ -3,447 +3,348 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Security | Haven</title>
-  <meta name="description" content="How Haven protects your family's most sensitive data. AES-256 encryption, row-level isolation, AI that never retains your documents, and biometric access controls.">
-  <meta property="og:title" content="Security | Haven">
-  <meta property="og:description" content="Your family's data deserves more than 'trust us.' See exactly how Haven protects every document, every conversation, every byte.">
-  <meta property="og:image" content="https://havenhome.dev/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://havenhome.dev/og-image.png">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23453A70'/%3E%3Ctext x='50' y='68' font-family='Georgia,serif' font-size='62' font-weight='bold' fill='%23F8F9FA' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <title>Security | Chez</title>
+  <meta name="description" content="How Chez protects your family's most sensitive data. AES-256-GCM encryption, row-level isolation, role-based document access, AI that never trains on your content, and biometric controls.">
+  <meta property="og:title" content="Security | Chez">
+  <meta property="og:description" content="Your home's data deserves more than 'trust us.' See exactly how Chez protects every document, every conversation, every byte.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://getchez.com/security.html">
+  <meta property="og:image" content="https://getchez.com/chez-logo.png">
+  <link rel="stylesheet" href="chez.css">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="chez-logo.png">
+  <style>
+    /* Page-specific: comparison table */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--white);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      font-family: var(--sans);
+    }
+    .compare-table thead th {
+      background: var(--indigo);
+      color: var(--white);
+      padding: 18px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .compare-table thead th.chez {
+      background: var(--salmon);
+    }
+    .compare-table tbody td {
+      padding: 16px;
+      border-top: 1px solid var(--neutral-200);
+      font-size: 14px;
+      color: var(--text-muted);
+      vertical-align: middle;
+    }
+    .compare-table tbody td:first-child {
+      font-weight: 500;
+      color: var(--text);
+    }
+    .compare-table tbody td.chez {
+      background: var(--salmon-50);
+      font-weight: 600;
+      color: var(--text);
+    }
+    .yes { color: var(--success); font-weight: 600; }
+    .partial { color: var(--warning); font-weight: 600; }
+    .no { color: var(--text-soft); }
+    .never-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 760px) {
+      .never-grid { grid-template-columns: 1fr; }
+      .compare-table { font-size: 13px; }
+      .compare-table thead th, .compare-table tbody td { padding: 12px 10px; }
+    }
+    .never-item {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-family: var(--sans);
+      font-size: 14px;
+      color: rgba(255,255,255,0.88);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .never-item::before {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--salmon);
+      flex-shrink: 0;
+      box-shadow: 0 0 0 4px rgba(237, 105, 85, 0.18);
+    }
+    .never-block {
+      background: var(--indigo);
+      border-radius: var(--radius-lg);
+      padding: 56px 48px;
+      color: var(--text-on-indigo);
+      position: relative;
+      overflow: hidden;
+    }
+    .never-block::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 80% 20%, rgba(237, 105, 85, 0.15), transparent 60%);
+      pointer-events: none;
+    }
+    .never-block-inner { position: relative; }
+    @media (max-width: 760px) { .never-block { padding: 40px 28px; } }
+  </style>
 </head>
 <body>
 
 <!-- NAV -->
-<nav>
+<nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="38" height="38">
-          <rect width="100" height="100" rx="22" fill="#453A70"/>
-          <text x="50" y="68" font-family="Georgia,serif" font-size="62" font-weight="bold" fill="#F8F9FA" text-anchor="middle">H</text>
-        </svg>
-      </div>
-      <span class="nav-logo-text">Haven</span>
+    <a href="/" class="nav-brand" aria-label="Chez home">
+      <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
+      <span>chez</span>
     </a>
     <div class="nav-links">
-      <a href="/#features" class="nav-link-text">Features</a>
-      <a href="security.html" class="nav-link-text" style="color: var(--navy); font-weight: 600;">Security</a>
-      <a href="https://testflight.apple.com/join/sw4xWsTA" class="nav-cta">Download Beta</a>
+      <a href="homeowners.html" class="nav-link nav-link-text-hide">Homeowners</a>
+      <a href="handymen.html" class="nav-link nav-link-text-hide">Handymen</a>
+      <a href="security.html" class="nav-link is-active nav-link-text-hide">Security</a>
+      <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-sm">Get the app</a>
     </div>
   </div>
 </nav>
 
-<!-- HERO -->
-<section class="security-hero">
-  <div class="container">
-    <div class="section-label">Security</div>
-    <h1>Your family's data deserves more than "trust us"</h1>
-    <p>Haven was designed from day one to protect the most sensitive information a family has: wills, insurance, financial accounts, medical documents. Here's exactly how we do it, and why it's stronger than the cloud storage you use today.</p>
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="page-hero-inner">
+    <span class="eyebrow eyebrow-on-indigo">Security</span>
+    <h1>Your home's data deserves more than "trust us."</h1>
+    <p class="lead">
+      Chez was designed from day one to protect the most sensitive information a household has: wills, financial accounts, medical documents, family records. Here's exactly how we do it — and why it's stronger than the cloud storage you're using today.
+    </p>
   </div>
 </section>
 
-<!-- SECURITY HIGHLIGHTS -->
-<div class="security-highlights">
+<!-- STAT ROW -->
+<section class="section-tight bg-pearl">
   <div class="container">
-    <div class="security-highlights-inner">
-      <div class="security-highlight">
-        <div class="security-highlight-num">AES-256</div>
-        <div class="security-highlight-label">Encryption at rest</div>
+    <div class="stat-row">
+      <div>
+        <span class="stat-num">AES-256</span>
+        <div class="stat-label">GCM ENCRYPTION AT REST</div>
       </div>
-      <div class="security-highlight">
-        <div class="security-highlight-num">TLS 1.3</div>
-        <div class="security-highlight-label">Encryption in transit</div>
+      <div>
+        <span class="stat-num">TLS 1.3</span>
+        <div class="stat-label">ENCRYPTION IN TRANSIT</div>
       </div>
-      <div class="security-highlight">
-        <div class="security-highlight-num">0</div>
-        <div class="security-highlight-label">Data retained by AI</div>
+      <div>
+        <span class="stat-num">0</span>
+        <div class="stat-label">CONTENT RETAINED BY AI</div>
       </div>
-      <div class="security-highlight">
-        <div class="security-highlight-num">100%</div>
-        <div class="security-highlight-label">Authenticated endpoints</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- SECURITY PROMISE -->
-<section style="padding-top: 64px; padding-bottom: 0;">
-  <div class="container">
-    <div class="security-promise">
-      <h2>More secure than Google Drive, Dropbox, or iCloud</h2>
-      <p>Most cloud storage encrypts your files, but anyone at the company with admin access can still see them. Haven adds row-level data isolation, household-scoped access controls, and AI that processes in isolation and discards immediately. Your documents are not just stored securely. They are architecturally inaccessible to anyone but you.</p>
-    </div>
-  </div>
-</section>
-
-<!-- HOW WE COMPARE -->
-<section class="comparison-section">
-  <div class="container">
-    <div class="section-header-center">
-      <div class="section-label">How we compare</div>
-      <h2 class="section-title">Haven vs. typical cloud storage</h2>
-      <p class="section-subtitle">Security isn't just encryption. It's architecture, access controls, and what happens with your data after you upload it.</p>
-    </div>
-
-    <!-- Desktop table -->
-    <table class="comparison-table desktop-only">
-      <thead>
-        <tr>
-          <th>Security Feature</th>
-          <th class="haven-col">Haven</th>
-          <th>Google Drive</th>
-          <th>Dropbox</th>
-          <th>iCloud</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Encryption at rest</td>
-          <td><span class="check-yes">AES-256</span></td>
-          <td><span class="check-yes">AES-256</span></td>
-          <td><span class="check-yes">AES-256</span></td>
-          <td><span class="check-yes">AES-256</span></td>
-        </tr>
-        <tr>
-          <td>Encryption in transit</td>
-          <td><span class="check-yes">TLS 1.3</span></td>
-          <td><span class="check-yes">TLS 1.3</span></td>
-          <td><span class="check-yes">TLS 1.2+</span></td>
-          <td><span class="check-yes">TLS 1.2+</span></td>
-        </tr>
-        <tr>
-          <td>Row-level data isolation</td>
-          <td><span class="check-yes">Yes</span></td>
-          <td><span class="check-no">No</span></td>
-          <td><span class="check-no">No</span></td>
-          <td><span class="check-no">No</span></td>
-        </tr>
-        <tr>
-          <td>Admin access to your files</td>
-          <td><span class="check-yes">None</span></td>
-          <td><span class="check-partial">Possible</span></td>
-          <td><span class="check-partial">Possible</span></td>
-          <td><span class="check-partial">Possible*</span></td>
-        </tr>
-        <tr>
-          <td>AI that discards data after use</td>
-          <td><span class="check-yes">Yes</span></td>
-          <td><span class="check-no">Retained</span></td>
-          <td><span class="check-no">N/A</span></td>
-          <td><span class="check-no">Retained</span></td>
-        </tr>
-        <tr>
-          <td>Per-document vault lock</td>
-          <td><span class="check-yes">Yes</span></td>
-          <td><span class="check-no">No</span></td>
-          <td><span class="check-partial">Add-on</span></td>
-          <td><span class="check-no">No</span></td>
-        </tr>
-        <tr>
-          <td>Biometric app lock</td>
-          <td><span class="check-yes">Yes</span></td>
-          <td><span class="check-no">No</span></td>
-          <td><span class="check-no">No</span></td>
-          <td><span class="check-partial">Device-level</span></td>
-        </tr>
-        <tr>
-          <td>Immutable audit log</td>
-          <td><span class="check-yes">Yes</span></td>
-          <td><span class="check-partial">Activity log</span></td>
-          <td><span class="check-partial">Events log</span></td>
-          <td><span class="check-no">No</span></td>
-        </tr>
-        <tr>
-          <td>Data used for ad targeting</td>
-          <td><span class="check-yes">Never</span></td>
-          <td><span class="check-partial">Metadata</span></td>
-          <td><span class="check-yes">No</span></td>
-          <td><span class="check-yes">No</span></td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- Mobile comparison cards -->
-    <div class="comparison-mobile mobile-only">
-      <div class="compare-row">
-        <div class="compare-feature">Row-level data isolation</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>Yes</strong></span>
-          <span class="compare-others">Others <strong>No</strong></span>
-        </div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-feature">Admin access to your files</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>None</strong></span>
-          <span class="compare-others">Others <strong>Possible</strong></span>
-        </div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-feature">AI discards data after use</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>Yes</strong></span>
-          <span class="compare-others">Others <strong>Retained</strong></span>
-        </div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-feature">Per-document vault lock</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>Yes</strong></span>
-          <span class="compare-others">Others <strong>No</strong></span>
-        </div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-feature">Biometric app lock</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>Yes</strong></span>
-          <span class="compare-others">Others <strong>No</strong></span>
-        </div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-feature">Immutable audit log</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>Yes</strong></span>
-          <span class="compare-others">Others <strong>Limited</strong></span>
-        </div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-feature">Data used for ad targeting</div>
-        <div class="compare-values">
-          <span class="compare-haven">Haven <strong>Never</strong></span>
-          <span class="compare-others">Others <strong>Possible</strong></span>
-        </div>
+      <div>
+        <span class="stat-num">100%</span>
+        <div class="stat-label">AUTHENTICATED ENDPOINTS</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- SECURITY GRID -->
-<section>
+<!-- PROMISE -->
+<section class="section bg-pearl">
+  <div class="container container-narrow" style="text-align: center;">
+    <span class="eyebrow">The promise</span>
+    <h2>More secure than Google Drive, Dropbox, or iCloud.</h2>
+    <p class="lead" style="margin-top: 18px;">Most cloud storage encrypts your files, but anyone at the company with admin access can still see them. Chez adds row-level data isolation, household-scoped access controls, role-based document visibility for staff, and AI that processes content in isolation. Your documents aren't just stored securely — they're architecturally inaccessible to anyone but you and the people you've explicitly invited.</p>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="section bg-white">
   <div class="container">
-    <div class="section-header-center">
-      <div class="section-label">Defense in depth</div>
-      <h2 class="section-title">Six layers of protection</h2>
-      <p class="section-subtitle">Every layer is independently secure. Even if one layer were compromised, the others keep your data protected.</p>
+    <div class="section-header">
+      <span class="eyebrow">How we compare</span>
+      <h2>Chez vs. typical cloud storage.</h2>
+      <p>Security isn't just encryption. It's architecture, access controls, and what happens with your data after you upload it.</p>
     </div>
 
-    <!-- Desktop: grid layout -->
-    <div class="security-grid desktop-only-grid" style="margin-top: 48px;">
+    <div style="overflow-x: auto;">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Security feature</th>
+            <th class="chez">Chez</th>
+            <th>Google Drive</th>
+            <th>Dropbox</th>
+            <th>iCloud</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Encryption at rest</td>
+            <td class="chez yes">AES-256-GCM</td>
+            <td class="yes">AES-256</td>
+            <td class="yes">AES-256</td>
+            <td class="yes">AES-256</td>
+          </tr>
+          <tr>
+            <td>Encryption in transit</td>
+            <td class="chez yes">TLS 1.3</td>
+            <td class="yes">TLS 1.3</td>
+            <td class="yes">TLS 1.2+</td>
+            <td class="yes">TLS 1.2+</td>
+          </tr>
+          <tr>
+            <td>Row-level data isolation</td>
+            <td class="chez yes">Yes</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Per-document role-based access for staff</td>
+            <td class="chez yes">Yes</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Per-document vault lock (biometric)</td>
+            <td class="chez yes">Yes</td>
+            <td class="no">No</td>
+            <td class="partial">Add-on</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Biometric app lock</td>
+            <td class="chez yes">Yes</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="partial">Device-level</td>
+          </tr>
+          <tr>
+            <td>AI never trained on your content</td>
+            <td class="chez yes">Yes</td>
+            <td class="partial">Limited</td>
+            <td class="no">N/A</td>
+            <td class="partial">Limited</td>
+          </tr>
+          <tr>
+            <td>Immutable access audit log</td>
+            <td class="chez yes">Yes</td>
+            <td class="partial">Activity log</td>
+            <td class="partial">Events log</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Data used for ad targeting</td>
+            <td class="chez yes">Never</td>
+            <td class="partial">Metadata</td>
+            <td class="yes">No</td>
+            <td class="yes">No</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
-      <div class="security-card animate-in">
-        <div class="sec-icon-box">
-          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        </div>
-        <h3>Encryption</h3>
-        <p>Every API call uses TLS 1.3. Database storage uses AES-256, the same standard used by banks. Optional vault lock adds an additional layer for your most sensitive documents.</p>
-        <ul>
-          <li>TLS 1.3 for all data in transit</li>
-          <li>AES-256 encryption at rest</li>
-          <li>Optional per-document vault lock</li>
-          <li>Secure key management with rotation</li>
-        </ul>
-      </div>
-
-      <div class="security-card animate-in">
-        <div class="sec-icon-box">
-          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><rect x="2" y="11" width="20" height="5" rx="1"/><rect x="2" y="18" width="14" height="3" rx="1"/></svg>
-        </div>
-        <h3>Architecture</h3>
-        <p>Row-level security on every table. Every query is scoped to your household. Cross-household access is architecturally impossible. Not just policy, but code.</p>
-        <ul>
-          <li>Row-level security on every table</li>
-          <li>Household-scoped data isolation</li>
-          <li>No cross-household access possible</li>
-          <li>Every endpoint requires authentication</li>
-        </ul>
-      </div>
-
-      <div class="security-card ai-card animate-in">
-        <div class="sec-icon-box">
-          <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/><line x1="9" y1="21" x2="15" y2="21"/><path d="M10 17v-2.26"/><path d="M14 17v-2.26"/></svg>
-        </div>
-        <h3>AI Privacy</h3>
-        <p>Alfred analyzes your documents in isolated, ephemeral processes. Content is immediately discarded. Nothing is stored, cached, or persisted. Never used to train AI models. Period.</p>
-        <ul>
-          <li>Analysis in isolated, ephemeral processes</li>
-          <li>Content discarded immediately after processing</li>
-          <li>Never used to train AI models</li>
-          <li>No third-party data sharing</li>
-          <li>AI context scoped to your household only</li>
-        </ul>
-      </div>
-
-      <div class="security-card animate-in">
-        <div class="sec-icon-box">
-          <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-        </div>
-        <h3>Access Controls</h3>
-        <p>Face ID and Touch ID for quick, secure access. Every document access is logged in an immutable audit trail that cannot be modified or deleted.</p>
-        <ul>
-          <li>Biometric authentication (Face ID / Touch ID)</li>
-          <li>Secure session management</li>
-          <li>Immutable access audit log</li>
-          <li>Secure password reset via email verification</li>
-        </ul>
-      </div>
-
-      <div class="security-card animate-in">
-        <div class="sec-icon-box">
-          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        </div>
-        <h3>Household Sharing</h3>
-        <p>Your spouse gets their own login with shared household access. Each person's Alfred chat history stays private. Invite codes expire after 30 days.</p>
-        <ul>
-          <li>Individual logins, shared household data</li>
-          <li>Private chat history per user</li>
-          <li>Invite codes with 30-day expiration</li>
-          <li>Merge confirmation required by both parties</li>
-        </ul>
-      </div>
-
-      <div class="security-card animate-in">
-        <div class="sec-icon-box">
-          <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        </div>
-        <h3>Device Security</h3>
-        <p>Tokens stored in the iOS Keychain, Apple's hardware-backed secure enclave. Biometric app lock keeps your data protected even on an unlocked phone.</p>
-        <ul>
-          <li>iOS Keychain for token storage</li>
-          <li>Biometric app lock</li>
-          <li>No sensitive data in local storage</li>
-          <li>Secure credential handling</li>
-        </ul>
-      </div>
-
-      <!-- What we don't do -->
-      <div class="dont-card animate-in">
-        <h3>What we will never do</h3>
-        <p>These aren't policies that can be changed with a terms update. They are architectural decisions baked into how Haven is built.</p>
-        <div class="dont-grid">
-          <div class="dont-item">Sell your data to anyone, ever</div>
-          <div class="dont-item">Share data with third parties</div>
-          <div class="dont-item">Show you advertisements</div>
-          <div class="dont-item">Use your documents for AI training</div>
-          <div class="dont-item">Store passwords in plain text</div>
-          <div class="dont-item">Access your data without authentication</div>
-          <div class="dont-item">Retain document content after AI analysis</div>
-          <div class="dont-item">Allow cross-household data access</div>
-          <div class="dont-item">Track your behavior for profiling</div>
-        </div>
-      </div>
-
+<!-- DEFENSE IN DEPTH -->
+<section class="section bg-pearl">
+  <div class="container">
+    <div class="section-header">
+      <span class="eyebrow">Defense in depth</span>
+      <h2>Seven layers of protection.</h2>
+      <p>Every layer is independently secure. Even if one were compromised, the others keep your data protected.</p>
     </div>
 
-    <!-- Mobile: carousel + static dont-card -->
-    <div class="security-mobile mobile-only" style="margin-top: 40px;">
-      <div class="security-carousel">
-        <div class="security-carousel-track">
-          <div class="security-card-mobile">
-            <div class="sec-icon-box">
-              <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-            </div>
-            <h3>Encryption</h3>
-            <p>TLS 1.3 in transit. AES-256 at rest. Optional per-document vault lock for your most sensitive files.</p>
-            <ul>
-              <li>TLS 1.3 for all data in transit</li>
-              <li>AES-256 encryption at rest</li>
-              <li>Optional per-document vault lock</li>
-              <li>Secure key management with rotation</li>
-            </ul>
-          </div>
-          <div class="security-card-mobile">
-            <div class="sec-icon-box">
-              <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><rect x="2" y="11" width="20" height="5" rx="1"/><rect x="2" y="18" width="14" height="3" rx="1"/></svg>
-            </div>
-            <h3>Architecture</h3>
-            <p>Row-level security on every table. Cross-household access is architecturally impossible.</p>
-            <ul>
-              <li>Row-level security on every table</li>
-              <li>Household-scoped data isolation</li>
-              <li>No cross-household access possible</li>
-              <li>Every endpoint requires authentication</li>
-            </ul>
-          </div>
-          <div class="security-card-mobile">
-            <div class="sec-icon-box">
-              <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
-            </div>
-            <h3>AI Privacy</h3>
-            <p>Documents analyzed in isolated processes. Content immediately discarded. Never used for AI training.</p>
-            <ul>
-              <li>Isolated, ephemeral processing</li>
-              <li>Content discarded immediately</li>
-              <li>Never used to train AI models</li>
-              <li>No third-party data sharing</li>
-            </ul>
-          </div>
-          <div class="security-card-mobile">
-            <div class="sec-icon-box">
-              <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-            </div>
-            <h3>Access Controls</h3>
-            <p>Face ID and Touch ID. Immutable audit trail on every document access.</p>
-            <ul>
-              <li>Biometric authentication</li>
-              <li>Secure session management</li>
-              <li>Immutable access audit log</li>
-              <li>Secure password reset</li>
-            </ul>
-          </div>
-          <div class="security-card-mobile">
-            <div class="sec-icon-box">
-              <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
-            </div>
-            <h3>Household Sharing</h3>
-            <p>Individual logins, shared data. Private chat history. 30-day invite codes.</p>
-            <ul>
-              <li>Individual logins, shared data</li>
-              <li>Private chat history per user</li>
-              <li>Invite codes with 30-day expiration</li>
-              <li>Merge confirmation required</li>
-            </ul>
-          </div>
-          <div class="security-card-mobile">
-            <div class="sec-icon-box">
-              <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            </div>
-            <h3>Device Security</h3>
-            <p>iOS Keychain token storage. Biometric app lock. No sensitive data in local storage.</p>
-            <ul>
-              <li>iOS Keychain for token storage</li>
-              <li>Biometric app lock</li>
-              <li>No sensitive data in local storage</li>
-              <li>Secure credential handling</li>
-            </ul>
-          </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         </div>
-        <div class="security-carousel-dots">
-          <span class="sec-dot active"></span>
-          <span class="sec-dot"></span>
-          <span class="sec-dot"></span>
-          <span class="sec-dot"></span>
-          <span class="sec-dot"></span>
-          <span class="sec-dot"></span>
-        </div>
+        <h4>Encryption</h4>
+        <p>Every API call uses TLS 1.3. Database storage uses AES-256-GCM. Optional vault lock adds an additional biometric layer for your most sensitive documents.</p>
       </div>
 
-      <div class="dont-card" style="margin-top: 24px;">
-        <h3>What we will never do</h3>
-        <p>Architectural decisions, not policies.</p>
-        <div class="dont-grid">
-          <div class="dont-item">Sell your data to anyone, ever</div>
-          <div class="dont-item">Share data with third parties</div>
-          <div class="dont-item">Show you advertisements</div>
-          <div class="dont-item">Use your documents for AI training</div>
-          <div class="dont-item">Store passwords in plain text</div>
-          <div class="dont-item">Access data without authentication</div>
-          <div class="dont-item">Retain content after AI analysis</div>
-          <div class="dont-item">Allow cross-household access</div>
-          <div class="dont-item">Track behavior for profiling</div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><rect x="2" y="11" width="20" height="5" rx="1"/><rect x="2" y="18" width="14" height="3" rx="1"/></svg>
+        </div>
+        <h4>Architecture</h4>
+        <p>Row-level security on every table in the database. Every query is scoped to your household. Cross-household access is architecturally impossible — not just policy, but enforced in code.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon salmon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
+        </div>
+        <h4>AI Privacy</h4>
+        <p>Alfred analyzes your documents in isolated, ephemeral processes. Content is processed in-session and never stored beyond it. Anthropic does not train models on your API content. AI context is scoped to your household only.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h4>Access Controls</h4>
+        <p>Face ID and Touch ID for quick, secure access. Every document access is logged in an immutable audit trail. Sessions short-lived; refresh handled transparently.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
+        </div>
+        <h4>Household Sharing</h4>
+        <p>Your spouse gets their own login with shared household access. Each person's Alfred chat history stays private. Invite codes are tokenized and expire after 30 days.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon salmon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 6V4a4 4 0 018 0v2"/><circle cx="12" cy="13" r="2"/></svg>
+        </div>
+        <h4>Home Manager Role</h4>
+        <p>Property staff get their own Chez login with permissions scoped to home operations only. They can manage tasks, systems, and vendors — they never see your will, financials, or medical documents. Enforced server-side via row-level security.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+        <h4>Device Security</h4>
+        <p>Auth tokens stored in the iOS Keychain — Apple's hardware-backed secure enclave. Biometric app lock keeps your data protected even on an unlocked phone. Screenshot prevention on sensitive screens. Jailbreak detection with user warning.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT WE NEVER DO -->
+<section class="section bg-pearl">
+  <div class="container">
+    <div class="never-block">
+      <div class="never-block-inner">
+        <span class="eyebrow eyebrow-on-indigo">Architectural commitments</span>
+        <h2 style="color: var(--text-on-indigo); margin-bottom: 16px;">What Chez will never do.</h2>
+        <p style="color: rgba(255,255,255,0.78); margin-bottom: 32px; max-width: 720px; font-size: 17px;">These aren't policies that change with a terms update. They're architectural decisions baked into how Chez is built.</p>
+        <div class="never-grid">
+          <div class="never-item">Sell your data to anyone, ever</div>
+          <div class="never-item">Share data with third parties</div>
+          <div class="never-item">Show you advertisements</div>
+          <div class="never-item">Train AI on your documents</div>
+          <div class="never-item">Store passwords in plain text</div>
+          <div class="never-item">Access your data without auth</div>
+          <div class="never-item">Allow cross-household access</div>
+          <div class="never-item">Track your behavior for profiling</div>
+          <div class="never-item">Reveal docs to staff you didn't share</div>
         </div>
       </div>
     </div>
@@ -451,153 +352,142 @@
 </section>
 
 <!-- ARCHITECTURE OVERVIEW -->
-<section class="steps-section">
+<section class="section bg-white">
   <div class="container">
-    <div class="section-header-center">
-      <div class="section-label">How it works</div>
-      <h2 class="section-title">Your data's journey through Haven</h2>
-      <p class="section-subtitle">From the moment you upload a document to the moment Alfred answers your question, here's what happens.</p>
+    <div class="section-header">
+      <span class="eyebrow">How it works</span>
+      <h2>Your data's journey through Chez.</h2>
+      <p>From the moment you upload a document to the moment Alfred answers your question, here's what happens.</p>
     </div>
 
-    <div class="arch-grid">
-      <div class="arch-card animate-in">
-        <div class="arch-num">1</div>
-        <div class="arch-label">Upload</div>
-        <p>Your document is encrypted with TLS 1.3 during upload, then stored with AES-256 encryption in Google Cloud Storage. The file is tagged to your household and inaccessible to any other account.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 20px;">1</div>
+        <h4>Upload</h4>
+        <p>Your document is encrypted with TLS 1.3 in transit, then stored with AES-256-GCM at rest. The file is tagged to your household. Row-level security means it's inaccessible to any other household, account, or — for sensitive categories — staff role.</p>
       </div>
-      <div class="arch-card animate-in">
-        <div class="arch-num">2</div>
-        <div class="arch-label">Analysis</div>
-        <p>Alfred reads your document in an isolated, ephemeral process. It extracts dates, identifies the type, and returns structured data. The document content is immediately discarded from AI memory. Nothing is cached.</p>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 20px;">2</div>
+        <h4>Analysis</h4>
+        <p>Alfred reads your document in an isolated, ephemeral process. It extracts dates, identifies the type, and returns structured data. Anthropic does not train models on your API content. The structured result lands in your encrypted record.</p>
       </div>
-      <div class="arch-card animate-in">
-        <div class="arch-num">3</div>
-        <div class="arch-label">Storage</div>
-        <p>Only the extracted metadata (dates, type, summary) is stored alongside your encrypted file. When you ask Alfred a question, it references this metadata, never re-reading the full document through AI.</p>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: var(--indigo); color: var(--white); font-family: var(--serif); font-weight: 600; font-size: 20px;">3</div>
+        <h4>Storage & retrieval</h4>
+        <p>Extracted metadata is stored alongside your encrypted file. When you ask Alfred a question, it references the metadata — never re-reading the full document unless you explicitly attach it. Every access logged immutably.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ESTATE DOCUMENT SECURITY -->
-<section class="security-section">
+<section class="section bg-pearl">
   <div class="container">
-    <div class="section-label">Estate Documents</div>
-    <h2>Estate Document Security</h2>
-    <p>Estate planning documents are among the most sensitive in your household. Haven applies additional protections to ensure they remain private and secure.</p>
+    <div class="section-header">
+      <span class="eyebrow">Estate documents</span>
+      <h2>The most sensitive documents get the strongest protection.</h2>
+      <p>Estate planning documents are among the most sensitive in your household. Chez applies additional safeguards to wills, trusts, POAs, and the data extracted from them.</p>
+    </div>
 
-    <div class="security-grid" style="margin-top: 32px;">
-      <div class="security-card">
-        <div class="security-icon">&#128274;</div>
-        <h3>No PII Collection</h3>
-        <p>Haven never collects Social Security numbers, full account numbers, or precise financial balances. Only ranges and categories are stored.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        </div>
+        <h4>No PII collection</h4>
+        <p>Chez never collects Social Security numbers, full account numbers, or precise financial balances. Only ranges and categories are stored.</p>
       </div>
-      <div class="security-card">
-        <div class="security-icon">&#128279;</div>
-        <h3>Expiring Verification Links</h3>
-        <p>Attorney handoff uses expiring links: 3-use limit, 7-day expiry. Links are sent from your own email, never from Haven servers.</p>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h4>Expiring verification links</h4>
+        <p>Attorney handoff PDFs use tokenized links: 3-use limit, 7-day expiry. Verifiable at getchez.com/verify. Revocable from the app.</p>
       </div>
-      <div class="security-card">
-        <div class="security-icon">&#128272;</div>
-        <h3>AES-256-GCM Encryption</h3>
-        <p>Exported estate PDFs are encrypted with AES-256-GCM before storage. Only authenticated sessions can decrypt them.</p>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <h4>AES-256-GCM PDF encryption</h4>
+        <p>Exported estate PDFs are encrypted before storage. Only authenticated sessions or valid verification tokens can decrypt them.</p>
       </div>
-      <div class="security-card">
-        <div class="security-icon">&#128203;</div>
-        <h3>IP-Hashed Access Logging</h3>
-        <p>Every access to a shared estate document is logged with a hashed IP address. Full audit trail available in the app.</p>
+      <div class="feature-card">
+        <div class="feature-icon salmon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        <h4>IP-hashed access logging</h4>
+        <p>Every access to a shared estate document is logged with a hashed IP address. Full audit trail visible in the app.</p>
       </div>
-      <div class="security-card">
-        <div class="security-icon">&#9940;</div>
-        <h3>One-Tap Revocation</h3>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+        <h4>One-tap revocation</h4>
         <p>Revoke any shared estate link instantly from the app. Once revoked, the link can never be used again.</p>
       </div>
-      <div class="security-card">
-        <div class="security-icon">&#128101;</div>
-        <h3>No Third-Party Sharing</h3>
-        <p>Haven never shares estate data with third parties. AI analysis happens server-side and is never stored beyond the session.</p>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+        <h4>No third-party sharing</h4>
+        <p>Chez never shares estate data with third parties. AI analysis happens server-side and is never persisted beyond the session.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- CONTACT CTA -->
-<section class="cta-section" style="padding-top: 48px;">
-  <div class="container">
+<section class="section bg-white">
+  <div class="container container-narrow" style="text-align: center;">
+    <span class="eyebrow">Direct line</span>
     <h2>Have a security question?</h2>
-    <p>We take this seriously. If you have questions about how your data is handled, reach out and we'll give you a straight answer.</p>
-    <a href="mailto:support@havenhome.dev" class="hero-cta">
-      support@havenhome.dev
-    </a>
+    <p class="lead" style="margin-top: 18px;">We take this seriously. If you have questions about how your data is handled, reach out and we'll give you a straight answer.</p>
+    <div style="margin-top: 36px;">
+      <a href="mailto:tom@getchez.com" class="btn btn-indigo btn-lg">tom@getchez.com</a>
+    </div>
   </div>
 </section>
 
 <!-- FOOTER -->
-<footer>
+<footer class="footer">
   <div class="footer-inner">
-    <div class="footer-brand">
-      <div class="footer-brand-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="34" height="34">
-          <rect width="100" height="100" rx="22" fill="rgba(255,255,255,0.15)"/>
-          <text x="50" y="68" font-family="Georgia,serif" font-size="62" font-weight="bold" fill="rgba(255,255,255,0.8)" text-anchor="middle">H</text>
-        </svg>
+    <div class="footer-grid">
+      <div class="footer-brand-block">
+        <a href="/" class="nav-brand">
+          <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
+          <span>chez</span>
+        </a>
+        <p>Your home, organized. The iOS app for high-net-worth homeowners and the platform for the handymen who serve them.</p>
       </div>
-      <span class="footer-brand-name">Haven</span>
+      <div class="footer-col">
+        <h5>Product</h5>
+        <ul>
+          <li><a href="homeowners.html">For Homeowners</a></li>
+          <li><a href="handymen.html">For Handymen</a></li>
+          <li><a href="https://testflight.apple.com/join/sw4xWsTA">Join Beta</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Trust</h5>
+        <ul>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="mailto:tom@getchez.com">Contact</a></li>
+        </ul>
+      </div>
     </div>
-    <div class="footer-links">
-      <a href="/">Home</a>
-      <a href="security.html">Security</a>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
-      <a href="mailto:support@havenhome.dev">Contact</a>
-      <a href="https://testflight.apple.com/join/sw4xWsTA">TestFlight</a>
+    <div class="footer-bottom">
+      <span>© 2026 Chez. All rights reserved.</span>
+      <span>Made with care for the people who keep their homes well.</span>
     </div>
   </div>
-  <p class="footer-copy">&copy; 2026 Haven Home. All rights reserved.</p>
 </footer>
-
-<script>
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach((entry, index) => {
-    if (entry.isIntersecting) {
-      setTimeout(() => { entry.target.classList.add('visible'); }, index * 80);
-      observer.unobserve(entry.target);
-    }
-  });
-}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
-
-// Security carousel
-(function() {
-  const track = document.querySelector('.security-carousel-track');
-  const dots = document.querySelectorAll('.sec-dot');
-  const cards = track ? track.querySelectorAll('.security-card-mobile') : [];
-  if (!track || !dots.length || !cards.length) return;
-
-  function updateDots(index) {
-    dots.forEach((d, i) => d.classList.toggle('active', i === index));
-  }
-
-  track.addEventListener('scroll', function() {
-    const scrollCenter = track.scrollLeft + track.offsetWidth / 2;
-    let closest = 0, closestDist = Infinity;
-    cards.forEach((card, i) => {
-      const cardCenter = card.offsetLeft - track.offsetLeft + card.offsetWidth / 2;
-      const dist = Math.abs(scrollCenter - cardCenter);
-      if (dist < closestDist) { closestDist = dist; closest = i; }
-    });
-    updateDots(closest);
-  });
-
-  dots.forEach((dot, i) => {
-    dot.addEventListener('click', () => {
-      const cardLeft = cards[i].offsetLeft;
-      const cardWidth = cards[i].offsetWidth;
-      track.scrollTo({ left: cardLeft - (track.offsetWidth / 2) + (cardWidth / 2), behavior: 'smooth' });
-    });
-  });
-})();
-</script>
 
 </body>
 </html>
