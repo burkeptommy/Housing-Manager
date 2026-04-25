@@ -6,7 +6,7 @@
   <rect x="64" y="28" width="6" height="10" rx="1" fill="#ED6955"/>
   <!-- Lowercase serif c -->
   <text x="50" y="84"
-        font-family="Fraunces, Georgia, 'Times New Roman', serif"
+        font-family="ui-serif, 'New York', Georgia, 'Times New Roman', serif"
         font-size="62"
         font-weight="500"
         fill="#FFFFFF"

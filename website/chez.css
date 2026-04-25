@@ -1,10 +1,13 @@
 /* Chez — Cosmic Indigo + Deepened Salmon + Pearl White
  * Brand stylesheet, ground-up rebuild for the getchez.com rebrand.
- * Colors mirror the iOS app's design tokens. Fraunces (display) + Inter (body)
- * mirror the iOS typography stack.
+ * Colors mirror the iOS app's design tokens. New York serif + SF Pro sans
+ * mirror the iOS typography stack (Phase 56.3 in the app).
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+/* No web font import — use the OS system fonts.
+ * iOS/macOS visitors see New York (serif) + SF Pro (sans), matching the app.
+ * Other platforms use their native serif/system stack, which feels more
+ * native than forcing a Google Font on everyone. */
 
 :root {
   /* Surface */
@@ -54,9 +57,12 @@
   --radius-lg: 24px;
   --radius-xl: 32px;
 
-  /* Type */
-  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  /* Type — match the iOS app (Phase 56.3: New York serif + SF Pro sans).
+   * `ui-serif` resolves to New York on iOS/macOS and the OS default serif
+   * elsewhere. The sans stack hits SF Pro on Apple devices and clean
+   * system fonts on everything else. No Google Fonts, no clipping. */
+  --serif: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
 
   /* Shadow — indigo-tinted, never pure black */
   --shadow-sm: 0 1px 2px rgba(42, 34, 82, 0.06), 0 1px 3px rgba(42, 34, 82, 0.04);
@@ -97,7 +103,6 @@ h1, h2, h3, h4, h5 {
   letter-spacing: -0.018em;
   color: var(--text);
   line-height: 1.15;
-  font-variation-settings: "opsz" 144;
 }
 
 h1 {
@@ -243,7 +248,6 @@ p.lead {
   color: var(--indigo);
   letter-spacing: -0.02em;
   text-decoration: none;
-  font-variation-settings: "opsz" 144;
 }
 
 .nav-brand-mark {
@@ -1147,7 +1151,6 @@ p.lead {
   font-family: var(--serif);
   font-weight: 600;
   font-size: 18px;
-  font-variation-settings: "opsz" 144;
 }
 
 .testflight-badge-text {
