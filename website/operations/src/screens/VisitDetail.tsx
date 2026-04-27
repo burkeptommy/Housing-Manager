@@ -5,7 +5,7 @@ import { Pill, type PillTone } from "../components/chrome/Pill";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { useWorkspace } from "../lib/workspace-context";
-import { formatCurrency, formatRelativeTime, formatTime12h, parsePunchList, postProviderAction } from "../lib/api";
+import { categorizePunchList, formatCurrency, formatRelativeTime, formatTime12h, parsePunchList, postProviderAction, type PunchListItem } from "../lib/api";
 import type { RequestStatus, VisitRow } from "../lib/types";
 
 export default function VisitDetailScreen() {
@@ -16,6 +16,7 @@ export default function VisitDetailScreen() {
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showReschedule, setShowReschedule] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
 
   const visit = useMemo(() => {
     if (!dashboard || !requestId) return null;
@@ -41,6 +42,12 @@ export default function VisitDetailScreen() {
 
   // Punch list parsed from the linked maintenance_task's notes.
   const punchList = useMemo(() => parsePunchList(visit?.visit?.notes), [visit?.visit?.notes]);
+  // Grouped by physical work zone so the handyman can do all the
+  // exterior in one pass, all the safety checks in one pass, etc.
+  const categorizedPunch = useMemo(() => categorizePunchList(punchList), [punchList]);
+  // Long visits are easier to manage as two — surface the split CTA
+  // by default at 8+ items.
+  const punchIsLong = punchList.length >= 8;
 
   if (!dashboard) return null;
   if (!visit) {
@@ -227,52 +234,104 @@ export default function VisitDetailScreen() {
             )}
           </Card>
 
-          {/* Punch list (parsed from the linked maintenance task's notes) */}
+          {/* Punch list — grouped by work zone so the tech doesn't double back. */}
           {punchList.length > 0 && (
             <Card padding="default">
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-                <div className="ops-section-label">Punch list ({punchList.length})</div>
-                <button
-                  onClick={openQuoteForVisit}
-                  style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                >
-                  + Pre-fill quote from these
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {punchList.map((item, i) => (
-                  <div
-                    key={item.id}
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
+                <div className="ops-section-label">
+                  Punch list ({punchList.length}) · grouped by zone
+                </div>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => setShowSplit(true)}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "10px 0",
-                      borderBottom: i < punchList.length - 1 ? "1px solid var(--neutral-200)" : "none",
+                      background: "none", border: "none",
+                      color: punchIsLong ? "var(--salmon-dark)" : "var(--indigo)",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
                     }}
                   >
-                    <div
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        border: "1.7px solid var(--neutral-300)",
-                        flex: "none",
-                      }}
-                    />
-                    <div style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{item.title}</div>
-                    {item.estimatedMinutes != null && (
-                      <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
-                        ~{item.estimatedMinutes} min
-                      </span>
-                    )}
+                    {punchIsLong ? "↗ Long list — split into two visits?" : "Split into two visits"}
+                  </button>
+                  <button
+                    onClick={openQuoteForVisit}
+                    style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    + Pre-fill quote from these
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
+                {categorizedPunch.map((group) => (
+                  <div key={group.category.id}>
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      paddingBottom: 6, marginBottom: 6,
+                      borderBottom: "1px solid var(--neutral-200)",
+                    }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+                        textTransform: "uppercase", color: "var(--indigo)",
+                      }}>
+                        {group.category.label} · {group.items.length}
+                      </div>
+                      {group.totalMinutes > 0 && (
+                        <div style={{ fontSize: 11, color: "var(--text-soft)", fontWeight: 500 }}>
+                          ~{group.totalMinutes} min total
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {group.items.map((item, i) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            padding: "8px 0",
+                            borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 22, height: 22, borderRadius: "50%",
+                              border: "1.7px solid var(--neutral-300)", flex: "none",
+                            }}
+                          />
+                          <div style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{item.title}</div>
+                          {item.estimatedMinutes != null && (
+                            <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
+                              ~{item.estimatedMinutes} min
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop: 12, fontSize: 11.5, color: "var(--text-muted)" }}>
-                These items came from the homeowner's punch list. Check them off in Chez Field on the day of the visit.
+
+              <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--text-muted)" }}>
+                Items grouped by work zone so you can knock out everything in one area before moving on.
+                Check them off in Chez Field on the day of the visit.
               </div>
             </Card>
+          )}
+
+          {/* Split-visit modal */}
+          {showSplit && visit && (
+            <SplitVisitModal
+              originalRequestId={visit.requestId}
+              originalTitle={visit.title}
+              workspaceId={dashboard.workspace.id}
+              items={punchList}
+              onClose={() => setShowSplit(false)}
+              onSplit={async () => {
+                setShowSplit(false);
+                await refresh();
+              }}
+            />
           )}
 
           {/* AI time estimate */}
@@ -692,6 +751,243 @@ function RescheduleModal({
             <button className="ops-button ops-button--salmon" onClick={submit} disabled={submitting}>
               {submitting ? "Sending…" : "Send proposal"}
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Split visit modal ──────────────────────────────────────────
+//
+// Lets the handyman peel items off the current visit into a brand-new
+// follow-up visit. Default selection is empty — the handyman ticks
+// the items they want to push to the second visit, picks a target
+// date, and we POST split_visit_punch_list. The edge function
+// creates a new handyman_request + maintenance_task and rewrites
+// the original task's notes to drop the moved items.
+
+function SplitVisitModal({
+  originalRequestId,
+  originalTitle,
+  workspaceId,
+  items,
+  onClose,
+  onSplit,
+}: {
+  originalRequestId: string;
+  originalTitle: string;
+  workspaceId: string;
+  items: PunchListItem[];
+  onClose: () => void;
+  onSplit: () => void | Promise<void>;
+}) {
+  const [moved, setMoved] = useState<Set<string>>(new Set());
+  const [followUpDate, setFollowUpDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  });
+  const [followUpTitle, setFollowUpTitle] = useState(`${originalTitle} — follow-up`);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Group the items so the handyman picks by zone, not by random order
+  const grouped = useMemo(() => categorizePunchList(items), [items]);
+
+  function toggle(id: string) {
+    setMoved((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function moveAllInGroup(groupItems: PunchListItem[]) {
+    setMoved((prev) => {
+      const next = new Set(prev);
+      const allMoved = groupItems.every((i) => next.has(i.id));
+      for (const item of groupItems) {
+        if (allMoved) next.delete(item.id);
+        else next.add(item.id);
+      }
+      return next;
+    });
+  }
+
+  async function submit() {
+    if (moved.size === 0) {
+      alert("Pick at least one item to move to the follow-up visit.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const titles = items.filter((i) => moved.has(i.id)).map((i) => i.title);
+      await postProviderAction("split_visit_punch_list", {
+        workspaceId,
+        requestId: originalRequestId,
+        movedTitles: titles,
+        followUpTitle: followUpTitle.trim() || `${originalTitle} — follow-up`,
+        followUpDate: followUpDate || undefined,
+      });
+      await onSplit();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't split the visit.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const movedCount = moved.size;
+  const remainingCount = items.length - movedCount;
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 60,
+        background: "rgba(42, 34, 82, 0.45)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={() => !submitting && onClose()}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: 18, width: "min(640px, 95vw)",
+          maxHeight: "88vh", overflowY: "auto",
+          boxShadow: "0 24px 60px rgba(42, 34, 82, 0.4)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ padding: 24, borderBottom: "1px solid var(--neutral-200)" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-soft)", marginBottom: 6 }}>
+            Split visit
+          </div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.018em" }}>
+            Move some items to a follow-up visit
+          </div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+            Tick anything that won't fit in this visit. We'll create a second visit on the date you pick and message the homeowner.
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          {grouped.map((group) => {
+            const allMoved = group.items.every((i) => moved.has(i.id));
+            return (
+              <div key={group.category.id}>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  paddingBottom: 6, marginBottom: 6,
+                  borderBottom: "1px solid var(--neutral-200)",
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+                    textTransform: "uppercase", color: "var(--indigo)",
+                  }}>
+                    {group.category.label} · {group.items.length}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => moveAllInGroup(group.items)}
+                    style={{
+                      background: "none", border: "none",
+                      color: "var(--salmon-dark)", fontSize: 11.5, fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {allMoved ? "Keep all in this visit" : "Move all to follow-up"}
+                  </button>
+                </div>
+                {group.items.map((item) => {
+                  const isMoved = moved.has(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        padding: "8px 0",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isMoved}
+                        onChange={() => toggle(item.id)}
+                        style={{ width: 18, height: 18, accentColor: "var(--salmon)", flexShrink: 0 }}
+                      />
+                      <span style={{
+                        flex: 1, fontSize: 13.5,
+                        color: isMoved ? "var(--text-muted)" : "var(--text)",
+                        textDecoration: isMoved ? "line-through" : "none",
+                      }}>
+                        {item.title}
+                      </span>
+                      {item.estimatedMinutes != null && (
+                        <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
+                          ~{item.estimatedMinutes} min
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--neutral-200)", background: "var(--cream)" }}>
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-soft)", marginBottom: 4 }}>
+                Follow-up title
+              </div>
+              <input
+                type="text"
+                value={followUpTitle}
+                onChange={(e) => setFollowUpTitle(e.target.value)}
+                style={{
+                  width: "100%", padding: "10px 12px",
+                  border: "1px solid var(--neutral-200)", borderRadius: 10,
+                  background: "#fff", fontSize: 13, fontFamily: "var(--sans)",
+                  color: "var(--text)",
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-soft)", marginBottom: 4 }}>
+                Target date
+              </div>
+              <input
+                type="date"
+                value={followUpDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setFollowUpDate(e.target.value)}
+                style={{
+                  padding: "10px 12px",
+                  border: "1px solid var(--neutral-200)", borderRadius: 10,
+                  background: "#fff", fontSize: 13, fontFamily: "var(--sans)",
+                  color: "var(--text)",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+              <strong style={{ color: "var(--text)" }}>{remainingCount}</strong> stay in this visit ·{" "}
+              <strong style={{ color: "var(--salmon-dark)" }}>{movedCount}</strong> move to follow-up
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="ops-button ops-button--ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+              <button
+                className="ops-button ops-button--salmon"
+                onClick={submit}
+                disabled={submitting || movedCount === 0}
+              >
+                {submitting ? "Splitting…" : `Schedule follow-up visit (${movedCount})`}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -2558,6 +2558,210 @@ async function deleteHomeSystemPhotoForProvider(
 }
 
 /**
+ * Split a visit's punch list into two visits. The provider hand-picks
+ * which items should move to a follow-up; we trim those lines from
+ * the original maintenance_task's notes, create a brand-new
+ * maintenance_task + handyman_request for the follow-up with just the
+ * moved items, and drop a system message in the original thread so
+ * the homeowner sees what happened.
+ */
+async function splitVisitPunchList(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canAssignWork");
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const movedTitles = Array.isArray(body.movedTitles)
+    ? (body.movedTitles as unknown[]).map(compactString).filter(Boolean)
+    : [];
+  if (movedTitles.length === 0) throw new Error("Pick at least one item to move");
+
+  const followUpTitle = compactString(body.followUpTitle) || "Follow-up visit";
+  const followUpDate = compactString(body.followUpDate) || null;
+
+  // Fetch the original request + verify the workspace owns it via the
+  // contractor link.
+  const { data: original, error: originalError } = await service
+    .from("handyman_requests")
+    .select("id, household_id, property_id, contractor_id, visit_task_id, title, request_type, urgency, recommended_lane")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (originalError) throw originalError;
+  if (!original) throw new Error("Visit not found");
+
+  const contractorId = compactString(original.contractor_id);
+  if (contractorId) {
+    const { data: link } = await service
+      .from("provider_contractor_links")
+      .select("workspace_id")
+      .eq("workspace_id", workspaceId)
+      .eq("contractor_id", contractorId)
+      .maybeSingle();
+    if (!link) throw new Error("This visit isn't on your books");
+  }
+
+  const householdId = compactString(original.household_id);
+  const propertyId = compactString(original.property_id);
+  const originalTaskId = compactString(original.visit_task_id);
+  if (!householdId || !propertyId || !originalTaskId) {
+    throw new Error("Visit is missing the linked maintenance task");
+  }
+
+  // Fetch the linked maintenance_task to read + rewrite notes.
+  const { data: originalTask, error: taskError } = await service
+    .from("maintenance_tasks")
+    .select("id, notes, title, scheduled_date, priority")
+    .eq("id", originalTaskId)
+    .maybeSingle();
+  if (taskError) throw taskError;
+  if (!originalTask) throw new Error("Linked task not found");
+
+  const originalNotes = compactString(originalTask.notes);
+
+  // Partition the notes lines: anything whose cleaned title is in
+  // movedTitles moves; everything else stays. We preserve the original
+  // header/preamble lines (anything before the first list item) as-is
+  // on the staying side.
+  const lines = originalNotes.split(/\r?\n/);
+  const moved: string[] = [];
+  const staying: string[] = [];
+  const movedSet = new Set(movedTitles.map((t) => t.toLowerCase().trim()));
+
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      staying.push(raw);
+      continue;
+    }
+    // Strip bullet/number prefix + any trailing duration marker so the
+    // cleaned title matches what the React side sent.
+    let working = trimmed;
+    for (const prefix of ["- ", "• ", "* "]) {
+      if (working.startsWith(prefix)) {
+        working = working.slice(prefix.length);
+        break;
+      }
+    }
+    const numericMatch = working.match(/^(\d+)[.)]\s+/);
+    if (numericMatch) working = working.slice(numericMatch[0].length);
+
+    const cleaned = working
+      .replace(/\s*\(~?\d+\s*min\)\s*$/i, "")
+      .replace(/\s*~\d+\s*min\s*$/i, "")
+      .replace(/\s*[·•\-]\s*~?\d+\s*min\s*$/i, "")
+      .replace(/\s*\d+\s*min\s*$/i, "")
+      .trim();
+
+    if (cleaned && movedSet.has(cleaned.toLowerCase())) {
+      moved.push(raw); // preserve the original line shape (bullet, duration)
+    } else {
+      staying.push(raw);
+    }
+  }
+
+  if (moved.length === 0) {
+    throw new Error("Couldn't match any of the moved items in the notes");
+  }
+
+  // Update the original task's notes with only the staying items.
+  const stayingNotes = staying.join("\n").trimEnd();
+  const { error: trimError } = await service
+    .from("maintenance_tasks")
+    .update({ notes: stayingNotes, updated_at: isoNow() })
+    .eq("id", originalTaskId);
+  if (trimError) throw trimError;
+
+  // Create the new follow-up task with the moved items as notes. Lead
+  // with a "Punch list:" header so the parser picks it up cleanly on
+  // both sides.
+  const followUpNotes = ["Punch list:", ...moved].join("\n");
+  const { data: newTask, error: newTaskError } = await service
+    .from("maintenance_tasks")
+    .insert({
+      property_id: propertyId,
+      household_id: householdId,
+      title: followUpTitle,
+      description: null,
+      frequency: "Once",
+      next_due_date: followUpDate || null,
+      scheduled_date: followUpDate || null,
+      priority: compactString(originalTask.priority) || "Medium",
+      assigned_contractor_id: contractorId || null,
+      notes: followUpNotes,
+      assignment_type: "vendor",
+      needs_vendor: false,
+      assigned_route: "handyman",
+      service_key: "handyman:visit-split",
+    })
+    .select("id")
+    .single();
+  if (newTaskError || !newTask) throw newTaskError ?? new Error("Could not create follow-up task");
+
+  // Create the new request, mirroring the original's metadata.
+  const { data: newRequest, error: newRequestError } = await service
+    .from("handyman_requests")
+    .insert({
+      household_id: householdId,
+      property_id: propertyId,
+      contractor_id: contractorId || null,
+      visit_task_id: compactString(newTask.id),
+      created_by_user_id: userId,
+      request_type: compactString(original.request_type) || "standard_visit",
+      source: "provider_split",
+      title: followUpTitle,
+      details: null,
+      preferred_timing: followUpDate || null,
+      urgency: compactString(original.urgency) || "routine",
+      status: "submitted",
+      first_visit_setup_requested: false,
+      recommended_lane: compactString(original.recommended_lane) || "handyman",
+      quick_upsell_titles: [],
+    })
+    .select()
+    .single();
+  if (newRequestError || !newRequest) throw newRequestError ?? new Error("Could not create follow-up visit");
+
+  // Drop a system message in the original thread so the homeowner
+  // sees what happened (and a confirmation in the new thread). Use
+  // the existing "vendor" sender_role so RLS + display layer treat
+  // it like a normal vendor message.
+  const movedSummary = `${moved.length} item${moved.length === 1 ? "" : "s"} moved to a follow-up visit${followUpDate ? ` on ${followUpDate}` : ""}.`;
+  await service.from("handyman_request_messages").insert([
+    {
+      request_id: requestId,
+      household_id: householdId,
+      sender_role: "vendor",
+      sender_user_id: userId,
+      body: `Split this visit: ${movedSummary} The follow-up is now its own thread.`,
+      metadata: { kind: "text", split_to_request_id: newRequest.id },
+    },
+    {
+      request_id: newRequest.id,
+      household_id: householdId,
+      sender_role: "vendor",
+      sender_user_id: userId,
+      body: `Created from a previous visit. ${moved.length} item${moved.length === 1 ? "" : "s"} ready to schedule${followUpDate ? ` for ${followUpDate}` : ""}.`,
+      metadata: { kind: "text", split_from_request_id: requestId },
+    },
+  ]);
+
+  return {
+    ok: true,
+    movedCount: moved.length,
+    remainingCount: staying.filter((l) => l.trim().length > 0).length,
+    newRequestId: newRequest.id,
+    newTaskId: newTask.id,
+  };
+}
+
+/**
  * Delete a draft quote. Only `draft` rows can be deleted — sent /
  * viewed / approved / declined quotes have a paper trail and stay on
  * record. Workspace-scoped via assertWorkspaceAccess + an explicit
@@ -4401,6 +4605,15 @@ serve(async (req) => {
 
       if (action === "delete_quote") {
         const result = await deleteQuoteForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "split_visit_punch_list") {
+        const result = await splitVisitPunchList(
           service,
           user as unknown as Record<string, unknown>,
           body,

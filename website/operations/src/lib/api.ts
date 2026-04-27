@@ -135,6 +135,120 @@ export interface PunchListItem {
   estimatedMinutes: number | null;
 }
 
+// ─── Punch-list categorization ────────────────────────────────
+//
+// Long visits (10+ items) are unscannable as a flat list. Group items
+// by *physical work zone* — the thing a handyman actually optimizes
+// against — so they can knock out everything in one area before
+// moving on. Categories are ordered roughly outside → inside →
+// safety walkaround, matching how a real visit flows.
+
+export type PunchCategoryId =
+  | "exterior"
+  | "roofing"
+  | "attic_insulation"
+  | "plumbing"
+  | "kitchen_laundry"
+  | "bathrooms"
+  | "hvac_air"
+  | "electrical"
+  | "safety"
+  | "general";
+
+export interface PunchCategoryMeta {
+  id: PunchCategoryId;
+  label: string;
+  /** SF-style icon hint for the chrome layer (Icon.tsx name). */
+  icon: string;
+  /** Sort order — lower = render first. */
+  order: number;
+}
+
+export const PUNCH_CATEGORIES: Record<PunchCategoryId, PunchCategoryMeta> = {
+  exterior: { id: "exterior", label: "Exterior + Grounds", icon: "home", order: 1 },
+  roofing: { id: "roofing", label: "Roof + Gutters", icon: "home", order: 2 },
+  attic_insulation: { id: "attic_insulation", label: "Attic + Insulation", icon: "home", order: 3 },
+  plumbing: { id: "plumbing", label: "Plumbing", icon: "wrench", order: 4 },
+  kitchen_laundry: { id: "kitchen_laundry", label: "Kitchen + Laundry", icon: "home", order: 5 },
+  bathrooms: { id: "bathrooms", label: "Bathrooms", icon: "wrench", order: 6 },
+  hvac_air: { id: "hvac_air", label: "HVAC + Air", icon: "wrench", order: 7 },
+  electrical: { id: "electrical", label: "Electrical", icon: "bolt", order: 8 },
+  safety: { id: "safety", label: "Safety walkaround", icon: "shield", order: 9 },
+  general: { id: "general", label: "Other", icon: "wrench", order: 10 },
+};
+
+/**
+ * Keyword-based categorizer. Order matters — first match wins, so
+ * specific phrases (e.g. "smoke detector") sit above broader ones
+ * (e.g. "detector" → safety) and exterior-paint sits above
+ * generic-paint. Any item not matched lands in "general".
+ */
+export function categorizePunchItem(title: string): PunchCategoryId {
+  const t = title.toLowerCase();
+
+  // Safety devices first — high confidence, narrow
+  if (/(smoke|carbon monoxide|\bco\b|co2|fire extinguisher|radon)/.test(t)) return "safety";
+  if (/(gfci|afci)/.test(t)) return "safety";
+
+  // Roof + gutters
+  if (/(gutter|downspout|roof|shingle|chimney|flashing)/.test(t)) return "roofing";
+
+  // Attic + insulation
+  if (/(attic|insulation)/.test(t)) return "attic_insulation";
+
+  // Bathrooms — caulking specifically in bath/shower
+  if (/(bath|shower|toilet|vanity)/.test(t)) return "bathrooms";
+
+  // Kitchen + laundry
+  if (/(dryer|washing machine|washer|dishwasher|garbage disposal|kitchen|range hood|fridge|refrigerator|ice maker)/.test(t)) return "kitchen_laundry";
+
+  // HVAC + air
+  if (/(hvac|furnace|boiler|ac\b|air condition|mini[- ]?split|heat pump|humidifier|filter|ceiling fan|duct|thermostat)/.test(t)) return "hvac_air";
+
+  // Plumbing — broad after kitchen/bath
+  if (/(pipe|plumb|water heater|anode|sump|drain|leak|valve)/.test(t)) return "plumbing";
+
+  // Exterior — outdoor faucets, paint, siding, foundation, weatherstripping, etc.
+  if (/(exterior|outdoor|outside|paint chip|siding|deck|fence|driveway|patio|hardscape|hose|faucet (?:bib)?|spigot|hose bib|winterize.*(faucet|hose)|reopen.*faucet|drain.*hose)/.test(t)) return "exterior";
+  if (/(foundation|grading|landscape|tree|shrub|bush|pest)/.test(t)) return "exterior";
+  if (/(weatherstrip|weather strip|window|door)/.test(t)) return "exterior"; // window/door caulking, weatherstripping is an exterior walkaround
+  if (/(caulk|seal)/.test(t)) return "exterior";
+
+  // Electrical — broad after safety
+  if (/(outlet|breaker|panel|electric|wiring|ev charger)/.test(t)) return "electrical";
+
+  return "general";
+}
+
+export interface CategorizedPunch {
+  category: PunchCategoryMeta;
+  items: PunchListItem[];
+  totalMinutes: number;
+}
+
+/**
+ * Groups a flat punch list into ordered categories. Empty categories
+ * are dropped. totalMinutes per category is the sum of any
+ * estimatedMinutes (null items contribute 0).
+ */
+export function categorizePunchList(items: PunchListItem[]): CategorizedPunch[] {
+  if (items.length === 0) return [];
+  const buckets = new Map<PunchCategoryId, PunchListItem[]>();
+  for (const item of items) {
+    const id = categorizePunchItem(item.title);
+    const bucket = buckets.get(id) ?? [];
+    bucket.push(item);
+    buckets.set(id, bucket);
+  }
+  return Array.from(buckets.entries())
+    .map(([id, items]) => ({
+      category: PUNCH_CATEGORIES[id],
+      items,
+      totalMinutes: items.reduce((sum, i) => sum + (i.estimatedMinutes ?? 0), 0),
+    }))
+    .sort((a, b) => a.category.order - b.category.order);
+}
+
 export function parsePunchList(notes: string | null | undefined): PunchListItem[] {
   if (!notes) return [];
   const lines = notes.split(/\r?\n/);
