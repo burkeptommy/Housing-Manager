@@ -1139,6 +1139,49 @@ final class HandymanRequestCoordinator: ObservableObject {
         }
     }
 
+    /// Homeowner accepts the most recent vendor-proposed visit time.
+    /// Returns true on success. The RPC stamps `confirmed_visit_at`,
+    /// walks status to `confirmed`, and inserts an `accept_time`
+    /// message — Realtime brings the new message into the thread
+    /// automatically.
+    func acceptProposedTime(note: String? = nil) async -> Bool {
+        guard let req = request else { return false }
+        do {
+            let updated = try await DatabaseService.shared.acceptVisitTime(
+                requestId: req.id,
+                acceptedBy: .homeowner,
+                note: note
+            )
+            await applyRequest(updated)
+            return true
+        } catch {
+            print("[HandymanRequestCoordinator] acceptProposedTime failed: \(error)")
+            return false
+        }
+    }
+
+    /// Homeowner proposes a counter time. The RPC inserts a
+    /// `propose_time` message with the new timestamp in metadata,
+    /// resets `confirmed_visit_at` to null, walks status to
+    /// `alternate_dates_proposed`. Realtime picks up the new message
+    /// so the thread updates without a manual refresh.
+    func proposeCounterTime(_ at: Date, note: String? = nil) async -> Bool {
+        guard let req = request else { return false }
+        do {
+            let updated = try await DatabaseService.shared.proposeVisitTime(
+                requestId: req.id,
+                proposedAt: at,
+                proposedBy: .homeowner,
+                note: note
+            )
+            await applyRequest(updated)
+            return true
+        } catch {
+            print("[HandymanRequestCoordinator] proposeCounterTime failed: \(error)")
+            return false
+        }
+    }
+
     /// Lazy-create a handyman_request for a visit task that doesn't yet
     /// have one. Only fires when the user types their first message AND
     /// the load path couldn't find an existing request.
