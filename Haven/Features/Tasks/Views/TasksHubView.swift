@@ -63,6 +63,12 @@ struct TasksHubView: View {
                 setMode(.maintenance)
             }
         }
+        // Push notification deep-link: handyman_* events land us here
+        // and want the Handyman view, not Maintenance. (Tom hit this
+        // when a reschedule push routed him to Maintenance.)
+        .onReceive(NotificationCenter.default.publisher(for: .handymanModeRequested)) { _ in
+            setMode(.handyman)
+        }
     }
 
     private func setMode(_ next: TasksHubSection) {

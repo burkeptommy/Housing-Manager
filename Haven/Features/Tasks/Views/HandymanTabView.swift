@@ -194,6 +194,30 @@ struct HandymanTabView: View {
                 await reloadCoordination()
             }
         }
+        // Push notification deep-link arrived. Present the right sheet
+        // for the visit referenced by the payload. The sheet defaults
+        // to the visit detail; quote-related events jump straight to
+        // the quote review sheet.
+        .onReceive(NotificationCenter.default.publisher(for: .openHandymanVisit)) { notification in
+            // Refresh tasks first so the next-scheduled-visit picker
+            // picks up the request that's being deep-linked to.
+            Task {
+                await maintenanceVM.loadTasks()
+                await reloadCoordination()
+                let presentation = notification.userInfo?["presentation"] as? String ?? "visit"
+                await MainActor.run {
+                    if presentation == "quote" && coordinator.quote != nil {
+                        presentChat = false
+                        presentedVisit = nil
+                        presentQuote = true
+                    } else if let visit = nextScheduledVisit {
+                        presentChat = false
+                        presentQuote = false
+                        presentedVisit = visit
+                    }
+                }
+            }
+        }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
             Button("Add a punch-list item") { pushTarget = .punchListFull }
             Button("Schedule a visit") { showScheduleSheet = true }

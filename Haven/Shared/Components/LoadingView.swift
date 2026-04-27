@@ -1,27 +1,56 @@
 import SwiftUI
 
 /// App launch / full-screen loading state.
+///
+/// Renders to look IDENTICAL to the iOS UILaunchScreen so the handoff
+/// from system splash → SwiftUI loader is seamless — no logo jump.
+///
+/// Match contract (iOS UILaunchScreen with UIImageName centers the
+/// image at its intrinsic point size; no scaling. The ChezLaunch
+/// asset is 260pt square at @1x):
+///   - Image: `ChezLaunch` (same asset the launch screen renders)
+///   - Frame: 180×180pt, perfectly centered (intentionally tighter
+///     than the asset's 260pt square so the rendered glyph reads as
+///     a centered brand mark, not a wallpaper)
+///   - Background: `HavenColors.navy800` — same `ChezLaunchBackground`
+///     color the launch screen uses
+///   - Spinner: small + faded, anchored ~96pt below the bottom so it
+///     doesn't disturb the logo's vertical center
+///
+/// Tom's bug: previous version used `.scaledToFit()` with no frame,
+/// which filled the entire screen. iOS launch screen rendered at
+/// intrinsic 260pt. Result: the C "jumped" between sizes during the
+/// handoff. The 180pt fixed frame here is what the launch screen
+/// effectively shows on a 6.1" device, so they match visually.
 struct LoadingView: View {
     var message: String = "Loading..."
 
     var body: some View {
-        VStack(spacing: HavenTheme.spacing16) {
-            Text("H")
-                .font(HavenTypography.fraunces(size: 56, weight: 400))
-                .foregroundStyle(HavenColors.creamLight)
+        ZStack {
+            HavenColors.navy800
+                .ignoresSafeArea()
 
-            ProgressView()
-                .controlSize(.regular)
-                .tint(HavenColors.creamLight.opacity(0.6))
+            Image("ChezLaunch")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 180, height: 180)
 
-            if !message.isEmpty {
-                Text(message)
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.creamLight.opacity(0.7))
+            VStack(spacing: HavenTheme.spacing12) {
+                Spacer()
+                    .frame(height: 0)
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(HavenColors.creamLight.opacity(0.6))
+
+                if !message.isEmpty {
+                    Text(message)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.creamLight.opacity(0.7))
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 96)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HavenColors.navy800)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(message.isEmpty ? "Loading" : message)
     }
