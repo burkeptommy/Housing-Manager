@@ -6,7 +6,7 @@ import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { useWorkspace } from "../lib/workspace-context";
 import { formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
-import type { HomeSystem, RequestStatus } from "../lib/types";
+import type { HomeSystem, HomeSystemPhoto, RequestStatus } from "../lib/types";
 
 export default function HomeDetailScreen() {
   const { propertyId } = useParams<{ propertyId: string }>();
@@ -761,14 +761,17 @@ function SystemEditSheet({
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
-  const { dashboard } = useWorkspace();
+  const { dashboard, refresh } = useWorkspace();
   const [name, setName] = useState(system.name);
   const [manufacturer, setManufacturer] = useState(system.manufacturer ?? "");
   const [modelNumber, setModelNumber] = useState(system.modelNumber ?? "");
-  const [serialNumber, setSerialNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [installDate, setInstallDate] = useState("");
+  const [serialNumber, setSerialNumber] = useState(system.serialNumber ?? "");
+  const [notes, setNotes] = useState(system.notes ?? "");
+  const [installDate, setInstallDate] = useState(system.installDate ?? "");
   const [submitting, setSubmitting] = useState(false);
+  const [photos, setPhotos] = useState(system.photos ?? []);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   async function save() {
     if (!dashboard) return;
@@ -789,6 +792,55 @@ function SystemEditSheet({
       alert(e instanceof Error ? e.message : "Couldn't save system.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handlePhotoFiles(files: FileList | null) {
+    if (!files || files.length === 0 || !dashboard) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("image/")) continue;
+        const compressed = await compressImageFile(file);
+        const result = await postProviderAction<{ photo: HomeSystemPhoto }>(
+          "upload_home_system_photo",
+          {
+            workspaceId: dashboard.workspace.id,
+            systemId: system.id,
+            filename: file.name,
+            contentType: compressed.contentType,
+            fileBase64: compressed.base64,
+          },
+        );
+        if (result.photo) {
+          setPhotos((prev) => [...prev, result.photo]);
+        }
+      }
+      // Refresh dashboard so the parent screen sees the new photo too
+      await refresh();
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : "Couldn't upload photo.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function deletePhoto(path: string) {
+    if (!dashboard) return;
+    const before = photos;
+    setPhotos((prev) => prev.filter((p) => p.path !== path));
+    try {
+      await postProviderAction("delete_home_system_photo", {
+        workspaceId: dashboard.workspace.id,
+        systemId: system.id,
+        path,
+      });
+      await refresh();
+    } catch (e) {
+      // Revert optimistic removal on failure
+      setPhotos(before);
+      setPhotoError(e instanceof Error ? e.message : "Couldn't remove photo.");
     }
   }
 
@@ -874,11 +926,94 @@ function SystemEditSheet({
           </Field>
         </div>
 
-        <div style={{ marginTop: 18, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-          Photo upload coming soon — for now, capture details from the field PWA on your phone.
+        {/* Photos — capture rating-plate / nameplate / install context */}
+        <div style={{ marginTop: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-soft)" }}>
+              Photos
+            </div>
+            <label
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 999,
+                background: "var(--indigo-50)", color: "var(--indigo)",
+                fontSize: 12, fontWeight: 600, cursor: photoBusy ? "wait" : "pointer",
+                opacity: photoBusy ? 0.6 : 1,
+              }}
+            >
+              <Icon name="plus" size={14} stroke={2} />
+              {photoBusy ? "Uploading…" : "Add photos"}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+                disabled={photoBusy}
+                onChange={(e) => {
+                  void handlePhotoFiles(e.target.files);
+                  e.target.value = ""; // reset so re-selecting same file fires
+                }}
+              />
+            </label>
+          </div>
+
+          {photos.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
+              {photos.map((photo) => (
+                <div
+                  key={photo.path}
+                  style={{
+                    position: "relative", aspectRatio: "1 / 1",
+                    borderRadius: 10, overflow: "hidden",
+                    background: "var(--cream)", border: "1px solid var(--neutral-200)",
+                  }}
+                >
+                  {photo.signedUrl ? (
+                    <img
+                      src={photo.signedUrl}
+                      alt={photo.caption || "System photo"}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      height: "100%", color: "var(--text-soft)", fontSize: 11,
+                    }}>
+                      Loading
+                    </div>
+                  )}
+                  <button
+                    onClick={() => void deletePhoto(photo.path)}
+                    aria-label="Remove photo"
+                    style={{
+                      position: "absolute", top: 4, right: 4,
+                      background: "rgba(42, 34, 82, 0.78)", color: "#fff",
+                      border: "none", borderRadius: "50%",
+                      width: 22, height: 22, fontSize: 13, lineHeight: 1,
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding: "16px 14px", borderRadius: 10,
+              background: "var(--cream)", border: "1px dashed var(--neutral-300)",
+              color: "var(--text-muted)", fontSize: 12.5, lineHeight: 1.5, textAlign: "center",
+            }}>
+              Snap the rating plate, model sticker, or anything that helps the next visit. Future you will thank you.
+            </div>
+          )}
+
+          {photoError && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--salmon-dark)" }}>{photoError}</div>
+          )}
         </div>
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
           <button className="ops-button ops-button--ghost" onClick={onClose} disabled={submitting}>Cancel</button>
           <button className="ops-button ops-button--salmon" onClick={save} disabled={submitting}>
             {submitting ? "Saving…" : "Save changes"}
@@ -887,6 +1022,56 @@ function SystemEditSheet({
       </div>
     </div>
   );
+}
+
+/**
+ * Client-side image compression — resize to max 1600px on the long
+ * edge and re-encode as JPEG q=0.82 to keep upload payloads under
+ * ~500KB. Returns base64 (no data: prefix) so the edge function can
+ * decode straight to bytes.
+ */
+async function compressImageFile(file: File): Promise<{ base64: string; contentType: string }> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("Failed to decode image"));
+    el.src = dataUrl;
+  });
+
+  const maxEdge = 1600;
+  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  const targetW = Math.round(img.width * scale);
+  const targetH = Math.round(img.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas unavailable");
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Encode failed"))), "image/jpeg", 0.82);
+  });
+
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.includes(",") ? result.split(",", 2)[1] : result);
+    };
+    reader.onerror = () => reject(new Error("Failed to encode"));
+    reader.readAsDataURL(blob);
+  });
+
+  return { base64, contentType: "image/jpeg" };
 }
 
 const inputStyle2: React.CSSProperties = {

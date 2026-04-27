@@ -1463,6 +1463,39 @@ async function createSignedDocumentUrl(service: ServiceClient, path: string) {
   return compactString(data?.signedUrl);
 }
 
+async function createSignedSystemPhotoUrl(service: ServiceClient, path: string) {
+  const cleanPath = compactString(path);
+  if (!cleanPath) return null;
+  const { data, error } = await service.storage
+    .from("home-system-photos")
+    .createSignedUrl(cleanPath, 60 * 60);
+  if (error) {
+    console.warn("[handyman-provider] failed to sign system photo", cleanPath, error.message);
+    return null;
+  }
+  return compactString(data?.signedUrl);
+}
+
+/**
+ * Decode a base64 string (with or without a data: URL prefix) into a
+ * Uint8Array suitable for handing to supabase storage.upload.
+ */
+function decodeBase64Body(raw: string): Uint8Array {
+  const cleaned = raw.includes(",") ? raw.split(",", 2)[1] : raw;
+  const binary = atob(cleaned);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function safeFilenameSegment(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || "photo";
+}
+
 async function autoLinkWorkspaceContractors(
   service: ServiceClient,
   workspaceId: string,
@@ -1764,7 +1797,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     propertyIds.length
       ? service
           .from("home_systems")
-          .select("id, property_id, name, category, manufacturer, model_number, serial_number, notes, install_date, status, subtype, catalog_series, catalog_model_name, catalog_fuel_type, catalog_features, reliability_score, score_summary, last_service_date, next_service_due, total_spent, cached_manual_links")
+          .select("id, property_id, name, category, manufacturer, model_number, serial_number, notes, install_date, status, subtype, catalog_series, catalog_model_name, catalog_fuel_type, catalog_features, reliability_score, score_summary, last_service_date, next_service_due, total_spent, cached_manual_links, photos")
           .in("property_id", propertyIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
     visitIds.length
@@ -2047,7 +2080,9 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       openRequests: homeVisits.filter((row) => !["completed", "cancelled", "declined"].includes(row.status)).length,
       lastCompletedVisit: completed[0]?.fieldWorkspace?.completedAt ?? null,
       assignedMembers: [...new Set(homeVisits.map((row) => row.assignment?.memberName).filter(Boolean))],
-      systems: homeSystems.map((system) => ({
+      // Sign photos in parallel — bucket is private so the React side
+      // needs short-lived signed URLs to display thumbnails.
+      systems: await Promise.all(homeSystems.map(async (system) => ({
         id: system.id,
         name: compactString(system.name),
         category: compactString(system.category),
@@ -2076,7 +2111,19 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
               cached: Boolean((link as Record<string, unknown>).cached),
             })).filter((link) => link.url)
           : [],
-      })),
+        photos: Array.isArray(system.photos)
+          ? await Promise.all(
+              (system.photos as Record<string, unknown>[]).map(async (photo) => ({
+                path: compactString(photo.path),
+                contentType: compactString(photo.content_type),
+                uploadedAt: compactString(photo.uploaded_at),
+                uploadedBy: compactString(photo.uploaded_by),
+                caption: compactString(photo.caption),
+                signedUrl: await createSignedSystemPhotoUrl(service, compactString(photo.path)),
+              })),
+            ).then((photos) => photos.filter((p) => p.path))
+          : [],
+      }))),
       openTasks: homeTasks.slice(0, 16).map((task) => ({
         id: compactString(task.id),
         title: compactString(task.title),
@@ -2371,6 +2418,143 @@ async function updateHomeSystemForProvider(
     .single();
   if (updateError) throw updateError;
   return { system: updated };
+}
+
+/**
+ * Shared helper — confirms the calling workspace serves this property
+ * via at least one handyman_request through one of its linked
+ * contractors, and returns the system row.
+ */
+async function loadSystemForProviderWrite(
+  service: ServiceClient,
+  workspaceId: string,
+  systemId: string,
+) {
+  const { data: system, error: systemError } = await service
+    .from("home_systems")
+    .select("id, property_id, household_id, photos")
+    .eq("id", systemId)
+    .maybeSingle();
+  if (systemError) throw systemError;
+  if (!system) throw new Error("System not found");
+
+  const propertyId = compactString(system.property_id);
+  if (!propertyId) throw new Error("System has no property");
+
+  const { data: links } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+  const contractorIds = (links ?? [])
+    .map((row: Record<string, unknown>) => compactString(row.contractor_id))
+    .filter(Boolean);
+  if (contractorIds.length === 0) throw new Error("Workspace has no linked contractors");
+
+  const { data: linkedRequest } = await service
+    .from("handyman_requests")
+    .select("id")
+    .eq("property_id", propertyId)
+    .in("contractor_id", contractorIds)
+    .limit(1)
+    .maybeSingle();
+  if (!linkedRequest) throw new Error("This home isn't on your books");
+
+  return system;
+}
+
+/**
+ * Upload a photo of a home_system. The web client reads the file as
+ * base64 (already client-side compressed to a sane size — typically
+ * <500KB), POSTs it through here, and we write through the service
+ * role so we never have to expose bucket-level write RLS to providers
+ * across household boundaries. The path lands in the system's
+ * `photos` JSONB array; the read path signs short-lived URLs.
+ */
+async function uploadHomeSystemPhotoForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  if (!systemId) throw new Error("systemId is required");
+
+  const fileBase64 = compactString(body.fileBase64);
+  if (!fileBase64) throw new Error("fileBase64 is required");
+  const filename = safeFilenameSegment(compactString(body.filename) || "photo.jpg");
+  const contentType = compactString(body.contentType) || "image/jpeg";
+  const caption = compactString(body.caption);
+
+  const system = await loadSystemForProviderWrite(service, workspaceId, systemId);
+  const householdId = compactString(system.household_id);
+  if (!householdId) throw new Error("System has no household");
+
+  // Path: {household_id}/{system_id}/{timestamp}-{filename}
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const path = `${householdId}/${systemId}/${stamp}-${filename}`;
+
+  const bytes = decodeBase64Body(fileBase64);
+  const { error: uploadError } = await service.storage
+    .from("home-system-photos")
+    .upload(path, bytes, { contentType, upsert: false });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const existing = Array.isArray(system.photos) ? (system.photos as unknown[]) : [];
+  const nextPhotos = [
+    ...existing,
+    {
+      path,
+      content_type: contentType,
+      uploaded_at: isoNow(),
+      uploaded_by: userId || null,
+      caption: caption || null,
+    },
+  ];
+
+  const { error: updateError } = await service
+    .from("home_systems")
+    .update({ photos: nextPhotos, updated_at: isoNow() })
+    .eq("id", systemId);
+  if (updateError) throw updateError;
+
+  const signedUrl = await createSignedSystemPhotoUrl(service, path);
+  return { photo: { path, contentType, uploadedAt: isoNow(), uploadedBy: userId, caption, signedUrl } };
+}
+
+async function deleteHomeSystemPhotoForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  const path = compactString(body.path);
+  if (!systemId) throw new Error("systemId is required");
+  if (!path) throw new Error("path is required");
+
+  const system = await loadSystemForProviderWrite(service, workspaceId, systemId);
+  const existing = Array.isArray(system.photos) ? (system.photos as Record<string, unknown>[]) : [];
+  const nextPhotos = existing.filter((row) => compactString(row.path) !== path);
+
+  // Best-effort storage cleanup; ignore failure (the row removal is
+  // the source of truth for the UI).
+  await service.storage.from("home-system-photos").remove([path]).catch((err: unknown) => {
+    console.warn("[handyman-provider] failed to remove system photo", path, err);
+  });
+
+  const { error: updateError } = await service
+    .from("home_systems")
+    .update({ photos: nextPhotos, updated_at: isoNow() })
+    .eq("id", systemId);
+  if (updateError) throw updateError;
+
+  return { ok: true };
 }
 
 /**
@@ -4148,6 +4332,24 @@ serve(async (req) => {
 
       if (action === "update_request_status") {
         const result = await updateRequestStatusForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "upload_home_system_photo") {
+        const result = await uploadHomeSystemPhotoForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "delete_home_system_photo") {
+        const result = await deleteHomeSystemPhotoForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,

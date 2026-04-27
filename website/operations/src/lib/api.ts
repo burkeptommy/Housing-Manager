@@ -38,10 +38,10 @@ export async function fetchDashboard(): Promise<Dashboard> {
  * Mutation helper — POST any supported provider action and return the
  * updated dashboard. Mirrors handyman.js's providerRequest("POST", body).
  */
-export async function postProviderAction(
+export async function postProviderAction<T = unknown>(
   action: string,
   body: Record<string, unknown> = {}
-): Promise<unknown> {
+): Promise<T> {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData.session;
   if (!session) throw new Error("Not signed in");
@@ -60,7 +60,7 @@ export async function postProviderAction(
     const text = await res.text().catch(() => "");
     throw new Error(`Provider API ${res.status}: ${text || res.statusText}`);
   }
-  return await res.json();
+  return (await res.json()) as T;
 }
 
 // ─── Currency helpers ───

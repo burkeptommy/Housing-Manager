@@ -165,12 +165,25 @@ export interface VisitRow {
   quote: VisitQuotePreview | null;
 }
 
+export interface HomeSystemPhoto {
+  path: string;
+  contentType: string;
+  uploadedAt: string;
+  uploadedBy: string;
+  caption: string;
+  signedUrl: string | null;
+}
+
 export interface HomeSystem {
   id: string;
   name: string;
   category: string;
   manufacturer: string;
   modelNumber: string;
+  serialNumber?: string;
+  notes?: string;
+  installDate?: string;
+  photos?: HomeSystemPhoto[];
 }
 
 export interface HomeRow {
