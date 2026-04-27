@@ -1055,10 +1055,14 @@ final class HandymanRequestCoordinator: ObservableObject {
             try? await channel.subscribeWithError()
             for await action in inserts {
                 guard let self else { return }
-                let payload = action.record
-                // Decode into HandymanRequestMessageRow.
+                // `action.record` is [String: AnyJSON] — a Swift enum
+                // tree from the Supabase SDK. JSONSerialization can't
+                // walk it (the inner enum cases are __SwiftValue, not
+                // Foundation NSDictionary/NSArray), which crashed the
+                // app with "Invalid type in JSON write (__SwiftValue)".
+                // AnyJSON is Codable, so JSONEncoder handles it.
                 guard
-                    let data = try? JSONSerialization.data(withJSONObject: payload),
+                    let data = try? Self.payloadEncoder.encode(action.record),
                     let decoded = try? Self.messageDecoder.decode(HandymanRequestMessageRow.self, from: data)
                 else {
                     continue
@@ -1071,6 +1075,11 @@ final class HandymanRequestCoordinator: ObservableObject {
             }
         }
     }
+
+    private static let payloadEncoder: JSONEncoder = {
+        let e = JSONEncoder()
+        return e
+    }()
 
     private func unsubscribeRealtime() {
         realtimeListenerTask?.cancel()
