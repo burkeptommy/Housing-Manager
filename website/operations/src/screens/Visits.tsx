@@ -54,13 +54,14 @@ export default function DispatchScreen() {
   if (!dashboard) return null;
 
   async function handleAssign(memberId: string) {
-    if (!selected) return;
+    if (!selected || !dashboard) return;
     setAssigning(true);
     try {
       const [start, end] = parseWindow(windowSlot);
       await postProviderAction("assign_visit", {
+        workspaceId: dashboard.workspace.id,
         requestId: selected.requestId,
-        memberId,
+        assignedMemberId: memberId,
         routeDate,
         windowStartTime: start,
         windowEndTime: end,
@@ -68,9 +69,8 @@ export default function DispatchScreen() {
       await refresh();
       setSelectedId(null);
     } catch (e) {
-      // Fall back: action might not exist yet on server. Don't crash UI.
       console.error("[Dispatch] assign_visit failed", e);
-      alert("Couldn't assign the visit. The action may not be wired on the server yet — Tom, ping the team.");
+      alert(e instanceof Error ? e.message : "Couldn't assign the visit.");
     } finally {
       setAssigning(false);
     }

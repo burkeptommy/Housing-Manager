@@ -4,19 +4,27 @@ import { Sidebar } from "./components/chrome/Sidebar";
 import { Topbar } from "./components/chrome/Topbar";
 import { WorkspaceProvider, useWorkspace } from "./lib/workspace-context";
 import OverviewScreen from "./screens/Overview";
-import DispatchScreen from "./screens/Dispatch";
+import VisitsScreen from "./screens/Visits";
+import VisitDetailScreen from "./screens/VisitDetail";
 import CalendarScreen from "./screens/Calendar";
 import RoutesScreen from "./screens/Routes";
 import CrewScreen from "./screens/Crew";
 import HomesScreen from "./screens/Homes";
+import HomeDetailScreen from "./screens/HomeDetail";
 import QuotesScreen from "./screens/Quotes";
 import MessagesScreen from "./screens/Messages";
+import { CommandPalette } from "./components/CommandPalette";
+import { NewQuoteModal, NewQuoteProvider, useNewQuoteModal } from "./components/NewQuoteModal";
 
 export default function App() {
   return (
     <WorkspaceProvider>
-      <MobileInterstitial />
-      <Shell />
+      <NewQuoteProvider>
+        <MobileInterstitial />
+        <Shell />
+        <NewQuoteModal />
+        <CommandPalette />
+      </NewQuoteProvider>
     </WorkspaceProvider>
   );
 }
@@ -52,11 +60,14 @@ function Shell() {
         <div className="ops-content">
           <Routes>
             <Route path="/" element={<OverviewScreen />} />
-            <Route path="/dispatch" element={<DispatchScreen />} />
+            <Route path="/visits" element={<VisitsScreen />} />
+            <Route path="/visits/:requestId" element={<VisitDetailScreen />} />
+            <Route path="/dispatch" element={<Navigate to="/visits" replace />} />
             <Route path="/calendar" element={<CalendarScreen />} />
             <Route path="/routes" element={<RoutesScreen />} />
             <Route path="/crew" element={<CrewScreen />} />
             <Route path="/homes" element={<HomesScreen />} />
+            <Route path="/homes/:propertyId" element={<HomeDetailScreen />} />
             <Route path="/quotes" element={<QuotesScreen />} />
             <Route path="/messages" element={<MessagesScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />

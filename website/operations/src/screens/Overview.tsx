@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/chrome/Card";
 import { Pill, type PillTone } from "../components/chrome/Pill";
 import { StatTile } from "../components/chrome/StatTile";
@@ -254,17 +255,32 @@ function Hero(props: {
 
 function KpiStrip() {
   const { dashboard, mode } = useWorkspace();
+  const navigate = useNavigate();
   if (!dashboard) return null;
   const s = dashboard.stats;
   const todayLabel = mode === "sole" ? "Today (you)" : "Today";
+
+  const tiles: { label: string; value: string | number; sub: string; to: string; accent?: boolean }[] = [
+    { label: "Requested",   value: s.requestedVisits,   sub: "Open requests",        to: "/visits?filter=requested" },
+    { label: "Unassigned",  value: s.unassignedVisits,  sub: "Awaiting dispatch",    to: "/visits" },
+    { label: todayLabel,    value: s.todayStops,        sub: "Stops on the board",   to: "/visits?filter=today" },
+    { label: "Homes",       value: s.homesServiced,     sub: "On your books",        to: "/homes" },
+    { label: "Pipeline",    value: formatCurrencyCompact(pipelineTotal(dashboard.quotes)), sub: `Across ${dashboard.quotes.length} quote${dashboard.quotes.length === 1 ? "" : "s"}`, to: "/quotes", accent: true },
+    { label: "This week",   value: s.upcomingVisits,    sub: "Visits booked",        to: "/visits?filter=week" },
+  ];
+
   return (
     <div className="ops-grid-kpis">
-      <StatTile label="Requested" value={s.requestedVisits} sub="Open requests" />
-      <StatTile label="Unassigned" value={s.unassignedVisits} sub="Awaiting dispatch" />
-      <StatTile label={todayLabel} value={s.todayStops} sub="Stops on the board" />
-      <StatTile label="Homes" value={s.homesServiced} sub="On your books" />
-      <StatTile label="Pipeline" value={formatCurrencyCompact(pipelineTotal(dashboard.quotes))} sub={`Across ${dashboard.quotes.length} quote${dashboard.quotes.length === 1 ? "" : "s"}`} accent />
-      <StatTile label="This week" value={s.upcomingVisits} sub="Visits booked" />
+      {tiles.map((t) => (
+        <button
+          key={t.label}
+          onClick={() => navigate(t.to)}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+          aria-label={`${t.label}: ${t.value} — open ${t.to}`}
+        >
+          <StatTile label={t.label} value={t.value} sub={t.sub} accent={t.accent} />
+        </button>
+      ))}
     </div>
   );
 }
@@ -274,7 +290,7 @@ function KpiStrip() {
 function FieldBoardRow({ visit }: { visit: VisitRow }) {
   const time = formatTime12h(visit.assignment?.windowStartTime ?? visit.visit?.scheduledDate);
   return (
-    <div className="ops-row" style={{ padding: "10px 0" }}>
+    <Link to={`/visits/${visit.requestId}`} className="ops-row" style={{ padding: "10px 0", textDecoration: "none", color: "inherit" }}>
       <div style={{ width: 86, flex: "none", display: "flex", flexDirection: "column" }}>
         <span style={{ fontFamily: "var(--serif)", fontSize: 14, color: "var(--text)", fontWeight: 600 }}>
           {time || "TBD"}
@@ -300,7 +316,8 @@ function FieldBoardRow({ visit }: { visit: VisitRow }) {
           </span>
         </div>
       )}
-    </div>
+      <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
+    </Link>
   );
 }
 
@@ -309,7 +326,7 @@ function FieldBoardRow({ visit }: { visit: VisitRow }) {
 function DecisionRow({ visit }: { visit: VisitRow }) {
   const sub = visit.preferredTiming || visit.property?.address || formatRelativeTime(visit.updatedAt);
   return (
-    <button className="ops-row" style={{ background: "none", border: "none", borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textAlign: "left", cursor: "pointer", width: "100%" }}>
+    <Link to={`/visits/${visit.requestId}`} className="ops-row" style={{ borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textDecoration: "none", color: "inherit" }}>
       <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
         <Icon name={iconForRequest(visit.requestType)} size={18} stroke={1.9} />
       </div>
@@ -321,7 +338,7 @@ function DecisionRow({ visit }: { visit: VisitRow }) {
       </div>
       <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
       <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
-    </button>
+    </Link>
   );
 }
 
@@ -329,7 +346,7 @@ function DecisionRow({ visit }: { visit: VisitRow }) {
 
 function ThreadPreviewRow({ thread }: { thread: MessageThread }) {
   return (
-    <button className="ops-row" style={{ background: "none", border: "none", borderBottom: "1px solid var(--neutral-200)", padding: "10px 0", textAlign: "left", cursor: "pointer", width: "100%" }}>
+    <Link to={`/messages?request=${thread.requestId}`} className="ops-row" style={{ borderBottom: "1px solid var(--neutral-200)", padding: "10px 0", textDecoration: "none", color: "inherit" }}>
       <Avatar initials={initialsFor(thread.propertyName || thread.title)} size={32} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
@@ -338,7 +355,7 @@ function ThreadPreviewRow({ thread }: { thread: MessageThread }) {
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{thread.latestMessage}</div>
       </div>
-    </button>
+    </Link>
   );
 }
 

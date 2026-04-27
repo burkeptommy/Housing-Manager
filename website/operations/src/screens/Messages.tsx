@@ -49,10 +49,11 @@ export default function MessagesScreen() {
   }
 
   async function handleSend() {
-    if (!selected || !draft.trim()) return;
+    if (!selected || !draft.trim() || !dashboard) return;
     setSending(true);
     try {
-      await postProviderAction("send_request_message", {
+      await postProviderAction("send_message", {
+        workspaceId: dashboard.workspace.id,
         requestId: selected.requestId,
         body: draft,
       });
@@ -60,7 +61,7 @@ export default function MessagesScreen() {
       await refresh();
     } catch (e) {
       console.error("[Messages] send failed", e);
-      alert("Couldn't send. Server action may not be wired yet.");
+      alert(e instanceof Error ? e.message : "Couldn't send. Try again.");
     } finally {
       setSending(false);
     }

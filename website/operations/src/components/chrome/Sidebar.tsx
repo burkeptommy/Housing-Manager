@@ -13,7 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Overview", icon: "grid", end: true },
-  { to: "/dispatch", label: "Dispatch", icon: "dispatch" },
+  { to: "/visits", label: "Visits", icon: "calendar" },
   { to: "/calendar", label: "Calendar", icon: "calendar" },
   { to: "/routes", label: "Routes", icon: "route" },
   { to: "/crew", label: "Crew", icon: "crew", crewOnly: true },

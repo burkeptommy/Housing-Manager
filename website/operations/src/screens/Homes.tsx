@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "../components/chrome/Card";
 import { Pill } from "../components/chrome/Pill";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
@@ -10,6 +11,7 @@ import type { HomeRow } from "../lib/types";
 
 export default function HomesScreen() {
   const { dashboard } = useWorkspace();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | "active" | "new">("all");
   const [search, setSearch] = useState("");
   const [selectedHomeId, setSelectedHomeId] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export default function HomesScreen() {
             key={home.propertyId}
             padding="default"
             hoverable
-            onClick={() => setSelectedHomeId(home.propertyId)}
+            onClick={() => navigate(`/homes/${home.propertyId}`)}
             style={selectedHome?.propertyId === home.propertyId ? { borderColor: "var(--indigo-400)", boxShadow: "0 6px 20px rgba(42,34,82,0.12)" } : {}}
           >
             <HomeArtwork isNew={!home.lastCompletedVisit} />
@@ -102,8 +104,20 @@ export default function HomesScreen() {
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="ops-button ops-button--ghost" style={{ flex: 1, fontSize: 12 }}>History</button>
-              <button className="ops-button ops-button--indigo" style={{ flex: 1, fontSize: 12 }}>New visit</button>
+              <button
+                className="ops-button ops-button--ghost"
+                style={{ flex: 1, fontSize: 12 }}
+                onClick={(e) => { e.stopPropagation(); setSelectedHomeId(home.propertyId); }}
+              >
+                Quick history
+              </button>
+              <button
+                className="ops-button ops-button--indigo"
+                style={{ flex: 1, fontSize: 12 }}
+                onClick={(e) => { e.stopPropagation(); navigate(`/homes/${home.propertyId}`); }}
+              >
+                Open profile →
+              </button>
             </div>
           </Card>
         ))}
