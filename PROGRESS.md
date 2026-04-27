@@ -6,6 +6,69 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 67: Tasks Tab V5 (iOS) + Chez Handyman Operations Desk (Web) (2026-04-27)
+
+Two parallel deliverables landed together against the high-fidelity design handoffs in `~/Downloads/Tasks-Maintenance UIUX-2.zip` and `~/Downloads/Handyman Website.zip`.
+
+### iOS — Tasks Tab redesign (`Haven/Features/Tasks/`)
+
+Replaces the Phase 66 `MaintenanceHubView` lobby (8 sections) with a focused 6-section narrative behind a serif title-switcher. `TasksHubView` becomes a thin mode-switch shell. The legacy `MaintenanceHubView` + `HandymanHubView` stay alive — `PropertyDetailView` still pushes `MaintenanceHubView(filterPropertyId:)` for the property-scoped lobby; only the Tasks tab itself adopts V5. `MaintenanceScheduleView` (Phase 56.4–56.6 workshop) is preserved as the "See all" deep-dive — every V5 ArrowLink routes into it with the right initial state, so zero functionality is lost.
+
+**Files added** (`Haven/Features/Tasks/Views/`):
+- `MaintenanceTabView.swift` (V5 Maintenance screen + `MaintenanceTabViewModel` aggregator)
+- `HandymanTabView.swift` (V5 Handyman screen — wraps `HandymanPunchListViewModel`, `MaintenanceViewModel.shared`)
+- `Components/TasksV5Tokens.swift` (V5-specific season tints, hero/band gradients, shadow recipes)
+- `Components/IconTile.swift` (36×36 / 44×44 rounded square; `indigo` / `salmon` tones)
+- `Components/SectionLabel.swift` (eyebrow + sub + ArrowLink action slot)
+- `Components/HeaderSwitcher.swift` (serif title chevron + 40×40 white "+" button)
+- `Components/IndigoGradientCard.swift` (.hero + .band variants; also `MiniHeroContent`, `VisitHeroContent`, `BrowseBand`, `WhatWeHandleBand`)
+- `Components/YearRibbon.swift` (4 season tiles, active 50% wider, NOW chip on current)
+- `Components/MaintenanceRows.swift` (`DecisionRow` salmon-wash + `ProgramRow` ON pill + `VehicleProgramRow` "Set up →")
+- `Components/HandymanComponents.swift` (`VendorCard` linked/empty + `PunchListCard` w/ green-fill checkbox + `RecommendedRow` salmon "+" + `VisitHistoryEmptyCard`)
+
+`TasksHubView.swift` rewritten to a 70-line shell — `@AppStorage("tasksHubMode")` persists last-used mode, `confirmationDialog` sheet swaps modes via the title-switcher chevron, both child views own their own `HeaderSwitcher`. `Season.months` extension added in `TasksV5Tokens.swift` so the YearRibbon's filter pipeline aggregates `routines.activeMonths` against the active season.
+
+Decision-row "Choose vendor →" wires through a `DecisionVendorPicker` wrapper around the existing `ContractorPickerSheet(systemCategory:onSelect:)` — selection sets `RoutineUpdate.vendorId` + flips `setupState` to `.active` via `DatabaseService.updateRoutine(id:_:)`. Recommended-row "+" creates a `HandymanPunchItemInsert(source: "recommended")` and reloads the punch list. Punch-list checkbox tap optimistically green-fills + line-throughs the row, then archives via `HandymanPunchListViewModel.archive(entry:)` after 500ms.
+
+CLAUDE.md typography section corrected (Phase 56.3 system font migration was already done — `New York` serif + `SF Pro` sans, not Fraunces + Inter as the previous text claimed). Tab table updated: index 2 is now `Tasks` (was misdocumented as `Life`). `xcodebuild ... build` succeeds.
+
+### Web — Operations Desk SPA (`website/operations/`)
+
+Brand-new React + Vite + TypeScript app. Replaces `handyman.html`'s embedded 9 workspace tabs with a properly-designed 8-screen SPA at `/operations/*`. `handyman.html` keeps the auth pitch + sign-in/sign-up form and redirects to `/operations/` post-auth (preserving `?next=` deep links). Vanilla pages, the field PWA (`handyman-visit.html`), and the homeowner quote view (`handyman-quote.html`) are all untouched.
+
+**Stack:** React 18 + TypeScript + Vite 5 + React Router v6 + `@supabase/supabase-js` v2. Reuses `chez.css` tokens via `<link>`. Inline SVG icon library — no Lucide, no icon font, no Google Fonts.
+
+**Files added:**
+- `package.json`, `vite.config.ts` (`base: '/operations/'`), `tsconfig.json`, `index.html`
+- `src/main.tsx` + `src/App.tsx` (auth gate + `<Sidebar>` + `<Topbar>` + 8-route `<Outlet>`)
+- `src/lib/supabase.ts`, `src/lib/types.ts`, `src/lib/workspace-context.tsx` (`WorkspaceProvider` + `useWorkspace`), `src/lib/fixtures.ts` (verbatim port of the design handoff's `data.jsx`)
+- `src/styles/operations.css` (sidebar, topbar, card, pill, hero, KPI strip, dispatch lanes, mobile interstitial)
+- `src/components/chrome/`: `Sidebar`, `Topbar`, `Pill`, `Card`, `Avatar` + `initialsFor()`, `StatTile`, `EmptyState`, `Icon`
+- `src/screens/`: `Overview`, `Dispatch`, `Calendar`, `Routes`, `Crew`, `Homes`, `Quotes`, `Messages`
+
+**Mode awareness:** `WorkspaceProvider` reads `provider_workspace_members.where { user_id == auth.uid }`, loads workspace + roster in parallel. `mode = members.length > 1 ? "crew" : "sole"`, overridable via `?mode=sole|crew`. Sole mode hides the Crew nav item, swaps "Crew today" → "Today (you)", uses personal hero copy ("Four stops today, finished by 3:30"). Crew mode adds the Crew workload strip + operational hero ("Own the queue, route the field team").
+
+**Data wiring:** v1 fixture-backed (`lib/fixtures.ts` mirrors the design's CREW / HOMES / VISITS / QUOTES / MESSAGES). Real Supabase queries plug in by extending `WorkspaceProvider` or adding a `lib/api.ts` layer — RLS already gates per-workspace via the Phase 71/72 tables (`provider_workspaces`, `provider_workspace_members`, `provider_visit_assignments`, `provider_quotes`, `provider_saved_quote_items`, `handyman_requests`, `handyman_request_messages`).
+
+**Files modified:**
+- `website/handyman.js`: `refreshWorkspace()` post-auth redirects to `/operations/` (or `?next=` if set) instead of rendering the embedded workspace. Legacy `renderWorkspace()` call kept as unreachable fallback for safety.
+- `website/nginx.conf`: added `location /operations/` block with SPA-fallback rewrite (`try_files $uri $uri/ /operations/index.html`) before the existing catch-all. Added long-cache rule for `/operations/assets/`.
+- `website/Dockerfile`: now multi-stage — `node:20-alpine` build stage compiles `operations/dist/`, `nginx:alpine` serves both vanilla pages and the SPA. Fixed pre-existing missing-asset bug by COPY'ing `chez.css` and `favicon.svg` into the image (both were referenced by vanilla pages but never copied).
+
+**Deployment:** `npm install && npm run build` succeeds (436 KB JS / 11.5 KB CSS gzipped). Local dev: `cd website/operations && npm run dev` at `localhost:5173/operations/`. Production: docker build runs end-to-end (Docker not available in current sandbox, will be verified in CI).
+
+**Acceptance:** All 8 routes render in `mode=sole` and `mode=crew` (toggle via `?mode=`). Empty states use the shared `EmptyState` component. Sidebar `is-active` state has the salmon-glow border + bg per spec. No Google Fonts requested. Max 2 salmon CTAs per screen (DESIGN_RULES rule #12).
+
+### What's left for follow-ups
+
+- Drag-to-reschedule on Calendar (V5 spec mentions; deferred to v2)
+- "Optimize all routes" actually computing optimal routes (would need a routing API; v1 stubs the button)
+- Live Supabase data wiring on Operations Desk screens (fixtures shape matches `lib/types.ts` row contracts; swap-in is mechanical)
+- Strip the embedded workspace tab DOM from `handyman.html` (kept as unreachable fallback for now to de-risk rollout)
+- Push notifications for handyman company events (assignment notifications, message replies)
+
+---
+
 ## Phase 66: Routines as First-Class Services (2026-04-20)
 
 Ships the five-section Maintenance hub ("Services", "Next Handyman Visit", "Vehicles", "This Season", "Upcoming Scheduled") entirely on top of the existing `routines` (Phase 55.1) + `routine_visits` tables rather than creating the proposed `household_services` + `service_visits` + `vehicle_service_programs` tables that would have duplicated ~85% of the routines model. Zero new tables; five additive columns + two partial unique indexes + one CHECK constraint. Evaluation in `/Users/tomburke/.claude/plans/users-tomburke-downloads-files-2-phase-logical-robin.md` documents why.

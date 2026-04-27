@@ -1,0 +1,85 @@
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Sidebar } from "./components/chrome/Sidebar";
+import { Topbar } from "./components/chrome/Topbar";
+import { WorkspaceProvider, useWorkspace } from "./lib/workspace-context";
+import OverviewScreen from "./screens/Overview";
+import DispatchScreen from "./screens/Dispatch";
+import CalendarScreen from "./screens/Calendar";
+import RoutesScreen from "./screens/Routes";
+import CrewScreen from "./screens/Crew";
+import HomesScreen from "./screens/Homes";
+import QuotesScreen from "./screens/Quotes";
+import MessagesScreen from "./screens/Messages";
+
+export default function App() {
+  return (
+    <WorkspaceProvider>
+      <MobileInterstitial />
+      <Shell />
+    </WorkspaceProvider>
+  );
+}
+
+function Shell() {
+  const { session, isLoading, mode } = useWorkspace();
+  const location = useLocation();
+
+  // Auth gate. If we're not loading and there's no session, kick the user
+  // to the marketing/auth page. Preserve the deep link in `?next=` so a
+  // post-login redirect can land them where they wanted to go.
+  useEffect(() => {
+    if (!isLoading && !session) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      window.location.assign(`/handyman.html?next=${next}`);
+    }
+  }, [isLoading, session, location]);
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 48, fontSize: 14, color: "var(--text-muted)" }}>
+        Loading your workspace…
+      </div>
+    );
+  }
+  if (!session) return null;
+
+  return (
+    <div className={`ops-shell ${mode === "sole" ? "is-sole" : ""}`}>
+      <Sidebar />
+      <main className="ops-main">
+        <Topbar />
+        <div className="ops-content">
+          <Routes>
+            <Route path="/" element={<OverviewScreen />} />
+            <Route path="/dispatch" element={<DispatchScreen />} />
+            <Route path="/calendar" element={<CalendarScreen />} />
+            <Route path="/routes" element={<RoutesScreen />} />
+            <Route path="/crew" element={<CrewScreen />} />
+            <Route path="/homes" element={<HomesScreen />} />
+            <Route path="/quotes" element={<QuotesScreen />} />
+            <Route path="/messages" element={<MessagesScreen />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function MobileInterstitial() {
+  return (
+    <div className="ops-mobile-interstitial">
+      <div className="ops-mobile-interstitial__title">
+        Operations Desk is desktop-only
+      </div>
+      <p className="ops-mobile-interstitial__body">
+        Open this page on a desktop or tablet to dispatch the field team. For
+        in-truck use, the Chez Field PWA is the right tool.
+      </p>
+      <a className="ops-mobile-interstitial__cta" href="/handyman-visit.html">
+        Open Chez Field
+      </a>
+    </div>
+  );
+}

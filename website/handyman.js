@@ -92,6 +92,18 @@ const dom = {
   messageStatus: document.getElementById("message-status"),
   messageBody: document.getElementById("message-body"),
   sendMessageButton: document.getElementById("send-message-button"),
+  // Chez v1: directory listing form
+  directoryStatusPill: document.getElementById("directory-status-pill"),
+  directoryForm: document.getElementById("directory-form"),
+  directoryListed: document.getElementById("directory-listed"),
+  directoryState: document.getElementById("directory-state"),
+  directoryCity: document.getElementById("directory-city"),
+  directoryZips: document.getElementById("directory-zips"),
+  directoryCategories: document.getElementById("directory-categories"),
+  directoryBlurb: document.getElementById("directory-blurb"),
+  directoryHeadshot: document.getElementById("directory-headshot"),
+  directoryFeedback: document.getElementById("directory-feedback"),
+  directorySaveButton: document.getElementById("directory-save-button"),
   savedItemForm: document.getElementById("saved-item-form"),
   savedItemName: document.getElementById("saved-item-name"),
   savedItemDescription: document.getElementById("saved-item-description"),
@@ -426,6 +438,11 @@ async function refreshWorkspace() {
   dom.authStatus.textContent = state.session.user.email || "Signed in";
   dom.signOutButton.classList.remove("hidden");
 
+  // Chez v2 (Phase 67): hide the auth pitch immediately on session
+  // confirmation. The user is going to /operations/ in a moment — they
+  // shouldn't see a "sign in" form while we confirm the workspace.
+  dom.authPanel.classList.add("hidden");
+
   let dashboard = await providerRequest("GET");
 
   if (dashboard.needsWorkspace) {
@@ -453,9 +470,17 @@ async function refreshWorkspace() {
   }
 
   state.dashboard = dashboard;
-  document.body.classList.add("workspace-authenticated");
-  syncExperienceMode();
-  renderWorkspace();
+
+  // Chez v2 (Phase 67): hand off to the Operations Desk SPA BEFORE
+  // adding the `workspace-authenticated` class — that class is what
+  // reveals the embedded workspace panel (now deprecated). Skipping
+  // the class-add prevents a flash of the old UI before the navigation
+  // takes effect. Honor ?next= so deep links from the SPA round-trip
+  // through sign-out → sign-in.
+  const next = params.get("next") || "/operations/";
+  const safeNext = next.startsWith("/operations") ? next : "/operations/";
+  window.location.assign(safeNext);
+  return;
 }
 
 function applyContextualNav() {
@@ -1416,12 +1441,15 @@ function renderMessageThreadDetail() {
         <div class="chip-row">
           ${statusChip(visit.statusLabel)}
           ${visit.assignment?.memberName ? statusChip(visit.assignment.memberName) : statusChip("Unassigned", "warning")}
-          ${visit.quote?.statusLabel ? statusChip(`${visit.quote.statusLabel} · ${money(visit.quote.total)}`, "success") : ""}
+          ${quoteStatusChip(visit.quote)}
         </div>
       </div>
+      ${schedulingBlockMarkup(visit)}
+      ${quoteCounterAlertMarkup(visit)}
+      ${quoteSignedAlertMarkup(visit)}
       <div class="message-thread-actions">
         ${visit.fieldWorkspace?.url ? `<a class="visit-link primary" href="${escapeHtml(visit.fieldWorkspace.url)}" target="_blank" rel="noreferrer">Open field workspace</a>` : ""}
-        ${providerPermissions().canBuildQuotes ? `<button class="visit-link accent open-quote" data-request-id="${escapeHtml(visit.requestId)}" type="button">Build quote</button>` : ""}
+        ${providerPermissions().canBuildQuotes ? `<button class="visit-link accent open-quote" data-request-id="${escapeHtml(visit.requestId)}" type="button">${visit.quote?.status === "countered_by_homeowner" ? "Open counter and re-quote" : "Build quote"}</button>` : ""}
       </div>
     </article>
   `;
@@ -1432,14 +1460,7 @@ function renderMessageThreadDetail() {
         <p class="section-eyebrow">Recent conversation</p>
         ${history.length ? `
           <div class="timeline-list">
-            ${history
-              .map((message) => `
-                <article class="timeline-entry">
-                  <div class="timeline-meta">${escapeHtml(message.senderRole)} · ${escapeHtml(shortDateTime(message.createdAt))}</div>
-                  <p class="card-copy">${escapeHtml(message.body)}</p>
-                </article>
-              `)
-              .join("")}
+            ${history.map(threadMessageMarkup).join("")}
           </div>
         ` : `<p class="card-copy">No messages have been sent yet. Your update here will start the Chez thread for this home.</p>`}
       </section>
@@ -1498,6 +1519,359 @@ function wireRequestActionButtons(container) {
       showTab("quotes");
     });
   });
+  wireSchedulingControls(container);
+}
+
+// Phase 73 sub-phase A: bidirectional scheduling controls.
+//
+// Renders a single "Visit scheduling" block above the message-thread
+// actions. Four states drive the markup:
+//
+//   1. Confirmed (visit.confirmedVisitAt non-null) — green readout, no
+//      buttons.
+//   2. Awaiting handyman (visit.proposedByRole === 'homeowner', not yet
+//      confirmed) — "Homeowner suggested {date}" + Accept + Counter.
+//   3. Awaiting homeowner (visit.proposedByRole === 'handyman', not yet
+//      confirmed) — "You suggested {date}, waiting on homeowner" +
+//      Update suggestion.
+//   4. No proposal yet — "Propose a visit time" form revealed inline.
+function schedulingBlockMarkup(visit) {
+  const requestId = visit.requestId;
+  if (!requestId) return "";
+
+  if (visit.confirmedVisitAt) {
+    return `
+      <div class="scheduling-block scheduling-confirmed" data-scheduling-block="${escapeHtml(requestId)}">
+        <p class="section-eyebrow">Visit scheduling</p>
+        <p class="scheduling-status"><strong>Confirmed</strong> · ${escapeHtml(formatScheduleDateTime(visit.confirmedVisitAt))}</p>
+      </div>
+    `;
+  }
+
+  if (visit.proposedVisitAt && visit.proposedByRole === "homeowner") {
+    return `
+      <div class="scheduling-block scheduling-awaiting-handyman" data-scheduling-block="${escapeHtml(requestId)}">
+        <p class="section-eyebrow">Visit scheduling</p>
+        <p class="scheduling-status">Homeowner suggested <strong>${escapeHtml(formatScheduleDateTime(visit.proposedVisitAt))}</strong>.</p>
+        <div class="scheduling-actions">
+          <button class="visit-link primary scheduling-accept" data-request-id="${escapeHtml(requestId)}" type="button">Accept</button>
+          <button class="visit-link scheduling-counter" data-request-id="${escapeHtml(requestId)}" data-existing="${escapeHtml(toDatetimeLocalValue(visit.proposedVisitAt))}" type="button">Counter</button>
+        </div>
+        ${schedulingFormMarkup(requestId, "")}
+      </div>
+    `;
+  }
+
+  if (visit.proposedVisitAt && visit.proposedByRole === "handyman") {
+    return `
+      <div class="scheduling-block scheduling-awaiting-homeowner" data-scheduling-block="${escapeHtml(requestId)}">
+        <p class="section-eyebrow">Visit scheduling</p>
+        <p class="scheduling-status">You suggested <strong>${escapeHtml(formatScheduleDateTime(visit.proposedVisitAt))}</strong>. Waiting on the homeowner.</p>
+        <div class="scheduling-actions">
+          <button class="visit-link scheduling-counter" data-request-id="${escapeHtml(requestId)}" data-existing="${escapeHtml(toDatetimeLocalValue(visit.proposedVisitAt))}" type="button">Update suggestion</button>
+        </div>
+        ${schedulingFormMarkup(requestId, toDatetimeLocalValue(visit.proposedVisitAt))}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="scheduling-block scheduling-empty" data-scheduling-block="${escapeHtml(requestId)}">
+      <p class="section-eyebrow">Visit scheduling</p>
+      <p class="scheduling-status">No date proposed yet. Propose a window — the homeowner will accept or counter.</p>
+      <div class="scheduling-actions">
+        <button class="visit-link primary scheduling-counter" data-request-id="${escapeHtml(requestId)}" data-existing="${escapeHtml(toDatetimeLocalValue(defaultScheduleStart()))}" type="button">Propose a date</button>
+      </div>
+      ${schedulingFormMarkup(requestId, toDatetimeLocalValue(defaultScheduleStart()))}
+    </div>
+  `;
+}
+
+function schedulingFormMarkup(requestId, defaultValue) {
+  return `
+    <form class="scheduling-form hidden" data-scheduling-form="${escapeHtml(requestId)}">
+      <label>
+        <span>Date and time</span>
+        <input type="datetime-local" name="scheduledAt" value="${escapeHtml(defaultValue || "")}" required>
+      </label>
+      <label>
+        <span>Note (optional)</span>
+        <input type="text" name="note" placeholder="What does the homeowner need to know?">
+      </label>
+      <div class="scheduling-form-actions">
+        <button class="visit-link" type="button" data-scheduling-cancel="${escapeHtml(requestId)}">Cancel</button>
+        <button class="visit-link primary" type="submit">Send</button>
+      </div>
+      <p class="scheduling-feedback hidden" data-scheduling-feedback="${escapeHtml(requestId)}"></p>
+    </form>
+  `;
+}
+
+function wireSchedulingControls(container) {
+  container.querySelectorAll(".scheduling-counter").forEach((button) => {
+    button.addEventListener("click", () => {
+      const requestId = button.dataset.requestId;
+      const form = container.querySelector(`[data-scheduling-form="${requestId}"]`);
+      if (!form) return;
+      const existing = button.dataset.existing;
+      const input = form.querySelector('input[name="scheduledAt"]');
+      if (input && existing) input.value = existing;
+      form.classList.remove("hidden");
+      input?.focus();
+    });
+  });
+
+  container.querySelectorAll("[data-scheduling-cancel]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const requestId = button.dataset.schedulingCancel;
+      const form = container.querySelector(`[data-scheduling-form="${requestId}"]`);
+      form?.classList.add("hidden");
+      const feedback = container.querySelector(`[data-scheduling-feedback="${requestId}"]`);
+      if (feedback) {
+        feedback.textContent = "";
+        feedback.classList.add("hidden");
+      }
+    });
+  });
+
+  container.querySelectorAll("[data-scheduling-form]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const requestId = form.dataset.schedulingForm;
+      const scheduledAtValue = form.querySelector('input[name="scheduledAt"]')?.value;
+      const note = form.querySelector('input[name="note"]')?.value || "";
+      const feedback = container.querySelector(`[data-scheduling-feedback="${requestId}"]`);
+      if (!scheduledAtValue) {
+        if (feedback) {
+          feedback.textContent = "Pick a date and time.";
+          feedback.classList.remove("hidden");
+        }
+        return;
+      }
+      try {
+        await providerRequest("POST", {
+          action: "propose_visit_time",
+          workspaceId: state.dashboard.workspace.id,
+          requestId,
+          proposedAt: new Date(scheduledAtValue).toISOString(),
+          note,
+        });
+        await refreshWorkspace();
+        renderMessageThreadDetail();
+        setFeedback(dom.authFeedback, "Time proposed. Homeowner will accept or counter.");
+      } catch (error) {
+        if (feedback) {
+          feedback.textContent = error?.message || "Couldn't send the proposal. Try again.";
+          feedback.classList.remove("hidden");
+        }
+      }
+    });
+  });
+
+  container.querySelectorAll(".scheduling-accept").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const requestId = button.dataset.requestId;
+      try {
+        button.disabled = true;
+        button.textContent = "Confirming…";
+        await providerRequest("POST", {
+          action: "accept_visit_time",
+          workspaceId: state.dashboard.workspace.id,
+          requestId,
+        });
+        await refreshWorkspace();
+        renderMessageThreadDetail();
+        setFeedback(dom.authFeedback, "Confirmed. The homeowner will see the locked-in time.");
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = "Accept";
+        setFeedback(dom.authFeedback, error?.message || "Couldn't accept the time. Try again.", true);
+      }
+    });
+  });
+}
+
+// Phase 73: render a single thread message. Schedule events
+// (`metadata.kind` of "propose_time" / "accept_time") get distinct
+// system-event styling — calendar icon and contextual headline — so
+// they don't visually blend with free-text replies. Unknown kinds and
+// legacy messages with empty metadata fall back to the text shape.
+function threadMessageMarkup(message) {
+  const kind = (message?.metadata && message.metadata.kind) || "text";
+  const senderLabel = providerSenderLabel(message?.senderRole);
+  const time = shortDateTime(message?.createdAt);
+
+  if (kind === "propose_time") {
+    const proposedAt = message?.metadata?.proposed_at ? formatScheduleDateTime(message.metadata.proposed_at) : "";
+    const headline = proposedAt
+      ? `${senderLabel} proposed ${proposedAt}`
+      : `${senderLabel} proposed a new visit time`;
+    const noteIsRedundant = !message?.body || /^proposed /i.test(String(message.body).trim());
+    return `
+      <article class="timeline-entry timeline-system timeline-system-proposal">
+        <div class="timeline-system-row">
+          <span class="timeline-system-icon" aria-hidden="true">📅</span>
+          <div>
+            <strong>${escapeHtml(headline)}</strong>
+            <div class="timeline-meta">${escapeHtml(senderLabel)} · ${escapeHtml(time)}</div>
+          </div>
+        </div>
+        ${!noteIsRedundant ? `<p class="card-copy">${escapeHtml(message.body)}</p>` : ""}
+      </article>
+    `;
+  }
+
+  if (kind === "accept_time") {
+    const confirmedAt = message?.metadata?.confirmed_at ? formatScheduleDateTime(message.metadata.confirmed_at) : "";
+    const headline = confirmedAt
+      ? `${senderLabel} confirmed ${confirmedAt}`
+      : `${senderLabel} confirmed the visit time`;
+    return `
+      <article class="timeline-entry timeline-system timeline-system-confirmation">
+        <div class="timeline-system-row">
+          <span class="timeline-system-icon" aria-hidden="true">✅</span>
+          <div>
+            <strong>${escapeHtml(headline)}</strong>
+            <div class="timeline-meta">${escapeHtml(senderLabel)} · ${escapeHtml(time)}</div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  if (kind === "decline_time") {
+    return `
+      <article class="timeline-entry timeline-system timeline-system-decline">
+        <div class="timeline-system-row">
+          <span class="timeline-system-icon" aria-hidden="true">⛔</span>
+          <div>
+            <strong>${escapeHtml(senderLabel)} declined the proposed time</strong>
+            <div class="timeline-meta">${escapeHtml(senderLabel)} · ${escapeHtml(time)}</div>
+          </div>
+        </div>
+        ${message?.body ? `<p class="card-copy">${escapeHtml(message.body)}</p>` : ""}
+      </article>
+    `;
+  }
+
+  return `
+    <article class="timeline-entry">
+      <div class="timeline-meta">${escapeHtml(senderLabel)} · ${escapeHtml(time)}</div>
+      <p class="card-copy">${escapeHtml(message?.body || "")}</p>
+    </article>
+  `;
+}
+
+function providerSenderLabel(role) {
+  switch ((role || "").toLowerCase()) {
+    case "homeowner":
+      return "Homeowner";
+    case "vendor":
+      return "You";
+    case "haven":
+      return "Chez";
+    default:
+      return role ? role.charAt(0).toUpperCase() + role.slice(1) : "Update";
+  }
+}
+
+// Phase 73 sub-phase B: surface a colored chip for the quote status.
+// Countered quotes pop in salmon to draw the provider's eye; signed
+// (approved) quotes stay green. Other states fall back to the legacy
+// success chip so existing screenshots / muscle memory don't shift.
+function quoteStatusChip(quote) {
+  if (!quote || !quote.statusLabel) return "";
+  const label = `${quote.statusLabel} · ${money(quote.total || 0)}`;
+  if (quote.status === "countered_by_homeowner") {
+    return statusChip(label, "warning");
+  }
+  if (quote.status === "approved" || quote.signedName) {
+    return statusChip(label, "success");
+  }
+  return statusChip(label, "success");
+}
+
+// Phase 73 sub-phase B: when the homeowner countered, show a callout
+// summarizing what they changed so the provider doesn't have to open
+// the builder to see the new total.
+function quoteCounterAlertMarkup(visit) {
+  if (!visit.quote || visit.quote.status !== "countered_by_homeowner") return "";
+  const newTotal = money(visit.quote.total || 0);
+  const note = compactQuoteNote(visit.quote.homeownerMessage);
+  const revisedAt = visit.quote.homeownerRevisedAt
+    ? formatScheduleDateTime(visit.quote.homeownerRevisedAt)
+    : "";
+  return `
+    <div class="quote-alert quote-alert-counter">
+      <div class="quote-alert-row">
+        <span class="quote-alert-icon" aria-hidden="true">📝</span>
+        <div>
+          <strong>Homeowner countered with ${escapeHtml(newTotal)}</strong>
+          ${revisedAt ? `<div class="timeline-meta">${escapeHtml(revisedAt)}</div>` : ""}
+        </div>
+      </div>
+      ${note ? `<p class="card-copy">${escapeHtml(note)}</p>` : ""}
+      <p class="quote-alert-helper">Open the counter to accept it as-is, or edit the line items and send a revised quote back.</p>
+    </div>
+  `;
+}
+
+// Phase 73 sub-phase B: signed-and-approved confirmation. Lets the
+// provider see who signed and when without leaving the thread.
+function quoteSignedAlertMarkup(visit) {
+  if (!visit.quote || !visit.quote.signedName) return "";
+  const total = money(visit.quote.total || 0);
+  const when = visit.quote.signedAt ? formatScheduleDateTime(visit.quote.signedAt) : "";
+  return `
+    <div class="quote-alert quote-alert-signed">
+      <div class="quote-alert-row">
+        <span class="quote-alert-icon" aria-hidden="true">✍️</span>
+        <div>
+          <strong>${escapeHtml(visit.quote.signedName)} signed for ${escapeHtml(total)}</strong>
+          ${when ? `<div class="timeline-meta">${escapeHtml(when)}</div>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function compactQuoteNote(text) {
+  if (!text || typeof text !== "string") return "";
+  return text.trim();
+}
+
+function formatScheduleDateTime(value) {
+  if (!value) return "";
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function toDatetimeLocalValue(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  // datetime-local expects YYYY-MM-DDTHH:MM in local time, no timezone.
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function defaultScheduleStart() {
+  const date = new Date();
+  date.setDate(date.getDate() + 2);
+  date.setHours(10, 0, 0, 0);
+  return date;
 }
 
 function wireDispatchButtons() {
@@ -1778,6 +2152,7 @@ function renderWorkspace() {
   renderRecentWork();
   renderThreads(dom.messagesList, dashboard.messages, "Homeowner threads will show up here as soon as they start messaging your team.");
   hydrateQuotePicker();
+  loadDirectoryForm();
 
   if (!state.selectedRequestId && dashboard.messages.length) {
     selectRequest(dashboard.messages[0].requestId);
@@ -2040,6 +2415,76 @@ async function inviteTeamMember(event) {
   }
 }
 
+// Chez v1: directory listing — homeowner-side find-a-handyman discovery.
+// Reads the current values directly from `provider_workspaces` via the
+// user's RLS-scoped session (members can SELECT their workspace).
+// Saves go through `update_workspace_directory` on handyman-provider so
+// service-role writes happen with workspace-membership verification.
+async function loadDirectoryForm() {
+  if (!dom.directoryForm || !state.dashboard?.workspace?.id) return;
+  try {
+    const { data, error } = await supabase
+      .from("provider_workspaces")
+      .select(
+        "is_listed_in_directory, service_state, service_city, service_zip_codes, categories, display_blurb, headshot_url",
+      )
+      .eq("id", state.dashboard.workspace.id)
+      .maybeSingle();
+    if (error) throw error;
+    const row = data || {};
+    dom.directoryListed.checked = Boolean(row.is_listed_in_directory);
+    dom.directoryState.value = row.service_state || "";
+    dom.directoryCity.value = row.service_city || "";
+    dom.directoryZips.value = Array.isArray(row.service_zip_codes)
+      ? row.service_zip_codes.join(", ")
+      : "";
+    const cats = Array.isArray(row.categories) && row.categories.length > 0 ? row.categories : ["handyman"];
+    dom.directoryCategories.value = cats.join(", ");
+    dom.directoryBlurb.value = row.display_blurb || "";
+    dom.directoryHeadshot.value = row.headshot_url || "";
+    if (dom.directoryStatusPill) {
+      dom.directoryStatusPill.textContent = row.is_listed_in_directory ? "Listed" : "Hidden";
+    }
+    setFeedback(dom.directoryFeedback, "");
+  } catch (error) {
+    setFeedback(dom.directoryFeedback, error.message || "Could not load directory settings.", true);
+  }
+}
+
+async function saveDirectoryListing(event) {
+  event.preventDefault();
+  if (!state.dashboard?.workspace?.id) return;
+  setFeedback(dom.directoryFeedback, "Saving…");
+  dom.directorySaveButton.disabled = true;
+  try {
+    const payload = await providerRequest("POST", {
+      action: "update_workspace_directory",
+      workspaceId: state.dashboard.workspace.id,
+      isListedInDirectory: dom.directoryListed.checked,
+      serviceState: dom.directoryState.value.trim(),
+      serviceCity: dom.directoryCity.value.trim(),
+      serviceZipCodes: dom.directoryZips.value.trim(),
+      categories: dom.directoryCategories.value.trim(),
+      displayBlurb: dom.directoryBlurb.value.trim(),
+      headshotUrl: dom.directoryHeadshot.value.trim(),
+    });
+    const ws = payload.workspace || {};
+    if (dom.directoryStatusPill) {
+      dom.directoryStatusPill.textContent = ws.is_listed_in_directory ? "Listed" : "Hidden";
+    }
+    setFeedback(
+      dom.directoryFeedback,
+      ws.is_listed_in_directory
+        ? "Saved. Homeowners in your service area can now find you in the Chez app."
+        : "Saved. Listing is hidden from homeowners.",
+    );
+  } catch (error) {
+    setFeedback(dom.directoryFeedback, error.message || "Save failed.", true);
+  } finally {
+    dom.directorySaveButton.disabled = false;
+  }
+}
+
 async function signIn(event) {
   event.preventDefault();
   setFeedback(dom.authFeedback, "");
@@ -2125,6 +2570,7 @@ function bindEvents() {
   dom.messageForm.addEventListener("submit", sendMessage);
   dom.savedItemForm.addEventListener("submit", saveLineItem);
   dom.teamForm.addEventListener("submit", inviteTeamMember);
+  dom.directoryForm.addEventListener("submit", saveDirectoryListing);
   dom.newQuoteButton.addEventListener("click", () => {
     showTab("quotes");
     openQuoteBuilder();

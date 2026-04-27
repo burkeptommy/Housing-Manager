@@ -1,0 +1,10 @@
+# Operations Desk — Vite + React + TypeScript
+# Vercel runs `npm install && npm run build` from this directory at
+# deploy time, so node_modules and dist are not checked in.
+
+node_modules/
+dist/
+*.log
+*.tsbuildinfo
+.DS_Store
+.vite/

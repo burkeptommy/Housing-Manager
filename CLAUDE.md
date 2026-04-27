@@ -73,9 +73,10 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 - Full dark mode support with adaptive indigo-purple dark surfaces
 
 ### Typography (see `Haven/Shared/Theme/HavenTypography.swift`)
-- **Fraunces serif** for DISPLAY elements: headlines, titles, entity names, hero numbers
-- **Inter sans** for BODY text, labels, and UI chrome: descriptions, chat, buttons, metadata, tabs
-- Nav titles: Fraunces Bold. Body/chat: Inter 14pt. Section headers: Inter 10pt semibold ALL CAPS.
+**Phase 56.3 migrated off Fraunces + Inter to system fonts** to fix descender clipping at 15-16pt and remove Google Font load weight. The "18pt rule" stayed: serif above, sans below.
+- **New York serif** (`Font.system(..., design: .serif)`) for DISPLAY at 18pt+: page titles, hero numbers, brand moments. Matches Apple Books, Apple News, App Store editorial usage. Helper `HavenTypography.fraunces(size:weight:)` is retained as a bridge — it now returns New York serif at the requested size, no Fraunces variable axis.
+- **SF Pro** (`Font.system(...)`) for BODY below 18pt: card titles, descriptions, chat, buttons, metadata, tabs. Zero clipping, perfect SF Symbol alignment.
+- Nav titles: 17pt Bold serif. Body/chat: 14pt sans. Section headers: 10pt semibold ALL CAPS sans.
 
 ### Spacing & Layout (see `Haven/Shared/Theme/HavenTheme.swift`)
 - 4pt grid. Page margin: 20pt. Card radius: 16pt. Button radius: 14pt.
@@ -92,7 +93,7 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 |-----|-------|-------|------|-----------|
 | Dashboard | 0 | Dashboard | `square.grid.2x2.fill` | `DashboardView` |
 | Property | 1 | Property | `building.columns.fill` | `PropertyListView` |
-| Life | 2 | Life | `heart.text.square.fill` | `DocumentVaultView` |
+| Tasks | 2 | Tasks | custom checklist glyph | `TasksHubView` (V5 — title-switcher between `MaintenanceTabView` and `HandymanTabView`) |
 | Alfred | 3 | Alfred | Serif "A" monogram circle | `ChatView` |
 
 **Floating Action Button:** "What If?" sparkles button on every tab except Alfred. Opens `ScenarioStudioView` as fullScreenCover. Collapses to icon-only after first use.
@@ -701,6 +702,57 @@ The "Services" and "Vehicle Programs" user-facing concepts ship entirely on top 
 - Do not add a post-quiz "Set up 3 services" screen — Q15b already captures contractors; routines are created inline there
 
 **Analytics events**: `routineVendorTasksLinked`, `vehicleRoutineTasksLinked`, `routineActivated`, `routineArchivedFromServices`, `pendingVendorRoutineCreated`, `day1CuratorRan`, `day1CuratorTaskRoutedHandyman`, `day1CuratorTaskRoutedVendor`, `day1CuratorTaskRoutedPendingVendor`, `maintenanceReorganizedCardViewed`, `maintenanceReorganizedCardDismissed`, `yourServicesOpened`, `nextHandymanVisitOpened`, `vehicleRoutineOpened`, `routineDetailOpened`, `seeFullYearTapped`.
+
+## Tasks Tab V5 Redesign (Phase 67)
+
+Replaces the Phase 66 `MaintenanceHubView` lobby (8 sections) with a focused 6-section narrative behind a serif title-switcher in `TasksHubView`. Two sibling screens — `MaintenanceTabView` and `HandymanTabView` — sit at `Haven/Features/Tasks/Views/`. Mode persists across sessions via `@AppStorage("tasksHubMode")`. The legacy `MaintenanceHubView` and `HandymanHubView` files remain alive — `PropertyDetailView` still pushes `MaintenanceHubView(filterPropertyId:)` for the property-scoped lobby; only the Tasks tab itself uses V5.
+
+**Maintenance screen** (`MaintenanceTabView`): HeaderSwitcher · YearRibbon (4 season tiles, active 50% wider, NOW chip on current-season tile) · MiniHero (% covered + 3 stats: programs / decisions / bundle-ready) · Needs your decision (salmon-wash rows for `routines.where { setupState == .pendingVendor }`) · Active programs (white rows + green ON pill) · Vehicles (with "Set up →" when `shop_contractor_id` null) · BrowseBand. Tap a season tile to scope sections 4-6; current-season scope reads "this year", others read "this {season}". `MaintenanceTabViewModel.seasonSummaries(activeSeason:)` aggregates routines + tasks by `activeMonths` against the season's months.
+
+**Handyman screen** (`HandymanTabView`): HeaderSwitcher · VisitHero (indigo gradient + Schedule visit CTA + phone shortcut) · VendorCard (linked handyman or empty-state Find a handyman) · PunchList (circle checkboxes — tap fills green, archives after 500ms via `HandymanPunchListViewModel.archive(entry:)`) · Recommended (salmon "+" adds to punch list via `HandymanPunchItemInsert(source: "recommended")`) · WhatWeHandleBand · VisitHistory (dashed empty card or past-visits list). Tap "Schedule visit" or "View all →" pushes the existing `HandymanPunchListView`.
+
+**V5 component primitives** at `Haven/Features/Tasks/Views/Components/`: `TasksV5Tokens` (season tints + indigo hero/band gradients + shadow recipes — keeps `Haven/Shared/Theme/HavenColors.swift` clean), `IconTile`, `SectionLabel` + `ArrowLink`, `HeaderSwitcher`, `IndigoGradientCard`, `MiniHeroContent`, `VisitHeroContent`, `BrowseBand`, `WhatWeHandleBand`, `YearRibbon` (drives off `Season` enum + `season.months` extension), `DecisionRow` / `ProgramRow` / `VehicleProgramRow` (renamed from `VehicleRow` to avoid clash with `DatabaseModels.swift`'s Codable row), `VendorCard`, `PunchListCard` (consumes `PunchListItem` with String id matching `HandymanPunchEntry.id`), `RecommendedRow`, `VisitHistoryEmptyCard`. Every primitive consumes `HavenColors.*` and `HavenTypography.*` — no new tokens added to the Theme layer.
+
+**Deep-dive preserved.** Every "See all →" / "View all →" / "Set up →" routes into the existing surfaces:
+- Decisions "See all" → `MaintenanceScheduleView(filterPropertyId:)` (Phase 56.4–56.6 workshop — list/calendar layouts, stats-pill filters, duplicate review banner, pinned routines strip, inline handyman quick-add — all preserved)
+- Programs "See all" → `RoutinesListView(householdId:propertyId:)` (Phase 55.3)
+- Punch list "View all" → `HandymanPunchListView(householdId:propertyId:)` (Phase 54B.1-3)
+- BrowseBand → `RecommendedServicesView(householdId:propertyId:)` (Phase 54C)
+- DashboardView's existing `MaintenanceScheduleView(initialLayout: .calendar)` push is unchanged
+
+Decision rows wire through a small `DecisionVendorPicker` wrapper around the existing `ContractorPickerSheet(systemCategory:onSelect:)` — selecting a contractor sets `RoutineUpdate.vendorId` and flips `setupState` to `.active` via `DatabaseService.updateRoutine(id:_:)`.
+
+## Chez Handyman Operations Desk (Web — Phase 67)
+
+Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces the 9 embedded workspace tabs that `handyman.html` was inflating after auth. Lives at `/operations/*` routes; `handyman.html` keeps the auth pitch + sign-in/sign-up form and redirects to `/operations/` after a successful session, preserving `?next=` deep links from the SPA.
+
+**Stack:** React 18 + TypeScript + Vite 5 + React Router v6 + `@supabase/supabase-js` v2. Plain CSS modules + `chez.css` tokens via `<link>`. No CSS-in-JS, no icon font (inline SVG `Icon.tsx` library, stroke 1.8 round caps, ~24 icons). Build emits to `website/operations/dist/`.
+
+**Modes:** `WorkspaceProvider` reads `provider_workspace_members` for the signed-in user, then loads the workspace + full roster in parallel. `mode = members.length > 1 ? "crew" : "sole"`, overridable via `?mode=sole|crew`. Sole mode hides the Crew nav item, swaps Crew today → Today (you), uses the personal hero copy ("Four stops today, finished by 3:30"). Crew mode adds the Crew workload strip on Overview + operational hero ("Own the queue, route the field team").
+
+**Eight routes:**
+| Route | File | Purpose |
+|---|---|---|
+| `/` | `screens/Overview.tsx` | Hero banner + KPI strip + 2-col body (Field board / Decision queue + Pipeline + Threads) + crew workload (crew mode) |
+| `/dispatch` | `screens/Dispatch.tsx` | 3-col grid (Unassigned 320 / Lanes 1fr / Assign panel 360). Selected card has salmon-50 bg + 3px salmon left-border. Best-fit tech in Assign panel gets salmon border + "Best fit" success pill. |
+| `/calendar` | `screens/Calendar.tsx` | Day/Week/Month toggle + 7-col month grid + tech filter chips. Today: salmon pill + salmon-50 cell bg. |
+| `/routes` | `screens/Routes.tsx` | 3-col tech route cards. Each has SVG mini-map preview (gradient bg + dashed indigo path + numbered salmon stop circles) + numbered stop list with index circle + connector line. |
+| `/crew` | `screens/Crew.tsx` | 2-col Roster / Profile + Permissions + Activity. Profile gradient indigo header. Permissions toggles in salmon. |
+| `/homes` | `screens/Homes.tsx` | Toolbar + 3-up home cards (gradient header + roof SVG + 3-up Stats + History/New visit buttons) + service history table. |
+| `/quotes` | `screens/Quotes.tsx` | 2-col Pipeline + Saved-line-items library / Quote builder spreadsheet (drag grip + line items + live totals: subtotal · materials markup · tax · 26pt serif total). |
+| `/messages` | `screens/Messages.tsx` | 3-col Inbox 320 / Thread 1fr / Selected-client rail 320. Thread has white "their" bubbles + indigo "ours" bubbles + system events as success pills + suggestion chips composer + Alfred suggestion card. |
+
+**Chrome primitives** at `website/operations/src/components/chrome/`: `Sidebar` (248px wide, deep-indigo `#2A2252` bg, brand row + workspace switcher + nav with active salmon-glow border + footer), `Topbar` (sticky pearl-with-blur bg, eyebrow + serif title + breadcrumb + 240px search + bell + per-route primary CTA via `ROUTE_META`), `Pill` (7 tones), `Card` (default + tight padding + hoverable), `Avatar` (initials + color), `StatTile`, `EmptyState`, `Icon`.
+
+**Data wiring:** Every screen v1-fixture-backed via `lib/fixtures.ts` (verbatim port of the design handoff's `data.jsx` so screenshot diffs match the prototype). The fixtures shape mirrors the Supabase row types in `lib/types.ts` (`ProviderWorkspace`, `ProviderWorkspaceMember`, `HandymanRequest`, `ProviderVisitAssignment`, `ProviderQuote`, `ProviderQuoteLineItem`, `ProviderSavedQuoteItem`, `HandymanRequestMessage`) — swap in real queries via Supabase client by extending `WorkspaceProvider` or adding a `lib/api.ts` layer. RLS already gates per-workspace via `provider_workspace_members.user_id = auth.uid()` (Phase 71/72 migrations).
+
+**Auth flow:** `WorkspaceProvider.refresh()` calls `supabase.auth.getSession()` on mount + `onAuthStateChange`. Unauth → `window.location.assign("/handyman.html?next=…")`. `handyman.js` post-auth redirect (line ~470) swaps the legacy `renderWorkspace()` for `window.location.assign(safeNext)`, defaulting to `/operations/`. The legacy embedded workspace DOM in `handyman.html` is unreachable post-redirect but kept in place as a fallback.
+
+**Deployment:** `website/Dockerfile` is now multi-stage — `node:20-alpine` builds the SPA → `nginx:alpine` serves both `handyman.html` (vanilla auth pitch) and `/operations/*` (React SPA). `nginx.conf` gained a `location /operations/` block with SPA-fallback rewrite (`try_files $uri $uri/ /operations/index.html`) so React Router owns every `/operations/*` route. `chez.css` + `favicon.svg` are now COPY'd into the image (previously missing — referenced by both vanilla pages and the Operations Desk's `<link rel="stylesheet" href="/chez.css">`).
+
+**Mobile:** `<768px` shows a "Use the field app on your phone" interstitial linking to `/handyman-visit.html`. Tablet 768–1279px collapses 3-col layouts (Dispatch, Messages) to single column.
+
+**Local dev:** `cd website/operations && npm install && npm run dev` runs Vite at `localhost:5173/operations/`. Use `python3 -m http.server 8000` from `website/` in another terminal so Vite's proxy can forward `/handyman.html` for the auth flow. Production build: `npm run build` emits to `dist/` → Docker stage 1 picks it up.
 
 ## Progress Tracking
 
