@@ -12,8 +12,10 @@ struct HandymanVisitDetailSheet: View {
     let vendor: ContractorRow?
     let children: [VisitChildItem]
     let onMessage: () -> Void
+    var onReviewQuote: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var coordinator = HandymanRequestCoordinator.shared
     @State private var showRescheduleSheet = false
     @State private var showCancelConfirm = false
 
@@ -46,6 +48,12 @@ struct HandymanVisitDetailSheet: View {
                     actionRow
                         .padding(.horizontal, 20)
                         .padding(.bottom, 24)
+
+                    if let q = coordinator.quote, let review = onReviewQuote {
+                        VisitDetailQuoteCard(quote: q, vendor: vendor, onTap: review)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
+                    }
 
                     statusSection
                         .padding(.horizontal, 20)
@@ -367,6 +375,65 @@ private struct VisitChildDetailRow: View {
                     .padding(.horizontal, 14)
             }
         }
+    }
+}
+
+// Sub-card on the visit detail sheet that surfaces the attached quote.
+// Tap opens the full quote review sheet via the parent's onReviewQuote
+// callback.
+private struct VisitDetailQuoteCard: View {
+    let quote: ProviderQuoteRow
+    let vendor: ContractorRow?
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(HavenColors.actionPale)
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(HavenColors.actionPressed)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("QUOTE FROM \(vendor?.companyName.uppercased() ?? "HANDYMAN")")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text(formatCurrency(quote.total))
+                        .font(HavenTypography.fraunces(size: 22, weight: 700))
+                        .tracking(-0.4)
+                        .foregroundStyle(HavenColors.navy900)
+                    Text("\(quote.lineItems.count) item\(quote.lineItems.count == 1 ? "" : "s") · Tap to review")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(HavenColors.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(HavenColors.beige200, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(Int(value))"
     }
 }
 
