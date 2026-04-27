@@ -28,6 +28,10 @@ const dom = {
   responseFeedback: document.getElementById("response-feedback"),
   lineItemList: document.getElementById("line-item-list"),
   quoteTimeline: document.getElementById("quote-timeline"),
+  signatureOverlay: document.getElementById("signature-overlay"),
+  signatureName: document.getElementById("signature-name"),
+  signatureConfirm: document.getElementById("signature-confirm"),
+  signatureCancel: document.getElementById("signature-cancel"),
 };
 
 const state = {
@@ -65,7 +69,20 @@ function shortDate(value) {
 
 function setFeedback(text, isError = false) {
   dom.responseFeedback.textContent = text || "";
-  dom.responseFeedback.style.color = text ? (isError ? "#c65241" : "#2f8b65") : "";
+  dom.responseFeedback.classList.toggle("error", Boolean(text && isError));
+}
+
+function openSignatureModal() {
+  if (!dom.signatureOverlay) return;
+  // Pre-fill from the response form's name field if present
+  dom.signatureName.value = (dom.responseName.value || "").trim();
+  dom.signatureConfirm.disabled = !dom.signatureName.value.trim();
+  dom.signatureOverlay.classList.remove("hidden");
+  setTimeout(() => dom.signatureName.focus(), 80);
+}
+
+function closeSignatureModal() {
+  dom.signatureOverlay?.classList.add("hidden");
 }
 
 function chip(label, tone = "") {
@@ -214,9 +231,42 @@ function bindEvents() {
     }
   });
 
-  dom.approveQuote.addEventListener("click", () => respondToQuote("approved"));
+  // Approve gates through the signature modal — typed name acts as the
+  // homeowner's authorization, mirroring the iOS HandymanQuoteReviewSheet.
+  dom.approveQuote.addEventListener("click", () => {
+    if (state.quote?.status === "approved") return;
+    openSignatureModal();
+  });
   dom.declineQuote.addEventListener("click", () => respondToQuote("declined"));
   dom.askQuestion.addEventListener("click", () => respondToQuote("question"));
+
+  if (dom.signatureOverlay) {
+    dom.signatureName.addEventListener("input", () => {
+      dom.signatureConfirm.disabled = !dom.signatureName.value.trim();
+    });
+    dom.signatureCancel.addEventListener("click", closeSignatureModal);
+    dom.signatureOverlay.addEventListener("click", (event) => {
+      if (event.target === dom.signatureOverlay) closeSignatureModal();
+    });
+    dom.signatureConfirm.addEventListener("click", async () => {
+      const signed = dom.signatureName.value.trim();
+      if (!signed) return;
+      // Sync the typed name back into the response form so the server
+      // has it on the record.
+      dom.responseName.value = signed;
+      dom.signatureConfirm.disabled = true;
+      dom.signatureConfirm.textContent = "Approving…";
+      await respondToQuote("approved");
+      dom.signatureConfirm.textContent = "Approve quote";
+      dom.signatureConfirm.disabled = false;
+      closeSignatureModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !dom.signatureOverlay.classList.contains("hidden")) {
+        closeSignatureModal();
+      }
+    });
+  }
 }
 
 async function init() {

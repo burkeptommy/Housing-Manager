@@ -5,147 +5,137 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Chez Handyman Quote</title>
   <meta name="description" content="Review and respond to your Chez Handyman quote.">
-  <meta name="theme-color" content="#ED6955">
-  <link rel="stylesheet" href="handyman-quote.css?v=20260423-quote1">
+  <meta name="theme-color" content="#453A70">
+  <link rel="stylesheet" href="chez.css?v=20260423">
+  <link rel="stylesheet" href="handyman-quote.css?v=20260427-quote2">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="chez-handyman-logo.png">
-  <style>
-    /* Chez Handyman brand mark for the homeowner-facing quote review. */
-    .chez-brand-block {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 18px;
-      text-decoration: none;
-      color: inherit;
-    }
-    .chez-brand-block img {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      object-fit: cover;
-      box-shadow: 0 4px 12px rgba(42, 34, 82, 0.18);
-      flex-shrink: 0;
-    }
-    .chez-brand-text {
-      font-family: ui-serif, "New York", Georgia, serif;
-      font-weight: 500;
-      font-size: 22px;
-      letter-spacing: -0.015em;
-      color: #2A2252;
-    }
-  </style>
 </head>
 <body>
   <main class="quote-page">
-    <section class="quote-shell">
-      <header class="quote-hero">
-        <a href="/" class="chez-brand-block" aria-label="Chez home">
-          <img src="chez-handyman-logo.png" alt="Chez Handyman">
-          <span class="chez-brand-text">chez handyman</span>
-        </a>
-        <p class="eyebrow">Chez Handyman</p>
-        <h1 id="quote-title">Loading your quote</h1>
-        <p class="lede" id="quote-lede">Review the scope, ask a question, approve it, or decline it.</p>
-        <div class="hero-chips" id="quote-hero-chips"></div>
-      </header>
+    <header class="quote-hero">
+      <a href="/" class="chez-brand-block" aria-label="Chez home">
+        <img src="chez-handyman-logo.png" alt="">
+        <span class="chez-brand-text">chez handyman</span>
+      </a>
+      <p class="eyebrow">Quote review</p>
+      <h1 id="quote-title">Loading your quote</h1>
+      <p class="lede" id="quote-lede">Review the scope, ask a question, approve it, or decline it.</p>
+      <div class="hero-chips" id="quote-hero-chips"></div>
+    </header>
 
-      <section class="quote-grid">
-        <article class="surface-card">
-          <div class="section-row">
-            <div>
-              <p class="section-eyebrow">Quote</p>
-              <h2 id="quote-status-title">Review</h2>
-            </div>
-            <span class="status-chip" id="quote-status-chip">Loading</span>
-          </div>
-          <div class="quote-total-card">
-            <span>Total</span>
-            <strong id="quote-total">$0.00</strong>
-            <p id="quote-audience"></p>
-          </div>
-          <div class="context-grid">
-            <div>
-              <span class="context-label">Company</span>
-              <strong id="quote-company">Loading</strong>
-            </div>
-            <div>
-              <span class="context-label">Home</span>
-              <strong id="quote-property">Loading</strong>
-            </div>
-            <div>
-              <span class="context-label">Sent</span>
-              <strong id="quote-sent-at">Loading</strong>
-            </div>
-            <div>
-              <span class="context-label">Share link</span>
-              <button class="inline-link" id="copy-quote-link" type="button">Copy link</button>
-            </div>
-          </div>
-          <div class="quote-note-card hidden" id="quote-note-card">
-            <p class="section-eyebrow">Note</p>
-            <p id="quote-note"></p>
-          </div>
-          <div class="quote-note-card hidden" id="quote-scope-card">
-            <p class="section-eyebrow">Scope notes</p>
-            <p id="quote-scope"></p>
-          </div>
-        </article>
-
-        <article class="surface-card">
-          <div class="section-row">
-            <div>
-              <p class="section-eyebrow">Respond</p>
-              <h2>Keep the job moving</h2>
-            </div>
-          </div>
-          <form class="response-form" id="response-form">
-            <div class="two-up">
-              <label>
-                <span>Your name</span>
-                <input id="response-name" type="text" placeholder="Optional">
-              </label>
-              <label>
-                <span>Email</span>
-                <input id="response-email" type="email" placeholder="Optional">
-              </label>
-            </div>
-            <label>
-              <span>Message</span>
-              <textarea id="response-body" rows="5" placeholder="Ask a question, confirm a detail, or add context for the handyman."></textarea>
-            </label>
-            <div class="button-row">
-              <button class="secondary-button" id="approve-quote" type="button">Approve quote</button>
-              <button class="ghost-button" id="ask-question" type="button">Send question</button>
-              <button class="decline-button" id="decline-quote" type="button">Decline</button>
-            </div>
-            <p class="feedback-copy" id="response-feedback"></p>
-          </form>
-        </article>
-      </section>
-
-      <section class="surface-card">
-        <div class="section-row">
-          <div>
-            <p class="section-eyebrow">Line items</p>
-            <h2>What’s included</h2>
-          </div>
+    <!-- Total + context -->
+    <section class="surface-card">
+      <div class="quote-total-row">
+        <div class="quote-total-stack">
+          <span class="total-label">Total</span>
+          <strong id="quote-total">$0.00</strong>
+          <p id="quote-audience"></p>
         </div>
-        <div class="line-item-list" id="line-item-list"></div>
-      </section>
+        <span class="status-chip" id="quote-status-chip">Loading</span>
+      </div>
 
-      <section class="surface-card">
-        <div class="section-row">
-          <div>
-            <p class="section-eyebrow">Collaboration</p>
-            <h2>Recent updates</h2>
-          </div>
+      <div class="context-grid">
+        <div class="context-cell">
+          <span class="context-label">Company</span>
+          <strong id="quote-company">—</strong>
         </div>
-        <div class="timeline-list" id="quote-timeline"></div>
-      </section>
+        <div class="context-cell">
+          <span class="context-label">Home</span>
+          <strong id="quote-property">—</strong>
+        </div>
+        <div class="context-cell">
+          <span class="context-label">Sent</span>
+          <strong id="quote-sent-at">—</strong>
+        </div>
+        <div class="context-cell">
+          <span class="context-label">Share link</span>
+          <button class="inline-link" id="copy-quote-link" type="button">Copy link</button>
+        </div>
+      </div>
+
+      <div class="quote-note-card hidden" id="quote-note-card">
+        <p class="section-eyebrow">From the homeowner</p>
+        <p id="quote-note"></p>
+      </div>
+      <div class="quote-note-card hidden" id="quote-scope-card">
+        <p class="section-eyebrow">Scope notes</p>
+        <p id="quote-scope"></p>
+      </div>
+    </section>
+
+    <!-- Line items -->
+    <section class="surface-card">
+      <div class="section-row">
+        <div>
+          <p class="section-eyebrow">Line items</p>
+          <h2 id="quote-status-title">What’s included</h2>
+        </div>
+      </div>
+      <div class="line-item-list" id="line-item-list"></div>
+    </section>
+
+    <!-- Respond -->
+    <section class="surface-card">
+      <div class="section-row">
+        <div>
+          <p class="section-eyebrow">Respond</p>
+          <h2>Keep the job moving</h2>
+        </div>
+      </div>
+      <form class="response-form" id="response-form">
+        <div class="two-up">
+          <label>
+            <span>Your name</span>
+            <input id="response-name" type="text" placeholder="Optional" autocomplete="name">
+          </label>
+          <label>
+            <span>Email</span>
+            <input id="response-email" type="email" placeholder="Optional" autocomplete="email">
+          </label>
+        </div>
+        <label>
+          <span>Message</span>
+          <textarea id="response-body" rows="4" placeholder="Ask a question, confirm a detail, or add context for the handyman."></textarea>
+        </label>
+        <div class="button-row">
+          <button class="primary-button" id="approve-quote" type="button">Approve quote</button>
+          <button class="ghost-button" id="ask-question" type="button">Send question</button>
+          <button class="decline-button" id="decline-quote" type="button">Decline</button>
+        </div>
+        <p class="feedback-copy" id="response-feedback"></p>
+      </form>
+    </section>
+
+    <!-- Activity -->
+    <section class="surface-card">
+      <div class="section-row">
+        <div>
+          <p class="section-eyebrow">Activity</p>
+          <h2>Recent updates</h2>
+        </div>
+      </div>
+      <div class="timeline-list" id="quote-timeline"></div>
     </section>
   </main>
 
-  <script type="module" src="handyman-quote.js?v=20260423-quote1"></script>
+  <!-- Signature modal — fires on approve -->
+  <div class="signature-overlay hidden" id="signature-overlay" role="dialog" aria-labelledby="signature-title" aria-modal="true">
+    <div class="signature-card">
+      <p class="eyebrow">Authorize the work</p>
+      <h2 id="signature-title">Sign to approve</h2>
+      <p class="signature-sub">Type your full name to authorize this quote. The handyman will be notified instantly.</p>
+      <label>
+        <span>Your name</span>
+        <input id="signature-name" type="text" placeholder="Type your full name" autocomplete="name">
+      </label>
+      <div class="signature-row">
+        <button class="ghost-button" id="signature-cancel" type="button">Cancel</button>
+        <button class="primary-button" id="signature-confirm" type="button" disabled>Approve quote</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="handyman-quote.js?v=20260427-quote2"></script>
 </body>
 </html>
