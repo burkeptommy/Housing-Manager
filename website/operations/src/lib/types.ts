@@ -95,6 +95,8 @@ export interface VisitTaskRef {
   title: string;
   scheduledDate: string;
   dueDate: string;
+  notes?: string;
+  description?: string;
 }
 
 export interface FieldWorkspace {

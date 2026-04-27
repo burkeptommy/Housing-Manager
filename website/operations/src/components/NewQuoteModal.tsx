@@ -15,6 +15,15 @@ interface OpenOpts {
   propertyId?: string;
   requestId?: string;
   title?: string;
+  suggestions?: SuggestedLine[];
+}
+
+interface SuggestedLine {
+  name: string;
+  description?: string;
+  unit?: string;
+  quantity?: number;
+  unitPrice?: number;
 }
 
 const _openTrigger: { current: ((opts?: OpenOpts) => void) | null } = { current: null };
@@ -72,9 +81,20 @@ export function NewQuoteModal() {
       setPropertyId(opts?.propertyId ?? null);
       setRequestId(opts?.requestId ?? null);
       setTitle(opts?.title ?? "");
-      setLines([]);
       setScopeNotes("");
       setHomeownerMessage("");
+      // Pre-populate from suggestions (e.g. punch list items from a
+      // visit). Each suggestion becomes an editable draft line so the
+      // handyman can adjust quantity/price before sending.
+      const seeded = (opts?.suggestions ?? []).map((s, i) => ({
+        key: `seed-${Date.now()}-${i}`,
+        name: s.name,
+        description: s.description ?? "",
+        unit: s.unit ?? "ea",
+        quantity: s.quantity ?? 1,
+        unitPrice: s.unitPrice ?? 0,
+      }));
+      setLines(seeded);
     };
     return () => {
       _openTrigger.current = null;

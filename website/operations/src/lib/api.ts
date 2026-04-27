@@ -119,3 +119,67 @@ export function isToday(iso: string | null | undefined): boolean {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   return day === todayStr;
 }
+
+// ─── Visit punch list parser ───────────────────────────────────
+
+/**
+ * Parses a maintenance_task's notes column into individual punch list
+ * items. Recognises lines starting with `-`, `•`, `*`, or numeric `1.`/
+ * `1)` markers. Strips header lines ("Punch list:", "What's included:")
+ * and pulls duration markers ("~15 min", "(15 min)") into a separate
+ * field. Mirrors the iOS VisitNotesParser.
+ */
+export interface PunchListItem {
+  id: string;
+  title: string;
+  estimatedMinutes: number | null;
+}
+
+export function parsePunchList(notes: string | null | undefined): PunchListItem[] {
+  if (!notes) return [];
+  const lines = notes.split(/\r?\n/);
+  const items: PunchListItem[] = [];
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    if (
+      lower.includes("what's included") ||
+      lower.includes("punch list:") ||
+      lower.includes("tasks:") ||
+      lower.endsWith(":")
+    ) continue;
+
+    let working = trimmed;
+    for (const prefix of ["- ", "• ", "* "]) {
+      if (working.startsWith(prefix)) {
+        working = working.slice(prefix.length);
+        break;
+      }
+    }
+    // Numeric "1. " / "1) "
+    const numericMatch = working.match(/^(\d+)[.)]\s+/);
+    if (numericMatch) working = working.slice(numericMatch[0].length);
+
+    if (working.length < 3) continue;
+
+    // Extract duration
+    const durMatch = working.match(/[~(·•\-]\s*(\d+)\s*min\)?/i) || working.match(/(\d+)\s*min\b/i);
+    const minutes = durMatch ? Number(durMatch[1]) : null;
+
+    // Strip duration suffix
+    const cleaned = working
+      .replace(/\s*\(~?\d+\s*min\)\s*$/i, "")
+      .replace(/\s*~\d+\s*min\s*$/i, "")
+      .replace(/\s*[·•\-]\s*~?\d+\s*min\s*$/i, "")
+      .replace(/\s*\d+\s*min\s*$/i, "")
+      .trim();
+
+    items.push({
+      id: `${items.length}-${cleaned.slice(0, 40)}`,
+      title: cleaned,
+      estimatedMinutes: minutes,
+    });
+  }
+  return items;
+}

@@ -5,7 +5,7 @@ import { Pill, type PillTone } from "../components/chrome/Pill";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { useWorkspace } from "../lib/workspace-context";
-import { formatCurrency, formatRelativeTime, formatTime12h, postProviderAction } from "../lib/api";
+import { formatCurrency, formatRelativeTime, formatTime12h, parsePunchList, postProviderAction } from "../lib/api";
 import type { RequestStatus, VisitRow } from "../lib/types";
 
 export default function VisitDetailScreen() {
@@ -38,6 +38,9 @@ export default function VisitDetailScreen() {
   }, [home, dashboard]);
 
   const aiTimeEstimate = useMemo(() => estimateVisitTime(visit), [visit]);
+
+  // Punch list parsed from the linked maintenance_task's notes.
+  const punchList = useMemo(() => parsePunchList(visit?.visit?.notes), [visit?.visit?.notes]);
 
   if (!dashboard) return null;
   if (!visit) {
@@ -98,11 +101,23 @@ export default function VisitDetailScreen() {
 
   function openQuoteForVisit() {
     if (!visit || !visit.property) return;
+    // Pre-populate line items from the visit's punch list so the
+    // handyman doesn't have to re-type each item — they can adjust
+    // quantities/prices and send.
+    const itemSuggestions = punchList.map((item) => ({
+      name: item.title,
+      description: "",
+      unit: "ea" as const,
+      quantity: 1,
+      // $75/item is a reasonable "starter" handyman line. Easy to adjust.
+      unitPrice: 75,
+    }));
     window.dispatchEvent(new CustomEvent("ops:open-new-quote", {
       detail: {
         propertyId: visit.property.id,
         requestId: visit.requestId,
         title: visit.quote ? `Revised quote · ${visit.title}` : `Quote for ${visit.title}`,
+        suggestions: itemSuggestions,
       },
     }));
   }
@@ -211,6 +226,54 @@ export default function VisitDetailScreen() {
               </div>
             )}
           </Card>
+
+          {/* Punch list (parsed from the linked maintenance task's notes) */}
+          {punchList.length > 0 && (
+            <Card padding="default">
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+                <div className="ops-section-label">Punch list ({punchList.length})</div>
+                <button
+                  onClick={openQuoteForVisit}
+                  style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                >
+                  + Pre-fill quote from these
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {punchList.map((item, i) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 0",
+                      borderBottom: i < punchList.length - 1 ? "1px solid var(--neutral-200)" : "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        border: "1.7px solid var(--neutral-300)",
+                        flex: "none",
+                      }}
+                    />
+                    <div style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{item.title}</div>
+                    {item.estimatedMinutes != null && (
+                      <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
+                        ~{item.estimatedMinutes} min
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 12, fontSize: 11.5, color: "var(--text-muted)" }}>
+                These items came from the homeowner's punch list. Check them off in Chez Field on the day of the visit.
+              </div>
+            </Card>
+          )}
 
           {/* AI time estimate */}
           <Card padding="default">

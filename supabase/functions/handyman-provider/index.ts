@@ -7,10 +7,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-const PROVIDER_SITE_URL = "https://havenhome.dev/handyman";
-const FIELD_SITE_URL = "https://havenhome.dev/handyman-visit";
-const QUOTE_SITE_URL = "https://havenhome.dev/handyman-quote";
-const FROM_EMAIL = "hello@havenhome.dev";
+const PROVIDER_SITE_URL = "https://www.getchez.com/handyman.html";
+const FIELD_SITE_URL = "https://www.getchez.com/handyman-visit.html";
+const QUOTE_SITE_URL = "https://www.getchez.com/handyman-quote.html";
+const FROM_EMAIL = "hello@getchez.com";
 const FROM_NAME = "Chez Field";
 
 function json(body: unknown, status = 200) {
@@ -1770,7 +1770,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     visitIds.length
       ? service
           .from("maintenance_tasks")
-          .select("id, title, scheduled_date, next_due_date")
+          .select("id, title, scheduled_date, next_due_date, notes, description")
           .in("id", visitIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
     quoteIds.length
@@ -1954,6 +1954,11 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
             title: compactString(visit.title),
             scheduledDate: compactString(visit.scheduled_date),
             dueDate: compactString(visit.next_due_date),
+            // Phase 74b: surface task notes/description so the desktop
+            // visit detail can parse the punch list ("What's included:")
+            // out of the maintenance_task that backs this visit.
+            notes: compactString(visit.notes),
+            description: compactString(visit.description),
           }
         : null,
       fieldWorkspace: session
@@ -2990,16 +2995,27 @@ async function saveQuote(
     : { data: null, error: null };
   if (existingQuote.error) throw existingQuote.error;
 
-  const lineItems = Array.isArray(body.lineItems)
-    ? (body.lineItems as Array<Record<string, unknown>>).map((item) => ({
-        id: compactString(item.id) || crypto.randomUUID(),
-        name: compactString(item.name),
-        description: compactString(item.description),
-        unit: compactString(item.unit) || "ea",
-        quantity: numberValue(item.quantity || 1),
-        unit_price: numberValue(item.unitPrice || item.unit_price || 0),
-      })).filter((item) => item.name)
+  // Phase 74b: when the client passes only a quoteId (e.g. send_quote
+  // re-firing on a draft), `body.lineItems` is missing — fall back to
+  // whatever the existing row already has so the second mutation
+  // doesn't blow up "at least one line item required".
+  const incomingLineItems = Array.isArray(body.lineItems)
+    ? (body.lineItems as Array<Record<string, unknown>>)
+    : null;
+  const fallbackLineItems = Array.isArray(existingQuote.data?.line_items)
+    ? (existingQuote.data!.line_items as Array<Record<string, unknown>>)
     : [];
+  const sourceLineItems = incomingLineItems ?? fallbackLineItems;
+  const lineItems = sourceLineItems
+    .map((item) => ({
+      id: compactString(item.id) || crypto.randomUUID(),
+      name: compactString(item.name),
+      description: compactString(item.description),
+      unit: compactString(item.unit) || "ea",
+      quantity: numberValue(item.quantity || 1),
+      unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+    }))
+    .filter((item) => item.name);
   const totals = quoteSummary(lineItems);
   const now = isoNow();
 
