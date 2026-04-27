@@ -3,27 +3,54 @@ import { Card } from "../components/chrome/Card";
 import { Pill } from "../components/chrome/Pill";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
-import { HOMES_DEMO, CREW_DEMO, formatCurrencyCents } from "../lib/fixtures";
-
-const HISTORY_DEMO = [
-  { id: "h1", date: "Apr 21", title: "Spring punch-list bundle", home: "14 Beacon Hill", tech: "MC", status: "Closed", totalCents: 184200 },
-  { id: "h2", date: "Apr 14", title: "Replace shower diverter",  home: "8 Marlborough",  tech: "DA", status: "Closed", totalCents: 64500 },
-  { id: "h3", date: "Apr 12", title: "Hang gallery wall",        home: "212 Highland",   tech: "MC", status: "Closed", totalCents: 28000 },
-  { id: "h4", date: "Apr 4",  title: "Fix toilet running",       home: "6 Carriage Ln",  tech: "DA", status: "Closed", totalCents: 9500 },
-];
+import { EmptyState } from "../components/chrome/EmptyState";
+import { useWorkspace } from "../lib/workspace-context";
+import { formatCurrency, formatRelativeTime } from "../lib/api";
+import type { HomeRow } from "../lib/types";
 
 export default function HomesScreen() {
+  const { dashboard } = useWorkspace();
   const [filter, setFilter] = useState<"all" | "active" | "new">("all");
   const [search, setSearch] = useState("");
+  const [selectedHomeId, setSelectedHomeId] = useState<string | null>(null);
+
+  const homes = useMemo(() => dashboard?.homes ?? [], [dashboard]);
 
   const filtered = useMemo(() => {
-    return HOMES_DEMO.filter((h) => {
-      if (filter === "active" && h.openWork === 0) return false;
-      if (filter === "new" && !h.isNew) return false;
-      if (search && !`${h.label} ${h.owner} ${h.city}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return homes.filter((h) => {
+      if (filter === "active" && h.openRequests === 0) return false;
+      if (filter === "new") {
+        // "New" heuristic: no completed visits yet
+        if (h.lastCompletedVisit) return false;
+      }
+      if (search && !`${h.name} ${h.address}`.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [filter, search]);
+  }, [homes, filter, search]);
+
+  const selectedHome = useMemo(() => {
+    if (selectedHomeId) return homes.find((h) => h.propertyId === selectedHomeId) ?? null;
+    return filtered[0] ?? null;
+  }, [selectedHomeId, homes, filtered]);
+
+  const historyForHome = useMemo(() => {
+    if (!dashboard || !selectedHome) return [];
+    return dashboard.visits
+      .filter((v) => v.property?.id === selectedHome.propertyId)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  }, [dashboard, selectedHome]);
+
+  if (!dashboard) return null;
+
+  if (homes.length === 0) {
+    return (
+      <EmptyState
+        icon="home"
+        title="No homes on your books yet"
+        body="When a homeowner requests a visit from you, their home shows up here. Share your Chez Handyman handle so customers can find you."
+      />
+    );
+  }
 
   return (
     <>
@@ -49,46 +76,29 @@ export default function HomesScreen() {
               }}
               onClick={() => setFilter(f)}
             >
-              {f === "all" ? `All · ${HOMES_DEMO.length}` : f === "active" ? "Active" : "New this month"}
+              {f === "all" ? `All · ${homes.length}` : f === "active" ? "Active" : "New"}
             </button>
           ))}
-          <button className="ops-button ops-button--ghost" style={{ fontSize: 12, padding: "4px 12px" }}>
-            <Icon name="filter" size={13} stroke={1.9} /> Filter
-          </button>
         </div>
       </div>
 
       <div className="ops-grid-3col" style={{ marginBottom: 24 }}>
         {filtered.map((home) => (
-          <Card key={home.id} padding="default" hoverable>
-            <div
-              style={{
-                height: 96,
-                borderRadius: 12,
-                background: "linear-gradient(135deg, #E8E4F2, #FFE8E2)",
-                position: "relative",
-                marginBottom: 14,
-                overflow: "hidden",
-              }}
-              aria-hidden="true"
-            >
-              <svg viewBox="0 0 240 96" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-                <path d="M40 80 L80 50 L120 80 Z" fill="var(--indigo)" opacity="0.5" />
-                <path d="M120 80 L160 45 L200 80 Z" fill="var(--salmon)" opacity="0.5" />
-              </svg>
-              {home.isNew && (
-                <span style={{ position: "absolute", top: 10, right: 10, background: "var(--salmon)", color: "#fff", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", padding: "3px 8px", borderRadius: 6 }}>
-                  NEW
-                </span>
-              )}
-            </div>
-            <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, color: "var(--text)" }}>{home.label}</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{home.owner} · {home.city}</div>
+          <Card
+            key={home.propertyId}
+            padding="default"
+            hoverable
+            onClick={() => setSelectedHomeId(home.propertyId)}
+            style={selectedHome?.propertyId === home.propertyId ? { borderColor: "var(--indigo-400)", boxShadow: "0 6px 20px rgba(42,34,82,0.12)" } : {}}
+          >
+            <HomeArtwork isNew={!home.lastCompletedVisit} />
+            <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, color: "var(--text)" }}>{home.name}</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{home.address || "—"}</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
-              <Stat label="Systems" value={String(home.systems)} />
-              <Stat label="Open" value={String(home.openWork)} accent={home.openWork > 0} />
-              <Stat label="Lifetime" value={`$${(home.lifetime / 1000).toFixed(1)}K`} />
+              <Stat label="Systems" value={String(home.systemCount)} />
+              <Stat label="Open" value={String(home.openRequests)} accent={home.openRequests > 0} />
+              <Stat label="Visits" value={String(historyCount(dashboard.visits, home.propertyId))} />
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
@@ -99,46 +109,71 @@ export default function HomesScreen() {
         ))}
       </div>
 
-      <Card padding="default">
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <div className="ops-section-label">Service history · 14 Beacon Hill</div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {["All", "Visits", "Quotes", "Photos"].map((c) => (
-              <button key={c} className="ops-button ops-button--ghost" style={{ fontSize: 11, padding: "4px 10px" }}>
-                {c}
-              </button>
-            ))}
+      {selectedHome && (
+        <Card padding="default">
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+            <div className="ops-section-label">Service history · {selectedHome.name}</div>
           </div>
-        </div>
-        <div>
-          {HISTORY_DEMO.map((row) => {
-            const tech = CREW_DEMO.find((c) => c.id === row.tech);
-            return (
-              <div key={row.id} className="ops-row" style={{ padding: "12px 0" }}>
-                <div style={{ width: 60, fontSize: 12, color: "var(--text-soft)", fontWeight: 600 }}>{row.date}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{row.title}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{row.home}</div>
-                </div>
-                {tech && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Avatar initials={tech.avatar} color={tech.color} size={26} fontSize={10} />
-                    <span style={{ fontSize: 12, color: "var(--text)" }}>{tech.name.split(" ")[0]}</span>
+          {historyForHome.length === 0 ? (
+            <div style={{ padding: "16px 0", fontSize: 13, color: "var(--text-muted)" }}>
+              No visits logged yet for this home.
+            </div>
+          ) : (
+            <div>
+              {historyForHome.map((row) => (
+                <div key={row.requestId} className="ops-row" style={{ padding: "12px 0" }}>
+                  <div style={{ width: 80, fontSize: 12, color: "var(--text-soft)", fontWeight: 600 }}>
+                    {row.routeDate ? new Date(row.routeDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}
                   </div>
-                )}
-                <Pill tone="success">{row.status}</Pill>
-                <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, color: "var(--indigo)", width: 70, textAlign: "right" }}>
-                  {formatCurrencyCents(row.totalCents)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{row.title}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{row.statusLabel}</div>
+                  </div>
+                  {row.assignment && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Avatar initials={initialsFor(row.assignment.memberName)} size={26} fontSize={10} />
+                      <span style={{ fontSize: 12, color: "var(--text)" }}>{row.assignment.memberName.split(" ")[0]}</span>
+                    </div>
+                  )}
+                  <Pill tone={row.status === "completed" ? "success" : "indigo"}>{row.statusLabel}</Pill>
+                  {row.quote && (
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, color: "var(--indigo)", width: 80, textAlign: "right" }}>
+                      {formatCurrency(row.quote.total)}
+                    </div>
+                  )}
                 </div>
-                <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-      {/* Suppress unused-var lint */}
-      <div style={{ display: "none" }}>{initialsFor("ignored")}</div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
     </>
+  );
+}
+
+function HomeArtwork({ isNew }: { isNew: boolean }) {
+  return (
+    <div
+      style={{
+        height: 96,
+        borderRadius: 12,
+        background: "linear-gradient(135deg, #E8E4F2, #FFE8E2)",
+        position: "relative",
+        marginBottom: 14,
+        overflow: "hidden",
+      }}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 240 96" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <path d="M40 80 L80 50 L120 80 Z" fill="var(--indigo)" opacity="0.5" />
+        <path d="M120 80 L160 45 L200 80 Z" fill="var(--salmon)" opacity="0.5" />
+      </svg>
+      {isNew && (
+        <span style={{ position: "absolute", top: 10, right: 10, background: "var(--salmon)", color: "#fff", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", padding: "3px 8px", borderRadius: 6 }}>
+          NEW
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -151,4 +186,8 @@ function Stat({ label, value, accent = false }: { label: string; value: string; 
       </div>
     </div>
   );
+}
+
+function historyCount(visits: { property: { id: string } | null }[], propertyId: string): number {
+  return visits.filter((v) => v.property?.id === propertyId).length;
 }

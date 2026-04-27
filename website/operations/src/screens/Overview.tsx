@@ -1,65 +1,54 @@
 import { useMemo } from "react";
 import { Card } from "../components/chrome/Card";
-import { Pill } from "../components/chrome/Pill";
+import { Pill, type PillTone } from "../components/chrome/Pill";
 import { StatTile } from "../components/chrome/StatTile";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
+import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
-import {
-  CREW_DEMO,
-  KPIS_DEMO,
-  PIPELINE_DEMO,
-  RECENT_THREADS_DEMO,
-  REQUESTS_DECISIONS_DEMO,
-  VISITS_DEMO,
-  formatCurrencyCents,
-  isDemoMode,
-} from "../lib/fixtures";
+import { formatCurrencyCompact, formatRelativeTime, formatTime12h, isToday } from "../lib/api";
+import type { VisitRow, RequestStatus, MessageThread } from "../lib/types";
 
 export default function OverviewScreen() {
-  const { mode, member, workspace } = useWorkspace();
-  const _demo = isDemoMode();
-  // v1: data is fixture-backed regardless of `_demo` because the live
-  // schema's aggregation views aren't wired yet. Once the dispatch
-  // table is loaded for real, swap the fixtures for the live `api.ts`
-  // queries — every render path below is structured to receive either.
-  void _demo;
+  const { dashboard, mode, isLoading } = useWorkspace();
 
-  const heroSnapshot = useMemo(() => {
-    const total = VISITS_DEMO.length;
-    const done = VISITS_DEMO.filter((v) => v.status === "on-the-way").length;
-    const togo = total - done;
-    return { total, done, ontheway: 0, togo };
-  }, []);
+  // Today's visits (for the field board) — sole prop sees all workspace
+  // visits today since they're the only person; crew sees the entire board.
+  const todaysVisits = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.visits.filter((v) => isToday(v.routeDate) && !["completed", "cancelled", "declined"].includes(v.status));
+  }, [dashboard]);
 
+  // The decision queue: requests that need attention from the workspace
+  // owner — needs assignment, awaiting response, urgent, or quoted but
+  // not approved.
+  const decisions = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.visits.filter((v) =>
+      ["submitted", "sent_to_handyman", "alternate_dates_proposed", "awaiting_homeowner", "quoted"].includes(v.status)
+    ).slice(0, 4);
+  }, [dashboard]);
+
+  if (isLoading) return <LoadingShell />;
+  if (!dashboard) return null;
+
+  const greetName = dashboard.currentUser.fullName?.split(" ")[0] ?? "";
   const personHero = mode === "sole";
-  const greetName = member?.full_name?.split(" ")[0] ?? "Tom";
-  const orgLabel = workspace?.company_name ?? "Burke Handymen";
+  const todayDoneCount = dashboard.visits.filter((v) => isToday(v.routeDate) && v.status === "completed").length;
+  const todayInProgress = dashboard.visits.filter((v) => isToday(v.routeDate) && ["on_my_way", "in_progress", "checked_in"].includes(v.status)).length;
+  const todayCount = todaysVisits.length;
+  const todayRemaining = Math.max(todayCount - todayDoneCount - todayInProgress, 0);
 
   return (
     <>
       <Hero
-        eyebrow={
-          personHero
-            ? `${greetName.toUpperCase()} · ${formattedDate()}`
-            : `OPERATIONS · ${formattedDate()}`
-        }
-        headline={
-          personHero
-            ? "Four stops today, finished by "
-            : "Own the queue, route the field "
-        }
-        emphasis={personHero ? "3:30." : "team."}
-        primaryCta={{ label: "Open my day →" }}
-        secondaryCta={{ label: "New quote" }}
-        tertiaryCta={{ label: "Auto-route the day", icon: "sparkles" }}
-        snapshot={{
-          label: "Today snapshot",
-          value: heroSnapshot.total,
-          done: heroSnapshot.done,
-          ontheway: heroSnapshot.ontheway,
-          togo: heroSnapshot.togo,
-        }}
+        eyebrow={`OPERATIONS · ${formattedDate()}`}
+        personHero={personHero}
+        firstName={greetName}
+        todayCount={todayCount + todayDoneCount + todayInProgress}
+        todayDone={todayDoneCount}
+        todayInProgress={todayInProgress}
+        todayRemaining={todayRemaining}
       />
 
       <KpiStrip />
@@ -75,38 +64,41 @@ export default function OverviewScreen() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <Pill tone="neutral">All techs</Pill>
-              <Pill tone="salmon">Unassigned · 4</Pill>
-              <button className="ops-button ops-button--ghost" style={{ height: 28, padding: "4px 10px", fontSize: 12 }}>
-                <Icon name="filter" size={13} stroke={1.9} /> Filter
-              </button>
+              <Pill tone="neutral">{personHero ? "You" : "All techs"}</Pill>
+              {dashboard.stats.unassignedVisits > 0 && (
+                <Pill tone="salmon">Unassigned · {dashboard.stats.unassignedVisits}</Pill>
+              )}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {VISITS_DEMO.map((v) => (
-              <FieldBoardRow key={v.id} visit={v} />
-            ))}
-          </div>
+
+          {todaysVisits.length === 0 ? (
+            <EmptyFieldBoard hasAnyVisits={dashboard.visits.length > 0} />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {todaysVisits.map((v) => (
+                <FieldBoardRow key={v.requestId} visit={v} />
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* RIGHT — Decision queue + Pipeline + Threads */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Card padding="default">
-            <div className="ops-section-label" style={{ marginBottom: 12 }}>Needs your decision</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {REQUESTS_DECISIONS_DEMO.map((d) => (
-                <button key={d.id} className="ops-row" style={{ background: "none", border: "none", borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textAlign: "left", cursor: "pointer", width: "100%" }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-                    <Icon name={d.icon} size={18} stroke={1.9} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>{d.title}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{d.sub}</div>
-                  </div>
-                  <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
-                </button>
-              ))}
-            </div>
+            <div className="ops-section-label" style={{ marginBottom: 12 }}>Needs your attention</div>
+            {decisions.length === 0 ? (
+              <SmallEmpty
+                icon="check"
+                title="Inbox zero"
+                body="No requests waiting on you. New homeowner work shows up here first."
+              />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {decisions.map((v) => (
+                  <DecisionRow key={v.requestId} visit={v} />
+                ))}
+              </div>
+            )}
           </Card>
 
           <Card padding="default">
@@ -114,58 +106,90 @@ export default function OverviewScreen() {
               <div>
                 <div className="ops-section-label">Quote pipeline</div>
                 <div style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 700, color: "var(--indigo)", letterSpacing: "-0.018em", lineHeight: 1.05 }}>
-                  {formatCurrencyCents(PIPELINE_DEMO.totalCents)}
+                  {formatCurrencyCompact(pipelineTotal(dashboard.quotes))}
                 </div>
               </div>
-              <Pill tone="indigo">5 quotes</Pill>
+              <Pill tone="indigo">{dashboard.quotes.length} quote{dashboard.quotes.length === 1 ? "" : "s"}</Pill>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-              {PIPELINE_DEMO.buckets.map((b) => (
-                <div key={b.label}>
-                  <div style={{ height: 3, borderRadius: 2, background: toneColor(b.tone), marginBottom: 6 }} />
-                  <div style={{ fontSize: 11, color: "var(--text-soft)", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>{b.label}</div>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 18, color: "var(--text)", fontWeight: 700 }}>{b.count}</div>
-                </div>
-              ))}
-            </div>
+            {dashboard.quotes.length === 0 ? (
+              <SmallEmpty
+                icon="quote"
+                title="No quotes yet"
+                body="When you draft a quote it lands here so you can track it through the pipeline."
+              />
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                {(["draft", "sent", "viewed", "approved", "declined"] as const).map((status) => {
+                  const count = dashboard.quotes.filter((q) => q.status === status).length;
+                  const tone = quoteStatusTone(status);
+                  return (
+                    <div key={status}>
+                      <div style={{ height: 3, borderRadius: 2, background: toneCss(tone), marginBottom: 6 }} />
+                      <div style={{ fontSize: 11, color: "var(--text-soft)", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>{status}</div>
+                      <div style={{ fontFamily: "var(--serif)", fontSize: 18, color: "var(--text)", fontWeight: 700 }}>{count}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Card>
 
           <Card padding="default">
             <div className="ops-section-label" style={{ marginBottom: 12 }}>Recent threads</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {RECENT_THREADS_DEMO.map((t) => (
-                <button key={t.id} className="ops-row" style={{ background: "none", border: "none", borderBottom: "1px solid var(--neutral-200)", padding: "10px 0", textAlign: "left", cursor: "pointer", width: "100%" }}>
-                  <Avatar initials={initialsFor(t.from)} size={32} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t.from}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-soft)" }}>{t.timestamp}</div>
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.preview}</div>
-                  </div>
-                  {t.unread > 0 && <Pill tone="salmon">{t.unread} new</Pill>}
-                </button>
-              ))}
-            </div>
+            {dashboard.messages.length === 0 ? (
+              <SmallEmpty
+                icon="message"
+                title="No homeowner messages yet"
+                body="When a homeowner messages you about a visit, threads show up here."
+              />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {dashboard.messages.slice(0, 4).map((t) => (
+                  <ThreadPreviewRow key={t.requestId} thread={t} />
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>
 
-      {mode === "crew" && (
+      {mode === "crew" && dashboard.teamMembers.length > 1 && (
         <div style={{ marginTop: 24 }}>
           <div className="ops-section-label" style={{ marginBottom: 10 }}>Crew workload</div>
           <div className="ops-grid-3col">
-            {CREW_DEMO.filter((c) => c.role !== "Owner").map((c) => (
-              <CrewWorkloadCard key={c.id} member={c} />
-            ))}
+            {dashboard.teamMembers
+              .filter((m) => m.role !== "owner")
+              .map((m) => {
+                const today = dashboard.visits.filter((v) => v.assignment?.memberId === m.id && isToday(v.routeDate)).length;
+                const open = dashboard.visits.filter((v) => v.assignment?.memberId === m.id && !["completed", "cancelled", "declined"].includes(v.status)).length;
+                const cap = Math.min(100, today * 18 + open * 5);
+                return (
+                  <Card key={m.id} padding="tight">
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <Avatar initials={initialsFor(m.fullName || m.email)} size={32} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{m.fullName || m.email}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-soft)" }}>{m.title || m.role}</div>
+                      </div>
+                      <Pill tone={cap > 90 ? "critical" : "indigo"}>
+                        {cap > 90 ? "At capacity" : "Available"}
+                      </Pill>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-soft)", marginBottom: 4 }}>
+                      <span>{today} today</span>
+                      <span>{open} open</span>
+                    </div>
+                    <div style={{ height: 6, background: "var(--neutral-200)", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ width: `${cap}%`, height: "100%", background: cap > 90 ? "var(--salmon)" : "var(--indigo)" }} />
+                    </div>
+                  </Card>
+                );
+              })}
           </div>
         </div>
       )}
 
-      <div style={{ height: 60 }} />
-      <div style={{ fontSize: 11, color: "var(--text-soft)", textAlign: "center" }}>
-        {orgLabel} · {personHero ? "Sole proprietor" : `${CREW_DEMO.length} teammates`}
-      </div>
+      <div style={{ height: 40 }} />
     </>
   );
 }
@@ -174,46 +198,52 @@ export default function OverviewScreen() {
 
 function Hero(props: {
   eyebrow: string;
-  headline: string;
-  emphasis: string;
-  primaryCta: { label: string };
-  secondaryCta: { label: string };
-  tertiaryCta?: { label: string; icon: string };
-  snapshot: { label: string; value: number; done: number; ontheway: number; togo: number };
+  personHero: boolean;
+  firstName: string;
+  todayCount: number;
+  todayDone: number;
+  todayInProgress: number;
+  todayRemaining: number;
 }) {
-  const total = Math.max(props.snapshot.value, 1);
-  const donePct = (props.snapshot.done / total) * 100;
-  const ontheWayPct = (props.snapshot.ontheway / total) * 100;
-  const togoPct = (props.snapshot.togo / total) * 100;
+  const total = Math.max(props.todayCount, 1);
+  const donePct = (props.todayDone / total) * 100;
+  const ontheWayPct = (props.todayInProgress / total) * 100;
+  const togoPct = (props.todayRemaining / total) * 100;
+
+  const headline = props.personHero
+    ? props.todayCount === 0
+      ? { lead: `Welcome back${props.firstName ? `, ${props.firstName}` : ""}.`, emphasis: " A clean slate." }
+      : props.todayRemaining === 0
+        ? { lead: "All ", emphasis: `${props.todayCount} visit${props.todayCount === 1 ? "" : "s"} done.` }
+        : { lead: `${props.todayRemaining} stop${props.todayRemaining === 1 ? "" : "s"} `, emphasis: "to go today." }
+    : props.todayCount === 0
+      ? { lead: "Quiet morning. ", emphasis: "Time to fill the board." }
+      : { lead: "Own the queue, ", emphasis: "route the field team." };
+
   return (
     <div className="ops-hero">
       <div>
         <div className="ops-hero__eyebrow">{props.eyebrow}</div>
         <h1 className="ops-hero__headline">
-          {props.headline}<em>{props.emphasis}</em>
+          {headline.lead}<em>{headline.emphasis}</em>
         </h1>
         <div className="ops-hero__cta-row">
-          <button className="ops-button ops-button--salmon">{props.primaryCta.label}</button>
-          <button className="ops-button ops-button--ghost">{props.secondaryCta.label}</button>
-          {props.tertiaryCta && (
-            <button className="ops-button ops-button--ghost">
-              <Icon name={props.tertiaryCta.icon} size={14} stroke={1.9} /> {props.tertiaryCta.label}
-            </button>
-          )}
+          <button className="ops-button ops-button--salmon">Open my day →</button>
+          <button className="ops-button ops-button--ghost">New quote</button>
         </div>
       </div>
       <div className="ops-hero__snapshot">
-        <div className="ops-hero__snapshot-label">{props.snapshot.label}</div>
-        <div className="ops-hero__snapshot-value">{props.snapshot.value}</div>
+        <div className="ops-hero__snapshot-label">Today snapshot</div>
+        <div className="ops-hero__snapshot-value">{props.todayCount}</div>
         <div className="ops-hero__snapshot-bar">
           <div className="ops-hero__snapshot-bar-segment ops-hero__snapshot-bar-segment--done" style={{ width: `${donePct}%` }} />
           <div className="ops-hero__snapshot-bar-segment ops-hero__snapshot-bar-segment--ontheway" style={{ width: `${ontheWayPct}%` }} />
           <div className="ops-hero__snapshot-bar-segment ops-hero__snapshot-bar-segment--togo" style={{ width: `${togoPct}%` }} />
         </div>
         <div className="ops-hero__snapshot-legend">
-          <span>{props.snapshot.done} done</span>
-          <span>{props.snapshot.ontheway} on the way</span>
-          <span>{props.snapshot.togo} to go</span>
+          <span>{props.todayDone} done</span>
+          <span>{props.todayInProgress} on the way</span>
+          <span>{props.todayRemaining} to go</span>
         </div>
       </div>
     </div>
@@ -223,75 +253,126 @@ function Hero(props: {
 // ─── KPI strip ──────────────────────────────────────────────────
 
 function KpiStrip() {
+  const { dashboard, mode } = useWorkspace();
+  if (!dashboard) return null;
+  const s = dashboard.stats;
+  const todayLabel = mode === "sole" ? "Today (you)" : "Today";
   return (
     <div className="ops-grid-kpis">
-      {KPIS_DEMO.map((k) => (
-        <StatTile key={k.label} label={k.label} value={k.value} sub={k.sub} accent={k.accent} />
-      ))}
+      <StatTile label="Requested" value={s.requestedVisits} sub="Open requests" />
+      <StatTile label="Unassigned" value={s.unassignedVisits} sub="Awaiting dispatch" />
+      <StatTile label={todayLabel} value={s.todayStops} sub="Stops on the board" />
+      <StatTile label="Homes" value={s.homesServiced} sub="On your books" />
+      <StatTile label="Pipeline" value={formatCurrencyCompact(pipelineTotal(dashboard.quotes))} sub={`Across ${dashboard.quotes.length} quote${dashboard.quotes.length === 1 ? "" : "s"}`} accent />
+      <StatTile label="This week" value={s.upcomingVisits} sub="Visits booked" />
     </div>
   );
 }
 
 // ─── Field board row ───────────────────────────────────────────
 
-function FieldBoardRow({ visit }: { visit: typeof VISITS_DEMO[number] }) {
-  const tech = CREW_DEMO.find((c) => c.id === visit.tech);
+function FieldBoardRow({ visit }: { visit: VisitRow }) {
+  const time = formatTime12h(visit.assignment?.windowStartTime ?? visit.visit?.scheduledDate);
   return (
     <div className="ops-row" style={{ padding: "10px 0" }}>
-      <div style={{ width: 70, flex: "none", display: "flex", flexDirection: "column" }}>
-        <span style={{ fontFamily: "var(--serif)", fontSize: 14, color: "var(--text)", fontWeight: 600 }}>{visit.time}</span>
-        <span style={{ fontSize: 11, color: "var(--text-soft)" }}>{visit.duration} min</span>
+      <div style={{ width: 86, flex: "none", display: "flex", flexDirection: "column" }}>
+        <span style={{ fontFamily: "var(--serif)", fontSize: 14, color: "var(--text)", fontWeight: 600 }}>
+          {time || "TBD"}
+        </span>
+        {visit.assignment?.windowEndTime && (
+          <span style={{ fontSize: 11, color: "var(--text-soft)" }}>to {formatTime12h(visit.assignment.windowEndTime)}</span>
+        )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{visit.title}</span>
-          {visit.bundle && <Pill tone="indigo">Bundle</Pill>}
-          {visit.priority === "high" && <Pill tone="critical">High</Pill>}
+          <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{visit.home}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          {visit.property?.name || visit.property?.address || "—"}
+        </div>
       </div>
-      {tech && (
+      {visit.assignment && (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Avatar initials={tech.avatar} color={tech.color} size={28} />
-          <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 500 }}>{tech.name.split(" ")[0]}</span>
+          <Avatar initials={initialsFor(visit.assignment.memberName)} size={28} />
+          <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 500 }}>
+            {visit.assignment.memberName.split(" ")[0]}
+          </span>
         </div>
       )}
-      <Pill tone={visit.status === "on-the-way" ? "salmon" : "indigo"} withDot>
-        {visit.status === "on-the-way" ? "On the way" : "Scheduled"}
-      </Pill>
-      <button style={{ background: "none", border: "none", color: "var(--text-soft)", cursor: "pointer", padding: 4 }} aria-label="More">
-        <Icon name="more" size={16} stroke={1.9} />
-      </button>
     </div>
   );
 }
 
-// ─── Crew workload ─────────────────────────────────────────────
+// ─── Decision row ───────────────────────────────────────────────
 
-function CrewWorkloadCard({ member }: { member: typeof CREW_DEMO[number] }) {
-  const today = Math.floor(Math.random() * 4) + 2;
-  const open = Math.floor(Math.random() * 6) + 2;
-  const cap = Math.min(100, today * 15 + open * 4);
+function DecisionRow({ visit }: { visit: VisitRow }) {
+  const sub = visit.preferredTiming || visit.property?.address || formatRelativeTime(visit.updatedAt);
   return (
-    <Card padding="tight">
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <Avatar initials={member.avatar} color={member.color} size={32} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{member.name}</div>
-          <div style={{ fontSize: 11, color: "var(--text-soft)" }}>{member.title}</div>
+    <button className="ops-row" style={{ background: "none", border: "none", borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textAlign: "left", cursor: "pointer", width: "100%" }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+        <Icon name={iconForRequest(visit.requestType)} size={18} stroke={1.9} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>{visit.title}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          {visit.property?.name ? `${visit.property.name} · ` : ""}{sub}
         </div>
-        <Pill tone={cap > 90 ? "critical" : "indigo"}>
-          {cap > 90 ? "At capacity" : "Available"}
-        </Pill>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-soft)", marginBottom: 4 }}>
-        <span>{today} today</span>
-        <span>{open} open</span>
+      <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
+      <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
+    </button>
+  );
+}
+
+// ─── Recent thread row ──────────────────────────────────────────
+
+function ThreadPreviewRow({ thread }: { thread: MessageThread }) {
+  return (
+    <button className="ops-row" style={{ background: "none", border: "none", borderBottom: "1px solid var(--neutral-200)", padding: "10px 0", textAlign: "left", cursor: "pointer", width: "100%" }}>
+      <Avatar initials={initialsFor(thread.propertyName || thread.title)} size={32} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{thread.propertyName || thread.title}</div>
+          <div style={{ fontSize: 11, color: "var(--text-soft)" }}>{formatRelativeTime(thread.latestMessageAt)}</div>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{thread.latestMessage}</div>
       </div>
-      <div style={{ height: 6, background: "var(--neutral-200)", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{ width: `${cap}%`, height: "100%", background: cap > 90 ? "var(--salmon)" : "var(--indigo)" }} />
+    </button>
+  );
+}
+
+// ─── Empty states ───────────────────────────────────────────────
+
+function EmptyFieldBoard({ hasAnyVisits }: { hasAnyVisits: boolean }) {
+  return (
+    <EmptyState
+      icon="calendar"
+      title={hasAnyVisits ? "Nothing on the board today" : "No visits scheduled yet"}
+      body={hasAnyVisits ? "Today's a clean slate. Tomorrow's stops are still on the calendar." : "When a homeowner books a visit with you it shows up here. The Visit Hub on Chez is the easiest way to get started."}
+    />
+  );
+}
+
+function SmallEmpty({ icon, title, body }: { icon: string; title: string; body: string }) {
+  return (
+    <div style={{ padding: "16px 4px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--neutral-200)", color: "var(--text-soft)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+        <Icon name={icon} size={16} stroke={1.9} />
       </div>
-    </Card>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{title}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>{body}</div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingShell() {
+  return (
+    <div style={{ padding: 48, fontSize: 14, color: "var(--text-muted)" }}>
+      Loading your workspace…
+    </div>
   );
 }
 
@@ -305,7 +386,50 @@ function formattedFullDate(): string {
   return new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 }
 
-function toneColor(tone: "neutral" | "indigo" | "salmon" | "success" | "warning" | "critical" | "info"): string {
+function pipelineTotal(quotes: { status: string; total: number }[]): number {
+  return quotes
+    .filter((q) => q.status === "sent" || q.status === "viewed")
+    .reduce((sum, q) => sum + (q.total || 0), 0);
+}
+
+function requestStatusTone(status: RequestStatus): PillTone {
+  switch (status) {
+    case "submitted":
+    case "sent_to_handyman":
+    case "alternate_dates_proposed":
+    case "awaiting_homeowner":
+      return "salmon";
+    case "scheduled":
+    case "confirmed":
+      return "indigo";
+    case "on_my_way":
+    case "checked_in":
+    case "in_progress":
+      return "info";
+    case "completed":
+      return "success";
+    case "cancelled":
+    case "declined":
+      return "neutral";
+    case "quoted":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
+function quoteStatusTone(status: string): PillTone {
+  switch (status) {
+    case "draft": return "neutral";
+    case "sent": return "info";
+    case "viewed": return "indigo";
+    case "approved": return "success";
+    case "declined": return "critical";
+    default: return "neutral";
+  }
+}
+
+function toneCss(tone: PillTone): string {
   switch (tone) {
     case "indigo":   return "var(--indigo)";
     case "salmon":   return "var(--salmon)";
@@ -314,5 +438,18 @@ function toneColor(tone: "neutral" | "indigo" | "salmon" | "success" | "warning"
     case "critical": return "#C25A5E";
     case "info":     return "#5A8DB5";
     default:         return "var(--neutral-300)";
+  }
+}
+
+function iconForRequest(requestType: string): string {
+  switch (requestType) {
+    case "quote": return "quote";
+    case "repair": return "truck";
+    case "install":
+    case "assembly": return "briefcase";
+    case "question": return "message";
+    case "setup": return "lightbulb";
+    case "standard_visit":
+    default: return "calendar";
   }
 }

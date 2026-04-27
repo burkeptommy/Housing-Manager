@@ -1,20 +1,80 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "../components/chrome/Card";
-import { Pill } from "../components/chrome/Pill";
-import { Avatar } from "../components/chrome/Avatar";
+import { Pill, type PillTone } from "../components/chrome/Pill";
+import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
-import { CREW_DEMO, UNASSIGNED_DEMO, VISITS_DEMO } from "../lib/fixtures";
+import { EmptyState } from "../components/chrome/EmptyState";
+import { useWorkspace } from "../lib/workspace-context";
+import { formatRelativeTime, formatTime12h, isToday, postProviderAction } from "../lib/api";
+import type { VisitRow, RequestStatus } from "../lib/types";
 
 export default function DispatchScreen() {
-  const [selectedJobId, setSelectedJobId] = useState<string | null>("u2");
-  const [filterChip, setFilterChip] = useState<"all" | "priority" | "bundles">("all");
-  const selected = UNASSIGNED_DEMO.find((u) => u.id === selectedJobId) ?? null;
+  const { dashboard, mode, refresh } = useWorkspace();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filterChip, setFilterChip] = useState<"all" | "urgent" | "older">("all");
+  const [assigning, setAssigning] = useState(false);
+  const [routeDate, setRouteDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [windowSlot, setWindowSlot] = useState<string>("9-11");
 
-  const filteredQueue = UNASSIGNED_DEMO.filter((u) => {
-    if (filterChip === "priority") return u.priority === "high";
-    if (filterChip === "bundles") return u.bundle;
-    return true;
-  });
+  const unassigned = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.visits.filter((v) =>
+      !v.assignment && !["completed", "cancelled", "declined"].includes(v.status)
+    );
+  }, [dashboard]);
+
+  const filteredQueue = useMemo(() => {
+    return unassigned.filter((u) => {
+      if (filterChip === "urgent") {
+        return ["submitted", "sent_to_handyman"].includes(u.status);
+      }
+      if (filterChip === "older") {
+        const created = new Date(u.updatedAt).getTime();
+        return Date.now() - created > 24 * 60 * 60 * 1000;
+      }
+      return true;
+    });
+  }, [unassigned, filterChip]);
+
+  const todayBoard = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.visits.filter((v) => isToday(v.routeDate) && v.assignment);
+  }, [dashboard]);
+
+  const selected = useMemo(() => {
+    if (!selectedId || !dashboard) return null;
+    return dashboard.visits.find((v) => v.requestId === selectedId) ?? null;
+  }, [selectedId, dashboard]);
+
+  const techs = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.teamMembers.filter((m) => m.status === "active");
+  }, [dashboard]);
+
+  if (!dashboard) return null;
+
+  async function handleAssign(memberId: string) {
+    if (!selected) return;
+    setAssigning(true);
+    try {
+      const [start, end] = parseWindow(windowSlot);
+      await postProviderAction("assign_visit", {
+        requestId: selected.requestId,
+        memberId,
+        routeDate,
+        windowStartTime: start,
+        windowEndTime: end,
+      });
+      await refresh();
+      setSelectedId(null);
+    } catch (e) {
+      // Fall back: action might not exist yet on server. Don't crash UI.
+      console.error("[Dispatch] assign_visit failed", e);
+      alert("Couldn't assign the visit. The action may not be wired on the server yet — Tom, ping the team.");
+    } finally {
+      setAssigning(false);
+    }
+  }
 
   return (
     <div className="ops-grid-dispatch">
@@ -24,7 +84,7 @@ export default function DispatchScreen() {
           <div className="ops-section-label">Unassigned · {filteredQueue.length}</div>
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-          {(["all", "priority", "bundles"] as const).map((c) => (
+          {(["all", "urgent", "older"] as const).map((c) => (
             <button
               key={c}
               className="ops-button ops-button--ghost"
@@ -35,38 +95,29 @@ export default function DispatchScreen() {
               }}
               onClick={() => setFilterChip(c)}
             >
-              {c === "all" ? "All" : c === "priority" ? "Priority" : "Bundles"}
+              {c === "all" ? "All" : c === "urgent" ? "Need response" : "24h+"}
             </button>
           ))}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filteredQueue.map((job) => {
-            const isSel = selectedJobId === job.id;
-            return (
-              <button
-                key={job.id}
-                onClick={() => setSelectedJobId(job.id)}
-                className="ops-card is-padded-tight is-hoverable"
-                style={{
-                  textAlign: "left",
-                  background: isSel ? "var(--salmon-50)" : "#fff",
-                  borderLeft: isSel ? "3px solid var(--salmon)" : "1px solid var(--neutral-200)",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-                  {job.priority === "high" && <Pill tone="critical">High</Pill>}
-                  {job.bundle && <Pill tone="indigo">Bundle</Pill>}
-                  <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-soft)" }}>{job.age} ago</span>
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{job.title}</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {job.home} · {job.requestedBy}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+
+        {filteredQueue.length === 0 ? (
+          <EmptyState
+            icon="check"
+            title={unassigned.length === 0 ? "Everything's assigned" : "No matches"}
+            body={unassigned.length === 0 ? "When a homeowner books a visit it lands here for routing." : "Nothing in the queue matches that filter."}
+          />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {filteredQueue.map((job) => (
+              <UnassignedCard
+                key={job.requestId}
+                visit={job}
+                isSelected={selectedId === job.requestId}
+                onClick={() => setSelectedId(job.requestId)}
+              />
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* Today's lanes */}
@@ -78,72 +129,48 @@ export default function DispatchScreen() {
               {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 4, background: "var(--neutral-200)", padding: 3, borderRadius: 9 }}>
-            {(["Day", "Lanes", "Map"] as const).map((label) => (
-              <button
-                key={label}
-                className="ops-page-toolbar__seg-button"
-                style={{
-                  background: label === "Lanes" ? "var(--indigo)" : "transparent",
-                  color: label === "Lanes" ? "#fff" : "var(--text-muted)",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Time gridline header */}
-        <div style={{ display: "grid", gridTemplateColumns: "90px repeat(10, 1fr)", borderBottom: "1px solid var(--neutral-200)", paddingBottom: 4, marginBottom: 8 }}>
-          <span />
-          {["8a", "9", "10", "11", "12p", "1", "2", "3", "4", "5"].map((h) => (
-            <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "var(--text-soft)", letterSpacing: "0.06em" }}>{h}</span>
-          ))}
-        </div>
-
-        {/* Lanes */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {CREW_DEMO.filter((c) => !c.desk).map((tech) => (
-            <div key={tech.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 12, alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Avatar initials={tech.avatar} color={tech.color} size={28} />
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{tech.name.split(" ")[0]}</span>
-              </div>
-              <div style={{ position: "relative", height: 36, background: "var(--neutral-200)", borderRadius: 6 }}>
-                {VISITS_DEMO.filter((v) => v.tech === tech.id).map((v) => {
-                  const start = parseTime(v.time);
-                  const left = ((start - 8) / 9) * 100;
-                  const width = (v.duration / 60 / 9) * 100;
-                  return (
-                    <div
-                      key={v.id}
-                      style={{
-                        position: "absolute",
-                        left: `${left}%`,
-                        width: `${width}%`,
-                        top: 2,
-                        bottom: 2,
-                        background: v.priority === "high" ? "var(--salmon)" : "var(--indigo)",
-                        color: "#fff",
-                        borderRadius: 6,
-                        padding: "4px 8px",
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                      title={`${v.title} · ${v.home}`}
-                    >
-                      {v.title}
+        {todayBoard.length === 0 ? (
+          <EmptyState
+            icon="calendar"
+            title="Nothing on the board today"
+            body={mode === "sole" ? "Pick a visit from the unassigned queue and route it to yourself." : "Assign visits from the unassigned queue and they'll fill in here."}
+          />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {techs.map((tech) => {
+              const techVisits = todayBoard.filter((v) => v.assignment?.memberId === tech.id);
+              if (techVisits.length === 0 && mode === "sole" && tech.role !== "owner") return null;
+              return (
+                <div key={tech.id} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--neutral-200)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Avatar initials={initialsFor(tech.fullName || tech.email)} size={28} />
+                    <span style={{ fontSize: 12, fontWeight: 600 }}>{(tech.fullName || tech.email).split(" ")[0]}</span>
+                  </div>
+                  {techVisits.length === 0 ? (
+                    <span style={{ fontSize: 12, color: "var(--text-soft)" }}>No stops today</span>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {techVisits.map((v) => (
+                        <div key={v.requestId} style={{
+                          background: "var(--indigo)",
+                          color: "#fff",
+                          borderRadius: 6,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          fontWeight: 500,
+                        }}>
+                          {formatTime12h(v.assignment?.windowStartTime || "")} {v.title} <span style={{ opacity: 0.7 }}>· {v.property?.name}</span>
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* Assign panel */}
@@ -151,82 +178,100 @@ export default function DispatchScreen() {
         {selected ? (
           <>
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-              {selected.priority === "high" && <Pill tone="critical">High</Pill>}
-              {selected.bundle && <Pill tone="indigo">Bundle</Pill>}
+              <Pill tone={requestStatusTone(selected.status)}>{selected.statusLabel}</Pill>
             </div>
             <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
               {selected.title}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 4 }}>
-              {selected.home} · {selected.city}
+              {selected.property?.name || "—"}{selected.property?.address ? ` · ${selected.property.address}` : ""}
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 16 }}>
-              Requested by {selected.requestedBy}
-            </div>
+            {selected.preferredTiming && (
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>
+                Preferred: {selected.preferredTiming}
+              </div>
+            )}
 
-            <div className="ops-section-label" style={{ marginBottom: 10 }}>Pick a technician</div>
+            <div className="ops-section-label" style={{ marginBottom: 10 }}>{techs.length === 1 ? "Assign to yourself" : "Pick a technician"}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-              {CREW_DEMO.filter((c) => !c.desk).map((tech, idx) => (
-                <div
-                  key={tech.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: 10,
-                    border: idx === 0 ? "1px solid var(--salmon)" : "1px solid var(--neutral-200)",
-                    background: idx === 0 ? "var(--salmon-50)" : "#fff",
-                    borderRadius: 10,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Avatar initials={tech.avatar} color={tech.color} size={32} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{tech.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-soft)" }}>
-                      {idx === 0 ? "4 today · 9 open · already in Brookline" : "Available"}
+              {techs.map((tech) => {
+                const isMe = tech.userId === dashboard.currentUser.id;
+                return (
+                  <button
+                    key={tech.id}
+                    onClick={() => handleAssign(tech.id)}
+                    disabled={assigning}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: 10,
+                      border: isMe ? "1px solid var(--salmon)" : "1px solid var(--neutral-200)",
+                      background: isMe ? "var(--salmon-50)" : "#fff",
+                      borderRadius: 10,
+                      cursor: assigning ? "not-allowed" : "pointer",
+                      opacity: assigning ? 0.5 : 1,
+                      width: "100%",
+                      textAlign: "left",
+                    }}
+                  >
+                    <Avatar initials={initialsFor(tech.fullName || tech.email)} size={32} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{tech.fullName || tech.email}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-soft)" }}>
+                        {tech.title || tech.role}
+                      </div>
                     </div>
-                  </div>
-                  {idx === 0 ? <Pill tone="success" withDot>Best fit</Pill> : <Pill tone="neutral">Available</Pill>}
-                </div>
-              ))}
+                    {isMe ? <Pill tone="success" withDot>You</Pill> : <Pill tone="neutral">Available</Pill>}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="ops-section-label" style={{ marginBottom: 8 }}>When</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              <input type="date" defaultValue="2026-04-28" style={selectInputStyle} />
-              <select defaultValue="9-11" style={selectInputStyle}>
+              <input type="date" value={routeDate} onChange={(e) => setRouteDate(e.target.value)} style={selectInputStyle} />
+              <select value={windowSlot} onChange={(e) => setWindowSlot(e.target.value)} style={selectInputStyle}>
                 <option value="9-11">9 AM – 11 AM</option>
-                <option value="11-1">11 AM – 1 PM</option>
-                <option value="1-3">1 PM – 3 PM</option>
-                <option value="3-5">3 PM – 5 PM</option>
+                <option value="11-13">11 AM – 1 PM</option>
+                <option value="13-15">1 PM – 3 PM</option>
+                <option value="15-17">3 PM – 5 PM</option>
               </select>
-            </div>
-
-            <div className="ops-section-label" style={{ marginBottom: 8 }}>Notes</div>
-            <textarea
-              defaultValue={`Spring punch list for ${selected.requestedBy} — ${selected.home}. Bundle includes 5 small jobs.`}
-              style={{
-                ...selectInputStyle,
-                width: "100%",
-                minHeight: 80,
-                padding: 10,
-                resize: "vertical",
-              }}
-            />
-
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button className="ops-button ops-button--ghost" style={{ flex: 1 }}>Save draft</button>
-              <button className="ops-button ops-button--salmon" style={{ flex: 1 }}>Assign &amp; notify Mara</button>
             </div>
           </>
         ) : (
-          <div style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", padding: 24 }}>
-            Pick a job from the unassigned queue to assign it.
-          </div>
+          <EmptyState
+            icon="dispatch"
+            title={unassigned.length === 0 ? "Nothing to dispatch" : "Pick a job"}
+            body={unassigned.length === 0 ? "When a new visit lands in the unassigned queue, you can route it from here." : "Tap an unassigned visit on the left to route it to a technician."}
+          />
         )}
       </Card>
     </div>
+  );
+}
+
+function UnassignedCard({ visit, isSelected, onClick }: { visit: VisitRow; isSelected: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="ops-card is-padded-tight is-hoverable"
+      style={{
+        textAlign: "left",
+        background: isSelected ? "var(--salmon-50)" : "#fff",
+        borderLeft: isSelected ? "3px solid var(--salmon)" : "1px solid var(--neutral-200)",
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-soft)" }}>{formatRelativeTime(visit.updatedAt)}</span>
+      </div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{visit.title}</div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+        {visit.property?.name || "—"}
+      </div>
+    </button>
   );
 }
 
@@ -241,11 +286,30 @@ const selectInputStyle: React.CSSProperties = {
   fontFamily: "var(--sans)",
 };
 
-function parseTime(time: string): number {
-  // "8:30 AM" → 8.5 (24-hour decimal)
-  const [hm, ampm] = time.split(" ");
-  const [h, m] = hm.split(":").map(Number);
-  let hour = h % 12;
-  if (ampm === "PM") hour += 12;
-  return hour + m / 60;
+function parseWindow(slot: string): [string, string] {
+  const [s, e] = slot.split("-").map(Number);
+  return [`${String(s).padStart(2, "0")}:00`, `${String(e).padStart(2, "0")}:00`];
+}
+
+function requestStatusTone(status: RequestStatus): PillTone {
+  switch (status) {
+    case "submitted":
+    case "sent_to_handyman":
+    case "alternate_dates_proposed":
+    case "awaiting_homeowner":
+      return "salmon";
+    case "scheduled":
+    case "confirmed":
+      return "indigo";
+    case "on_my_way":
+    case "checked_in":
+    case "in_progress":
+      return "info";
+    case "completed":
+      return "success";
+    case "quoted":
+      return "warning";
+    default:
+      return "neutral";
+  }
 }

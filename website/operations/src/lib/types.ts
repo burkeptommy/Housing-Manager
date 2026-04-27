@@ -1,126 +1,299 @@
-// Mirror of the Supabase row shapes the Operations Desk consumes. Phase 71
-// + 72 migrations defined every column; the columns we actually surface
-// are typed here so TypeScript catches typos and missing fields.
+// Dashboard payload shape returned by the `handyman-provider` Edge Function.
+// Mirrors `loadDashboard()` in supabase/functions/handyman-provider/index.ts.
+// All field names are camelCase (the function already normalizes from snake).
 
 export type WorkspaceMode = "sole" | "crew";
-
-export interface ProviderWorkspace {
-  id: string;
-  company_name: string;
-  primary_email: string | null;
-  phone: string | null;
-  website: string | null;
-  license_number: string | null;
-  created_at: string;
-}
-
-export interface ProviderWorkspaceMember {
-  id: string;
-  workspace_id: string;
-  user_id: string | null;
-  email: string | null;
-  full_name: string | null;
-  role: "owner" | "admin" | "dispatcher" | "technician";
-  phone: string | null;
-  title: string | null;
-  invite_token: string | null;
-  is_active: boolean;
-  created_at: string;
-}
-
+export type ProviderRole = "owner" | "admin" | "dispatcher" | "technician";
 export type RequestStatus =
-  | "new"
-  | "in_review"
+  | "draft"
+  | "submitted"
   | "scheduled"
+  | "sent_to_handyman"
+  | "alternate_dates_proposed"
+  | "awaiting_homeowner"
+  | "confirmed"
+  | "on_my_way"
+  | "checked_in"
+  | "quoted"
   | "in_progress"
   | "completed"
-  | "cancelled";
+  | "follow_up_recommended"
+  | "cancelled"
+  | "declined";
+export type QuoteStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "approved"
+  | "declined"
+  | "withdrawn"
+  | "countered_by_homeowner"
+  | "superseded";
 
-export interface HandymanRequest {
+export interface CurrentUser {
   id: string;
-  household_id: string;
-  contractor_id: string | null;
-  request_type: string;
-  status: RequestStatus;
-  urgency: "routine" | "soon" | "urgent" | "emergency" | null;
+  memberId: string;
+  email: string;
+  fullName: string;
+  role: ProviderRole;
+  roleLabel: string;
+}
+
+export interface Permissions {
+  canManageCrew: boolean;
+  canViewQuotes: boolean;
+  canEditQuotes: boolean;
+  canViewMessages: boolean;
+  canSendMessages: boolean;
+  canBootstrapWorkspace: boolean;
+  isFieldTechnician: boolean;
+}
+
+export interface Workspace {
+  id: string;
+  companyName: string;
+  primaryEmail: string;
+  primaryPhone: string;
+  website: string;
+  contractorCount: number;
+  activeMemberCount: number;
+  invitedMemberCount: number;
+  providerUrl: string;
+}
+
+export interface LinkedContractor {
+  contractorId: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  category: string;
+}
+
+export interface DashboardStats {
+  requestedVisits: number;
+  upcomingVisits: number;
+  unassignedVisits: number;
+  todayStops: number;
+  homesServiced: number;
+  activeMembers: number;
+  draftQuotes: number;
+  quotesSent: number;
+  completedVisits: number;
+  openThreads: number;
+  myAssignedVisits: number;
+}
+
+export interface VisitProperty {
+  id: string;
+  name: string;
+  address: string;
+}
+
+export interface VisitTaskRef {
+  id: string;
   title: string;
-  description: string | null;
-  household_label: string | null;
-  household_city: string | null;
-  household_owner_name: string | null;
-  created_at: string;
-  updated_at: string;
+  scheduledDate: string;
+  dueDate: string;
 }
 
-export interface ProviderVisitAssignment {
-  id: string;
-  workspace_id: string;
-  request_id: string;
-  assigned_member_id: string | null;
-  route_date: string;            // YYYY-MM-DD
-  window_start_time: string | null;   // HH:MM
-  window_end_time: string | null;
-  stop_order: number | null;
-  duration_minutes: number | null;
-  notes: string | null;
-  status: "draft" | "notified" | "confirmed" | "in_progress" | "completed" | "cancelled";
-  created_at: string;
+export interface FieldWorkspace {
+  portalToken: string;
+  url: string;
+  reportStatus: string;
+  completedAt: string | null;
 }
 
-export interface ProviderQuote {
+export interface VisitAssignment {
   id: string;
-  workspace_id: string;
-  request_id: string | null;
-  household_id: string | null;
-  quote_number: string;
-  customer_name: string | null;
-  property_label: string | null;
-  status: "draft" | "sent" | "viewed" | "approved" | "declined";
-  subtotal_cents: number;
-  tax_rate_basis_points: number;
-  materials_markup_basis_points: number;
-  total_cents: number;
-  line_items: ProviderQuoteLineItem[];
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
+  memberId: string;
+  memberName: string;
+  memberRole: string;
+  memberRoleLabel: string;
+  routeDate: string;
+  windowStartTime: string;
+  windowEndTime: string;
+  stopOrder: number;
+  routeNotes: string;
 }
 
-export interface ProviderQuoteLineItem {
-  id: string;
-  name: string;
-  description: string | null;
-  unit: string;
-  quantity: number;
-  unit_price_cents: number;
-}
-
-export interface ProviderSavedQuoteItem {
-  id: string;
-  workspace_id: string;
-  name: string;
-  description: string | null;
-  unit: string;
-  default_quantity: number;
-  default_unit_price_cents: number;
-}
-
-export interface HandymanRequestMessage {
-  id: string;
-  request_id: string;
-  sender_role: "homeowner" | "haven" | "vendor" | "system";
-  sender_name: string | null;
+export interface VisitMessagePreview {
+  senderRole: string;
   body: string;
-  body_card: Record<string, unknown> | null;
-  created_at: string;
+  createdAt: string;
 }
 
-// Aggregated views used by the Overview screen
-export interface DashboardSummary {
-  requested_count: number;
-  unassigned_count: number;
-  today_count: number;
-  crew_today_count: number;
-  pipeline_total_cents: number;
-  this_week_count: number;
+export interface VisitQuotePreview {
+  id: string;
+  status: QuoteStatus;
+  statusLabel: string;
+  total: number;
+  lineItems: QuoteLineItem[];
+  scopeNotes: string | null;
+  homeownerMessage: string | null;
+  parentQuoteId: string | null;
+  signedAt: string | null;
+  signedName: string | null;
+  homeownerRevisedAt: string | null;
+  updatedAt: string;
+  publicShareUrl: string;
+}
+
+export interface VisitRow {
+  requestId: string;
+  householdId: string;
+  propertyId: string;
+  contractorId: string;
+  title: string;
+  requestType: string;
+  status: RequestStatus;
+  statusLabel: string;
+  preferredTiming: string;
+  proposedVisitAt: string | null;
+  proposedByRole: string | null;
+  proposedAt: string | null;
+  confirmedVisitAt: string | null;
+  updatedAt: string;
+  routeDate: string;
+  property: VisitProperty | null;
+  visit: VisitTaskRef | null;
+  fieldWorkspace: FieldWorkspace | null;
+  assignment: VisitAssignment | null;
+  latestMessage: VisitMessagePreview | null;
+  quote: VisitQuotePreview | null;
+}
+
+export interface HomeSystem {
+  id: string;
+  name: string;
+  category: string;
+  manufacturer: string;
+  modelNumber: string;
+}
+
+export interface HomeRow {
+  propertyId: string;
+  householdId: string;
+  name: string;
+  address: string;
+  systemCount: number;
+  openRequests: number;
+  lastCompletedVisit: string | null;
+  assignedMembers: string[];
+  systems?: HomeSystem[];
+}
+
+export interface MessageThread {
+  requestId: string;
+  propertyId: string;
+  title: string;
+  requestType: string;
+  preferredTiming: string;
+  status: RequestStatus;
+  statusLabel: string;
+  propertyName: string;
+  propertyAddress: string;
+  latestMessage: string;
+  latestMessageAt: string;
+  senderRole: string;
+  assignedMemberName: string;
+  fieldWorkspaceUrl: string;
+  recentMessages: ThreadMessage[];
+  quote: VisitQuotePreview | null;
+}
+
+export interface ThreadMessage {
+  id: string;
+  body: string;
+  senderRole: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TeamMember {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  title: string;
+  role: ProviderRole;
+  roleLabel: string;
+  status: "invited" | "active" | "disabled";
+  inviteUrl: string | null;
+  lastSeenAt: string | null;
+  todayStops: number;
+  openVisits: number;
+  completedCount: number;
+  mobileFocus: boolean;
+}
+
+export interface QuoteLineItem {
+  id?: string;
+  name: string;
+  description?: string;
+  unit?: string;
+  quantity?: number;
+  unitPrice?: number;
+  total?: number;
+}
+
+export interface Quote {
+  id: string;
+  workspaceId: string;
+  contractorId: string;
+  householdId: string;
+  propertyId: string;
+  visitTaskId: string;
+  title: string;
+  status: QuoteStatus;
+  statusLabel: string;
+  propertyName: string;
+  recipientKind: "linked_home" | "prospect" | string;
+  recipientName: string;
+  recipientEmail: string;
+  recipientPhone: string;
+  recipientAddress: string;
+  audienceLabel: string;
+  total: number;
+  itemCount: number;
+  updatedAt: string;
+  sentAt: string | null;
+  lastSentAt: string | null;
+  viewedAt: string | null;
+  approvedAt: string | null;
+  declinedAt: string | null;
+  requestId: string;
+  publicShareUrl: string;
+  lineItems: QuoteLineItem[];
+  homeownerMessage: string;
+  scopeNotes: string;
+  latestMessage: { senderRole: string; senderName: string; body: string; createdAt: string } | null;
+  recentMessages: { id: string; senderRole: string; senderName: string; body: string; createdAt: string; deliveryChannel: string }[];
+}
+
+export interface SavedQuoteItem {
+  id: string;
+  name: string;
+  description: string;
+  unit: string;
+  defaultQuantity: number;
+  defaultUnitPrice: number;
+  sortOrder: number;
+}
+
+export interface Dashboard {
+  needsWorkspace: boolean;
+  currentUser: CurrentUser;
+  permissions: Permissions;
+  workspace: Workspace;
+  linkedContractors: LinkedContractor[];
+  stats: DashboardStats;
+  visits: VisitRow[];
+  homes: HomeRow[];
+  messages: MessageThread[];
+  recentWork: VisitRow[];
+  teamMembers: TeamMember[];
+  quotes: Quote[];
+  savedQuoteItems: SavedQuoteItem[];
 }

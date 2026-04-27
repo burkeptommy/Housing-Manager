@@ -23,21 +23,22 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const { workspace, member, members, mode, signOut } = useWorkspace();
+  const { dashboard, mode, signOut } = useWorkspace();
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.crewOnly || mode === "crew"
   );
 
-  const memberFullName = member?.full_name ?? "Operator";
+  const memberFullName = dashboard?.currentUser.fullName || dashboard?.currentUser.email || "Operator";
   const memberInitials = initialsFor(memberFullName);
-  const memberEmail = member?.email ?? "";
+  const memberEmail = dashboard?.currentUser.email ?? "";
 
-  const workspaceName = workspace?.company_name ?? "Workspace";
+  const workspaceName = dashboard?.workspace.companyName ?? "Workspace";
+  const memberCount = dashboard?.workspace.activeMemberCount ?? 1;
   const subLabel =
     mode === "sole"
       ? "Sole proprietor"
-      : `${members.length} teammate${members.length === 1 ? "" : "s"}`;
+      : `${memberCount} teammate${memberCount === 1 ? "" : "s"}`;
 
   return (
     <aside className="ops-sidebar">
