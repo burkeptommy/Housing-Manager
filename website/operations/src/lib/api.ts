@@ -196,8 +196,9 @@ export function categorizePunchItem(title: string): PunchCategoryId {
   // Attic + insulation
   if (/(attic|insulation)/.test(t)) return "attic_insulation";
 
-  // Bathrooms — caulking specifically in bath/shower
-  if (/(bath|shower|toilet|vanity)/.test(t)) return "bathrooms";
+  // Bathrooms — caulking specifically in bath/shower must run before
+  // the generic exterior caulk match below.
+  if (/(bath|shower|toilet|vanity|tub)/.test(t)) return "bathrooms";
 
   // Kitchen + laundry
   if (/(dryer|washing machine|washer|dishwasher|garbage disposal|kitchen|range hood|fridge|refrigerator|ice maker)/.test(t)) return "kitchen_laundry";
