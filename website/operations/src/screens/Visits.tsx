@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../components/chrome/Card";
 import { Pill, type PillTone } from "../components/chrome/Pill";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
@@ -76,8 +77,77 @@ export default function DispatchScreen() {
     }
   }
 
+  // All visits filtered for the all-list section. Excludes completed
+  // unless filter explicitly asks for it.
+  const allVisitsList = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.visits
+      .filter((v) => !["completed", "cancelled", "declined"].includes(v.status))
+      .sort((a, b) => {
+        const aDate = a.routeDate || "9999-12-31";
+        const bDate = b.routeDate || "9999-12-31";
+        return aDate.localeCompare(bDate);
+      });
+  }, [dashboard]);
+
   return (
-    <div className="ops-grid-dispatch">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* All open visits — full-width list, every row clickable */}
+      <Card padding="default">
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+          <div className="ops-section-label">All open visits · {allVisitsList.length}</div>
+          <span style={{ fontSize: 11, color: "var(--text-soft)" }}>Tap any row to manage the visit</span>
+        </div>
+        {allVisitsList.length === 0 ? (
+          <div style={{ padding: 20, fontSize: 13, color: "var(--text-muted)" }}>
+            No open visits right now. New visit requests from homeowners land here.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {allVisitsList.map((v) => (
+              <Link
+                key={v.requestId}
+                to={`/visits/${v.requestId}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 0",
+                  borderBottom: "1px solid var(--neutral-200)",
+                  textDecoration: "none",
+                  color: "inherit",
+                }}
+              >
+                <div style={{ width: 80, fontSize: 12, color: "var(--text-soft)", fontWeight: 600 }}>
+                  {v.routeDate
+                    ? new Date(v.routeDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                    : "TBD"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>{v.title}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                    {v.property?.name || "—"}
+                  </div>
+                </div>
+                {v.assignment && (
+                  <div style={{ fontSize: 11, color: "var(--text-soft)" }}>
+                    {v.assignment.memberName.split(" ")[0]}
+                  </div>
+                )}
+                <Pill tone={requestStatusTone(v.status)}>{v.statusLabel}</Pill>
+                {v.quote && (
+                  <Pill tone={v.quote.status === "approved" ? "success" : "indigo"}>
+                    Quote · {v.quote.statusLabel}
+                  </Pill>
+                )}
+                <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <div className="ops-grid-dispatch">
       {/* Unassigned column */}
       <Card padding="default">
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
@@ -153,16 +223,22 @@ export default function DispatchScreen() {
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       {techVisits.map((v) => (
-                        <div key={v.requestId} style={{
-                          background: "var(--indigo)",
-                          color: "#fff",
-                          borderRadius: 6,
-                          padding: "6px 10px",
-                          fontSize: 12,
-                          fontWeight: 500,
-                        }}>
+                        <Link
+                          key={v.requestId}
+                          to={`/visits/${v.requestId}`}
+                          style={{
+                            background: "var(--indigo)",
+                            color: "#fff",
+                            borderRadius: 6,
+                            padding: "6px 10px",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            textDecoration: "none",
+                            display: "block",
+                          }}
+                        >
                           {formatTime12h(v.assignment?.windowStartTime || "")} {v.title} <span style={{ opacity: 0.7 }}>· {v.property?.name}</span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -247,6 +323,7 @@ export default function DispatchScreen() {
           />
         )}
       </Card>
+      </div>
     </div>
   );
 }

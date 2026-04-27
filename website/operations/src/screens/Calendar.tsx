@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "../components/chrome/Card";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
@@ -120,8 +121,9 @@ export default function CalendarScreen() {
                 {dayVisits.length > 0 && (
                   <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 3 }}>
                     {dayVisits.slice(0, 3).map((v) => (
-                      <div
+                      <Link
                         key={v.requestId}
+                        to={`/visits/${v.requestId}`}
                         style={{
                           background: "var(--indigo-50)",
                           color: "var(--indigo)",
@@ -132,11 +134,14 @@ export default function CalendarScreen() {
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
+                          textDecoration: "none",
+                          cursor: "pointer",
+                          display: "block",
                         }}
                         title={`${v.title} · ${v.property?.name ?? ""}`}
                       >
                         {formatTime12h(v.assignment?.windowStartTime || "")} {v.title}
-                      </div>
+                      </Link>
                     ))}
                     {dayVisits.length > 3 && (
                       <div style={{ position: "absolute", top: 6, right: 6, fontSize: 10, color: "var(--text-soft)", fontWeight: 600 }}>

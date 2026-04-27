@@ -6,7 +6,7 @@ import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { useWorkspace } from "../lib/workspace-context";
 import { formatCurrency, formatRelativeTime, formatTime12h, postProviderAction } from "../lib/api";
-import type { RequestStatus } from "../lib/types";
+import type { RequestStatus, VisitRow } from "../lib/types";
 
 export default function VisitDetailScreen() {
   const { requestId } = useParams<{ requestId: string }>();
@@ -15,6 +15,7 @@ export default function VisitDetailScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showReschedule, setShowReschedule] = useState(false);
 
   const visit = useMemo(() => {
     if (!dashboard || !requestId) return null;
@@ -95,6 +96,37 @@ export default function VisitDetailScreen() {
     }
   }
 
+  function openQuoteForVisit() {
+    if (!visit || !visit.property) return;
+    window.dispatchEvent(new CustomEvent("ops:open-new-quote", {
+      detail: {
+        propertyId: visit.property.id,
+        requestId: visit.requestId,
+        title: visit.quote ? `Revised quote · ${visit.title}` : `Quote for ${visit.title}`,
+      },
+    }));
+  }
+
+  async function handleMarkComplete() {
+    if (!visit || !dashboard) return;
+    const next = visit.status === "completed" ? "in_progress" : "completed";
+    const verb = next === "completed" ? "Mark this visit complete?" : "Reopen this visit?";
+    if (!window.confirm(verb)) return;
+    setBusy(true);
+    try {
+      await postProviderAction("update_request_status", {
+        workspaceId: dashboard.workspace.id,
+        requestId: visit.requestId,
+        status: next,
+      });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't update status. The action may not be wired on the server yet.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <div style={{ marginBottom: 16, display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
@@ -137,11 +169,33 @@ export default function VisitDetailScreen() {
               Open in Chez Field →
             </a>
           )}
-          <button className="ops-button ops-button--ghost">Propose new time</button>
-          <button className="ops-button ops-button--ghost">Build a quote</button>
-          <button className="ops-button ops-button--ghost" style={{ marginLeft: "auto" }}>Mark complete</button>
+          <button className="ops-button ops-button--ghost" onClick={() => setShowReschedule(true)}>
+            Propose new time
+          </button>
+          <button className="ops-button ops-button--ghost" onClick={openQuoteForVisit}>
+            {visit.quote ? "Edit quote" : "Build a quote"}
+          </button>
+          <button
+            className="ops-button ops-button--ghost"
+            style={{ marginLeft: "auto" }}
+            onClick={handleMarkComplete}
+            disabled={busy}
+          >
+            {visit.status === "completed" ? "Reopen visit" : "Mark complete"}
+          </button>
         </div>
       </Card>
+
+      {showReschedule && (
+        <RescheduleModal
+          visit={visit}
+          onClose={() => setShowReschedule(false)}
+          onConfirmed={async () => {
+            setShowReschedule(false);
+            await refresh();
+          }}
+        />
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -282,18 +336,40 @@ export default function VisitDetailScreen() {
             <SidebarRow label="Stop #" value={visit.assignment?.stopOrder ? String(visit.assignment.stopOrder) : "—"} />
           </Card>
 
-          {visit.quote && (
+          {visit.quote ? (
             <Card padding="default">
-              <div className="ops-section-label" style={{ marginBottom: 12 }}>Quote</div>
-              <div style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 700, color: "var(--indigo)", marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                <div className="ops-section-label">Quote</div>
+                <Pill tone={visit.quote.status === "approved" ? "success" : visit.quote.status === "declined" ? "critical" : visit.quote.status === "viewed" ? "indigo" : "info"}>
+                  {visit.quote.statusLabel}
+                </Pill>
+              </div>
+              <div style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 700, color: "var(--indigo)", letterSpacing: "-0.018em", marginBottom: 8 }}>
                 {formatCurrency(visit.quote.total)}
               </div>
-              <Pill tone={visit.quote.status === "approved" ? "success" : "indigo"}>{visit.quote.statusLabel}</Pill>
-              {visit.quote.publicShareUrl && (
-                <a href={visit.quote.publicShareUrl} target="_blank" rel="noopener" style={{ display: "block", marginTop: 12, fontSize: 12, color: "var(--indigo-500)" }}>
-                  Open homeowner view →
-                </a>
-              )}
+              <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 12 }}>
+                {visit.quote.lineItems.length} line item{visit.quote.lineItems.length === 1 ? "" : "s"} · updated {formatRelativeTime(visit.quote.updatedAt)}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button className="ops-button ops-button--ghost" style={{ fontSize: 12 }} onClick={openQuoteForVisit}>
+                  Edit
+                </button>
+                {visit.quote.publicShareUrl && (
+                  <a className="ops-button ops-button--ghost" style={{ fontSize: 12 }} href={visit.quote.publicShareUrl} target="_blank" rel="noopener">
+                    Homeowner view →
+                  </a>
+                )}
+              </div>
+            </Card>
+          ) : (
+            <Card padding="default">
+              <div className="ops-section-label" style={{ marginBottom: 8 }}>Quote</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 12 }}>
+                No quote on this visit yet. Build one from the home's systems and send it for the homeowner to approve.
+              </div>
+              <button className="ops-button ops-button--salmon" style={{ width: "100%", justifyContent: "center" }} onClick={openQuoteForVisit}>
+                + Build a quote
+              </button>
             </Card>
           )}
 
@@ -439,4 +515,123 @@ function requestStatusTone(status: RequestStatus): PillTone {
     default:
       return "neutral";
   }
+}
+
+// ─── Reschedule modal — propose a new time to the homeowner ───
+
+function RescheduleModal({
+  visit,
+  onClose,
+  onConfirmed,
+}: {
+  visit: VisitRow;
+  onClose: () => void;
+  onConfirmed: () => Promise<void>;
+}) {
+  const { dashboard } = useWorkspace();
+  const initialDate = visit.routeDate || new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(initialDate);
+  const [hour, setHour] = useState("09");
+  const [minute, setMinute] = useState("00");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (!dashboard) return;
+    setSubmitting(true);
+    try {
+      // Build an ISO timestamp from the local date + hour:minute
+      const proposedAt = new Date(`${date}T${hour}:${minute}:00`).toISOString();
+      await postProviderAction("propose_visit_time", {
+        workspaceId: dashboard.workspace.id,
+        requestId: visit.requestId,
+        proposedAt,
+        note: note.trim() || undefined,
+      });
+      await onConfirmed();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't propose new time.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const hours = Array.from({ length: 12 }, (_, i) => String(i + 7).padStart(2, "0")); // 7am-6pm
+  const minutes = ["00", "15", "30", "45"];
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 50,
+        background: "rgba(42,34,82,0.4)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={() => !submitting && onClose()}
+    >
+      <div
+        style={{ background: "#fff", borderRadius: 16, padding: 24, width: "min(440px, 90vw)", boxShadow: "0 24px 60px rgba(42,34,82,0.4)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600 }}>Propose a new time</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-soft)", cursor: "pointer", padding: 4 }} aria-label="Close">
+            <Icon name="remove" size={16} stroke={2} />
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 16 }}>
+          The homeowner gets a notification with this proposal. If they accept, the visit shifts to the new time; if they counter, you'll see their proposal here.
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-soft)" }}>New date</span>
+            <input
+              type="date"
+              value={date}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDate(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--neutral-200)", borderRadius: 10, fontSize: 13, fontFamily: "var(--sans)" }}
+            />
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-soft)" }}>Hour</span>
+              <select value={hour} onChange={(e) => setHour(e.target.value)} style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--neutral-200)", borderRadius: 10, fontSize: 13, fontFamily: "var(--sans)" }}>
+                {hours.map((h) => (
+                  <option key={h} value={h}>{Number(h) > 12 ? `${Number(h) - 12} PM` : Number(h) === 12 ? "12 PM" : `${Number(h)} AM`}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-soft)" }}>Minutes</span>
+              <select value={minute} onChange={(e) => setMinute(e.target.value)} style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--neutral-200)", borderRadius: 10, fontSize: 13, fontFamily: "var(--sans)" }}>
+                {minutes.map((m) => (
+                  <option key={m} value={m}>:{m}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-soft)" }}>Note (optional)</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Quick context for the homeowner — e.g. 'Pushed back because of a delivery delay'."
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--neutral-200)", borderRadius: 10, fontSize: 13, fontFamily: "var(--sans)", minHeight: 80, resize: "vertical" }}
+            />
+          </label>
+
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+            <button className="ops-button ops-button--ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+            <button className="ops-button ops-button--salmon" onClick={submit} disabled={submitting}>
+              {submitting ? "Sending…" : "Send proposal"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

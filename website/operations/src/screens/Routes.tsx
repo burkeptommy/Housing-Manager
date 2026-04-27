@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "../components/chrome/Card";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
@@ -117,7 +118,11 @@ export default function RoutesScreen() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                   {route.visits.map((stop, i) => (
-                    <div key={stop.requestId} style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: i < route.visits.length - 1 ? "1px solid var(--neutral-200)" : "none" }}>
+                    <Link
+                      key={stop.requestId}
+                      to={`/visits/${stop.requestId}`}
+                      style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: i < route.visits.length - 1 ? "1px solid var(--neutral-200)" : "none", textDecoration: "none", color: "inherit" }}
+                    >
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "none" }}>
                         <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
                           {i + 1}
@@ -138,7 +143,8 @@ export default function RoutesScreen() {
                           )}
                         </div>
                       </div>
-                    </div>
+                      <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
+                    </Link>
                   ))}
                 </div>
               </Card>
