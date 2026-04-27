@@ -7,7 +7,7 @@ import type { HomeRow, SavedQuoteItem } from "../lib/types";
 // ─── Context for opening the modal from anywhere ───
 
 interface NewQuoteContextValue {
-  open: (opts?: { propertyId?: string; requestId?: string; title?: string }) => void;
+  open: (opts?: { propertyId?: string; requestId?: string; title?: string; editQuoteId?: string }) => void;
 }
 const NewQuoteContext = createContext<NewQuoteContextValue | null>(null);
 
@@ -16,6 +16,13 @@ interface OpenOpts {
   requestId?: string;
   title?: string;
   suggestions?: SuggestedLine[];
+  /**
+   * If passed, the modal opens in edit mode for this existing quote.
+   * Pre-fills every field from `dashboard.quotes` and routes the
+   * save_quote action through `quoteId` so the row updates instead
+   * of inserting a new draft.
+   */
+  editQuoteId?: string;
 }
 
 interface SuggestedLine {
@@ -67,6 +74,7 @@ export function NewQuoteModal() {
   const [open, setOpen] = useState(false);
   const [propertyId, setPropertyId] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
+  const [editQuoteId, setEditQuoteId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [scopeNotes, setScopeNotes] = useState("");
   const [homeownerMessage, setHomeownerMessage] = useState("");
@@ -74,10 +82,38 @@ export function NewQuoteModal() {
   const [submitting, setSubmitting] = useState(false);
   const [showSavedPicker, setShowSavedPicker] = useState(false);
 
-  // Register the global open trigger
+  // Register the global open trigger. We re-register on every dashboard
+  // change so the closure can read the latest quotes when opening in
+  // edit mode.
   useEffect(() => {
     _openTrigger.current = (opts?: OpenOpts) => {
+      // Edit mode — pre-fill every field from the existing quote.
+      const existing = opts?.editQuoteId
+        ? dashboard?.quotes.find((q) => q.id === opts.editQuoteId) ?? null
+        : null;
+
       setOpen(true);
+      setEditQuoteId(opts?.editQuoteId ?? null);
+
+      if (existing) {
+        setPropertyId(existing.propertyId || opts?.propertyId || null);
+        setRequestId(existing.requestId || opts?.requestId || null);
+        setTitle(existing.title);
+        setScopeNotes(existing.scopeNotes ?? "");
+        setHomeownerMessage(existing.homeownerMessage ?? "");
+        setLines(
+          existing.lineItems.map((line, i) => ({
+            key: `edit-${existing.id}-${i}`,
+            name: line.name,
+            description: line.description ?? "",
+            unit: line.unit ?? "ea",
+            quantity: line.quantity ?? 1,
+            unitPrice: line.unitPrice ?? 0,
+          })),
+        );
+        return;
+      }
+
       setPropertyId(opts?.propertyId ?? null);
       setRequestId(opts?.requestId ?? null);
       setTitle(opts?.title ?? "");
@@ -99,7 +135,9 @@ export function NewQuoteModal() {
     return () => {
       _openTrigger.current = null;
     };
-  }, []);
+  }, [dashboard]);
+
+  const isEditing = Boolean(editQuoteId);
 
   const homes = useMemo(() => dashboard?.homes ?? [], [dashboard]);
   const savedItems = useMemo(() => dashboard?.savedQuoteItems ?? [], [dashboard]);
@@ -149,6 +187,10 @@ export function NewQuoteModal() {
     try {
       const payload = {
         workspaceId: dashboard!.workspace.id,
+        // In edit mode, threading quoteId routes through the
+        // existingQuote branch in the edge function so the row updates
+        // instead of inserting a duplicate draft.
+        quoteId: editQuoteId || undefined,
         propertyId,
         householdId: selectedHome.householdId,
         requestId: requestId || undefined,
@@ -202,9 +244,13 @@ export function NewQuoteModal() {
       >
         <div style={{ padding: 24, borderBottom: "1px solid var(--neutral-200)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--text)" }}>New quote</div>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--text)" }}>
+              {isEditing ? "Edit quote" : "New quote"}
+            </div>
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
-              Build a quote, save as draft, or send it straight to the homeowner.
+              {isEditing
+                ? "Update the scope, line items, or message before sending."
+                : "Build a quote, save as draft, or send it straight to the homeowner."}
             </div>
           </div>
           <button onClick={() => !submitting && setOpen(false)} style={{ background: "none", border: "none", color: "var(--text-soft)", cursor: "pointer", padding: 4 }} aria-label="Close">
@@ -376,10 +422,10 @@ export function NewQuoteModal() {
         <div style={{ padding: 18, borderTop: "1px solid var(--neutral-200)", display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button className="ops-button ops-button--ghost" onClick={() => !submitting && setOpen(false)} disabled={submitting}>Cancel</button>
           <button className="ops-button ops-button--ghost" onClick={() => submit(false)} disabled={submitting}>
-            {submitting ? "Saving…" : "Save as draft"}
+            {submitting ? "Saving…" : isEditing ? "Save changes" : "Save as draft"}
           </button>
           <button className="ops-button ops-button--salmon" onClick={() => submit(true)} disabled={submitting}>
-            {submitting ? "Sending…" : "Save & send to homeowner"}
+            {submitting ? "Sending…" : isEditing ? "Save & send to homeowner" : "Save & send to homeowner"}
           </button>
         </div>
       </div>

@@ -4,7 +4,8 @@ import { Pill, type PillTone } from "../components/chrome/Pill";
 import { Icon } from "../components/chrome/Icon";
 import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
-import { formatCurrency, formatRelativeTime } from "../lib/api";
+import { formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
+import { useNewQuoteModal } from "../components/NewQuoteModal";
 
 const STATUS_TONE: Record<string, PillTone> = {
   draft: "neutral",
@@ -18,8 +19,10 @@ const STATUS_TONE: Record<string, PillTone> = {
 };
 
 export default function QuotesScreen() {
-  const { dashboard } = useWorkspace();
+  const { dashboard, refresh } = useWorkspace();
+  const newQuote = useNewQuoteModal();
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"send" | "delete" | null>(null);
 
   const quotes = useMemo(() => dashboard?.quotes ?? [], [dashboard]);
   const savedItems = useMemo(() => dashboard?.savedQuoteItems ?? [], [dashboard]);
@@ -136,14 +139,65 @@ export default function QuotesScreen() {
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>
               {selected.recipientAddress || selected.propertyName || "—"}
             </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
               {selected.publicShareUrl && (
                 <a className="ops-button ops-button--ghost" href={selected.publicShareUrl} target="_blank" rel="noopener">
                   View public link
                 </a>
               )}
-              <button className="ops-button ops-button--ghost">Save draft</button>
-              <button className="ops-button ops-button--salmon" style={{ marginLeft: "auto" }}>Send to homeowner</button>
+              <button
+                className="ops-button ops-button--ghost"
+                onClick={() => newQuote.open({ editQuoteId: selected.id })}
+              >
+                Edit quote
+              </button>
+              {selected.status === "draft" && (
+                <button
+                  className="ops-button ops-button--ghost"
+                  disabled={busy !== null}
+                  onClick={async () => {
+                    if (!confirm(`Delete draft "${selected.title}"? This can't be undone.`)) return;
+                    setBusy("delete");
+                    try {
+                      await postProviderAction("delete_quote", {
+                        workspaceId: dashboard.workspace.id,
+                        quoteId: selected.id,
+                      });
+                      setSelectedQuoteId(null);
+                      await refresh();
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "Couldn't delete the quote.");
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {busy === "delete" ? "Deleting…" : "Delete draft"}
+                </button>
+              )}
+              {(selected.status === "draft" || selected.status === "viewed" || selected.status === "countered_by_homeowner") && (
+                <button
+                  className="ops-button ops-button--salmon"
+                  style={{ marginLeft: "auto" }}
+                  disabled={busy !== null}
+                  onClick={async () => {
+                    setBusy("send");
+                    try {
+                      await postProviderAction("send_quote", {
+                        workspaceId: dashboard.workspace.id,
+                        quoteId: selected.id,
+                      });
+                      await refresh();
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "Couldn't send the quote.");
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {busy === "send" ? "Sending…" : selected.status === "draft" ? "Send to homeowner" : "Resend"}
+                </button>
+              )}
             </div>
 
             {/* Spreadsheet */}

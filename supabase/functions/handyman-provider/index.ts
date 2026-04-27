@@ -2558,6 +2558,48 @@ async function deleteHomeSystemPhotoForProvider(
 }
 
 /**
+ * Delete a draft quote. Only `draft` rows can be deleted — sent /
+ * viewed / approved / declined quotes have a paper trail and stay on
+ * record. Workspace-scoped via assertWorkspaceAccess + an explicit
+ * workspace_id match on the row.
+ */
+async function deleteQuoteForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const quoteId = compactString(body.quoteId);
+  if (!quoteId) throw new Error("quoteId is required");
+
+  const { data: quote, error: quoteError } = await service
+    .from("provider_quotes")
+    .select("id, status, workspace_id")
+    .eq("id", quoteId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (quoteError) throw quoteError;
+  if (!quote) throw new Error("Quote not found");
+  if (compactString(quote.status) !== "draft") {
+    throw new Error("Only draft quotes can be deleted. Withdraw or supersede sent quotes instead.");
+  }
+
+  // Cascade: provider_quote_messages have ON DELETE CASCADE on most
+  // schemas, but be defensive — clean them out first.
+  await service.from("provider_quote_messages").delete().eq("quote_id", quoteId);
+  const { error: deleteError } = await service
+    .from("provider_quotes")
+    .delete()
+    .eq("id", quoteId);
+  if (deleteError) throw deleteError;
+  return { ok: true, quoteId };
+}
+
+/**
  * Update the status on a handyman_request from the provider side. Used
  * by the desktop "Mark complete" / "Reopen" buttons. Validates the
  * request belongs to the calling workspace.
@@ -4350,6 +4392,15 @@ serve(async (req) => {
 
       if (action === "delete_home_system_photo") {
         const result = await deleteHomeSystemPhotoForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "delete_quote") {
+        const result = await deleteQuoteForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
