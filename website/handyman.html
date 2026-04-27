@@ -492,6 +492,7 @@
             <button class="nav-button" data-tab="homes" type="button">Homes</button>
             <button class="nav-button" data-tab="quotes" type="button">Quotes</button>
             <button class="nav-button" data-tab="messages" type="button">Messages</button>
+            <button class="nav-button" data-tab="directory" type="button" data-owner-only="true">Directory</button>
           </nav>
 
           <div class="workspace-card compact-card">
@@ -774,6 +775,59 @@
               </article>
             </div>
           </section>
+
+          <section class="tab-panel" data-panel="directory">
+            <div class="panel-grid">
+              <article class="surface-card">
+                <div class="section-row">
+                  <div>
+                    <p class="section-eyebrow">Homeowner directory</p>
+                    <h3>List your workspace in the Chez homeowner search</h3>
+                  </div>
+                  <span class="status-pill" id="directory-status-pill">Hidden</span>
+                </div>
+                <p class="card-copy">
+                  When listing is on, homeowners using the Chez app see your workspace at the top
+                  of their "Find a handyman" search — above Google Places — for service areas you
+                  match. Off by default; you opt in here.
+                </p>
+                <form class="auth-form" id="directory-form">
+                  <label class="toggle-row">
+                    <input type="checkbox" id="directory-listed">
+                    <span>List this workspace in the homeowner directory</span>
+                  </label>
+                  <div class="form-grid two-col">
+                    <label>
+                      <span>State (2-letter)</span>
+                      <input id="directory-state" type="text" maxlength="2" placeholder="NY" autocapitalize="characters">
+                    </label>
+                    <label>
+                      <span>Primary city</span>
+                      <input id="directory-city" type="text" placeholder="Mount Kisco">
+                    </label>
+                  </div>
+                  <label>
+                    <span>Service ZIP codes (comma-separated, optional — sharper than state-only)</span>
+                    <input id="directory-zips" type="text" placeholder="10549, 10514, 10506">
+                  </label>
+                  <label>
+                    <span>Service categories (comma-separated, lowercase)</span>
+                    <input id="directory-categories" type="text" placeholder="handyman" value="handyman">
+                  </label>
+                  <label>
+                    <span>Display blurb (max 280 chars)</span>
+                    <textarea id="directory-blurb" rows="3" maxlength="280" placeholder="One or two sentences a homeowner sees on your card. e.g. Family-owned, fully insured, 15 yr in Westchester. Same-day for paint, drywall, light electrical."></textarea>
+                  </label>
+                  <label>
+                    <span>Headshot URL (optional)</span>
+                    <input id="directory-headshot" type="url" placeholder="https://…">
+                  </label>
+                  <p class="card-copy" id="directory-feedback"></p>
+                  <button class="primary-button" id="directory-save-button" type="submit">Save directory listing</button>
+                </form>
+              </article>
+            </div>
+          </section>
         </div>
       </section>
     </main>
@@ -885,6 +939,6 @@
     </article>
   </template>
 
-  <script type="module" src="handyman.js?v=20260423-provider-delivery1"></script>
+  <script type="module" src="handyman.js?v=20260427-redirect-fix"></script>
 </body>
 </html>

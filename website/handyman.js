@@ -442,18 +442,60 @@ async function refreshWorkspace() {
   // confirmation. The user is going to /operations/ in a moment — they
   // shouldn't see a "sign in" form while we confirm the workspace.
   dom.authPanel.classList.add("hidden");
+  // Show a brief "loading" line so a slow dashboard fetch doesn't
+  // leave the page looking broken before the redirect fires.
+  dom.authStatus.textContent = "Loading your desk…";
 
-  let dashboard = await providerRequest("GET");
+  // Resolve the redirect target up front — used by every exit branch.
+  const next = params.get("next") || "/operations/";
+  const safeNext = next.startsWith("/operations") ? next : "/operations/";
+
+  // Chez v2 (Phase 67): hand off to the Operations Desk SPA. The SPA
+  // has its own session + workspace checks via WorkspaceProvider, so
+  // for already-bootstrapped users we don't need to fetch the
+  // dashboard here at all — handyman.html's job ends at "user is
+  // signed in, send them to /operations/".
+  //
+  // We ONLY stay on this page when there's a fresh sign-up seed or a
+  // team-invite token — those need the bootstrap_workspace POST
+  // before /operations/ can do anything useful.
+  const seed = workspaceSeed();
+  const needsBootstrap = Boolean(teamInviteToken || seed.companyName || (inviteToken && !state.inviteLinked));
+
+  if (!needsBootstrap) {
+    window.location.assign(safeNext);
+    return;
+  }
+
+  // Bootstrap path — try the dashboard fetch, but never let a
+  // failure leave the user stranded on a blank page. If anything
+  // throws, log it and still send them to /operations/ so the SPA
+  // can surface a real error.
+  let dashboard;
+  try {
+    dashboard = await providerRequest("GET");
+  } catch (error) {
+    console.error("[handyman] providerRequest GET failed; routing to /operations/ anyway", error);
+    window.location.assign(safeNext);
+    return;
+  }
 
   if (dashboard.needsWorkspace) {
     dom.pageGrid.classList.remove("workspace-live");
-    const seed = workspaceSeed();
     if (teamInviteToken || seed.companyName) {
-      dashboard = await providerRequest("POST", {
-        action: "bootstrap_workspace",
-        ...seed,
-      });
-      setFeedback(dom.authFeedback, "Workspace ready. Loading your Chez Handyman desk.");
+      try {
+        dashboard = await providerRequest("POST", {
+          action: "bootstrap_workspace",
+          ...seed,
+        });
+        setFeedback(dom.authFeedback, "Workspace ready. Loading your Chez Handyman desk.");
+      } catch (error) {
+        console.error("[handyman] bootstrap_workspace failed", error);
+        setFeedback(dom.authFeedback, error instanceof Error ? error.message : "Couldn't create workspace.", true);
+        dom.authPanel.classList.remove("hidden");
+        showAuthMode("sign-up");
+        return;
+      }
     } else {
       dom.authPanel.classList.remove("hidden");
       dom.workspacePanel.classList.add("hidden");
@@ -462,23 +504,19 @@ async function refreshWorkspace() {
       return;
     }
   } else if (inviteToken && !state.inviteLinked) {
-    dashboard = await providerRequest("POST", {
-      action: "link_invite",
-      inviteToken,
-    });
-    state.inviteLinked = true;
+    try {
+      dashboard = await providerRequest("POST", {
+        action: "link_invite",
+        inviteToken,
+      });
+      state.inviteLinked = true;
+    } catch (error) {
+      console.error("[handyman] link_invite failed", error);
+      // Non-fatal — fall through to the redirect.
+    }
   }
 
   state.dashboard = dashboard;
-
-  // Chez v2 (Phase 67): hand off to the Operations Desk SPA BEFORE
-  // adding the `workspace-authenticated` class — that class is what
-  // reveals the embedded workspace panel (now deprecated). Skipping
-  // the class-add prevents a flash of the old UI before the navigation
-  // takes effect. Honor ?next= so deep links from the SPA round-trip
-  // through sign-out → sign-in.
-  const next = params.get("next") || "/operations/";
-  const safeNext = next.startsWith("/operations") ? next : "/operations/";
   window.location.assign(safeNext);
   return;
 }
