@@ -183,11 +183,21 @@ export default function QuotesScreen() {
                   onClick={async () => {
                     setBusy("send");
                     try {
-                      await postProviderAction("send_quote", {
+                      const result = await postProviderAction<{
+                        quote: { id: string; status: string };
+                        delivery?: { sent: boolean; channel?: string; error?: string };
+                      }>("send_quote", {
                         workspaceId: dashboard.workspace.id,
                         quoteId: selected.id,
                       });
                       await refresh();
+                      // Surface delivery failures — the quote still
+                      // mirrors into the homeowner's chat thread so
+                      // it's marked sent, but the email channel
+                      // failed. Tell the user.
+                      if (result.delivery && result.delivery.sent === false) {
+                        alert(`Quote saved + posted to the homeowner's chat thread, but the email didn't go out: ${result.delivery.error || "unknown error"}.\n\nThey'll still see it in their Chez Handyman tab.`);
+                      }
                     } catch (e) {
                       alert(e instanceof Error ? e.message : "Couldn't send the quote.");
                     } finally {

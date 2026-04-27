@@ -783,6 +783,31 @@ struct HomeSystemRow: Identifiable {
     /// process-invoice cadence detection), "manual" (system detail
     /// frequency editor). Used to render the source caption.
     let serviceIntervalSource: String?
+    /// Chez v1: provenance for `installDate`. One of `exact`,
+    /// `estimated`, `unknown`, or nil (legacy rows). Drives the
+    /// gamified system-coverage flow and the SystemProfileAudit so
+    /// "I don't know" rows stop appearing in the missing-profile
+    /// list for ~90 days.
+    let installDateSource: String?
+    /// Set when the user explicitly answers "I don't know". The audit
+    /// treats systems with this stamp as satisfied for ~90 days, then
+    /// re-surfaces them in case the homeowner found paperwork in the
+    /// meantime.
+    let installDateUnknownAt: Date?
+    /// True when ATTOM (or another public-records source) pre-filled
+    /// this system's install date. The coverage flow shows these as
+    /// "estimated from public records — confirm or correct".
+    let installDateAttomPrefilled: Bool?
+    /// Set when the user has confirmed an ATTOM pre-fill (or otherwise
+    /// signed off). Lets us distinguish "user hasn't reviewed" from
+    /// "user reviewed and kept it".
+    let installDateConfirmedAt: Date?
+    /// Chez v1: soft-delete timestamp. Set when the user picks "I
+    /// don't have this" in `SystemCoverageFlow` or when the one-time
+    /// backfill retires service-shaped rows. Every property-level
+    /// read filters `archived_at IS NULL` so an archived row is
+    /// invisible without being lost. Mirrors the routines pattern.
+    let archivedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status, subtype
@@ -810,6 +835,21 @@ struct HomeSystemRow: Identifiable {
         case cachedManualLinks = "cached_manual_links"
         case serviceIntervalDays = "service_interval_days"
         case serviceIntervalSource = "service_interval_source"
+        case installDateSource = "install_date_source"
+        case installDateUnknownAt = "install_date_unknown_at"
+        case installDateAttomPrefilled = "install_date_attom_prefilled"
+        case installDateConfirmedAt = "install_date_confirmed_at"
+        case archivedAt = "archived_at"
+    }
+}
+
+extension HomeSystemRow: Hashable {
+    static func == (lhs: HomeSystemRow, rhs: HomeSystemRow) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
@@ -848,6 +888,11 @@ extension HomeSystemRow: Decodable {
         customCategoryName = try? c.decodeIfPresent(String.self, forKey: .customCategoryName)
         serviceIntervalDays = try? c.decodeIfPresent(Int.self, forKey: .serviceIntervalDays)
         serviceIntervalSource = try? c.decodeIfPresent(String.self, forKey: .serviceIntervalSource)
+        installDateSource = try? c.decodeIfPresent(String.self, forKey: .installDateSource)
+        installDateUnknownAt = try? c.decodeIfPresent(Date.self, forKey: .installDateUnknownAt)
+        installDateAttomPrefilled = try? c.decodeIfPresent(Bool.self, forKey: .installDateAttomPrefilled)
+        installDateConfirmedAt = try? c.decodeIfPresent(Date.self, forKey: .installDateConfirmedAt)
+        archivedAt = try? c.decodeIfPresent(Date.self, forKey: .archivedAt)
     }
 }
 
@@ -907,6 +952,14 @@ struct HomeSystemInsert: Codable {
     var parentSystemId: UUID?
     var subtype: String?
     var customCategoryName: String?
+    /// Chez v1: source of the `installDate` value at insert time.
+    /// `estimated` is set by the ATTOM pre-fill path; `exact` is used
+    /// by manual-entry inserts when the user provided a date.
+    var installDateSource: String?
+    /// True for inserts where ATTOM (or another public-records source)
+    /// supplied the install date — drives the "Confirm or correct"
+    /// banner in the coverage flow.
+    var installDateAttomPrefilled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case name, category, manufacturer, notes, status, subtype
@@ -919,6 +972,8 @@ struct HomeSystemInsert: Codable {
         case expectedLifespanYears = "expected_lifespan_years"
         case catalogEntryId = "catalog_entry_id"
         case parentSystemId = "parent_system_id"
+        case installDateSource = "install_date_source"
+        case installDateAttomPrefilled = "install_date_attom_prefilled"
     }
 }
 
@@ -954,6 +1009,23 @@ struct HomeSystemUpdate: Codable {
     var serviceIntervalDays: Int?
     /// Phase 50: Provenance string — see HomeSystemRow.serviceIntervalSource.
     var serviceIntervalSource: String?
+    /// Chez v1: provenance for `installDate`. `exact` / `estimated` /
+    /// `unknown` / nil. Updated by the gamified coverage flow.
+    var installDateSource: String?
+    /// Set when the user explicitly answers "I don't know" so the
+    /// audit gives the system a 90-day cooldown.
+    var installDateUnknownAt: Date?
+    /// Cleared (false) when the user manually edits the install date,
+    /// or set true when ATTOM pre-fills.
+    var installDateAttomPrefilled: Bool?
+    /// Set when the user confirms an ATTOM pre-fill or saves an
+    /// exact / estimated date.
+    var installDateConfirmedAt: Date?
+    /// Chez v1: soft-delete timestamp. Set when the user picks "I
+    /// don't have this" in the coverage flow, or when the legacy
+    /// service-row backfill retires Pet Waste / Cleaning / Trash &
+    /// Recycling / etc. rows.
+    var archivedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case name, category, manufacturer, notes, status, subtype
@@ -977,6 +1049,11 @@ struct HomeSystemUpdate: Codable {
         case parentSystemId = "parent_system_id"
         case serviceIntervalDays = "service_interval_days"
         case serviceIntervalSource = "service_interval_source"
+        case installDateSource = "install_date_source"
+        case installDateUnknownAt = "install_date_unknown_at"
+        case installDateAttomPrefilled = "install_date_attom_prefilled"
+        case installDateConfirmedAt = "install_date_confirmed_at"
+        case archivedAt = "archived_at"
     }
 }
 
@@ -1087,8 +1164,8 @@ struct ContractorRow: Codable, Identifiable {
     let logoUrl: String?
     let brandColor: String?
     let website: String?
-    /// Phase 19k: How this contractor was added — "manual", "quiz", or
-    /// "find_vendor" (from the Phase 19n Google Places picker).
+    /// Phase 19k: How this contractor was added — "manual", "quiz",
+    /// "find_vendor" (Google Places), or "chez_field" (provider directory).
     let source: String?
 
     enum CodingKeys: String, CodingKey {
@@ -1167,6 +1244,907 @@ struct ContractorUpdate: Codable {
     }
 }
 
+struct HandymanProviderDirectoryRow: Codable, Identifiable, Hashable {
+    let id: String
+    let companyName: String
+    let primaryEmail: String?
+    let primaryPhone: String?
+    let website: String?
+    let activeMemberCount: Int?
+    let invitedMemberCount: Int?
+    let isLinked: Bool
+    let isPreferred: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case companyName
+        case primaryEmail
+        case primaryPhone
+        case website
+        case activeMemberCount
+        case invitedMemberCount
+        case isLinked
+        case isPreferred
+    }
+}
+
+struct HandymanProviderDirectoryResponse: Codable {
+    let providers: [HandymanProviderDirectoryRow]
+}
+
+struct HandymanProviderLinkResponse: Codable {
+    let contractor: ContractorRow
+    let workspace: HandymanProviderDirectoryRow?
+}
+
+// MARK: - Premier Handyman Program
+
+enum HandymanRequestStatus: String, Codable, CaseIterable {
+    case draft
+    case submitted
+    case scheduled
+    case sentToHandyman = "sent_to_handyman"
+    case alternateDatesProposed = "alternate_dates_proposed"
+    case awaitingHomeowner = "awaiting_homeowner"
+    case confirmed
+    case onMyWay = "on_my_way"
+    case checkedIn = "checked_in"
+    case quoted
+    case inProgress = "in_progress"
+    case completed
+    case followUpRecommended = "follow_up_recommended"
+    case cancelled
+    case declined
+
+    var displayLabel: String {
+        switch self {
+        case .draft:
+            return "Draft"
+        case .submitted:
+            return "Requested"
+        case .scheduled:
+            return "Scheduled"
+        case .sentToHandyman:
+            return "Sent to handyman"
+        case .alternateDatesProposed:
+            return "Dates proposed"
+        case .awaitingHomeowner:
+            return "Reply needed"
+        case .confirmed:
+            return "Confirmed"
+        case .onMyWay:
+            return "On my way"
+        case .checkedIn:
+            return "Checked in"
+        case .quoted:
+            return "Quoted"
+        case .inProgress:
+            return "In progress"
+        case .completed:
+            return "Completed"
+        case .followUpRecommended:
+            return "Follow-up recommended"
+        case .cancelled:
+            return "Cancelled"
+        case .declined:
+            return "Declined"
+        }
+    }
+
+    var homeownerSummary: String {
+        switch self {
+        case .draft:
+            return "This visit is still a draft."
+        case .submitted:
+            return "Chez saved the request and is getting it ready to send."
+        case .scheduled:
+            return "The visit has a date, but the handyman still needs the full Chez confirmation flow."
+        case .sentToHandyman:
+            return "The handyman has the visit link and still needs to confirm or suggest another date."
+        case .alternateDatesProposed:
+            return "The handyman asked for different timing."
+        case .awaitingHomeowner:
+            return "The handyman sent a question or note that needs a homeowner reply."
+        case .confirmed:
+            return "Both sides are aligned and the visit is confirmed."
+        case .onMyWay:
+            return "The handyman is on the way."
+        case .checkedIn:
+            return "The handyman has checked in and started the visit."
+        case .quoted:
+            return "A quote is ready for review."
+        case .inProgress:
+            return "The visit is actively in progress."
+        case .completed:
+            return "The visit is complete."
+        case .followUpRecommended:
+            return "The handyman finished and recommended follow-up work."
+        case .cancelled:
+            return "This request was cancelled."
+        case .declined:
+            return "The handyman declined this visit."
+        }
+    }
+
+    var actionRequiredByHomeowner: Bool {
+        self == .alternateDatesProposed || self == .awaitingHomeowner || self == .quoted || self == .followUpRecommended
+    }
+}
+
+struct HandymanRequestRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let propertyId: UUID?
+    let contractorId: UUID?
+    let visitTaskId: UUID?
+    let createdByUserId: UUID?
+    let requestType: String
+    let source: String
+    let title: String
+    let details: String?
+    let preferredTiming: String?
+    let urgency: String
+    let status: String
+    let firstVisitSetupRequested: Bool
+    let recommendedLane: String?
+    let quickUpsellTitles: [String]
+    /// Phase 73 sub-phase A: most-recent-proposal columns. Both sides walk
+    /// the schedule round-trip via `propose_visit_time`; the columns
+    /// reflect the latest state. `confirmedVisitAt` is non-nil once one
+    /// side accepts. Old rows (pre-Phase-73) read these as nil.
+    let proposedVisitAt: Date?
+    let proposedByRole: String?
+    let proposedAt: Date?
+    let confirmedVisitAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, source, title, details, urgency, status
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case createdByUserId = "created_by_user_id"
+        case requestType = "request_type"
+        case preferredTiming = "preferred_timing"
+        case firstVisitSetupRequested = "first_visit_setup_requested"
+        case recommendedLane = "recommended_lane"
+        case quickUpsellTitles = "quick_upsell_titles"
+        case proposedVisitAt = "proposed_visit_at"
+        case proposedByRole = "proposed_by_role"
+        case proposedAt = "proposed_at"
+        case confirmedVisitAt = "confirmed_visit_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+extension HandymanRequestRow {
+    var typedStatus: HandymanRequestStatus {
+        HandymanRequestStatus(rawValue: status) ?? .submitted
+    }
+
+    /// Phase 73: which side proposed the most-recent time. Used by the
+    /// scheduling UI to decide whether the current viewer should see
+    /// "Accept / Counter" or just "Propose a date".
+    var proposedByActor: HandymanScheduleActor? {
+        guard let role = proposedByRole else { return nil }
+        return HandymanScheduleActor(rawValue: role)
+    }
+
+    /// True when there's a proposal sitting on the request that's not yet
+    /// been accepted. Drives the homeowner's "ball is in your court" UI.
+    var hasOpenProposal: Bool {
+        proposedVisitAt != nil && confirmedVisitAt == nil
+    }
+}
+
+/// Mirrors the SQL CHECK constraint on `proposed_by_role` /
+/// `accepted_by_role` and the message metadata's `proposed_by_role`
+/// field. Use the raw value when calling the propose / accept RPCs.
+enum HandymanScheduleActor: String, Codable {
+    case homeowner
+    case handyman
+}
+
+/// Discriminator for `handyman_request_messages.metadata.kind`. Both the
+/// homeowner iOS thread view and the provider PWA thread view branch on
+/// this to render system events (proposals, accepts) differently from
+/// free-text replies. Unknown values fall back to `.text` so a future
+/// new event type doesn't break older clients.
+enum HandymanMessageKind: String, Codable {
+    case text
+    case proposeTime = "propose_time"
+    case acceptTime = "accept_time"
+    case declineTime = "decline_time"
+    /// Provider sent a quote — message renders as a rich card with
+    /// the dollar total and a "Review quote" CTA that opens the
+    /// HandymanQuoteReviewSheet.
+    case quoteSent = "quote_sent"
+}
+
+extension HandymanRequestMessageRow {
+    /// Resolved discriminator. Returns `.text` for legacy messages whose
+    /// `metadata` is empty or missing the `kind` field.
+    var typedKind: HandymanMessageKind {
+        guard let raw = metadata?["kind"]?.stringValue,
+              let kind = HandymanMessageKind(rawValue: raw)
+        else {
+            return .text
+        }
+        return kind
+    }
+
+    /// For `.proposeTime` events, the proposed visit timestamp parsed
+    /// out of metadata. Returns nil for any other event kind or when
+    /// the metadata is malformed.
+    var proposedTime: Date? {
+        guard typedKind == .proposeTime,
+              let iso = metadata?["proposed_at"]?.stringValue
+        else {
+            return nil
+        }
+        return ISO8601DateFormatter.handymanScheduleFormatter.date(from: iso)
+    }
+
+    /// For `.acceptTime` events, the confirmed visit timestamp.
+    var confirmedTime: Date? {
+        guard typedKind == .acceptTime,
+              let iso = metadata?["confirmed_at"]?.stringValue
+        else {
+            return nil
+        }
+        return ISO8601DateFormatter.handymanScheduleFormatter.date(from: iso)
+    }
+
+    /// For `.quoteSent` events, the linked provider_quotes.id so the
+    /// rich card can deep-link into the quote review sheet.
+    var quoteId: UUID? {
+        guard typedKind == .quoteSent,
+              let raw = metadata?["quote_id"]?.stringValue
+        else { return nil }
+        return UUID(uuidString: raw)
+    }
+
+    /// For `.quoteSent` events, the dollar total parsed out of metadata.
+    var quoteTotal: Double? {
+        guard typedKind == .quoteSent, let value = metadata?["total"] else { return nil }
+        switch value {
+        case .double(let d): return d
+        case .int(let i): return Double(i)
+        case .string(let s): return Double(s)
+        default: return nil
+        }
+    }
+
+    /// For `.quoteSent` events, the line-item count for the card subtitle.
+    var quoteLineItemCount: Int? {
+        guard typedKind == .quoteSent, let value = metadata?["line_item_count"] else { return nil }
+        switch value {
+        case .int(let i): return i
+        case .double(let d): return Int(d)
+        case .string(let s): return Int(s)
+        default: return nil
+        }
+    }
+}
+
+private extension ISO8601DateFormatter {
+    /// Matches the `YYYY-MM-DD"T"HH24:MI:SS"Z"` to_char format used by
+    /// the Phase 73 RPCs when stamping metadata. Standard ISO8601 sans
+    /// fractional seconds.
+    static let handymanScheduleFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+}
+
+struct HandymanRequestInsert: Codable {
+    let householdId: UUID
+    var propertyId: UUID?
+    var contractorId: UUID?
+    var visitTaskId: UUID?
+    var createdByUserId: UUID?
+    let requestType: String
+    var source: String = "homeowner"
+    let title: String
+    var details: String?
+    var preferredTiming: String?
+    var urgency: String = "routine"
+    var status: String = "submitted"
+    var firstVisitSetupRequested: Bool = false
+    var recommendedLane: String?
+    var quickUpsellTitles: [String] = []
+
+    enum CodingKeys: String, CodingKey {
+        case source, title, details, urgency, status
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case createdByUserId = "created_by_user_id"
+        case requestType = "request_type"
+        case preferredTiming = "preferred_timing"
+        case firstVisitSetupRequested = "first_visit_setup_requested"
+        case recommendedLane = "recommended_lane"
+        case quickUpsellTitles = "quick_upsell_titles"
+    }
+}
+
+struct HandymanRequestUpdate: Codable {
+    var contractorId: UUID?
+    var visitTaskId: UUID?
+    var title: String?
+    var details: String?
+    var preferredTiming: String?
+    var urgency: String?
+    var status: String?
+    var firstVisitSetupRequested: Bool?
+    var recommendedLane: String?
+    var quickUpsellTitles: [String]?
+    var updatedAt: Date? = Date()
+
+    enum CodingKeys: String, CodingKey {
+        case title, details, urgency, status
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case preferredTiming = "preferred_timing"
+        case firstVisitSetupRequested = "first_visit_setup_requested"
+        case recommendedLane = "recommended_lane"
+        case quickUpsellTitles = "quick_upsell_titles"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct HandymanRequestMessageRow: Codable, Identifiable {
+    let id: UUID
+    let requestId: UUID
+    let householdId: UUID
+    let senderRole: String
+    let body: String
+    let metadata: [String: FlexibleValue]?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, body, metadata
+        case requestId = "request_id"
+        case householdId = "household_id"
+        case senderRole = "sender_role"
+        case createdAt = "created_at"
+    }
+}
+
+struct HandymanRequestMessageInsert: Codable {
+    let requestId: UUID
+    let householdId: UUID
+    let senderRole: String
+    let body: String
+    var metadata: [String: String]? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case body, metadata
+        case requestId = "request_id"
+        case householdId = "household_id"
+        case senderRole = "sender_role"
+    }
+}
+
+struct HandymanPortalChecklistItem: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    let category: String?
+    let status: String
+    let source: String
+    let recommended: Bool
+}
+
+struct HandymanPortalSetupPrompt: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let detail: String
+    let category: String
+    let isRequired: Bool
+}
+
+struct HandymanPortalUpsell: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let detail: String
+    let category: String
+    let priceHint: String?
+    let minutesHint: Int?
+}
+
+struct HandymanPortalSystemRecord: Codable, Identifiable, Hashable {
+    let id: String
+    let systemId: UUID?
+    let name: String
+    let category: String
+    let manufacturer: String?
+    let modelNumber: String?
+    let serialNumber: String?
+    let installDate: String?
+    let notes: String?
+    let lastServiceDate: String?
+    let nextServiceDue: String?
+    let needsSetup: Bool
+    let serviced: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, manufacturer, notes
+        case systemId = "system_id"
+        case modelNumber = "model_number"
+        case serialNumber = "serial_number"
+        case installDate = "install_date"
+        case lastServiceDate = "last_service_date"
+        case nextServiceDue = "next_service_due"
+        case needsSetup = "needs_setup"
+        case serviced
+    }
+}
+
+struct HandymanPortalRecommendation: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let detail: String
+    let category: String
+    let priority: String
+    let createFollowUp: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, detail, category, priority
+        case createFollowUp = "create_follow_up"
+    }
+}
+
+struct HandymanPortalCoordinationState: Codable, Hashable {
+    let requestId: UUID?
+    let status: String
+    let statusLabel: String
+    let intro: String
+    let lastMessage: String?
+    let scheduledDate: String?
+    let requestTitle: String?
+    let needsHomeownerReply: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case status, intro
+        case requestId = "request_id"
+        case statusLabel = "status_label"
+        case lastMessage = "last_message"
+        case scheduledDate = "scheduled_date"
+        case requestTitle = "request_title"
+        case needsHomeownerReply = "needs_homeowner_reply"
+    }
+}
+
+struct HandymanPortalPropertySnapshot: Codable, Hashable {
+    let name: String
+    let addressLine: String?
+    let propertyType: String
+    let squareFootage: Int?
+    let yearBuilt: Int?
+    let systemCount: Int
+    let knownSystems: [String]
+    let systems: [HandymanPortalSystemRecord]?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case addressLine = "address_line"
+        case propertyType = "property_type"
+        case squareFootage = "square_footage"
+        case yearBuilt = "year_built"
+        case systemCount = "system_count"
+        case knownSystems = "known_systems"
+        case systems
+    }
+}
+
+struct HandymanPortalSeedPayload: Codable, Hashable {
+    let visitId: UUID?
+    let visitTitle: String
+    let scheduledDate: String?
+    let dueDate: String?
+    let firstVisit: Bool
+    let property: HandymanPortalPropertySnapshot
+    let contractorName: String?
+    let contractorPhone: String?
+    let contractorEmail: String?
+    let homeownerNotes: String?
+    let checklist: [HandymanPortalChecklistItem]
+    let diyClaims: [HandymanPortalChecklistItem]
+    let quickUpsells: [HandymanPortalUpsell]
+    let setupPrompts: [HandymanPortalSetupPrompt]
+    let coordination: HandymanPortalCoordinationState?
+    let recommendations: [HandymanPortalRecommendation]?
+
+    enum CodingKeys: String, CodingKey {
+        case visitId = "visit_id"
+        case visitTitle = "visit_title"
+        case scheduledDate = "scheduled_date"
+        case dueDate = "due_date"
+        case firstVisit = "first_visit"
+        case property
+        case contractorName = "contractor_name"
+        case contractorPhone = "contractor_phone"
+        case contractorEmail = "contractor_email"
+        case homeownerNotes = "homeowner_notes"
+        case checklist
+        case diyClaims = "diy_claims"
+        case quickUpsells = "quick_upsells"
+        case setupPrompts = "setup_prompts"
+        case coordination
+        case recommendations
+    }
+}
+
+struct HandymanPortalSessionRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let propertyId: UUID?
+    let contractorId: UUID?
+    let visitTaskId: UUID?
+    let createdByUserId: UUID?
+    let title: String
+    let portalToken: String
+    let status: String
+    let firstVisit: Bool
+    let seedPayload: HandymanPortalSeedPayload
+    let lastOpenedAt: Date?
+    let expiresAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, status
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case createdByUserId = "created_by_user_id"
+        case portalToken = "portal_token"
+        case firstVisit = "first_visit"
+        case seedPayload = "seed_payload"
+        case lastOpenedAt = "last_opened_at"
+        case expiresAt = "expires_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct HandymanPortalSessionInsert: Codable {
+    let householdId: UUID
+    var propertyId: UUID?
+    var contractorId: UUID?
+    var visitTaskId: UUID?
+    var createdByUserId: UUID?
+    let title: String
+    let portalToken: String
+    var status: String = "active"
+    var firstVisit: Bool = false
+    let seedPayload: HandymanPortalSeedPayload
+    var expiresAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case title, status
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case createdByUserId = "created_by_user_id"
+        case portalToken = "portal_token"
+        case firstVisit = "first_visit"
+        case seedPayload = "seed_payload"
+        case expiresAt = "expires_at"
+    }
+}
+
+struct HandymanPortalSessionUpdate: Codable {
+    var status: String?
+    var portalToken: String?
+    var seedPayload: HandymanPortalSeedPayload?
+    var lastOpenedAt: Date?
+    var expiresAt: Date?
+    var updatedAt: Date? = Date()
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case portalToken = "portal_token"
+        case seedPayload = "seed_payload"
+        case lastOpenedAt = "last_opened_at"
+        case expiresAt = "expires_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct HandymanVisitReportRow: Codable, Identifiable {
+    let id: UUID
+    let portalSessionId: UUID
+    let householdId: UUID
+    let propertyId: UUID?
+    let contractorId: UUID?
+    let visitTaskId: UUID?
+    let requestId: UUID?
+    let reportStatus: String
+    let checklist: [HandymanPortalChecklistItem]
+    let setupPrompts: [HandymanPortalSetupPrompt]
+    let quickUpsells: [HandymanPortalUpsell]
+    let homeownerNotes: String?
+    let fieldNotes: String?
+    let systemsSnapshot: [HandymanPortalSystemRecord]?
+    let recommendations: [HandymanPortalRecommendation]?
+    let coordinationStatus: String?
+    let startedAt: Date?
+    let completedAt: Date?
+    let lastSyncedAt: Date
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, checklist
+        case portalSessionId = "portal_session_id"
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case requestId = "request_id"
+        case reportStatus = "report_status"
+        case setupPrompts = "setup_prompts"
+        case quickUpsells = "quick_upsells"
+        case homeownerNotes = "homeowner_notes"
+        case fieldNotes = "field_notes"
+        case systemsSnapshot = "systems_snapshot"
+        case recommendations
+        case coordinationStatus = "coordination_status"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case lastSyncedAt = "last_synced_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct HandymanVisitReportInsert: Codable {
+    let portalSessionId: UUID
+    let householdId: UUID
+    var propertyId: UUID?
+    var contractorId: UUID?
+    var visitTaskId: UUID?
+    var requestId: UUID?
+    var reportStatus: String = "draft"
+    var checklist: [HandymanPortalChecklistItem] = []
+    var setupPrompts: [HandymanPortalSetupPrompt] = []
+    var quickUpsells: [HandymanPortalUpsell] = []
+    var homeownerNotes: String?
+    var fieldNotes: String?
+    var systemsSnapshot: [HandymanPortalSystemRecord]?
+    var recommendations: [HandymanPortalRecommendation]?
+    var coordinationStatus: String?
+    var startedAt: Date?
+    var completedAt: Date?
+    var lastSyncedAt: Date? = Date()
+
+    enum CodingKeys: String, CodingKey {
+        case checklist
+        case portalSessionId = "portal_session_id"
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case contractorId = "contractor_id"
+        case visitTaskId = "visit_task_id"
+        case requestId = "request_id"
+        case reportStatus = "report_status"
+        case setupPrompts = "setup_prompts"
+        case quickUpsells = "quick_upsells"
+        case homeownerNotes = "homeowner_notes"
+        case fieldNotes = "field_notes"
+        case systemsSnapshot = "systems_snapshot"
+        case recommendations
+        case coordinationStatus = "coordination_status"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case lastSyncedAt = "last_synced_at"
+    }
+}
+
+struct HandymanVisitReportUpdate: Codable {
+    var reportStatus: String?
+    var checklist: [HandymanPortalChecklistItem]?
+    var setupPrompts: [HandymanPortalSetupPrompt]?
+    var quickUpsells: [HandymanPortalUpsell]?
+    var homeownerNotes: String?
+    var fieldNotes: String?
+    var systemsSnapshot: [HandymanPortalSystemRecord]?
+    var recommendations: [HandymanPortalRecommendation]?
+    var coordinationStatus: String?
+    var startedAt: Date?
+    var completedAt: Date?
+    var lastSyncedAt: Date? = Date()
+    var updatedAt: Date? = Date()
+
+    enum CodingKeys: String, CodingKey {
+        case checklist
+        case reportStatus = "report_status"
+        case setupPrompts = "setup_prompts"
+        case quickUpsells = "quick_upsells"
+        case homeownerNotes = "homeowner_notes"
+        case fieldNotes = "field_notes"
+        case systemsSnapshot = "systems_snapshot"
+        case recommendations
+        case coordinationStatus = "coordination_status"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case lastSyncedAt = "last_synced_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct ProviderQuoteLineItem: Codable, Identifiable, Hashable {
+    let id: String
+    var name: String
+    var description: String?
+    var unit: String
+    /// Phase 73 sub-phase B: mutable so the homeowner counter sheet can
+    /// bind `$item.quantity` / `$item.unitPrice` via SwiftUI's Form
+    /// inputs and recompute totals live.
+    var quantity: Double
+    var unitPrice: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, unit, quantity
+        case unitPrice = "unit_price"
+    }
+}
+
+enum ProviderQuoteStatus: String, Codable, CaseIterable {
+    case draft
+    case sent
+    case viewed
+    case approved
+    case declined
+    case withdrawn
+    /// Phase 73 sub-phase B: homeowner edited line items and sent the
+    /// quote back to the provider. The countered row is the new active
+    /// quote in the chain; its `parent_quote_id` points at the version
+    /// the homeowner started from. Provider re-quotes by inserting a
+    /// fresh draft pointing at the countered row, OR approves it as-is.
+    case counteredByHomeowner = "countered_by_homeowner"
+    /// Phase 73 sub-phase B: terminal state for any quote that's been
+    /// replaced by a child revision. Hidden from "active" filters but
+    /// kept for the audit trail.
+    case superseded
+
+    var displayLabel: String {
+        switch self {
+        case .draft:
+            return "Draft"
+        case .sent:
+            return "Sent"
+        case .viewed:
+            return "Viewed"
+        case .approved:
+            return "Approved"
+        case .declined:
+            return "Declined"
+        case .withdrawn:
+            return "Withdrawn"
+        case .counteredByHomeowner:
+            return "Countered"
+        case .superseded:
+            return "Superseded"
+        }
+    }
+
+    var homeownerActionRequired: Bool {
+        self == .sent || self == .viewed
+    }
+
+    /// True when the homeowner can edit + counter from this state.
+    var allowsCounter: Bool {
+        self == .sent || self == .viewed
+    }
+
+    /// True when the homeowner can sign-and-approve from this state.
+    /// Includes `counteredByHomeowner` so the homeowner can sign their
+    /// own counter without waiting for provider re-quote.
+    var allowsSign: Bool {
+        self == .sent || self == .viewed || self == .counteredByHomeowner
+    }
+}
+
+struct ProviderQuoteRow: Codable, Identifiable {
+    let id: UUID
+    let workspaceId: UUID
+    let contractorId: UUID?
+    let householdId: UUID
+    let propertyId: UUID?
+    let requestId: UUID?
+    let visitTaskId: UUID?
+    let title: String
+    let status: String
+    let currency: String
+    let lineItems: [ProviderQuoteLineItem]
+    let scopeNotes: String?
+    let homeownerMessage: String?
+    let subtotal: Double
+    let taxTotal: Double
+    let total: Double
+    let sentAt: Date?
+    let viewedAt: Date?
+    let approvedAt: Date?
+    let declinedAt: Date?
+    /// Phase 73 sub-phase B: revision chain pointer. Non-nil when this
+    /// row was created by `counter_provider_quote` or by a provider
+    /// re-quote. Walk parent_quote_id to render history.
+    let parentQuoteId: UUID?
+    /// Phase 73 sub-phase B: stamped when a homeowner signs the quote.
+    let signedAt: Date?
+    let signedName: String?
+    /// Phase 73 sub-phase B: stamped when the homeowner submits a
+    /// counter (lets the provider sort countered quotes that need a
+    /// re-quote).
+    let homeownerRevisedAt: Date?
+    let createdAt: Date?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, status, currency, subtotal, total
+        case workspaceId = "workspace_id"
+        case contractorId = "contractor_id"
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case requestId = "request_id"
+        case visitTaskId = "visit_task_id"
+        case lineItems = "line_items"
+        case scopeNotes = "scope_notes"
+        case homeownerMessage = "homeowner_message"
+        case taxTotal = "tax_total"
+        case sentAt = "sent_at"
+        case viewedAt = "viewed_at"
+        case approvedAt = "approved_at"
+        case declinedAt = "declined_at"
+        case parentQuoteId = "parent_quote_id"
+        case signedAt = "signed_at"
+        case signedName = "signed_name"
+        case homeownerRevisedAt = "homeowner_revised_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+extension ProviderQuoteRow {
+    var typedStatus: ProviderQuoteStatus {
+        ProviderQuoteStatus(rawValue: status) ?? .draft
+    }
+}
+
+struct ProviderSavedQuoteItemRow: Codable, Identifiable {
+    let id: UUID
+    let workspaceId: UUID
+    let createdByUserId: UUID?
+    let name: String
+    let description: String?
+    let unit: String
+    let defaultQuantity: Double
+    let defaultUnitPrice: Double
+    let sortOrder: Int
+    let createdAt: Date?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, unit
+        case workspaceId = "workspace_id"
+        case createdByUserId = "created_by_user_id"
+        case defaultQuantity = "default_quantity"
+        case defaultUnitPrice = "default_unit_price"
+        case sortOrder = "sort_order"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
 // MARK: - Maintenance Task
 
 struct MaintenanceTaskDBRow: Codable, Identifiable {
@@ -1234,6 +2212,10 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     /// 54A template-time `bundleId` pattern to runtime — existing bundles
     /// continue to work via `templateId` matching, new ones use this FK.
     let bundleParentTaskId: UUID?
+    /// Phase 68: Canonical service-library identifier used by the new
+    /// vendor-orchestration model. `template_id` remains as a legacy
+    /// back-reference while `service_key` powers homeowner grouping.
+    let serviceKey: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -1265,6 +2247,7 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case assignedRoute = "assigned_route"
         case parentRoutineId = "parent_routine_id"
         case bundleParentTaskId = "bundle_parent_task_id"
+        case serviceKey = "service_key"
     }
 
     /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
@@ -1319,7 +2302,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             standingAppointmentId: nil,
             assignedRoute: nil,
             parentRoutineId: nil,
-            bundleParentTaskId: nil
+            bundleParentTaskId: nil,
+            serviceKey: nil
         )
     }
 
@@ -1365,7 +2349,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             standingAppointmentId: nil,
             assignedRoute: nil,
             parentRoutineId: nil,
-            bundleParentTaskId: nil
+            bundleParentTaskId: nil,
+            serviceKey: templateId.flatMap { ServiceLibrary.serviceKey(forLegacyTemplateKey: $0) }
         )
     }
 }
@@ -1410,6 +2395,8 @@ struct MaintenanceTaskInsert: Codable {
     /// RoutineGroupingEngine when a child row is created under a bundle
     /// parent. Parent rows leave this nil.
     var bundleParentTaskId: UUID?
+    /// Phase 68: Canonical service-library identifier.
+    var serviceKey: String?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1436,6 +2423,7 @@ struct MaintenanceTaskInsert: Codable {
         case assignedRoute = "assigned_route"
         case parentRoutineId = "parent_routine_id"
         case bundleParentTaskId = "bundle_parent_task_id"
+        case serviceKey = "service_key"
     }
 }
 
@@ -1475,6 +2463,8 @@ struct MaintenanceTaskUpdate: Codable {
     /// rearrangement uses this to re-parent a task when the user promotes
     /// a bundle member to a standalone task.
     var bundleParentTaskId: UUID?
+    /// Phase 68: Canonical service-library identifier.
+    var serviceKey: String?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1496,6 +2486,7 @@ struct MaintenanceTaskUpdate: Codable {
         case assignedRoute = "assigned_route"
         case parentRoutineId = "parent_routine_id"
         case bundleParentTaskId = "bundle_parent_task_id"
+        case serviceKey = "service_key"
     }
 }
 

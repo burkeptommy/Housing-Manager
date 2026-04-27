@@ -231,6 +231,28 @@ function requestStatusLabel(status: string) {
   }
 }
 
+/**
+ * Normalize a raw provider_quotes.line_items row (snake_case from the
+ * DB) into the camelCase shape every client reads. Without this, the
+ * React Quotes screen reads `line.unitPrice` as undefined and renders
+ * every row as $0 even though the row stores the correct value, and
+ * the Edit Quote modal pre-fills with zeros and silently destroys
+ * the prices on save.
+ */
+function mapLineItemForClient(item: Record<string, unknown>) {
+  const quantity = numberValue(item.quantity ?? 1);
+  const unitPrice = numberValue(item.unit_price ?? item.unitPrice ?? 0);
+  return {
+    id: compactString(item.id) || undefined,
+    name: compactString(item.name),
+    description: compactString(item.description),
+    unit: compactString(item.unit) || "ea",
+    quantity,
+    unitPrice,
+    total: numberValue(item.total ?? quantity * unitPrice),
+  };
+}
+
 function quoteSummary(lineItems: Array<Record<string, unknown>>) {
   const subtotal = roundMoney(
     lineItems.reduce((sum, item) => {
@@ -2032,7 +2054,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
             status: compactString(quote.status),
             statusLabel: quoteStatusLabel(compactString(quote.status)),
             total: numberValue(quote.total),
-            lineItems: Array.isArray(quote.line_items) ? quote.line_items : [],
+            lineItems: (Array.isArray(quote.line_items) ? quote.line_items : []).map(mapLineItemForClient),
             scopeNotes: compactString(quote.scope_notes) || null,
             homeownerMessage: compactString(quote.homeowner_message) || null,
             parentQuoteId: compactString(quote.parent_quote_id) || null,
@@ -2278,7 +2300,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     teamMembers: teamMemberRows,
     quotes: quotes.map((quote) => {
       const property = propertyById.get(compactString(quote.property_id));
-      const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
+      const lineItems = (Array.isArray(quote.line_items) ? quote.line_items : []).map(mapLineItemForClient);
       const quoteId = compactString(quote.id);
       const latestQuoteMessage = latestQuoteMessageByQuoteId.get(quoteId) ?? null;
       const recentQuoteMessages = (quoteMessagesByQuoteId.get(quoteId) ?? [])
@@ -3700,68 +3722,81 @@ async function saveQuote(
       error: deliveryError instanceof Error ? deliveryError.message : String(deliveryError),
     }));
 
-    if (delivery.sent) {
-      const { data: sentQuote, error: sentError } = await service
-        .from("provider_quotes")
+    // Mark the quote sent regardless of email outcome — the homeowner
+    // will always see it in their iOS chat thread (mirrored below) and
+    // on the public link. Email is one notification channel of many;
+    // when it fails we still want the row to reflect that the
+    // homeowner was notified.
+    const sentVia: string[] = [];
+    if (delivery.sent) sentVia.push("email");
+    sentVia.push("chat");
+
+    const shareUrl = publicQuoteUrl(compactString(quote.public_share_token));
+    const { data: sentQuote, error: sentError } = await service
+      .from("provider_quotes")
+      .update({
+        status: "sent",
+        sent_at: now,
+        last_sent_at: now,
+        sent_via: sentVia,
+        viewed_at: null,
+        approved_at: null,
+        declined_at: null,
+        updated_by_user_id: userId,
+        updated_at: now,
+      })
+      .eq("id", compactString(quote.id))
+      .select()
+      .single();
+    if (sentError || !sentQuote) throw sentError ?? new Error("Failed to finalize quote send");
+    quote = sentQuote as Record<string, unknown>;
+
+    const bodyText = providerQuoteMessageBody(title, totals.total, lineItems.length, homeownerMessage);
+    await addQuoteMessage(service, {
+      workspaceId,
+      quoteId: compactString(quote.id),
+      requestId,
+      householdId,
+      senderRole: "provider",
+      senderName: compactString(membership.full_name) || compactString(user.email),
+      senderEmail: compactString(user.email),
+      deliveryChannel: delivery.sent ? "email" : "chat",
+      body: bodyText,
+      metadata: {
+        event: "quote_sent",
+        total: totals.total,
+        lineItemCount: lineItems.length,
+        shareUrl,
+      },
+    });
+
+    if (requestId) {
+      await service
+        .from("handyman_requests")
         .update({
-          status: "sent",
-          sent_at: now,
-          last_sent_at: now,
-          sent_via: [delivery.channel],
-          viewed_at: null,
-          approved_at: null,
-          declined_at: null,
-          updated_by_user_id: userId,
+          status: "quoted",
           updated_at: now,
         })
-        .eq("id", compactString(quote.id))
-        .select()
-        .single();
-      if (sentError || !sentQuote) throw sentError ?? new Error("Failed to finalize quote send");
-      quote = sentQuote as Record<string, unknown>;
+        .eq("id", requestId);
 
-      const bodyText = providerQuoteMessageBody(title, totals.total, lineItems.length, homeownerMessage);
-      await addQuoteMessage(service, {
-        workspaceId,
-        quoteId: compactString(quote.id),
+      // Mirror the quote-sent into the request chat thread so the
+      // homeowner's iOS Handyman tab renders a rich quote card with a
+      // "Review quote" CTA. `kind: "quote_sent"` is the new
+      // discriminator iOS reads alongside the existing event field.
+      await mirrorQuoteMessageToRequestThread(service, {
         requestId,
         householdId,
-        senderRole: "provider",
-        senderName: compactString(membership.full_name) || compactString(user.email),
-        senderEmail: compactString(user.email),
-        deliveryChannel: "email",
+        senderRole: "vendor",
         body: bodyText,
         metadata: {
+          kind: "quote_sent",
           event: "quote_sent",
+          quote_id: compactString(quote.id),
           total: totals.total,
-          lineItemCount: lineItems.length,
-          shareUrl: compactString(delivery.shareUrl),
+          line_item_count: lineItems.length,
+          share_url: shareUrl,
         },
       });
-
-      if (requestId) {
-        await service
-          .from("handyman_requests")
-          .update({
-            status: "quoted",
-            updated_at: now,
-          })
-          .eq("id", requestId);
-
-        await mirrorQuoteMessageToRequestThread(service, {
-          requestId,
-          householdId,
-          senderRole: "vendor",
-          body: bodyText,
-          metadata: {
-            event: "quote_sent",
-            quote_id: compactString(quote.id),
-            total: totals.total,
-            line_item_count: lineItems.length,
-            share_url: compactString(delivery.shareUrl),
-          },
-        });
-      }
     }
   }
 

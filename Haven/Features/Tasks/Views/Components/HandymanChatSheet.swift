@@ -18,6 +18,7 @@ struct HandymanChatSheet: View {
     @State private var showingCounterSheet = false
     @State private var counteringMessageId: UUID?
     @State private var actingOnProposalId: UUID?
+    @State private var presentingQuoteReview = false
 
     private var orderedMessages: [HandymanRequestMessageRow] {
         coordinator.messages.sorted { $0.createdAt < $1.createdAt }
@@ -94,6 +95,12 @@ struct HandymanChatSheet: View {
                 counterSheet
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $presentingQuoteReview) {
+                HandymanQuoteReviewSheet(
+                    vendor: vendor,
+                    onMessage: { presentingQuoteReview = false }
+                )
             }
         }
     }
@@ -238,7 +245,8 @@ struct HandymanChatSheet: View {
             isActing: message.id == actingOnProposalId,
             vendorName: vendor?.companyName,
             onApprove: { await approveProposal(messageId: message.id) },
-            onCounter: { startCounter(for: message) }
+            onCounter: { startCounter(for: message) },
+            onReviewQuote: { presentingQuoteReview = true }
         )
     }
 
@@ -310,6 +318,7 @@ private struct MessageBubble: View {
     let vendorName: String?
     let onApprove: () async -> Void
     let onCounter: () -> Void
+    let onReviewQuote: () -> Void
 
     private var isFromHomeowner: Bool { message.senderRole == "homeowner" }
 
@@ -317,6 +326,8 @@ private struct MessageBubble: View {
         switch message.typedKind {
         case .proposeTime:
             proposalCard
+        case .quoteSent:
+            quoteCard
         case .acceptTime, .declineTime:
             systemEventRow
         case .text:
@@ -332,6 +343,73 @@ private struct MessageBubble: View {
                 }
             }
         }
+    }
+
+    // MARK: - Quote card (rich, with Review CTA)
+
+    private var quoteCard: some View {
+        let total = message.quoteTotal ?? 0
+        let count = message.quoteLineItemCount ?? 0
+        let totalLabel = "$" + (Int(total)).formatted(.number.grouping(.automatic))
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+                Text("QUOTE READY TO REVIEW")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Spacer()
+                Text(message.createdAt, format: .relative(presentation: .named))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(totalLabel)
+                    .font(HavenTypography.fraunces(size: 28, weight: 600))
+                    .foregroundStyle(HavenColors.navy900)
+                if count > 0 {
+                    Text("\(count) line item\(count == 1 ? "" : "s") from \(vendorName ?? "your handyman")")
+                        .font(.system(size: 13))
+                        .foregroundStyle(HavenColors.textSecondary)
+                } else if let vendor = vendorName {
+                    Text("From \(vendor)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+
+            Button {
+                onReviewQuote()
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Review quote")
+                        .font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(.white)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(HavenColors.action)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(HavenColors.action.opacity(0.35), lineWidth: 1)
+        )
     }
 
     // MARK: - Text bubble
