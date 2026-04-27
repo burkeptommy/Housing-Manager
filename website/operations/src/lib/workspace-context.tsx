@@ -4,10 +4,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { Session } from "@supabase/supabase-js";
+import { Session, RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { fetchDashboard } from "./api";
 import type { Dashboard, WorkspaceMode } from "./types";
@@ -31,6 +32,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ?mode=sole|crew query string overrides the auto-detected mode.
   const queryMode = useMemo<WorkspaceMode | null>(() => {
@@ -84,6 +87,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     await loadDashboard(data.session, false);
   }, [loadDashboard]);
 
+  /**
+   * Schedule a debounced refresh so a burst of Realtime events doesn't
+   * fire 50 dashboard fetches. We coalesce inside a 500ms window.
+   */
+  const scheduleRefresh = useCallback(() => {
+    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    refreshDebounceRef.current = setTimeout(() => {
+      refresh();
+    }, 500);
+  }, [refresh]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -102,6 +116,49 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, [loadDashboard]);
+
+  // Realtime: subscribe to inserts on handyman_request_messages and
+  // handyman_requests as soon as we have a session. Phase 74 added the
+  // provider-side SELECT policy so RLS lets the workspace owner see
+  // these change events.
+  //
+  // On any insert we debounce-refresh the entire dashboard. The fetch
+  // is one round-trip and propagates to every screen that reads
+  // useWorkspace().dashboard, so screens stay in sync without bespoke
+  // per-screen wiring.
+  useEffect(() => {
+    if (!session) return;
+
+    const channel = supabase
+      .channel("ops-desk-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "handyman_request_messages" },
+        () => scheduleRefresh()
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "handyman_requests" },
+        () => scheduleRefresh()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "handyman_requests" },
+        () => scheduleRefresh()
+      )
+      .subscribe();
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+      realtimeChannelRef.current = null;
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+        refreshDebounceRef.current = null;
+      }
+    };
+  }, [session, scheduleRefresh]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
