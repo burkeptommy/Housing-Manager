@@ -1,22 +1,25 @@
 import SwiftUI
 
 /// V5 Handyman screen — focused punch-list-and-vendor surface that lives
-/// behind the title-switcher in `TasksHubView`. Replaces the embedded
-/// `HandymanHubView` for the Tasks tab. Property-scoped and the legacy
-/// HandymanHubView are untouched.
+/// behind the title-switcher in `TasksHubView`.
 ///
-/// Sections (top-down):
-///   1. HeaderSwitcher (title + mode chevron + "+" button)
-///   2. VisitHero (indigo gradient + Schedule visit CTA + phone shortcut)
-///   3. VendorCard (linked handyman or empty-state Find a handyman)
-///   4. PunchList (checkboxes + durations + "+ N more")
-///   5. Recommended (salmon-icon rows with "+" to add to punch list)
-///   6. WhatWeHandleBand (explainer band — bulleted list)
-///   7. VisitHistory (dashed empty card or list)
+/// A handyman visit is a PARENT (the scheduled visit) containing CHILD
+/// punch-list items the handyman will work through. When an upcoming
+/// visit is on the books, the screen reframes around it:
+///   • Visit hero shows the date, vendor, and item count from the visit's
+///     parsed punch list (children parsed from the task's notes).
+///   • Punch list card shows those parsed children (read-only — the
+///     handyman owns them).
+///   • Tap the hero → opens HandymanVisitDetailSheet (chat, reschedule,
+///     full punch list, real-time status).
+///
+/// When NO visit is scheduled, falls back to the user's accumulating
+/// draft punch list (the legacy behavior).
 struct HandymanTabView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var maintenanceVM = MaintenanceViewModel.shared
     @StateObject private var punchListVM = HandymanPunchListViewModel()
+    @ObservedObject private var coordinator = HandymanRequestCoordinator.shared
 
     @State private var pendingChecked: Set<String> = []
     @State private var addingRecommendedIds: Set<UUID> = []
@@ -24,6 +27,8 @@ struct HandymanTabView: View {
     @State private var pushTarget: HandymanPush?
     @State private var showFindHandyman = false
     @State private var showScheduleSheet = false
+    @State private var presentedVisit: MaintenanceTaskDBRow? = nil
+    @State private var presentChat = false
 
     let onSwitchMode: () -> Void
 
@@ -45,7 +50,39 @@ struct HandymanTabView: View {
         }
     }
 
+    /// The next scheduled visit from this handyman. A handyman visit is a
+    /// `maintenance_task` row assigned to the handyman vendor where the
+    /// task IS the parent visit and the punch list lives in its notes.
+    private var nextScheduledVisit: MaintenanceTaskDBRow? {
+        guard let handyman = linkedHandyman else { return nil }
+        let candidates = maintenanceVM.tasks.filter { task in
+            task.assignedContractorId == handyman.id &&
+            task.lastCompletedDate == nil &&
+            (task.isArchived ?? false) == false
+        }
+        return candidates.min { lhs, rhs in
+            let l = MaintenanceDateFormatting.date(from: lhs.scheduledDate ?? lhs.nextDueDate) ?? .distantFuture
+            let r = MaintenanceDateFormatting.date(from: rhs.scheduledDate ?? rhs.nextDueDate) ?? .distantFuture
+            return l < r
+        }
+    }
+
+    /// Punch list items parsed from the visit's notes block. Each `-` /
+    /// `•` / `*` bullet becomes a child item. Strips the parent header
+    /// line ("What's included", "Punch list", etc).
+    private var visitChildren: [VisitChildItem] {
+        guard let notes = nextScheduledVisit?.notes, !notes.isEmpty else { return [] }
+        return VisitNotesParser.parsePunchList(from: notes)
+    }
+
+    private var totalPunchCount: Int { punchListVM.entries.count }
+
+    private var extraPunchCount: Int {
+        max(totalPunchCount - visiblePunchItems.count - pendingChecked.count, 0)
+    }
+
     /// Visible punch list items (not yet checked in this session).
+    /// Only used when no scheduled visit exists.
     private var visiblePunchItems: [PunchListItem] {
         Array(
             punchListVM.entries
@@ -62,16 +99,12 @@ struct HandymanTabView: View {
         )
     }
 
-    private var totalPunchCount: Int { punchListVM.entries.count }
-
-    private var extraPunchCount: Int {
-        max(totalPunchCount - visiblePunchItems.count - pendingChecked.count, 0)
-    }
-
     private var recommendedTasks: [MaintenanceTaskDBRow] {
         let punchSourceIds = Set(punchListVM.entries.compactMap { $0.sourceTaskId })
+        let visitId = nextScheduledVisit?.id
         let candidates = maintenanceVM.tasks.filter { task in
             guard !punchSourceIds.contains(task.id) else { return false }
+            guard task.id != visitId else { return false }                // exclude the visit itself
             guard task.lastCompletedDate == nil else { return false }
             guard !(task.isArchived ?? false) else { return false }
             guard task.assignedContractorId == nil else { return false }
@@ -101,6 +134,13 @@ struct HandymanTabView: View {
             }
     }
 
+    private var hasFirstVisitOpportunity: Bool {
+        // First-visit prompt: surface when there's an upcoming visit and
+        // no past completed visits — i.e. this is the homeowner's first
+        // time working with their handyman.
+        nextScheduledVisit != nil && pastVisits.isEmpty
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -112,6 +152,11 @@ struct HandymanTabView: View {
 
                 visitHeroSection
                 vendorCardSection
+
+                if hasFirstVisitOpportunity {
+                    firstVisitPromptSection
+                }
+
                 punchListSection
                 recommendedSection
 
@@ -130,12 +175,14 @@ struct HandymanTabView: View {
                 await punchListVM.load(householdId: householdId, propertyId: propertyId)
             }
             await maintenanceVM.loadTasks()
+            await reloadCoordination()
         }
         .refreshable {
             if let householdId {
                 await punchListVM.load(householdId: householdId, propertyId: propertyId)
             }
             await maintenanceVM.loadTasks()
+            await reloadCoordination()
         }
         .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
             Task {
@@ -143,6 +190,7 @@ struct HandymanTabView: View {
                     await punchListVM.load(householdId: householdId, propertyId: propertyId)
                 }
                 await maintenanceVM.loadTasks()
+                await reloadCoordination()
             }
         }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
@@ -170,22 +218,74 @@ struct HandymanTabView: View {
                 HandymanPunchListView(householdId: householdId, propertyId: propertyId)
             }
         }
+        .sheet(item: $presentedVisit) { visit in
+            HandymanVisitDetailSheet(
+                visit: visit,
+                vendor: linkedHandyman,
+                children: VisitNotesParser.parsePunchList(from: visit.notes ?? ""),
+                onMessage: {
+                    presentedVisit = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        presentChat = true
+                    }
+                }
+            )
+        }
+        .sheet(isPresented: $presentChat) {
+            HandymanChatSheet(
+                visit: nextScheduledVisit,
+                vendor: linkedHandyman,
+                householdId: householdId,
+                propertyId: propertyId
+            )
+        }
     }
 
     // MARK: - Sections
 
+    @ViewBuilder
     private var visitHeroSection: some View {
-        IndigoGradientCard(variant: .hero) {
-            VisitHeroContent(
-                itemCount: totalPunchCount,
-                vendorName: linkedHandyman?.companyName,
-                estimateLabel: estimateLabel,
-                onSchedule: { showScheduleSheet = true },
-                onCall: handymanCallAction
-            )
+        if let visit = nextScheduledVisit {
+            // Live upcoming-visit hero — replaces the "nothing on the
+            // punch list yet" empty state.
+            Button {
+                Haptics.selection()
+                presentedVisit = visit
+            } label: {
+                IndigoGradientCard(variant: .hero) {
+                    UpcomingVisitHero(
+                        visit: visit,
+                        vendor: linkedHandyman,
+                        itemCount: visitChildren.count,
+                        coordinationRequest: coordinator.request,
+                        onSchedule: {
+                            Haptics.selection()
+                            presentedVisit = visit
+                        },
+                        onMessage: {
+                            Haptics.light()
+                            presentChat = true
+                        },
+                        onCall: handymanCallAction
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, 18)
+        } else {
+            IndigoGradientCard(variant: .hero) {
+                VisitHeroContent(
+                    itemCount: totalPunchCount,
+                    vendorName: linkedHandyman?.companyName,
+                    estimateLabel: estimateLabel,
+                    onSchedule: { showScheduleSheet = true },
+                    onCall: handymanCallAction
+                )
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, 18)
         }
-        .padding(.horizontal, TasksV5.pageMargin)
-        .padding(.bottom, 18)
     }
 
     private var vendorCardSection: some View {
@@ -196,7 +296,8 @@ struct HandymanTabView: View {
                         name: handyman.companyName,
                         phoneURL: handymanPhoneURL
                     ),
-                    onTap: { pushTarget = .vendorDetail(handyman) }
+                    onTap: { presentChat = true },
+                    onCall: nil
                 )
             } else {
                 VendorCard(state: .empty) { showFindHandyman = true }
@@ -206,20 +307,134 @@ struct HandymanTabView: View {
         .padding(.bottom, 20)
     }
 
-    private var handymanPhoneURL: URL? {
-        guard let phone = linkedHandyman?.phone else { return nil }
-        let digits = phone.filter { $0.isNumber }
-        guard !digits.isEmpty else { return nil }
-        return URL(string: "tel://\(digits)")
-    }
-
-    private var handymanCallAction: (() -> Void)? {
-        guard let url = handymanPhoneURL else { return nil }
-        return { UIApplication.shared.open(url) }
+    private var firstVisitPromptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.actionPressed)
+                Text("FIRST VISIT")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.6)
+                    .foregroundStyle(HavenColors.actionPressed)
+            }
+            Text("Your handyman will help build out your home profile")
+                .font(HavenTypography.fraunces(size: 16, weight: 600))
+                .tracking(-0.2)
+                .foregroundStyle(HavenColors.navy900)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("On your first visit, they'll capture make + model on systems we don't have details for yet (e.g. \"Bosch 800 refrigerator\" instead of just \"refrigerator\"). It syncs back here automatically so future suggestions get sharper.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(HavenColors.textSecondary)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(TasksV5.decisionRowBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(TasksV5.decisionRowBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, TasksV5.pageMargin)
+        .padding(.bottom, 20)
     }
 
     @ViewBuilder
     private var punchListSection: some View {
+        if let visit = nextScheduledVisit {
+            // Punch list = parsed children of the upcoming visit
+            visitChildrenPunchList(visit: visit)
+        } else {
+            // Fallback to the user's accumulating draft list
+            draftPunchListSection
+        }
+    }
+
+    private func visitChildrenPunchList(visit: MaintenanceTaskDBRow) -> some View {
+        let children = visitChildren
+        return VStack(alignment: .leading, spacing: 0) {
+            SectionLabel(
+                eyebrow: "Punch list for this visit",
+                sub: "\(children.count) item\(children.count == 1 ? "" : "s")",
+                action: .init(title: "View all", tone: .indigo, perform: {
+                    presentedVisit = visit
+                })
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            if children.isEmpty {
+                emptyVisitChildrenCard
+                    .padding(.horizontal, TasksV5.pageMargin)
+                    .padding(.bottom, TasksV5.sectionGap)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(children.prefix(4).enumerated()), id: \.element.id) { index, child in
+                        VisitChildRow(
+                            child: child,
+                            isLast: index >= min(children.count, 4) - 1 && children.count <= 4
+                        )
+                    }
+                    if children.count > 4 {
+                        Button {
+                            presentedVisit = visit
+                        } label: {
+                            HStack {
+                                Text("+ \(children.count - 4) more")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .padding(.top, 10)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 14)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(HavenColors.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+                .padding(.horizontal, TasksV5.pageMargin)
+                .padding(.bottom, TasksV5.sectionGap)
+            }
+        }
+    }
+
+    private var emptyVisitChildrenCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("No items on this visit yet")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HavenColors.navy900)
+            Text("Add items so your handyman knows exactly what's on the docket.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(HavenColors.beige200, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var draftPunchListSection: some View {
         SectionLabel(
             eyebrow: "Punch list",
             sub: totalPunchCount > 0 ? "\(totalPunchCount) item\(totalPunchCount == 1 ? "" : "s")" : nil,
@@ -290,7 +505,7 @@ struct HandymanTabView: View {
 
     private func pastVisitRow(_ visit: MaintenanceTaskDBRow) -> some View {
         Button {
-            pushTarget = .punchListFull
+            presentedVisit = visit
         } label: {
             HStack(spacing: 12) {
                 IconTile(symbol: "checkmark.circle.fill", tone: .indigo)
@@ -360,13 +575,11 @@ struct HandymanTabView: View {
 
     private func handleToggle(_ id: String) {
         guard !pendingChecked.contains(id) else { return }
-        // Optimistic check — show the green-fill animation, then archive.
         withAnimation(.easeInOut(duration: 0.15)) {
             pendingChecked.insert(id)
         }
         guard let entry = punchListVM.entries.first(where: { $0.id == id }) else { return }
         Task {
-            // Hold the green check for ~500ms so the state transition reads.
             try? await Task.sleep(nanoseconds: 500_000_000)
             await punchListVM.archive(entry: entry)
             await MainActor.run { pendingChecked.remove(id) }
@@ -396,19 +609,20 @@ struct HandymanTabView: View {
         }
     }
 
+    private func reloadCoordination() async {
+        guard let visit = nextScheduledVisit else {
+            await MainActor.run { coordinator.clear() }
+            return
+        }
+        await coordinator.load(visit: visit)
+    }
+
     // MARK: - Navigation
 
     enum HandymanPush: Hashable, Identifiable {
         case punchListFull
-        case vendorDetail(ContractorRow)
 
-        var id: String {
-            switch self {
-            case .punchListFull: return "punchListFull"
-            case .vendorDetail(let c): return "vendor-\(c.id.uuidString)"
-            }
-        }
-
+        var id: String { "punchListFull" }
         static func == (lhs: HandymanPush, rhs: HandymanPush) -> Bool { lhs.id == rhs.id }
         func hash(into hasher: inout Hasher) { hasher.combine(id) }
     }
@@ -420,11 +634,6 @@ struct HandymanTabView: View {
             if let householdId {
                 HandymanPunchListView(householdId: householdId, propertyId: propertyId)
             }
-        case .vendorDetail:
-            // Push the existing contractor detail flow. Notification routing
-            // keeps this screen out of the contractors-detail import graph.
-            EmptyView()
-                .onAppear { pushTarget = nil }
         }
     }
 
@@ -462,5 +671,423 @@ struct HandymanTabView: View {
         if hours < 1 { return "~\(totalMinutes) min" }
         if hours == hours.rounded() { return "~\(Int(hours)) hrs" }
         return String(format: "~%.1f hrs", hours)
+    }
+
+    private var handymanPhoneURL: URL? {
+        guard let phone = linkedHandyman?.phone else { return nil }
+        let digits = phone.filter { $0.isNumber }
+        guard !digits.isEmpty else { return nil }
+        return URL(string: "tel://\(digits)")
+    }
+
+    private var handymanCallAction: (() -> Void)? {
+        guard let url = handymanPhoneURL else { return nil }
+        return { UIApplication.shared.open(url) }
+    }
+}
+
+// MARK: - Upcoming visit hero
+
+private struct UpcomingVisitHero: View {
+    let visit: MaintenanceTaskDBRow
+    let vendor: ContractorRow?
+    let itemCount: Int
+    let coordinationRequest: HandymanRequestRow?
+    let onSchedule: () -> Void
+    let onMessage: () -> Void
+    let onCall: (() -> Void)?
+
+    private var dateLabel: String {
+        if let confirmed = coordinationRequest?.confirmedVisitAt {
+            return confirmed.formatted(date: .abbreviated, time: .shortened)
+        }
+        if let proposed = coordinationRequest?.proposedVisitAt, coordinationRequest?.confirmedVisitAt == nil {
+            return "Proposed: \(proposed.formatted(date: .abbreviated, time: .shortened))"
+        }
+        let dateString = visit.scheduledDate ?? visit.nextDueDate
+        if let parsed = MaintenanceDateFormatting.date(from: dateString) {
+            return parsed.formatted(date: .complete, time: .omitted)
+        }
+        return "Date pending"
+    }
+
+    private var statusLabel: String {
+        if let request = coordinationRequest {
+            switch request.typedStatus {
+            case .scheduled, .confirmed: return "Confirmed"
+            case .alternateDatesProposed: return "Time being discussed"
+            case .awaitingHomeowner: return "Awaiting your reply"
+            case .onMyWay: return "Handyman on the way"
+            case .checkedIn, .inProgress: return "Visit in progress"
+            case .completed: return "Wrapped up"
+            case .submitted, .sentToHandyman: return "Request sent"
+            default: break
+            }
+        }
+        return "Scheduled"
+    }
+
+    private var headline: String {
+        if itemCount > 0 {
+            return "\(itemCount) item\(itemCount == 1 ? "" : "s") on the punch list"
+        }
+        return "Visit on the books"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("NEXT VISIT")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.32)
+                .foregroundStyle(HavenColors.actionLight)
+                .padding(.bottom, 6)
+
+            Text(headline)
+                .font(HavenTypography.fraunces(size: 19, weight: 500))
+                .tracking(-0.3)
+                .lineSpacing(2)
+                .foregroundStyle(.white)
+                .padding(.bottom, 4)
+                .multilineTextAlignment(.leading)
+
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(dateLabel)
+                    .font(.system(size: 12.5, weight: .medium))
+            }
+            .foregroundStyle(Color.white.opacity(0.85))
+            .padding(.bottom, 4)
+
+            HStack(spacing: 6) {
+                Image(systemName: statusIcon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text("\(vendor?.companyName ?? "Your handyman") · \(statusLabel)")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(Color.white.opacity(0.7))
+            .padding(.bottom, 14)
+
+            HStack(spacing: 8) {
+                Button(action: {
+                    Haptics.medium()
+                    onSchedule()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "list.bullet.rectangle")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("View visit")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(HavenColors.action)
+                    )
+                    .shadow(
+                        color: TasksV5.salmonGlowColor,
+                        radius: TasksV5.salmonGlowRadius,
+                        x: 0,
+                        y: TasksV5.salmonGlowY
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onMessage) {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.14))
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Message handyman")
+
+                if let onCall {
+                    Button(action: {
+                        Haptics.light()
+                        onCall()
+                    }) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.white.opacity(0.14))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Call handyman")
+                }
+            }
+        }
+    }
+
+    private var statusIcon: String {
+        guard let request = coordinationRequest else { return "wrench.and.screwdriver.fill" }
+        switch request.typedStatus {
+        case .onMyWay, .checkedIn, .inProgress: return "location.fill"
+        case .awaitingHomeowner, .alternateDatesProposed: return "clock.fill"
+        default: return "wrench.and.screwdriver.fill"
+        }
+    }
+}
+
+// MARK: - Visit child row
+
+private struct VisitChildRow: View {
+    let child: VisitChildItem
+    let isLast: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "circle")
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(HavenColors.beige400)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(child.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(HavenColors.navy900)
+                    .multilineTextAlignment(.leading)
+                if let duration = child.estimatedMinutes {
+                    Text("~\(duration) min")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Rectangle()
+                    .fill(TasksV5.punchListDivider)
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+            }
+        }
+    }
+}
+
+// MARK: - Coordinator (shared state for visit + chat)
+
+@MainActor
+final class HandymanRequestCoordinator: ObservableObject {
+    static let shared = HandymanRequestCoordinator()
+
+    @Published private(set) var request: HandymanRequestRow?
+    @Published private(set) var messages: [HandymanRequestMessageRow] = []
+
+    private var loadedVisitId: UUID?
+
+    func clear() {
+        request = nil
+        messages = []
+        loadedVisitId = nil
+    }
+
+    /// Loads the existing handyman_request linked to a visit task (if any).
+    /// When no request exists, leaves both nil — callers can lazy-create
+    /// one when the user sends their first message.
+    func load(visit: MaintenanceTaskDBRow) async {
+        guard loadedVisitId != visit.id else { return }
+        loadedVisitId = visit.id
+        do {
+            let req = try await DatabaseService.shared.fetchLatestHandymanRequest(visitTaskId: visit.id)
+            request = req
+            if let req {
+                messages = (try? await DatabaseService.shared.fetchHandymanRequestMessages(requestId: req.id)) ?? []
+            } else {
+                messages = []
+            }
+        } catch {
+            print("[HandymanRequestCoordinator] load failed: \(error)")
+        }
+    }
+
+    func reload() async {
+        guard let req = request else { return }
+        messages = (try? await DatabaseService.shared.fetchHandymanRequestMessages(requestId: req.id)) ?? []
+    }
+
+    /// Lazy-create a handyman_request for a visit task that doesn't yet
+    /// have one. Used when the homeowner opens chat on a maintenance-task-
+    /// only visit (the legacy data shape) and types their first message.
+    func ensureRequest(
+        visit: MaintenanceTaskDBRow,
+        vendor: ContractorRow?,
+        householdId: UUID,
+        propertyId: UUID?
+    ) async -> HandymanRequestRow? {
+        if let existing = request { return existing }
+        let insert = HandymanRequestInsert(
+            householdId: householdId,
+            propertyId: propertyId,
+            contractorId: vendor?.id,
+            visitTaskId: visit.id,
+            createdByUserId: nil,
+            requestType: "standard_visit",
+            source: "homeowner",
+            title: visit.title,
+            details: visit.notes,
+            preferredTiming: visit.scheduledDate,
+            urgency: "routine",
+            status: "submitted",
+            firstVisitSetupRequested: false,
+            recommendedLane: "handyman",
+            quickUpsellTitles: []
+        )
+        do {
+            let created = try await DatabaseService.shared.createHandymanRequest(insert)
+            request = created
+            return created
+        } catch {
+            print("[HandymanRequestCoordinator] ensureRequest failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Send a homeowner-side message. Lazy-creates the request if needed.
+    func sendMessage(
+        text: String,
+        visit: MaintenanceTaskDBRow,
+        vendor: ContractorRow?,
+        householdId: UUID,
+        propertyId: UUID?
+    ) async -> Bool {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let req = await ensureRequest(visit: visit, vendor: vendor, householdId: householdId, propertyId: propertyId)
+        guard let req else { return false }
+        let insert = HandymanRequestMessageInsert(
+            requestId: req.id,
+            householdId: req.householdId,
+            senderRole: "homeowner",
+            body: text
+        )
+        do {
+            _ = try await DatabaseService.shared.createHandymanRequestMessage(insert)
+            await reload()
+            return true
+        } catch {
+            print("[HandymanRequestCoordinator] sendMessage failed: \(error)")
+            return false
+        }
+    }
+}
+
+// MARK: - Notes parser
+
+struct VisitChildItem: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let estimatedMinutes: Int?
+}
+
+enum VisitNotesParser {
+    /// Extracts bullet-list items from a visit task's notes block.
+    /// Recognises lines starting with `-`, `•`, `*`, or numeric `1.` /
+    /// `1)` markers. Strips the duration marker (`~15 min`, `(15 min)`,
+    /// `15 min`) into a separate field. Skips any header line that
+    /// contains "Punch list" / "What's included" / "Tasks" headers.
+    static func parsePunchList(from notes: String) -> [VisitChildItem] {
+        let lines = notes.components(separatedBy: .newlines)
+        var items: [VisitChildItem] = []
+        for raw in lines {
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            // Skip header-style lines
+            let lower = trimmed.lowercased()
+            if lower.contains("what's included") || lower.contains("punch list:") || lower.contains("tasks:") || lower.hasSuffix(":") {
+                continue
+            }
+            // Strip leading bullet markers
+            var working = trimmed
+            for prefix in ["- ", "• ", "* "] {
+                if working.hasPrefix(prefix) {
+                    working = String(working.dropFirst(prefix.count))
+                    break
+                }
+            }
+            // Numeric "1. " / "1) " prefixes
+            if let firstSpace = working.firstIndex(of: " ") {
+                let head = working[..<firstSpace]
+                if head.hasSuffix(".") || head.hasSuffix(")") {
+                    let numericPart = head.dropLast()
+                    if Int(numericPart) != nil {
+                        working = String(working[working.index(after: firstSpace)...])
+                    }
+                }
+            }
+            // Skip if it doesn't look like a real item
+            guard !working.isEmpty, working.count > 2 else { continue }
+
+            // Extract minutes
+            let minutes = extractMinutes(from: working)
+            let cleaned = stripMinuteSuffix(from: working)
+
+            let id = "\(items.count)-\(cleaned.prefix(40))"
+            items.append(VisitChildItem(id: id, title: cleaned, estimatedMinutes: minutes))
+        }
+        return items
+    }
+
+    private static func extractMinutes(from text: String) -> Int? {
+        // Look for "~15 min" or "(15 min)" or "15 min" patterns near the end.
+        let lower = text.lowercased()
+        let candidates = ["~", "(", "•", "·"]
+        for marker in candidates {
+            if let idx = lower.range(of: marker)?.lowerBound,
+               let mins = parseMinutes(in: String(lower[idx...])) {
+                return mins
+            }
+        }
+        return parseMinutes(in: lower)
+    }
+
+    private static func parseMinutes(in text: String) -> Int? {
+        // Find a digit run followed by " min"
+        var digits = ""
+        var sawMin = false
+        for char in text {
+            if char.isNumber {
+                digits.append(char)
+            } else if !digits.isEmpty {
+                if char == " " || char == "~" || char == "(" { continue }
+                if text.lowercased().contains("\(digits) min") {
+                    sawMin = true
+                    break
+                }
+                digits = ""
+            }
+        }
+        if sawMin || (text.contains("min") && !digits.isEmpty) {
+            return Int(digits)
+        }
+        return nil
+    }
+
+    private static func stripMinuteSuffix(from text: String) -> String {
+        // Remove trailing "(15 min)", "~15 min", "· 15 min", "- 15 min" etc.
+        var result = text
+        let patterns: [String] = [
+            #"\s*\(~?\d+\s*min\)\s*$"#,
+            #"\s*~\d+\s*min\s*$"#,
+            #"\s*[·•\-]\s*~?\d+\s*min\s*$"#,
+            #"\s*\d+\s*min\s*$"#,
+        ]
+        for pattern in patterns {
+            if let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                let range = NSRange(result.startIndex..., in: result)
+                result = re.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "")
+            }
+        }
+        return result.trimmingCharacters(in: .whitespaces)
     }
 }

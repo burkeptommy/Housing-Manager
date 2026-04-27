@@ -347,6 +347,7 @@
 		733174286991BA1825C504F2 /* ContractorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEEF7014024523EB1E9CB7E /* ContractorViewModel.swift */; };
 		734530E7AE2F9ACB9AE76FE6 /* ServiceLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 618647B92D0DEC8867F15F9F /* ServiceLibrary.swift */; };
 		73C038DC57D112D72634E6F1 /* ManageSystemTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */; };
+		73C95F69A9EC90729CCE459C /* HandymanChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D84533D1A420378319EF60 /* HandymanChatSheet.swift */; };
 		73CC09CFB5F54FF8FFCB032C /* ProcessingBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31B7C57764591968933F9EF /* ProcessingBanner.swift */; };
 		73DCFB5867CF9D3F3EE0F51E /* ActivityLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECE835BCE77ED8E444413FFC /* ActivityLogView.swift */; };
 		73F578310CDA4553B2078C6F /* HomeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D64EAE4435181BE7303600 /* HomeSystem.swift */; };
@@ -443,6 +444,7 @@
 		933430937C48605A9C99D706 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C149790C33B097708FA1F8D /* Constants.swift */; };
 		938DF2F2D42C348D384BD413 /* VendorCoverageSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D07CDFA8A4620D46E521CC /* VendorCoverageSheet.swift */; };
 		939D0746966E906891EBCC90 /* Double+Currency.swift in Sources */ = {isa = PBXBuildFile; fileRef = C312D5AA48C650B2453392CC /* Double+Currency.swift */; };
+		93BF5F19C8AF1B75885CA745 /* HandymanVisitDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */; };
 		9435320CD32FD9117CE03AC9 /* VendorScheduleStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A186CE2A32E3F44ACD44049A /* VendorScheduleStrip.swift */; };
 		9440F2CD5FE528C381BB44E7 /* ScenarioStudioViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C55BD89D3FF9E725F8E5B37 /* ScenarioStudioViewModel.swift */; };
 		9451E048C0F3A1D5972DC5B8 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DF354058556E442328CA13C /* AuthService.swift */; };
@@ -682,6 +684,7 @@
 		E3F851472B6A1FD5E93E4E2F /* MaintenanceHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 600602D6660D13F45C20FE70 /* MaintenanceHubView.swift */; };
 		E446F860AA38988B051E48DD /* InviteToHavenSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F1566D1DA1A840DCB8665 /* InviteToHavenSheet.swift */; };
 		E46555FD1F54A70E5591E6C7 /* AccountCreationStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69676563E2133ED3DADAC982 /* AccountCreationStep.swift */; };
+		E478BBF5F328BF9306D6B545 /* HandymanChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D84533D1A420378319EF60 /* HandymanChatSheet.swift */; };
 		E4C027C2A514FFBF60AFCC2E /* TrustedContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591C1EFF7654F52ADA3D6B96 /* TrustedContactsView.swift */; };
 		E4C4377248A8C873373B67B0 /* EditPropertyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426A351F90CA70BE3D0EF607 /* EditPropertyView.swift */; };
 		E4E19844C848779E367E1B55 /* RoutingPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5113B82BE252D292DFAFC9 /* RoutingPreferencesView.swift */; };
@@ -692,6 +695,7 @@
 		E6D820656455B8F6F0A8A6A6 /* HavenTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109CDCA81D4910C03E8C92C1 /* HavenTypography.swift */; };
 		E706EDC98BE7D860C86995B5 /* InboxItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56810297D7D51BAE3CBBFECB /* InboxItemDetailView.swift */; };
 		E7627B10E1380740DE422203 /* HouseholdStaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C82F8F17DB61DE2C6A48C79 /* HouseholdStaffView.swift */; };
+		E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */; };
 		E844B3B782B687101D043825 /* AlfredLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */; };
 		E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAE3950BF1A95CC45D9C55B /* PushNotificationService.swift */; };
 		E88FC8C0D1E9642313F9CDA8 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDD425AF92101F7B1B5793E /* LoginView.swift */; };
@@ -792,6 +796,7 @@
 		05ADA54A4E7717D0015544C8 /* EquipmentSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentSearchSheet.swift; sourceTree = "<group>"; };
 		063BB781C19C00BDA3FF0767 /* AddPropertyFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPropertyFlow.swift; sourceTree = "<group>"; };
 		065CD0193255DF7812606891 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanVisitDetailSheet.swift; sourceTree = "<group>"; };
 		07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCaretakerInlineForm.swift; sourceTree = "<group>"; };
 		077DCD83BD7C719A6BAB5E25 /* FamilyMemberProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberProfileView.swift; sourceTree = "<group>"; };
 		0787BB580C28578F9F427589 /* DuplicateDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDetectionService.swift; sourceTree = "<group>"; };
@@ -1091,6 +1096,7 @@
 		D041049F5E39B0DE4D007767 /* SystemProfileAudit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemProfileAudit.swift; sourceTree = "<group>"; };
 		D08D056E30880763A14839C3 /* CategoryProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryProgress.swift; sourceTree = "<group>"; };
 		D09C463CADD4EC1A7F9BB9B3 /* HavenTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenTextField.swift; sourceTree = "<group>"; };
+		D0D84533D1A420378319EF60 /* HandymanChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanChatSheet.swift; sourceTree = "<group>"; };
 		D10346B1798B972FA9CA0219 /* DESIGN_RULES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DESIGN_RULES.md; sourceTree = "<group>"; };
 		D253512E9703A545575048F1 /* PropertyHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyHookView.swift; sourceTree = "<group>"; };
 		D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyRecapEditors.swift; sourceTree = "<group>"; };
@@ -1687,7 +1693,9 @@
 		B8925EEC9BEE800B27D09729 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				D0D84533D1A420378319EF60 /* HandymanChatSheet.swift */,
 				FD205FB93F1848711CBFDC25 /* HandymanComponents.swift */,
+				06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */,
 				AD0CED2ECB3698ED477BB00D /* HeaderSwitcher.swift */,
 				32699B80B8FD02163046904B /* IconTile.swift */,
 				77BC4FCF0CC7FABC8B4D6AC4 /* IndigoGradientCard.swift */,
@@ -2266,12 +2274,14 @@
 				F3B1AD08159C74877B12E0AC /* GapAlert.swift in Sources */,
 				539BBB8FD239711CC12A0194 /* GapAnalysisView.swift in Sources */,
 				3774C65A00E721AD8728FFC0 /* GooglePlacesService.swift in Sources */,
+				73C95F69A9EC90729CCE459C /* HandymanChatSheet.swift in Sources */,
 				F2D831C4ED1191FC151925B5 /* HandymanComponents.swift in Sources */,
 				9536B356AF288DF62D1D5A15 /* HandymanHubView.swift in Sources */,
 				457AF4079AD60E15A0C0472B /* HandymanPreferenceView.swift in Sources */,
 				D3439DE6767AE24F1815E62A /* HandymanPunchItem.swift in Sources */,
 				907DF6DB46C7079D4741BF74 /* HandymanPunchListView.swift in Sources */,
 				A8DE9719896D1D2D896D4C7A /* HandymanTabView.swift in Sources */,
+				E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */,
 				9EDF63ACEDEC411FB6500535 /* HandymanVisitDetailView.swift in Sources */,
 				30A774AE804F91A02028AF2C /* HandymanVisitReportView.swift in Sources */,
 				6FCE9156D1D4A8B861F116D2 /* HandymanVisitService.swift in Sources */,
@@ -2658,12 +2668,14 @@
 				635AEB4A8FA3A878A0FAEC92 /* GapAlert.swift in Sources */,
 				D71F9AC9940E3D9FD2260EC5 /* GapAnalysisView.swift in Sources */,
 				0F1F01E5D2C68643B54ADFE0 /* GooglePlacesService.swift in Sources */,
+				E478BBF5F328BF9306D6B545 /* HandymanChatSheet.swift in Sources */,
 				5E974096458D7BC7183FD61F /* HandymanComponents.swift in Sources */,
 				B68594F57018C7B2A8DA1EDB /* HandymanHubView.swift in Sources */,
 				BFDC902664B3901BD5CF554E /* HandymanPreferenceView.swift in Sources */,
 				D0A8B4F6E40F1BB1CC6D15DB /* HandymanPunchItem.swift in Sources */,
 				E234FE712D979F9C446A21A5 /* HandymanPunchListView.swift in Sources */,
 				389EEB9E5E8E29628C9AAA6E /* HandymanTabView.swift in Sources */,
+				93BF5F19C8AF1B75885CA745 /* HandymanVisitDetailSheet.swift in Sources */,
 				E8C6AB41CEB3FDA4FAD2B438 /* HandymanVisitDetailView.swift in Sources */,
 				F7CF7F0663F5B667057A4072 /* HandymanVisitReportView.swift in Sources */,
 				F158CE24F0118601806CAC36 /* HandymanVisitService.swift in Sources */,

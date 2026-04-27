@@ -82,25 +82,29 @@ private struct SeasonTile: View {
         ZStack(alignment: .topLeading) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(season.displayName)
-                    .font(.system(size: 11.5, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(isActive ? HavenColors.navy900 : season.v5Ink)
                     .padding(.bottom, 4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 Text("\(summary.totalItems)")
-                    .font(HavenTypography.fraunces(size: isActive ? 22 : 17, weight: 700))
+                    .font(HavenTypography.fraunces(size: 20, weight: 700))
                     .tracking(-0.4)
                     .foregroundStyle(isActive ? HavenColors.navy900 : season.v5Ink)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 Text(actionLine)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(actionColor)
-                    .padding(.top, 5)
+                    .padding(.top, 4)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isActive ? HavenColors.surface : season.v5Tint)
@@ -111,9 +115,9 @@ private struct SeasonTile: View {
             )
             .shadow(
                 color: isActive ? HavenColors.navy800.opacity(0.08) : .clear,
-                radius: isActive ? 12 : 0,
+                radius: isActive ? 8 : 0,
                 x: 0,
-                y: isActive ? 4 : 0
+                y: isActive ? 3 : 0
             )
 
             // NOW chip on current-season tile when active
@@ -128,12 +132,13 @@ private struct SeasonTile: View {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(HavenColors.action)
                     )
-                    .offset(x: 10, y: -7)
+                    .offset(x: 8, y: -6)
             }
         }
+        // Tom: equal-sized pills, not active=50%-wider. The previous
+        // layoutPriority(isActive ? 1.5 : 1) caused inactive tiles to
+        // collapse to slivers that hid all their content.
         .frame(maxWidth: .infinity)
-        .layoutPriority(isActive ? 1.5 : 1)
-        .scaleEffect(1.0)                              // hook for press animation
         .contentShape(Rectangle())
     }
 
