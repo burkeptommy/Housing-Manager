@@ -120,11 +120,7 @@ export default function HomeDetailScreen() {
                 No systems registered yet for this home. On your first visit, build the home profile in Chez Field — manufacturer + model + serial syncs back to the homeowner's app automatically.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {home.systems.map((s) => (
-                  <SystemRow key={s.id} system={s} />
-                ))}
-              </div>
+              <CategorizedSystems systems={home.systems} />
             )}
           </Card>
 
@@ -316,21 +312,251 @@ function SystemRow({ system }: { system: HomeSystem }) {
     ? `${system.manufacturer ?? ""} ${system.modelNumber ?? ""}`.trim()
     : "Manufacturer unknown";
   return (
-    <div className="ops-row" style={{ padding: "12px 0" }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--indigo-50)", color: "var(--indigo)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-        <Icon name="briefcase" size={16} stroke={1.9} />
+    <div className="ops-row" style={{ padding: "10px 0" }}>
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--indigo-50)", color: "var(--indigo)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+        <Icon name={iconForCategory(system.category)} size={14} stroke={1.9} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{system.name}</div>
-        <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-          {system.category}{system.category && headline !== "Manufacturer unknown" ? " · " : ""}{headline !== "Manufacturer unknown" ? headline : ""}
-        </div>
+        {headline !== "Manufacturer unknown" && (
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{headline}</div>
+        )}
       </div>
       {!system.manufacturer && (
         <Pill tone="warning">Update on next visit</Pill>
       )}
     </div>
   );
+}
+
+// ─── Categorized systems group ────────────────────────────────
+
+/**
+ * Groups a flat systems list into 6 collapsible buckets so a 27-system
+ * home is scannable at a glance:
+ *
+ *   • Mechanicals          — HVAC, water heater, plumbing, electrical, generator
+ *   • Outdoor & water      — pool/spa, hot tub, irrigation, septic, well, sump pump
+ *   • Building envelope    — roofing, crawl space, garage door, driveway, hardscape
+ *   • Recurring services   — trash, cleaning, pet waste, snow, mosquito, pest, lawn, window/pressure wash, tree
+ *   • Appliances           — washer/dryer/refrigerator/dishwasher
+ *   • Safety & security    — security system, smoke/CO, radon
+ *   • Other                — anything that didn't bucket
+ *
+ * Default expansion: groups with ≤4 items expanded; the larger ones
+ * collapsed so the section opens scannable, not overwhelming.
+ */
+function CategorizedSystems({ systems }: { systems: HomeSystem[] }) {
+  const groups = useMemo(() => groupSystems(systems), [systems]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {groups.map((group) => (
+        <SystemGroup key={group.label} group={group} />
+      ))}
+    </div>
+  );
+}
+
+interface SystemGroupData {
+  label: string;
+  count: number;
+  defaultExpanded: boolean;
+  items: HomeSystem[];
+}
+
+function SystemGroup({ group }: { group: SystemGroupData }) {
+  const [open, setOpen] = useState(group.defaultExpanded);
+  return (
+    <div style={{ border: "1px solid var(--neutral-200)", borderRadius: 12, overflow: "hidden" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          width: "100%",
+          padding: "10px 14px",
+          background: open ? "var(--pearl)" : "#fff",
+          border: "none",
+          borderBottom: open ? "1px solid var(--neutral-200)" : "none",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--text-soft)",
+          }}
+        >
+          {group.label}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-soft)" }}>· {group.count}</span>
+        <span style={{ marginLeft: "auto" }}>
+          <Icon
+            name="chevronDown"
+            size={14}
+            color="var(--text-soft)"
+            stroke={2}
+            style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 150ms" }}
+          />
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 14px" }}>
+          {group.items.map((s, i) => (
+            <div
+              key={s.id}
+              style={{ borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none" }}
+            >
+              <SystemRow system={s} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Categorization rules ────────────────────────────────────
+
+/**
+ * Map a HomeSystem.category string (the value the homeowner-side iOS
+ * stamps when creating a system) to one of our top-level groups.
+ */
+function bucketForCategory(category: string): SystemGroupKey {
+  const c = (category ?? "").toLowerCase().trim();
+  if (!c) return "other";
+
+  // Recurring services first — Tom's explicit callout. These aren't
+  // "systems" in the traditional sense; they're vendor relationships
+  // that recur on a schedule.
+  if (
+    c.includes("trash") || c.includes("recycling") || c.includes("garbage") ||
+    c.includes("cleaning service") || c.includes("housekeeping") ||
+    c.includes("pet waste") ||
+    c.includes("snow removal") || c.includes("snow") ||
+    c.includes("mosquito") || c.includes("tick") ||
+    c.includes("pest") || c.includes("exterminat") ||
+    c.includes("lawn care") || c.includes("landscap") ||
+    c.includes("window cleaning") || c.includes("pressure washing") || c.includes("power washing") ||
+    c.includes("tree service") || c.includes("tree care") ||
+    c.includes("gutter cleaning") || c.includes("gutter clean")
+  ) return "recurring";
+
+  // Mechanicals
+  if (
+    c.includes("hvac") || c === "heating" || c === "cooling" || c === "ac" ||
+    c.includes("water heater") || c.includes("plumb") ||
+    c.includes("electrical") || c === "panel" ||
+    c.includes("generator")
+  ) return "mechanicals";
+
+  // Outdoor systems + water
+  if (
+    c.includes("pool") || c.includes("spa") || c.includes("hot tub") ||
+    c.includes("irrigation") || c.includes("sprinkler") ||
+    c.includes("septic") ||
+    c.includes("well") ||
+    c.includes("sump")
+  ) return "outdoor";
+
+  // Building envelope
+  if (
+    c.includes("roof") || c.includes("siding") || c.includes("foundation") ||
+    c.includes("crawl") || c.includes("attic") || c.includes("insulation") ||
+    c.includes("garage door") ||
+    c.includes("driveway") || c.includes("hardscape") || c.includes("paver")
+  ) return "building";
+
+  // Appliances
+  if (
+    c === "appliance" || c.includes("appliances") ||
+    c.includes("dishwasher") || c.includes("refriger") ||
+    c.includes("washer") || c.includes("dryer") || c.includes("oven") ||
+    c.includes("range") || c.includes("microwave")
+  ) return "appliances";
+
+  // Safety & security
+  if (
+    c.includes("security") || c.includes("alarm") ||
+    c.includes("smoke") || c.includes("carbon monoxide") || c === "co" ||
+    c.includes("radon") || c.includes("fire")
+  ) return "safety";
+
+  // Handyman as its own light catch-all
+  if (c.includes("handyman")) return "other";
+
+  return "other";
+}
+
+type SystemGroupKey =
+  | "mechanicals"
+  | "outdoor"
+  | "building"
+  | "appliances"
+  | "safety"
+  | "recurring"
+  | "other";
+
+const GROUP_LABEL: Record<SystemGroupKey, string> = {
+  mechanicals: "Mechanicals",
+  outdoor:     "Outdoor & water",
+  building:    "Building envelope",
+  appliances:  "Appliances",
+  safety:      "Safety & security",
+  recurring:   "Recurring services",
+  other:       "Other",
+};
+
+const GROUP_ORDER: SystemGroupKey[] = [
+  "mechanicals",
+  "outdoor",
+  "building",
+  "appliances",
+  "safety",
+  "recurring",
+  "other",
+];
+
+function groupSystems(systems: HomeSystem[]): SystemGroupData[] {
+  const buckets = new Map<SystemGroupKey, HomeSystem[]>();
+  systems.forEach((s) => {
+    const key = bucketForCategory(s.category);
+    const arr = buckets.get(key) ?? [];
+    arr.push(s);
+    buckets.set(key, arr);
+  });
+  return GROUP_ORDER
+    .filter((k) => buckets.has(k))
+    .map((k) => {
+      const items = (buckets.get(k) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+      return {
+        label: GROUP_LABEL[k],
+        count: items.length,
+        // Open ≤4-item groups by default; collapse the chunky ones so
+        // the page isn't a wall of rows on first paint.
+        defaultExpanded: items.length <= 4,
+        items,
+      };
+    });
+}
+
+function iconForCategory(category: string): string {
+  const c = (category ?? "").toLowerCase();
+  if (c.includes("hvac") || c.includes("heating") || c.includes("cooling")) return "lightbulb";
+  if (c.includes("water heater") || c.includes("plumb")) return "drag";
+  if (c.includes("electrical") || c.includes("generator")) return "lightbulb";
+  if (c.includes("pool") || c.includes("spa") || c.includes("irrigation") || c.includes("sump") || c.includes("well") || c.includes("septic")) return "drag";
+  if (c.includes("roof") || c.includes("siding") || c.includes("foundation") || c.includes("crawl") || c.includes("garage")) return "home";
+  if (c.includes("appliance") || c.includes("dishwasher") || c.includes("refriger") || c.includes("washer") || c.includes("dryer")) return "briefcase";
+  if (c.includes("security") || c.includes("smoke") || c.includes("alarm") || c.includes("radon")) return "shield";
+  if (c.includes("trash") || c.includes("recycling") || c.includes("cleaning service")) return "history";
+  if (c.includes("pet waste") || c.includes("mosquito") || c.includes("tick") || c.includes("pest") || c.includes("snow") || c.includes("lawn") || c.includes("landscap") || c.includes("window") || c.includes("tree") || c.includes("gutter")) return "history";
+  return "briefcase";
 }
 
 function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
