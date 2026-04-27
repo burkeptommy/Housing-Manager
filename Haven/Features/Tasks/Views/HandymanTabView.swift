@@ -614,7 +614,7 @@ struct HandymanTabView: View {
             await MainActor.run { coordinator.clear() }
             return
         }
-        await coordinator.load(visit: visit)
+        await coordinator.load(visit: visit, vendor: linkedHandyman)
     }
 
     // MARK: - Navigation
@@ -878,6 +878,8 @@ private struct VisitChildRow: View {
 
 // MARK: - Coordinator (shared state for visit + chat)
 
+import Supabase
+
 @MainActor
 final class HandymanRequestCoordinator: ObservableObject {
     static let shared = HandymanRequestCoordinator()
@@ -886,30 +888,73 @@ final class HandymanRequestCoordinator: ObservableObject {
     @Published private(set) var messages: [HandymanRequestMessageRow] = []
 
     private var loadedVisitId: UUID?
+    private var realtimeChannel: RealtimeChannelV2?
+    private var realtimeListenerTask: Task<Void, Never>?
+    private var subscribedRequestId: UUID?
 
     func clear() {
         request = nil
         messages = []
         loadedVisitId = nil
+        unsubscribeRealtime()
     }
 
-    /// Loads the existing handyman_request linked to a visit task (if any).
-    /// When no request exists, leaves both nil — callers can lazy-create
-    /// one when the user sends their first message.
-    func load(visit: MaintenanceTaskDBRow) async {
-        guard loadedVisitId != visit.id else { return }
+    /// Loads the handyman_request for a visit task. Tries the explicit
+    /// `visit_task_id` link first; falls back to finding any active
+    /// handyman_request for the same household + contractor (the common
+    /// case for legacy visits that were created without the link), and
+    /// backfills `visit_task_id` so future loads are O(1).
+    func load(visit: MaintenanceTaskDBRow, vendor: ContractorRow?) async {
+        if loadedVisitId == visit.id, request != nil { return }
         loadedVisitId = visit.id
+
         do {
-            let req = try await DatabaseService.shared.fetchLatestHandymanRequest(visitTaskId: visit.id)
-            request = req
-            if let req {
-                messages = (try? await DatabaseService.shared.fetchHandymanRequestMessages(requestId: req.id)) ?? []
-            } else {
-                messages = []
+            // Path A: direct visit_task_id link
+            if let direct = try await DatabaseService.shared.fetchLatestHandymanRequest(visitTaskId: visit.id) {
+                await applyRequest(direct)
+                return
             }
+
+            // Path B: fall back to household + contractor lookup. The
+            // Operations Desk-side request might exist without the
+            // visit_task_id stamped on it — surface it anyway so the
+            // homeowner can see the same conversation thread.
+            if let vendor {
+                let candidates = try await DatabaseService.shared.fetchHandymanRequests(
+                    householdId: visit.householdId,
+                    propertyId: nil,
+                    limit: 25
+                )
+                let match = candidates
+                    .filter { $0.contractorId == vendor.id }
+                    .filter { !["completed", "cancelled", "declined"].contains($0.status) }
+                    .sorted { $0.updatedAt > $1.updatedAt }
+                    .first
+                if let match {
+                    // Backfill visit_task_id so the cheap path wins next time.
+                    if match.visitTaskId == nil {
+                        var update = HandymanRequestUpdate()
+                        update.visitTaskId = visit.id
+                        _ = try? await DatabaseService.shared.updateHandymanRequest(id: match.id, update)
+                    }
+                    await applyRequest(match)
+                    return
+                }
+            }
+
+            // Nothing found — leave nil so chat shows empty state.
+            request = nil
+            messages = []
+            unsubscribeRealtime()
         } catch {
             print("[HandymanRequestCoordinator] load failed: \(error)")
         }
+    }
+
+    private func applyRequest(_ req: HandymanRequestRow) async {
+        request = req
+        messages = (try? await DatabaseService.shared.fetchHandymanRequestMessages(requestId: req.id)) ?? []
+        subscribeRealtime(requestId: req.id)
     }
 
     func reload() async {
@@ -918,8 +963,8 @@ final class HandymanRequestCoordinator: ObservableObject {
     }
 
     /// Lazy-create a handyman_request for a visit task that doesn't yet
-    /// have one. Used when the homeowner opens chat on a maintenance-task-
-    /// only visit (the legacy data shape) and types their first message.
+    /// have one. Only fires when the user types their first message AND
+    /// the load path couldn't find an existing request.
     func ensureRequest(
         visit: MaintenanceTaskDBRow,
         vendor: ContractorRow?,
@@ -946,7 +991,7 @@ final class HandymanRequestCoordinator: ObservableObject {
         )
         do {
             let created = try await DatabaseService.shared.createHandymanRequest(insert)
-            request = created
+            await applyRequest(created)
             return created
         } catch {
             print("[HandymanRequestCoordinator] ensureRequest failed: \(error)")
@@ -954,7 +999,9 @@ final class HandymanRequestCoordinator: ObservableObject {
         }
     }
 
-    /// Send a homeowner-side message. Lazy-creates the request if needed.
+    /// Send a homeowner-side message. Optimistically appends the message
+    /// to the local thread (Realtime echo dedupes by id), then writes
+    /// the row.
     func sendMessage(
         text: String,
         visit: MaintenanceTaskDBRow,
@@ -962,22 +1009,103 @@ final class HandymanRequestCoordinator: ObservableObject {
         householdId: UUID,
         propertyId: UUID?
     ) async -> Bool {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
         let req = await ensureRequest(visit: visit, vendor: vendor, householdId: householdId, propertyId: propertyId)
         guard let req else { return false }
         let insert = HandymanRequestMessageInsert(
             requestId: req.id,
             householdId: req.householdId,
             senderRole: "homeowner",
-            body: text
+            body: trimmed
         )
         do {
-            _ = try await DatabaseService.shared.createHandymanRequestMessage(insert)
-            await reload()
+            let inserted = try await DatabaseService.shared.createHandymanRequestMessage(insert)
+            // Append immediately if not already in the list (Realtime
+            // may or may not have echoed yet).
+            if !messages.contains(where: { $0.id == inserted.id }) {
+                messages.append(inserted)
+            }
             return true
         } catch {
             print("[HandymanRequestCoordinator] sendMessage failed: \(error)")
             return false
+        }
+    }
+
+    // MARK: Realtime
+
+    /// Subscribes to INSERT events on `handyman_request_messages` filtered
+    /// to this request. New messages from either side land in real time.
+    private func subscribeRealtime(requestId: UUID) {
+        if subscribedRequestId == requestId { return }
+        unsubscribeRealtime()
+        subscribedRequestId = requestId
+
+        let channel = HavenSupabase.client.realtimeV2.channel("handyman-msg-\(requestId.uuidString)")
+        let inserts = channel.postgresChange(
+            InsertAction.self,
+            schema: "public",
+            table: "handyman_request_messages",
+            filter: "request_id=eq.\(requestId.uuidString)"
+        )
+        realtimeChannel = channel
+
+        realtimeListenerTask = Task { [weak self] in
+            try? await channel.subscribeWithError()
+            for await action in inserts {
+                guard let self else { return }
+                let payload = action.record
+                // Decode into HandymanRequestMessageRow.
+                guard
+                    let data = try? JSONSerialization.data(withJSONObject: payload),
+                    let decoded = try? Self.messageDecoder.decode(HandymanRequestMessageRow.self, from: data)
+                else {
+                    continue
+                }
+                await MainActor.run {
+                    if !self.messages.contains(where: { $0.id == decoded.id }) {
+                        self.messages.append(decoded)
+                    }
+                }
+            }
+        }
+    }
+
+    private func unsubscribeRealtime() {
+        realtimeListenerTask?.cancel()
+        realtimeListenerTask = nil
+        let channel = realtimeChannel
+        realtimeChannel = nil
+        subscribedRequestId = nil
+        if let channel {
+            Task { await channel.unsubscribe() }
+        }
+    }
+
+    private static let messageDecoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601WithFractionalSeconds
+        return d
+    }()
+}
+
+private extension JSONDecoder.DateDecodingStrategy {
+    /// Postgres timestamps in Realtime payloads come back with microsecond
+    /// precision (e.g. `2026-04-27T15:42:01.123456+00:00`). The default
+    /// `.iso8601` strategy only handles seconds. This decoder accepts
+    /// either.
+    static var iso8601WithFractionalSeconds: JSONDecoder.DateDecodingStrategy {
+        .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            let withFraction = ISO8601DateFormatter()
+            withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let d = withFraction.date(from: raw) { return d }
+            let withoutFraction = ISO8601DateFormatter()
+            withoutFraction.formatOptions = [.withInternetDateTime]
+            if let d = withoutFraction.date(from: raw) { return d }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Bad date: \(raw)")
         }
     }
 }

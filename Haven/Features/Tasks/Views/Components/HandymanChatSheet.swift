@@ -65,7 +65,7 @@ struct HandymanChatSheet: View {
                 }
             }
             .task {
-                if let visit { await coordinator.load(visit: visit) }
+                if let visit { await coordinator.load(visit: visit, vendor: vendor) }
             }
         }
     }
