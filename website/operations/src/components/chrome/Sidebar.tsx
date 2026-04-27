@@ -42,14 +42,18 @@ export function Sidebar() {
 
   return (
     <aside className="ops-sidebar">
-      {/* Brand row */}
-      <div className="ops-sidebar__brand">
-        <div className="ops-sidebar__brand-mark">c</div>
+      {/* Brand row — actual Chez Handyman mark, not a CSS letterform */}
+      <a className="ops-sidebar__brand" href="/" aria-label="Chez Handyman">
+        <img
+          className="ops-sidebar__brand-mark-img"
+          src="/chez-handyman-logo.png"
+          alt=""
+        />
         <div className="ops-sidebar__brand-text">
-          <div className="ops-sidebar__brand-name">Chez</div>
-          <div className="ops-sidebar__brand-eyebrow">Handyman</div>
+          <div className="ops-sidebar__brand-name">chez</div>
+          <div className="ops-sidebar__brand-eyebrow">handyman</div>
         </div>
-      </div>
+      </a>
 
       {/* Workspace switcher */}
       <button

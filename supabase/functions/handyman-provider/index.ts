@@ -2054,7 +2054,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     return String(lhs.updatedAt || "").localeCompare(String(rhs.updatedAt || ""));
   });
 
-  const homes = propertyIds.map((propertyId) => {
+  const homes = await Promise.all(propertyIds.map(async (propertyId) => {
     const property = propertyById.get(propertyId);
     const homeSystems = systemsByPropertyId.get(propertyId) ?? [];
     const homeTasks = openTasksByPropertyId.get(propertyId) ?? [];
@@ -2148,7 +2148,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
         signedUrl: compactString(file.signed_url),
       })),
     };
-  });
+  }));
 
   const messageThreads = visibleRequests.map((request) => {
     const requestId = compactString(request.id);

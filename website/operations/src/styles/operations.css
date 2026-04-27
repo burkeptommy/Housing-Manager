@@ -60,21 +60,18 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 8px 12px;
+  padding: 4px 8px 14px;
+  text-decoration: none;
+  color: inherit;
 }
-.ops-sidebar__brand-mark {
+.ops-sidebar__brand-mark-img {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #ED6955, #D14E3E);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--serif);
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.02em;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  display: block;
 }
 .ops-sidebar__brand-text {
   display: flex;
@@ -83,18 +80,18 @@ button { font-family: inherit; }
 }
 .ops-sidebar__brand-name {
   font-family: var(--serif);
-  font-weight: 600;
-  font-size: 16px;
+  font-weight: 500;
+  font-size: 18px;
   color: #fff;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
 }
 .ops-sidebar__brand-eyebrow {
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.55);
-  margin-top: 2px;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: -0.005em;
+  margin-top: 1px;
 }
 
 .ops-sidebar__workspace {
