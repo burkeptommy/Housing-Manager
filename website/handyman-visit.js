@@ -54,6 +54,18 @@ const dom = {
   recommendationTemplate: document.getElementById("recommendation-item-template"),
   systemTemplate: document.getElementById("system-item-template"),
   messageTemplate: document.getElementById("message-item-template"),
+  // Phase 73 sub-phase C: home-profile read-only panels.
+  homeProfileCard: document.getElementById("home-profile-card"),
+  homeProfileSummaryChip: document.getElementById("home-profile-summary-chip"),
+  homeProfileSystems: document.getElementById("home-profile-systems"),
+  homeProfilePunch: document.getElementById("home-profile-punch"),
+  homeProfileInvoices: document.getElementById("home-profile-invoices"),
+  homeProfileTasks: document.getElementById("home-profile-tasks"),
+  // Free-form chat composer (Phase 75)
+  chatComposer: document.getElementById("chat-composer"),
+  chatInput: document.getElementById("chat-input"),
+  chatSendButton: document.getElementById("chat-send-button"),
+  chatStatus: document.getElementById("chat-status"),
 };
 
 const token = new URLSearchParams(window.location.search).get("token");
@@ -180,6 +192,11 @@ const state = {
     startedAt: null,
     completedAt: null,
   },
+  // Phase 73 sub-phase C: read-only home profile snapshot fetched
+  // alongside the session. The portal_token is the only auth, so this
+  // mirrors what the homeowner-side iOS app shows about the property —
+  // active systems, recent invoices, open punch list.
+  homeProfile: { systems: [], recentInvoices: [], punchList: [] },
   dirty: false,
   systemIdentifyStatus: {},
 };
@@ -851,6 +868,205 @@ function render() {
 
   dom.startVisitButton.disabled = !unlocked;
   dom.completeVisitButton.disabled = !unlocked;
+
+  renderHomeProfile();
+}
+
+// Phase 73 sub-phase C: read-only home profile panels.
+//
+// The data lives on `state.homeProfile` (loaded from the portal GET).
+// Three sections render: systems on file, open punch list, recent
+// invoices. Each uses the same compact-card pattern so the technician
+// can scan in seconds. Empty states keep the section header but
+// surface a quiet placeholder so the technician knows the homeowner
+// hasn't logged anything yet (vs. a load failure).
+function renderHomeProfile() {
+  if (!dom.homeProfileCard) return;
+  const profile = state.homeProfile || { systems: [], recentInvoices: [], punchList: [] };
+
+  if (dom.homeProfileSummaryChip) {
+    const counts = [
+      `${profile.systems.length} system${profile.systems.length === 1 ? "" : "s"}`,
+      `${profile.punchList.length} punch`,
+      `${profile.recentInvoices.length} invoice${profile.recentInvoices.length === 1 ? "" : "s"}`,
+    ];
+    dom.homeProfileSummaryChip.textContent = counts.join(" · ");
+  }
+
+  if (dom.homeProfileSystems) {
+    if (profile.systems.length === 0) {
+      dom.homeProfileSystems.innerHTML = `<p class="task-subtitle">No systems on file yet. Add what you find on the visit.</p>`;
+    } else {
+      dom.homeProfileSystems.innerHTML = profile.systems
+        .map((system) => {
+          const meta = [
+            compactString(system.manufacturer),
+            compactString(system.modelNumber) ? `Model ${escapeText(system.modelNumber)}` : "",
+            system.lastServiceDate ? `Last serviced ${escapeText(formatProfileDate(system.lastServiceDate))}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const notes = compactString(system.notes);
+          return `
+            <div class="home-profile-row">
+              <div class="home-profile-row-head">
+                <strong>${escapeText(system.name || "Unnamed system")}</strong>
+                <span class="home-profile-tag">${escapeText(system.category || "System")}</span>
+              </div>
+              ${meta ? `<div class="home-profile-meta">${meta}</div>` : ""}
+              ${notes ? `<p class="home-profile-note">${escapeText(notes)}</p>` : ""}
+            </div>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  if (dom.homeProfilePunch) {
+    if (profile.punchList.length === 0) {
+      dom.homeProfilePunch.innerHTML = `<p class="task-subtitle">Punch list is empty. Anything the homeowner adds before your visit will show here.</p>`;
+    } else {
+      dom.homeProfilePunch.innerHTML = profile.punchList
+        .map((item) => {
+          const sourceLabel = punchSourceLabel(item.source);
+          const notes = compactString(item.notes);
+          const minutes = item.estimatedMinutes ? `${item.estimatedMinutes} min` : "";
+          return `
+            <div class="home-profile-row" data-punch-id="${escapeText(item.id)}">
+              <div class="home-profile-row-head">
+                <strong>${escapeText(item.label || "Punch item")}</strong>
+                ${sourceLabel ? `<span class="home-profile-tag">${escapeText(sourceLabel)}</span>` : ""}
+              </div>
+              ${minutes ? `<div class="home-profile-meta">${escapeText(minutes)}</div>` : ""}
+              ${notes ? `<p class="home-profile-note">${escapeText(notes)}</p>` : ""}
+              <div class="home-profile-actions">
+                <button class="secondary-button small-button" type="button" data-mark-punch-done="${escapeText(item.id)}">Mark done</button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+      dom.homeProfilePunch.querySelectorAll("[data-mark-punch-done]").forEach((button) => {
+        button.addEventListener("click", () => {
+          markPunchItemDone(button.getAttribute("data-mark-punch-done"));
+        });
+      });
+    }
+  }
+
+  if (dom.homeProfileTasks) {
+    const openTasks = profile.openTasks || [];
+    if (openTasks.length === 0) {
+      dom.homeProfileTasks.innerHTML = `<p class="task-subtitle">No open homeowner tasks at this property.</p>`;
+    } else {
+      dom.homeProfileTasks.innerHTML = openTasks
+        .map((task) => {
+          const meta = [
+            task.priority ? `${escapeText(task.priority)} priority` : "",
+            task.frequency ? escapeText(task.frequency) : "",
+            task.nextDueDate ? `Due ${escapeText(formatProfileDate(task.nextDueDate))}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const description = compactString(task.description);
+          return `
+            <div class="home-profile-row" data-task-id="${escapeText(task.id)}">
+              <div class="home-profile-row-head">
+                <strong>${escapeText(task.title || "Maintenance task")}</strong>
+                ${task.assignedRoute ? `<span class="home-profile-tag">${escapeText(task.assignedRoute)}</span>` : ""}
+              </div>
+              ${meta ? `<div class="home-profile-meta">${meta}</div>` : ""}
+              ${description ? `<p class="home-profile-note">${escapeText(description)}</p>` : ""}
+              <div class="home-profile-actions">
+                <button class="secondary-button small-button" type="button" data-mark-task-done="${escapeText(task.id)}">Mark complete</button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+      dom.homeProfileTasks.querySelectorAll("[data-mark-task-done]").forEach((button) => {
+        button.addEventListener("click", () => {
+          markOpenTaskDone(button.getAttribute("data-mark-task-done"));
+        });
+      });
+    }
+  }
+
+  if (dom.homeProfileInvoices) {
+    if (profile.recentInvoices.length === 0) {
+      dom.homeProfileInvoices.innerHTML = `<p class="task-subtitle">No recent invoices on file at this property.</p>`;
+    } else {
+      dom.homeProfileInvoices.innerHTML = profile.recentInvoices
+        .map((invoice) => {
+          const meta = [
+            compactString(invoice.vendorName),
+            invoice.documentDate ? formatProfileDate(invoice.documentDate) : "",
+            invoice.totalAmount != null ? formatCurrency(invoice.totalAmount) : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const summary = compactString(invoice.summary);
+          return `
+            <div class="home-profile-row">
+              <div class="home-profile-row-head">
+                <strong>${escapeText(invoice.name || "Invoice")}</strong>
+              </div>
+              ${meta ? `<div class="home-profile-meta">${meta}</div>` : ""}
+              ${summary ? `<p class="home-profile-note">${escapeText(summary)}</p>` : ""}
+            </div>
+          `;
+        })
+        .join("");
+    }
+  }
+}
+
+function punchSourceLabel(source) {
+  switch ((source || "").toLowerCase()) {
+    case "recommended":
+      return "Recommended";
+    case "maintenance_task":
+      return "From maintenance";
+    case "manual":
+      return "Manual";
+    default:
+      return "";
+  }
+}
+
+function escapeText(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatProfileDate(value) {
+  if (!value) return "";
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function formatCurrency(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "";
+  return num.toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
 }
 
 function markDirty(syncMessage) {
@@ -876,6 +1092,11 @@ async function fetchPortal() {
   state.session = payload.session;
   state.request = payload.request || null;
   state.messages = payload.messages || [];
+  state.homeProfile = payload.homeProfile || {
+    systems: [],
+    recentInvoices: [],
+    punchList: [],
+  };
 
   if (payload.report) {
     state.report = {
@@ -918,6 +1139,13 @@ async function syncDraft() {
   state.report.fieldNotes = dom.fieldNotes.value;
   state.report.homeownerNotes = dom.homeownerNotes.value;
 
+  // Phase 73 sub-phase D: optionally piggyback a punch item or task
+  // completion onto the report sync. Both are consumed by the portal
+  // edge function inside the same POST so we don't burn a second
+  // round-trip when the technician taps "Mark done" in the field.
+  const completePunchItemId = state.pendingCompletePunchItemId || null;
+  const completeTaskId = state.pendingCompleteTaskId || null;
+
   const response = await fetch(EDGE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -925,6 +1153,8 @@ async function syncDraft() {
       token,
       report: state.report,
       coordinationAction: state.pendingCoordinationAction,
+      completePunchItemId,
+      completeTaskId,
     }),
   });
 
@@ -934,6 +1164,9 @@ async function syncDraft() {
   state.session = payload.session || state.session;
   state.request = payload.request || state.request;
   state.messages = payload.messages || state.messages;
+  if (payload.homeProfile) {
+    state.homeProfile = payload.homeProfile;
+  }
   if (payload.report) {
     state.report.reportStatus = payload.report.report_status || state.report.reportStatus;
     state.report.coordinationStatus =
@@ -942,11 +1175,103 @@ async function syncDraft() {
     state.report.recommendations = payload.report.recommendations || state.report.recommendations;
   }
   state.pendingCoordinationAction = null;
+  state.pendingCompletePunchItemId = null;
+  state.pendingCompleteTaskId = null;
   state.dirty = false;
   saveDraft();
   render();
   setConnectivity();
   setSyncState("Synced just now");
+}
+
+// Phase 73 sub-phase D: optimistic "Mark done" for a punch item. Pulls
+// it out of the local state immediately, queues the writeback for the
+// next syncDraft, and triggers a sync. If the sync fails the item
+// reappears on the next portal GET — we don't add it back optimistically
+// to keep the queue logic simple.
+async function markPunchItemDone(punchItemId) {
+  if (!punchItemId) return;
+  state.homeProfile.punchList = (state.homeProfile.punchList || []).filter(
+    (item) => item.id !== punchItemId,
+  );
+  state.pendingCompletePunchItemId = punchItemId;
+  markDirty("Punch item completion queued");
+  try {
+    await syncDraft();
+  } catch (error) {
+    setSyncState(error instanceof Error ? error.message : "Sync failed");
+  }
+}
+
+// Phase 73 sub-phase D: optimistic completion for a homeowner task.
+// Same pattern as markPunchItemDone — pull from the visible list,
+// queue the writeback, sync.
+async function markOpenTaskDone(taskId) {
+  if (!taskId) return;
+  state.homeProfile.openTasks = (state.homeProfile.openTasks || []).filter(
+    (task) => task.id !== taskId,
+  );
+  state.pendingCompleteTaskId = taskId;
+  markDirty("Task completion queued");
+  try {
+    await syncDraft();
+  } catch (error) {
+    setSyncState(error instanceof Error ? error.message : "Sync failed");
+  }
+}
+
+/**
+ * Send a free-form chat message to the homeowner. Reuses the
+ * ask_question coordination action (which is the existing message
+ * sender) but preserves coordination_status so casual chat doesn't
+ * flip the visit to "awaiting_homeowner". Optimistic append so the
+ * message appears in the local list instantly.
+ */
+async function sendChatMessage(body) {
+  const trimmed = compactString(body);
+  if (!trimmed) return;
+  const previousStatus = state.report.coordinationStatus;
+
+  // Optimistic local insert so the tech sees the message immediately.
+  state.messages = [
+    ...state.messages,
+    {
+      id: `local-${Date.now()}`,
+      sender_role: "haven",
+      created_at: new Date().toISOString(),
+      body: trimmed,
+    },
+  ];
+  state.pendingCoordinationAction = {
+    type: "ask_question",
+    message: trimmed,
+    proposedDate: "",
+    quietStatus: true, // hint to syncDraft to restore prior status
+  };
+
+  dom.chatInput.value = "";
+  dom.chatSendButton.disabled = true;
+  dom.chatStatus.textContent = "Sending…";
+  dom.chatStatus.classList.remove("error");
+  render();
+  markDirty("Message queued");
+
+  try {
+    await syncDraft();
+    // Restore the prior coordination status so the chat doesn't bump
+    // visit state. ask_question would otherwise stamp
+    // "awaiting_homeowner" on the report.
+    if (previousStatus && state.report.coordinationStatus === "awaiting_homeowner") {
+      state.report.coordinationStatus = previousStatus;
+    }
+    dom.chatStatus.textContent = "Sent";
+    setTimeout(() => {
+      if (dom.chatStatus.textContent === "Sent") dom.chatStatus.textContent = "";
+    }, 2200);
+  } catch (error) {
+    dom.chatStatus.textContent = error instanceof Error ? error.message : "Couldn't send.";
+    dom.chatStatus.classList.add("error");
+  }
 }
 
 async function applyCoordinationAction(type) {
@@ -1059,6 +1384,22 @@ function registerEvents() {
     await applyCoordinationAction("ask_question");
   });
 
+  // Free-form chat composer — sends a message to the homeowner without
+  // touching coordination_status. Piggybacks the ask_question
+  // coordination action with the chat input as the message body, then
+  // restores the prior status so the visit isn't bumped to
+  // "awaiting_homeowner" just because the tech said hi.
+  dom.chatInput.addEventListener("input", () => {
+    dom.chatSendButton.disabled = !dom.chatInput.value.trim();
+  });
+
+  dom.chatComposer.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = dom.chatInput.value.trim();
+    if (!body) return;
+    await sendChatMessage(body);
+  });
+
   dom.declineButton.addEventListener("click", async () => {
     await applyCoordinationAction("decline_visit");
   });
@@ -1137,6 +1478,32 @@ async function boot() {
     setConnectivity();
     setSyncState("Using saved local draft");
   }
+
+  // Phase 75: live message polling. The portal token is anonymous so
+  // we can't subscribe to Supabase Realtime here — but a 30s pull on
+  // page focus + every 30s while the tab is visible covers the
+  // overwhelmingly common case of the tech glancing at the phone
+  // between systems. We skip while offline or when the document is
+  // hidden to save battery.
+  let pollTimer = null;
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(() => {
+      if (document.hidden || !navigator.onLine || !token) return;
+      if (state.dirty) return; // mid-edit; let syncDraft win
+      fetchPortal().catch(() => {/* swallow — next tick will retry */});
+    }, 30_000);
+  }
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    if (!navigator.onLine || !token || state.dirty) return;
+    fetchPortal().catch(() => {});
+  });
+  startPolling();
 }
 
 boot();

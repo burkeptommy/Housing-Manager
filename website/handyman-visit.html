@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="handyman-visit.webmanifest">
-  <link rel="stylesheet" href="handyman-visit.css?v=20260423-collab1">
+  <link rel="stylesheet" href="handyman-visit.css?v=20260427-chat1">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="chez-handyman-logo.png">
   <style>
@@ -86,6 +86,21 @@
           </div>
           <p class="hero-copy compact-copy" id="coordination-summary">Loading the Chez coordination state.</p>
           <div class="message-list" id="message-list"></div>
+
+          <!-- Free-form chat composer — pings the homeowner without
+               needing to use the structured coordination buttons. -->
+          <form class="chat-composer" id="chat-composer" autocomplete="off">
+            <input
+              id="chat-input"
+              type="text"
+              placeholder="Message the homeowner — “The basement door is locked, can you let me in?”"
+              maxlength="600"
+              aria-label="Quick message to homeowner"
+            />
+            <button class="primary-button small-button" id="chat-send-button" type="submit" disabled>Send</button>
+          </form>
+          <p class="task-subtitle compact-eyebrow" id="chat-status"></p>
+
           <label class="input-label" for="coordination-note">Coordination note</label>
           <textarea id="coordination-note" rows="4" placeholder="Examples: We can do Friday afternoon instead, can the homeowner confirm if the side gate is still sticking, or we need to decline this week."></textarea>
           <label class="input-label" for="proposed-date">Alternate date</label>
@@ -189,6 +204,32 @@
           <textarea id="field-notes" rows="7" placeholder="Examples: brought two 16x25x1 filters, loose upstairs hall handrail, homeowner wants quote for shelving in mudroom."></textarea>
           <label class="input-label" for="homeowner-notes">Homeowner notes</label>
           <textarea id="homeowner-notes" rows="4" placeholder="Anything passed from the homeowner or Chez will appear here."></textarea>
+        </article>
+
+        <article class="surface-card" id="home-profile-card">
+          <div class="section-header">
+            <div>
+              <p class="section-eyebrow">House profile · live</p>
+              <h2>What Chez knows about this home</h2>
+            </div>
+            <span class="section-chip" id="home-profile-summary-chip">Loading</span>
+          </div>
+          <div class="home-profile-block">
+            <p class="section-eyebrow compact-eyebrow">Systems on file</p>
+            <div class="home-profile-list" id="home-profile-systems"></div>
+          </div>
+          <div class="home-profile-block">
+            <p class="section-eyebrow compact-eyebrow">Open punch list</p>
+            <div class="home-profile-list" id="home-profile-punch"></div>
+          </div>
+          <div class="home-profile-block">
+            <p class="section-eyebrow compact-eyebrow">Open homeowner tasks</p>
+            <div class="home-profile-list" id="home-profile-tasks"></div>
+          </div>
+          <div class="home-profile-block">
+            <p class="section-eyebrow compact-eyebrow">Recent invoices</p>
+            <div class="home-profile-list" id="home-profile-invoices"></div>
+          </div>
         </article>
 
         <article class="surface-card summary-card">
@@ -329,6 +370,6 @@
     </div>
   </template>
 
-  <script src="handyman-visit.js?v=20260423-collab1" defer></script>
+  <script src="handyman-visit.js?v=20260427-chat1" defer></script>
 </body>
 </html>

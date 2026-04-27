@@ -349,6 +349,52 @@ dd {
   gap: 12px;
 }
 
+/* Free-form chat composer — pings the homeowner without using the
+   structured coordination buttons. Sits below the message list. */
+.chat-composer {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+
+.chat-composer input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.95);
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink-900, #2A2252);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.chat-composer input:focus {
+  outline: none;
+  border-color: var(--ink-700, #524580);
+  box-shadow: 0 0 0 3px rgba(83, 69, 128, 0.12);
+}
+
+.chat-composer .small-button {
+  flex-shrink: 0;
+}
+
+.chat-composer .small-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#chat-status {
+  margin: 6px 0 0;
+  min-height: 14px;
+  font-size: 12px;
+  color: var(--ink-500, #6F6A88);
+}
+#chat-status.error {
+  color: var(--accent-dark, #D14E3E);
+}
+
 .task-item,
 .recommendation-item {
   grid-template-columns: auto 1fr auto;
@@ -681,4 +727,67 @@ textarea {
   .summary-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Phase 73 sub-phase C: read-only home-profile panels in the field PWA. */
+.home-profile-block {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+}
+.home-profile-block + .home-profile-block {
+  margin-top: 8px;
+  border-top: 1px solid rgba(42, 34, 82, 0.08);
+}
+.home-profile-block .compact-eyebrow {
+  margin: 0 0 4px;
+}
+.home-profile-list {
+  display: grid;
+  gap: 8px;
+}
+.home-profile-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(42, 34, 82, 0.04);
+  border: 1px solid rgba(42, 34, 82, 0.08);
+}
+.home-profile-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.home-profile-row-head strong {
+  font-weight: 600;
+}
+.home-profile-tag {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(237, 105, 85, 0.12);
+  color: #b34a36;
+}
+.home-profile-meta {
+  font-size: 0.86rem;
+  color: rgba(42, 34, 82, 0.7);
+}
+.home-profile-note {
+  font-size: 0.92rem;
+  color: rgba(42, 34, 82, 0.85);
+  margin: 4px 0 0;
+}
+.home-profile-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.home-profile-actions .small-button {
+  font-size: 0.86rem;
+  padding: 6px 10px;
 }
