@@ -17,6 +17,7 @@ export default function HomeDetailScreen() {
   const [suggestDetails, setSuggestDetails] = useState("");
   const [suggestType, setSuggestType] = useState("standard_visit");
   const [suggestSubmitting, setSuggestSubmitting] = useState(false);
+  const [editingSystem, setEditingSystem] = useState<HomeSystem | null>(null);
 
   const home = useMemo(() => {
     if (!dashboard || !propertyId) return null;
@@ -120,9 +121,20 @@ export default function HomeDetailScreen() {
                 No systems registered yet for this home. On your first visit, build the home profile in Chez Field — manufacturer + model + serial syncs back to the homeowner's app automatically.
               </div>
             ) : (
-              <CategorizedSystems systems={home.systems} />
+              <CategorizedSystems systems={home.systems} onEditSystem={setEditingSystem} />
             )}
           </Card>
+
+          {editingSystem && (
+            <SystemEditSheet
+              system={editingSystem}
+              onClose={() => setEditingSystem(null)}
+              onSaved={async () => {
+                setEditingSystem(null);
+                await refresh();
+              }}
+            />
+          )}
 
           {/* AI suggestions */}
           <Card padding="default">
@@ -307,12 +319,23 @@ export default function HomeDetailScreen() {
 
 // ─── Subcomponents ───
 
-function SystemRow({ system }: { system: HomeSystem }) {
+function SystemRow({ system, onClick }: { system: HomeSystem; onClick: () => void }) {
   const headline = system.manufacturer || system.modelNumber
     ? `${system.manufacturer ?? ""} ${system.modelNumber ?? ""}`.trim()
     : "Manufacturer unknown";
   return (
-    <div className="ops-row" style={{ padding: "10px 0" }}>
+    <button
+      onClick={onClick}
+      className="ops-row"
+      style={{
+        padding: "10px 0",
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        textAlign: "left",
+        width: "100%",
+      }}
+    >
       <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--indigo-50)", color: "var(--indigo)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
         <Icon name={iconForCategory(system.category)} size={14} stroke={1.9} />
       </div>
@@ -325,11 +348,15 @@ function SystemRow({ system }: { system: HomeSystem }) {
       {!system.manufacturer && (
         <Pill tone="warning">Update on next visit</Pill>
       )}
-    </div>
+      <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
+    </button>
   );
 }
 
 // ─── Categorized systems group ────────────────────────────────
+
+// editing-system-id state lives in the parent so the modal can open
+// regardless of which group the row belongs to.
 
 /**
  * Groups a flat systems list into 6 collapsible buckets so a 27-system
@@ -346,12 +373,12 @@ function SystemRow({ system }: { system: HomeSystem }) {
  * Default expansion: groups with ≤4 items expanded; the larger ones
  * collapsed so the section opens scannable, not overwhelming.
  */
-function CategorizedSystems({ systems }: { systems: HomeSystem[] }) {
+function CategorizedSystems({ systems, onEditSystem }: { systems: HomeSystem[]; onEditSystem: (s: HomeSystem) => void }) {
   const groups = useMemo(() => groupSystems(systems), [systems]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {groups.map((group) => (
-        <SystemGroup key={group.label} group={group} />
+        <SystemGroup key={group.label} group={group} onEditSystem={onEditSystem} />
       ))}
     </div>
   );
@@ -364,7 +391,7 @@ interface SystemGroupData {
   items: HomeSystem[];
 }
 
-function SystemGroup({ group }: { group: SystemGroupData }) {
+function SystemGroup({ group, onEditSystem }: { group: SystemGroupData; onEditSystem: (s: HomeSystem) => void }) {
   const [open, setOpen] = useState(group.defaultExpanded);
   return (
     <div style={{ border: "1px solid var(--neutral-200)", borderRadius: 12, overflow: "hidden" }}>
@@ -412,7 +439,7 @@ function SystemGroup({ group }: { group: SystemGroupData }) {
               key={s.id}
               style={{ borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none" }}
             >
-              <SystemRow system={s} />
+              <SystemRow system={s} onClick={() => onEditSystem(s)} />
             </div>
           ))}
         </div>
@@ -715,3 +742,160 @@ function requestStatusTone(status: RequestStatus): PillTone {
       return "neutral";
   }
 }
+
+// ─── System edit sheet ─────────────────────────────────────
+
+/**
+ * Lets the handyman update the make/model/notes/install date on a
+ * system from desktop, e.g. after a visit when they're back at the
+ * desk and don't want to fumble with their phone. Posts the new
+ * `update_home_system` action which the edge function gates by
+ * "this workspace has worked with this property" before writing.
+ */
+function SystemEditSheet({
+  system,
+  onClose,
+  onSaved,
+}: {
+  system: HomeSystem;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const { dashboard } = useWorkspace();
+  const [name, setName] = useState(system.name);
+  const [manufacturer, setManufacturer] = useState(system.manufacturer ?? "");
+  const [modelNumber, setModelNumber] = useState(system.modelNumber ?? "");
+  const [serialNumber, setSerialNumber] = useState("");
+  const [notes, setNotes] = useState("");
+  const [installDate, setInstallDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function save() {
+    if (!dashboard) return;
+    setSubmitting(true);
+    try {
+      await postProviderAction("update_home_system", {
+        workspaceId: dashboard.workspace.id,
+        systemId: system.id,
+        name,
+        manufacturer,
+        modelNumber,
+        serialNumber,
+        notes,
+        installDate: installDate || undefined,
+      });
+      await onSaved();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't save system.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 50,
+        background: "rgba(42,34,82,0.4)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={() => !submitting && onClose()}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: 16, padding: 24,
+          width: "min(520px, 95vw)", maxHeight: "90vh", overflowY: "auto",
+          boxShadow: "0 24px 60px rgba(42,34,82,0.4)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-soft)" }}>
+              {system.category || "Home system"}
+            </div>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--text)", marginTop: 4 }}>
+              {system.name}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-soft)", cursor: "pointer", padding: 4 }} aria-label="Close">
+            <Icon name="remove" size={18} stroke={2} />
+          </button>
+        </div>
+
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 18, lineHeight: 1.5 }}>
+          Anything you capture here syncs back to the homeowner's app so future visits get smarter recommendations.
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <Field label="Display name">
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle2} />
+          </Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <Field label="Manufacturer">
+              <input
+                type="text"
+                placeholder="Bosch"
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                style={inputStyle2}
+              />
+            </Field>
+            <Field label="Model #">
+              <input
+                type="text"
+                placeholder="800 Series"
+                value={modelNumber}
+                onChange={(e) => setModelNumber(e.target.value)}
+                style={inputStyle2}
+              />
+            </Field>
+          </div>
+          <Field label="Serial #">
+            <input
+              type="text"
+              placeholder="(if you can find it)"
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
+              style={inputStyle2}
+            />
+          </Field>
+          <Field label="Install date (rough is fine)">
+            <input type="date" value={installDate} onChange={(e) => setInstallDate(e.target.value)} style={inputStyle2} />
+          </Field>
+          <Field label="Notes">
+            <textarea
+              placeholder="Anything you noticed — corrosion, last service date, recommended replacements…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              style={{ ...inputStyle2, minHeight: 100, resize: "vertical" }}
+            />
+          </Field>
+        </div>
+
+        <div style={{ marginTop: 18, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          Photo upload coming soon — for now, capture details from the field PWA on your phone.
+        </div>
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+          <button className="ops-button ops-button--ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="ops-button ops-button--salmon" onClick={save} disabled={submitting}>
+            {submitting ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle2: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  border: "1px solid var(--neutral-200)",
+  borderRadius: 10,
+  background: "#fff",
+  fontSize: 13,
+  fontFamily: "var(--sans)",
+  color: "var(--text)",
+};

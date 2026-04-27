@@ -2302,6 +2302,129 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   };
 }
 
+/**
+ * Allow a provider to edit a home_system row for a property they have
+ * a confirmed work relationship with (i.e. there's at least one
+ * handyman_request linking that property's household to one of the
+ * workspace's linked contractors). Lets the handyman update make/model/
+ * notes after a visit from desktop without granting broad RLS write
+ * access on home_systems.
+ */
+async function updateHomeSystemForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  if (!systemId) throw new Error("systemId is required");
+
+  // Verify the system's property is one we serve.
+  const { data: system, error: systemError } = await service
+    .from("home_systems")
+    .select("id, property_id, household_id")
+    .eq("id", systemId)
+    .maybeSingle();
+  if (systemError) throw systemError;
+  if (!system) throw new Error("System not found");
+
+  const propertyId = compactString(system.property_id);
+  if (!propertyId) throw new Error("System has no property");
+
+  // Workspace must have at least one handyman_request for this property's
+  // household via one of its linked contractors.
+  const { data: links } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+  const contractorIds = (links ?? [])
+    .map((row: Record<string, unknown>) => compactString(row.contractor_id))
+    .filter(Boolean);
+  if (contractorIds.length === 0) throw new Error("Workspace has no linked contractors");
+
+  const { data: linkedRequest } = await service
+    .from("handyman_requests")
+    .select("id")
+    .eq("property_id", propertyId)
+    .in("contractor_id", contractorIds)
+    .limit(1)
+    .maybeSingle();
+  if (!linkedRequest) throw new Error("This home isn't on your books");
+
+  // Build update payload — only include fields that were sent.
+  const update: Record<string, unknown> = { updated_at: isoNow() };
+  if (typeof body.name === "string")          update.name = compactString(body.name);
+  if (typeof body.manufacturer === "string")  update.manufacturer = compactString(body.manufacturer);
+  if (typeof body.modelNumber === "string")   update.model_number = compactString(body.modelNumber);
+  if (typeof body.serialNumber === "string")  update.serial_number = compactString(body.serialNumber);
+  if (typeof body.notes === "string")         update.notes = compactString(body.notes);
+  if (typeof body.installDate === "string")   update.install_date = compactString(body.installDate);
+
+  const { data: updated, error: updateError } = await service
+    .from("home_systems")
+    .update(update)
+    .eq("id", systemId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+  return { system: updated };
+}
+
+/**
+ * Update the status on a handyman_request from the provider side. Used
+ * by the desktop "Mark complete" / "Reopen" buttons. Validates the
+ * request belongs to the calling workspace.
+ */
+async function updateRequestStatusForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  const status = compactString(body.status);
+  if (!requestId) throw new Error("requestId is required");
+  const allowed = [
+    "submitted", "scheduled", "sent_to_handyman", "alternate_dates_proposed",
+    "awaiting_homeowner", "confirmed", "on_my_way", "checked_in", "quoted",
+    "in_progress", "completed", "follow_up_recommended", "cancelled", "declined",
+  ];
+  if (!allowed.includes(status)) throw new Error(`Invalid status: ${status}`);
+
+  const { data: links } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+  const contractorIds = (links ?? [])
+    .map((row: Record<string, unknown>) => compactString(row.contractor_id))
+    .filter(Boolean);
+
+  const { data: request } = await service
+    .from("handyman_requests")
+    .select("id, contractor_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!request) throw new Error("Request not found");
+  if (!contractorIds.includes(compactString(request.contractor_id))) {
+    throw new Error("Request not in this workspace");
+  }
+
+  const { data: updated, error: updateError } = await service
+    .from("handyman_requests")
+    .update({ status, updated_at: isoNow() })
+    .eq("id", requestId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+  return { request: updated };
+}
+
 async function assertWorkspaceAccess(service: ServiceClient, userId: string, workspaceId: string) {
   const membership = await getWorkspaceMembership(service, userId);
   if (!membership) throw new Error("No provider workspace found");
@@ -4007,6 +4130,24 @@ serve(async (req) => {
 
       if (action === "accept_visit_time") {
         const result = await acceptVisitTimeForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "update_home_system") {
+        const result = await updateHomeSystemForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "update_request_status") {
+        const result = await updateRequestStatusForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
