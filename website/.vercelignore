@@ -1,0 +1,20 @@
+# Operations Desk source files — Vercel runs `npm install && npm run build`
+# in `operations/` during the build step, then deploys the project root.
+# Without this filter, the source `operations/index.html` (which references
+# `./src/main.tsx`) wins the static-file lookup and shadows the built one
+# at `operations/dist/index.html`. Excluding the source files lets the
+# vercel.json rewrite `/operations/* → /operations/dist/*` actually fire.
+operations/src
+operations/index.html
+operations/package.json
+operations/package-lock.json
+operations/tsconfig.json
+operations/tsconfig.tsbuildinfo
+operations/vite.config.ts
+operations/node_modules
+operations/.gitignore
+operations/.vite
+
+# Local Xcode artifacts that shouldn't ship even if they leak into the dir
+.DS_Store
+*.swp
