@@ -58,6 +58,10 @@ export default function DispatchScreen() {
     if (!selected || !dashboard) return;
     setAssigning(true);
     try {
+      // Server locks the date to confirmed_visit_at when one exists,
+      // so what we send here gets ignored in that case. Only matters
+      // for unconfirmed visits where the dispatcher is booking from
+      // scratch.
       const [start, end] = parseWindow(windowSlot);
       await postProviderAction("assign_visit", {
         workspaceId: dashboard.workspace.id,
@@ -305,15 +309,44 @@ export default function DispatchScreen() {
             </div>
 
             <div className="ops-section-label" style={{ marginBottom: 8 }}>When</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              <input type="date" value={routeDate} onChange={(e) => setRouteDate(e.target.value)} style={selectInputStyle} />
-              <select value={windowSlot} onChange={(e) => setWindowSlot(e.target.value)} style={selectInputStyle}>
-                <option value="9-11">9 AM – 11 AM</option>
-                <option value="11-13">11 AM – 1 PM</option>
-                <option value="13-15">1 PM – 3 PM</option>
-                <option value="15-17">3 PM – 5 PM</option>
-              </select>
-            </div>
+            {selected.confirmedVisitAt ? (
+              <div style={{
+                marginBottom: 16,
+                padding: 12,
+                borderRadius: 10,
+                background: "var(--cream)",
+                border: "1px solid var(--neutral-200)",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}>
+                <Icon name="lock" size={14} stroke={2} color="var(--text-muted)" />
+                <div style={{ flex: 1, fontSize: 12.5, color: "var(--text)", lineHeight: 1.4 }}>
+                  <strong style={{ color: "var(--indigo)" }}>
+                    {new Date(selected.confirmedVisitAt).toLocaleString(undefined, {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </strong>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                    Locked to homeowner's accepted time. Use Propose new time to change it.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                <input type="date" value={routeDate} onChange={(e) => setRouteDate(e.target.value)} style={selectInputStyle} />
+                <select value={windowSlot} onChange={(e) => setWindowSlot(e.target.value)} style={selectInputStyle}>
+                  <option value="9-11">9 AM – 11 AM</option>
+                  <option value="11-13">11 AM – 1 PM</option>
+                  <option value="13-15">1 PM – 3 PM</option>
+                  <option value="15-17">3 PM – 5 PM</option>
+                </select>
+              </div>
+            )}
           </>
         ) : (
           <EmptyState

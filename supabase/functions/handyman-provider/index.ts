@@ -3124,9 +3124,9 @@ async function assignVisit(
   if (!requestId) throw new Error("Missing request");
 
   const assignedMemberId = compactString(body.assignedMemberId) || null;
-  const routeDate = compactString(body.routeDate) || null;
-  const windowStartTime = compactString(body.windowStartTime) || null;
-  const windowEndTime = compactString(body.windowEndTime) || null;
+  let routeDate = compactString(body.routeDate) || null;
+  let windowStartTime = compactString(body.windowStartTime) || null;
+  let windowEndTime = compactString(body.windowEndTime) || null;
   const routeNotes = compactString(body.routeNotes) || null;
   const stopOrder = numberValue(body.stopOrder || 0);
 
@@ -3144,12 +3144,34 @@ async function assignVisit(
 
   const { data: request, error: requestError } = await service
     .from("handyman_requests")
-    .select("id, visit_task_id, status")
+    .select("id, visit_task_id, status, confirmed_visit_at")
     .eq("id", requestId)
     .limit(1)
     .maybeSingle();
 
   if (requestError || !request) throw requestError ?? new Error("Request not found");
+
+  // Lock the visit date to the homeowner-confirmed time. The dispatch
+  // UI is for picking WHO does the work, not WHEN — when the homeowner
+  // already accepted a time, any client-side date the UI sends gets
+  // ignored. Without this, opening the assign panel on a confirmed
+  // visit and clicking a tech would silently rebook to whatever date
+  // the picker happened to default to.
+  const confirmedAt = compactString(request.confirmed_visit_at);
+  if (confirmedAt) {
+    const confirmedDate = new Date(confirmedAt);
+    if (!Number.isNaN(confirmedDate.getTime())) {
+      const yyyy = confirmedDate.getUTCFullYear();
+      const mm = String(confirmedDate.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(confirmedDate.getUTCDate()).padStart(2, "0");
+      const hh = String(confirmedDate.getUTCHours()).padStart(2, "0");
+      const mi = String(confirmedDate.getUTCMinutes()).padStart(2, "0");
+      const endHh = String((confirmedDate.getUTCHours() + 2) % 24).padStart(2, "0");
+      routeDate = `${yyyy}-${mm}-${dd}`;
+      windowStartTime = `${hh}:${mi}:00`;
+      windowEndTime = `${endHh}:${mi}:00`;
+    }
+  }
 
   if (!assignedMemberId && !routeDate && !windowStartTime && !windowEndTime && !routeNotes && stopOrder <= 0) {
     await service

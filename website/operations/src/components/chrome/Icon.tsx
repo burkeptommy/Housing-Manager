@@ -38,6 +38,9 @@ const PATHS: Record<string, string> = {
   shield: "M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7z",
   history: "M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2",
   lightbulb: "M9 20h6M10 23h4M12 3a7 7 0 0 0-4 12.7c.6.6 1 1.4 1 2.3v1h6v-1c0-.9.4-1.7 1-2.3A7 7 0 0 0 12 3z",
+  lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
+  bolt: "M13 2L4 14h7l-1 8 9-12h-7z",
+  wrench: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z",
 };
 
 interface IconProps {

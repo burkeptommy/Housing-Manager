@@ -90,13 +90,17 @@ export default function VisitDetailScreen() {
     if (!visit || !dashboard || !dashboard.currentUser.memberId) return;
     setBusy(true);
     try {
+      // Server locks date/time to confirmed_visit_at when present, so
+      // we don't override here. For unconfirmed visits we send the
+      // existing routeDate so the assignment lands on the same day
+      // the homeowner originally requested instead of jumping to today.
       await postProviderAction("assign_visit", {
         workspaceId: dashboard.workspace.id,
         requestId: visit.requestId,
         assignedMemberId: dashboard.currentUser.memberId,
         routeDate: visit.routeDate || new Date().toISOString().slice(0, 10),
-        windowStartTime: "09:00",
-        windowEndTime: "11:00",
+        windowStartTime: visit.assignment?.windowStartTime || "09:00",
+        windowEndTime: visit.assignment?.windowEndTime || "11:00",
       });
       await refresh();
     } catch (e) {
