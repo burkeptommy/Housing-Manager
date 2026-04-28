@@ -2606,7 +2606,14 @@ async function splitVisitPunchList(
   if (movedTitles.length === 0) throw new Error("Pick at least one item to move");
 
   const followUpTitle = compactString(body.followUpTitle) || "Follow-up visit";
-  const followUpDate = compactString(body.followUpDate) || null;
+  // maintenance_tasks.next_due_date is NOT NULL — fall back to +14
+  // days when the provider didn't pick a target date in the modal.
+  const requestedFollowUpDate = compactString(body.followUpDate);
+  const followUpDate = requestedFollowUpDate || (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  })();
 
   // Fetch the original request + verify the workspace owns it via the
   // contractor link.
@@ -2712,8 +2719,8 @@ async function splitVisitPunchList(
       title: followUpTitle,
       description: null,
       frequency: "Once",
-      next_due_date: followUpDate || null,
-      scheduled_date: followUpDate || null,
+      next_due_date: followUpDate,
+      scheduled_date: followUpDate,
       priority: compactString(originalTask.priority) || "Medium",
       assigned_contractor_id: contractorId || null,
       notes: followUpNotes,
@@ -2727,6 +2734,8 @@ async function splitVisitPunchList(
   if (newTaskError || !newTask) throw newTaskError ?? new Error("Could not create follow-up task");
 
   // Create the new request, mirroring the original's metadata.
+  // Source must be one of: homeowner, haven, vendor, field. We're
+  // the provider creating it, so "vendor" matches the schema's intent.
   const { data: newRequest, error: newRequestError } = await service
     .from("handyman_requests")
     .insert({
@@ -2736,10 +2745,10 @@ async function splitVisitPunchList(
       visit_task_id: compactString(newTask.id),
       created_by_user_id: userId,
       request_type: compactString(original.request_type) || "standard_visit",
-      source: "provider_split",
+      source: "vendor",
       title: followUpTitle,
       details: null,
-      preferred_timing: followUpDate || null,
+      preferred_timing: followUpDate,
       urgency: compactString(original.urgency) || "routine",
       status: "submitted",
       first_visit_setup_requested: false,
@@ -4669,6 +4678,22 @@ serve(async (req) => {
     return json({ error: "Method not allowed" }, 405);
   } catch (error) {
     console.error("[handyman-provider] unhandled error", error);
-    return json({ error: error instanceof Error ? error.message : "Internal error" }, 500);
+    // Surface real failure reasons. Supabase's PostgrestError isn't
+    // an `instanceof Error` — it's a plain object with `message` /
+    // `details` / `hint` / `code`. Without this the React side just
+    // sees "Internal error" and we have to dig through dashboard
+    // logs to find a CHECK violation.
+    let message = "Internal error";
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (error && typeof error === "object") {
+      const err = error as Record<string, unknown>;
+      const msg = compactString(err.message);
+      const details = compactString(err.details);
+      const hint = compactString(err.hint);
+      const code = compactString(err.code);
+      message = [msg, details, hint, code ? `(${code})` : ""].filter(Boolean).join(" — ") || "Internal error";
+    }
+    return json({ error: message }, 500);
   }
 });
