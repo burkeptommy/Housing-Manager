@@ -5,7 +5,7 @@ interface RouteMeta {
   title: string;
   eyebrow?: string;
   breadcrumb?: string;
-  primaryCta?: { label: string; action: "new-quote" | "navigate"; to?: string };
+  primaryCta?: { label: string; action: "new-quote" | "add-client" | "navigate"; to?: string };
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
@@ -13,7 +13,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
     eyebrow: "Operations · " + new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }).toUpperCase(),
     title: "Today's desk",
     breadcrumb: "Workspace overview",
-    primaryCta: { label: "+ New quote", action: "new-quote" },
+    primaryCta: { label: "+ Add client", action: "add-client" },
   },
   "/visits": {
     title: "Visits",
@@ -34,7 +34,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
   "/homes": {
     title: "Homes",
     breadcrumb: "Every home you've worked on",
-    primaryCta: { label: "+ New quote", action: "new-quote" },
+    primaryCta: { label: "+ Add client", action: "add-client" },
   },
   "/quotes": {
     title: "Quotes",
@@ -66,6 +66,8 @@ export function Topbar() {
     if (!meta.primaryCta) return;
     if (meta.primaryCta.action === "new-quote") {
       window.dispatchEvent(new CustomEvent("ops:open-new-quote"));
+    } else if (meta.primaryCta.action === "add-client") {
+      window.dispatchEvent(new CustomEvent("ops:open-add-client"));
     } else if (meta.primaryCta.action === "navigate" && meta.primaryCta.to) {
       navigate(meta.primaryCta.to);
     }

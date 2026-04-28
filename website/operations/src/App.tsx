@@ -15,6 +15,7 @@ import QuotesScreen from "./screens/Quotes";
 import MessagesScreen from "./screens/Messages";
 import { CommandPalette } from "./components/CommandPalette";
 import { NewQuoteModal, NewQuoteProvider, useNewQuoteModal } from "./components/NewQuoteModal";
+import { AddClientModal } from "./components/AddClientModal";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <MobileInterstitial />
         <Shell />
         <NewQuoteModal />
+        <AddClientModal />
         <CommandPalette />
       </NewQuoteProvider>
     </WorkspaceProvider>

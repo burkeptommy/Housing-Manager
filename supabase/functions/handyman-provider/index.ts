@@ -2810,6 +2810,132 @@ async function splitVisitPunchList(
 }
 
 /**
+ * Add a "managed" client (homeowner + property) without requiring the
+ * homeowner to install the Chez app first. Creates a household with
+ * no auth user, a property, a contractor linked to the workspace, and
+ * a placeholder handyman_request so the home immediately surfaces in
+ * /homes / /visits / dashboard counts. The homeowner can later claim
+ * the household by signing up with the email we stored.
+ */
+async function addClientForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canAssignWork");
+
+  const clientName = compactString(body.clientName);
+  const street = compactString(body.street);
+  if (!clientName) throw new Error("Client name is required");
+  if (!street) throw new Error("Street address is required");
+
+  const email = normalizedEmail(body.email);
+  const phone = compactString(body.phone);
+  const city = compactString(body.city);
+  const state = compactString(body.state);
+  const zip = compactString(body.zip);
+  const notes = compactString(body.notes);
+
+  // 1. Household — no linked auth user; this is a "managed" household
+  //    the provider is operating on behalf of. The homeowner can claim
+  //    it later by signing up with `claim_email`.
+  const { data: household, error: householdError } = await service
+    .from("households")
+    .insert({
+      name: `${clientName}'s home`,
+      claim_email: email || null,
+      managed_by_provider_workspace_id: workspaceId,
+    })
+    .select("id")
+    .single();
+  if (householdError || !household) throw householdError ?? new Error("Could not create household");
+  const householdId = compactString(household.id);
+
+  // 2. Property anchored to that household.
+  const fullAddress = [street, city, state, zip].filter(Boolean).join(", ");
+  const { data: property, error: propertyError } = await service
+    .from("properties")
+    .insert({
+      household_id: householdId,
+      name: street,
+      street,
+      city: city || null,
+      state: state || null,
+      zip_code: zip || null,
+      property_type: "Single Family",
+    })
+    .select("id, name, street, city, state, zip_code")
+    .single();
+  if (propertyError || !property) throw propertyError ?? new Error("Could not create property");
+  const propertyId = compactString(property.id);
+
+  // 3. Workspace info for the contractor mirror.
+  const { data: workspace } = await service
+    .from("provider_workspaces")
+    .select("company_name, primary_email, primary_phone, website")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  const contractorId = await ensureHouseholdContractorForWorkspace(service, {
+    workspaceId,
+    householdId,
+    companyName: compactString(workspace?.company_name),
+    contactName: compactString(workspace?.company_name),
+    email: compactString(workspace?.primary_email),
+    phone: compactString(workspace?.primary_phone),
+    website: compactString(workspace?.website),
+    claimSource: "manual",
+  });
+
+  // 4. Placeholder request so the home shows up in /homes (the
+  //    homes list aggregates from handyman_requests). Marked as
+  //    "scheduled" rather than "submitted" so it doesn't pollute
+  //    the unassigned dispatch queue. The provider can build quotes
+  //    or actual visits against this request.
+  const noteParts: string[] = [`Added by ${compactString(user.email) || "the provider"}.`];
+  if (notes) noteParts.push(notes);
+  if (email) noteParts.push(`Contact: ${email}`);
+  if (phone) noteParts.push(`Phone: ${phone}`);
+
+  await service
+    .from("handyman_requests")
+    .insert({
+      household_id: householdId,
+      property_id: propertyId,
+      contractor_id: contractorId || null,
+      created_by_user_id: userId,
+      request_type: "standard_visit",
+      source: "vendor",
+      title: `Initial setup — ${clientName}`,
+      details: noteParts.join("\n"),
+      preferred_timing: null,
+      urgency: "routine",
+      status: "scheduled",
+      first_visit_setup_requested: true,
+      recommended_lane: "handyman",
+      quick_upsell_titles: [],
+    });
+
+  return {
+    ok: true,
+    household: {
+      id: householdId,
+      name: `${clientName}'s home`,
+      email,
+      phone,
+    },
+    property: {
+      id: propertyId,
+      name: compactString(property.name),
+      address: fullAddress,
+    },
+  };
+}
+
+/**
  * Delete a draft quote. Only `draft` rows can be deleted — sent /
  * viewed / approved / declined quotes have a paper trail and stay on
  * record. Workspace-scoped via assertWorkspaceAccess + an explicit
@@ -4831,6 +4957,15 @@ serve(async (req) => {
 
       if (action === "split_visit_punch_list") {
         const result = await splitVisitPunchList(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "add_client") {
+        const result = await addClientForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
