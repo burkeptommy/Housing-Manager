@@ -6,6 +6,14 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/admin/",
+      "destination": "/admin.html"
+    },
+    {
       "source": "/operations/assets/:path*",
       "destination": "/operations/dist/assets/:path*"
     },
@@ -23,6 +31,32 @@
     }
   ],
   "headers": [
+    {
+      "source": "/admin(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, noarchive, nosnippet"
+        }
+      ]
+    },
+    {
+      "source": "/admin-data/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, noarchive, nosnippet"
+        }
+      ]
+    },
     {
       "source": "/operations/dist/assets/(.*)",
       "headers": [

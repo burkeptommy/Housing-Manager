@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chez Admin · Onboarding Lab</title>
+    <meta
+      name="description"
+      content="Private Chez admin workspace for onboarding, quiz, routines, vendors, and task curation."
+    />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#2A2252" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/chez.css" />
+    <link rel="stylesheet" href="/admin.css" />
+  </head>
+  <body>
+    <main id="admin-root" class="admin-root">
+      <section class="admin-login" data-login>
+        <div class="admin-login__card">
+          <div class="admin-mark">chez</div>
+          <p class="admin-eyebrow">Private admin</p>
+          <h1>Onboarding Lab</h1>
+          <p class="admin-muted">
+            Sign in as Tom to curate quiz questions, searches, routines,
+            vendors, task categories, and notes for Codex.
+          </p>
+          <form class="admin-login__form" data-login-form>
+            <label>
+              <span>Email</span>
+              <input
+                data-login-email
+                type="email"
+                value="tom@getchez.com"
+                autocomplete="username"
+                spellcheck="false"
+              />
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                data-login-password
+                type="password"
+                autocomplete="current-password"
+                placeholder="Enter admin password"
+              />
+            </label>
+            <button type="submit" class="admin-button admin-button--primary">
+              Open admin
+            </button>
+            <p class="admin-login__feedback" data-login-feedback></p>
+          </form>
+          <p class="admin-login__footnote">
+            This page uses Supabase Auth and an email allowlist. Apply the
+            admin catalog migration before expecting cloud saves.
+          </p>
+        </div>
+      </section>
+
+      <section class="admin-app is-hidden" data-app>
+        <aside class="admin-sidebar">
+          <a class="admin-sidebar__brand" href="/" aria-label="Chez home">
+            <img src="/chez-logo.png" alt="" />
+            <div>
+              <strong>chez</strong>
+              <span>admin</span>
+            </div>
+          </a>
+          <nav class="admin-nav" data-nav></nav>
+          <div class="admin-sidebar__footer">
+            <span data-session-email>tom@getchez.com</span>
+            <button type="button" data-sign-out>Sign out</button>
+          </div>
+        </aside>
+
+        <section class="admin-main">
+          <header class="admin-topbar">
+            <div>
+              <p class="admin-eyebrow" data-view-eyebrow>Onboarding</p>
+              <h2 data-view-title>Quiz Builder</h2>
+              <p class="admin-muted" data-view-subtitle>
+                Curate the first homeowner quiz and decide what ships.
+              </p>
+            </div>
+            <div class="admin-topbar__actions">
+              <button type="button" class="admin-button" data-export-config>
+                Export config
+              </button>
+              <button type="button" class="admin-button admin-button--primary" data-new-item>
+                Add item
+              </button>
+            </div>
+          </header>
+
+          <section class="admin-warning" data-storage-warning hidden>
+            <strong>Local draft mode.</strong>
+            Supabase admin tables are not available yet, so edits are saved in
+            this browser only. Apply the migration to make this durable.
+          </section>
+
+          <section class="admin-layout">
+            <div class="admin-list-panel">
+              <div class="admin-list-tools">
+                <input data-search placeholder="Search this view..." />
+                <select data-status-filter>
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="draft">Draft</option>
+                  <option value="cut">Cut</option>
+                  <option value="defer">Defer</option>
+                  <option value="reshape">Reshape</option>
+                </select>
+              </div>
+              <div class="admin-stats" data-stats></div>
+              <div class="admin-list" data-list></div>
+            </div>
+
+            <div class="admin-detail-panel">
+              <div class="admin-empty-detail" data-empty-detail>
+                <h3>Select something to curate.</h3>
+                <p>
+                  Pick a quiz question, task, routine, search, vendor category,
+                  or system from the list. You can promote audit rows into
+                  editable admin drafts.
+                </p>
+              </div>
+
+              <article class="admin-detail is-hidden" data-detail>
+                <div class="admin-detail__header">
+                  <div>
+                    <p class="admin-eyebrow" data-detail-kind></p>
+                    <h3 data-detail-title></h3>
+                    <p class="admin-muted" data-detail-subtitle></p>
+                  </div>
+                  <span class="admin-pill" data-detail-status></span>
+                </div>
+
+                <div class="admin-form-grid">
+                  <label>
+                    <span>Title</span>
+                    <input data-field-title />
+                  </label>
+                  <label>
+                    <span>Status</span>
+                    <select data-field-status>
+                      <option value="active">Active</option>
+                      <option value="draft">Draft</option>
+                      <option value="cut">Cut</option>
+                      <option value="defer">Defer</option>
+                      <option value="reshape">Reshape</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Category / chapter</span>
+                    <input data-field-category />
+                  </label>
+                  <label>
+                    <span>Sort order</span>
+                    <input data-field-sort type="number" />
+                  </label>
+                </div>
+
+                <label class="admin-block-label">
+                  <span>Description / route notes</span>
+                  <textarea data-field-description rows="4"></textarea>
+                </label>
+
+                <label class="admin-block-label">
+                  <span>Payload JSON</span>
+                  <textarea data-field-payload rows="10" spellcheck="false"></textarea>
+                </label>
+
+                <div class="admin-detail__actions">
+                  <button type="button" class="admin-button admin-button--primary" data-save-item>
+                    Save item
+                  </button>
+                  <button type="button" class="admin-button" data-promote-item>
+                    Promote audit row
+                  </button>
+                  <button type="button" class="admin-button" data-duplicate-item>
+                    Duplicate
+                  </button>
+                  <button type="button" class="admin-button admin-button--danger" data-delete-item>
+                    Delete draft
+                  </button>
+                </div>
+
+                <section class="admin-notes-box">
+                  <div>
+                    <p class="admin-eyebrow">Codex context note</p>
+                    <h4>Leave a note about this exact item</h4>
+                    <p>
+                      The note captures the selected item, its type, current
+                      status, and your long-form context so Codex can pick it
+                      up next session. Notes save to Supabase and can be synced
+                      into CODEX_ADMIN_NOTES.md for local Codex work.
+                    </p>
+                  </div>
+                  <textarea
+                    data-context-note
+                    rows="5"
+                    placeholder="Example: Cut this question from first quiz, but keep the system data capture later in the property settings flow..."
+                  ></textarea>
+                  <div class="admin-note-feed" data-context-notes></div>
+                  <button type="button" class="admin-button admin-button--primary" data-save-note>
+                    Save note for Codex
+                  </button>
+                </section>
+              </article>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/admin.js"></script>
+  </body>
+</html>
