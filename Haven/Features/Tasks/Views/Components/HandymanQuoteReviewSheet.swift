@@ -18,13 +18,31 @@ struct HandymanQuoteReviewSheet: View {
     @State private var showApprovalSheet = false
     @State private var signedName: String = ""
     @State private var submitting = false
+    @State private var showHistorySheet = false
+    /// When the user taps a past version from the history sheet we
+    /// pin it here so the main view renders that version's line items
+    /// and totals (read-only — actions stay scoped to the live quote).
+    @State private var viewingVersion: ProviderQuoteRow?
 
-    private var quote: ProviderQuoteRow? { coordinator.quote }
+    /// The quote currently displayed. Defaults to the live quote, but
+    /// flips to a historical version when the user is browsing.
+    private var quote: ProviderQuoteRow? { viewingVersion ?? coordinator.quote }
+    /// The live, actionable quote — Approve/Decline always act on this
+    /// even when the user is browsing an older version.
+    private var liveQuote: ProviderQuoteRow? { coordinator.quote }
+    private var isViewingHistorical: Bool {
+        guard let pinned = viewingVersion, let live = liveQuote else { return false }
+        return pinned.id != live.id
+    }
     private var status: ProviderQuoteStatus { quote?.typedStatus ?? .draft }
+    /// Older revisions exist when the chain has more than one row.
+    private var hasHistory: Bool { coordinator.quoteHistory.count > 1 }
     private var canRespond: Bool {
         // Once a quote has been responded to, we hide the action buttons
         // (the provider has to send a counter / new revision before the
-        // homeowner can respond again).
+        // homeowner can respond again). Also: when browsing a
+        // historical version, only the live quote can be acted on.
+        if isViewingHistorical { return false }
         switch status {
         case .sent, .viewed: return true
         default: return false
@@ -36,9 +54,15 @@ struct HandymanQuoteReviewSheet: View {
             if let q = quote {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
+                        if isViewingHistorical {
+                            historicalBanner
+                                .padding(.horizontal, 20)
+                                .padding(.top, 12)
+                        }
+
                         heroCard(quote: q)
                             .padding(.horizontal, 20)
-                            .padding(.top, 16)
+                            .padding(.top, isViewingHistorical ? 8 : 16)
                             .padding(.bottom, 18)
 
                         if canRespond {
@@ -80,6 +104,19 @@ struct HandymanQuoteReviewSheet: View {
                     .font(HavenTypography.fraunces(size: 18, weight: 600))
                     .foregroundStyle(HavenColors.navy900)
             }
+            ToolbarItem(placement: .topBarLeading) {
+                if hasHistory {
+                    Button {
+                        showHistorySheet = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("History")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }
                     .font(.system(size: 15, weight: .semibold))
@@ -88,6 +125,22 @@ struct HandymanQuoteReviewSheet: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showApprovalSheet) {
             approvalSheet
+        }
+        .sheet(isPresented: $showHistorySheet) {
+            QuoteVersionHistorySheet(
+                versions: coordinator.quoteHistory,
+                liveQuoteId: liveQuote?.id,
+                viewingId: viewingVersion?.id ?? liveQuote?.id,
+                onSelect: { picked in
+                    // Pin the chosen version (or unpin to return to live).
+                    if picked.id == liveQuote?.id {
+                        viewingVersion = nil
+                    } else {
+                        viewingVersion = picked
+                    }
+                    showHistorySheet = false
+                }
+            )
         }
     }
 
@@ -182,6 +235,48 @@ struct HandymanQuoteReviewSheet: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(isPrimary ? Color.clear : HavenColors.beige200, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Historical-version banner
+
+    /// Shown above the hero when the user has tapped a past version
+    /// from the history sheet. Cream callout with a "Back to current"
+    /// affordance — keeps the homeowner oriented and prevents
+    /// confusion when the displayed total doesn't match the live
+    /// quote in the chat thread.
+    private var historicalBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HavenColors.textSecondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Viewing an earlier version")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy900)
+                Text("Approve / Decline are disabled. Tap to return to the current quote.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Button {
+                viewingVersion = nil
+            } label: {
+                Text("Back to current")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(HavenColors.beige200.opacity(0.6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(HavenColors.beige300, lineWidth: 1)
         )
     }
 
@@ -461,6 +556,165 @@ private struct LineItemRow: View {
     }
 
     private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(Int(value))"
+    }
+}
+
+// MARK: - Version history sheet
+
+/// Lists every revision of a quote chain so the homeowner can scan the
+/// negotiation arc — Provider $1,725 → Counter $1,200 → Provider $1,400
+/// → Approved $1,300, etc. Tapping a row pins that version on the main
+/// sheet (read-only); tapping the live row clears the pin.
+struct QuoteVersionHistorySheet: View {
+    let versions: [ProviderQuoteRow]
+    let liveQuoteId: UUID?
+    let viewingId: UUID?
+    let onSelect: (ProviderQuoteRow) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    /// Versions sorted oldest → newest so the timeline reads top-down
+    /// like a chat thread. The fetcher returns DESC; flip it here.
+    private var ordered: [ProviderQuoteRow] {
+        versions.reversed()
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Each row is one version of this quote — tap any to view its line items in detail.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineSpacing(2)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, 18)
+
+                    ForEach(Array(ordered.enumerated()), id: \.element.id) { idx, version in
+                        Button {
+                            onSelect(version)
+                        } label: {
+                            versionRow(
+                                version: version,
+                                versionNumber: idx + 1,
+                                isLive: version.id == liveQuoteId,
+                                isViewing: version.id == viewingId
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 10)
+                    }
+
+                    Spacer(minLength: 24)
+                }
+            }
+            .background(HavenColors.background)
+            .navigationTitle("Quote history")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            }
+        }
+    }
+
+    private func versionRow(
+        version: ProviderQuoteRow,
+        versionNumber: Int,
+        isLive: Bool,
+        isViewing: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("V\(versionNumber)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(HavenColors.beige200))
+                statusPill(version.typedStatus)
+                if isLive {
+                    Text("CURRENT")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(HavenColors.success)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(HavenColors.success.opacity(0.12)))
+                }
+                Spacer()
+                if isViewing {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(HavenColors.action)
+                }
+            }
+
+            Text(currency(version.total))
+                .font(HavenTypography.fraunces(size: 22, weight: 600))
+                .foregroundStyle(HavenColors.navy900)
+
+            HStack(spacing: 6) {
+                Text("\(version.lineItems.count) item\(version.lineItems.count == 1 ? "" : "s")")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.textSecondary)
+                if let when = version.updatedAt {
+                    Text("·")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text(when.formatted(.relative(presentation: .named)))
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isViewing ? HavenColors.action.opacity(0.4) : HavenColors.beige200, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func statusPill(_ status: ProviderQuoteStatus) -> some View {
+        let style = pillStyle(for: status)
+        Text(style.label.uppercased())
+            .font(.system(size: 10, weight: .bold))
+            .tracking(0.5)
+            .foregroundStyle(style.color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(style.color.opacity(0.12)))
+    }
+
+    private func pillStyle(for status: ProviderQuoteStatus) -> (label: String, color: Color) {
+        switch status {
+        case .draft:                return ("Draft", HavenColors.textSecondary)
+        case .sent:                 return ("Sent", HavenColors.action)
+        case .viewed:               return ("Viewed", HavenColors.action)
+        case .approved:             return ("Approved", HavenColors.success)
+        case .declined:             return ("Declined", HavenColors.critical)
+        case .counteredByHomeowner: return ("Countered", HavenColors.warning)
+        case .superseded:           return ("Superseded", HavenColors.textTertiary)
+        case .withdrawn:            return ("Withdrawn", HavenColors.textTertiary)
+        }
+    }
+
+    private func currency(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = "USD"

@@ -1181,6 +1181,12 @@ final class HandymanRequestCoordinator: ObservableObject {
     @Published private(set) var request: HandymanRequestRow?
     @Published private(set) var messages: [HandymanRequestMessageRow] = []
     @Published private(set) var quote: ProviderQuoteRow?
+    /// Every quote ever attached to this request, newest first. The
+    /// current `quote` is always quoteHistory.first (or the freshest
+    /// non-superseded one). Used to render version history on the
+    /// review sheet so the homeowner can see how a counter chain
+    /// evolved (Provider $1,725 → Counter $1,200 → Provider $1,400 → …).
+    @Published private(set) var quoteHistory: [ProviderQuoteRow] = []
 
     private var loadedVisitId: UUID?
     private var realtimeChannel: RealtimeChannelV2?
@@ -1191,6 +1197,7 @@ final class HandymanRequestCoordinator: ObservableObject {
         request = nil
         messages = []
         quote = nil
+        quoteHistory = []
         loadedVisitId = nil
         unsubscribeRealtime()
     }
@@ -1262,6 +1269,9 @@ final class HandymanRequestCoordinator: ObservableObject {
 
     private func reloadQuote(requestId: UUID) async {
         let quotes = (try? await DatabaseService.shared.fetchProviderQuotes(requestId: requestId)) ?? []
+        // Hold onto the full chain for the version-history surface.
+        // Already sorted updated_at DESC by the fetch.
+        quoteHistory = quotes
         // Pick the most recent quote that's still in play. Skip
         // superseded/withdrawn — they'd otherwise show as the "latest"
         // because the table sorts updated_at DESC.
