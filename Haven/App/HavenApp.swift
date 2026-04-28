@@ -238,16 +238,21 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
                 NotificationCenter.default.post(name: .handymanModeRequested, object: nil)
                 let requestId = userInfo["request_id"] as? String
+                let quoteId = userInfo["quote_id"] as? String
                 let presentation: String = (t == "handyman_quote_sent" || t == "handyman_quote_revised")
                     ? "quote"
                     : "visit"
+                var payload: [String: String] = [
+                    "request_id": requestId ?? "",
+                    "presentation": presentation,
+                ]
+                if let qid = quoteId, !qid.isEmpty {
+                    payload["quote_id"] = qid
+                }
                 NotificationCenter.default.post(
                     name: .openHandymanVisit,
                     object: nil,
-                    userInfo: [
-                        "request_id": requestId ?? "",
-                        "presentation": presentation,
-                    ]
+                    userInfo: payload
                 )
 
             default:

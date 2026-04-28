@@ -194,6 +194,7 @@ struct HandymanTabView: View {
 
                 visitHeroSection
                 vendorCardSection
+                quotesSection
 
                 if hasFirstVisitOpportunity {
                     firstVisitPromptSection
@@ -246,6 +247,25 @@ struct HandymanTabView: View {
                 await maintenanceVM.loadTasks()
                 await reloadCoordination()
                 let presentation = notification.userInfo?["presentation"] as? String ?? "visit"
+                let quoteIdRaw = notification.userInfo?["quote_id"] as? String
+                let quoteId = quoteIdRaw.flatMap(UUID.init(uuidString:))
+
+                // Quote deep-link: pin the specific quote by id (push
+                // payload carries it from saveQuote) so we don't have
+                // to find it via request_id matching — quotes built
+                // without a visit linkage would otherwise never load.
+                if presentation == "quote", let qid = quoteId {
+                    let ok = await coordinator.loadAndPinQuote(quoteId: qid)
+                    if ok {
+                        await MainActor.run {
+                            presentChat = false
+                            presentedVisit = nil
+                            presentQuote = true
+                        }
+                        return
+                    }
+                }
+
                 await MainActor.run {
                     if presentation == "quote" && coordinator.quote != nil {
                         presentChat = false
@@ -409,6 +429,45 @@ struct HandymanTabView: View {
             }
             .padding(.horizontal, TasksV5.pageMargin)
             .padding(.bottom, 18)
+        }
+    }
+
+    /// Top-level Quotes section. Surfaces every active provider quote
+    /// for this property so the homeowner has a guaranteed entry point
+    /// to the review sheet — even when the quote was built without a
+    /// specific visit linkage and so the visit hero's QuoteNudgeCard
+    /// doesn't show.
+    @ViewBuilder
+    private var quotesSection: some View {
+        let active = coordinator.quoteHistory.filter { q in
+            let s = q.typedStatus
+            return s != .superseded && s != .withdrawn && s != .draft
+        }
+        if !active.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("QUOTES")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.32)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .padding(.horizontal, 4)
+
+                VStack(spacing: 8) {
+                    ForEach(active, id: \.id) { q in
+                        Button {
+                            Haptics.selection()
+                            Task {
+                                _ = await coordinator.loadAndPinQuote(quoteId: q.id)
+                                presentQuote = true
+                            }
+                        } label: {
+                            HandymanQuoteRow(quote: q, vendorName: linkedHandyman?.companyName)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, 20)
         }
     }
 
@@ -1170,6 +1229,99 @@ private struct VisitChildRow: View {
     }
 }
 
+// MARK: - Quote row (top-level Quotes section)
+
+/// Compact tappable row used in the Handyman tab's Quotes section.
+/// Surfaces every active quote regardless of whether it's linked to a
+/// visit, so the homeowner can always reach the review sheet.
+private struct HandymanQuoteRow: View {
+    let quote: ProviderQuoteRow
+    let vendorName: String?
+
+    private var totalLabel: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = quote.total.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+        return formatter.string(from: NSNumber(value: quote.total)) ?? "$\(Int(quote.total))"
+    }
+
+    private var statusStyle: (label: String, color: Color) {
+        switch quote.typedStatus {
+        case .draft:                return ("Draft", HavenColors.textSecondary)
+        case .sent:                 return ("New", HavenColors.action)
+        case .viewed:               return ("Viewed", HavenColors.action)
+        case .approved:             return ("Approved", HavenColors.success)
+        case .declined:             return ("Declined", HavenColors.critical)
+        case .counteredByHomeowner: return ("Countered", HavenColors.warning)
+        case .superseded:           return ("Superseded", HavenColors.textTertiary)
+        case .withdrawn:            return ("Withdrawn", HavenColors.textTertiary)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(HavenColors.actionPale)
+                    .frame(width: 38, height: 38)
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(HavenColors.actionPressed)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(quote.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy900)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(totalLabel)
+                        .font(HavenTypography.fraunces(size: 14, weight: 600))
+                        .foregroundStyle(HavenColors.navy900)
+                    Text("·")
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("\(quote.lineItems.count) item\(quote.lineItems.count == 1 ? "" : "s")")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textSecondary)
+                    if let vendor = vendorName {
+                        Text("·")
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text(vendor)
+                            .font(.system(size: 12))
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Text(statusStyle.label.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(statusStyle.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(statusStyle.color.opacity(0.12)))
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(HavenColors.beige200, lineWidth: 1)
+        )
+    }
+}
+
 // MARK: - Coordinator (shared state for visit + chat)
 
 import Supabase
@@ -1268,17 +1420,39 @@ final class HandymanRequestCoordinator: ObservableObject {
     }
 
     private func reloadQuote(requestId: UUID) async {
-        let quotes = (try? await DatabaseService.shared.fetchProviderQuotes(requestId: requestId)) ?? []
-        // Hold onto the full chain for the version-history surface.
-        // Already sorted updated_at DESC by the fetch.
-        quoteHistory = quotes
+        // Fetch by request first (canonical link), then fall back to
+        // the property's full quote list so we don't miss quotes the
+        // provider built without picking a visit. Dedup by id and
+        // keep newest first.
+        let byRequest = (try? await DatabaseService.shared.fetchProviderQuotes(requestId: requestId)) ?? []
+        var combined = byRequest
+        if let propId = request?.propertyId {
+            let byProperty = (try? await DatabaseService.shared.fetchProviderQuotesForProperty(propertyId: propId)) ?? []
+            let existingIds = Set(combined.map(\.id))
+            combined.append(contentsOf: byProperty.filter { !existingIds.contains($0.id) })
+        }
+        quoteHistory = combined
         // Pick the most recent quote that's still in play. Skip
         // superseded/withdrawn — they'd otherwise show as the "latest"
         // because the table sorts updated_at DESC.
-        quote = quotes.first { q in
+        quote = combined.first { q in
             let s = q.typedStatus
             return s != .superseded && s != .withdrawn
         }
+    }
+
+    /// Push-driven deep link: load a specific quote by id and pin it as
+    /// the active quote so the review sheet opens straight to it. Used
+    /// when the user taps a `handyman_quote_sent` push that carried
+    /// `quote_id` in the payload.
+    func loadAndPinQuote(quoteId: UUID) async -> Bool {
+        let fetched = try? await DatabaseService.shared.fetchProviderQuote(id: quoteId)
+        guard let row = fetched ?? nil else { return false }
+        if !quoteHistory.contains(where: { $0.id == row.id }) {
+            quoteHistory.insert(row, at: 0)
+        }
+        quote = row
+        return true
     }
 
     /// Mark the homeowner's response on the latest quote.

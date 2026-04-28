@@ -597,9 +597,16 @@ final class DatabaseService {
     // MARK: - Home Systems
 
     func fetchHomeSystems(propertyId: UUID, topLevelOnly: Bool = false) async throws -> [HomeSystemRow] {
+        // Chez v1: archived rows (`archived_at IS NOT NULL`) are
+        // hidden from every property-level read. Soft-deletes via
+        // `archiveHomeSystem(id:)` — used by the "I don't have this"
+        // affordance in SystemCoverageFlow and the legacy service-row
+        // backfill — disappear from Browse Systems / Coverage / etc.
+        // without losing the row.
         var query = from("home_systems")
             .select()
             .eq("property_id", value: propertyId.uuidString)
+            .is("archived_at", value: nil)
         if topLevelOnly {
             query = query.is("parent_system_id", value: nil)
         }
@@ -609,6 +616,20 @@ final class DatabaseService {
     func fetchHomeSystems() async throws -> [HomeSystemRow] {
         try await from("home_systems")
             .select()
+            .is("archived_at", value: nil)
+            .order("name")
+            .execute()
+            .value
+    }
+
+    /// Variant that returns ALL rows including archived. Reserved for
+    /// the legacy backfill + future "Hidden systems" settings page.
+    /// Routine reads should keep using `fetchHomeSystems` so they
+    /// auto-filter.
+    func fetchHomeSystemsIncludingArchived(householdId: UUID) async throws -> [HomeSystemRow] {
+        try await from("home_systems")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
             .order("name")
             .execute()
             .value
@@ -618,6 +639,7 @@ final class DatabaseService {
         try await from("home_systems")
             .select()
             .eq("parent_system_id", value: parentId.uuidString)
+            .is("archived_at", value: nil)
             .order("name")
             .execute()
             .value
@@ -630,6 +652,34 @@ final class DatabaseService {
             .single()
             .execute()
             .value
+    }
+
+    /// Chez v1: soft-deletes a home_systems row. Used by the "I don't
+    /// have this" affordance in SystemCoverageFlow and by the legacy
+    /// service-row backfill. Sets `archived_at = NOW()`. Idempotent —
+    /// re-archiving a row just updates the timestamp.
+    func archiveHomeSystem(id: UUID) async throws {
+        var update = HomeSystemUpdate()
+        update.archivedAt = Date()
+        _ = try await from("home_systems")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Reverses `archiveHomeSystem`. Reserved for a future "Hidden
+    /// systems" settings list where users can restore mistakenly-
+    /// removed rows.
+    func unarchiveHomeSystem(id: UUID) async throws {
+        // Postgres NULL on update isn't expressible through
+        // HomeSystemUpdate's Optional<Date> (nil omits the key per
+        // synthesized encodeIfPresent). Fall back to a raw RPC-style
+        // update via a tiny encodable struct.
+        struct Unarchive: Encodable { let archived_at: String? = nil }
+        _ = try await from("home_systems")
+            .update(Unarchive())
+            .eq("id", value: id.uuidString)
+            .execute()
     }
 
     func updateHomeSystem(id: UUID, _ updates: HomeSystemUpdate) async throws -> HomeSystemRow {
@@ -649,6 +699,15 @@ final class DatabaseService {
             .select()
             .eq("property_id", value: propertyId.uuidString)
             .order("provider_type", ascending: true)
+            .execute()
+            .value
+    }
+
+    func fetchUtilityAccount(id: UUID) async throws -> UtilityAccountRow {
+        try await from("utility_accounts")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
             .execute()
             .value
     }
@@ -1041,6 +1100,104 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Handyman Provider Directory
+
+    private func makeHandymanProviderRequest(
+        method: String,
+        queryItems: [URLQueryItem] = [],
+        body: Data? = nil
+    ) async throws -> URLRequest {
+        var components = URLComponents(string: "\(AppConfig.Supabase.url)/functions/v1/handyman-provider")
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        guard let url = components?.url else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.timeoutInterval = 60
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+
+        if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        request.httpBody = body
+        return request
+    }
+
+    private func performHandymanProvider<T: Decodable>(
+        method: String,
+        queryItems: [URLQueryItem] = [],
+        body: Data? = nil,
+        expecting: T.Type
+    ) async throws -> T {
+        let request = try await makeHandymanProviderRequest(
+            method: method,
+            queryItems: queryItems,
+            body: body
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let message = String(data: data, encoding: .utf8) ?? "Request failed"
+            throw NSError(
+                domain: "DatabaseService.HandymanProvider",
+                code: http.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: message]
+            )
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(T.self, from: data)
+    }
+
+    func searchHandymanProviders(query: String, limit: Int = 18) async throws -> [HandymanProviderDirectoryRow] {
+        let response: HandymanProviderDirectoryResponse = try await performHandymanProvider(
+            method: "GET",
+            queryItems: [
+                URLQueryItem(name: "directory", value: "1"),
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "limit", value: String(limit))
+            ],
+            expecting: HandymanProviderDirectoryResponse.self
+        )
+        return response.providers
+    }
+
+    func connectHandymanProviderToCurrentHousehold(
+        workspaceId: String,
+        setPreferred: Bool = true
+    ) async throws -> ContractorRow {
+        struct Request: Encodable {
+            let action = "link_homeowner_contractor"
+            let workspaceId: String
+            let setPreferred: Bool
+        }
+
+        let body = try JSONEncoder().encode(
+            Request(
+                workspaceId: workspaceId,
+                setPreferred: setPreferred
+            )
+        )
+
+        let response: HandymanProviderLinkResponse = try await performHandymanProvider(
+            method: "POST",
+            body: body,
+            expecting: HandymanProviderLinkResponse.self
+        )
+        return response.contractor
+    }
+
     // MARK: - Maintenance Tasks
 
     func fetchMaintenanceTasks(propertyId: UUID? = nil, systemId: UUID? = nil, vehicleId: UUID? = nil, includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
@@ -1098,6 +1255,11 @@ final class DatabaseService {
     }
 
     func createMaintenanceTask(_ task: MaintenanceTaskInsert) async throws -> MaintenanceTaskDBRow {
+        var task = task
+        if task.serviceKey == nil {
+            task.serviceKey = ServiceLibrary.serviceKey(for: task)
+        }
+
         // Dedup check: skip if a task with the same title already exists for this property/vehicle/system
         var query = from("maintenance_tasks")
             .select("id")
@@ -1416,6 +1578,448 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Premier Handyman Program
+
+    func fetchHandymanRequests(
+        householdId: UUID,
+        propertyId: UUID? = nil,
+        limit: Int? = nil
+    ) async throws -> [HandymanRequestRow] {
+        let filteredQuery = if let propertyId {
+            from("handyman_requests")
+                .select()
+                .eq("household_id", value: householdId.uuidString)
+                .eq("property_id", value: propertyId.uuidString)
+        } else {
+            from("handyman_requests")
+                .select()
+                .eq("household_id", value: householdId.uuidString)
+        }
+
+        if let limit {
+            return try await filteredQuery
+                .order("created_at", ascending: false)
+                .limit(limit)
+                .execute()
+                .value
+        }
+
+        return try await filteredQuery
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func createHandymanRequest(_ insert: HandymanRequestInsert) async throws -> HandymanRequestRow {
+        try await from("handyman_requests")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func fetchLatestHandymanRequest(visitTaskId: UUID) async throws -> HandymanRequestRow? {
+        let rows: [HandymanRequestRow] = try await from("handyman_requests")
+            .select()
+            .eq("visit_task_id", value: visitTaskId.uuidString)
+            .order("updated_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func updateHandymanRequest(id: UUID, _ update: HandymanRequestUpdate) async throws -> HandymanRequestRow {
+        try await from("handyman_requests")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func fetchHandymanRequestMessages(requestId: UUID) async throws -> [HandymanRequestMessageRow] {
+        try await from("handyman_request_messages")
+            .select()
+            .eq("request_id", value: requestId.uuidString)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    func createHandymanRequestMessage(_ insert: HandymanRequestMessageInsert) async throws -> HandymanRequestMessageRow {
+        try await from("handyman_request_messages")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Phase 73 sub-phase A: propose a visit time. Both sides (homeowner
+    /// from iOS, handyman from the dispatch board's REST endpoint) call
+    /// this. Stamps `proposed_visit_at`, `proposed_by_role`, walks
+    /// `status` to `alternate_dates_proposed`, and appends a system
+    /// message to the request thread — all atomically. Returns the
+    /// updated request row.
+    func proposeVisitTime(
+        requestId: UUID,
+        proposedAt: Date,
+        proposedBy: HandymanScheduleActor,
+        note: String? = nil
+    ) async throws -> HandymanRequestRow {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+
+        var params: [String: String] = [
+            "p_request_id": requestId.uuidString,
+            "p_proposed_at": isoFormatter.string(from: proposedAt),
+            "p_proposed_by_role": proposedBy.rawValue,
+        ]
+        if let note {
+            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                params["p_note"] = trimmed
+            }
+        }
+
+        let data = try await HavenSupabase.client
+            .rpc("propose_visit_time", params: params)
+            .execute()
+            .data
+
+        return try Self.handymanRequestDecoder.decode(HandymanRequestRow.self, from: data)
+    }
+
+    /// Phase 73 sub-phase A: accept the most recent proposal on a
+    /// request. Stamps `confirmed_visit_at = proposed_visit_at`, walks
+    /// status to `confirmed`, appends a confirmation message to the
+    /// thread. The accepting side passes its own role; the RPC doesn't
+    /// enforce "you can't accept your own proposal" because the UIs
+    /// gate that — server-side it's just a state write.
+    func acceptVisitTime(
+        requestId: UUID,
+        acceptedBy: HandymanScheduleActor,
+        note: String? = nil
+    ) async throws -> HandymanRequestRow {
+        var params: [String: String] = [
+            "p_request_id": requestId.uuidString,
+            "p_accepted_by_role": acceptedBy.rawValue,
+        ]
+        if let note {
+            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                params["p_note"] = trimmed
+            }
+        }
+
+        let data = try await HavenSupabase.client
+            .rpc("accept_visit_time", params: params)
+            .execute()
+            .data
+
+        return try Self.handymanRequestDecoder.decode(HandymanRequestRow.self, from: data)
+    }
+
+    /// Decoder for RPCs that return `handyman_requests` rows. Postgres
+    /// stamps timestamps with microsecond precision, so we accept both
+    /// fractional and plain ISO-8601 forms — same pattern as
+    /// `respondToProviderQuote`.
+    private static let handymanRequestDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let str = try container.decode(String.self)
+            let withFractional = ISO8601DateFormatter()
+            withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+            for formatter in [withFractional, plain] {
+                if let date = formatter.date(from: str) {
+                    return date
+                }
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid date: \(str)"
+            )
+        }
+        return decoder
+    }()
+
+    func fetchHandymanPortalSession(visitTaskId: UUID) async throws -> HandymanPortalSessionRow? {
+        let rows: [HandymanPortalSessionRow] = try await from("handyman_portal_sessions")
+            .select()
+            .eq("visit_task_id", value: visitTaskId.uuidString)
+            .order("created_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func createHandymanPortalSession(_ insert: HandymanPortalSessionInsert) async throws -> HandymanPortalSessionRow {
+        try await from("handyman_portal_sessions")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateHandymanPortalSession(id: UUID, _ update: HandymanPortalSessionUpdate) async throws -> HandymanPortalSessionRow {
+        try await from("handyman_portal_sessions")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Phase 73 sub-phase E: homeowner-side fetch for the after-visit
+    /// report by visit_task_id. The technician's writes from the field
+    /// PWA land in `handyman_visit_reports.visit_task_id`, so the iOS
+    /// `HandymanVisitReportView` reads via this path. Returns the most
+    /// recent report (the field PWA only writes one per portal session
+    /// but a request that's been re-opened could have multiple).
+    func fetchHandymanVisitReportByVisitTask(visitTaskId: UUID) async throws -> HandymanVisitReportRow? {
+        let rows: [HandymanVisitReportRow] = try await from("handyman_visit_reports")
+            .select()
+            .eq("visit_task_id", value: visitTaskId.uuidString)
+            .order("updated_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func fetchHandymanVisitReport(portalSessionId: UUID) async throws -> HandymanVisitReportRow? {
+        let rows: [HandymanVisitReportRow] = try await from("handyman_visit_reports")
+            .select()
+            .eq("portal_session_id", value: portalSessionId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func createHandymanVisitReport(_ insert: HandymanVisitReportInsert) async throws -> HandymanVisitReportRow {
+        try await from("handyman_visit_reports")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateHandymanVisitReport(id: UUID, _ update: HandymanVisitReportUpdate) async throws -> HandymanVisitReportRow {
+        try await from("handyman_visit_reports")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func fetchProviderQuotes(requestId: UUID) async throws -> [ProviderQuoteRow] {
+        try await from("provider_quotes")
+            .select()
+            .eq("request_id", value: requestId.uuidString)
+            .order("updated_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    /// Fetch every provider quote tied to this property — used by the
+    /// homeowner Handyman tab to surface a "Quotes for your home"
+    /// section regardless of whether a quote was attached to a
+    /// specific visit (request_id) or stood alone for the home.
+    func fetchProviderQuotesForProperty(propertyId: UUID) async throws -> [ProviderQuoteRow] {
+        try await from("provider_quotes")
+            .select()
+            .eq("property_id", value: propertyId.uuidString)
+            .order("updated_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    /// Fetch a single provider quote by id. Used by the push handler
+    /// when a `handyman_quote_sent` event lands carrying a quote_id —
+    /// lets us deep-link straight into the review sheet without
+    /// having to find it via request_id matching.
+    func fetchProviderQuote(id: UUID) async throws -> ProviderQuoteRow? {
+        let rows: [ProviderQuoteRow] = try await from("provider_quotes")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Secure homeowner-side quote collaboration path. Routed through the
+    /// `respond_to_provider_quote` SECURITY DEFINER RPC so the app can mark a
+    /// quote as viewed / approved / declined without opening broad direct
+    /// UPDATE rights on `provider_quotes`.
+    func respondToProviderQuote(
+        id: UUID,
+        status: ProviderQuoteStatus,
+        homeownerNote: String? = nil
+    ) async throws -> ProviderQuoteRow {
+        var params: [String: String] = [
+            "p_quote_id": id.uuidString,
+            "p_response_status": status.rawValue,
+        ]
+        if let homeownerNote {
+            let trimmed = homeownerNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                params["p_homeowner_note"] = trimmed
+            }
+        }
+
+        let data = try await HavenSupabase.client
+            .rpc("respond_to_provider_quote", params: params)
+            .execute()
+            .data
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let str = try container.decode(String.self)
+            let formatters: [ISO8601DateFormatter] = {
+                let withFractional = ISO8601DateFormatter()
+                withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                let plain = ISO8601DateFormatter()
+                plain.formatOptions = [.withInternetDateTime]
+                return [withFractional, plain]
+            }()
+
+            for formatter in formatters {
+                if let date = formatter.date(from: str) {
+                    return date
+                }
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid date: \(str)"
+            )
+        }
+
+        return try decoder.decode(ProviderQuoteRow.self, from: data)
+    }
+
+    /// Phase 73 sub-phase B: homeowner edits line items + sends back as
+    /// a counter-offer. Calls `counter_provider_quote` which clones
+    /// the parent into a new row with `parent_quote_id` set + status
+    /// `countered_by_homeowner`, marks the parent `superseded`, and
+    /// appends a system event to the request thread. Returns the
+    /// freshly-created counter quote.
+    func counterProviderQuote(
+        id: UUID,
+        revisedLineItems: [ProviderQuoteLineItem],
+        scopeNotesOverride: String? = nil,
+        note: String? = nil
+    ) async throws -> ProviderQuoteRow {
+        // Re-encode the line items as JSON string. The RPC expects a
+        // jsonb array — we send the camelCase shape that matches what
+        // the provider PWA writes today (see line-item key fix in
+        // migration 20260908).
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(revisedLineItems)
+        let lineItemsString = String(data: data, encoding: .utf8) ?? "[]"
+
+        var params: [String: String] = [
+            "p_quote_id": id.uuidString,
+            "p_revised_line_items": lineItemsString,
+        ]
+        if let scopeNotesOverride {
+            let trimmed = scopeNotesOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                params["p_scope_notes_override"] = trimmed
+            }
+        }
+        if let note {
+            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                params["p_note"] = trimmed
+            }
+        }
+
+        let dataResponse = try await HavenSupabase.client
+            .rpc("counter_provider_quote", params: params)
+            .execute()
+            .data
+
+        return try Self.providerQuoteDecoder.decode(ProviderQuoteRow.self, from: dataResponse)
+    }
+
+    /// Phase 73 sub-phase B: homeowner signs + approves the quote in
+    /// one shot. Calls `sign_provider_quote` which walks status to
+    /// `approved`, stamps `signed_at = now()` + `signed_name`, and
+    /// appends a `kind = "quote_signed"` event to the request thread.
+    func signProviderQuote(
+        id: UUID,
+        signedName: String,
+        homeownerNote: String? = nil
+    ) async throws -> ProviderQuoteRow {
+        var params: [String: String] = [
+            "p_quote_id": id.uuidString,
+            "p_signed_name": signedName,
+        ]
+        if let homeownerNote {
+            let trimmed = homeownerNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                params["p_homeowner_note"] = trimmed
+            }
+        }
+
+        let data = try await HavenSupabase.client
+            .rpc("sign_provider_quote", params: params)
+            .execute()
+            .data
+
+        return try Self.providerQuoteDecoder.decode(ProviderQuoteRow.self, from: data)
+    }
+
+    /// Decoder for RPCs that return a single `provider_quotes` row.
+    /// Postgres timestamps may carry fractional seconds; accept both.
+    private static let providerQuoteDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let str = try container.decode(String.self)
+            let withFractional = ISO8601DateFormatter()
+            withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+            for formatter in [withFractional, plain] {
+                if let date = formatter.date(from: str) {
+                    return date
+                }
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid date: \(str)"
+            )
+        }
+        return decoder
+    }()
+
+    func fetchProviderSavedQuoteItems(workspaceId: UUID) async throws -> [ProviderSavedQuoteItemRow] {
+        try await from("provider_saved_quote_items")
+            .select()
+            .eq("workspace_id", value: workspaceId.uuidString)
+            .order("sort_order", ascending: true)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
     // Phase 55.3: The Phase 54D household_cadences CRUD block and
     // the Phase 55.2.9 cadence → routine write bridge were removed.
     // Every writer now lives against `routines` directly via the
@@ -1452,7 +2056,12 @@ final class DatabaseService {
     }
 
     func createRoutine(_ insert: RoutineInsert) async throws -> RoutineRow {
-        try await from("routines")
+        var insert = insert
+        if insert.serviceKey == nil {
+            insert.serviceKey = ServiceLibrary.serviceKey(for: insert)
+        }
+
+        return try await from("routines")
             .insert(insert, returning: .representation)
             .select()
             .single()
@@ -1585,7 +2194,7 @@ final class DatabaseService {
     }
 
     /// Phase 66: Routines in the Your Services list where the user wants
-    /// Haven to find them a vendor. Rendered with a "Haven helping" tag.
+    /// Haven to find them a vendor. Rendered with a "Chez helping" tag.
     func fetchPendingVendorRoutines(
         householdId: UUID,
         propertyId: UUID
@@ -1661,7 +2270,17 @@ final class DatabaseService {
     /// machine. Use `visitState: "scheduled"` when the user confirms a
     /// date, "planned" for a bucket that exists but hasn't been scheduled.
     func createRoutineVisit(_ insert: RoutineVisitInsert) async throws -> RoutineVisitRow {
-        try await from("routine_visits")
+        var insert = insert
+        if insert.visitTypeKey == nil,
+           let routine = try? await fetchRoutine(id: insert.routineId) {
+            insert.visitTypeKey = ServiceLibrary.visitTypeKey(
+                for: routine,
+                scheduledDate: insert.scheduledDate,
+                notes: insert.notes
+            )
+        }
+
+        return try await from("routine_visits")
             .insert(insert, returning: .representation)
             .select()
             .single()
@@ -2888,7 +3507,7 @@ final class DatabaseService {
         // Get the current user's household
         let user = try await fetchCurrentUser()
         guard let householdId = user.householdId else {
-            throw NSError(domain: "Haven", code: 0, userInfo: [NSLocalizedDescriptionKey: "No household found"])
+            throw NSError(domain: "Chez", code: 0, userInfo: [NSLocalizedDescriptionKey: "No household found"])
         }
 
         // Get the household name to generate a readable email
@@ -2985,7 +3604,7 @@ final class DatabaseService {
             }
         }
 
-        throw NSError(domain: "Haven", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not generate a unique email address"])
+        throw NSError(domain: "Chez", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not generate a unique email address"])
     }
 
     // MARK: - Allowed Senders (Email Whitelist)
