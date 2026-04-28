@@ -51,21 +51,34 @@ struct HandymanTabView: View {
         }
     }
 
-    /// The next scheduled visit from this handyman. A handyman visit is a
-    /// `maintenance_task` row assigned to the handyman vendor where the
-    /// task IS the parent visit and the punch list lives in its notes.
+    /// All upcoming visits from this handyman, sorted by scheduled date.
+    /// A handyman visit is a `maintenance_task` row assigned to the
+    /// handyman vendor where the task IS the parent visit and the punch
+    /// list lives in its notes. After a split this returns 2+ rows.
+    private var upcomingVisits: [MaintenanceTaskDBRow] {
+        guard let handyman = linkedHandyman else { return [] }
+        return maintenanceVM.tasks
+            .filter { task in
+                task.assignedContractorId == handyman.id &&
+                task.lastCompletedDate == nil &&
+                (task.isArchived ?? false) == false
+            }
+            .sorted { lhs, rhs in
+                let l = MaintenanceDateFormatting.date(from: lhs.scheduledDate ?? lhs.nextDueDate) ?? .distantFuture
+                let r = MaintenanceDateFormatting.date(from: rhs.scheduledDate ?? rhs.nextDueDate) ?? .distantFuture
+                return l < r
+            }
+    }
+
+    /// The soonest upcoming visit. Used for the hero card; the rest
+    /// render in the "Also upcoming" rail below.
     private var nextScheduledVisit: MaintenanceTaskDBRow? {
-        guard let handyman = linkedHandyman else { return nil }
-        let candidates = maintenanceVM.tasks.filter { task in
-            task.assignedContractorId == handyman.id &&
-            task.lastCompletedDate == nil &&
-            (task.isArchived ?? false) == false
-        }
-        return candidates.min { lhs, rhs in
-            let l = MaintenanceDateFormatting.date(from: lhs.scheduledDate ?? lhs.nextDueDate) ?? .distantFuture
-            let r = MaintenanceDateFormatting.date(from: rhs.scheduledDate ?? rhs.nextDueDate) ?? .distantFuture
-            return l < r
-        }
+        upcomingVisits.first
+    }
+
+    /// Visits beyond the hero — split follow-ups, additional bookings.
+    private var additionalUpcomingVisits: [MaintenanceTaskDBRow] {
+        Array(upcomingVisits.dropFirst())
     }
 
     /// Punch list items parsed from the visit's notes block. Each `-` /
@@ -325,6 +338,34 @@ struct HandymanTabView: View {
                         presentQuote = true
                     })
                 }
+
+                // "Also upcoming" rail — surfaces every other booked
+                // visit from this handyman (e.g. a follow-up created
+                // by Split Visit). Without this the homeowner only
+                // sees the soonest visit and would never realize the
+                // second one exists.
+                if !additionalUpcomingVisits.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("ALSO UPCOMING")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(1.32)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .padding(.horizontal, 4)
+
+                        VStack(spacing: 8) {
+                            ForEach(additionalUpcomingVisits, id: \.id) { extra in
+                                Button {
+                                    Haptics.selection()
+                                    presentedVisit = extra
+                                } label: {
+                                    AdditionalVisitRow(visit: extra)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
             }
             .padding(.horizontal, TasksV5.pageMargin)
             .padding(.bottom, 18)
@@ -355,7 +396,7 @@ struct HandymanTabView: View {
                     onCall: nil
                 )
             } else {
-                VendorCard(state: .empty) { showFindHandyman = true }
+                VendorCard(state: .empty, onTap: { showFindHandyman = true })
             }
         }
         .padding(.horizontal, TasksV5.pageMargin)
@@ -630,21 +671,22 @@ struct HandymanTabView: View {
 
     private func handleToggle(_ id: String) {
         guard !pendingChecked.contains(id) else { return }
-        withAnimation(.easeInOut(duration: 0.15)) {
+        _ = withAnimation(.easeInOut(duration: 0.15)) {
             pendingChecked.insert(id)
         }
         guard let entry = punchListVM.entries.first(where: { $0.id == id }) else { return }
-        Task {
+        let task = Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             await punchListVM.archive(entry: entry)
             await MainActor.run { pendingChecked.remove(id) }
         }
+        _ = task
     }
 
     private func addToPunchList(task: MaintenanceTaskDBRow) {
         guard let householdId, let propertyId else { return }
         addingRecommendedIds.insert(task.id)
-        Task {
+        let work = Task {
             do {
                 let item = HandymanPunchItemInsert(
                     householdId: householdId,
@@ -662,6 +704,7 @@ struct HandymanTabView: View {
             }
             await MainActor.run { addingRecommendedIds.remove(task.id) }
         }
+        _ = work
     }
 
     private func reloadCoordination() async {
@@ -891,6 +934,78 @@ private struct UpcomingVisitHero: View {
         case .awaitingHomeowner, .alternateDatesProposed: return "clock.fill"
         default: return "wrench.and.screwdriver.fill"
         }
+    }
+}
+
+// MARK: - Additional visit row
+
+/// Compact row used in the "Also upcoming" rail when the homeowner
+/// has more than one booked visit with this handyman (e.g. after the
+/// provider used Split Visit to peel items off into a follow-up).
+/// Tap → opens the HandymanVisitDetailSheet for that visit.
+private struct AdditionalVisitRow: View {
+    let visit: MaintenanceTaskDBRow
+
+    private var dateLabel: String {
+        let raw = visit.scheduledDate ?? visit.nextDueDate
+        if let parsed = MaintenanceDateFormatting.date(from: raw) {
+            return parsed.formatted(date: .abbreviated, time: .omitted)
+        }
+        return "Date pending"
+    }
+
+    private var itemCount: Int {
+        guard let notes = visit.notes else { return 0 }
+        return VisitNotesParser.parsePunchList(from: notes).count
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(HavenColors.actionPale)
+                    .frame(width: 38, height: 38)
+                Image(systemName: "calendar")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(HavenColors.actionPressed)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(visit.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy900)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(dateLabel)
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textSecondary)
+                    if itemCount > 0 {
+                        Text("·")
+                            .font(.system(size: 12))
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("\(itemCount) item\(itemCount == 1 ? "" : "s")")
+                            .font(.system(size: 12))
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(HavenColors.beige200, lineWidth: 1)
+        )
     }
 }
 
@@ -1267,7 +1382,7 @@ final class HandymanRequestCoordinator: ObservableObject {
             InsertAction.self,
             schema: "public",
             table: "handyman_request_messages",
-            filter: "request_id=eq.\(requestId.uuidString)"
+            filter: .eq("request_id", value: requestId.uuidString)
         )
         realtimeChannel = channel
 

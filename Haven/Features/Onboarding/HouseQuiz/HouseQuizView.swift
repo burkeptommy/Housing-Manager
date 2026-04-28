@@ -260,7 +260,7 @@ struct HouseQuizView: View {
                                 }
                             }
                             .font(HavenTypography.uiLabel.weight(.semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                         .padding(HavenTheme.spacing12)
                         .background(HavenColors.critical.opacity(0.1))
@@ -336,7 +336,7 @@ struct HouseQuizView: View {
                                 .foregroundStyle(HavenColors.success)
                             Text("Your place is saved.")
                                 .font(HavenTypography.uiLabel.weight(.semibold))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                         .padding(.horizontal, HavenTheme.spacing16)
                         .padding(.vertical, HavenTheme.spacing12)
@@ -581,7 +581,7 @@ struct HouseQuizView: View {
             questionCount: viewModel.questionsInChapter(viewModel.currentChapter),
             valuePreview: viewModel.expectedValueForChapter(viewModel.currentChapter),
             onContinue: {
-                withAnimation(HavenTheme.animationStandard) {
+                _ = withAnimation(HavenTheme.animationStandard) {
                     viewModel.shownChapterIntros.insert(viewModel.currentChapter)
                 }
                 Analytics.track(.quizChapterIntroConfirmed, [
@@ -639,7 +639,7 @@ struct HouseQuizView: View {
             }
             Text(formattedMeterCurrency(viewModel.protectedValue))
                 .font(HavenTypography.title2)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .contentTransition(.numericText(value: viewModel.protectedValue))
                 .animation(.spring(response: 0.55, dampingFraction: 0.75), value: viewModel.protectedValue)
         }
@@ -714,7 +714,7 @@ struct HouseQuizView: View {
                 // literal braces to the UI.
                 Text(q.personalizedTitle(using: viewModel.propertyFactBundle))
                     .font(HavenTypography.fraunces(size: 24, weight: 600))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let subtitle = q.subtitle {
@@ -912,7 +912,7 @@ struct HouseQuizView: View {
                         }
                         Text(option.label)
                             .font(HavenTypography.body)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
                         Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
                             .font(.system(size: isSelected ? 18 : 12, weight: .semibold))
@@ -1107,7 +1107,7 @@ struct HouseQuizView: View {
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.2)
                 }
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .padding(.horizontal, HavenTheme.spacing12)
                 .padding(.vertical, 8)
                 .background(HavenColors.navy.opacity(0.08))
@@ -1215,7 +1215,7 @@ struct HouseQuizView: View {
                             .foregroundStyle(isSelected ? HavenColors.navy800 : HavenColors.textTertiary)
                         Text(option.label)
                             .font(HavenTypography.body)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
                     }
                     .padding(HavenTheme.spacing16)
@@ -1359,7 +1359,7 @@ struct HouseQuizView: View {
             if let picked = q20PropaneProvider {
                 HStack(spacing: HavenTheme.spacing8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Selected: \(picked.name)")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
@@ -1460,7 +1460,7 @@ struct HouseQuizView: View {
                                 .foregroundStyle(HavenColors.success)
                             Text(entry)
                                 .font(HavenTypography.body)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Spacer()
                             Button {
                                 Haptics.light()
@@ -1558,7 +1558,7 @@ struct HouseQuizView: View {
                         if isSuggested && !isSelected {
                             Text("Suggested")
                                 .font(HavenTypography.uiLabelSmall)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(HavenColors.navy.opacity(0.08))
@@ -1712,7 +1712,7 @@ struct HouseQuizView: View {
             }
             Text(headline)
                 .font(HavenTypography.title3)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Not right? Edit the field below.")
                 .font(HavenTypography.caption)
@@ -1727,7 +1727,7 @@ struct HouseQuizView: View {
     /// Phase 60.1 — State B: ATTOM legitimately has no sale on record.
     /// Common for land purchases, tear-downs, and inherited homes.
     /// Explicit messaging + "Skip for now" below the Continue button
-    /// means the user can always tell the difference between "Haven
+    /// means the user can always tell the difference between "Chez
     /// failed" and "ATTOM just doesn't have this."
     private func q4NoSaleOnRecordHeader() -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1742,7 +1742,7 @@ struct HouseQuizView: View {
             }
             Text("We couldn't find a sale on record for this home.")
                 .font(HavenTypography.headline)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Common for land purchases, tear-downs, or homes passed through family. Enter what you paid, or skip for now.")
                 .font(HavenTypography.caption)
@@ -2131,11 +2131,11 @@ struct HouseQuizView: View {
                 }
                 Text(option.label)
                     .font(HavenTypography.body)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
             .padding(HavenTheme.spacing16)
@@ -2183,11 +2183,11 @@ struct HouseQuizView: View {
                     .frame(width: 24)
                 Text(label)
                     .font(HavenTypography.body)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
             .padding(HavenTheme.spacing16)
@@ -2242,7 +2242,7 @@ struct HouseQuizView: View {
             if let picked = q22GeneratorProvider {
                 HStack(spacing: HavenTheme.spacing8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Selected: \(picked.name)")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
@@ -2331,7 +2331,7 @@ struct HouseQuizView: View {
                             .font(HavenTypography.uiButton)
                         Spacer(minLength: 0)
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .padding(.horizontal, HavenTheme.spacing16)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(HavenColors.creamLight)
@@ -2366,7 +2366,7 @@ struct HouseQuizView: View {
                 .frame(width: 36, height: 36)
             Text(initial)
                 .font(HavenTypography.uiButton)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
 
@@ -2654,7 +2654,7 @@ struct HouseQuizView: View {
                     }
                     Text(option.label)
                         .font(HavenTypography.body)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Spacer()
                     if let name = attachedDisplayName {
                         HStack(spacing: 4) {
@@ -2811,7 +2811,7 @@ struct HouseQuizView: View {
 
                     Text(summaryLineForQ28(residentType: residentType, answer: priorAnswer))
                         .font(HavenTypography.body)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Button {
@@ -2915,7 +2915,7 @@ struct HouseQuizView: View {
                         HStack {
                             Text(option.label)
                                 .font(HavenTypography.body)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Spacer()
                             Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
                                 .font(.system(size: isSelected ? 18 : 12, weight: .semibold))
@@ -3032,7 +3032,7 @@ struct HouseQuizView: View {
         HStack(alignment: .top, spacing: HavenTheme.spacing8) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("We already have your spouse on file. Adding other family now.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
@@ -3089,10 +3089,10 @@ struct HouseQuizView: View {
                     HStack(spacing: HavenTheme.spacing12) {
                         Image(systemName: "person.badge.key.fill")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Add home manager")
                             .font(HavenTypography.body.weight(.semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
@@ -3221,10 +3221,10 @@ struct HouseQuizView: View {
             Spacer()
             Image(systemName: "sparkles")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("Section complete!")
                 .font(HavenTypography.fraunces(size: 24, weight: 600))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("You're already \(Int(viewModel.progress * 100))% more prepared than the average homeowner.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
@@ -3267,12 +3267,12 @@ struct HouseQuizView: View {
 
             Image(systemName: "tray.and.arrow.down.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: HavenTheme.spacing8) {
-                Text("Your Haven inbox is live")
+                Text("Your Chez inbox is live")
                     .font(HavenTypography.fraunces(size: 24, weight: 600))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
 
                 Text("Forward any bill, warranty, or quote to this address and we'll file it for you automatically.")
@@ -3286,7 +3286,7 @@ struct HouseQuizView: View {
             HStack(spacing: HavenTheme.spacing12) {
                 Text(email)
                     .font(HavenTypography.body.weight(.medium))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .textSelection(.enabled)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -3382,7 +3382,7 @@ struct HouseQuizView: View {
                         ? "You saved 1 question for later"
                         : "You saved \(viewModel.unresolvedSavedQuestions.count) questions for later")
                         .font(HavenTypography.fraunces(size: 24, weight: 600))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text("Tap any question to answer it now, or skip the rest to finish.")
@@ -3406,7 +3406,7 @@ struct HouseQuizView: View {
                                         .foregroundStyle(HavenColors.textTertiary)
                                     Text(question.title)
                                         .font(HavenTypography.body)
-                                        .foregroundStyle(HavenColors.navy800)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                         .multilineTextAlignment(.leading)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -3474,16 +3474,48 @@ struct HouseQuizView: View {
     // MARK: - Completion view
 
     private var completionView: some View {
-        // Phase 60.5: replaces the legacy "Quiz complete" surface with
-        // the cinematic reveal + scrollable summary. The user just spent
-        // 8-12 minutes walking Haven through their home. The legacy
-        // "Added X, Removed Y" diff read like a changelog — the new
-        // reveal reads like a moment. Reference: Opendoor offer reveal,
-        // Zillow Zestimate card, Wealthfront year-end summary.
-        //
-        // Phase 19l delegation sheet machinery is preserved exactly as
-        // it was — it still fires over this view once the candidates
-        // load.
+        // Phase 60.5 + Chez v1: completion routes through the install-
+        // date sweep (when the post-quiz reconciler finds unverified
+        // systems) before showing the cinematic reveal. The user gets
+        // ATTOM-pre-filled rows as one-tap confirms first, then
+        // anything else. Reveal celebrates "X of Y systems verified"
+        // when it lands.
+        Group {
+            if viewModel.installDateSweepNeeded && !viewModel.installDateSweepDone {
+                installDateSweepStage
+            } else {
+                cinematicRevealStage
+            }
+        }
+    }
+
+    /// Chez v1: hosts SystemCoverageFlow as the first thing the user
+    /// sees after Q36. The view model populates
+    /// `unverifiedSystemsForSweep` from the post-quiz reconcile +
+    /// ATTOM pre-fill pass. When the user finishes (or closes) the
+    /// flow, we flip `installDateSweepDone` and the cinematic reveal
+    /// takes over.
+    private var installDateSweepStage: some View {
+        // viewModel.property is non-optional `PropertyRow`. Reach
+        // through directly — the ViewModel is alive whenever the view
+        // body renders, and the post-completion sequence only flips
+        // `installDateSweepNeeded` to true after the property has
+        // already been loaded for the reconciler pass.
+        SystemCoverageFlow(
+            systems: viewModel.unverifiedSystemsForSweep,
+            property: viewModel.property,
+            onComplete: { [weak viewModel = viewModel] in
+                Task { @MainActor in
+                    viewModel?.installDatesVerifiedInSweep =
+                        viewModel?.unverifiedSystemsForSweep.count ?? 0
+                    viewModel?.installDateSweepDone = true
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var cinematicRevealStage: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 0) {
                 QuizCinematicReveal(

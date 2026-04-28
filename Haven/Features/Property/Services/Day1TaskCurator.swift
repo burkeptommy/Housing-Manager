@@ -312,7 +312,7 @@ enum Day1TaskCurator {
         switch template.routing {
         case .diyDefault, .diyCapable:
             break
-        case .vendorDefault, .bundledIntoParent:
+        case .vendorDefault, .vendorOnly, .bundledIntoParent:
             return false
         @unknown default:
             return false

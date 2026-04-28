@@ -51,6 +51,25 @@ final class HouseQuizViewModel: ObservableObject {
     /// scheduled / 2 vendors" instead of their actual numbers.
     private var finalReconcileTask: Task<Void, Never>?
 
+    /// Chez v1: post-completion install-date sweep. When the
+    /// reconciler + Day1Curator + ATTOM pre-fill have finished, the
+    /// view model checks for unverified systems and flips
+    /// `installDateSweepNeeded` true. The view routes to
+    /// SystemCoverageFlow before rendering the cinematic reveal.
+    /// `installDateSweepDone` flips when the user finishes the sweep
+    /// (either by working through every card or by closing it via
+    /// the toolbar Close button).
+    @Published var installDateSweepNeeded: Bool = false
+    @Published var installDateSweepDone: Bool = false
+    /// Systems that need the user's confirmation. Includes both rows
+    /// with no `install_date_source` AND ATTOM-pre-filled rows that
+    /// haven't been confirmed yet. Filled in by `prepareInstallDateSweep`.
+    @Published var unverifiedSystemsForSweep: [HomeSystemRow] = []
+    /// Counter the cinematic reveal can read to add a "verified [N]
+    /// install dates" line to the summary. Set in the sweep's
+    /// onComplete closure.
+    @Published var installDatesVerifiedInSweep: Int = 0
+
     /// Phase 16c — when the user picks an auto carrier that also offers home
     /// insurance (per `bundles_with_home`), we stash the row here so the q27
     /// render can show a "Looks like {name} also does home" suggestion card
@@ -931,17 +950,58 @@ final class HouseQuizViewModel: ObservableObject {
                     propertyId: propId,
                     householdId: hhId
                 )
-                await MainActor.run {
-                    guard let self else { return }
-                    if !result.isEmpty {
-                        self.reconciliationTotals = self.reconciliationTotals.merging(result)
-                    }
-                    if !day1.isEmpty {
-                        print("[HouseQuiz] Day1Curator: vendor=\(day1.vendorRouted) pendingVendor=\(day1.pendingVendorRouted) handyman=\(day1.handymanRouted) thisSeason=\(day1.remainingInThisSeason) routinesCreated=\(day1.routinesCreated)")
-                    }
-                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
-                    NotificationCenter.default.post(name: .routineChanged, object: nil)
+
+                // Chez v1: ATTOM pre-fill runs RIGHT after Day1Curator
+                // so the structural categories (roof, foundation,
+                // crawl space) land with `source = 'estimated'` BEFORE
+                // we compute the sweep list. The sweep then surfaces
+                // these as one-tap confirms first, with everything
+                // else queued behind.
+                if let yearBuilt = await Self.fetchYearBuilt(for: propId) {
+                    _ = await InstallDatePrefiller.prefill(
+                        propertyId: propId,
+                        yearBuilt: yearBuilt
+                    )
                 }
+
+                // Compute which systems still need the user's
+                // confirmation. Two cohorts:
+                //   1. install_date_source IS NULL — never been asked
+                //   2. ATTOM pre-fill landed and hasn't been confirmed
+                //      yet (source = 'estimated' AND attom_prefilled
+                //      AND confirmed_at IS NULL). One-tap accept first.
+                let allSystems = (try? await DatabaseService.shared.fetchHomeSystems(propertyId: propId)) ?? []
+                let unverified = allSystems
+                    .filter { $0.parentSystemId == nil }
+                    .filter { !SystemGroup.isServiceCategory($0.category) }
+                    .filter { sys in
+                        if sys.installDateSource == nil { return true }
+                        if sys.installDateSource == "estimated"
+                            && sys.installDateAttomPrefilled == true
+                            && sys.installDateConfirmedAt == nil {
+                            return true
+                        }
+                        return false
+                    }
+                    .sorted { lhs, rhs in
+                        // ATTOM-prefilled rows (one-tap confirms) come
+                        // first so the user gets early wins.
+                        let lhsPrefilled = lhs.installDateAttomPrefilled == true
+                        let rhsPrefilled = rhs.installDateAttomPrefilled == true
+                        if lhsPrefilled != rhsPrefilled { return lhsPrefilled }
+                        return lhs.displayName < rhs.displayName
+                    }
+
+                // Hop back to the actor and apply the results in one
+                // method call. Calling `self?.applyReconcileResult(...)`
+                // crosses the isolation boundary cleanly, so Swift 6
+                // doesn't flag a captured-var-self read across an
+                // await like an inline `MainActor.run` would.
+                await self?.applyReconcileResult(
+                    result: result,
+                    day1: day1,
+                    unverified: unverified
+                )
             }
         } else if isAnswerChange {
             // Build 82 (Apr 7, 2026): the user changed a previously
@@ -1028,6 +1088,14 @@ final class HouseQuizViewModel: ObservableObject {
             saveErrorMessage = "Couldn't save your progress. Check your connection and try again."
             Analytics.track(.quizSaveAndExitFailed, ["error": "\(error)"])
         }
+    }
+
+    /// Chez v1: lightweight helper to read a property's `year_built`
+    /// for ATTOM pre-fill in the post-quiz sweep prep. Returns nil if
+    /// the row is missing or the column is null.
+    private static func fetchYearBuilt(for propertyId: UUID) async -> Int? {
+        let property = try? await DatabaseService.shared.fetchProperty(id: propertyId)
+        return property?.yearBuilt
     }
 
     /// Phase 17b — runs `MaintenanceTaskReconciler.reconcileAll` on the
@@ -1239,5 +1307,31 @@ final class HouseQuizViewModel: ObservableObject {
             }
         }
         return allQuestions.count
+    }
+
+    /// Apply the post-quiz reconcile + Day1 routing results onto the
+    /// view-model. Pulled out of the inline `MainActor.run` so the
+    /// outer `Task.detached { [weak self] in ... }` doesn't read a
+    /// captured-var `self` across an await — that's the Swift 6
+    /// strict-concurrency warning the compiler flags.
+    @MainActor
+    fileprivate func applyReconcileResult(
+        result: MaintenanceTaskReconciler.ReconciliationResult,
+        day1: Day1TaskCurator.Result,
+        unverified: [HomeSystemRow]
+    ) {
+        if !result.isEmpty {
+            reconciliationTotals = reconciliationTotals.merging(result)
+        }
+        if !day1.isEmpty {
+            print("[HouseQuiz] Day1Curator: vendor=\(day1.vendorRouted) pendingVendor=\(day1.pendingVendorRouted) handyman=\(day1.handymanRouted) thisSeason=\(day1.remainingInThisSeason) routinesCreated=\(day1.routinesCreated)")
+        }
+        unverifiedSystemsForSweep = unverified
+        installDateSweepNeeded = !unverified.isEmpty
+        if unverified.isEmpty {
+            installDateSweepDone = true
+        }
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
     }
 }

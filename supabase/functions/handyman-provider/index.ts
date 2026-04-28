@@ -2784,6 +2784,15 @@ async function splitVisitPunchList(
     },
   ]);
 
+  // Push the homeowner so the new visit doesn't sit silently.
+  await notifyHomeownersForRequest(service, householdId, {
+    title: "A second visit was scheduled",
+    body: movedSummary,
+    requestId: newRequest.id,
+    eventType: "handyman_visit_split",
+    extra: { source_request_id: requestId },
+  });
+
   return {
     ok: true,
     movedCount: moved.length,
