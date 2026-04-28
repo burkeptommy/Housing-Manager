@@ -2700,10 +2700,11 @@ async function splitVisitPunchList(
   }
 
   // Update the original task's notes with only the staying items.
+  // maintenance_tasks doesn't have updated_at — only created_at.
   const stayingNotes = staying.join("\n").trimEnd();
   const { error: trimError } = await service
     .from("maintenance_tasks")
-    .update({ notes: stayingNotes, updated_at: isoNow() })
+    .update({ notes: stayingNotes })
     .eq("id", originalTaskId);
   if (trimError) throw trimError;
 
