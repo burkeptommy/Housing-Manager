@@ -52,22 +52,50 @@ struct HandymanTabView: View {
     }
 
     /// All upcoming visits from this handyman, sorted by scheduled date.
-    /// A handyman visit is a `maintenance_task` row assigned to the
-    /// handyman vendor where the task IS the parent visit and the punch
-    /// list lives in its notes. After a split this returns 2+ rows.
+    /// A handyman visit is a parent `maintenance_task` row whose notes
+    /// contain a punch list (or whose service_key marks it as a
+    /// handyman visit). Standalone vendor tasks assigned to the
+    /// handyman are intentionally excluded — they belong INSIDE a
+    /// visit's punch list, not as siblings to it. Without this filter
+    /// every individual punch item rendered as its own "upcoming visit"
+    /// row, which made the post-split state unreadable.
     private var upcomingVisits: [MaintenanceTaskDBRow] {
         guard let handyman = linkedHandyman else { return [] }
         return maintenanceVM.tasks
             .filter { task in
                 task.assignedContractorId == handyman.id &&
                 task.lastCompletedDate == nil &&
-                (task.isArchived ?? false) == false
+                (task.isArchived ?? false) == false &&
+                Self.isHandymanVisitParent(task)
             }
             .sorted { lhs, rhs in
                 let l = MaintenanceDateFormatting.date(from: lhs.scheduledDate ?? lhs.nextDueDate) ?? .distantFuture
                 let r = MaintenanceDateFormatting.date(from: rhs.scheduledDate ?? rhs.nextDueDate) ?? .distantFuture
                 return l < r
             }
+    }
+
+    /// Distinguishes a parent visit-task from a standalone item. A
+    /// parent visit either:
+    ///   - has a handyman-visit service_key (field-ad-hoc, visit-split,
+    ///     or any handyman:* tag the seeder produces), OR
+    ///   - carries a canonical visit-notes header ("Punch list:" /
+    ///     "What's included") in its notes
+    /// We deliberately don't fall through to "any task with bulleted
+    /// notes" — a regular vendor task's AI-generated description can
+    /// contain bullets without being a real visit, and we don't want
+    /// those leaking into the upcoming-visits list.
+    private static func isHandymanVisitParent(_ task: MaintenanceTaskDBRow) -> Bool {
+        if let key = task.serviceKey, key.hasPrefix("handyman:") {
+            return true
+        }
+        if let notes = task.notes, !notes.isEmpty {
+            let lower = notes.lowercased()
+            if lower.contains("punch list:") || lower.contains("what's included") {
+                return true
+            }
+        }
+        return false
     }
 
     /// The soonest upcoming visit. Used for the hero card; the rest
@@ -339,14 +367,14 @@ struct HandymanTabView: View {
                     })
                 }
 
-                // "Also upcoming" rail — surfaces every other booked
+                // "Upcoming visits" rail — surfaces every other booked
                 // visit from this handyman (e.g. a follow-up created
                 // by Split Visit). Without this the homeowner only
                 // sees the soonest visit and would never realize the
                 // second one exists.
                 if !additionalUpcomingVisits.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("ALSO UPCOMING")
+                        Text("UPCOMING VISITS")
                             .font(.system(size: 11, weight: .semibold))
                             .tracking(1.32)
                             .foregroundStyle(HavenColors.textTertiary)
@@ -796,15 +824,22 @@ private struct UpcomingVisitHero: View {
     let onCall: (() -> Void)?
 
     private var dateLabel: String {
+        // 1. Confirmed time on the linked request — source of truth.
         if let confirmed = coordinationRequest?.confirmedVisitAt {
             return confirmed.formatted(date: .abbreviated, time: .shortened)
         }
-        if let proposed = coordinationRequest?.proposedVisitAt, coordinationRequest?.confirmedVisitAt == nil {
-            return "Proposed: \(proposed.formatted(date: .abbreviated, time: .shortened))"
-        }
+        // 2. The task's own scheduled_date / next_due_date — set when
+        //    the visit is on the books, even if no proposal cycle ran.
+        //    This was previously LOWER priority than proposedVisitAt
+        //    which left stale proposals showing up after the visit
+        //    had already been auto-assigned.
         let dateString = visit.scheduledDate ?? visit.nextDueDate
         if let parsed = MaintenanceDateFormatting.date(from: dateString) {
             return parsed.formatted(date: .complete, time: .omitted)
+        }
+        // 3. Active proposal still negotiating.
+        if let proposed = coordinationRequest?.proposedVisitAt {
+            return "Proposed: \(proposed.formatted(date: .abbreviated, time: .shortened))"
         }
         return "Date pending"
     }
