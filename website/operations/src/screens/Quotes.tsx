@@ -191,12 +191,12 @@ export default function QuotesScreen() {
                         quoteId: selected.id,
                       });
                       await refresh();
-                      // Surface delivery failures — the quote still
-                      // mirrors into the homeowner's chat thread so
-                      // it's marked sent, but the email channel
-                      // failed. Tell the user.
+                      // Email is best-effort now — the quote always
+                      // lands in the homeowner's iOS chat + on the
+                      // public link. Quietly note when email also
+                      // didn't go out so the user knows; no alarm.
                       if (result.delivery && result.delivery.sent === false) {
-                        alert(`Quote saved + posted to the homeowner's chat thread, but the email didn't go out: ${result.delivery.error || "unknown error"}.\n\nThey'll still see it in their Chez Handyman tab.`);
+                        console.info("[send_quote] email channel failed:", result.delivery.error);
                       }
                     } catch (e) {
                       alert(e instanceof Error ? e.message : "Couldn't send the quote.");

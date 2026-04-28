@@ -3705,40 +3705,21 @@ async function saveQuote(
   }
 
   if (sendNow) {
-    delivery = await sendQuoteEmail(service, {
-      quote,
-      workspaceId,
-      lineItems,
-      propertyName,
-      propertyAddress,
-      title,
-      homeownerMessage,
-      scopeNotes,
-      total: totals.total,
-    }).catch((deliveryError) => ({
-      sent: false,
-      channel: "email",
-      recipientCount: 0,
-      error: deliveryError instanceof Error ? deliveryError.message : String(deliveryError),
-    }));
-
-    // Mark the quote sent regardless of email outcome — the homeowner
-    // will always see it in their iOS chat thread (mirrored below) and
-    // on the public link. Email is one notification channel of many;
-    // when it fails we still want the row to reflect that the
-    // homeowner was notified.
-    const sentVia: string[] = [];
-    if (delivery.sent) sentVia.push("email");
-    sentVia.push("chat");
-
+    // The in-app channel (iOS Handyman tab chat thread + the public
+    // quote page) is always available — that's our source of truth.
+    // Email is best-effort; if SendGrid trips or the homeowner has no
+    // email on file we still want the quote to land. Mark it sent,
+    // post to chat, then try email after.
     const shareUrl = publicQuoteUrl(compactString(quote.public_share_token));
+    const bodyText = providerQuoteMessageBody(title, totals.total, lineItems.length, homeownerMessage);
+
     const { data: sentQuote, error: sentError } = await service
       .from("provider_quotes")
       .update({
         status: "sent",
         sent_at: now,
         last_sent_at: now,
-        sent_via: sentVia,
+        sent_via: ["in_app"],
         viewed_at: null,
         approved_at: null,
         declined_at: null,
@@ -3751,7 +3732,6 @@ async function saveQuote(
     if (sentError || !sentQuote) throw sentError ?? new Error("Failed to finalize quote send");
     quote = sentQuote as Record<string, unknown>;
 
-    const bodyText = providerQuoteMessageBody(title, totals.total, lineItems.length, homeownerMessage);
     await addQuoteMessage(service, {
       workspaceId,
       quoteId: compactString(quote.id),
@@ -3760,7 +3740,7 @@ async function saveQuote(
       senderRole: "provider",
       senderName: compactString(membership.full_name) || compactString(user.email),
       senderEmail: compactString(user.email),
-      deliveryChannel: delivery.sent ? "email" : "chat",
+      deliveryChannel: "in_app",
       body: bodyText,
       metadata: {
         event: "quote_sent",
@@ -3797,6 +3777,33 @@ async function saveQuote(
           share_url: shareUrl,
         },
       });
+    }
+
+    // Email is additive — try it but never let a failure roll back
+    // the in-app send. Update sent_via best-effort to record the
+    // channel that worked.
+    delivery = await sendQuoteEmail(service, {
+      quote,
+      workspaceId,
+      lineItems,
+      propertyName,
+      propertyAddress,
+      title,
+      homeownerMessage,
+      scopeNotes,
+      total: totals.total,
+    }).catch((deliveryError) => ({
+      sent: false,
+      channel: "email",
+      recipientCount: 0,
+      error: deliveryError instanceof Error ? deliveryError.message : String(deliveryError),
+    }));
+
+    if (delivery.sent) {
+      await service
+        .from("provider_quotes")
+        .update({ sent_via: ["in_app", "email"], updated_at: isoNow() })
+        .eq("id", compactString(quote.id));
     }
   }
 
