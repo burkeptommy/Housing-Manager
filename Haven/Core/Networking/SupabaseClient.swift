@@ -210,6 +210,41 @@ enum HavenSupabase {
         }
     }
 
+    /// Tell the provider workspace serving a request that the
+    /// homeowner just acted (accepted a time, proposed a counter).
+    /// Routes through the handyman-provider edge function which
+    /// resolves the contractor → workspace members and fires push.
+    private struct HomeownerNotifyProviderRequest: Encodable {
+        let action: String
+        let requestId: String
+        let eventType: String
+        let title: String
+        let body: String
+        enum CodingKeys: String, CodingKey {
+            case action, title, body
+            case requestId, eventType
+        }
+    }
+
+    static func notifyProviderForRequest(
+        requestId: UUID,
+        eventType: String,
+        title: String,
+        body: String
+    ) async throws {
+        _ = try await callEdgeFunction(
+            name: "handyman-provider",
+            body: HomeownerNotifyProviderRequest(
+                action: "homeowner_notify_provider",
+                requestId: requestId.uuidString,
+                eventType: eventType,
+                title: title,
+                body: body
+            ),
+            timeoutSeconds: 15
+        )
+    }
+
     static func sendPushNotification(
         recipientUserIds: [String],
         title: String,
@@ -981,5 +1016,144 @@ enum HavenSupabase {
             timeoutSeconds: 30
         )
         return try JSONDecoder().decode(LocalVendorResponse.self, from: data)
+    }
+
+    // MARK: - Chez v1: Find Network Handymen
+
+    /// One Chez Field provider returned by `find-network-handymen`. These
+    /// are companies who registered via the desktop command center
+    /// (havenhome.dev/handyman) and explicitly opted into the homeowner
+    /// directory. Surfaced ABOVE Google Places results in
+    /// `FindLocalVendorSheet` because they're already in the network.
+    struct ChezFieldProvider: Codable, Identifiable {
+        let id: String
+        let workspaceId: String
+        let name: String
+        let phone: String?
+        let website: String?
+        let city: String?
+        let state: String?
+        let blurb: String?
+        let headshotUrl: String?
+        let rating: Double?
+        let reviewCount: Int
+        let categories: [String]
+        let source: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, workspaceId, name, phone, website, city, state, blurb
+            case headshotUrl, rating, reviewCount, categories, source
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+            workspaceId = (try? c.decodeIfPresent(String.self, forKey: .workspaceId)) ?? ""
+            name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+            phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+            website = try? c.decodeIfPresent(String.self, forKey: .website)
+            city = try? c.decodeIfPresent(String.self, forKey: .city)
+            state = try? c.decodeIfPresent(String.self, forKey: .state)
+            blurb = try? c.decodeIfPresent(String.self, forKey: .blurb)
+            headshotUrl = try? c.decodeIfPresent(String.self, forKey: .headshotUrl)
+            rating = try? c.decodeIfPresent(Double.self, forKey: .rating)
+            reviewCount = (try? c.decodeIfPresent(Int.self, forKey: .reviewCount)) ?? 0
+            categories = (try? c.decodeIfPresent([String].self, forKey: .categories)) ?? []
+            source = (try? c.decodeIfPresent(String.self, forKey: .source)) ?? "chez_field"
+        }
+    }
+
+    struct ChezFieldProviderResponse: Codable {
+        let providers: [ChezFieldProvider]
+    }
+
+    private struct NetworkHandymanRequest: Encodable {
+        let town: String?
+        let state: String?
+        let zip: String?
+        let category: String
+        let searchQuery: String?
+        let nationwide: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case town, state, zip, category, searchQuery, nationwide
+        }
+    }
+
+    // MARK: - Phase 73 follow-up: link adopted handyman to workspace
+
+    private struct LinkAdoptedProviderRequest: Encodable {
+        let action = "link_adopted_provider"
+        let workspaceId: String
+        let contractorId: String
+    }
+
+    struct LinkAdoptedProviderResponse: Codable {
+        let linked: Bool
+        let alreadyLinked: Bool?
+        let isPrimary: Bool?
+    }
+
+    /// Calls the `handyman-provider` edge function's
+    /// `link_adopted_provider` action. Validates the homeowner adoption
+    /// chain server-side (auth user owns contractor, contractor's notes
+    /// reference the workspace, workspace is directory-listed) and then
+    /// inserts the missing `provider_contractor_links` row so the
+    /// provider's dispatch board surfaces the household. Idempotent.
+    static func linkAdoptedHandymanProvider(
+        workspaceId: UUID,
+        contractorId: UUID
+    ) async throws -> LinkAdoptedProviderResponse {
+        let data = try await callEdgeFunction(
+            name: "handyman-provider",
+            body: LinkAdoptedProviderRequest(
+                workspaceId: workspaceId.uuidString,
+                contractorId: contractorId.uuidString
+            ),
+            timeoutSeconds: 15
+        )
+        return try JSONDecoder().decode(LinkAdoptedProviderResponse.self, from: data)
+    }
+
+    /// Calls the `find-network-handymen` edge function in either of two
+    /// modes:
+    ///
+    /// - **Auto-match (default).** Pass `searchQuery == nil`. The function
+    ///   filters by state + category + listed-flag, then drops providers
+    ///   whose populated `service_zip_codes` don't match the homeowner's
+    ///   zip-prefix or city. Capped at 5 results. This is the path the
+    ///   `FindLocalVendorSheet` uses to render the ON CHEZ section
+    ///   alongside Google Places.
+    ///
+    /// - **Directory search.** Pass any non-nil `searchQuery` (empty string
+    ///   is fine for an unfiltered initial browse; non-empty triggers an
+    ///   ILIKE filter across `company_name` + `display_blurb`). The
+    ///   function skips the zip/city filter entirely and caps at 25. Set
+    ///   `nationwide = true` to also drop the state filter — used by the
+    ///   "Show pros nationwide" toggle in `ChezDirectorySearchView`.
+    ///
+    /// Empty `providers` is a valid result. Callers should render an empty
+    /// state rather than treating it as an error.
+    static func findNetworkHandymen(
+        town: String? = nil,
+        state: String,
+        zip: String? = nil,
+        category: String = "handyman",
+        searchQuery: String? = nil,
+        nationwide: Bool = false
+    ) async throws -> ChezFieldProviderResponse {
+        let data = try await callEdgeFunction(
+            name: "find-network-handymen",
+            body: NetworkHandymanRequest(
+                town: town,
+                state: state.isEmpty ? nil : state,
+                zip: zip,
+                category: category,
+                searchQuery: searchQuery,
+                nationwide: nationwide ? true : nil
+            ),
+            timeoutSeconds: 15
+        )
+        return try JSONDecoder().decode(ChezFieldProviderResponse.self, from: data)
     }
 }

@@ -161,6 +161,23 @@ export default function VisitDetailScreen() {
         <span style={{ color: "var(--text-muted)" }}>{visit.requestId.slice(0, 8)}</span>
       </div>
 
+      {/* Pending homeowner counter-proposal — Accept/Counter inline so
+          the dispatcher doesn't have to hunt through the chat thread to
+          act on the homeowner's response. Only renders when the most
+          recent proposal came from the homeowner and isn't yet
+          confirmed. */}
+      {visit.proposedVisitAt
+        && visit.proposedByRole === "homeowner"
+        && !visit.confirmedVisitAt && (
+        <PendingHomeownerProposalCard
+          visit={visit}
+          workspaceId={dashboard.workspace.id}
+          onResolved={async () => {
+            await refresh();
+          }}
+        />
+      )}
+
       {/* Header card */}
       <Card padding="default" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
@@ -996,5 +1013,113 @@ function SplitVisitModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Pending homeowner counter-proposal callout ─────────────────
+//
+// The most prominent visual element on the page when the homeowner
+// has counter-proposed a time. Big proposed time in serif, two
+// inline buttons (Accept locks it in, Counter opens the existing
+// reschedule modal). Without this the only signal of a pending
+// proposal was a row buried in the chat thread.
+
+function PendingHomeownerProposalCard({
+  visit,
+  workspaceId,
+  onResolved,
+}: {
+  visit: VisitRow;
+  workspaceId: string;
+  onResolved: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<"accept" | "counter" | null>(null);
+  const [showReschedule, setShowReschedule] = useState(false);
+
+  const proposedDate = visit.proposedVisitAt ? new Date(visit.proposedVisitAt) : null;
+  const dateLabel = proposedDate
+    ? proposedDate.toLocaleString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "A new time";
+
+  async function accept() {
+    setBusy("accept");
+    try {
+      await postProviderAction("accept_visit_time", {
+        workspaceId,
+        requestId: visit.requestId,
+      });
+      await onResolved();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't accept the time.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <>
+      <div
+        style={{
+          marginBottom: 16,
+          padding: 20,
+          borderRadius: 16,
+          background: "linear-gradient(155deg, #FFF5F2 0%, #FFE8E2 100%)",
+          border: "1px solid rgba(237, 105, 85, 0.35)",
+          boxShadow: "0 6px 20px rgba(237, 105, 85, 0.12)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <Icon name="clock" size={14} stroke={2} color="var(--salmon-dark)" />
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.16em",
+            textTransform: "uppercase", color: "var(--salmon-dark)",
+          }}>
+            Homeowner proposed a new time
+          </div>
+        </div>
+        <div style={{
+          fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600,
+          color: "var(--text)", letterSpacing: "-0.018em", marginBottom: 4,
+        }}>
+          {dateLabel}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+          Accept to lock it in, or counter with another time. The homeowner gets a push either way.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            className="ops-button ops-button--salmon"
+            disabled={busy !== null}
+            onClick={accept}
+          >
+            {busy === "accept" ? "Accepting…" : "✓ Accept this time"}
+          </button>
+          <button
+            className="ops-button ops-button--ghost"
+            disabled={busy !== null}
+            onClick={() => setShowReschedule(true)}
+          >
+            Counter with another time
+          </button>
+        </div>
+      </div>
+
+      {showReschedule && (
+        <RescheduleModal
+          visit={visit}
+          onClose={() => setShowReschedule(false)}
+          onConfirmed={async () => {
+            setShowReschedule(false);
+            await onResolved();
+          }}
+        />
+      )}
+    </>
   );
 }

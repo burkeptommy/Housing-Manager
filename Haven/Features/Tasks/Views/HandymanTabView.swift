@@ -1303,6 +1303,12 @@ final class HandymanRequestCoordinator: ObservableObject {
                 note: note
             )
             await applyRequest(updated)
+            await notifyProvider(
+                requestId: req.id,
+                eventType: "homeowner_accepted_time",
+                title: "Visit time confirmed",
+                body: "The homeowner accepted your proposed time."
+            )
             return true
         } catch {
             print("[HandymanRequestCoordinator] acceptProposedTime failed: \(error)")
@@ -1325,10 +1331,43 @@ final class HandymanRequestCoordinator: ObservableObject {
                 note: note
             )
             await applyRequest(updated)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            await notifyProvider(
+                requestId: req.id,
+                eventType: "homeowner_proposed_time",
+                title: "Homeowner proposed a new time",
+                body: "Tap to review and accept or counter: \(formatter.string(from: at))"
+            )
             return true
         } catch {
             print("[HandymanRequestCoordinator] proposeCounterTime failed: \(error)")
             return false
+        }
+    }
+
+    /// Fire-and-forget push to the provider workspace serving this
+    /// request. Without this the operations desk has no signal that
+    /// the homeowner just acted on a proposal — they'd only find out
+    /// next time they manually refreshed.
+    private func notifyProvider(
+        requestId: UUID,
+        eventType: String,
+        title: String,
+        body: String
+    ) async {
+        do {
+            try await HavenSupabase.notifyProviderForRequest(
+                requestId: requestId,
+                eventType: eventType,
+                title: title,
+                body: body
+            )
+        } catch {
+            // Non-fatal — the DB state is already correct, this is just
+            // the push channel.
+            print("[HandymanRequestCoordinator] notifyProvider failed: \(error)")
         }
     }
 
@@ -1441,6 +1480,15 @@ final class HandymanRequestCoordinator: ObservableObject {
                     if !self.messages.contains(where: { $0.id == decoded.id }) {
                         self.messages.append(decoded)
                     }
+                }
+                // When a quote_sent message lands, reload the quote so
+                // the visit hero's QuoteNudgeCard appears + the
+                // chat's rich quote bubble has live data behind its
+                // "Review quote" button. Without this, the message
+                // shows up but `coordinator.quote` stays nil until
+                // the user manually re-opens the visit.
+                if decoded.typedKind == .quoteSent {
+                    await self.reloadQuote(requestId: requestId)
                 }
             }
         }

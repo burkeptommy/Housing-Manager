@@ -3827,6 +3827,19 @@ async function saveQuote(
       });
     }
 
+    // Push notification so the homeowner doesn't have to be in the
+    // app to know a quote landed. Routes to Tasks → Handyman → quote
+    // review per the handyman_* push deep-link handler.
+    if (householdId) {
+      await notifyHomeownersForRequest(service, householdId, {
+        title: `${propertyName ? "Quote ready for " + propertyName : "Quote ready"}`,
+        body: `${moneyLabel(totals.total)} from your handyman. Tap to review.`,
+        requestId: requestId || compactString(quote.id),
+        eventType: "handyman_quote_sent",
+        extra: { quote_id: compactString(quote.id) },
+      });
+    }
+
     // Email is additive — try it but never let a failure roll back
     // the in-app send. Update sent_via best-effort to record the
     // channel that worked.
@@ -4090,6 +4103,79 @@ async function sendMessage(
 /// gets a notification the instant their provider proposes or accepts
 /// a visit time. Errors are logged and swallowed — pushes shouldn't
 /// fail the underlying state write.
+/**
+ * Push to every active member of the provider workspace serving this
+ * request. The homeowner-side iOS calls this after their accept_visit_time
+ * or propose_visit_time RPC succeeds — without it, the handyman has no
+ * way to know they need to act on a counter-proposal until they happen
+ * to refresh the operations desk.
+ */
+async function notifyProviderForRequest(
+  service: ServiceClient,
+  contractorId: string | null,
+  payload: {
+    title: string;
+    body: string;
+    requestId: string;
+    eventType: string;
+    extra?: Record<string, string>;
+  },
+): Promise<void> {
+  if (!contractorId) return;
+
+  try {
+    // Contractor → workspace via provider_contractor_links.
+    const { data: links } = await service
+      .from("provider_contractor_links")
+      .select("workspace_id")
+      .eq("contractor_id", contractorId);
+
+    const workspaceIds = ((links ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.workspace_id))
+      .filter(Boolean);
+
+    if (workspaceIds.length === 0) return;
+
+    // Active workspace members → their auth user_ids.
+    const { data: members } = await service
+      .from("provider_workspace_members")
+      .select("user_id")
+      .in("workspace_id", workspaceIds)
+      .eq("status", "active");
+
+    const userIds = ((members ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.user_id))
+      .filter(Boolean);
+
+    if (userIds.length === 0) return;
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    const data: Record<string, string> = {
+      type: payload.eventType,
+      request_id: payload.requestId,
+      ...(payload.extra ?? {}),
+    };
+
+    await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        recipient_user_ids: userIds,
+        title: payload.title,
+        body: payload.body,
+        data,
+      }),
+    });
+  } catch (pushError) {
+    console.error("[handyman-provider:notifyProvider] push failed", pushError);
+  }
+}
+
 async function notifyHomeownersForRequest(
   service: ServiceClient,
   householdId: string | null,
@@ -4646,6 +4732,47 @@ serve(async (req) => {
           body,
         );
         return json(result);
+      }
+
+      // Homeowner-initiated push to the handyman after the homeowner
+      // RPC has already updated the DB. iOS calls this after
+      // accept_visit_time / propose_visit_time so the operations desk
+      // gets notified instead of silently waiting for a manual refresh.
+      if (action === "homeowner_notify_provider") {
+        const requestId = compactString(body.requestId);
+        const eventType = compactString(body.eventType) || "homeowner_message";
+        const title = compactString(body.title) || "Update from your homeowner";
+        const messageBody = compactString(body.body) || "";
+        if (!requestId) throw new Error("requestId is required");
+
+        const { data: req } = await service
+          .from("handyman_requests")
+          .select("id, contractor_id, household_id")
+          .eq("id", requestId)
+          .maybeSingle();
+        if (!req) throw new Error("Request not found");
+
+        // Trust check: caller must own the household this request
+        // belongs to. Otherwise any signed-in user could spam pushes
+        // to any provider.
+        const callerUserId = compactString(user.id);
+        const { data: callerRow } = await service
+          .from("users")
+          .select("household_id")
+          .eq("id", callerUserId)
+          .maybeSingle();
+        const callerHouseholdId = compactString(callerRow?.household_id);
+        if (!callerHouseholdId || callerHouseholdId !== compactString(req.household_id)) {
+          throw new Error("You don't own this request");
+        }
+
+        await notifyProviderForRequest(service, compactString(req.contractor_id), {
+          title,
+          body: messageBody,
+          requestId,
+          eventType,
+        });
+        return json({ ok: true });
       }
 
       if (action === "accept_visit_time") {
