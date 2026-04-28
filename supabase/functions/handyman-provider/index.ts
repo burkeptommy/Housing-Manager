@@ -1975,7 +1975,14 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     const quote = quoteByRequestId.get(requestId) ?? null;
     const assignment = assignmentByRequestId.get(requestId) ?? null;
     const assignedMember = assignment ? memberById.get(compactString(assignment.assigned_member_id)) ?? null : null;
+    // Prefer the request's `confirmed_visit_at` over the assignment's
+    // route_date — the homeowner's accept_visit_time always updates
+    // confirmed_visit_at, but if there was no assignment at the time
+    // of accept (or the RPC's assignment-sync was added after this
+    // request) route_date can lag. confirmedVisitAt is the truth.
+    const confirmedDate = compactString(request.confirmed_visit_at).slice(0, 10);
     const routeDate =
+      confirmedDate ||
       compactString(assignment?.route_date) ||
       compactString(visit?.scheduled_date) ||
       compactString(visit?.next_due_date);
