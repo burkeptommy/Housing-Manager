@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "../components/chrome/Card";
 import { Pill, type PillTone } from "../components/chrome/Pill";
 import { Icon } from "../components/chrome/Icon";
 import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
-import { formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
+import { fetchQuoteComments, formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
+import type { QuoteComment } from "../lib/types";
 import { useNewQuoteModal } from "../components/NewQuoteModal";
 
 const STATUS_TONE: Record<string, PillTone> = {
@@ -23,6 +24,8 @@ export default function QuotesScreen() {
   const newQuote = useNewQuoteModal();
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [busy, setBusy] = useState<"send" | "delete" | null>(null);
+  const [comments, setComments] = useState<QuoteComment[]>([]);
+  const [commentsBusy, setCommentsBusy] = useState(false);
 
   const quotes = useMemo(() => dashboard?.quotes ?? [], [dashboard]);
   const savedItems = useMemo(() => dashboard?.savedQuoteItems ?? [], [dashboard]);
@@ -32,6 +35,32 @@ export default function QuotesScreen() {
     if (selectedQuoteId) return quotes.find((q) => q.id === selectedQuoteId) ?? quotes[0];
     return quotes[0];
   }, [selectedQuoteId, quotes]);
+
+  // Fetch the comment thread for the selected quote so we can show
+  // homeowner questions inline + reply per-line.
+  useEffect(() => {
+    if (!selected) {
+      setComments([]);
+      return;
+    }
+    setCommentsBusy(true);
+    let cancelled = false;
+    fetchQuoteComments(selected.id)
+      .then((rows) => { if (!cancelled) setComments(rows); })
+      .catch((e) => { if (!cancelled) console.warn("[Quotes] fetchQuoteComments failed", e); })
+      .finally(() => { if (!cancelled) setCommentsBusy(false); });
+    return () => { cancelled = true; };
+  }, [selected?.id]);
+
+  async function reloadComments() {
+    if (!selected) return;
+    try {
+      const rows = await fetchQuoteComments(selected.id);
+      setComments(rows);
+    } catch (e) {
+      console.warn("[Quotes] reloadComments failed", e);
+    }
+  }
 
   if (!dashboard) return null;
 
@@ -210,6 +239,18 @@ export default function QuotesScreen() {
               )}
             </div>
 
+            {/* Homeowner questions — surfaces above the spreadsheet so
+                the provider sees them before they edit anything */}
+            {selected && (
+              <QuestionsPanel
+                quote={selected}
+                comments={comments}
+                workspaceId={dashboard.workspace.id}
+                busy={commentsBusy}
+                onReplied={async () => { await reloadComments(); }}
+              />
+            )}
+
             {/* Spreadsheet */}
             <div style={{ border: "1px solid var(--neutral-200)", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "10px 12px", borderBottom: "1px solid var(--neutral-200)", background: "var(--pearl)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-soft)" }}>
@@ -224,20 +265,36 @@ export default function QuotesScreen() {
                   No line items on this quote yet.
                 </div>
               ) : (
-                selected.lineItems.map((line, i) => (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "12px", borderBottom: i < selected.lineItems.length - 1 ? "1px solid var(--neutral-200)" : "none", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{line.name}</div>
-                      {line.description && <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{line.description}</div>}
+                selected.lineItems.map((line, i) => {
+                  const lineComments = line.id ? comments.filter((c) => c.lineItemId === line.id) : [];
+                  const openCount = lineComments.filter((c) => c.status === "open" && c.authorRole === "homeowner").length;
+                  return (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "12px", borderBottom: i < selected.lineItems.length - 1 ? "1px solid var(--neutral-200)" : "none", alignItems: "center" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{line.name}</span>
+                          {openCount > 0 && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+                              color: "var(--salmon-dark)",
+                              background: "var(--salmon-pale)",
+                              padding: "2px 6px", borderRadius: 999,
+                            }}>
+                              {openCount} question{openCount === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </div>
+                        {line.description && <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{line.description}</div>}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text)" }}>{line.unit ?? "ea"}</div>
+                      <div style={{ fontSize: 12, color: "var(--text)" }}>{line.quantity ?? 1}</div>
+                      <div style={{ fontSize: 12, color: "var(--text)", textAlign: "right" }}>{formatCurrency(line.unitPrice ?? 0)}</div>
+                      <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600, color: "var(--text)", textAlign: "right" }}>
+                        {formatCurrency((line.quantity ?? 1) * (line.unitPrice ?? 0))}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text)" }}>{line.unit ?? "ea"}</div>
-                    <div style={{ fontSize: 12, color: "var(--text)" }}>{line.quantity ?? 1}</div>
-                    <div style={{ fontSize: 12, color: "var(--text)", textAlign: "right" }}>{formatCurrency(line.unitPrice ?? 0)}</div>
-                    <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600, color: "var(--text)", textAlign: "right" }}>
-                      {formatCurrency((line.quantity ?? 1) * (line.unitPrice ?? 0))}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -279,4 +336,171 @@ function toneCss(t: PillTone): string {
     case "info":     return "#5A8DB5";
     default:         return "var(--neutral-400)";
   }
+}
+
+// ─── Questions panel — homeowner Q&A on a quote ──────────────────
+
+interface QuestionsPanelProps {
+  quote: { id: string; lineItems: { id?: string; name: string }[] };
+  comments: QuoteComment[];
+  workspaceId: string;
+  busy: boolean;
+  onReplied: () => Promise<void>;
+}
+
+function QuestionsPanel({ quote, comments, workspaceId, busy, onReplied }: QuestionsPanelProps) {
+  // Group homeowner-authored comments. Each gets the line item context
+  // (or "General" if no lineItemId) and any provider replies threaded
+  // underneath via parent_comment_id.
+  const homeownerQuestions = comments.filter((c) => c.authorRole === "homeowner");
+  if (homeownerQuestions.length === 0 && !busy) return null;
+
+  return (
+    <div style={{
+      marginBottom: 16,
+      padding: 18,
+      borderRadius: 14,
+      background: "linear-gradient(155deg, #FFF5F2 0%, #FFE8E2 100%)",
+      border: "1px solid rgba(237, 105, 85, 0.35)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Icon name="message" size={14} stroke={2} color="var(--salmon-dark)" />
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.16em",
+          textTransform: "uppercase", color: "var(--salmon-dark)",
+        }}>
+          Homeowner questions ({homeownerQuestions.length})
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {homeownerQuestions.map((q) => {
+          const lineName = q.lineItemId
+            ? quote.lineItems.find((li) => li.id === q.lineItemId)?.name ?? "Removed line item"
+            : "General question";
+          const replies = comments.filter((c) => c.parentCommentId === q.id);
+          return (
+            <QuestionItem
+              key={q.id}
+              question={q}
+              lineName={lineName}
+              replies={replies}
+              workspaceId={workspaceId}
+              onReplied={onReplied}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function QuestionItem({
+  question,
+  lineName,
+  replies,
+  workspaceId,
+  onReplied,
+}: {
+  question: QuoteComment;
+  lineName: string;
+  replies: QuoteComment[];
+  workspaceId: string;
+  onReplied: () => Promise<void>;
+}) {
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const isAnswered = question.status === "answered" && replies.length > 0;
+
+  async function send() {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    setSending(true);
+    try {
+      await postProviderAction("reply_to_quote_comment", {
+        workspaceId,
+        parentCommentId: question.id,
+        body: trimmed,
+      });
+      setDraft("");
+      await onReplied();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't send reply.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div style={{
+      padding: 14,
+      borderRadius: 12,
+      background: "#fff",
+      border: "1px solid rgba(42, 34, 82, 0.08)",
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: "0.14em",
+        textTransform: "uppercase", color: "var(--text-soft)", marginBottom: 6,
+      }}>
+        {lineName}
+      </div>
+      <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.55, marginBottom: 8, whiteSpace: "pre-wrap" }}>
+        {question.body}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--text-soft)", marginBottom: 10 }}>
+        Asked {new Date(question.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+        {isAnswered && (
+          <span style={{ marginLeft: 8, color: "var(--success)", fontWeight: 600 }}>
+            · Replied
+          </span>
+        )}
+      </div>
+
+      {replies.length > 0 && (
+        <div style={{
+          padding: 10,
+          background: "var(--cream)",
+          borderRadius: 8,
+          marginBottom: 10,
+          display: "flex", flexDirection: "column", gap: 6,
+        }}>
+          {replies.map((r) => (
+            <div key={r.id} style={{ fontSize: 12.5, color: "var(--text)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              <span style={{ fontWeight: 600, color: "var(--indigo)" }}>You · </span>
+              {r.body}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          type="text"
+          placeholder="Type a reply…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !sending) void send(); }}
+          disabled={sending}
+          style={{
+            flex: 1,
+            padding: "8px 12px",
+            border: "1px solid var(--neutral-200)",
+            borderRadius: 8,
+            background: "#fff",
+            fontSize: 13,
+            fontFamily: "var(--sans)",
+            color: "var(--text)",
+          }}
+        />
+        <button
+          className="ops-button ops-button--salmon"
+          onClick={() => void send()}
+          disabled={sending || !draft.trim()}
+          style={{ minHeight: 36, fontSize: 13 }}
+        >
+          {sending ? "Sending…" : "Reply"}
+        </button>
+      </div>
+    </div>
+  );
 }

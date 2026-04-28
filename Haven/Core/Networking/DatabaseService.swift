@@ -1630,6 +1630,20 @@ final class DatabaseService {
         return rows.first
     }
 
+    /// Lookup a handyman_request by its primary key. Used by the iOS
+    /// push handler to route a propose_time / accept_time / quote_sent
+    /// event to the SPECIFIC visit it concerns instead of always
+    /// opening the soonest visit.
+    func fetchHandymanRequest(id: UUID) async throws -> HandymanRequestRow? {
+        let rows: [HandymanRequestRow] = try await from("handyman_requests")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
     func updateHandymanRequest(id: UUID, _ update: HandymanRequestUpdate) async throws -> HandymanRequestRow {
         try await from("handyman_requests")
             .update(update)
@@ -1859,6 +1873,30 @@ final class DatabaseService {
             .execute()
             .value
         return rows.first
+    }
+
+    /// Phase 75h: per-line-item Q&A comments. Returns every comment
+    /// on the quote (provider replies + homeowner questions),
+    /// ordered oldest first so the UI can render threads top-down.
+    func fetchProviderQuoteComments(quoteId: UUID) async throws -> [ProviderQuoteCommentRow] {
+        try await from("provider_quote_comments")
+            .select()
+            .eq("quote_id", value: quoteId.uuidString)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    /// Insert a homeowner-authored question/comment. The provider side
+    /// inserts via the handyman-provider edge function (service role)
+    /// because RLS only grants insert to `author_role = 'homeowner'`.
+    func createProviderQuoteComment(_ insert: ProviderQuoteCommentInsert) async throws -> ProviderQuoteCommentRow {
+        try await from("provider_quote_comments")
+            .insert(insert)
+            .select()
+            .single()
+            .execute()
+            .value
     }
 
     /// Secure homeowner-side quote collaboration path. Routed through the

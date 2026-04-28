@@ -135,6 +135,34 @@ export interface PunchListItem {
   estimatedMinutes: number | null;
 }
 
+// ─── Quote Q&A comments ───────────────────────────────────────
+
+import type { QuoteComment } from "./types";
+
+/**
+ * Fetch every comment on a quote (homeowner questions + provider
+ * replies). Direct table read — RLS restricts to comments on quotes
+ * owned by this workspace.
+ */
+export async function fetchQuoteComments(quoteId: string): Promise<QuoteComment[]> {
+  const { data, error } = await supabase
+    .from("provider_quote_comments")
+    .select("id, quote_id, line_item_id, parent_comment_id, author_role, body, status, created_at")
+    .eq("quote_id", quoteId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    quoteId: String(row.quote_id),
+    lineItemId: row.line_item_id == null ? null : String(row.line_item_id),
+    parentCommentId: row.parent_comment_id == null ? null : String(row.parent_comment_id),
+    authorRole: String(row.author_role),
+    body: String(row.body),
+    status: String(row.status),
+    createdAt: String(row.created_at),
+  }));
+}
+
 // ─── Punch-list categorization ────────────────────────────────
 //
 // Long visits (10+ items) are unscannable as a flat list. Group items

@@ -73,6 +73,17 @@ struct HandymanVisitDetailSheet: View {
                 }
             }
             .background(HavenColors.background)
+            .task(id: visit.id) {
+                // Switch the shared coordinator to THIS visit's
+                // request_id whenever the sheet opens (or the user
+                // navigates between visits). Without this, opening
+                // the follow-up visit kept the coordinator pointed
+                // at the main visit's request — every reschedule
+                // message + quote that landed on the follow-up's
+                // thread was invisible because Realtime + the chat
+                // sheet read from coordinator.request.
+                await coordinator.load(visit: visit, vendor: vendor)
+            }
             .navigationTitle("Visit details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

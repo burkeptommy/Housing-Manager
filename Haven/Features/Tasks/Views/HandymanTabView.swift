@@ -241,14 +241,34 @@ struct HandymanTabView: View {
         // to the visit detail; quote-related events jump straight to
         // the quote review sheet.
         .onReceive(NotificationCenter.default.publisher(for: .openHandymanVisit)) { notification in
-            // Refresh tasks first so the next-scheduled-visit picker
-            // picks up the request that's being deep-linked to.
             Task {
                 await maintenanceVM.loadTasks()
-                await reloadCoordination()
+
                 let presentation = notification.userInfo?["presentation"] as? String ?? "visit"
                 let quoteIdRaw = notification.userInfo?["quote_id"] as? String
                 let quoteId = quoteIdRaw.flatMap(UUID.init(uuidString:))
+                let requestIdRaw = notification.userInfo?["request_id"] as? String
+                let requestId = requestIdRaw.flatMap { $0.isEmpty ? nil : UUID(uuidString: $0) }
+
+                // Route to the SPECIFIC visit identified by request_id.
+                // Without this, a reschedule push for a follow-up
+                // visit silently opened the soonest visit instead and
+                // the propose_time message never surfaced for the
+                // homeowner. When request_id matches a known task,
+                // pin that task as the presented visit + switch the
+                // coordinator to its request so Realtime + chat
+                // load the right thread.
+                var routedVisit: MaintenanceTaskDBRow?
+                if let rid = requestId {
+                    if let req = await coordinator.loadByRequestId(rid),
+                       let taskId = req.visitTaskId,
+                       let task = maintenanceVM.tasks.first(where: { $0.id == taskId }) {
+                        routedVisit = task
+                    }
+                }
+                if routedVisit == nil {
+                    await reloadCoordination()
+                }
 
                 // Quote deep-link: pin the specific quote by id (push
                 // payload carries it from saveQuote) so we don't have
@@ -271,7 +291,7 @@ struct HandymanTabView: View {
                         presentChat = false
                         presentedVisit = nil
                         presentQuote = true
-                    } else if let visit = nextScheduledVisit {
+                    } else if let visit = routedVisit ?? nextScheduledVisit {
                         presentChat = false
                         presentQuote = false
                         presentedVisit = visit
@@ -1339,6 +1359,10 @@ final class HandymanRequestCoordinator: ObservableObject {
     /// review sheet so the homeowner can see how a counter chain
     /// evolved (Provider $1,725 → Counter $1,200 → Provider $1,400 → …).
     @Published private(set) var quoteHistory: [ProviderQuoteRow] = []
+    /// Phase 75h Q&A: per-line-item comment threads on the active
+    /// quote. Loaded alongside the quote; refreshed when comments
+    /// are submitted. Always ordered oldest → newest.
+    @Published private(set) var quoteComments: [ProviderQuoteCommentRow] = []
 
     private var loadedVisitId: UUID?
     private var realtimeChannel: RealtimeChannelV2?
@@ -1350,6 +1374,7 @@ final class HandymanRequestCoordinator: ObservableObject {
         messages = []
         quote = nil
         quoteHistory = []
+        quoteComments = []
         loadedVisitId = nil
         unsubscribeRealtime()
     }
@@ -1439,6 +1464,51 @@ final class HandymanRequestCoordinator: ObservableObject {
             let s = q.typedStatus
             return s != .superseded && s != .withdrawn
         }
+        await reloadQuoteComments()
+    }
+
+    /// Refresh the Q&A comment thread for the active quote.
+    func reloadQuoteComments() async {
+        guard let q = quote else {
+            quoteComments = []
+            return
+        }
+        quoteComments = (try? await DatabaseService.shared.fetchProviderQuoteComments(quoteId: q.id)) ?? []
+    }
+
+    /// Submit a batch of homeowner-authored questions for the active
+    /// quote, then push the provider so they see them on the
+    /// operations desk. `pending` is the local array of (lineItemId,
+    /// body) tuples the user added before tapping "Send to handyman".
+    func submitQuoteQuestions(_ pending: [(lineItemId: String?, body: String)]) async -> Bool {
+        guard let q = quote, let req = request else { return false }
+        guard !pending.isEmpty else { return true }
+        do {
+            for entry in pending {
+                let trimmed = entry.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                let insert = ProviderQuoteCommentInsert(
+                    quoteId: q.id,
+                    lineItemId: entry.lineItemId,
+                    body: trimmed,
+                    authorRole: "homeowner"
+                )
+                _ = try await DatabaseService.shared.createProviderQuoteComment(insert)
+            }
+            await reloadQuoteComments()
+            // Push the provider so they see the questions without
+            // having to refresh the operations desk.
+            await notifyProvider(
+                requestId: req.id,
+                eventType: "homeowner_quote_questions",
+                title: "New questions on your quote",
+                body: "\(pending.count) question\(pending.count == 1 ? "" : "s") on \"\(q.title)\". Tap to review."
+            )
+            return true
+        } catch {
+            print("[HandymanRequestCoordinator] submitQuoteQuestions failed: \(error)")
+            return false
+        }
     }
 
     /// Push-driven deep link: load a specific quote by id and pin it as
@@ -1453,6 +1523,24 @@ final class HandymanRequestCoordinator: ObservableObject {
         }
         quote = row
         return true
+    }
+
+    /// Push-driven deep link: when a handyman_* push arrives carrying
+    /// a `request_id`, load that specific request (and its linked
+    /// visit task). Without this, the push handler always opened the
+    /// soonest scheduled visit — which meant a reschedule on a
+    /// follow-up visit silently rerouted the homeowner to the MAIN
+    /// visit and the propose_time message never surfaced. Returns
+    /// the matching task (so the caller can pin it as `presentedVisit`)
+    /// or nil when the request can't be found.
+    func loadByRequestId(_ requestId: UUID) async -> HandymanRequestRow? {
+        let fetched = try? await DatabaseService.shared.fetchHandymanRequest(id: requestId)
+        guard let req = fetched ?? nil else { return nil }
+        // Apply the request directly (this also reloads messages,
+        // quote, and switches the Realtime subscription).
+        loadedVisitId = req.visitTaskId
+        await applyRequest(req)
+        return req
     }
 
     /// Mark the homeowner's response on the latest quote.

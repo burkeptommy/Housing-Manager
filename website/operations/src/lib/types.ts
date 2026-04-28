@@ -253,6 +253,17 @@ export interface QuoteLineItem {
   total?: number;
 }
 
+export interface QuoteComment {
+  id: string;
+  quoteId: string;
+  lineItemId: string | null;
+  parentCommentId: string | null;
+  authorRole: "homeowner" | "provider" | string;
+  body: string;
+  status: "open" | "answered" | string;
+  createdAt: string;
+}
+
 export interface Quote {
   id: string;
   workspaceId: string;

@@ -23,6 +23,21 @@ struct HandymanQuoteReviewSheet: View {
     /// pin it here so the main view renders that version's line items
     /// and totals (read-only — actions stay scoped to the live quote).
     @State private var viewingVersion: ProviderQuoteRow?
+    /// Phase 75h Q&A — line item the user just tapped. Drives the
+    /// inline comment composer sheet.
+    @State private var commentingLine: ProviderQuoteLineItem?
+    /// Locally-staged questions the user has typed but hasn't sent
+    /// yet. Each has the line_item_id, the body text, and a generated
+    /// id so the UI can list them. Sent in a single batch via the
+    /// "Send to handyman" footer button.
+    @State private var pendingQuestions: [PendingQuestion] = []
+    @State private var sendingQuestions = false
+
+    struct PendingQuestion: Identifiable, Equatable {
+        let id = UUID()
+        let lineItemId: String?
+        var body: String
+    }
 
     /// The quote currently displayed. Defaults to the live quote, but
     /// flips to a historical version when the user is browsing.
@@ -141,6 +156,25 @@ struct HandymanQuoteReviewSheet: View {
                     showHistorySheet = false
                 }
             )
+        }
+        .sheet(item: $commentingLine) { line in
+            LineItemCommentSheet(
+                line: line,
+                existingComments: coordinator.quoteComments.filter { $0.lineItemId == line.id },
+                pendingForLine: pendingQuestions.filter { $0.lineItemId == line.id },
+                vendorName: vendor?.companyName,
+                onAdd: { body in
+                    pendingQuestions.append(PendingQuestion(lineItemId: line.id, body: body))
+                },
+                onRemovePending: { id in
+                    pendingQuestions.removeAll { $0.id == id }
+                }
+            )
+        }
+        .safeAreaInset(edge: .bottom) {
+            if !pendingQuestions.isEmpty && !isViewingHistorical {
+                pendingQuestionsFooter
+            }
         }
     }
 
@@ -349,15 +383,34 @@ struct HandymanQuoteReviewSheet: View {
 
     private func lineItemsSection(quote: ProviderQuoteRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("LINE ITEMS")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.5)
-                .foregroundStyle(HavenColors.textTertiary)
-                .padding(.horizontal, 4)
+            HStack(spacing: 6) {
+                Text("LINE ITEMS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Spacer()
+                if !isViewingHistorical {
+                    Text("Tap any item to ask a question")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
                 ForEach(Array(quote.lineItems.enumerated()), id: \.element.id) { index, line in
-                    LineItemRow(line: line, isLast: index == quote.lineItems.count - 1)
+                    Button {
+                        if !isViewingHistorical { commentingLine = line }
+                    } label: {
+                        LineItemRow(
+                            line: line,
+                            isLast: index == quote.lineItems.count - 1,
+                            commentCount: commentCount(for: line.id),
+                            pendingCount: pendingCount(for: line.id)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isViewingHistorical)
                 }
                 Divider()
                     .padding(.horizontal, 14)
@@ -505,6 +558,75 @@ struct HandymanQuoteReviewSheet: View {
         }
     }
 
+    // MARK: - Q&A helpers
+
+    /// Sent + provider-replied comments tied to this line item — drives
+    /// the small badge on the row.
+    private func commentCount(for lineItemId: String) -> Int {
+        coordinator.quoteComments.filter { $0.lineItemId == lineItemId }.count
+    }
+
+    /// Locally-staged questions the user added but hasn't sent yet.
+    private func pendingCount(for lineItemId: String) -> Int {
+        pendingQuestions.filter { $0.lineItemId == lineItemId }.count
+    }
+
+    private var pendingQuestionsFooter: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(pendingQuestions.count) question\(pendingQuestions.count == 1 ? "" : "s") ready to send")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy900)
+                    Text("Your handyman gets a push and can reply on each item.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Button {
+                    Task { await sendPending() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if sendingQuestions {
+                            ProgressView().tint(.white).controlSize(.small)
+                        } else {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                        Text(sendingQuestions ? "Sending…" : "Send to handyman")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .foregroundStyle(.white)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(HavenColors.action)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(sendingQuestions)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(HavenColors.surface)
+        }
+    }
+
+    private func sendPending() async {
+        let toSend = pendingQuestions.map { (lineItemId: $0.lineItemId, body: $0.body) }
+        sendingQuestions = true
+        let ok = await coordinator.submitQuoteQuestions(toSend)
+        sendingQuestions = false
+        if ok {
+            Haptics.success()
+            pendingQuestions = []
+        } else {
+            Haptics.error()
+        }
+    }
+
     private func formatCurrency(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -517,6 +639,8 @@ struct HandymanQuoteReviewSheet: View {
 private struct LineItemRow: View {
     let line: ProviderQuoteLineItem
     let isLast: Bool
+    var commentCount: Int = 0
+    var pendingCount: Int = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -536,9 +660,22 @@ private struct LineItemRow: View {
                         .foregroundStyle(HavenColors.textTertiary)
                 }
                 Spacer()
-                Text(formatCurrency(line.quantity * line.unitPrice))
-                    .font(HavenTypography.fraunces(size: 16, weight: 600))
-                    .foregroundStyle(HavenColors.navy900)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(formatCurrency(line.quantity * line.unitPrice))
+                        .font(HavenTypography.fraunces(size: 16, weight: 600))
+                        .foregroundStyle(HavenColors.navy900)
+                    if commentCount + pendingCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bubble.left.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(pendingCount > 0
+                                 ? "\(pendingCount) draft\(pendingCount == 1 ? "" : "s")"
+                                 : "\(commentCount)")
+                                .font(.system(size: 10.5, weight: .semibold))
+                        }
+                        .foregroundStyle(pendingCount > 0 ? HavenColors.action : HavenColors.navy700)
+                    }
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -720,5 +857,219 @@ struct QuoteVersionHistorySheet: View {
         formatter.currencyCode = "USD"
         formatter.maximumFractionDigits = value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
         return formatter.string(from: NSNumber(value: value)) ?? "$\(Int(value))"
+    }
+}
+
+// MARK: - Line item comment sheet
+
+/// Inline composer for adding questions / comments to a single line
+/// item. Shows existing replies from the provider, the user's locally-
+/// staged drafts (red coral), and a text field to add another. Send
+/// happens via the parent's footer button — this sheet just collects.
+struct LineItemCommentSheet: View {
+    let line: ProviderQuoteLineItem
+    let existingComments: [ProviderQuoteCommentRow]
+    let pendingForLine: [HandymanQuoteReviewSheet.PendingQuestion]
+    let vendorName: String?
+    let onAdd: (String) -> Void
+    let onRemovePending: (UUID) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: String = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerCard
+                    if !existingComments.isEmpty || !pendingForLine.isEmpty {
+                        threadSection
+                    }
+                    composer
+                    Spacer(minLength: 24)
+                }
+                .padding(20)
+            }
+            .background(HavenColors.background)
+            .navigationTitle("Ask a question")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("LINE ITEM")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(HavenColors.textTertiary)
+            Text(line.name)
+                .font(HavenTypography.fraunces(size: 20, weight: 600))
+                .foregroundStyle(HavenColors.navy900)
+            if let desc = line.description, !desc.isEmpty {
+                Text(desc)
+                    .font(.system(size: 13))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(HavenColors.beige200, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var threadSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CONVERSATION")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            ForEach(existingComments) { comment in
+                commentBubble(
+                    body: comment.body,
+                    when: comment.createdAt.formatted(.relative(presentation: .named)),
+                    isHomeowner: comment.isHomeowner,
+                    isPending: false,
+                    pendingId: nil
+                )
+            }
+
+            ForEach(pendingForLine) { pending in
+                commentBubble(
+                    body: pending.body,
+                    when: "draft — not sent yet",
+                    isHomeowner: true,
+                    isPending: true,
+                    pendingId: pending.id
+                )
+            }
+        }
+    }
+
+    private func commentBubble(
+        body: String,
+        when: String,
+        isHomeowner: Bool,
+        isPending: Bool,
+        pendingId: UUID?
+    ) -> some View {
+        HStack {
+            if isHomeowner { Spacer(minLength: 36) }
+            VStack(alignment: isHomeowner ? .trailing : .leading, spacing: 4) {
+                Text(body)
+                    .font(.system(size: 14))
+                    .foregroundStyle(isHomeowner ? .white : HavenColors.navy900)
+                    .multilineTextAlignment(isHomeowner ? .trailing : .leading)
+                HStack(spacing: 6) {
+                    Text(isHomeowner ? "You" : (vendorName ?? "Handyman"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(
+                            isHomeowner ? Color.white.opacity(0.7) : HavenColors.textTertiary
+                        )
+                    Text("·")
+                        .foregroundStyle(
+                            isHomeowner ? Color.white.opacity(0.5) : HavenColors.textTertiary
+                        )
+                    Text(when)
+                        .font(.system(size: 10))
+                        .foregroundStyle(
+                            isHomeowner ? Color.white.opacity(0.7) : HavenColors.textTertiary
+                        )
+                    if isPending, let pid = pendingId {
+                        Button {
+                            onRemovePending(pid)
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.7))
+                                .padding(2)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isHomeowner
+                          ? (isPending ? HavenColors.actionPressed : HavenColors.action)
+                          : HavenColors.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(isHomeowner ? Color.clear : HavenColors.beige200, lineWidth: 1)
+            )
+            if !isHomeowner { Spacer(minLength: 36) }
+        }
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("YOUR QUESTION")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(HavenColors.textTertiary)
+            TextField(
+                "Why is this priced higher than I expected?",
+                text: $draft,
+                axis: .vertical
+            )
+            .lineLimit(3...8)
+            .font(.system(size: 14))
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(HavenColors.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(HavenColors.beige200, lineWidth: 1)
+            )
+
+            Button {
+                let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                onAdd(trimmed)
+                draft = ""
+                Haptics.light()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14, weight: .bold))
+                    Text("Add to questions")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(.white)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                              ? HavenColors.beige400
+                              : HavenColors.action)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            Text("Add as many as you want — they all send together when you tap “Send to handyman.”")
+                .font(.system(size: 11.5))
+                .foregroundStyle(HavenColors.textSecondary)
+                .padding(.top, 2)
+        }
     }
 }

@@ -2054,6 +2054,50 @@ enum ProviderQuoteStatus: String, Codable, CaseIterable {
     }
 }
 
+/// One Q&A entry on a quote — either a homeowner question or a
+/// provider reply. `lineItemId` is null for quote-level comments.
+/// Phase 75h.
+struct ProviderQuoteCommentRow: Codable, Identifiable {
+    let id: UUID
+    let quoteId: UUID
+    let lineItemId: String?
+    let parentCommentId: UUID?
+    let authorRole: String
+    let authorUserId: UUID?
+    let body: String
+    let status: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, body, status
+        case quoteId = "quote_id"
+        case lineItemId = "line_item_id"
+        case parentCommentId = "parent_comment_id"
+        case authorRole = "author_role"
+        case authorUserId = "author_user_id"
+        case createdAt = "created_at"
+    }
+
+    var isHomeowner: Bool { authorRole == "homeowner" }
+    var isProvider: Bool { authorRole == "provider" }
+}
+
+struct ProviderQuoteCommentInsert: Codable {
+    let quoteId: UUID
+    let lineItemId: String?
+    let body: String
+    var parentCommentId: UUID? = nil
+    let authorRole: String
+
+    enum CodingKeys: String, CodingKey {
+        case body
+        case quoteId = "quote_id"
+        case lineItemId = "line_item_id"
+        case parentCommentId = "parent_comment_id"
+        case authorRole = "author_role"
+    }
+}
+
 struct ProviderQuoteRow: Codable, Identifiable {
     let id: UUID
     let workspaceId: UUID

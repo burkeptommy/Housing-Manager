@@ -4973,6 +4973,74 @@ serve(async (req) => {
         return json(result);
       }
 
+      // Phase 75h: provider replies to a homeowner question on a
+      // specific line item. Inserts a provider-authored comment +
+      // marks the parent question as answered + pushes the homeowner.
+      if (action === "reply_to_quote_comment") {
+        const workspaceId = compactString(body.workspaceId);
+        const userId = compactString(user.id);
+        const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+        assertPermission(membership, "canBuildQuotes");
+
+        const parentCommentId = compactString(body.parentCommentId);
+        const replyBody = compactString(body.body);
+        if (!parentCommentId) throw new Error("parentCommentId is required");
+        if (!replyBody) throw new Error("Reply body is required");
+
+        // Load the parent comment + the parent quote so we know which
+        // workspace + line + household this applies to.
+        const { data: parent, error: parentError } = await service
+          .from("provider_quote_comments")
+          .select("id, quote_id, line_item_id, status")
+          .eq("id", parentCommentId)
+          .maybeSingle();
+        if (parentError) throw parentError;
+        if (!parent) throw new Error("Parent comment not found");
+
+        const { data: quote, error: quoteError } = await service
+          .from("provider_quotes")
+          .select("id, workspace_id, household_id, request_id, title")
+          .eq("id", parent.quote_id)
+          .eq("workspace_id", workspaceId)
+          .maybeSingle();
+        if (quoteError) throw quoteError;
+        if (!quote) throw new Error("Quote not found in this workspace");
+
+        const { data: inserted, error: insertError } = await service
+          .from("provider_quote_comments")
+          .insert({
+            quote_id: parent.quote_id,
+            line_item_id: parent.line_item_id,
+            parent_comment_id: parentCommentId,
+            author_role: "provider",
+            author_user_id: userId,
+            body: replyBody,
+            status: "answered",
+          })
+          .select()
+          .single();
+        if (insertError) throw insertError;
+
+        // Mark the original question as answered.
+        await service
+          .from("provider_quote_comments")
+          .update({ status: "answered" })
+          .eq("id", parentCommentId);
+
+        // Push the homeowner so they see the reply without manual refresh.
+        if (compactString(quote.household_id)) {
+          await notifyHomeownersForRequest(service, compactString(quote.household_id), {
+            title: "Your handyman replied",
+            body: `New reply on "${compactString(quote.title)}". Tap to read.`,
+            requestId: compactString(quote.request_id) || compactString(quote.id),
+            eventType: "handyman_quote_reply",
+            extra: { quote_id: compactString(quote.id) },
+          });
+        }
+
+        return json({ ok: true, reply: inserted });
+      }
+
       return json({ error: "Unknown action" }, 400);
     }
 
