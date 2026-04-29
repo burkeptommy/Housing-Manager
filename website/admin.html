@@ -83,6 +83,9 @@
               </p>
             </div>
             <div class="admin-topbar__actions">
+              <button type="button" class="admin-button is-hidden" data-preview-quiz>
+                Preview entire quiz
+              </button>
               <button type="button" class="admin-button" data-export-config>
                 Export config
               </button>
@@ -135,40 +138,53 @@
                   <span class="admin-pill" data-detail-status></span>
                 </div>
 
-                <div class="admin-form-grid">
-                  <label>
-                    <span>Title</span>
-                    <input data-field-title />
-                  </label>
-                  <label>
-                    <span>Status</span>
-                    <select data-field-status>
-                      <option value="active">Active</option>
-                      <option value="draft">Draft</option>
-                      <option value="cut">Cut</option>
-                      <option value="defer">Defer</option>
-                      <option value="reshape">Reshape</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Category / chapter</span>
-                    <input data-field-category />
-                  </label>
-                  <label>
-                    <span>Sort order</span>
-                    <input data-field-sort type="number" />
+                <div class="admin-detail__quick-actions" data-detail-quick-actions>
+                  <button type="button" class="admin-button admin-button--secondary is-hidden" data-preview-question>
+                    Preview this question
+                  </button>
+                </div>
+
+                <!-- Schema-driven form (live entities — Quiz / Tasks / etc.). -->
+                <div class="admin-form-host" data-form-host></div>
+
+                <!-- Diff strip (only renders when proposed changes exist on a live entity). -->
+                <div class="admin-diff-host" data-diff-host></div>
+
+                <!-- Curated form (admin_content_items — only shown when no live schema applies). -->
+                <div class="admin-curated-form is-hidden" data-curated-form>
+                  <div class="admin-form-grid">
+                    <label>
+                      <span>Title</span>
+                      <input data-field-title />
+                    </label>
+                    <label>
+                      <span>Status</span>
+                      <select data-field-status>
+                        <option value="active">Active</option>
+                        <option value="draft">Draft</option>
+                        <option value="cut">Cut</option>
+                        <option value="defer">Defer</option>
+                        <option value="reshape">Reshape</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Category</span>
+                      <input data-field-category />
+                    </label>
+                    <label>
+                      <span>Sort order</span>
+                      <input data-field-sort type="number" />
+                    </label>
+                  </div>
+
+                  <label class="admin-block-label">
+                    <span>Description / route notes</span>
+                    <textarea data-field-description rows="4"></textarea>
                   </label>
                 </div>
 
-                <label class="admin-block-label">
-                  <span>Description / route notes</span>
-                  <textarea data-field-description rows="4"></textarea>
-                </label>
-
-                <label class="admin-block-label">
-                  <span>Payload JSON</span>
-                  <textarea data-field-payload rows="10" spellcheck="false"></textarea>
-                </label>
+                <!-- Hidden field — old payload JSON path kept as a safety net for surfaces that don't have a structured schema yet. -->
+                <textarea data-field-payload class="is-hidden" hidden></textarea>
 
                 <div class="admin-detail__actions">
                   <button type="button" class="admin-button admin-button--primary" data-save-item>
@@ -235,6 +251,9 @@
         </section>
       </section>
     </main>
+
+    <!-- Datalist for system-picker controls in the schema-driven form. Populated at runtime from system-categories.json. -->
+    <datalist id="admin-system-options"></datalist>
 
     <script type="module" src="/admin.js"></script>
   </body>

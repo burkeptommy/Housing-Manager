@@ -1,4 +1,16 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import {
+  SCHEMAS,
+  renderEntityForm,
+  attachFormHandlers,
+  computeProposedDiff,
+  renderDiffStrip,
+} from "/admin-forms.js";
+import {
+  openQuestionPreview,
+  openQuizFlowPreview,
+  closePreview,
+} from "/admin-preview.js";
 
 const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -218,6 +230,23 @@ const el = {
   // Admin Lab v2 — Phase 4 note form additions
   fieldIntent: document.querySelector("[data-field-intent]"),
   fieldTarget: document.querySelector("[data-field-target]"),
+  // Phase 4b — schema-driven form + diff + previews
+  formHost: document.querySelector("[data-form-host]"),
+  diffHost: document.querySelector("[data-diff-host]"),
+  curatedForm: document.querySelector("[data-curated-form]"),
+  previewQuestion: document.querySelector("[data-preview-question]"),
+  previewQuiz: document.querySelector("[data-preview-quiz]"),
+  systemOptions: document.querySelector("#admin-system-options"),
+};
+
+// Phase 4b — per-detail editing state. `original` is the unmodified entity
+// from the JSON snapshot (or admin_content_items row). `current` is a deep
+// clone we mutate as Tom edits. The diff between the two is the
+// proposed_diff that gets attached to the next saved note.
+const editingState = {
+  viewId: null,
+  original: null,
+  current: null,
 };
 
 init();
@@ -245,6 +274,62 @@ function wireEvents() {
   el.duplicateItem.addEventListener("click", duplicateSelectedItem);
   el.deleteItem.addEventListener("click", deleteSelectedItem);
   el.saveNote.addEventListener("click", saveContextNote);
+
+  // Phase 4b — preview buttons + flow drilldown
+  el.previewQuestion?.addEventListener("click", () => {
+    if (!state.selected || state.selected.itemType !== "question") return;
+    openQuestionPreview(structuredCloneSafe(editingState.current ?? state.selected.payload), {
+      index: indexOfSelectedQuestion(),
+      total: state.liveData["quiz-questions"]?.entries?.length || 41,
+    });
+  });
+  el.previewQuiz?.addEventListener("click", () => {
+    const entries = state.liveData["quiz-questions"]?.entries || [];
+    if (!entries.length) {
+      alert("Quiz JSON not loaded yet. Run scripts/export_swift_admin_data.mjs and refresh.");
+      return;
+    }
+    // Annotate each Q with note count for the flow listing.
+    const annotated = entries.map((q) => ({
+      ...q,
+      _noteCount: state.notes.filter((n) => n.scopeType === "question" && (n.scopeId === q.id || n.scopeTitle === q.title))
+        .length,
+    }));
+    openQuizFlowPreview(annotated);
+    // Wire flow item clicks to open single-question preview.
+    setTimeout(() => {
+      document.querySelectorAll("[data-preview-question-id]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.previewQuestionId;
+          const q = entries.find((entry) => entry.id === id);
+          if (!q) return;
+          closePreview();
+          openQuestionPreview(q, { index: entries.findIndex((entry) => entry.id === id) + 1, total: entries.length });
+        });
+      });
+    }, 60);
+  });
+}
+
+function indexOfSelectedQuestion() {
+  const entries = state.liveData["quiz-questions"]?.entries || [];
+  const id = state.selected?.payload?.id;
+  if (!id) return 1;
+  const idx = entries.findIndex((q) => q.id === id);
+  return idx >= 0 ? idx + 1 : 1;
+}
+
+function populateSystemOptions() {
+  if (!el.systemOptions) return;
+  const sys = state.liveData["system-categories"]?.entries || [];
+  el.systemOptions.innerHTML = sys
+    .map(
+      (s) =>
+        `<option value="${escapeHtml(s.categoryKey)}">${escapeHtml(s.displayName || s.categoryKey)} · Tier ${escapeHtml(
+          s.tier || "?"
+        )}</option>`
+    )
+    .join("");
 }
 
 async function restoreSession() {
@@ -299,6 +384,7 @@ async function showApp() {
   el.sessionEmail.textContent = state.session?.user.email ?? ADMIN_EMAIL;
   renderNav();
   await loadLiveData();
+  populateSystemOptions();
   await loadAuditData();
   await loadAdminData();
   render();
@@ -631,6 +717,13 @@ function render() {
   el.statusFilter.value = state.statusFilter;
   el.newItem.textContent = state.view === "notes" ? "Add note" : "Add item";
   renderNav();
+
+  // Phase 4b — Preview-entire-quiz button is only relevant on the quiz view.
+  if (el.previewQuiz) {
+    if (state.view === "quiz") el.previewQuiz.classList.remove("is-hidden");
+    else el.previewQuiz.classList.add("is-hidden");
+  }
+
   if (state.view === "notes") {
     renderNotesView();
   } else {
@@ -690,6 +783,7 @@ function renderDetail() {
   if (!item) {
     el.emptyDetail.classList.remove("is-hidden");
     el.detail.classList.add("is-hidden");
+    resetEditingState();
     return;
   }
   el.emptyDetail.classList.add("is-hidden");
@@ -701,19 +795,80 @@ function renderDetail() {
     .join(" · ");
   el.detailStatus.textContent = item.status;
   el.detailStatus.dataset.tone = item.status;
-  el.fieldTitle.value = item.title ?? "";
-  el.fieldStatus.value = item.status ?? "draft";
-  el.fieldCategory.value = item.category ?? "";
-  el.fieldSort.value = String(item.sortOrder ?? 0);
-  el.fieldDescription.value = item.description ?? "";
-  el.fieldPayload.value = JSON.stringify(item.payload ?? {}, null, 2);
+
+  // Phase 4b — branch on whether this surface has a structured schema.
+  const viewId = state.view;
+  const schema = SCHEMAS[viewId];
+  const hasLiveSchema = !!schema && item.source === "live";
+
+  // Toggle preview-question button on quiz only.
+  if (el.previewQuestion) {
+    if (item.itemType === "question") el.previewQuestion.classList.remove("is-hidden");
+    else el.previewQuestion.classList.add("is-hidden");
+  }
+
+  if (hasLiveSchema) {
+    // Hide curated/legacy form. Render schema-driven form into formHost.
+    el.curatedForm?.classList.add("is-hidden");
+    if (el.formHost) {
+      // Deep-clone payload into editing state so inline edits don't mutate
+      // the cached liveData rendering. Original stays pristine for diff.
+      editingState.viewId = viewId;
+      editingState.original = structuredCloneSafe(item.payload ?? {});
+      editingState.current = structuredCloneSafe(item.payload ?? {});
+      el.formHost.innerHTML = renderEntityForm(viewId, editingState.current, editingState.original);
+      attachFormHandlers(el.formHost, viewId, editingState.original, editingState.current, () => {
+        renderDiff();
+      });
+    }
+    renderDiff();
+    el.saveItem.textContent = "Save proposed change";
+    el.promoteItem.disabled = true;
+    el.duplicateItem.disabled = true;
+    el.deleteItem.disabled = true;
+  } else {
+    // Curated / legacy mode — keep original form behavior.
+    el.curatedForm?.classList.remove("is-hidden");
+    if (el.formHost) el.formHost.innerHTML = "";
+    if (el.diffHost) el.diffHost.innerHTML = "";
+    resetEditingState();
+    el.fieldTitle.value = item.title ?? "";
+    el.fieldStatus.value = item.status ?? "draft";
+    el.fieldCategory.value = item.category ?? "";
+    el.fieldSort.value = String(item.sortOrder ?? 0);
+    el.fieldDescription.value = item.description ?? "";
+    if (el.fieldPayload) el.fieldPayload.value = JSON.stringify(item.payload ?? {}, null, 2);
+    el.saveItem.textContent = "Save item";
+    el.promoteItem.disabled = item.source === "admin";
+    el.duplicateItem.disabled = false;
+    el.deleteItem.disabled = item.source !== "admin";
+  }
+
   el.contextNote.value = "";
   renderContextNotes(item);
-  el.saveItem.textContent = "Save item";
-  el.saveNote.textContent = "Save note for Codex";
-  el.promoteItem.disabled = item.source === "admin";
-  el.duplicateItem.disabled = false;
-  el.deleteItem.disabled = item.source !== "admin";
+  el.saveNote.textContent = "Save note";
+}
+
+function resetEditingState() {
+  editingState.viewId = null;
+  editingState.original = null;
+  editingState.current = null;
+}
+
+function renderDiff() {
+  if (!el.diffHost) return;
+  if (!editingState.viewId) {
+    el.diffHost.innerHTML = "";
+    return;
+  }
+  const diff = computeProposedDiff(editingState.viewId, editingState.original, editingState.current);
+  el.diffHost.innerHTML = renderDiffStrip(diff, SCHEMAS[editingState.viewId]);
+  // Highlight save button when changes exist
+  if (Object.keys(diff).length > 0) {
+    el.saveItem.classList.add("admin-button--has-changes");
+  } else {
+    el.saveItem.classList.remove("admin-button--has-changes");
+  }
 }
 
 function renderNotesView() {
@@ -1004,8 +1159,19 @@ async function saveSelectedItem() {
     await saveGeneralNote();
     return;
   }
+
+  // Phase 4b — live entity edits become structured proposed_diff notes,
+  // never direct mutations to admin_content_items.
+  if (editingState.viewId && state.selected?.source === "live") {
+    await saveLiveProposal();
+    return;
+  }
+
   const current = state.selected;
   if (!current) return;
+  // Curated mode — payload still shipped as JSON because admin_content_items
+  // doesn't have a per-surface schema. Hidden textarea is populated from
+  // structured data when we switch to it; otherwise stays the prior value.
   let payload;
   try {
     payload = JSON.parse(el.fieldPayload.value || "{}");
@@ -1040,6 +1206,78 @@ async function saveSelectedItem() {
     writeLocal(LOCAL_ITEMS_KEY, state.adminItems);
   }
   render();
+}
+
+async function saveLiveProposal() {
+  const item = state.selected;
+  if (!item || !editingState.viewId) return;
+  const diff = computeProposedDiff(editingState.viewId, editingState.original, editingState.current);
+  const changedKeys = Object.keys(diff);
+  if (!changedKeys.length) {
+    alert("No changes to save. Edit a field first.");
+    return;
+  }
+  const userBody = (el.contextNote.value || "").trim();
+  const summary = changedKeys
+    .map((k) => `${k}: ${formatDiffValue(diff[k].from)} → ${formatDiffValue(diff[k].to)}`)
+    .join("\n");
+  const body = userBody
+    ? `${userBody}\n\n---\nField changes:\n${summary}`
+    : `Field changes:\n${summary}`;
+  await writeNote({
+    scopeType: item.itemType,
+    scopeId:
+      item.payload?.id ||
+      item.payload?.questionId ||
+      item.payload?.templateKey ||
+      item.payload?.stableId ||
+      item.payload?.categoryKey ||
+      item.payload?.functionName ||
+      item.payload?.rawValue ||
+      item.id,
+    scopeTitle: item.title,
+    body,
+    intent: "change_request",
+    target: el.fieldTarget?.value || "claude",
+    proposedDiff: diff,
+    snapshot: {
+      itemType: item.itemType,
+      status: item.status,
+      category: item.category,
+      description: item.description,
+      payload: editingState.original,
+      capturedAt: new Date().toISOString(),
+      capturedFrom: window.location.origin,
+    },
+  });
+  el.contextNote.value = "";
+  // Keep the form's `current` values, but reset original to current so the
+  // diff strip clears (the proposal is now captured in a note).
+  editingState.original = structuredCloneSafe(editingState.current);
+  el.formHost.innerHTML = renderEntityForm(editingState.viewId, editingState.current, editingState.original);
+  attachFormHandlers(el.formHost, editingState.viewId, editingState.original, editingState.current, () => {
+    renderDiff();
+  });
+  renderDiff();
+  renderContextNotes(item);
+  flashSavePill();
+  el.saveItem.textContent = "Saved ✓";
+  setTimeout(() => {
+    el.saveItem.textContent = "Save proposed change";
+  }, 1500);
+}
+
+function formatDiffValue(value) {
+  if (value == null || value === "") return "(empty)";
+  if (Array.isArray(value)) {
+    if (!value.length) return "(empty)";
+    return value
+      .map((v) => (typeof v === "object" && v ? v.label || v.id || JSON.stringify(v) : String(v)))
+      .join(",");
+  }
+  if (typeof value === "boolean") return value ? "On" : "Off";
+  if (typeof value === "object") return JSON.stringify(value).slice(0, 60);
+  return String(value);
 }
 
 async function deleteSelectedItem() {

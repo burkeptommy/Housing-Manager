@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-29T00:27:55.041Z",
+  "generatedAt": "2026-04-29T00:52:25.410Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizAnswerMapper.swift",
-  "sourceCommit": "28d1fbd4",
+  "sourceCommit": "1d9fd02d",
   "note": "Heuristic side-effect digest from regex scan. v2 will parse case bodies with the Swift expression parser.",
   "effectsByQuestion": {
     "q1_roof_material": {
