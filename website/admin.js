@@ -264,6 +264,7 @@ const state = {
   lifecycleFilter: "all", // all | auto_seed | opt_in | bundle_child | bundle_parent
   seasonFilter: "all",    // all | Spring | Summer | Fall | Winter | year_round | Spring/Fall
   routingFilter: "all",   // all | vendor_only | vendor_or_handyman | handyman_only | bundled
+  handymanFilter: "all",  // all | spring | fall | library — only used on Handyman tab
   // Phase 7 — simulator scratch state. Fact bundle + last result so
   // re-rendering the surface doesn't reset Tom's edits.
   simFacts: structuredCloneSafePure(DEFAULT_FACTS),
@@ -934,19 +935,23 @@ const LIVE_MAPPERS = {
     lintCount: (r._lint || []).length,
   }),
   handyman: (t, idx) => {
-    // Phase 5p — Surface bundle membership clearly so Tom can scan the
-    // library and know which items auto-populate vs. which are available
-    // for the homeowner / handyman to opt into. Sort order pulls
-    // auto-populating bundles to the top: Spring → Fall → Library.
+    // Phase 5p / 5s — Surface the parent-visit-vs-punch-list-item
+    // distinction. The "Spring handyman visit" template carries
+    // bundleId: Handyman:spring AND bundleTitle: Spring Handyman Visit
+    // — that bundleTitle is the marker that this template IS the
+    // parent visit, not a punch-list item inside it.
     const bundleSpring = t.bundleId === "Handyman:spring";
     const bundleFall = t.bundleId === "Handyman:fall";
+    const isParentVisit = !!t.bundleTitle;     // the "Spring/Fall handyman visit" rows
+    const isPunchItem = (bundleSpring || bundleFall) && !isParentVisit;
     const isLibrary = !t.bundleId;
-    const bucketLabel = bundleSpring
-      ? "🌷 Auto-populates Spring punch list"
-      : bundleFall
-      ? "🍂 Auto-populates Fall punch list"
-      : "🛠️ Library — homeowner opt-in";
-    const sortBucket = bundleSpring ? 0 : bundleFall ? 1 : 2;
+    let bucketLabel;
+    let sortBucket;
+    if (isParentVisit && bundleSpring) { bucketLabel = "📅 Spring visit (the bundle parent)"; sortBucket = 0; }
+    else if (isPunchItem && bundleSpring) { bucketLabel = "🌷 Spring punch-list item (auto-populates)"; sortBucket = 1; }
+    else if (isParentVisit && bundleFall) { bucketLabel = "📅 Fall visit (the bundle parent)"; sortBucket = 2; }
+    else if (isPunchItem && bundleFall) { bucketLabel = "🍂 Fall punch-list item (auto-populates)"; sortBucket = 3; }
+    else { bucketLabel = "🛠️ Library — homeowner opt-in"; sortBucket = 4; }
     return {
       id: `live-handyman-${slug(t.templateKey)}`,
       source: "live",
@@ -954,12 +959,15 @@ const LIVE_MAPPERS = {
       title: titleCase(t.title),
       status: t.isEssential ? "active" : "draft",
       category: bucketLabel,
-      // Sort: bundle-spring first, then bundle-fall, then library — and
-      // alphabetically within each bucket so the list reads as 3 grouped
-      // sections without needing real <h2> dividers.
       sortOrder: sortBucket * 1000 + (titleCase(t.title) || "").charCodeAt(0),
       description: t.description || "",
-      payload: { ...t, _autoPopulates: bundleSpring ? "spring" : bundleFall ? "fall" : null, _libraryOnly: isLibrary },
+      payload: {
+        ...t,
+        _isParentVisit: isParentVisit,
+        _isPunchItem: isPunchItem,
+        _isLibrary: isLibrary,
+        _autoPopulates: isPunchItem && bundleSpring ? "spring" : isPunchItem && bundleFall ? "fall" : null,
+      },
       lintCount: (t._lint || []).length,
     };
   },
@@ -1418,6 +1426,7 @@ function jumpToTemplate(templateKey) {
       state.lifecycleFilter = "all";
       state.seasonFilter = "all";
       state.routingFilter = "all";
+      state.handymanFilter = "all";
       render();
       return;
     }
@@ -1441,6 +1450,7 @@ function jumpToRoutine(kind) {
     state.lifecycleFilter = "all";
     state.seasonFilter = "all";
     state.routingFilter = "all";
+      state.handymanFilter = "all";
     render();
     return;
   }
@@ -1464,6 +1474,7 @@ function renderNav() {
       state.lifecycleFilter = "all";
       state.seasonFilter = "all";
       state.routingFilter = "all";
+      state.handymanFilter = "all";
       render();
     });
   });
@@ -1518,8 +1529,39 @@ function renderFacetPills(allItems) {
     </div>
   `;
 
+  // Phase 5s — Handyman-only "Visit" filter row at the top so the parent
+  // visits + their punch items + the library are clearly separated.
+  let handymanRow = "";
+  if (state.view === "handyman") {
+    const counts = countByHandymanVisit(allItems);
+    const pillH = (val, label, count, tip) => {
+      const isActive = state.handymanFilter === val;
+      return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""}" data-facet-axis="handyman" data-facet-value="${escapeHtml(val)}" title="${escapeHtml(tip)}">
+        <span class="admin-facet-pill__label">${label}</span>
+        <span class="admin-facet-pill__count">${count}</span>
+      </button>`;
+    };
+    handymanRow = `
+      <div class="admin-facet-row">
+        <div class="admin-facet-row__head">
+          <span class="admin-facet-row__label">Visit</span>
+          <span class="admin-facet-row__caption admin-muted">
+            Parent visits (Spring + Fall) auto-populate punch items at season anchors. Library items are opt-in.
+          </span>
+        </div>
+        <div class="admin-facet-row__pills">
+          ${pillH("all", "All", allItems.length, "Show every handyman-eligible template — parent visits + punch items + library.")}
+          ${pillH("spring", "🌷 Spring visit", counts.spring, "The Spring Handyman Visit (parent) + 11 punch-list items that auto-populate inside it. The homeowner sees ONE scheduled task; the handyman knocks out all 11 in one visit.")}
+          ${pillH("fall", "🍂 Fall visit", counts.fall, "The Fall Handyman Visit (parent) + 12 punch-list items that auto-populate inside it.")}
+          ${pillH("library", "🛠️ Library", counts.library, "Standalone DIY-capable templates the homeowner adds opt-in via Recommended Services or the punch list 'Recommended' section.")}
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="admin-facets">
+      ${handymanRow}
       ${axisRow(
         "Lifecycle",
         "When does this template enter the homeowner's task list?",
@@ -1638,6 +1680,23 @@ function routingOf(item) {
 function countByRouting(items) {
   const out = { vendor: 0, vendor_or_handyman: 0, handyman: 0, homeowner_pull: 0, bundled: 0 };
   for (const i of items) out[routingOf(i)]++;
+  return out;
+}
+
+// Phase 5s — Handyman tab uses bundleId + bundleTitle to bucket into
+// Spring visit / Fall visit / Library. The parent visit row is the one
+// that carries `bundleTitle`; punch items share the same bundleId but
+// have empty bundleTitle. Library items have no bundleId at all.
+function handymanVisitOf(item) {
+  const t = item.payload || {};
+  if (t.bundleId === "Handyman:spring") return "spring";
+  if (t.bundleId === "Handyman:fall") return "fall";
+  return "library";
+}
+
+function countByHandymanVisit(items) {
+  const out = { spring: 0, fall: 0, library: 0 };
+  for (const i of items) out[handymanVisitOf(i)]++;
   return out;
 }
 
@@ -3571,6 +3630,10 @@ function renderTaskSummaryCard(item) {
   const seasonEmoji = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️", "Spring/Fall": "🔁" }[t.seasonalTiming] || "🔄";
   const seasonLabel = t.seasonalTiming || "Year-round";
   const proactive = computeProactiveSurfacing(t);
+  // Phase 5s — "Where this came from" = which quiz question creates
+  // the system that hosts this template. Walks the reverse index from
+  // quiz-questions.json _impact.creates_systems back to the systemCategory.
+  const upstreamQuestions = questionsCreatingSystem(t.systemCategory);
 
   // Bundle map — interactive parent + siblings
   let bundleMap = "";
@@ -3640,6 +3703,31 @@ function renderTaskSummaryCard(item) {
       ? `<strong>Opt-in.</strong> ${t.systemCategory === "Handyman" ? "Surfaced in the handyman punch list 'Recommended' section." : "Surfaced in PropertyDetailView → Recommended Services."} Homeowner taps + to schedule.`
       : `<strong>Auto-seeds at quiz completion</strong> if subtypes / region match.`;
 
+  // Phase 5s — "Where this template came from" block. Shows the quiz
+  // path that creates the system that hosts this template, so Tom can
+  // trace any task back to its provenance with one click.
+  let provenanceBlock = "";
+  if (upstreamQuestions.length) {
+    const links = upstreamQuestions.map((q) =>
+      `<button type="button" class="admin-jump-link" data-jump-question="${escapeHtml(q.id)}">${escapeHtml(q.id)} — ${escapeHtml(q.title || "")}</button>`
+    ).join(" ");
+    provenanceBlock = `
+      <div class="admin-summary__section">
+        <h4>🧬 Where this came from</h4>
+        <p>Created when the homeowner answers ${upstreamQuestions.length === 1 ? "this question" : "any of these questions"} during onboarding:</p>
+        <p>${links}</p>
+        <p class="admin-muted">Their answer creates the <strong>${escapeHtml(t.systemCategory || "")}</strong> system on the property, and this template seeds against that system at quiz completion (or via Recommended Services if it's opt-in).</p>
+      </div>
+    `;
+  } else if (t.systemCategory) {
+    provenanceBlock = `
+      <div class="admin-summary__section">
+        <h4>🧬 Where this came from</h4>
+        <p class="admin-muted">No quiz question directly creates the <strong>${escapeHtml(t.systemCategory)}</strong> system. It's auto-created by the reconciler at quiz completion (universal categories like Plumbing / Water Heater / Electrical / Septic / Well are stamped on every property) or surfaces only via opt-in.</p>
+      </div>
+    `;
+  }
+
   // Phase 67C — proactive surfacing block. For seasonal tasks, show
   // when the homeowner SEES the task vs. when the work HAPPENS, so Tom
   // can audit each template's lead-time at a glance.
@@ -3690,12 +3778,24 @@ function renderTaskSummaryCard(item) {
           <p>${lifecycle}</p>
         </div>
 
+        ${provenanceBlock}
         ${proactiveBlock}
         ${systemLink}
         ${bundleMap}
       </div>
     </section>
   `;
+}
+
+// Phase 5s — Reverse index: which quiz questions create the system
+// that hosts this template. Built once per render from the quiz JSON's
+// _impact.creates_systems field (heuristic, may miss edge cases).
+function questionsCreatingSystem(systemCategory) {
+  if (!systemCategory) return [];
+  const questions = state.liveData?.["quiz-questions"]?.entries || [];
+  return questions
+    .filter((q) => (q._impact?.creates_systems || []).includes(systemCategory))
+    .map((q) => ({ id: q.id, title: q.title }));
 }
 
 // Phase 67C — Compute the surfacing month + lead-time explanation for
@@ -3810,6 +3910,7 @@ function attachSummaryCardHandlers(host) {
         state.lifecycleFilter = "all";
         state.seasonFilter = "all";
         state.routingFilter = "all";
+      state.handymanFilter = "all";
         render();
       }
     });
@@ -3880,6 +3981,7 @@ function filterItems(items) {
         if (state.seasonFilter !== "year_round" && s !== state.seasonFilter) return false;
       }
       if (state.routingFilter !== "all" && routingOf(item) !== state.routingFilter) return false;
+      if (state.view === "handyman" && state.handymanFilter !== "all" && handymanVisitOf(item) !== state.handymanFilter) return false;
     }
     if (!q) return true;
     return [item.title, item.category, item.description, JSON.stringify(item.payload ?? {})]
