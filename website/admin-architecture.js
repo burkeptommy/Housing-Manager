@@ -440,122 +440,236 @@ const CLUSTERS = [
 // =============================================================================
 // Public API
 // =============================================================================
+// Single-object detail mode. The grid-of-cards view was too noisy — now
+// it's a clean cluster overview by default, and clicking any object
+// (or quick-jump nav row) swaps the pane to ONE object at a time with
+// its full fields + relationships rendered cleanly.
 
-export function renderArchitectureView() {
-  const clusterHtml = CLUSTERS
-    .map((cluster) => {
-      const objects = OBJECT_MAP.filter((o) => o.cluster === cluster.key);
-      return `
-        <section class="admin-arch__cluster">
-          <header>
-            <h3>${escapeHtml(cluster.label)}</h3>
-            <p>${escapeHtml(cluster.description)}</p>
-          </header>
-          <div class="admin-arch__grid">
-            ${objects.map(renderObjectCard).join("")}
-          </div>
-        </section>
-      `;
-    })
-    .join("");
+export function findObject(key) {
+  return OBJECT_MAP.find((o) => o.key === key) || null;
+}
 
+export function getObjectMapLite() {
+  return OBJECT_MAP.map((o) => ({ key: o.key, name: o.name, emoji: o.emoji, cluster: o.cluster }));
+}
+
+export function getClusters() {
+  return CLUSTERS;
+}
+
+// Render the empty-state overview shown when nothing is selected:
+// 7 cluster bands with the member objects as click-to-open chips.
+export function renderArchitectureOverview() {
   return `
-    <div class="admin-arch">
+    <div class="admin-arch admin-arch--overview">
       <header class="admin-arch__intro">
-        <p>Walkable map of every object the lab tracks — fields, relationships, and how they connect.
-        Click any "→ X" link to jump to that object's card.</p>
+        <p>Pick an object below (or in the left rail) to see its purpose, fields, and how it
+        connects to everything else. Each cluster groups objects by what part of the
+        product they sit in.</p>
       </header>
-      ${clusterHtml}
+      ${CLUSTERS
+        .map((cluster) => {
+          const objects = OBJECT_MAP.filter((o) => o.cluster === cluster.key);
+          return `
+            <section class="admin-arch__cluster">
+              <header>
+                <h3>${escapeHtml(cluster.label)}</h3>
+                <p>${escapeHtml(cluster.description)}</p>
+              </header>
+              <div class="admin-arch__chip-row">
+                ${objects
+                  .map(
+                    (o) => `
+                      <button type="button" class="admin-arch__chip" data-arch-open="${escapeHtml(o.key)}">
+                        <span class="admin-arch__chip-emoji">${o.emoji}</span>
+                        <span class="admin-arch__chip-name">${escapeHtml(o.name)}</span>
+                      </button>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </section>
+          `;
+        })
+        .join("")}
     </div>
   `;
 }
 
-function renderObjectCard(obj) {
-  const fields = (obj.keyFields || [])
-    .map(
-      (f) => `
-        <li>
-          <strong>${escapeHtml(f.label)}</strong>
-          <span>${escapeHtml(f.desc || "")}</span>
-        </li>
-      `
-    )
-    .join("");
+// Render the focused single-object detail panel.
+export function renderArchitectureObject(key) {
+  const obj = findObject(key);
+  if (!obj) return renderArchitectureOverview();
 
+  const cluster = CLUSTERS.find((c) => c.key === obj.cluster);
   const owns = (obj.relationships || []).filter((r) => r.kind === "owns");
   const belongsTo = (obj.relationships || []).filter((r) => r.kind === "belongs_to");
   const refs = (obj.relationships || []).filter((r) => r.kind === "references");
+  const incoming = computeIncoming(obj.key);
+
+  // Sibling chips inside the same cluster — handy for hopping laterally.
+  const siblings = OBJECT_MAP.filter((o) => o.cluster === obj.cluster && o.key !== obj.key);
 
   return `
-    <article class="admin-arch__card" id="arch-${escapeHtml(obj.key)}" data-arch-card="${escapeHtml(obj.key)}">
-      <header>
-        <span class="admin-arch__emoji">${obj.emoji}</span>
+    <div class="admin-arch admin-arch--detail">
+      <nav class="admin-arch__breadcrumb">
+        <button type="button" class="admin-arch__breadcrumb-btn" data-arch-back>← All objects</button>
+        ${cluster ? `<span class="admin-arch__breadcrumb-cluster">${escapeHtml(cluster.label)}</span>` : ""}
+      </nav>
+
+      <header class="admin-arch__hero">
+        <span class="admin-arch__hero-emoji">${obj.emoji}</span>
         <div>
-          <h4>${escapeHtml(obj.name)}</h4>
+          <h2>${escapeHtml(obj.name)}</h2>
           <code>${escapeHtml(obj.key)}</code>
+          <p>${escapeHtml(obj.purpose)}</p>
         </div>
       </header>
-      <p class="admin-arch__purpose">${escapeHtml(obj.purpose)}</p>
+
       ${
         obj.primaryKeys?.length
-          ? `<div class="admin-arch__keys">
-              <strong>Primary keys</strong>
-              <code>${obj.primaryKeys.map(escapeHtml).join(" · ")}</code>
+          ? `<div class="admin-arch__panel">
+              <h4>Primary keys</h4>
+              <ul class="admin-arch__keylist">
+                ${obj.primaryKeys.map((k) => `<li><code>${escapeHtml(k)}</code></li>`).join("")}
+              </ul>
             </div>`
           : ""
       }
+
       ${
-        fields
-          ? `<details class="admin-arch__fields"><summary>${obj.keyFields.length} key fields</summary><ul>${fields}</ul></details>`
+        obj.keyFields?.length
+          ? `<div class="admin-arch__panel">
+              <h4>${obj.keyFields.length} key fields</h4>
+              <ul class="admin-arch__fields-list">
+                ${obj.keyFields
+                  .map(
+                    (f) => `
+                      <li>
+                        <strong>${escapeHtml(f.label)}</strong>
+                        <span>${escapeHtml(f.desc || "")}</span>
+                      </li>
+                    `
+                  )
+                  .join("")}
+              </ul>
+            </div>`
           : ""
       }
-      ${renderRelGroup("Belongs to", belongsTo, "belongs-to")}
-      ${renderRelGroup("Owns / has many", owns, "owns")}
-      ${renderRelGroup("References", refs, "references")}
-    </article>
+
+      <div class="admin-arch__rel-grid">
+        ${renderRelPanel("Belongs to", belongsTo, "belongs-to", "What this object needs to exist.")}
+        ${renderRelPanel("Owns / has many", owns, "owns", "Things created when this object is created or deleted with it.")}
+        ${renderRelPanel("References", refs, "references", "Optional links — may or may not be set.")}
+        ${renderIncomingPanel(incoming)}
+      </div>
+
+      ${
+        siblings.length
+          ? `<div class="admin-arch__siblings">
+              <strong>Other objects in ${escapeHtml(cluster?.label || "this cluster")}</strong>
+              <div class="admin-arch__chip-row">
+                ${siblings
+                  .map(
+                    (s) => `
+                      <button type="button" class="admin-arch__chip admin-arch__chip--small" data-arch-open="${escapeHtml(s.key)}">
+                        <span class="admin-arch__chip-emoji">${s.emoji}</span>
+                        <span class="admin-arch__chip-name">${escapeHtml(s.name)}</span>
+                      </button>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </div>`
+          : ""
+      }
+    </div>
   `;
 }
 
-function renderRelGroup(title, rels, klass) {
+function renderRelPanel(title, rels, klass, blurb) {
   if (!rels.length) return "";
   return `
-    <div class="admin-arch__rels admin-arch__rels--${escapeHtml(klass)}">
-      <strong>${escapeHtml(title)}</strong>
+    <section class="admin-arch__rel-panel admin-arch__rel-panel--${escapeHtml(klass)}">
+      <header>
+        <h4>${escapeHtml(title)}</h4>
+        <p>${escapeHtml(blurb)}</p>
+      </header>
       <ul>
         ${rels
-          .map(
-            (r) => `
+          .map((r) => {
+            const target = findObject(r.target);
+            return `
               <li>
-                <button type="button" class="admin-arch__rel-link" data-arch-target="${escapeHtml(r.target)}">
-                  → ${escapeHtml(targetName(r.target))}
+                <button type="button" class="admin-arch__rel-link" data-arch-open="${escapeHtml(r.target)}">
+                  ${target ? target.emoji + " " : ""}${escapeHtml(target?.name || r.target)}
                 </button>
-                <span class="admin-arch__rel-label">${escapeHtml(r.label)}${
-              r.desc ? ` · <em>${escapeHtml(r.desc)}</em>` : ""
-            }</span>
+                <p class="admin-arch__rel-label">
+                  ${escapeHtml(r.label)}${r.desc ? ` <em>${escapeHtml(r.desc)}</em>` : ""}
+                </p>
+              </li>
+            `;
+          })
+          .join("")}
+      </ul>
+    </section>
+  `;
+}
+
+// Compute who points AT this object (the inverse map). e.g. for Property,
+// we list every object whose relationships array references key 'property'.
+function computeIncoming(targetKey) {
+  const incoming = [];
+  for (const obj of OBJECT_MAP) {
+    if (obj.key === targetKey) continue;
+    for (const rel of obj.relationships || []) {
+      if (rel.target !== targetKey) continue;
+      incoming.push({ from: obj, rel });
+    }
+  }
+  return incoming;
+}
+
+function renderIncomingPanel(incoming) {
+  if (!incoming.length) return "";
+  return `
+    <section class="admin-arch__rel-panel admin-arch__rel-panel--incoming">
+      <header>
+        <h4>Linked from</h4>
+        <p>Other objects that point at this one. Reverse of the panels above.</p>
+      </header>
+      <ul>
+        ${incoming
+          .map(
+            ({ from, rel }) => `
+              <li>
+                <button type="button" class="admin-arch__rel-link" data-arch-open="${escapeHtml(from.key)}">
+                  ${from.emoji} ${escapeHtml(from.name)}
+                </button>
+                <p class="admin-arch__rel-label">
+                  <em>${escapeHtml(rel.kind)}</em> · ${escapeHtml(rel.label)}
+                </p>
               </li>
             `
           )
           .join("")}
       </ul>
-    </div>
+    </section>
   `;
 }
 
-function targetName(key) {
-  const obj = OBJECT_MAP.find((o) => o.key === key);
-  return obj ? `${obj.emoji} ${obj.name}` : key;
-}
-
-export function attachArchitectureHandlers(container) {
-  container.querySelectorAll("[data-arch-target]").forEach((btn) => {
+// Hand-off — admin.js calls this after dropping our HTML into the form
+// host. It wires every "Open object" button to the navigate callback
+// (provided by admin.js) so router state stays in admin.js.
+export function attachArchitectureHandlers(container, { onOpen, onBack } = {}) {
+  container.querySelectorAll("[data-arch-open]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const targetKey = btn.dataset.archTarget;
-      const target = container.querySelector(`#arch-${CSS.escape(targetKey)}`);
-      if (!target) return;
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      target.classList.add("is-flashing");
-      setTimeout(() => target.classList.remove("is-flashing"), 1800);
+      const key = btn.dataset.archOpen;
+      onOpen?.(key);
     });
+  });
+  container.querySelectorAll("[data-arch-back]").forEach((btn) => {
+    btn.addEventListener("click", () => onBack?.());
   });
 }
 

@@ -20,8 +20,12 @@ import {
   attachFactFormHandlers,
 } from "/admin-simulator.js";
 import {
-  renderArchitectureView,
+  renderArchitectureOverview,
+  renderArchitectureObject,
   attachArchitectureHandlers,
+  findObject as findArchObject,
+  getObjectMapLite,
+  getClusters,
 } from "/admin-architecture.js";
 
 const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
@@ -242,6 +246,8 @@ const state = {
   // re-rendering the surface doesn't reset Tom's edits.
   simFacts: structuredCloneSafePure(DEFAULT_FACTS),
   simResult: null,
+  // Phase 5e — currently-focused architecture object (null = overview).
+  archSelectedKey: null,
 };
 
 function structuredCloneSafePure(value) {
@@ -1887,73 +1893,92 @@ function renderArchitectureSurface() {
   el.curatedForm?.classList.add("is-hidden");
   if (el.formHost) el.formHost.innerHTML = "";
   if (el.diffHost) el.diffHost.innerHTML = "";
-  el.detailKind.textContent = "object map";
-  el.detailTitle.textContent = "How everything connects";
-  el.detailSubtitle.textContent = "Read top to bottom or click any “→ Object” to jump.";
-  el.detailStatus.textContent = "browse";
-  el.detailStatus.dataset.tone = "active";
   if (el.lockToggle) el.lockToggle.classList.add("is-hidden");
   if (el.previewQuestion) el.previewQuestion.classList.add("is-hidden");
   if (el.launchPill) el.launchPill.classList.add("is-hidden");
   if (el.detailTabs) el.detailTabs.classList.add("is-hidden");
 
-  // Show the architecture content in the form host slot.
+  // Header reflects whether we're looking at an object or the overview.
+  const focused = state.archSelectedKey ? findArchObject(state.archSelectedKey) : null;
+  if (focused) {
+    el.detailKind.textContent = focused.cluster;
+    el.detailTitle.textContent = `${focused.emoji} ${focused.name}`;
+    el.detailSubtitle.textContent = "Click any related object to navigate to it.";
+    el.detailStatus.textContent = "object";
+  } else {
+    el.detailKind.textContent = "object map";
+    el.detailTitle.textContent = "Pick an object to start";
+    el.detailSubtitle.textContent = "Or use the left rail to jump straight in.";
+    el.detailStatus.textContent = "overview";
+  }
+  el.detailStatus.dataset.tone = "active";
+
+  // Render the appropriate body into formHost.
   if (el.formHost) {
-    el.formHost.innerHTML = renderArchitectureView();
-    attachArchitectureHandlers(el.formHost);
+    el.formHost.innerHTML = focused
+      ? renderArchitectureObject(focused.key)
+      : renderArchitectureOverview();
+    attachArchitectureHandlers(el.formHost, {
+      onOpen: openArchitectureObject,
+      onBack: clearArchitectureObject,
+    });
   }
 
-  // List panel: surface a quick-jump nav of all objects.
+  // Left rail: cluster-grouped quick-jump nav with the current object
+  // highlighted (cluster headers separate the list visually).
+  const lite = getObjectMapLite();
+  const clusters = getClusters();
   el.list.innerHTML = `
     <div class="admin-arch__nav">
-      <strong>Quick jump</strong>
-      <ul>
-        ${OBJECT_MAP_LITE.map((o) => `
-          <li>
-            <button type="button" data-arch-jump="${escapeHtml(o.key)}">
-              <span>${o.emoji}</span> ${escapeHtml(o.name)}
-            </button>
-          </li>
-        `).join("")}
-      </ul>
+      <strong>Object map</strong>
+      ${clusters
+        .map((cluster) => {
+          const objects = lite.filter((o) => o.cluster === cluster.key);
+          if (!objects.length) return "";
+          return `
+            <div class="admin-arch__nav-cluster">
+              <span class="admin-arch__nav-cluster-label">${escapeHtml(cluster.label)}</span>
+              <ul>
+                ${objects
+                  .map(
+                    (o) => `
+                      <li>
+                        <button type="button" data-arch-jump="${escapeHtml(o.key)}" class="${state.archSelectedKey === o.key ? "is-active" : ""}">
+                          <span>${o.emoji}</span> ${escapeHtml(o.name)}
+                        </button>
+                      </li>
+                    `
+                  )
+                  .join("")}
+              </ul>
+            </div>
+          `;
+        })
+        .join("")}
     </div>
   `;
   el.list.querySelectorAll("[data-arch-jump]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const target = el.formHost.querySelector(`#arch-${CSS.escape(btn.dataset.archJump)}`);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-        target.classList.add("is-flashing");
-        setTimeout(() => target.classList.remove("is-flashing"), 1800);
-      }
-    });
+    btn.addEventListener("click", () => openArchitectureObject(btn.dataset.archJump));
   });
 
-  el.stats.innerHTML = `<div class="admin-stat"><strong>${OBJECT_MAP_LITE.length}</strong><span>Objects mapped</span></div>`;
+  el.stats.innerHTML = focused
+    ? `<div class="admin-stat"><strong>${focused.keyFields?.length || 0}</strong><span>Key fields</span></div>
+       <div class="admin-stat"><strong>${(focused.relationships || []).length}</strong><span>Outgoing links</span></div>`
+    : `<div class="admin-stat"><strong>${lite.length}</strong><span>Objects mapped</span></div>
+       <div class="admin-stat"><strong>${clusters.length}</strong><span>Clusters</span></div>`;
 }
 
-// Lightweight list for the quick-jump nav (avoids re-importing the full map).
-const OBJECT_MAP_LITE = [
-  { key: "property", name: "Property", emoji: "🏠" },
-  { key: "home_system", name: "Home System", emoji: "⚙️" },
-  { key: "maintenance_task", name: "Maintenance Task", emoji: "✅" },
-  { key: "maintenance_template", name: "Maintenance Template", emoji: "📋" },
-  { key: "routine", name: "Routine", emoji: "🔁" },
-  { key: "routine_visit", name: "Routine Visit", emoji: "📅" },
-  { key: "handyman_punch_item", name: "Handyman Punch Item", emoji: "🔨" },
-  { key: "system_category", name: "System Category", emoji: "🏷️" },
-  { key: "routine_kind", name: "Routine Kind", emoji: "🌀" },
-  { key: "contractor", name: "Contractor", emoji: "🛠" },
-  { key: "family_member", name: "Family Member", emoji: "👤" },
-  { key: "vehicle", name: "Vehicle", emoji: "🚗" },
-  { key: "vehicle_service_record", name: "Vehicle Service Record", emoji: "🧾" },
-  { key: "document", name: "Document", emoji: "📄" },
-  { key: "project", name: "Project", emoji: "🛠" },
-  { key: "project_quote", name: "Project Quote", emoji: "💵" },
-  { key: "quiz_question", name: "Quiz Question", emoji: "❓" },
-  { key: "quiz_answer", name: "Quiz Answer", emoji: "🟢" },
-  { key: "edge_function_prompt", name: "Edge Function Prompt", emoji: "🧠" },
-];
+function openArchitectureObject(key) {
+  state.archSelectedKey = key;
+  renderArchitectureSurface();
+  // Scroll the new detail to the top so it always starts clean.
+  if (el.formHost) el.formHost.scrollTop = 0;
+}
+
+function clearArchitectureObject() {
+  state.archSelectedKey = null;
+  renderArchitectureSurface();
+}
 
 // =============================================================================
 // Phase 5b — CLAUDE_ADMIN_NOTES.md live preview

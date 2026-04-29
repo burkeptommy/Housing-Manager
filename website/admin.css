@@ -1398,7 +1398,7 @@
 }
 
 /* =============================================================================
-   Phase 5e — Architecture view
+   Phase 5e — Architecture view (overview + single-object detail)
    ============================================================================= */
 
 .admin-arch {
@@ -1414,13 +1414,15 @@
 
 .admin-arch__intro p {
   font: 500 14px var(--sans);
-  line-height: 1.5;
+  line-height: 1.55;
   margin: 0;
 }
 
+/* ---- Overview mode (cluster bands + chip rows) ----------------------- */
+
 .admin-arch__cluster {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .admin-arch__cluster header {
@@ -1439,182 +1441,276 @@
   margin: 0;
 }
 
-.admin-arch__grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-}
-
-.admin-arch__card {
-  background: #fff;
-  border: 1px solid var(--neutral-200);
-  border-radius: 14px;
-  display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  transition: box-shadow 240ms ease, border-color 240ms ease;
-}
-
-.admin-arch__card.is-flashing {
-  border-color: var(--salmon, #ed6955);
-  box-shadow: 0 0 0 4px rgba(237, 105, 85, 0.18);
-}
-
-.admin-arch__card header {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-}
-
-.admin-arch__emoji {
-  background: rgba(69, 58, 112, 0.08);
-  border-radius: 10px;
-  font-size: 22px;
-  height: 36px;
-  line-height: 36px;
-  text-align: center;
-  width: 36px;
-}
-
-.admin-arch__card header h4 {
-  font: 700 16px Fraunces, Georgia, serif;
-  margin: 0;
-}
-
-.admin-arch__card header code {
-  background: rgba(69, 58, 112, 0.08);
-  border-radius: 5px;
-  color: var(--indigo-700);
-  font: 600 11px ui-monospace, monospace;
-  padding: 1px 6px;
-}
-
-.admin-arch__purpose {
-  color: var(--text);
-  font: 500 13px var(--sans);
-  line-height: 1.5;
-  margin: 0;
-}
-
-.admin-arch__keys {
-  background: rgba(69, 58, 112, 0.05);
-  border-radius: 8px;
-  font: 500 11px var(--sans);
-  padding: 6px 10px;
-}
-
-.admin-arch__keys strong {
-  color: var(--text-muted);
-  font: 800 10px var(--sans);
-  letter-spacing: 0.1em;
-  margin-right: 8px;
-  text-transform: uppercase;
-}
-
-.admin-arch__keys code {
-  background: transparent;
-  color: var(--indigo-700);
-  font: 600 11px ui-monospace, monospace;
-}
-
-.admin-arch__fields summary {
-  color: var(--indigo-700);
-  cursor: pointer;
-  font: 700 11px var(--sans);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.admin-arch__fields ul {
-  display: grid;
-  gap: 4px;
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-}
-
-.admin-arch__fields li {
-  background: rgba(69, 58, 112, 0.03);
-  border-radius: 6px;
-  padding: 5px 8px;
-}
-
-.admin-arch__fields li strong {
-  color: var(--indigo-700);
-  display: block;
-  font: 600 12px ui-monospace, monospace;
-  margin-bottom: 2px;
-}
-
-.admin-arch__fields li span {
-  color: var(--text);
-  font: 500 12px var(--sans);
-}
-
-.admin-arch__rels {
-  display: grid;
-  gap: 4px;
-}
-
-.admin-arch__rels strong {
-  color: var(--text-muted);
-  font: 800 10px var(--sans);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.admin-arch__rels ul {
-  display: grid;
-  gap: 4px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.admin-arch__rels li {
-  align-items: baseline;
+.admin-arch__chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.admin-arch__rel-link {
-  background: var(--indigo-700);
-  border: 0;
+.admin-arch__chip {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
   border-radius: 999px;
-  color: #fff;
+  color: var(--text);
   cursor: pointer;
+  display: inline-flex;
+  font: 600 13px var(--sans);
+  gap: 8px;
+  padding: 8px 14px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.admin-arch__chip:hover {
+  background: rgba(69, 58, 112, 0.06);
+  border-color: var(--indigo-700);
+  color: var(--indigo-800, #453a70);
+}
+
+.admin-arch__chip--small {
+  font: 500 12px var(--sans);
+  padding: 5px 10px;
+}
+
+.admin-arch__chip-emoji {
+  font-size: 16px;
+}
+
+/* ---- Detail mode (single object) ------------------------------------- */
+
+.admin-arch--detail {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-arch__breadcrumb {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.admin-arch__breadcrumb-btn {
+  background: rgba(69, 58, 112, 0.08);
+  border: 0;
+  border-radius: 8px;
+  color: var(--indigo-700);
+  cursor: pointer;
+  font: 700 12px var(--sans);
+  padding: 6px 12px;
+}
+
+.admin-arch__breadcrumb-btn:hover {
+  background: rgba(69, 58, 112, 0.16);
+}
+
+.admin-arch__breadcrumb-cluster {
+  color: var(--text-muted);
+  font: 500 12px var(--sans);
+}
+
+.admin-arch__hero {
+  align-items: start;
+  background: linear-gradient(135deg, rgba(69, 58, 112, 0.08), rgba(69, 58, 112, 0.02));
+  border: 1px solid rgba(69, 58, 112, 0.18);
+  border-radius: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 56px 1fr;
+  padding: 20px;
+}
+
+.admin-arch__hero-emoji {
+  background: rgba(69, 58, 112, 0.16);
+  border-radius: 14px;
+  font-size: 32px;
+  height: 56px;
+  line-height: 56px;
+  text-align: center;
+  width: 56px;
+}
+
+.admin-arch__hero h2 {
+  font: 700 28px Fraunces, Georgia, serif;
+  margin: 0 0 4px;
+}
+
+.admin-arch__hero code {
+  background: rgba(69, 58, 112, 0.12);
+  border-radius: 6px;
+  color: var(--indigo-700);
+  font: 600 12px ui-monospace, monospace;
+  padding: 2px 8px;
+}
+
+.admin-arch__hero p {
+  color: var(--text);
+  font: 500 14px var(--sans);
+  line-height: 1.55;
+  margin: 10px 0 0;
+}
+
+.admin-arch__panel {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.admin-arch__panel h4 {
+  color: var(--indigo-700);
   font: 700 11px var(--sans);
-  padding: 3px 10px;
-  white-space: nowrap;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.admin-arch__keylist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-arch__keylist code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 5px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 2px 8px;
+}
+
+.admin-arch__fields-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-arch__fields-list li {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.admin-arch__fields-list li strong {
+  color: var(--indigo-700);
+  display: block;
+  font: 700 12px ui-monospace, monospace;
+  margin-bottom: 3px;
+}
+
+.admin-arch__fields-list li span {
+  color: var(--text);
+  font: 500 13px var(--sans);
+  line-height: 1.5;
+}
+
+/* ---- Relationship panels (grid of 4: belongs-to / owns / refs / incoming) ---- */
+
+.admin-arch__rel-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.admin-arch__rel-panel {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-left-width: 4px;
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.admin-arch__rel-panel--belongs-to { border-left-color: var(--salmon, #ed6955); }
+.admin-arch__rel-panel--owns       { border-left-color: #4a7c59; }
+.admin-arch__rel-panel--references { border-left-color: rgba(199, 126, 46, 0.85); }
+.admin-arch__rel-panel--incoming   { border-left-color: var(--indigo-700); }
+
+.admin-arch__rel-panel header h4 {
+  font: 700 12px var(--sans);
+  letter-spacing: 0.06em;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+}
+
+.admin-arch__rel-panel--belongs-to header h4 { color: var(--salmon-dark, #c25a4a); }
+.admin-arch__rel-panel--owns header h4 { color: #3a6048; }
+.admin-arch__rel-panel--references header h4 { color: #9c6322; }
+.admin-arch__rel-panel--incoming header h4 { color: var(--indigo-700); }
+
+.admin-arch__rel-panel header p {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.admin-arch__rel-panel ul {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-arch__rel-panel li {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-arch__rel-link {
+  background: rgba(69, 58, 112, 0.08);
+  border: 0;
+  border-radius: 8px;
+  color: var(--indigo-800, #453a70);
+  cursor: pointer;
+  font: 700 13px var(--sans);
+  padding: 6px 10px;
+  text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+  width: max-content;
 }
 
 .admin-arch__rel-link:hover {
-  background: var(--indigo-800, #453a70);
-}
-
-.admin-arch__rels--owns .admin-arch__rel-link {
-  background: #4a7c59;
-}
-
-.admin-arch__rels--belongs-to .admin-arch__rel-link {
-  background: var(--salmon, #ed6955);
-}
-
-.admin-arch__rels--references .admin-arch__rel-link {
-  background: rgba(199, 126, 46, 0.85);
+  background: var(--indigo-700);
+  color: #fff;
 }
 
 .admin-arch__rel-label {
   color: var(--text);
   font: 500 12px var(--sans);
   line-height: 1.45;
+  margin: 0;
 }
 
 .admin-arch__rel-label em {
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* ---- Sibling chips (lateral-hop nav within cluster) ------------------ */
+
+.admin-arch__siblings {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.admin-arch__siblings strong {
+  color: var(--text-muted);
+  display: block;
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+/* ---- Left-rail nav (cluster-grouped, current object highlighted) ----- */
 
 .admin-arch__nav {
   background: #fff;
@@ -1625,41 +1721,66 @@
   top: 8px;
 }
 
-.admin-arch__nav strong {
+.admin-arch__nav > strong {
   color: var(--text-muted);
   display: block;
   font: 800 10.5px var(--sans);
   letter-spacing: 0.12em;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   text-transform: uppercase;
 }
 
-.admin-arch__nav ul {
+.admin-arch__nav-cluster {
+  margin-bottom: 12px;
+}
+
+.admin-arch__nav-cluster:last-child { margin-bottom: 0; }
+
+.admin-arch__nav-cluster-label {
+  color: var(--indigo-700);
+  display: block;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.admin-arch__nav-cluster ul {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.admin-arch__nav button {
+.admin-arch__nav-cluster button {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text);
   cursor: pointer;
   display: flex;
   font: 600 12px var(--sans);
   gap: 8px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   text-align: left;
+  transition: background 120ms ease, color 120ms ease;
   width: 100%;
 }
 
-.admin-arch__nav button:hover {
+.admin-arch__nav-cluster button:hover {
   background: rgba(69, 58, 112, 0.06);
   color: var(--indigo-800, #453a70);
+}
+
+.admin-arch__nav-cluster button.is-active {
+  background: var(--indigo-700);
+  color: #fff;
+}
+
+.admin-arch__nav-cluster button.is-active:hover {
+  background: var(--indigo-800, #453a70);
+  color: #fff;
 }
 
 /* Notes view — "Open X →" jump hint */
