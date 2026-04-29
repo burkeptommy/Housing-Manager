@@ -1,6 +1,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import {
   SCHEMAS,
+  ENUMS,
   renderEntityForm,
   attachFormHandlers,
   computeProposedDiff,
@@ -1695,10 +1696,17 @@ function renderDetail() {
       editingState.viewId = viewId;
       editingState.original = structuredCloneSafe(item.payload ?? {});
       editingState.current = structuredCloneSafe(item.payload ?? {});
-      el.formHost.innerHTML = renderEntityForm(viewId, editingState.current, editingState.original);
+      // Phase 5r — plain-English summary card BEFORE the form, so anyone
+      // (including non-engineers) can read the entity's purpose without
+      // decoding field names. For bundle children + system-linked tasks
+      // this also includes interactive bundle/system maps with
+      // click-to-jump navigation.
+      const summaryHtml = renderEntitySummaryCard(item);
+      el.formHost.innerHTML = summaryHtml + renderEntityForm(viewId, editingState.current, editingState.original);
       attachFormHandlers(el.formHost, viewId, editingState.original, editingState.current, () => {
         renderDiff();
       });
+      attachSummaryCardHandlers(el.formHost);
     }
     renderDiff();
     el.saveItem.textContent = "Save proposed change";
@@ -3417,6 +3425,370 @@ function countBundleSiblings(bundleId) {
   if (!bundleId) return 0;
   const templates = state.liveData?.templates?.entries || [];
   return templates.filter((t) => t.bundleId === bundleId).length;
+}
+
+// Phase 5r — Return all sibling templates for a bundleId, sorted by title.
+// Used by the bundle map in the entity summary card so Tom can click any
+// sibling to jump to it.
+function bundleSiblings(bundleId) {
+  if (!bundleId) return [];
+  const templates = state.liveData?.templates?.entries || [];
+  return templates
+    .filter((t) => t.bundleId === bundleId)
+    .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+}
+
+// Phase 5r — For a quiz question, summarize what the answer creates in
+// plain English: which systems get stamped, which other questions get
+// gated, which attributes get written. Pulls from the question's
+// _impact + the quiz-mapper-effects digest exported alongside.
+function quizQuestionImpact(payload) {
+  const out = { creates_systems: [], drives_attributes: [], gates_questions: [] };
+  if (!payload) return out;
+  const impact = payload._impact || {};
+  if (Array.isArray(impact.creates_systems)) out.creates_systems = [...impact.creates_systems];
+  if (Array.isArray(impact.drives_attributes)) out.drives_attributes = [...impact.drives_attributes];
+  if (Array.isArray(impact.gates_questions)) out.gates_questions = [...impact.gates_questions];
+  // quiz-mapper-effects.json is keyed by questionId → array of effect strings
+  const mapperEffects = state.liveData?.["quiz-mapper-effects"]?.byQuestion?.[payload.id]
+    || state.liveData?.["quiz-mapper-effects"]?.entries?.find?.((e) => e.questionId === payload.id);
+  if (Array.isArray(mapperEffects?.effects)) {
+    for (const eff of mapperEffects.effects) {
+      if (typeof eff !== "string") continue;
+      if (/creates? home_system/i.test(eff)) {
+        const m = eff.match(/home_system[s]?:?\s*([A-Za-z\/ &]+)/i);
+        if (m) out.creates_systems.push(m[1].trim());
+      } else if (/writes? attribute|stamps? attribute/i.test(eff)) {
+        const m = eff.match(/attribute[s]?:?\s*([a-z_]+)/i);
+        if (m) out.drives_attributes.push(m[1].trim());
+      }
+    }
+  }
+  out.creates_systems = [...new Set(out.creates_systems)];
+  out.drives_attributes = [...new Set(out.drives_attributes)];
+  out.gates_questions = [...new Set(out.gates_questions)];
+  return out;
+}
+
+// Phase 5r — Return templates whose systemCategory matches OR whose
+// equipmentKeywords contain a token derived from the system. Lets the
+// system detail panel show "templates that depend on this system."
+function templatesForSystem(systemCategoryKey) {
+  if (!systemCategoryKey) return [];
+  const templates = state.liveData?.templates?.entries || [];
+  return templates.filter((t) => t.systemCategory === systemCategoryKey);
+}
+
+// Phase 5r — Build the plain-English summary card injected at the top
+// of every live-entity detail panel. Tom can show this to anyone
+// (including his wife) and they can read what the entity does without
+// decoding field names. Works across quiz / tasks / handyman /
+// recommended / systems / routines.
+function renderEntitySummaryCard(item) {
+  if (!item || item.source !== "live") return "";
+  const t = item.itemType;
+  if (t === "question") return renderQuizSummaryCard(item);
+  if (t === "task" || t === "handyman" || t === "recommended") return renderTaskSummaryCard(item);
+  if (t === "system") return renderSystemSummaryCard(item);
+  if (t === "routine") return renderRoutineSummaryCard(item);
+  return "";
+}
+
+function renderQuizSummaryCard(item) {
+  const q = item.payload || {};
+  const impact = quizQuestionImpact(q);
+  const placement = [
+    q.chapter && `Chapter: <strong>${escapeHtml(prettyEnumLabel("quizChapter", q.chapter))}</strong>`,
+    q.section && `Section: <strong>${escapeHtml(prettyEnumLabel("quizSection", q.section))}</strong>`,
+    q.kind && `Kind: <strong>${escapeHtml(prettyEnumLabel("quizKind", q.kind))}</strong>`,
+  ].filter(Boolean).join(" · ");
+
+  const goalText = q.subtitle
+    ? escapeHtml(q.subtitle)
+    : `<em class="admin-muted">No subtitle set. Add one to explain why we're asking.</em>`;
+
+  // "What it creates" — bullet list of impacts
+  const createsBullets = [];
+  if (impact.creates_systems.length) {
+    createsBullets.push(`<li><strong>Creates systems:</strong> ${
+      impact.creates_systems.map((s) => `<button type="button" class="admin-jump-link" data-jump-system="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join(", ")
+    }</li>`);
+  }
+  if (impact.drives_attributes.length) {
+    createsBullets.push(`<li><strong>Stamps attributes on the property:</strong> ${
+      impact.drives_attributes.map((a) => `<code>${escapeHtml(a)}</code>`).join(", ")
+    }</li>`);
+  }
+  if (impact.gates_questions.length) {
+    createsBullets.push(`<li><strong>Affects which other questions show:</strong> ${
+      impact.gates_questions.map((qid) => `<button type="button" class="admin-jump-link" data-jump-question="${escapeHtml(qid)}">${escapeHtml(qid)}</button>`).join(", ")
+    }</li>`);
+  }
+  if (q.documentUploadCategory) {
+    createsBullets.push(`<li><strong>Doc upload escape hatch:</strong> homeowner can skip and upload a document categorized as <code>${escapeHtml(q.documentUploadCategory)}</code> instead.</li>`);
+  }
+  if (!createsBullets.length) {
+    createsBullets.push(`<li class="admin-muted">No downstream effects captured. (Either this question is purely informational, or the impact heuristic missed it — check Edit tab fields.)</li>`);
+  }
+
+  // Skip rules
+  const skipNote = q.dynamicSkip
+    ? `Auto-skips when prior answers make it irrelevant — see <em>Dynamic skip rule</em> in the form below.`
+    : `Always shown to every homeowner who reaches this point in the quiz.`;
+
+  return `
+    <section class="admin-summary admin-summary--quiz">
+      <header class="admin-summary__head">
+        <span class="admin-summary__eyebrow">Quiz question</span>
+        <h2 class="admin-summary__title">${escapeHtml(q.title || q.id || "(no title)")}</h2>
+        <p class="admin-summary__placement admin-muted">${placement}</p>
+      </header>
+
+      <div class="admin-summary__body">
+        <div class="admin-summary__section">
+          <h4>🎯 Goal — what the homeowner sees</h4>
+          <p>${goalText}</p>
+          ${q.fallbackTitle ? `<p class="admin-muted">Fallback (when tokens like {state} can't resolve): <em>${escapeHtml(q.fallbackTitle)}</em></p>` : ""}
+        </div>
+
+        <div class="admin-summary__section">
+          <h4>🔁 What this answer creates downstream</h4>
+          <ul class="admin-summary__bullets">${createsBullets.join("")}</ul>
+        </div>
+
+        <div class="admin-summary__section">
+          <h4>⏭️ When does this question appear?</h4>
+          <p>${skipNote}</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskSummaryCard(item) {
+  const t = item.payload || {};
+  const reason = routingReason(t);
+  const seasonEmoji = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️", "Spring/Fall": "🔁" }[t.seasonalTiming] || "🔄";
+  const seasonLabel = t.seasonalTiming || "Year-round";
+
+  // Bundle map — interactive parent + siblings
+  let bundleMap = "";
+  if (t.bundleId) {
+    const siblings = bundleSiblings(t.bundleId);
+    const parentTitle = prettyBundleTitle(t.bundleId);
+    const siblingItems = siblings
+      .map((s) => {
+        const isSelf = s.templateKey === t.templateKey;
+        const cls = isSelf ? "admin-summary__sibling is-self" : "admin-summary__sibling";
+        const marker = isSelf ? `<span class="admin-summary__sibling-marker">▶ you are here</span>` : "";
+        const title = escapeHtml(s.title || "(untitled)");
+        const button = isSelf
+          ? `<span class="admin-summary__sibling-title">${title}</span>`
+          : `<button type="button" class="admin-summary__sibling-title admin-jump-link" data-jump-template-key="${escapeHtml(s.templateKey || "")}">${title}</button>`;
+        return `<li class="${cls}">${button}${marker}</li>`;
+      }).join("");
+    bundleMap = `
+      <div class="admin-summary__section">
+        <h4>📦 Bundle map — this template lives inside a parent visit</h4>
+        <div class="admin-summary__bundle-map">
+          <div class="admin-summary__bundle-parent">
+            <strong>↳ ${escapeHtml(parentTitle)}</strong>
+            <span class="admin-muted">${siblings.length} item${siblings.length === 1 ? "" : "s"} fold into this single visit at runtime. The homeowner sees ONE scheduled task, not ${siblings.length} separate to-dos.</span>
+          </div>
+          <ol class="admin-summary__siblings">${siblingItems}</ol>
+        </div>
+      </div>
+    `;
+  } else {
+    // Check if THIS template is the conceptual parent of a bundle (no
+    // template literally has children — bundles are flat — but we can
+    // check if templates exist with a bundleId derived from this.
+    bundleMap = "";
+  }
+
+  // System link — clickable jump
+  let systemLink = "";
+  if (t.systemCategory) {
+    const equipmentChips = (t.equipmentKeywords || []).length
+      ? `<p class="admin-muted">Migrates to a more specific child system at runtime if any of these keywords match equipment in the home: ${t.equipmentKeywords.map((k) => `<code>${escapeHtml(k)}</code>`).join(", ")}.</p>`
+      : "";
+    systemLink = `
+      <div class="admin-summary__section">
+        <h4>🏷️ System this lives under</h4>
+        <p><button type="button" class="admin-jump-link admin-jump-link--prominent" data-jump-system="${escapeHtml(t.systemCategory)}">${escapeHtml(t.systemCategory)} →</button></p>
+        ${equipmentChips}
+      </div>
+    `;
+  }
+
+  // Goal text — first sentence of description
+  const goal = (t.description || "").split(/\.\s+/)[0];
+  const goalText = goal
+    ? `${escapeHtml(goal)}.`
+    : `<em class="admin-muted">No description set.</em>`;
+
+  // Why we have it — notes if set, else default explanation
+  const whyText = t.notes
+    ? escapeHtml(t.notes)
+    : `<em class="admin-muted">No notes set. Use the Pro tips field to explain WHY this cadence exists or what to watch for.</em>`;
+
+  // Lifecycle line
+  const lifecycle = t.bundleId
+    ? `Folds into the parent visit (never its own task)`
+    : t.isEssential === false
+      ? `<strong>Opt-in.</strong> ${t.systemCategory === "Handyman" ? "Surfaced in the handyman punch list 'Recommended' section." : "Surfaced in PropertyDetailView → Recommended Services."} Homeowner taps + to schedule.`
+      : `<strong>Auto-seeds at quiz completion</strong> if subtypes / region match.`;
+
+  return `
+    <section class="admin-summary admin-summary--task">
+      <header class="admin-summary__head">
+        <span class="admin-summary__eyebrow">Maintenance template</span>
+        <h2 class="admin-summary__title">${escapeHtml(t.title || "(no title)")}</h2>
+        <p class="admin-summary__placement admin-muted">
+          ${escapeHtml(t.frequency || "?")} · ${seasonEmoji} ${escapeHtml(seasonLabel)} · ${escapeHtml(t.estimatedCostRange || "no cost set")}
+        </p>
+      </header>
+
+      <div class="admin-summary__body">
+        <div class="admin-summary__section">
+          <h4>🎯 Goal — what gets done</h4>
+          <p>${goalText}</p>
+        </div>
+
+        <div class="admin-summary__section">
+          <h4>💡 Why we have it</h4>
+          <p>${whyText}</p>
+        </div>
+
+        ${reason ? `
+        <div class="admin-summary__section">
+          <h4>👤 Who handles it by default</h4>
+          <p><strong>${escapeHtml(reason.label.replace(/^↳\s+/, ""))}</strong> — ${escapeHtml(reason.tooltip.split(". Trigger:")[0])}.</p>
+        </div>
+        ` : ""}
+
+        <div class="admin-summary__section">
+          <h4>🌱 When does it enter the homeowner's task list?</h4>
+          <p>${lifecycle}</p>
+        </div>
+
+        ${systemLink}
+        ${bundleMap}
+      </div>
+    </section>
+  `;
+}
+
+function renderSystemSummaryCard(item) {
+  const s = item.payload || {};
+  const linked = templatesForSystem(s.categoryKey || s.displayName);
+  const linkedSummary = linked.length
+    ? `<ul class="admin-summary__system-templates">${linked.slice(0, 8).map((t) => `<li><button type="button" class="admin-jump-link" data-jump-template-key="${escapeHtml(t.templateKey || "")}">${escapeHtml(t.title || "")}</button> <span class="admin-muted">${escapeHtml(t.frequency || "")}</span></li>`).join("")}${linked.length > 8 ? `<li class="admin-muted">… and ${linked.length - 8} more</li>` : ""}</ul>`
+    : `<p class="admin-muted">No templates currently target this system. Likely a navigation-only category or a system without canonical maintenance.</p>`;
+  return `
+    <section class="admin-summary admin-summary--system">
+      <header class="admin-summary__head">
+        <span class="admin-summary__eyebrow">System category</span>
+        <h2 class="admin-summary__title">${escapeHtml(s.displayName || s.categoryKey || "(no name)")}</h2>
+        <p class="admin-summary__placement admin-muted">
+          Tier: <strong>${escapeHtml(s.tier || "?")}</strong>
+          ${s.specialtyGroup ? ` · Specialty group: <strong>${escapeHtml(s.specialtyGroup)}</strong>` : ""}
+          ${s.defaultCadence ? ` · Default cadence: <strong>${escapeHtml(s.defaultCadence)}</strong>` : ""}
+        </p>
+      </header>
+      <div class="admin-summary__body">
+        <div class="admin-summary__section">
+          <h4>🔧 Templates anchored to this system (${linked.length})</h4>
+          ${linkedSummary}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderRoutineSummaryCard(item) {
+  const r = item.payload || {};
+  const cadence = r.seederDefault?.cadenceType || "no default";
+  const months = (r.seederDefault?.activeMonths || []).length;
+  return `
+    <section class="admin-summary admin-summary--routine">
+      <header class="admin-summary__head">
+        <span class="admin-summary__eyebrow">Routine kind</span>
+        <h2 class="admin-summary__title">${escapeHtml(r.displayLabel || r.rawValue || "(no label)")}</h2>
+        <p class="admin-summary__placement admin-muted">
+          ${r.isVendorBased ? "Vendor-based (recurring relationship)" : "Cadence-based (homeowner-managed)"}
+          · Default: <strong>${escapeHtml(cadence)}</strong>
+          ${months ? ` · ${months} active months` : " · year-round"}
+        </p>
+      </header>
+      <div class="admin-summary__body">
+        <div class="admin-summary__section">
+          <h4>🎯 What this routine represents</h4>
+          <p>${r.isVendorBased
+            ? `A recurring vendor relationship the homeowner has with a specific pro (e.g. "Pat the landscaper, every Tuesday April-November"). The Routine card on the Property tab shows the next visit date, vendor logo, and lets the homeowner pause/edit cadence.`
+            : `A weekly household rhythm that's not tied to a vendor (trash day, recycling, school pickup). Surfaces as a dashboard banner the night before / morning of.`}</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+// Phase 5r — Wire up jump links in the summary card. Click a system /
+// template / question link → switch surface + select that entity.
+function attachSummaryCardHandlers(host) {
+  if (!host) return;
+  host.querySelectorAll("[data-jump-system]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const key = btn.dataset.jumpSystem;
+      const items = liveItemsForView("systems") || [];
+      const hit = items.find((i) =>
+        (i.payload?.categoryKey || "").toLowerCase() === (key || "").toLowerCase() ||
+        (i.payload?.displayName || "").toLowerCase() === (key || "").toLowerCase() ||
+        (i.title || "").toLowerCase() === (key || "").toLowerCase()
+      );
+      if (hit) {
+        state.view = "systems";
+        state.selected = hit;
+        state.search = "";
+        state.statusFilter = "all";
+        state.lifecycleFilter = "all";
+        state.seasonFilter = "all";
+        state.routingFilter = "all";
+        render();
+      }
+    });
+  });
+  host.querySelectorAll("[data-jump-question]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const qid = btn.dataset.jumpQuestion;
+      const items = liveItemsForView("quiz") || [];
+      const hit = items.find((i) => i.payload?.id === qid);
+      if (hit) {
+        state.view = "quiz";
+        state.selected = hit;
+        state.search = "";
+        state.statusFilter = "all";
+        render();
+      }
+    });
+  });
+  host.querySelectorAll("[data-jump-template-key]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const key = btn.dataset.jumpTemplateKey;
+      jumpToTemplate(key);
+    });
+  });
+}
+
+// Phase 5r — Resolve enum value to its human-readable label using the
+// same ENUMS table the form uses, so summary cards read naturally.
+function prettyEnumLabel(enumKey, value) {
+  const opts = (typeof ENUMS !== "undefined" && ENUMS?.[enumKey]) || [];
+  const hit = opts.find((o) => o.value === value);
+  return hit?.label || value || "";
 }
 
 // Phase 5q — Map a bundleId like "Pool/Spa:opening" or "Landscaping:spring"

@@ -596,24 +596,76 @@ function renderControl(field, value) {
 }
 
 function renderAnswerOptions(options, field, readonlyAttr) {
+  // Phase 5r — Card-style answer-option editor. Each option is its
+  // own row with: position number, label (big + editable), id (slug
+  // pill), SF Symbol name (subtle code), accepts-custom flag, and a
+  // remove button. Mirrors how the homeowner sees the chips on screen
+  // so the editor reads like a preview, not a JSON dump.
   const list = options
     .map(
       (opt, idx) => `
         <li class="admin-form__answer-option" data-index="${idx}">
-          <span class="admin-form__answer-icon">${opt.icon ? `<code>${escapeHtml(opt.icon)}</code>` : "—"}</span>
-          <code class="admin-form__answer-id">${escapeHtml(opt.id || "")}</code>
-          <span class="admin-form__answer-label">${escapeHtml(opt.label || "")}</span>
-          ${opt.acceptsCustomInput ? `<span class="admin-pill admin-pill--note">accepts custom</span>` : ""}
+          <div class="admin-form__answer-num">${idx + 1}</div>
+          <div class="admin-form__answer-body">
+            <div class="admin-form__answer-row admin-form__answer-row--top">
+              <input
+                type="text"
+                class="admin-form__answer-label-input"
+                data-answer-edit
+                data-answer-field="label"
+                data-answer-index="${idx}"
+                value="${escapeHtml(opt.label || "")}"
+                placeholder="Label the homeowner sees"
+                ${readonlyAttr}
+              />
+              ${opt.acceptsCustomInput
+                ? `<span class="admin-pill admin-pill--note" title="When the homeowner taps this option, an input field appears so they can type a custom value.">accepts custom input</span>`
+                : ""}
+            </div>
+            <div class="admin-form__answer-row admin-form__answer-row--bottom">
+              <span class="admin-form__answer-meta-label">ID</span>
+              <input
+                type="text"
+                class="admin-form__answer-id-input"
+                data-answer-edit
+                data-answer-field="id"
+                data-answer-index="${idx}"
+                value="${escapeHtml(opt.id || "")}"
+                placeholder="snake_case_id"
+                ${readonlyAttr}
+              />
+              <span class="admin-form__answer-meta-label">SF Symbol</span>
+              <input
+                type="text"
+                class="admin-form__answer-icon-input"
+                data-answer-edit
+                data-answer-field="icon"
+                data-answer-index="${idx}"
+                value="${escapeHtml(opt.icon || "")}"
+                placeholder="e.g. house.fill"
+                ${readonlyAttr}
+              />
+            </div>
+          </div>
+          ${readonlyAttr ? "" : `
+            <button type="button" class="admin-form__answer-remove" data-answer-remove="${idx}" title="Propose removing this option">×</button>
+          `}
         </li>
       `
     )
     .join("");
+  const addBtn = readonlyAttr
+    ? ""
+    : `<button type="button" class="admin-button admin-button--ghost admin-form__answer-add" data-answer-add data-field-key="${escapeHtml(field.key)}">+ Propose adding an option</button>`;
   return `
     <div class="admin-form__answer-options" data-field-key="${escapeHtml(field.key)}" ${readonlyAttr.includes("disabled") ? "data-readonly" : ""}>
-      <ol>${list || `<li class="admin-muted">No options.</li>`}</ol>
-      <p class="admin-form__hint">${
-        readonlyAttr ? "Edit answer options via a proposal note." : "Edit options inline (proposal mode)"
-      }</p>
+      <ol>${list || `<li class="admin-muted">No options yet.</li>`}</ol>
+      ${addBtn}
+      <p class="admin-form__hint">
+        ${readonlyAttr
+          ? "Read-only — promote to admin draft to edit."
+          : "Edit any field inline. Changes show up in the diff strip below the form and ship as a proposal note when you save."}
+      </p>
     </div>
   `;
 }
@@ -767,6 +819,65 @@ export function attachFormHandlers(container, viewId, original, current, onChang
     });
   });
 
+  // Phase 5r — Answer-option inline editing (label / id / icon).
+  // Writes back into entity.answerOptions[idx][field] and fires the diff.
+  root.querySelectorAll("[data-answer-edit]").forEach((input) => {
+    const handler = () => {
+      const idx = Number(input.dataset.answerIndex);
+      const fieldName = input.dataset.answerField;
+      const opts = readPath(current, "answerOptions") || [];
+      if (!opts[idx]) return;
+      opts[idx] = { ...opts[idx], [fieldName]: input.value };
+      writePath(current, "answerOptions", opts);
+      onChange?.(current);
+    };
+    input.addEventListener("input", handler);
+    input.addEventListener("change", handler);
+  });
+
+  // Phase 5r — Add answer option (proposal mode only).
+  root.querySelectorAll("[data-answer-add]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      const opts = readPath(current, "answerOptions") || [];
+      const next = Array.isArray(opts) ? opts.slice() : [];
+      const placeholderId = `new_option_${next.length + 1}`;
+      next.push({ id: placeholderId, label: "", icon: "", acceptsCustomInput: false });
+      writePath(current, "answerOptions", next);
+      onChange?.(current);
+      // Re-render the options list inline so the new row appears.
+      const container = btn.closest(".admin-form__answer-options");
+      if (container) {
+        const fieldKey = container.dataset.fieldKey;
+        const ol = container.querySelector("ol");
+        if (ol) {
+          // Lazy re-render: wipe + replace list HTML using the same renderer
+          ol.outerHTML = renderAnswerOptionsListOnly(next);
+        }
+        attachFormHandlers(container.parentElement, viewId, original, current, onChange);
+      }
+    });
+  });
+
+  // Phase 5r — Remove answer option (proposal mode only).
+  root.querySelectorAll("[data-answer-remove]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      const idx = Number(btn.dataset.answerRemove);
+      const opts = readPath(current, "answerOptions") || [];
+      const next = Array.isArray(opts) ? opts.slice() : [];
+      next.splice(idx, 1);
+      writePath(current, "answerOptions", next);
+      onChange?.(current);
+      const container = btn.closest(".admin-form__answer-options");
+      if (container) {
+        const ol = container.querySelector("ol");
+        if (ol) ol.outerHTML = renderAnswerOptionsListOnly(next);
+        attachFormHandlers(container.parentElement, viewId, original, current, onChange);
+      }
+    });
+  });
+
   // Info buttons — click toggles a popover anchored to the button.
   root.querySelectorAll(".admin-form__info").forEach((btn) => {
     btn.addEventListener("click", (event) => {
@@ -775,6 +886,31 @@ export function attachFormHandlers(container, viewId, original, current, onChang
       showInfoPopover(btn);
     });
   });
+}
+
+// Phase 5r — Helper used by add/remove answer-option handlers to
+// re-render only the <ol> list when options change inline.
+function renderAnswerOptionsListOnly(options) {
+  const items = options
+    .map((opt, idx) => `
+      <li class="admin-form__answer-option" data-index="${idx}">
+        <div class="admin-form__answer-num">${idx + 1}</div>
+        <div class="admin-form__answer-body">
+          <div class="admin-form__answer-row admin-form__answer-row--top">
+            <input type="text" class="admin-form__answer-label-input" data-answer-edit data-answer-field="label" data-answer-index="${idx}" value="${escapeHtml(opt.label || "")}" placeholder="Label the homeowner sees" />
+            ${opt.acceptsCustomInput ? `<span class="admin-pill admin-pill--note">accepts custom input</span>` : ""}
+          </div>
+          <div class="admin-form__answer-row admin-form__answer-row--bottom">
+            <span class="admin-form__answer-meta-label">ID</span>
+            <input type="text" class="admin-form__answer-id-input" data-answer-edit data-answer-field="id" data-answer-index="${idx}" value="${escapeHtml(opt.id || "")}" placeholder="snake_case_id" />
+            <span class="admin-form__answer-meta-label">SF Symbol</span>
+            <input type="text" class="admin-form__answer-icon-input" data-answer-edit data-answer-field="icon" data-answer-index="${idx}" value="${escapeHtml(opt.icon || "")}" placeholder="e.g. house.fill" />
+          </div>
+        </div>
+        <button type="button" class="admin-form__answer-remove" data-answer-remove="${idx}" title="Propose removing this option">×</button>
+      </li>
+    `).join("");
+  return `<ol>${items || `<li class="admin-muted">No options yet.</li>`}</ol>`;
 }
 
 // Phase 4b — info popover. Lazy-built singleton anchored next to the

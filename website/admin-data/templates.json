@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-29T15:28:27.532Z",
+  "generatedAt": "2026-04-29T19:22:30.554Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift",
-  "sourceCommit": "f839e6cd",
+  "sourceCommit": "ef08742b",
   "count": 221,
   "entries": [
     {
@@ -7081,7 +7081,9 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "ceiling fan"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 60,
       "diyEffortLabel": null,
@@ -7281,7 +7283,9 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "thermostat"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 30,
       "diyEffortLabel": null,
@@ -7401,7 +7405,10 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "doorbell",
+        "video doorbell"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 45,
       "diyEffortLabel": null,
@@ -8041,7 +8048,10 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "disposal",
+        "garbage disposal"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 10,
       "diyEffortLabel": null,
@@ -8121,7 +8131,11 @@
       "notes": "Replace charcoal filters annually if your hood recirculates instead of vents outside.",
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "range hood",
+        "exhaust hood",
+        "kitchen hood"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 15,
       "diyEffortLabel": null,
@@ -8161,7 +8175,10 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "refrigerator",
+        "fridge"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 45,
       "diyEffortLabel": null,
@@ -8601,7 +8618,9 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "garage door"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 30,
       "diyEffortLabel": null,
@@ -8641,7 +8660,9 @@
       "notes": "Skip the springs unless you're a pro. High tension and risk of injury.",
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "garage door"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 20,
       "diyEffortLabel": null,
@@ -8681,7 +8702,10 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "attic stairs",
+        "pull-down ladder"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 60,
       "diyEffortLabel": null,
@@ -8801,7 +8825,9 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "doorbell"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 15,
       "diyEffortLabel": null,
@@ -8841,7 +8867,11 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "smoke detector",
+        "co detector",
+        "smoke alarm"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 60,
       "diyEffortLabel": null,
@@ -8881,7 +8911,9 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "thermostat"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 10,
       "diyEffortLabel": null,
@@ -8921,7 +8953,10 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "leak sensor",
+        "leak detector"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 30,
       "diyEffortLabel": null,
@@ -8961,7 +8996,10 @@
       "notes": null,
       "requiredSubtypes": [],
       "isEssential": false,
-      "equipmentKeywords": [],
+      "equipmentKeywords": [
+        "security camera",
+        "smart camera"
+      ],
       "assignmentType": "either",
       "diyEffortMinutes": 60,
       "diyEffortLabel": null,
