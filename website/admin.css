@@ -1571,6 +1571,66 @@
   font: 700 13px var(--sans);
 }
 
+/* Phase 5 — threaded replies + attachments */
+.admin-note-card[data-reply="true"] {
+  background: rgba(69, 58, 112, 0.04);
+  border-left: 2px solid var(--indigo-700);
+  margin-left: 22px;
+  margin-top: 6px;
+}
+
+.admin-note-card--depth-1 { margin-left: 22px; }
+.admin-note-card--depth-2 { margin-left: 44px; }
+
+.admin-note-card__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.admin-button--xs {
+  font-size: 11px;
+  min-height: 28px;
+  padding: 4px 10px;
+}
+
+.admin-note-card__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.admin-note-card__attachment {
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  height: 80px;
+  object-fit: cover;
+  width: 120px;
+}
+
+.admin-note-controls__attachment {
+  grid-column: 1 / -1;
+}
+
+.admin-note-controls__attachment-status {
+  color: var(--text-muted);
+  display: block;
+  font: 500 11px var(--sans);
+  margin-top: 4px;
+  min-height: 14px;
+}
+
+.admin-note-controls__attachment input[type="file"] {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px dashed var(--neutral-300);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font: 500 12px var(--sans);
+  padding: 8px 10px;
+  width: 100%;
+}
+
 /* Admin Lab v2 — note form intent + target controls */
 .admin-note-controls {
   display: grid;

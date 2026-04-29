@@ -260,7 +260,13 @@ const el = {
   readinessCount: document.querySelector("[data-readiness-count]"),
   readinessBar: document.querySelector("[data-readiness-bar]"),
   readinessHint: document.querySelector("[data-readiness-hint]"),
+  // Phase 5 — note attachments
+  fieldAttachment: document.querySelector("[data-field-attachment]"),
+  attachmentStatus: document.querySelector("[data-attachment-status]"),
 };
+
+// Phase 5 — pending file uploads queued for the next note save
+const pendingAttachments = [];
 
 // Phase 4b — per-detail editing state. `original` is the unmodified entity
 // from the JSON snapshot (or admin_content_items row). `current` is a deep
@@ -300,6 +306,9 @@ function wireEvents() {
 
   // Phase 4b — preview buttons + flow drilldown
   el.lockToggle?.addEventListener("click", () => toggleLockSelected());
+
+  // Phase 5 — file attachment uploader
+  el.fieldAttachment?.addEventListener("change", handleAttachmentSelect);
 
   // Phase 7.5 — keyboard shortcuts (only when no input has focus)
   document.addEventListener("keydown", (event) => {
@@ -899,7 +908,9 @@ function renderDetail() {
     renderDiff();
     el.saveItem.textContent = "Save proposed change";
     el.promoteItem.disabled = true;
-    el.duplicateItem.disabled = true;
+    // Phase 5 — duplicate works on live entities as a proposal_add note.
+    el.duplicateItem.disabled = false;
+    el.duplicateItem.textContent = "Clone as proposal";
     el.deleteItem.disabled = true;
   } else {
     // Curated / legacy mode — keep original form behavior.
@@ -916,6 +927,7 @@ function renderDetail() {
     el.saveItem.textContent = "Save item";
     el.promoteItem.disabled = item.source === "admin";
     el.duplicateItem.disabled = false;
+    el.duplicateItem.textContent = "Duplicate";
     el.deleteItem.disabled = item.source !== "admin";
   }
 
@@ -1394,8 +1406,8 @@ function renderNotesView() {
 }
 
 function renderContextNotes(item) {
-  const notes = state.notes.filter((note) => itemNoteMatches(note, item)).slice(0, 8);
-  if (!notes.length) {
+  const allMatching = state.notes.filter((note) => itemNoteMatches(note, item));
+  if (!allMatching.length) {
     el.contextNotes.innerHTML = `
       <div class="admin-note-card">
         <strong>No notes on this item yet.</strong>
@@ -1404,31 +1416,101 @@ function renderContextNotes(item) {
     `;
     return;
   }
-  el.contextNotes.innerHTML = notes.map((note) => {
-    const intent = note.intent || "feedback";
-    const author = note.author || "tom";
-    const appliedPill = note.appliedAt
-      ? `<span class="admin-pill" data-tone="active" title="Applied ${formatDate(note.appliedAt)}${
-          note.appliedCommit ? " · " + note.appliedCommit.slice(0, 7) : ""
-        }">applied</span>`
-      : note.revertedAt
-      ? `<span class="admin-pill" data-tone="cut">reverted</span>`
-      : `<span class="admin-pill admin-pill--note">${intent}</span>`;
-    const authorTag = author === "claude"
-      ? `<span class="admin-pill admin-pill--note">claude</span>`
-      : "";
-    return `
-      <article class="admin-note-card">
-        <div class="admin-note-card__top">
-          <strong>${escapeHtml(note.scopeTitle || "Context note")}</strong>
-          ${appliedPill}
-          ${authorTag}
-        </div>
-        <small>${escapeHtml(formatDate(note.createdAt))} · target: ${escapeHtml(note.target || "claude")}</small>
-        <pre>${escapeHtml(note.body || "")}</pre>
-      </article>
-    `;
-  }).join("");
+
+  // Phase 5 — thread by parent_note_id so Claude's replies nest under
+  // Tom's original notes inline.
+  const byId = new Map(allMatching.map((n) => [n.id, { ...n, replies: [] }]));
+  const top = [];
+  for (const n of allMatching) {
+    const wrapped = byId.get(n.id);
+    if (n.parentNoteId && byId.has(n.parentNoteId)) {
+      byId.get(n.parentNoteId).replies.push(wrapped);
+    } else {
+      top.push(wrapped);
+    }
+  }
+  top.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  for (const t of top) {
+    t.replies.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+  }
+
+  const limit = 8;
+  el.contextNotes.innerHTML = top.slice(0, limit).map((note) => renderNoteCard(note, 0)).join("");
+  if (top.length > limit) {
+    el.contextNotes.innerHTML += `<p class="admin-muted" style="margin-top:8px">…and ${top.length - limit} more older notes (Notes tab to see all).</p>`;
+  }
+  // Wire revert buttons
+  el.contextNotes.querySelectorAll("[data-revert-note]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await revertNote(btn.dataset.revertNote);
+    });
+  });
+}
+
+function renderNoteCard(note, depth) {
+  const intent = note.intent || "feedback";
+  const author = note.author || "tom";
+  const isApplied = !!note.appliedAt;
+  const isReverted = !!note.revertedAt;
+  const pill = isApplied
+    ? `<span class="admin-pill" data-tone="active" title="Applied ${formatDate(note.appliedAt)}${
+        note.appliedCommit ? " · " + note.appliedCommit.slice(0, 7) : ""
+      }">applied</span>`
+    : isReverted
+    ? `<span class="admin-pill" data-tone="cut">reverted</span>`
+    : `<span class="admin-pill admin-pill--note">${escapeHtml(intent)}</span>`;
+  const authorTag = author === "claude"
+    ? `<span class="admin-pill admin-pill--note">claude</span>`
+    : "";
+  const revertBtn = isApplied && !isReverted
+    ? `<button type="button" class="admin-button admin-button--secondary admin-button--xs" data-revert-note="${escapeHtml(note.id)}">Revert</button>`
+    : "";
+  const attachments = (note.snapshot?.attachment_urls || note.attachmentUrls || [])
+    .map((url) => `<img src="${escapeHtml(url)}" alt="attachment" class="admin-note-card__attachment" />`)
+    .join("");
+  const replies = (note.replies || [])
+    .map((reply) => renderNoteCard(reply, depth + 1))
+    .join("");
+  return `
+    <article class="admin-note-card admin-note-card--depth-${Math.min(depth, 2)}" ${depth > 0 ? 'data-reply="true"' : ""}>
+      <div class="admin-note-card__top">
+        <strong>${escapeHtml(note.scopeTitle || "Context note")}</strong>
+        ${pill}
+        ${authorTag}
+      </div>
+      <small>${escapeHtml(formatDate(note.createdAt))} · target: ${escapeHtml(note.target || "claude")}</small>
+      <pre>${escapeHtml(note.body || "")}</pre>
+      ${attachments ? `<div class="admin-note-card__attachments">${attachments}</div>` : ""}
+      ${revertBtn ? `<div class="admin-note-card__actions">${revertBtn}</div>` : ""}
+      ${replies}
+    </article>
+  `;
+}
+
+// Phase 5 — flip applied note to reverted; Claude reads this as "undo"
+// instructions on next session start.
+async function revertNote(noteId) {
+  if (!noteId) return;
+  if (!confirm("Mark this applied change as reverted? Claude will apply the reverse next session.")) return;
+  if (state.storageMode !== "cloud") {
+    alert("Revert requires cloud storage.");
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from("admin_codex_notes")
+      .update({ reverted_at: new Date().toISOString() })
+      .eq("id", noteId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    state.notes = state.notes.map((n) => (n.id === noteId ? dbNoteToUi(data) : n));
+    if (state.selected) renderContextNotes(state.selected);
+    else renderActivityView();
+  } catch (error) {
+    alert(`Revert failed: ${error.message}`);
+  }
 }
 
 function itemNoteMatches(note, item) {
@@ -1620,6 +1702,41 @@ async function promoteSelectedItem() {
 
 async function duplicateSelectedItem() {
   if (!state.selected) return;
+  // Phase 5 — for live entities, "duplicate" becomes a proposal_add note
+  // that captures the cloned payload. Claude reads it as "create a new
+  // entity like this one with these tweaks." For curated drafts the
+  // existing in-memory clone-as-draft path stays.
+  if (state.selected.source === "live") {
+    const cloned = structuredCloneSafe(state.selected.payload);
+    // Strip identity fields so Claude knows this is meant as a NEW entity
+    delete cloned.id;
+    delete cloned.templateKey;
+    delete cloned.stableId;
+    delete cloned.functionName;
+    delete cloned.rawValue;
+    delete cloned.categoryKey;
+    await writeNote({
+      scopeType: state.selected.itemType,
+      scopeId: liveEntityIdFor(state.selected),
+      scopeTitle: `${state.selected.title} (clone proposal)`,
+      body:
+        `Propose adding a NEW ${state.selected.itemType} based on "${state.selected.title}". ` +
+        `Edit the proposed_diff before saving in admin or write a follow-up note here with the changes you want.`,
+      intent: "proposal_add",
+      target: el.fieldTarget?.value || "claude",
+      proposedDiff: { based_on: liveEntityIdFor(state.selected), new_entity: cloned },
+      snapshot: {
+        itemType: state.selected.itemType,
+        category: state.selected.category,
+        payload: state.selected.payload,
+        capturedAt: new Date().toISOString(),
+      },
+    });
+    flashSavePill();
+    renderContextNotes(state.selected);
+    return;
+  }
+
   const copy = {
     ...state.selected,
     id: `local-${Date.now()}`,
@@ -1631,6 +1748,60 @@ async function duplicateSelectedItem() {
   state.adminItems.unshift(copy);
   state.selected = copy;
   render();
+}
+
+// Phase 5 — attachment upload pipeline
+async function handleAttachmentSelect(event) {
+  const files = Array.from(event.target?.files || []);
+  if (!files.length) return;
+  if (state.storageMode !== "cloud") {
+    alert("Attachments require cloud storage. Local-draft mode skips file uploads.");
+    return;
+  }
+  for (const file of files) {
+    setAttachmentStatus(`Uploading ${file.name}…`);
+    try {
+      const url = await uploadAttachment(file);
+      pendingAttachments.push({ name: file.name, url, type: file.type });
+      setAttachmentStatus(`${pendingAttachments.length} file(s) ready to attach. Save the note to commit.`);
+    } catch (err) {
+      console.warn("[admin] attachment upload failed", err);
+      setAttachmentStatus(`Upload failed: ${err.message}`);
+    }
+  }
+  // Reset the input so the same file can be re-selected.
+  event.target.value = "";
+}
+
+async function uploadAttachment(file) {
+  // Path: <user_id>/<scope_type>/<timestamp>-<filename>
+  const userId = state.session?.user?.id || "anon";
+  const scope = state.selected?.itemType || "general";
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${userId}/${scope}/${Date.now()}-${safeName}`;
+  const { error } = await supabase.storage.from("admin-attachments").upload(path, file, {
+    upsert: false,
+    contentType: file.type,
+  });
+  if (error) throw error;
+  // Signed URL valid for a year; admin is Tom-only so this stays private.
+  const { data: signed, error: signErr } = await supabase.storage
+    .from("admin-attachments")
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (signErr) throw signErr;
+  return signed?.signedUrl || null;
+}
+
+function setAttachmentStatus(text) {
+  if (!el.attachmentStatus) return;
+  el.attachmentStatus.textContent = text;
+}
+
+function consumePendingAttachments() {
+  const urls = pendingAttachments.filter((a) => !!a.url).map((a) => a.url);
+  pendingAttachments.length = 0;
+  setAttachmentStatus("");
+  return urls;
 }
 
 async function saveSelectedItem() {
@@ -1930,12 +2101,15 @@ function flashSavePill() {
 }
 
 async function writeNote(note) {
+  // Phase 5 — drain any uploaded attachments staged for this note.
+  const attachmentUrls = note.attachmentUrls || consumePendingAttachments();
   const full = {
     id: `note-${Date.now()}`,
     createdAt: new Date().toISOString(),
     intent: note.intent || "feedback",
     target: note.target || "claude",
     author: "tom",
+    attachmentUrls,
     ...note,
   };
   if (state.storageMode === "cloud") {
@@ -1953,6 +2127,7 @@ async function writeNote(note) {
           target: full.target,
           author: full.author,
           proposed_diff: full.proposedDiff ?? null,
+          attachment_urls: attachmentUrls,
         })
         .select("*")
         .single();
@@ -2103,6 +2278,7 @@ function dbNoteToUi(row) {
     proposedDiff: row.proposed_diff ?? null,
     parentNoteId: row.parent_note_id ?? null,
     revertedAt: row.reverted_at ?? null,
+    attachmentUrls: Array.isArray(row.attachment_urls) ? row.attachment_urls : [],
   };
 }
 
