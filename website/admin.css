@@ -497,25 +497,39 @@
 .admin-facets {
   background: rgba(0, 0, 0, 0.025);
   border: 1px solid var(--neutral-200);
-  border-radius: 12px;
+  border-radius: 14px;
   display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
 }
 .admin-facet-row {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 130px 1fr;
+}
+.admin-facet-row__head {
+  display: grid;
+  gap: 2px;
+  padding-top: 4px;
+}
+.admin-facet-row__label {
+  color: var(--text);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.admin-facet-row__caption {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+  line-height: 1.35;
+}
+.admin-facet-row__pills {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.admin-facet-row__label {
-  color: var(--text-muted);
-  font: 700 10px var(--sans);
-  letter-spacing: 0.06em;
-  margin-right: 6px;
-  text-transform: uppercase;
-  width: 60px;
 }
 .admin-facet-pill {
   align-items: center;
@@ -524,10 +538,11 @@
   border-radius: 999px;
   cursor: pointer;
   display: inline-flex;
-  font: 600 12px var(--sans);
-  gap: 6px;
-  padding: 4px 10px;
-  transition: background 120ms ease, border-color 120ms ease;
+  font: 600 13px var(--sans);
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 12px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .admin-facet-pill:hover {
   background: rgba(237, 105, 85, 0.06);
@@ -539,7 +554,7 @@
   color: #fff;
 }
 .admin-facet-pill.is-active .admin-facet-pill__count {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.22);
   color: #fff;
 }
 .admin-facet-pill__label {
@@ -549,8 +564,17 @@
   background: rgba(0, 0, 0, 0.06);
   border-radius: 999px;
   color: var(--text-muted);
-  font: 700 10px var(--sans);
-  padding: 1px 7px;
+  font: 700 11px var(--sans);
+  padding: 2px 8px;
+}
+
+@media (max-width: 720px) {
+  .admin-facet-row {
+    grid-template-columns: 1fr;
+  }
+  .admin-facet-row__head {
+    padding-top: 0;
+  }
 }
 
 /* =============================================================================

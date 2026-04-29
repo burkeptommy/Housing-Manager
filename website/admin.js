@@ -1485,54 +1485,75 @@ function renderList() {
 }
 
 // Phase 5q — Facet pill rows for Tasks / Handyman / Recommended.
-// Surfaces lifecycle (auto-seed / opt-in / bundle child / bundle parent),
-// season, and routing filters with live counts so Tom can drill into
-// the 220+ template library without scrolling.
+// Three filter axes (lifecycle / season / routing) with explainer
+// captions so the labels aren't bare nouns. Layout uses a 2-column
+// grid: fixed-width label + caption on the left, wrapping pill row on
+// the right, so pills always start at the same x and never wrap into
+// the label column.
 function renderFacetPills(allItems) {
   if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
-  // Compute counts on the FULL view (all items) so the pill counts stay
-  // stable across filter selections — same UX as Apple Mail / Linear.
+  // Compute counts on the FULL view so pill counts stay stable across
+  // filter selections — same UX as Apple Mail / Linear.
   const lifecycleCounts = countByLifecycle(allItems);
   const seasonCounts = countBySeason(allItems);
   const routingCounts = countByRouting(allItems);
 
-  const pill = (axis, value, label, count, extraClass = "") => {
+  const pill = (axis, value, label, count, title = "") => {
     if (count === 0 && value !== "all") return "";
     const isActive = state[`${axis}Filter`] === value;
-    return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""} ${extraClass}" data-facet-axis="${escapeHtml(axis)}" data-facet-value="${escapeHtml(value)}">
+    return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""}" data-facet-axis="${escapeHtml(axis)}" data-facet-value="${escapeHtml(value)}" ${title ? `title="${escapeHtml(title)}"` : ""}>
       <span class="admin-facet-pill__label">${label}</span>
       <span class="admin-facet-pill__count">${count}</span>
     </button>`;
   };
 
+  const axisRow = (label, caption, pillsHtml) => `
+    <div class="admin-facet-row">
+      <div class="admin-facet-row__head">
+        <span class="admin-facet-row__label">${escapeHtml(label)}</span>
+        <span class="admin-facet-row__caption admin-muted">${caption}</span>
+      </div>
+      <div class="admin-facet-row__pills">${pillsHtml}</div>
+    </div>
+  `;
+
   return `
     <div class="admin-facets">
-      <div class="admin-facet-row">
-        <span class="admin-facet-row__label">Lifecycle</span>
-        ${pill("lifecycle", "all", "All", allItems.length)}
-        ${pill("lifecycle", "auto_seed", "Auto-seeds", lifecycleCounts.auto_seed)}
-        ${pill("lifecycle", "opt_in", "Opt-in", lifecycleCounts.opt_in)}
-        ${pill("lifecycle", "bundle_child", "Bundle child", lifecycleCounts.bundle_child)}
-        ${pill("lifecycle", "bundle_parent", "Has children", lifecycleCounts.bundle_parent)}
-      </div>
-      <div class="admin-facet-row">
-        <span class="admin-facet-row__label">Season</span>
-        ${pill("season", "all", "All", allItems.length)}
-        ${pill("season", "Spring", "🌷 Spring", seasonCounts.Spring)}
-        ${pill("season", "Summer", "☀️ Summer", seasonCounts.Summer)}
-        ${pill("season", "Fall", "🍂 Fall", seasonCounts.Fall)}
-        ${pill("season", "Winter", "❄️ Winter", seasonCounts.Winter)}
-        ${pill("season", "Spring/Fall", "🔁 Spring/Fall", seasonCounts["Spring/Fall"])}
-        ${pill("season", "year_round", "🔄 Year-round", seasonCounts.year_round)}
-      </div>
-      <div class="admin-facet-row">
-        <span class="admin-facet-row__label">Routing</span>
-        ${pill("routing", "all", "All", allItems.length)}
-        ${pill("routing", "vendor_only", "Vendor only", routingCounts.vendor_only)}
-        ${pill("routing", "vendor_or_handyman", "Vendor or DIY", routingCounts.vendor_or_handyman)}
-        ${pill("routing", "handyman_only", "DIY only", routingCounts.handyman_only)}
-        ${pill("routing", "bundled", "Bundled", routingCounts.bundled)}
-      </div>
+      ${axisRow(
+        "Lifecycle",
+        "When does this template enter the homeowner's task list?",
+        [
+          pill("lifecycle", "all", "All", allItems.length),
+          pill("lifecycle", "auto_seed", "Auto-seeds", lifecycleCounts.auto_seed, "Fires automatically the moment the homeowner finishes the quiz. No homeowner action required."),
+          pill("lifecycle", "opt_in", "Opt-in", lifecycleCounts.opt_in, "Never seeds automatically. Homeowner adds it from Recommended Services or the handyman punch list 'Recommended' section."),
+          pill("lifecycle", "bundle_child", `Bundle child (${lifecycleCounts.bundle_parent} bundles)`, lifecycleCounts.bundle_child, `Never gets its own task row. Rolls up into one of ${lifecycleCounts.bundle_parent} parent visits (e.g. Spring Landscaping Service, Pool Opening Service). Click to see children grouped by bundle.`),
+        ].join("")
+      )}
+      ${axisRow(
+        "Season",
+        "When during the year is this typically scheduled?",
+        [
+          pill("season", "all", "All", allItems.length),
+          pill("season", "Spring", "🌷 Spring", seasonCounts.Spring, "Mar–May. Opening tasks: HVAC cooling tune-up, irrigation startup, pool open, mulching, gutter cleaning."),
+          pill("season", "Summer", "☀️ Summer", seasonCounts.Summer, "Jun–Aug. Warm-weather work: exterior painting, deck staining, hardscape repairs."),
+          pill("season", "Fall", "🍂 Fall", seasonCounts.Fall, "Sep–Nov. Winterization: HVAC heating tune-up, boiler service, chimney sweep, snow plow contract."),
+          pill("season", "Winter", "❄️ Winter", seasonCounts.Winter, "Dec–Feb. Cold-weather indoor projects + dormant tree pruning."),
+          pill("season", "Spring/Fall", "🔁 Spring/Fall", seasonCounts["Spring/Fall"], "Twice-a-year cadence — runs at both seasonal anchors."),
+          pill("season", "year_round", "🔄 Year-round", seasonCounts.year_round, "No seasonal anchor. Homeowner schedules whenever convenient."),
+        ].join("")
+      )}
+      ${axisRow(
+        "Routing",
+        "Who handles this by default?",
+        [
+          pill("routing", "all", "All", allItems.length),
+          pill("routing", "vendor", "Vendor", routingCounts.vendor, "Always a pro — gas, panel, roof, septic, generator. Homeowner can't safely take this on."),
+          pill("routing", "vendor_or_handyman", "Vendor or Handyman", routingCounts.vendor_or_handyman, "Defaults to a vendor visit, but the handyman can knock it out on a punch-list visit too."),
+          pill("routing", "handyman", "Handyman", routingCounts.handyman, "Punch-list items the handyman tackles. Homeowner can still pull any of these into 'I'll do it myself' if they want."),
+          pill("routing", "homeowner_pull", "I'll do it myself", routingCounts.homeowner_pull, "Always 0 by default. Only populates when the homeowner explicitly pulls a task off another routing lane."),
+          pill("routing", "routine", "Routines", routingCounts.routine, "Recurring vendor work (landscaping, cleaning, pool service, pest control) that gets extracted into a Routine card instead of a one-off task."),
+        ].join("")
+      )}
     </div>
   `;
 }
@@ -1552,9 +1573,6 @@ function lifecycleOf(item) {
   const t = item.payload || {};
   if (t.bundleId) return "bundle_child";
   if (t.isEssential === false) return "opt_in";
-  // "Has children" = a category that owns 2+ children with the same
-  // bundleId. Phase 5q surfaces this as a virtual lifecycle so Tom can
-  // see which bundles exist without manually grouping.
   return "auto_seed";
 }
 
@@ -1583,19 +1601,65 @@ function countBySeason(items) {
   return out;
 }
 
+// Phase 5q — Routine-eligible categories + cadences. Mirrors the
+// simulator's SIM_ROUTINE_CATEGORIES + SIM_ROUTINE_FREQUENCIES so the
+// admin's "Routines" routing filter shows the same templates the
+// reconciler would extract into a routine card at runtime.
+const ADMIN_ROUTINE_CATEGORIES = new Set([
+  "Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub",
+  "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste",
+  "Window Cleaning", "Gutter Cleaning", "Trash & Recycling",
+]);
+const ADMIN_ROUTINE_FREQUENCIES = new Set([
+  "Weekly", "Biweekly", "Triweekly", "Monthly", "Bi-monthly", "Quarterly",
+]);
+
+function isRoutineCandidate(t) {
+  if (!t) return false;
+  if (t.assignmentType === "personal") return false;
+  if (t.safetyFloor === true) return false;
+  if (t.routingOverride === "diyDefault") return false;
+  if (!ADMIN_ROUTINE_FREQUENCIES.has(t.frequency)) return false;
+  if (!ADMIN_ROUTINE_CATEGORIES.has(t.systemCategory)) return false;
+  return true;
+}
+
+// Phase 5q — Re-mapped routing taxonomy per Tom: drop "DIY" nomenclature
+// (homeowners don't DIY by default; "I'll do it myself" is a runtime pull
+// only). Add "Routines" as a first-class lane for recurring vendor work.
+//
+// Routing categories:
+//   vendor             — always a pro (safetyFloor, gas, panel, roof, septic)
+//   vendor_or_handyman — defaults to vendor, handyman can also tackle
+//   handyman           — punch-list items the handyman handles
+//   homeowner_pull     — never the default (always 0); only set when the
+//                        homeowner explicitly pulls a task to themselves
+//   routine            — recurring vendor work that gets routine-extracted
 function routingOf(item) {
   const t = item.payload || {};
-  if (t.bundleId) return "bundled";
-  if (t.safetyFloor === true) return "vendor_only";
-  if (t.routingOverride === "vendorOnly") return "vendor_only";
-  if (t.assignmentType === "vendor" && !t.routingOverride) return "vendor_only";
-  if (t.routingOverride === "diyDefault") return "handyman_only";
-  if (t.assignmentType === "personal") return "handyman_only";
+  // Routines take priority over the underlying assignmentType — recurring
+  // vendor work surfaces as a routine even if the template ships as
+  // `vendorDefault`. Mirrors simIsRoutineCandidate in admin-simulator.js.
+  if (isRoutineCandidate(t)) return "routine";
+  // Bundle children inherit routing from the synthesized bundle parent.
+  // For filtering purposes, treat them as part of their bundle's routing
+  // lane (most bundles end up vendor_or_handyman or vendor).
+  if (t.bundleId) {
+    if (t.safetyFloor === true) return "vendor";
+    if (t.routingOverride === "vendorOnly") return "vendor";
+    if (t.assignmentType === "vendor") return "vendor";
+    return "vendor_or_handyman";
+  }
+  if (t.safetyFloor === true) return "vendor";
+  if (t.routingOverride === "vendorOnly") return "vendor";
+  if (t.assignmentType === "vendor" && !t.routingOverride) return "vendor";
+  if (t.routingOverride === "diyDefault" || t.routingOverride === "diyCapable") return "handyman";
+  if (t.assignmentType === "personal") return "handyman";
   return "vendor_or_handyman";
 }
 
 function countByRouting(items) {
-  const out = { vendor_only: 0, vendor_or_handyman: 0, handyman_only: 0, bundled: 0 };
+  const out = { vendor: 0, vendor_or_handyman: 0, handyman: 0, homeowner_pull: 0, routine: 0 };
   for (const i of items) out[routingOf(i)]++;
   return out;
 }
@@ -3229,18 +3293,25 @@ function itemRowHtml(item) {
       handymanBadge = `<span class="admin-pill admin-pill--library" title="Library item — opt-in via Recommended Services">🛠️ Library</span>`;
     }
   }
-  // Phase 5q — task lifecycle + season pills. "Won't auto-seed" makes
-  // opt-in items obvious; "→ rolls up into X" makes bundle children's
-  // hidden parent visible without opening the row.
+  // Phase 5q — task lifecycle + season pills with concrete "how to opt
+  // in" / "rolls up into X" context so the row is self-explanatory.
   let lifecycleBadge = "";
   let seasonBadge = "";
   if (["task", "recommended", "handyman"].includes(item.itemType)) {
     const t = item.payload || {};
     if (t.bundleId) {
       const parentTitle = prettyBundleTitle(t.bundleId);
-      lifecycleBadge = `<span class="admin-pill admin-pill--bundle-child" title="This template never seeds as its own task — it rolls up into the bundle parent visit">↳ ${escapeHtml(parentTitle)}</span>`;
+      const siblingCount = countBundleSiblings(t.bundleId);
+      const tooltip = `Never seeds as its own task. Rolls up into "${parentTitle}" alongside ${siblingCount - 1} sibling${siblingCount - 1 === 1 ? "" : "s"}. The homeowner sees ONE scheduled visit, not ${siblingCount} separate tasks.`;
+      lifecycleBadge = `<span class="admin-pill admin-pill--bundle-child" title="${escapeHtml(tooltip)}">↳ ${escapeHtml(parentTitle)} (${siblingCount} items)</span>`;
     } else if (t.isEssential === false) {
-      lifecycleBadge = `<span class="admin-pill admin-pill--optin" title="Won't auto-seed at quiz completion. Homeowner picks via Recommended Services / handyman punch list">Opt-in</span>`;
+      // Phase 5q — surface HOW the opt-in surfaces. Handyman-category
+      // opt-ins land on the punch list "Recommended" section; everything
+      // else lands in the Recommended Services view (Phase 54C).
+      const optInSurface = t.systemCategory === "Handyman"
+        ? "Surfaced in the handyman punch list 'Recommended' section. Homeowner taps + to add it to the next handyman visit."
+        : "Surfaced in PropertyDetailView → Recommended Services. Homeowner taps + on the card to schedule it.";
+      lifecycleBadge = `<span class="admin-pill admin-pill--optin" title="${escapeHtml(optInSurface)}">Opt-in</span>`;
     }
     if (t.seasonalTiming) {
       const seasonEmoji = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️", "Spring/Fall": "🔁" }[t.seasonalTiming] || "";
@@ -3267,6 +3338,15 @@ function itemRowHtml(item) {
       </div>
     </button>
   `;
+}
+
+// Phase 5q — Count siblings in a bundle so a "Bundle child" row can
+// show "↳ Spring Landscaping visit (4 items)" instead of leaving the
+// reader guessing how many things land together.
+function countBundleSiblings(bundleId) {
+  if (!bundleId) return 0;
+  const templates = state.liveData?.templates?.entries || [];
+  return templates.filter((t) => t.bundleId === bundleId).length;
 }
 
 // Phase 5q — Map a bundleId like "Pool/Spa:opening" or "Landscaping:spring"
