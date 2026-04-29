@@ -132,6 +132,14 @@ const VIEWS = [
     subtitle: "Every change Claude has shipped, in reverse-chronological order.",
   },
   {
+    id: "claude_file",
+    label: "Claude file",
+    type: "claude_file",
+    title: "CLAUDE_ADMIN_NOTES.md (live preview)",
+    eyebrow: "What Claude reads next session",
+    subtitle: "Live render of what's in your notes file right now. Mirrors the sync script's output without needing a local terminal.",
+  },
+  {
     id: "notes",
     label: "Notes",
     type: "note",
@@ -861,6 +869,8 @@ function render() {
     renderDecisionsView();
   } else if (state.view === "activity") {
     renderActivityView();
+  } else if (state.view === "claude_file") {
+    renderClaudeFileView();
   } else if (state.view === "simulator") {
     renderSimulatorView();
   } else {
@@ -1842,6 +1852,216 @@ function activityRowHtml(event) {
     `;
   }
   return "";
+}
+
+// =============================================================================
+// Phase 5b — CLAUDE_ADMIN_NOTES.md live preview
+// =============================================================================
+// Mirrors what scripts/sync_claude_admin_notes.mjs produces, rendered in
+// the browser so Tom can see exactly what next-session Claude will read
+// without dropping into a terminal. Same priority order: questions for
+// Claude → pending changes → open feedback by entity → recently applied.
+
+function renderClaudeFileView() {
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.add("is-hidden");
+
+  // Filter to claude/both target + non-archived, then group.
+  const claudeNotes = state.notes.filter(
+    (n) => n.target === "claude" || n.target === "both"
+  );
+
+  const pending = claudeNotes.filter(
+    (n) =>
+      !n.appliedAt &&
+      !n.revertedAt &&
+      ["change_request", "proposal_add", "proposal_delete"].includes(n.intent)
+  );
+  const questions = claudeNotes.filter(
+    (n) => !n.appliedAt && n.intent === "question_for_claude"
+  );
+  const feedback = claudeNotes.filter(
+    (n) =>
+      !n.appliedAt &&
+      !n.revertedAt &&
+      !["change_request", "proposal_add", "proposal_delete", "question_for_claude"].includes(n.intent)
+  );
+  const applied = claudeNotes.filter((n) => n.appliedAt && !n.revertedAt);
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${pending.length}</strong><span>Pending changes</span></div>
+    <div class="admin-stat"><strong>${questions.length}</strong><span>Open questions</span></div>
+    <div class="admin-stat"><strong>${feedback.length}</strong><span>Feedback</span></div>
+    <div class="admin-stat"><strong>${applied.length}</strong><span>Applied</span></div>
+  `;
+
+  // Build threaded structure (parent → children) so replies render nested.
+  const threaded = nestThreadsForFile(claudeNotes);
+
+  const listHtml = `
+    <div class="admin-claude-file">
+      <header class="admin-claude-file__header">
+        <p class="admin-eyebrow">CLAUDE_ADMIN_NOTES.md</p>
+        <h2>${escapeHtml(claudeNotes.length)} note${claudeNotes.length === 1 ? "" : "s"} synced to Claude</h2>
+        <p class="admin-muted">Live preview. Saving a note above auto-updates this view. The actual
+        <code>CLAUDE_ADMIN_NOTES.md</code> file refreshes on the next sync —
+        run <code>node scripts/sync_claude_admin_notes.mjs</code> locally to write the file.</p>
+      </header>
+
+      ${
+        questions.length
+          ? `<section class="admin-claude-file__section admin-claude-file__section--question">
+              <h3>❓ Questions for Claude (answer first)</h3>
+              ${threaded.filter((n) => questions.includes(n)).map(claudeFileNoteHtml).join("")}
+            </section>`
+          : ""
+      }
+
+      ${
+        pending.length
+          ? `<section class="admin-claude-file__section admin-claude-file__section--pending">
+              <h3>⚡ Pending Changes (act on these first)</h3>
+              ${threaded.filter((n) => pending.includes(n)).map(claudeFileNoteHtml).join("")}
+            </section>`
+          : ""
+      }
+
+      ${
+        feedback.length
+          ? `<section class="admin-claude-file__section">
+              <h3>📋 Open Feedback (by entity)</h3>
+              ${renderFeedbackByEntity(threaded.filter((n) => feedback.includes(n)))}
+            </section>`
+          : ""
+      }
+
+      ${
+        applied.length
+          ? `<section class="admin-claude-file__section admin-claude-file__section--applied">
+              <h3>✅ Recently Applied</h3>
+              <p class="admin-muted">Already shipped. Read for retroactive QA only.</p>
+              ${renderFeedbackByEntity(threaded.filter((n) => applied.includes(n)))}
+            </section>`
+          : ""
+      }
+
+      ${
+        !claudeNotes.length
+          ? `<div class="admin-empty-detail" style="min-height:240px">
+              <h3>No notes yet</h3>
+              <p>Save a note from any detail panel or quiz preview and it'll show up here.</p>
+            </div>`
+          : ""
+      }
+    </div>
+  `;
+
+  el.list.innerHTML = listHtml;
+
+  // Wire revert buttons inside the file preview.
+  el.list.querySelectorAll("[data-revert-note]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await revertNote(btn.dataset.revertNote);
+      renderClaudeFileView();
+    });
+  });
+}
+
+function nestThreadsForFile(notes) {
+  // Wrap each note with replies array; populate from parentNoteId.
+  const byId = new Map(notes.map((n) => [n.id, { ...n, replies: [] }]));
+  const top = [];
+  for (const n of notes) {
+    const wrapped = byId.get(n.id);
+    if (n.parentNoteId && byId.has(n.parentNoteId)) {
+      byId.get(n.parentNoteId).replies.push(wrapped);
+    } else {
+      top.push(wrapped);
+    }
+  }
+  top.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  for (const t of top) t.replies.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+  return top;
+}
+
+function renderFeedbackByEntity(notes) {
+  // Group by scopeType + scopeId for a clean per-entity view.
+  const groups = new Map();
+  for (const note of notes) {
+    const key = `${note.scopeType || "general"}::${note.scopeId || note.scopeTitle || "(unscoped)"}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        scopeType: note.scopeType || "general",
+        scopeTitle: note.scopeTitle || "Unnamed",
+        scopeId: note.scopeId,
+        notes: [],
+      });
+    }
+    groups.get(key).notes.push(note);
+  }
+  const ordered = [...groups.values()].sort((a, b) => {
+    const order = ["question", "task", "handyman", "routine", "system", "vehicle", "prompt", "general"];
+    const ai = order.indexOf(a.scopeType);
+    const bi = order.indexOf(b.scopeType);
+    if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    return a.scopeTitle.localeCompare(b.scopeTitle);
+  });
+  return ordered
+    .map(
+      (g) => `
+        <article class="admin-claude-file__entity">
+          <header>
+            <span class="admin-pill admin-pill--note">${escapeHtml(g.scopeType)}</span>
+            <strong>${escapeHtml(g.scopeTitle)}</strong>
+            ${g.scopeId ? `<code>${escapeHtml(g.scopeId)}</code>` : ""}
+          </header>
+          ${g.notes.map(claudeFileNoteHtml).join("")}
+        </article>
+      `
+    )
+    .join("");
+}
+
+function claudeFileNoteHtml(note, depth = 0) {
+  const author = note.author || "tom";
+  const ts = note.createdAt ? formatDate(note.createdAt) : "?";
+  const intent = note.intent || "feedback";
+  const headerBits = [ts, intent, author];
+  if (note.appliedAt) {
+    headerBits.push(`applied ${formatDate(note.appliedAt)}`);
+    if (note.appliedCommit) headerBits.push(`commit ${note.appliedCommit.slice(0, 7)}`);
+  }
+  if (note.revertedAt) headerBits.push(`reverted ${formatDate(note.revertedAt)}`);
+
+  const diffHtml =
+    note.proposedDiff && Object.keys(note.proposedDiff).length
+      ? `<details class="admin-claude-file__diff"><summary>Proposed diff</summary><pre>${escapeHtml(JSON.stringify(note.proposedDiff, null, 2))}</pre></details>`
+      : "";
+
+  const attachments = (note.attachmentUrls || [])
+    .map((url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="admin-claude-file__attachment">attachment</a>`)
+    .join(" ");
+
+  const revertBtn =
+    note.appliedAt && !note.revertedAt
+      ? `<button type="button" class="admin-button admin-button--secondary admin-button--xs" data-revert-note="${escapeHtml(note.id)}">Revert</button>`
+      : "";
+
+  const replies = (note.replies || []).map((r) => claudeFileNoteHtml(r, depth + 1)).join("");
+
+  return `
+    <article class="admin-claude-file__note ${depth > 0 ? "admin-claude-file__note--reply" : ""}">
+      <header>
+        <span class="admin-claude-file__note-meta">${escapeHtml(headerBits.join(" · "))}</span>
+        ${revertBtn}
+      </header>
+      <pre>${escapeHtml(note.body || "")}</pre>
+      ${attachments ? `<div class="admin-claude-file__attachments">${attachments}</div>` : ""}
+      ${diffHtml}
+      ${replies}
+    </article>
+  `;
 }
 
 function renderNotesView() {

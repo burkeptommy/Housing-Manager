@@ -1371,6 +1371,183 @@
 }
 
 /* =============================================================================
+   Phase 5b — CLAUDE_ADMIN_NOTES.md live preview view
+   ============================================================================= */
+
+.admin-claude-file {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-claude-file__header {
+  background: linear-gradient(135deg, rgba(69, 58, 112, 0.1), rgba(69, 58, 112, 0.02));
+  border: 1px solid rgba(69, 58, 112, 0.2);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.admin-claude-file__header h2 {
+  font: 700 22px Fraunces, Georgia, serif;
+  margin: 4px 0 6px;
+}
+
+.admin-claude-file__header code {
+  background: rgba(69, 58, 112, 0.1);
+  border-radius: 5px;
+  font: 600 12px ui-monospace, monospace;
+  padding: 1px 6px;
+}
+
+.admin-claude-file__section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+}
+
+.admin-claude-file__section h3 {
+  color: var(--indigo-700);
+  font: 700 14px var(--sans);
+  letter-spacing: 0.04em;
+  margin: 0 0 10px;
+}
+
+.admin-claude-file__section--question {
+  background: rgba(199, 126, 46, 0.05);
+  border-color: rgba(199, 126, 46, 0.32);
+}
+
+.admin-claude-file__section--question h3 {
+  color: #9c6322;
+}
+
+.admin-claude-file__section--pending {
+  background: rgba(237, 105, 85, 0.05);
+  border-color: rgba(237, 105, 85, 0.3);
+}
+
+.admin-claude-file__section--pending h3 {
+  color: var(--salmon-dark, #c25a4a);
+}
+
+.admin-claude-file__section--applied {
+  background: rgba(74, 124, 89, 0.04);
+  border-color: rgba(74, 124, 89, 0.28);
+}
+
+.admin-claude-file__section--applied h3 {
+  color: #3a6048;
+}
+
+.admin-claude-file__entity {
+  background: rgba(69, 58, 112, 0.03);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+.admin-claude-file__entity header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-claude-file__entity header strong {
+  font: 700 14px var(--sans);
+}
+
+.admin-claude-file__entity code {
+  background: rgba(69, 58, 112, 0.1);
+  border-radius: 5px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 1px 6px;
+}
+
+.admin-claude-file__note {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.admin-claude-file__note + .admin-claude-file__note {
+  margin-top: 8px;
+}
+
+.admin-claude-file__note--reply {
+  background: rgba(69, 58, 112, 0.04);
+  border-left: 3px solid var(--indigo-700);
+  margin-left: 22px;
+}
+
+.admin-claude-file__note header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-claude-file__note-meta {
+  color: var(--text-muted);
+  font: 600 11px var(--sans);
+}
+
+.admin-claude-file__note pre {
+  background: transparent;
+  color: var(--text);
+  font: 500 13px var(--sans);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.admin-claude-file__diff {
+  font: 500 11px ui-monospace, monospace;
+}
+
+.admin-claude-file__diff summary {
+  color: var(--indigo-700);
+  cursor: pointer;
+  font: 600 11px var(--sans);
+}
+
+.admin-claude-file__diff pre {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 6px;
+  font: 500 11px ui-monospace, monospace;
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
+
+.admin-claude-file__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-claude-file__attachment {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 999px;
+  color: var(--indigo-700);
+  font: 600 11px var(--sans);
+  padding: 3px 10px;
+  text-decoration: none;
+}
+
+.admin-claude-file__attachment:hover {
+  background: rgba(69, 58, 112, 0.16);
+}
+
+/* =============================================================================
    Phase 4b — Info buttons + popover, walkthrough nav, live notes in preview
    ============================================================================= */
 
