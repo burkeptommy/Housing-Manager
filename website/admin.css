@@ -1370,6 +1370,193 @@
   .qf__list { gap: 8px; }
 }
 
+/* =============================================================================
+   Phase 7.5 — Launch lifecycle, Decisions, Activity, Readiness
+   ============================================================================= */
+
+/* Launch lifecycle pills (draft / staged / approved / shipped / sunset) */
+.admin-pill--launch[data-tone="draft"] {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-muted);
+}
+
+.admin-pill--launch[data-tone="staged"] {
+  background: rgba(199, 126, 46, 0.14);
+  color: #9c6322;
+}
+
+.admin-pill--launch[data-tone="approved"] {
+  background: rgba(74, 124, 89, 0.18);
+  color: #3a6048;
+}
+
+.admin-pill--launch[data-tone="shipped"] {
+  background: rgba(74, 124, 89, 0.32);
+  color: #2a4a35;
+}
+
+.admin-pill--launch[data-tone="sunset"] {
+  background: rgba(194, 90, 94, 0.18);
+  color: #a9444b;
+}
+
+/* Lock button — when locked, render as solid green */
+.admin-button--lock {
+  background: rgba(74, 124, 89, 0.1);
+  border-color: rgba(74, 124, 89, 0.3);
+  color: #3a6048;
+}
+
+.admin-button--lock:hover {
+  background: rgba(74, 124, 89, 0.18);
+}
+
+.admin-button--lock.admin-button--locked {
+  background: #4a7c59;
+  border-color: #4a7c59;
+  box-shadow: 0 8px 18px rgba(74, 124, 89, 0.28);
+  color: #fff;
+}
+
+.admin-button--lock.admin-button--locked:hover {
+  background: #3a6048;
+}
+
+/* Topbar readiness pill */
+.admin-readiness {
+  align-items: center;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: max-content 1fr max-content;
+  margin-top: 8px;
+  max-width: 540px;
+}
+
+.admin-readiness__count {
+  color: var(--text);
+  font: 700 12px var(--sans);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.admin-readiness__bar {
+  background: var(--neutral-200);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.admin-readiness__bar > div {
+  background: linear-gradient(90deg, var(--salmon, #ed6955), #4a7c59);
+  border-radius: 999px;
+  height: 100%;
+  transition: width 240ms ease;
+  width: 0%;
+}
+
+.admin-readiness__hint {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+  white-space: nowrap;
+}
+
+/* Decisions list */
+.admin-decision {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-left: 3px solid var(--salmon, #ed6955);
+  border-radius: 14px;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.admin-decision:hover {
+  background: rgba(237, 105, 85, 0.04);
+}
+
+.admin-decision__top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-decision__top strong {
+  flex: 1;
+  font: 700 14px var(--sans);
+}
+
+.admin-decision__reason {
+  color: var(--text-muted);
+  font: 500 13px var(--sans);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.admin-decision__rec {
+  color: var(--indigo-700);
+  font: 600 12px var(--sans);
+  margin: 0;
+}
+
+.admin-decision__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-button--danger {
+  background: rgba(194, 90, 94, 0.08);
+  border-color: rgba(194, 90, 94, 0.3);
+  color: #a9444b;
+}
+
+.admin-button--danger:hover {
+  background: rgba(194, 90, 94, 0.16);
+}
+
+/* Activity feed */
+.admin-activity {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 12px 16px;
+}
+
+.admin-activity header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-activity header strong {
+  flex: 1;
+  font: 700 13px var(--sans);
+}
+
+.admin-activity pre {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 8px;
+  color: var(--text);
+  font: 500 12px ui-monospace, "SF Mono", Menlo, monospace;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
+
+.admin-activity--applied { border-left: 3px solid #4a7c59; }
+.admin-activity--reverted { border-left: 3px solid #c25a4a; }
+.admin-activity--locked { border-left: 3px solid var(--indigo-700); }
+
 /* Admin Lab v2 — admin-note-card layout */
 .admin-note-card__top {
   align-items: center;

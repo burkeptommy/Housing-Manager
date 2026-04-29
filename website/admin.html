@@ -81,6 +81,11 @@
               <p class="admin-muted" data-view-subtitle>
                 Curate the first homeowner quiz and decide what ships.
               </p>
+              <div class="admin-readiness is-hidden" data-readiness-pill>
+                <span class="admin-readiness__count" data-readiness-count></span>
+                <div class="admin-readiness__bar"><div data-readiness-bar></div></div>
+                <span class="admin-readiness__hint" data-readiness-hint></span>
+              </div>
             </div>
             <div class="admin-topbar__actions">
               <button type="button" class="admin-button is-hidden" data-preview-quiz>
@@ -142,6 +147,10 @@
                   <button type="button" class="admin-button admin-button--secondary is-hidden" data-preview-question>
                     Preview this question
                   </button>
+                  <button type="button" class="admin-button admin-button--lock" data-lock-toggle>
+                    Lock as approved
+                  </button>
+                  <span class="admin-pill admin-pill--launch is-hidden" data-launch-pill></span>
                 </div>
 
                 <!-- Schema-driven form (live entities — Quiz / Tasks / etc.). -->

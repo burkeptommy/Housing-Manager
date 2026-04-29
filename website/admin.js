@@ -30,6 +30,14 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const VIEWS = [
   {
+    id: "decisions",
+    label: "Decisions",
+    type: "decision",
+    title: "Decisions Queue",
+    eyebrow: "Curate to launch",
+    subtitle: "Auto-flagged entities awaiting your call. Approve, cut, or note for Claude.",
+  },
+  {
     id: "quiz",
     label: "Quiz",
     type: "question",
@@ -99,6 +107,14 @@ const VIEWS = [
     title: "Search Builders (legacy)",
     eyebrow: "Provider and system search",
     subtitle: "Hand-curated search-surface defaults. Will fold into Vendors+Systems eventually.",
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    type: "activity",
+    title: "Recent Activity",
+    eyebrow: "Applied + reverted timeline",
+    subtitle: "Every change Claude has shipped, in reverse-chronological order.",
   },
   {
     id: "notes",
@@ -237,6 +253,13 @@ const el = {
   previewQuestion: document.querySelector("[data-preview-question]"),
   previewQuiz: document.querySelector("[data-preview-quiz]"),
   systemOptions: document.querySelector("#admin-system-options"),
+  // Phase 7.5 — launch lifecycle controls
+  lockToggle: document.querySelector("[data-lock-toggle]"),
+  launchPill: document.querySelector("[data-launch-pill]"),
+  readinessPill: document.querySelector("[data-readiness-pill]"),
+  readinessCount: document.querySelector("[data-readiness-count]"),
+  readinessBar: document.querySelector("[data-readiness-bar]"),
+  readinessHint: document.querySelector("[data-readiness-hint]"),
 };
 
 // Phase 4b — per-detail editing state. `original` is the unmodified entity
@@ -276,6 +299,39 @@ function wireEvents() {
   el.saveNote.addEventListener("click", saveContextNote);
 
   // Phase 4b — preview buttons + flow drilldown
+  el.lockToggle?.addEventListener("click", () => toggleLockSelected());
+
+  // Phase 7.5 — keyboard shortcuts (only when no input has focus)
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const inField =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target?.isContentEditable);
+    if (event.key === "?" && event.shiftKey && !inField) {
+      event.preventDefault();
+      showShortcutHelp();
+      return;
+    }
+    if (event.key === "/" && !inField) {
+      event.preventDefault();
+      el.search?.focus();
+      el.search?.select();
+      return;
+    }
+    if (event.key === "Escape" && !inField) {
+      if (state.search) {
+        state.search = "";
+        el.search.value = "";
+        render();
+      } else if (state.selected) {
+        state.selected = null;
+        render();
+      }
+    }
+  });
+
   el.previewQuestion?.addEventListener("click", () => {
     if (!state.selected || state.selected.itemType !== "question") return;
     openQuestionPreview(structuredCloneSafe(editingState.current ?? state.selected.payload), {
@@ -309,6 +365,20 @@ function wireEvents() {
       });
     }, 60);
   });
+}
+
+function showShortcutHelp() {
+  alert(
+    [
+      "Keyboard shortcuts",
+      "",
+      "/ — focus the search input",
+      "Esc — clear search, then deselect, then close any open preview",
+      "? — this help",
+      "",
+      "(More shortcuts coming — keyboard-only review pass is on the roadmap.)",
+    ].join("\n")
+  );
 }
 
 function indexOfSelectedQuestion() {
@@ -726,10 +796,15 @@ function render() {
 
   if (state.view === "notes") {
     renderNotesView();
+  } else if (state.view === "decisions") {
+    renderDecisionsView();
+  } else if (state.view === "activity") {
+    renderActivityView();
   } else {
     renderList();
     renderDetail();
   }
+  renderReadiness();
 }
 
 function renderNav() {
@@ -844,9 +919,51 @@ function renderDetail() {
     el.deleteItem.disabled = item.source !== "admin";
   }
 
+  // Phase 7.5 — launch lifecycle pill + lock toggle label
+  const launch = effectiveLaunchStatus(item);
+  if (el.launchPill) {
+    if (launch && launch !== "draft") {
+      el.launchPill.textContent = launch;
+      el.launchPill.dataset.tone = launch;
+      el.launchPill.classList.remove("is-hidden");
+    } else {
+      el.launchPill.classList.add("is-hidden");
+    }
+  }
+  if (el.lockToggle) {
+    if (item.itemType === "decision" || item.itemType === "activity" || item.itemType === "note") {
+      el.lockToggle.classList.add("is-hidden");
+    } else {
+      el.lockToggle.classList.remove("is-hidden");
+      el.lockToggle.textContent = launch === "approved" ? "Unlock" : "Lock as approved";
+      el.lockToggle.classList.toggle("admin-button--locked", launch === "approved");
+    }
+  }
+
   el.contextNote.value = "";
   renderContextNotes(item);
   el.saveNote.textContent = "Save note";
+}
+
+// Phase 7.5 — show "X of Y approved" + progress bar in the topbar for
+// surfaces where it makes sense (live entities — Quiz/Tasks/Routines/etc.)
+function renderReadiness() {
+  if (!el.readinessPill) return;
+  const surfaces = ["quiz", "tasks", "routines", "handyman", "systems", "vehicles", "prompts"];
+  if (!surfaces.includes(state.view)) {
+    el.readinessPill.classList.add("is-hidden");
+    return;
+  }
+  const items = itemsForCurrentView().filter((i) => i.source === "live");
+  const total = items.length;
+  const approved = items.filter((i) => effectiveLaunchStatus(i) === "approved").length;
+  const pct = total ? Math.round((approved / total) * 100) : 0;
+  el.readinessPill.classList.remove("is-hidden");
+  el.readinessCount.textContent = `${approved} / ${total} approved · ${pct}%`;
+  el.readinessBar.style.width = `${pct}%`;
+  el.readinessHint.textContent = approved === total
+    ? "Surface ready to ship."
+    : `${total - approved} entities still need your call.`;
 }
 
 function resetEditingState() {
@@ -869,6 +986,362 @@ function renderDiff() {
   } else {
     el.saveItem.classList.remove("admin-button--has-changes");
   }
+}
+
+// =============================================================================
+// Phase 7.5 — Decisions queue
+// =============================================================================
+// Auto-flagged entities awaiting Tom's call. Rules:
+//   - Live entities not yet approved AND with high impact (large bundle,
+//     gates other questions, or template count > 5 in category)
+//   - Entities with lint hits AND launch_status != approved
+//   - Entities with question_for_claude notes pending
+//   - Entities with change_request notes pending application
+// Each row gets one-click Approve / Cut / Open buttons so the tab can be
+// burned through quickly.
+
+function renderDecisionsView() {
+  const decisions = computeDecisionQueue();
+  el.search.value = state.search || "";
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${decisions.length}</strong><span>Awaiting your call</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "lint").length}</strong><span>Lint</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "question").length}</strong><span>Questions</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "proposal").length}</strong><span>Proposals</span></div>
+  `;
+
+  const filtered = state.search
+    ? decisions.filter((d) =>
+        [d.title, d.reason, d.itemType].join(" ").toLowerCase().includes(state.search.toLowerCase())
+      )
+    : decisions;
+
+  el.list.innerHTML = filtered.length
+    ? filtered.map((d) => decisionRowHtml(d)).join("")
+    : `<div class="admin-empty-detail" style="min-height:240px"><h3>No decisions waiting</h3><p>Surfaces are clean. Move to Quiz or Tasks for active curation.</p></div>`;
+
+  el.list.querySelectorAll("[data-decision-action]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const decisionId = btn.closest("[data-decision-id]")?.dataset.decisionId;
+      const action = btn.dataset.decisionAction;
+      const decision = decisions.find((d) => d.id === decisionId);
+      if (!decision) return;
+      await handleDecisionAction(decision, action);
+    });
+  });
+  el.list.querySelectorAll("[data-decision-id][data-open-detail]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const decisionId = row.dataset.decisionId;
+      const decision = decisions.find((d) => d.id === decisionId);
+      if (!decision?.targetItem) return;
+      // Jump to the entity's home surface.
+      state.view = decision.targetView;
+      state.selected = decision.targetItem;
+      render();
+    });
+  });
+
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.add("is-hidden");
+}
+
+function computeDecisionQueue() {
+  const queue = [];
+  const surfaces = ["quiz", "tasks", "routines", "handyman", "systems", "vehicles", "prompts"];
+
+  // 1. question_for_claude pending notes — top priority
+  for (const note of state.notes) {
+    if (note.intent === "question_for_claude" && !note.appliedAt) {
+      queue.push({
+        id: `q4c-${note.id}`,
+        severity: "question",
+        title: `${note.scopeTitle || "Open question"}`,
+        reason: note.body?.slice(0, 200) || "(no body)",
+        itemType: note.scopeType,
+        targetView: viewIdForType(note.scopeType),
+        targetItem: locateLiveItemByScope(note),
+        recommendation: "Answer first — Tom is waiting on you.",
+        primaryActions: ["open"],
+      });
+    }
+  }
+
+  // 2. Pending change_request / proposal_* notes
+  for (const note of state.notes) {
+    if (
+      ["change_request", "proposal_add", "proposal_delete"].includes(note.intent) &&
+      !note.appliedAt &&
+      !note.revertedAt
+    ) {
+      queue.push({
+        id: `proposal-${note.id}`,
+        severity: "proposal",
+        title: `${note.intent}: ${note.scopeTitle || "(unscoped)"}`,
+        reason: note.body?.slice(0, 200) || "(no body)",
+        itemType: note.scopeType,
+        targetView: viewIdForType(note.scopeType),
+        targetItem: locateLiveItemByScope(note),
+        recommendation: "Apply or revert this proposal.",
+        primaryActions: ["open"],
+      });
+    }
+  }
+
+  // 3. Lint violations on un-approved live entities
+  for (const surfaceId of surfaces) {
+    const items = liveItemsForView(surfaceId) || [];
+    for (const item of items) {
+      const lintCount = item.lintCount || 0;
+      const launch = effectiveLaunchStatus(item);
+      if (lintCount > 0 && launch !== "approved" && launch !== "shipped") {
+        queue.push({
+          id: `lint-${surfaceId}-${item.id}`,
+          severity: "lint",
+          title: item.title,
+          reason: `${lintCount} voice-lint hit${lintCount === 1 ? "" : "s"}.`,
+          itemType: item.itemType,
+          targetView: surfaceId,
+          targetItem: item,
+          recommendation: "Fix the voice issue, then lock as approved.",
+          primaryActions: ["open", "approve", "cut"],
+        });
+      }
+    }
+  }
+
+  // 4. High-impact entities not yet approved (top tier in registry, or
+  // bundle parents). Cap to 30 to avoid drowning the queue.
+  let highImpactCount = 0;
+  for (const surfaceId of surfaces) {
+    const items = liveItemsForView(surfaceId) || [];
+    for (const item of items) {
+      if (highImpactCount >= 30) break;
+      const launch = effectiveLaunchStatus(item);
+      if (launch === "approved" || launch === "shipped") continue;
+      const high = isHighImpact(item);
+      if (!high) continue;
+      // Skip if already in queue from earlier rules.
+      const already = queue.some((q) => q.targetItem?.id === item.id);
+      if (already) continue;
+      queue.push({
+        id: `impact-${surfaceId}-${item.id}`,
+        severity: "impact",
+        title: item.title,
+        reason: high,
+        itemType: item.itemType,
+        targetView: surfaceId,
+        targetItem: item,
+        recommendation: "Review + lock if it's right.",
+        primaryActions: ["open", "approve", "cut"],
+      });
+      highImpactCount += 1;
+    }
+  }
+
+  return queue;
+}
+
+function isHighImpact(item) {
+  const p = item.payload || {};
+  if (p.bundleId) return `Bundle parent (${p.bundleId})`;
+  if ((p._impact?.templates_in_category || []).length > 5) {
+    return `${p._impact.templates_in_category.length} templates depend on this category`;
+  }
+  if (p.tier === "universal") return "Universal-tier system (every household)";
+  if (p.safetyFloor === true) return "Safety-floor template";
+  if (p.requiredSubtypes?.length === 0 && item.itemType === "task") return "Universal template (no gating)";
+  return null;
+}
+
+function viewIdForType(type) {
+  return (
+    {
+      question: "quiz",
+      task: "tasks",
+      handyman: "handyman",
+      routine: "routines",
+      system: "systems",
+      vehicle: "vehicles",
+      prompt: "prompts",
+    }[type] || "quiz"
+  );
+}
+
+function locateLiveItemByScope(note) {
+  const surface = viewIdForType(note.scopeType);
+  const items = liveItemsForView(surface) || [];
+  return (
+    items.find((i) =>
+      [i.payload?.id, i.payload?.templateKey, i.payload?.categoryKey, i.payload?.functionName, i.payload?.rawValue]
+        .filter(Boolean)
+        .includes(note.scopeId)
+    ) ||
+    items.find((i) => i.title === note.scopeTitle) ||
+    null
+  );
+}
+
+function decisionRowHtml(decision) {
+  const severityLabel =
+    {
+      question: "Open question",
+      proposal: "Pending proposal",
+      lint: "Lint issue",
+      impact: "High-impact entity",
+    }[decision.severity] || decision.severity;
+  const severityTone =
+    {
+      question: "defer",
+      proposal: "active",
+      lint: "cut",
+      impact: "reshape",
+    }[decision.severity] || "active";
+  const actions = decision.primaryActions
+    .map((a) => {
+      if (a === "open") return `<button type="button" class="admin-button" data-decision-action="open">Open</button>`;
+      if (a === "approve") return `<button type="button" class="admin-button admin-button--primary" data-decision-action="approve">Approve</button>`;
+      if (a === "cut") return `<button type="button" class="admin-button admin-button--danger" data-decision-action="cut">Cut</button>`;
+      return "";
+    })
+    .join("");
+  return `
+    <div class="admin-decision" data-decision-id="${escapeHtml(decision.id)}" data-open-detail>
+      <div class="admin-decision__top">
+        <span class="admin-pill" data-tone="${severityTone}">${escapeHtml(severityLabel)}</span>
+        <strong>${escapeHtml(decision.title)}</strong>
+        <span class="admin-muted">${escapeHtml(decision.itemType || "")}</span>
+      </div>
+      <p class="admin-decision__reason">${escapeHtml(decision.reason)}</p>
+      <p class="admin-decision__rec">${escapeHtml(decision.recommendation)}</p>
+      <div class="admin-decision__actions">${actions}</div>
+    </div>
+  `;
+}
+
+async function handleDecisionAction(decision, action) {
+  if (action === "open" && decision.targetItem) {
+    state.view = decision.targetView;
+    state.selected = decision.targetItem;
+    render();
+    return;
+  }
+  if (action === "approve" && decision.targetItem) {
+    state.selected = decision.targetItem;
+    await toggleLockSelected(); // toggles to approved (or unlocks if already)
+    render();
+    return;
+  }
+  if (action === "cut" && decision.targetItem) {
+    state.selected = decision.targetItem;
+    const ok = confirm(`Mark "${decision.targetItem.title}" as cut?`);
+    if (!ok) return;
+    await markCutLive(decision.targetItem);
+    render();
+  }
+}
+
+async function markCutLive(item) {
+  if (state.storageMode !== "cloud") return;
+  const liveId = liveEntityIdFor(item);
+  if (!liveId) return;
+  const shadow = findLockShadow(item);
+  const row = {
+    item_type: item.itemType,
+    title: item.title,
+    status: "cut",
+    category: item.category || null,
+    description: item.description || null,
+    sort_order: item.sortOrder ?? 0,
+    payload: shadow?.payload ?? { live_entity_id: liveId, source: "live_lock" },
+    live_entity_id: liveId,
+    launch_status: "sunset",
+    locked_at: new Date().toISOString(),
+  };
+  try {
+    if (shadow?.id) {
+      await supabase.from("admin_content_items").update(row).eq("id", shadow.id);
+    } else {
+      await supabase.from("admin_content_items").insert(row);
+    }
+    await loadAdminData();
+  } catch (error) {
+    alert(`Cut save failed: ${error.message}`);
+  }
+}
+
+// =============================================================================
+// Phase 7.5 — Activity feed
+// =============================================================================
+
+function renderActivityView() {
+  // Applied notes + reverted notes, reverse chronological
+  const events = [];
+  for (const note of state.notes) {
+    if (note.appliedAt) {
+      events.push({
+        type: "applied",
+        when: note.appliedAt,
+        note,
+      });
+    }
+    if (note.revertedAt) {
+      events.push({ type: "reverted", when: note.revertedAt, note });
+    }
+  }
+  // Locks too — admin_content_items that have locked_at
+  for (const item of state.adminItems) {
+    if (item.lockedAt) {
+      events.push({ type: "locked", when: item.lockedAt, item });
+    }
+  }
+  events.sort((a, b) => +new Date(b.when) - +new Date(a.when));
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${events.length}</strong><span>Events</span></div>
+    <div class="admin-stat"><strong>${events.filter((e) => e.type === "applied").length}</strong><span>Applied</span></div>
+    <div class="admin-stat"><strong>${events.filter((e) => e.type === "locked").length}</strong><span>Locks</span></div>
+    <div class="admin-stat"><strong>${events.filter((e) => e.type === "reverted").length}</strong><span>Reverted</span></div>
+  `;
+
+  el.list.innerHTML = events.length
+    ? events.map(activityRowHtml).join("")
+    : `<div class="admin-empty-detail" style="min-height:240px"><h3>No activity yet</h3><p>Apply a note or lock an entity to see it here.</p></div>`;
+
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.add("is-hidden");
+}
+
+function activityRowHtml(event) {
+  if (event.type === "applied" || event.type === "reverted") {
+    const note = event.note;
+    const tone = event.type === "applied" ? "active" : "cut";
+    return `
+      <article class="admin-activity admin-activity--${event.type}">
+        <header>
+          <span class="admin-pill" data-tone="${tone}">${event.type}</span>
+          <strong>${escapeHtml(note.scopeTitle || "(unscoped)")}</strong>
+          <span class="admin-muted">${escapeHtml(formatDate(event.when))}</span>
+        </header>
+        <p class="admin-muted">${escapeHtml(note.scopeType || "general")}${note.appliedCommit ? ` · commit ${escapeHtml(note.appliedCommit.slice(0, 7))}` : ""}</p>
+        <pre>${escapeHtml(note.body || "")}</pre>
+      </article>
+    `;
+  }
+  if (event.type === "locked") {
+    return `
+      <article class="admin-activity admin-activity--locked">
+        <header>
+          <span class="admin-pill" data-tone="active">locked</span>
+          <strong>${escapeHtml(event.item.title || "(untitled)")}</strong>
+          <span class="admin-muted">${escapeHtml(formatDate(event.when))}</span>
+        </header>
+        <p class="admin-muted">${escapeHtml(event.item.itemType)} · launch_status: ${escapeHtml(event.item.launchStatus || "?")}</p>
+      </article>
+    `;
+  }
+  return "";
 }
 
 function renderNotesView() {
@@ -998,11 +1471,17 @@ function itemRowHtml(item) {
   const lintBadge = item.lintCount > 0
     ? `<span class="admin-pill admin-pill--lint" title="${item.lintCount} voice-lint hit(s)">${item.lintCount} lint</span>`
     : "";
+  // Phase 7.5 — launch lifecycle pill
+  const launch = effectiveLaunchStatus(item);
+  const launchBadge = launch && launch !== "draft"
+    ? `<span class="admin-pill admin-pill--launch" data-tone="${launch}">${escapeHtml(launch)}</span>`
+    : "";
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
         <strong>${escapeHtml(item.title)}</strong>
         <span class="admin-pill" data-tone="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+        ${launchBadge}
         ${lintBadge}
         ${noteBadge}
       </div>
@@ -1206,6 +1685,67 @@ async function saveSelectedItem() {
     writeLocal(LOCAL_ITEMS_KEY, state.adminItems);
   }
   render();
+}
+
+// Phase 7.5 — toggle launch_status between draft and approved on the
+// admin_content_items shadow row that tracks lock state for live entities.
+async function toggleLockSelected() {
+  const item = state.selected;
+  if (!item) return;
+  const liveId = liveEntityIdFor(item);
+  if (!liveId) {
+    alert("This entity has no stable identifier to anchor a lock against.");
+    return;
+  }
+  const shadow = findLockShadow(item);
+  const targetStatus = shadow?.launchStatus === "approved" ? "draft" : "approved";
+
+  const row = {
+    item_type: item.itemType,
+    title: item.title,
+    status: shadow?.status || "active",
+    category: item.category || null,
+    description: item.description || null,
+    sort_order: item.sortOrder ?? 0,
+    payload: shadow?.payload ?? { live_entity_id: liveId, source: "live_lock" },
+    live_entity_id: liveId,
+    launch_status: targetStatus,
+    locked_at: targetStatus === "approved" ? new Date().toISOString() : null,
+  };
+
+  if (state.storageMode !== "cloud") {
+    alert("Lock requires cloud storage. Local-draft mode can't anchor approval state.");
+    return;
+  }
+
+  try {
+    let saved;
+    if (shadow?.id) {
+      const { data, error } = await supabase
+        .from("admin_content_items")
+        .update(row)
+        .eq("id", shadow.id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      saved = dbItemToUi(data);
+      state.adminItems = state.adminItems.map((a) => (a.id === saved.id ? saved : a));
+    } else {
+      const { data, error } = await supabase
+        .from("admin_content_items")
+        .insert(row)
+        .select("*")
+        .single();
+      if (error) throw error;
+      saved = dbItemToUi(data);
+      state.adminItems.unshift(saved);
+    }
+    renderDetail();
+    renderList();
+    renderReadiness();
+  } catch (error) {
+    alert(`Lock save failed: ${error.message}`);
+  }
 }
 
 async function saveLiveProposal() {
@@ -1509,7 +2049,41 @@ function dbItemToUi(row) {
     description: row.description ?? "",
     payload: row.payload ?? {},
     updatedAt: row.updated_at,
+    // Phase 7.5 — launch lifecycle
+    launchStatus: row.launch_status || "draft",
+    lockedAt: row.locked_at || null,
+    reviewedAt: row.reviewed_at || null,
+    liveEntityId: row.live_entity_id || null,
   };
+}
+
+// Phase 7.5 — given a live item, find its admin_content_items shadow row.
+function findLockShadow(item) {
+  if (item?.source !== "live") return null;
+  const liveId = liveEntityIdFor(item);
+  if (!liveId) return null;
+  return state.adminItems.find(
+    (a) => a.itemType === item.itemType && a.liveEntityId === liveId
+  );
+}
+
+function liveEntityIdFor(item) {
+  return (
+    item.payload?.id ||
+    item.payload?.questionId ||
+    item.payload?.templateKey ||
+    item.payload?.stableId ||
+    item.payload?.categoryKey ||
+    item.payload?.functionName ||
+    item.payload?.rawValue ||
+    item.id
+  );
+}
+
+function effectiveLaunchStatus(item) {
+  if (item.source === "admin") return item.launchStatus || "draft";
+  const shadow = findLockShadow(item);
+  return shadow?.launchStatus || "draft";
 }
 
 function dbNoteToUi(row) {
