@@ -983,6 +983,64 @@
   font-size: 14px;
   padding: 4px 14px;
 }
+/* Phase 5t — Quick-scan stats strip just below the entity title */
+.admin-summary__stats {
+  border-bottom: 1px solid var(--neutral-200);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  padding-bottom: 14px;
+}
+.admin-summary__stat {
+  display: grid;
+  gap: 2px;
+}
+.admin-summary__stat-label {
+  color: var(--text-muted);
+  font: 700 9px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.admin-summary__stat strong {
+  color: var(--text);
+  font: 700 14px var(--sans);
+}
+
+/* Phase 5t — Stats bar admin-draft variant */
+.admin-stat--draft {
+  background: rgba(160, 120, 30, 0.08);
+  border-color: rgba(160, 120, 30, 0.3);
+}
+.admin-stat--draft strong {
+  color: #8a6213;
+}
+
+/* Phase 5t — Gating pills (region + subtype + opt-in) */
+.admin-pill--gating-region {
+  background: rgba(160, 120, 30, 0.14);
+  color: #8a6213;
+}
+.admin-pill--gating-subtype {
+  background: rgba(70, 110, 90, 0.12);
+  color: #2f5e3f;
+}
+.admin-pill--gating-subtype code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  padding: 1px 4px;
+}
+
+/* Phase 5t — Nav badge "live + draft" delta */
+.admin-nav-badge__delta {
+  background: rgba(160, 120, 30, 0.18);
+  border-radius: 999px;
+  color: #8a6213;
+  font: 700 10px var(--sans);
+  margin-left: 4px;
+  padding: 1px 5px;
+}
+
 .admin-summary__section--proactive {
   background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), rgba(74, 124, 89, 0.02));
   border: 1px solid rgba(74, 124, 89, 0.2);

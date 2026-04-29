@@ -1459,12 +1459,23 @@ function jumpToRoutine(kind) {
 
 function renderNav() {
   const counts = countByView();
-  el.nav.innerHTML = VIEWS.map((view) => `
-    <button type="button" class="${state.view === view.id ? "is-active" : ""}" data-view="${escapeHtml(view.id)}">
-      <span>${escapeHtml(view.label)}</span>
-      <small>${counts[view.id] ?? 0}</small>
-    </button>
-  `).join("");
+  el.nav.innerHTML = VIEWS.map((view) => {
+    const c = counts[view.id];
+    const total = typeof c === "object" ? c.total : (c ?? 0);
+    const drafts = typeof c === "object" ? c.drafts : 0;
+    // Phase 5t — Show "live + draft" breakdown in the badge when admin
+    // drafts are stacking on top of the Swift-derived count, so totals
+    // are auditable at a glance.
+    const badge = drafts > 0
+      ? `<small title="${total - drafts} live (Swift) + ${drafts} admin drafts">${total - drafts}<span class="admin-nav-badge__delta">+${drafts}</span></small>`
+      : `<small>${total}</small>`;
+    return `
+      <button type="button" class="${state.view === view.id ? "is-active" : ""}" data-view="${escapeHtml(view.id)}">
+        <span>${escapeHtml(view.label)}</span>
+        ${badge}
+      </button>
+    `;
+  }).join("");
   el.nav.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       state.view = button.dataset.view;
@@ -1701,16 +1712,36 @@ function countByHandymanVisit(items) {
 }
 
 function renderStats(all, filtered) {
-  const active = all.filter((item) => item.status === "active").length;
+  // Phase 5t — Split the count into Swift-derived (live) and admin
+  // drafts so Tom can see exactly where the totals come from. Earlier
+  // confusion: "Handyman tab shows 38 active / 118 total" — the 12-row
+  // delta was admin drafts, not live data. Now they're separated.
+  const live = all.filter((item) => item.source === "live");
+  const drafts = all.filter((item) => item.source === "admin");
+  const liveActive = live.filter((item) => item.status === "active").length;
+  const liveTotal = live.length;
+  const draftsTotal = drafts.length;
+  const draftsActive = drafts.filter((item) => item.status === "active").length;
   const cuts = all.filter((item) => item.status === "cut" || item.status === "defer").length;
-  el.stats.innerHTML = `
-    <div class="admin-stat"><strong>${all.length}</strong><span>Total</span></div>
-    <div class="admin-stat"><strong>${active}</strong><span>Active</span></div>
-    <div class="admin-stat"><strong>${filtered.length}</strong><span>Visible</span></div>
+
+  let html = `
+    <div class="admin-stat"><strong>${liveTotal}</strong><span>Live (Swift)</span></div>
+    <div class="admin-stat"><strong>${liveActive}</strong><span>Live · active</span></div>
+  `;
+  if (draftsTotal > 0) {
+    html += `
+      <div class="admin-stat admin-stat--draft" title="Admin drafts you've authored in this lab. They live in admin_content_items in Supabase, not in Swift code. Once approved + applied, they'd be folded into Swift on the next build.">
+        <strong>+${draftsTotal}</strong><span>Admin drafts (${draftsActive} active)</span>
+      </div>
+    `;
+  }
+  html += `
+    <div class="admin-stat"><strong>${filtered.length}</strong><span>Visible (filters)</span></div>
   `;
   if (cuts > 0 && state.view === "quiz") {
-    el.stats.innerHTML += `<div class="admin-stat"><strong>${cuts}</strong><span>Cut/defer</span></div>`;
+    html += `<div class="admin-stat"><strong>${cuts}</strong><span>Cut/defer</span></div>`;
   }
+  el.stats.innerHTML = html;
 }
 
 function renderDetail() {
@@ -3728,22 +3759,90 @@ function renderTaskSummaryCard(item) {
     `;
   }
 
-  // Phase 67C — proactive surfacing block. For seasonal tasks, show
-  // when the homeowner SEES the task vs. when the work HAPPENS, so Tom
-  // can audit each template's lead-time at a glance.
-  const proactiveBlock = proactive ? `
-    <div class="admin-summary__section admin-summary__section--proactive">
-      <h4>🗓️ Proactive surfacing (when the homeowner sees it)</h4>
-      <p>
-        Surfaces in <strong>${escapeHtml(proactive.surfaceMonth)}</strong>
-        for work in <strong>${escapeHtml(proactive.executionMonth)}</strong>
-        — ${proactive.leadDays}-day lead time.
-      </p>
-      <p class="admin-muted">
-        ${escapeHtml(proactive.reasoning)}
-      </p>
+  // Phase 67C / 5t — Surfacing block. Seasonal tasks get the proactive
+  // lead-time. Year-round tasks get a clear "no anchor" explanation so
+  // the section never goes blank.
+  let proactiveBlock = "";
+  if (proactive) {
+    proactiveBlock = `
+      <div class="admin-summary__section admin-summary__section--proactive">
+        <h4>🗓️ Proactive surfacing (when the homeowner sees it)</h4>
+        <p>
+          Surfaces in <strong>${escapeHtml(proactive.surfaceMonth)}</strong>
+          for work in <strong>${escapeHtml(proactive.executionMonth)}</strong>
+          — ${proactive.leadDays}-day lead time.
+        </p>
+        <p class="admin-muted">${escapeHtml(proactive.reasoning)}</p>
+      </div>
+    `;
+  } else if (t.frequency) {
+    // Year-round / pace tasks — explain the cadence model clearly.
+    const cadenceExplain = (t.frequency || "").toLowerCase().includes("week")
+      || (t.frequency || "").toLowerCase().includes("month")
+      ? "Weekly / monthly tasks tick on their own schedule. The homeowner sees them when they're due — no proactive lead time needed."
+      : "No seasonal anchor on this template. The next-due date is set as `today + interval` when the task seeds, so the homeowner schedules it whenever convenient. Add a seasonalTiming if this should anchor to a specific month.";
+    proactiveBlock = `
+      <div class="admin-summary__section admin-summary__section--proactive">
+        <h4>🗓️ When the homeowner sees it</h4>
+        <p>${escapeHtml(t.frequency)} cadence, no seasonal anchor.</p>
+        <p class="admin-muted">${escapeHtml(cadenceExplain)}</p>
+      </div>
+    `;
+  }
+
+  // Phase 5t — Gating section. Surface requiredSubtypes + region gates
+  // explicitly so it's obvious WHO this task applies to.
+  let gatingBlock = "";
+  const subtypes = t.requiredSubtypes || [];
+  const region = t.regionalPack;
+  if (subtypes.length > 0 || region || t.isEssential === false) {
+    const gatingPills = [];
+    if (region) {
+      gatingPills.push(`<span class="admin-pill admin-pill--gating-region" title="Only seeds on properties in this regional pack. Other regions skip this template entirely.">📍 ${escapeHtml(region)} only</span>`);
+    }
+    for (const s of subtypes) {
+      gatingPills.push(`<span class="admin-pill admin-pill--gating-subtype" title="The home_systems row must carry this subtype tag for the template to seed. Set during the quiz (e.g. q3b answer = central_ducted stamps 'ducted' on the HVAC system).">🏷️ requires <code>${escapeHtml(s)}</code></span>`);
+    }
+    if (t.isEssential === false) {
+      gatingPills.push(`<span class="admin-pill admin-pill--optin" title="Won't auto-seed. Homeowner picks via Recommended Services / handyman punch list 'Recommended' section.">Opt-in</span>`);
+    }
+    const gatingExplainer = subtypes.length === 0 && !region && t.isEssential === false
+      ? "Doesn't auto-seed at quiz completion."
+      : subtypes.length > 0
+        ? `Only seeds when the parent ${escapeHtml(t.systemCategory || "system")} row carries the listed subtype${subtypes.length === 1 ? "" : "s"}. Subtypes are stamped during the quiz based on the homeowner's answers.`
+        : "Universal — no subtype gating.";
+    gatingBlock = `
+      <div class="admin-summary__section">
+        <h4>🚪 Gating — who actually sees this</h4>
+        <p>${gatingPills.join(" ")}</p>
+        <p class="admin-muted">${gatingExplainer}</p>
+      </div>
+    `;
+  }
+
+  // Phase 5t — Stats strip: cost / effort / frequency / priority all
+  // visible at a glance so Tom doesn't have to scroll the form for the
+  // basics.
+  const statsStrip = `
+    <div class="admin-summary__stats">
+      <div class="admin-summary__stat">
+        <span class="admin-summary__stat-label">Cadence</span>
+        <strong>${escapeHtml(t.frequency || "—")}</strong>
+      </div>
+      <div class="admin-summary__stat">
+        <span class="admin-summary__stat-label">Cost range</span>
+        <strong>${escapeHtml(t.estimatedCostRange || "—")}</strong>
+      </div>
+      <div class="admin-summary__stat">
+        <span class="admin-summary__stat-label">Priority</span>
+        <strong>${escapeHtml(t.priority || "—")}</strong>
+      </div>
+      <div class="admin-summary__stat">
+        <span class="admin-summary__stat-label">DIY effort</span>
+        <strong>${t.diyEffortMinutes ? escapeHtml(`${t.diyEffortMinutes} min`) : "Vendor-only"}</strong>
+      </div>
     </div>
-  ` : "";
+  `;
 
   return `
     <section class="admin-summary admin-summary--task">
@@ -3754,6 +3853,8 @@ function renderTaskSummaryCard(item) {
           ${escapeHtml(t.frequency || "?")} · ${seasonEmoji} ${escapeHtml(seasonLabel)} · ${escapeHtml(t.estimatedCostRange || "no cost set")}
         </p>
       </header>
+
+      ${statsStrip}
 
       <div class="admin-summary__body">
         <div class="admin-summary__section">
@@ -3772,6 +3873,8 @@ function renderTaskSummaryCard(item) {
           <p><strong>${escapeHtml(reason.label.replace(/^↳\s+/, ""))}</strong> — ${escapeHtml(reason.tooltip.split(". Trigger:")[0])}.</p>
         </div>
         ` : ""}
+
+        ${gatingBlock}
 
         <div class="admin-summary__section">
           <h4>🌱 When does it enter the homeowner's task list?</h4>
@@ -4588,7 +4691,7 @@ function countByView() {
     if (view.id === "notes") return [view.id, state.notes.length];
     const defaults = defaultItemsForView(view.id).length;
     const drafts = state.adminItems.filter((item) => item.itemType === view.type).length;
-    return [view.id, defaults + drafts];
+    return [view.id, { total: defaults + drafts, drafts }];
   }));
 }
 
