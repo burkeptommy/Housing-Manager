@@ -23,18 +23,36 @@ concurrency:
 
 jobs:
   build:
-    name: xcodebuild iPhone 15 Simulator
-    runs-on: macos-14
+    name: xcodebuild iOS Simulator
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      - name: Generate Xcode project (xcodegen if present)
+      - name: Select latest Xcode
         run: |
+          # The checked-in project.pbxproj uses object format 77 (Xcode 16+).
+          # macos-15 runners ship multiple Xcode versions — pick the newest.
+          LATEST=$(ls /Applications | grep -E '^Xcode_[0-9]+(\.[0-9]+)*\.app$' | sort -V | tail -1)
+          if [ -n "$LATEST" ]; then
+            sudo xcode-select -s "/Applications/$LATEST/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun --show-sdk-path --sdk iphonesimulator || true
+
+      - name: Install xcodegen
+        run: |
+          if ! command -v xcodegen >/dev/null; then
+            brew install xcodegen || true
+          fi
+          xcodegen --version || true
+
+      - name: Regenerate Xcode project from project.yml
+        run: |
+          # Belt-and-suspenders: regenerate against the runner's Xcode so
+          # we never hit "future project file format" mismatches even if
+          # the checked-in xcodeproj got out of sync.
           if [ -f project.yml ] && command -v xcodegen >/dev/null; then
             xcodegen generate
           else
@@ -45,13 +63,17 @@ jobs:
         id: xcodebuild
         run: |
           set +e
+          # generic/platform avoids hard-coding a simulator device name
+          # so this keeps working as Apple ships new simulators.
           xcodebuild \
             -scheme Haven \
-            -destination "platform=iOS Simulator,name=iPhone 15,OS=latest" \
+            -destination "generic/platform=iOS Simulator" \
             -configuration Debug \
             -derivedDataPath build/DerivedData \
             -quiet \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= \
             build 2>&1 | tee build.log
           STATUS=${PIPESTATUS[0]}
           echo "build_status=$STATUS" >> "$GITHUB_OUTPUT"
