@@ -457,12 +457,37 @@ function normalizeTemplate({ args, sourceLine }) {
     maxIntervalDays: swInt(args.maxIntervalDays, null),
     warrantyLinked: swBool(args.warrantyLinked, false),
     regionalPack: swEnum(args.regionalPack) || null,
+    proactiveLeadTimeDays: swInt(args.proactiveLeadTimeDays, null),
+    effectiveLeadTimeDays: deriveEffectiveLeadTime(args, systemCategory),
     routing: deriveRouting(args),
     _sourceLine: sourceLine,
     _impact: { gated_by: [], in_bundle: null, system_category_meta: null },
     _lint: [],
     _recommendation: null,
   };
+}
+
+// Phase 67C: mirror MaintenanceTemplate.effectiveLeadTimeDays in JS so the
+// admin can show the lead-time + computed surface date without re-deriving
+// at runtime. Order matches the Swift fallback chain exactly.
+function deriveEffectiveLeadTime(args, systemCategory) {
+  const explicit = swInt(args.proactiveLeadTimeDays, null);
+  if (explicit != null) return explicit;
+  const safety = swBool(args.safetyFloor, false);
+  if (safety) return 56;
+  const at = swEnum(args.assignmentType) || "either";
+  const ro = swEnum(args.routingOverride) || null;
+  const preWinter = new Set(["Chimney", "Septic System", "Roofing", "Generator"]);
+  if (at === "vendor" && preWinter.has(systemCategory)) return 56;
+  const peak = new Set([
+    "HVAC", "Pool/Spa", "Hot Tub", "Landscaping",
+    "Snow Removal", "Pest Control", "Mosquito & Tick",
+  ]);
+  if (at === "vendor" && peak.has(systemCategory)) return 42;
+  if (systemCategory === "Tree Service") return 28;
+  if (at === "vendor") return 28;
+  if (ro === "diyDefault" || ro === "diyCapable") return 14;
+  return 21;
 }
 
 function deriveRouting(args) {

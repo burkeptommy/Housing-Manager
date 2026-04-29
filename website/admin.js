@@ -3570,6 +3570,7 @@ function renderTaskSummaryCard(item) {
   const reason = routingReason(t);
   const seasonEmoji = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️", "Spring/Fall": "🔁" }[t.seasonalTiming] || "🔄";
   const seasonLabel = t.seasonalTiming || "Year-round";
+  const proactive = computeProactiveSurfacing(t);
 
   // Bundle map — interactive parent + siblings
   let bundleMap = "";
@@ -3639,6 +3640,23 @@ function renderTaskSummaryCard(item) {
       ? `<strong>Opt-in.</strong> ${t.systemCategory === "Handyman" ? "Surfaced in the handyman punch list 'Recommended' section." : "Surfaced in PropertyDetailView → Recommended Services."} Homeowner taps + to schedule.`
       : `<strong>Auto-seeds at quiz completion</strong> if subtypes / region match.`;
 
+  // Phase 67C — proactive surfacing block. For seasonal tasks, show
+  // when the homeowner SEES the task vs. when the work HAPPENS, so Tom
+  // can audit each template's lead-time at a glance.
+  const proactiveBlock = proactive ? `
+    <div class="admin-summary__section admin-summary__section--proactive">
+      <h4>🗓️ Proactive surfacing (when the homeowner sees it)</h4>
+      <p>
+        Surfaces in <strong>${escapeHtml(proactive.surfaceMonth)}</strong>
+        for work in <strong>${escapeHtml(proactive.executionMonth)}</strong>
+        — ${proactive.leadDays}-day lead time.
+      </p>
+      <p class="admin-muted">
+        ${escapeHtml(proactive.reasoning)}
+      </p>
+    </div>
+  ` : "";
+
   return `
     <section class="admin-summary admin-summary--task">
       <header class="admin-summary__head">
@@ -3672,11 +3690,48 @@ function renderTaskSummaryCard(item) {
           <p>${lifecycle}</p>
         </div>
 
+        ${proactiveBlock}
         ${systemLink}
         ${bundleMap}
       </div>
     </section>
   `;
+}
+
+// Phase 67C — Compute the surfacing month + lead-time explanation for
+// the summary card. Mirrors the iOS reconciler's effectiveLeadTimeDays
+// helper so the admin shows what the homeowner would actually see.
+function computeProactiveSurfacing(t) {
+  if (!t || !t.seasonalTiming || t.seasonalTiming === "Spring/Fall") return null;
+  const lead = typeof t.effectiveLeadTimeDays === "number" ? t.effectiveLeadTimeDays : null;
+  if (!lead) return null;
+  const execMonthIdx = { Spring: 3, Summer: 6, Fall: 9, Winter: 0 }[t.seasonalTiming];
+  if (execMonthIdx == null) return null;
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const anchor = new Date(2025, execMonthIdx, 1);
+  anchor.setDate(anchor.getDate() - lead);
+  const surfaceMonth = months[anchor.getMonth()];
+  const executionMonth = months[execMonthIdx];
+
+  // Lead-time reasoning — match the rules in
+  // MaintenanceTemplate.effectiveLeadTimeDays so it stays in sync.
+  let reasoning;
+  if (t.safetyFloor === true) {
+    reasoning = "Safety-floor work (gas, panel, roof, septic, generator) needs the longest lead — these vendors are the most booked at peak season, and overdue work isn't safe to defer.";
+  } else if (t.assignmentType === "vendor" && ["Chimney","Septic System","Roofing","Generator"].includes(t.systemCategory)) {
+    reasoning = "Pre-winter rush category. Chimney sweeps, septic pumpers, roofers, generator techs all get slammed in fall — booking 8 weeks out keeps the homeowner ahead of their backlog.";
+  } else if (t.assignmentType === "vendor" && ["HVAC","Pool/Spa","Hot Tub","Landscaping","Snow Removal","Pest Control","Mosquito & Tick"].includes(t.systemCategory)) {
+    reasoning = "Peak-season vendor (HVAC techs in May, pool services in April, landscapers in March). 6-week lead lets the homeowner compare quotes before the rush.";
+  } else if (t.systemCategory === "Tree Service") {
+    reasoning = "Arborists routinely book 4 weeks out — surfacing earlier gives the homeowner time to walk the property and decide what needs trimming.";
+  } else if (t.assignmentType === "vendor") {
+    reasoning = "Standard vendor lead time. 4 weeks gives the homeowner time to call, get a quote, and book a slot.";
+  } else if (t.routingOverride === "diyDefault" || t.routingOverride === "diyCapable") {
+    reasoning = "DIY / handyman item. 2-week lead lets the homeowner plan a weekend (or add it to the next punch-list visit) without scrambling.";
+  } else {
+    reasoning = "Default lead time for an `either` template — gives the homeowner some breathing room.";
+  }
+  return { surfaceMonth, executionMonth, leadDays: lead, reasoning };
 }
 
 function renderSystemSummaryCard(item) {

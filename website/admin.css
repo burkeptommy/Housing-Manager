@@ -983,6 +983,19 @@
   font-size: 14px;
   padding: 4px 14px;
 }
+.admin-summary__section--proactive {
+  background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), rgba(74, 124, 89, 0.02));
+  border: 1px solid rgba(74, 124, 89, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.admin-summary__section--proactive h4 {
+  color: #2f5e3f;
+}
+.admin-summary__section--proactive p:first-of-type {
+  font: 600 15px var(--sans);
+}
+
 .admin-summary__bundle-map {
   background: rgba(150, 90, 200, 0.04);
   border: 1px solid rgba(150, 90, 200, 0.18);

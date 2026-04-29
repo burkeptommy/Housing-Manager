@@ -147,6 +147,22 @@ struct MaintenanceTemplate: Identifiable {
     /// universal before Phase 57, so the default of nil preserves behavior.
     var regionalPack: RegionalPack? = nil
 
+    /// Phase 67C: How many days BEFORE the seasonal execution anchor the
+    /// task should appear in the homeowner's task list. Lets us be
+    /// PROACTIVE — surface "Spring AC tune-up" in late February so the
+    /// homeowner can call their HVAC tech before April books up, not in
+    /// April when they're scrambling.
+    ///
+    /// When nil, the reconciler uses `effectiveLeadTimeDays` which
+    /// derives a sensible default from the template's safety floor /
+    /// assignment type / system category (gas + roof + chimney + septic
+    /// = 8 weeks; peak-season vendors like HVAC + pool + landscaping =
+    /// 6 weeks; tree service = 4 weeks; general vendor = 4 weeks; DIY =
+    /// 2 weeks). Set explicitly to override the default for templates
+    /// where the lead time is unusual (long-lead-time custom work, or
+    /// items that genuinely need same-day attention).
+    var proactiveLeadTimeDays: Int? = nil
+
     /// Phase 50: Computed routing hint. Templates with a `bundleId` are
     /// always reported as `.bundledIntoParent` because the reconciler
     /// rolls them up into a single bundle task that the routing filter
@@ -155,6 +171,38 @@ struct MaintenanceTemplate: Identifiable {
     var routing: TaskRouting {
         if bundleId != nil { return .bundledIntoParent }
         return routingOverride ?? .vendorDefault
+    }
+
+    /// Phase 67C: Resolved lead time in days. Falls back to a category-
+    /// driven default when `proactiveLeadTimeDays` isn't set on the
+    /// template. The reconciler subtracts this from the seasonal anchor
+    /// to compute the surface date — so a Spring task with 42 days lead
+    /// surfaces in late February instead of April.
+    var effectiveLeadTimeDays: Int {
+        if let explicit = proactiveLeadTimeDays { return explicit }
+        // Safety floor + pre-winter rush categories (gas, roof, septic,
+        // chimney, generator) — book early because vendors get slammed
+        // in fall and spring.
+        if safetyFloor { return 56 }
+        let preWinterVendor: Set<String> = [
+            "Chimney", "Septic System", "Roofing", "Generator"
+        ]
+        if assignmentType == .vendor && preWinterVendor.contains(systemCategory) { return 56 }
+        // Peak-season vendors: HVAC techs in May, pool services in April,
+        // landscapers in March. 6 weeks gives time to compare quotes.
+        let peakVendor: Set<String> = [
+            "HVAC", "Pool/Spa", "Hot Tub", "Landscaping",
+            "Snow Removal", "Pest Control", "Mosquito & Tick"
+        ]
+        if assignmentType == .vendor && peakVendor.contains(systemCategory) { return 42 }
+        // Tree service — arborists book a month out routinely.
+        if systemCategory == "Tree Service" { return 28 }
+        // Generic vendor — 4 weeks.
+        if assignmentType == .vendor { return 28 }
+        // DIY / handyman — 2 weeks (homeowner needs to plan a weekend).
+        if routingOverride == .diyDefault || routingOverride == .diyCapable { return 14 }
+        // Default — 3 weeks.
+        return 21
     }
 
     /// Phase 19j: Returns a copy of this template with `{city}` and `{state}`

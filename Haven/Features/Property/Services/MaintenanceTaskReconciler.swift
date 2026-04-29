@@ -1238,7 +1238,7 @@ enum MaintenanceTaskReconciler {
         }
 
         let currentYear = calendar.component(.year, from: today)
-        var candidates: [Date] = []
+        var executionDates: [Date] = []
         for yearOffset in 0...1 {
             for month in candidateMonths {
                 var comps = DateComponents()
@@ -1246,14 +1246,36 @@ enum MaintenanceTaskReconciler {
                 comps.month = month
                 comps.day = 1
                 if let date = calendar.date(from: comps) {
-                    candidates.append(date)
+                    executionDates.append(date)
                 }
             }
         }
 
+        // Phase 67C: PROACTIVE surfacing. Subtract the template's lead
+        // time from each candidate execution anchor so the task appears
+        // in the homeowner's list early enough to actually book a vendor
+        // before peak-season slots fill up. A Spring HVAC tune-up
+        // (Apr 1 anchor, 42-day lead) now surfaces around Feb 18 — the
+        // homeowner has 6 weeks to schedule before April.
+        let leadDays = template.effectiveLeadTimeDays
+        let surfaceDates = executionDates.compactMap {
+            calendar.date(byAdding: .day, value: -leadDays, to: $0)
+        }
+
+        // Earliest acceptable: at least 14 days out, so a freshly seeded
+        // task isn't due tomorrow. If lead-time math produced a date in
+        // the past for current-season tasks, accept the next future
+        // surface date even if it's < 14 days out so the homeowner sees
+        // the task surface as overdue, which is exactly right.
         let earliestAcceptable = calendar.date(byAdding: .day, value: 14, to: today) ?? today
-        let valid = candidates.filter { $0 >= earliestAcceptable }.sorted()
-        return valid.first ?? (calendar.date(byAdding: template.interval, to: today) ?? today)
+        let valid = surfaceDates.filter { $0 >= earliestAcceptable }.sorted()
+        if let pick = valid.first {
+            return pick
+        }
+        if let nearest = surfaceDates.sorted().first(where: { $0 >= today }) {
+            return nearest
+        }
+        return calendar.date(byAdding: template.interval, to: today) ?? today
     }
 
     /// Phase 54A: One-time re-dating pass for existing template-based tasks
