@@ -187,23 +187,46 @@
 
                 <section class="admin-notes-box">
                   <div>
-                    <p class="admin-eyebrow">Codex context note</p>
+                    <p class="admin-eyebrow">Note for Claude</p>
                     <h4>Leave a note about this exact item</h4>
                     <p>
-                      The note captures the selected item, its type, current
-                      status, and your long-form context so Codex can pick it
-                      up next session. Notes save to Supabase and can be synced
-                      into CODEX_ADMIN_NOTES.md for local Codex work.
+                      Every note captures the selected entity's full Swift-side
+                      configuration as a snapshot, so the next Claude session
+                      sees exactly what you saw without re-exploring. Pick an
+                      intent so I know whether to apply, ask back, or just
+                      remember.
                     </p>
+                  </div>
+                  <div class="admin-note-controls">
+                    <label>
+                      <span>Intent</span>
+                      <select data-field-intent>
+                        <option value="feedback">Feedback (just remember)</option>
+                        <option value="change_request">Change request (apply next session)</option>
+                        <option value="proposal_add">Proposal: add new entity</option>
+                        <option value="proposal_delete">Proposal: cut this entity</option>
+                        <option value="bug">Bug</option>
+                        <option value="idea">Idea (explore later)</option>
+                        <option value="question_for_claude">Question for Claude (answer first)</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Target file</span>
+                      <select data-field-target>
+                        <option value="claude" selected>CLAUDE_ADMIN_NOTES.md</option>
+                        <option value="codex">CODEX_ADMIN_NOTES.md</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </label>
                   </div>
                   <textarea
                     data-context-note
                     rows="5"
-                    placeholder="Example: Cut this question from first quiz, but keep the system data capture later in the property settings flow..."
+                    placeholder="Example: Cut this question — drop-off rate is 25%+ and the answer doesn't drive any downstream tasks. Keep the data capture in property settings if needed later."
                   ></textarea>
                   <div class="admin-note-feed" data-context-notes></div>
                   <button type="button" class="admin-button admin-button--primary" data-save-note>
-                    Save note for Codex
+                    Save note
                   </button>
                 </section>
               </article>

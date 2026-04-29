@@ -23,55 +23,78 @@ const VIEWS = [
     type: "question",
     title: "Quiz Builder",
     eyebrow: "Onboarding",
-    subtitle: "Manage what shows up in the homeowner first quiz.",
-  },
-  {
-    id: "searches",
-    label: "Searches",
-    type: "search",
-    title: "Search Builders",
-    eyebrow: "Provider and system search",
-    subtitle: "Configure vendor, provider, system, and equipment search surfaces.",
-  },
-  {
-    id: "routines",
-    label: "Routines",
-    type: "routine",
-    title: "Routine Programs",
-    eyebrow: "Recurring services",
-    subtitle: "Manage frequent rhythms like cleaning, trash, pool, pest, and landscaping.",
-  },
-  {
-    id: "vendors",
-    label: "Vendors",
-    type: "vendor",
-    title: "Vendor Categories",
-    eyebrow: "Pros and provider categories",
-    subtitle: "Manage vendor chips, categories, and orchestration defaults.",
+    subtitle: "Every quiz question with full Swift-side configuration. Notes round-trip to Claude.",
+    liveSource: "quiz-questions",
   },
   {
     id: "tasks",
     label: "Tasks",
     type: "task",
-    title: "Task Catalog",
-    eyebrow: "Maintenance and handyman",
-    subtitle: "Categorize annual work, one-off work, and handyman bundle candidates.",
+    title: "Maintenance Templates",
+    eyebrow: "MaintenanceTemplates.swift",
+    subtitle: "Every template Haven seeds — full field set, lint warnings, bundle membership.",
+    liveSource: "templates",
+  },
+  {
+    id: "routines",
+    label: "Routines",
+    type: "routine",
+    title: "Routine Kinds",
+    eyebrow: "RoutineKind enum + RoutineSeeder defaults",
+    subtitle: "The 20 kinds of recurring rhythms (vendor + cadence) the app understands.",
+    liveSource: "routine-kinds",
+  },
+  {
+    id: "handyman",
+    label: "Handyman",
+    type: "handyman",
+    title: "Handyman-Eligible Templates",
+    eyebrow: "diyDefault + diyCapable + Handyman bundles",
+    subtitle: "The subset of templates that flow into the punch-list / handyman visit path.",
+    liveSource: "handyman-templates",
   },
   {
     id: "systems",
     label: "Systems",
     type: "system",
     title: "System Categories",
-    eyebrow: "Home facts",
-    subtitle: "Manage the home systems the quiz can create or confirm.",
+    eyebrow: "SystemCategoryRegistry",
+    subtitle: "Tiered registry that gates vendor coverage + drives template grouping.",
+    liveSource: "system-categories",
+  },
+  {
+    id: "vehicles",
+    label: "Vehicles",
+    type: "vehicle",
+    title: "Vehicle Task Generation",
+    eyebrow: "vehicle-lookup edge function",
+    subtitle: "The prompt that generates per-vehicle maintenance schedules.",
+    liveSource: "vehicle-task-prompt",
+  },
+  {
+    id: "prompts",
+    label: "Prompts",
+    type: "prompt",
+    title: "Edge Function Prompts",
+    eyebrow: "supabase/functions/*/index.ts",
+    subtitle: "All 50+ Edge Functions — first system prompt, model, and notes.",
+    liveSource: "edge-function-prompts",
+  },
+  {
+    id: "searches",
+    label: "Searches",
+    type: "search",
+    title: "Search Builders (legacy)",
+    eyebrow: "Provider and system search",
+    subtitle: "Hand-curated search-surface defaults. Will fold into Vendors+Systems eventually.",
   },
   {
     id: "notes",
-    label: "Codex Notes",
+    label: "Notes",
     type: "note",
-    title: "Running Codex Notes",
-    eyebrow: "Product memory",
-    subtitle: "Every contextual note you save for the next Codex session.",
+    title: "All Notes",
+    eyebrow: "Product memory for Claude + Codex",
+    subtitle: "Every contextual note you've saved. Filter by intent + target.",
   },
 ];
 
@@ -147,6 +170,7 @@ const state = {
   auditTasks: [],
   adminItems: [],
   notes: [],
+  liveData: {}, // { quiz-questions: { generatedAt, count, entries: [...] }, templates: ..., ... }
   selected: null,
   search: "",
   statusFilter: "all",
@@ -191,6 +215,9 @@ const el = {
   contextNote: document.querySelector("[data-context-note]"),
   contextNotes: document.querySelector("[data-context-notes]"),
   saveNote: document.querySelector("[data-save-note]"),
+  // Admin Lab v2 — Phase 4 note form additions
+  fieldIntent: document.querySelector("[data-field-intent]"),
+  fieldTarget: document.querySelector("[data-field-target]"),
 };
 
 init();
@@ -271,6 +298,7 @@ async function showApp() {
   el.app.classList.remove("is-hidden");
   el.sessionEmail.textContent = state.session?.user.email ?? ADMIN_EMAIL;
   renderNav();
+  await loadLiveData();
   await loadAuditData();
   await loadAdminData();
   render();
@@ -284,6 +312,146 @@ async function loadAuditData() {
   state.auditQuestions = parseTsv(quizText).map(questionAuditToItem);
   state.auditTasks = parseTsv(taskText).map(taskAuditToItem);
 }
+
+// Phase 4 (Admin Lab v2): load Swift-derived JSON snapshots emitted by
+// scripts/export_swift_admin_data.mjs. These are the canonical source for
+// the Quiz / Tasks / Routines / Handyman / Systems / Vehicles / Prompts views.
+const LIVE_SOURCES = [
+  "quiz-questions",
+  "templates",
+  "system-categories",
+  "routine-kinds",
+  "handyman-templates",
+  "vehicle-task-prompt",
+  "edge-function-prompts",
+  "quiz-feedback",
+  "quiz-mapper-effects",
+];
+
+async function loadLiveData() {
+  const results = await Promise.all(
+    LIVE_SOURCES.map((name) =>
+      fetch(`/admin-data/${name}.json`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+    )
+  );
+  state.liveData = Object.fromEntries(
+    LIVE_SOURCES.map((name, i) => [name, results[i] || { entries: [] }])
+  );
+}
+
+function liveItemsForView(viewId) {
+  const view = VIEWS.find((v) => v.id === viewId);
+  if (!view?.liveSource) return null;
+  const src = state.liveData[view.liveSource];
+  if (!src) return null;
+
+  const mapper = LIVE_MAPPERS[view.id];
+  if (!mapper) return null;
+
+  const entries = src.entries || src.functions || [];
+  // Vehicle-task-prompt is a single entity, not an array. Wrap it.
+  if (view.id === "vehicles") {
+    return [mapper(src, 0)];
+  }
+  return entries.map((entry, idx) => mapper(entry, idx)).filter(Boolean);
+}
+
+const LIVE_MAPPERS = {
+  quiz: (q, idx) => ({
+    id: `live-quiz-${q.id}`,
+    source: "live",
+    itemType: "question",
+    title: q.title || q.id,
+    status: "active",
+    category: `${q.chapter || "?"} · ${q.section || "?"}`,
+    sortOrder: idx + 1,
+    description: q.subtitle || q.fallbackTitle || "",
+    payload: q,
+    lintCount: (q._lint || []).length,
+  }),
+  tasks: (t, idx) => ({
+    id: `live-task-${slug(t.templateKey)}`,
+    source: "live",
+    itemType: "task",
+    title: t.title,
+    status: t.isEssential ? "active" : "draft",
+    category: t.systemCategory,
+    sortOrder: idx + 1,
+    description: t.description || t.notes || "",
+    payload: t,
+    lintCount: (t._lint || []).length,
+  }),
+  routines: (r, idx) => ({
+    id: `live-routine-${r.rawValue || r.swiftCase}`,
+    source: "live",
+    itemType: "routine",
+    title: r.displayLabel || r.rawValue,
+    status: "active",
+    category: r.isVendorBased ? "Vendor-based" : "Cadence-based",
+    sortOrder: idx + 1,
+    description: r.seederDefault
+      ? `Default cadence ${r.seederDefault.cadenceType || "?"}, active months ${
+          (r.seederDefault.activeMonths || []).join(",") || "year-round"
+        }`
+      : "(no seeder default captured)",
+    payload: r,
+    lintCount: (r._lint || []).length,
+  }),
+  handyman: (t, idx) => ({
+    id: `live-handyman-${slug(t.templateKey)}`,
+    source: "live",
+    itemType: "handyman",
+    title: t.title,
+    status: t.isEssential ? "active" : "draft",
+    category: t.bundleId || t.systemCategory,
+    sortOrder: idx + 1,
+    description: t.description || "",
+    payload: t,
+    lintCount: (t._lint || []).length,
+  }),
+  systems: (s, idx) => ({
+    id: `live-system-${s.categoryKey}`,
+    source: "live",
+    itemType: "system",
+    title: s.displayName || s.categoryKey,
+    status: s.tier === "universal" ? "active" : s.tier === "conditional" ? "draft" : "defer",
+    category: `Tier ${s.tier || "?"}${s.specialtyGroup ? ` · ${s.specialtyGroup}` : ""}`,
+    sortOrder: s.displayPriority || idx + 1,
+    description: s.defaultCadence ? `Default cadence ${s.defaultCadence}` : "",
+    payload: s,
+    lintCount: (s._lint || []).length,
+  }),
+  vehicles: (src) => ({
+    id: `live-vehicle-prompt`,
+    source: "live",
+    itemType: "vehicle",
+    title: "vehicle-lookup edge function prompt",
+    status: src.sourceExists ? "active" : "draft",
+    category: "AI-generated maintenance schedule",
+    sortOrder: 1,
+    description: src.systemPrompt
+      ? `Prompt is ${src.systemPrompt.length} chars. Cached samples: ${(src.cachedSamples || []).length}.`
+      : "(prompt not extracted)",
+    payload: src,
+    lintCount: 0,
+  }),
+  prompts: (p, idx) => ({
+    id: `live-prompt-${p.functionName}`,
+    source: "live",
+    itemType: "prompt",
+    title: p.functionName,
+    status: p.systemPrompt ? "active" : "draft",
+    category: p.model || "(no model detected)",
+    sortOrder: idx + 1,
+    description: p.systemPrompt
+      ? `${p.systemPrompt.length} char prompt`
+      : "(no system prompt found by heuristic)",
+    payload: p,
+    lintCount: 0,
+  }),
+};
 
 async function loadAdminData() {
   state.storageMode = "cloud";
@@ -381,6 +549,11 @@ function taskAuditToItem(row, index) {
 }
 
 function defaultItemsForView(viewId) {
+  // Phase 4: Swift-derived JSON wins when available — falls back to legacy
+  // TSV / hardcoded defaults so the admin keeps working if the exporter
+  // hasn't run yet.
+  const live = liveItemsForView(viewId);
+  if (live && live.length > 0) return live;
   if (viewId === "quiz") return state.auditQuestions;
   if (viewId === "tasks") return state.auditTasks;
   if (viewId === "routines") {
@@ -593,31 +766,58 @@ function renderNotesView() {
 }
 
 function renderContextNotes(item) {
-  const notes = state.notes.filter((note) => itemNoteMatches(note, item)).slice(0, 6);
+  const notes = state.notes.filter((note) => itemNoteMatches(note, item)).slice(0, 8);
   if (!notes.length) {
     el.contextNotes.innerHTML = `
       <div class="admin-note-card">
         <strong>No notes on this item yet.</strong>
-        <pre>Write one above and it will attach this item's ID, type, status, payload, and your long-form context.</pre>
+        <pre>Write one above. The note auto-captures the entity's full Swift configuration so Claude can act on it next session without re-exploring.</pre>
       </div>
     `;
     return;
   }
-  el.contextNotes.innerHTML = notes.map((note) => `
-    <article class="admin-note-card">
-      <strong>${escapeHtml(note.scopeTitle || "Context note")}</strong>
-      <small>${escapeHtml(formatDate(note.createdAt))}</small>
-      <pre>${escapeHtml(note.body || "")}</pre>
-    </article>
-  `).join("");
+  el.contextNotes.innerHTML = notes.map((note) => {
+    const intent = note.intent || "feedback";
+    const author = note.author || "tom";
+    const appliedPill = note.appliedAt
+      ? `<span class="admin-pill" data-tone="active" title="Applied ${formatDate(note.appliedAt)}${
+          note.appliedCommit ? " · " + note.appliedCommit.slice(0, 7) : ""
+        }">applied</span>`
+      : note.revertedAt
+      ? `<span class="admin-pill" data-tone="cut">reverted</span>`
+      : `<span class="admin-pill admin-pill--note">${intent}</span>`;
+    const authorTag = author === "claude"
+      ? `<span class="admin-pill admin-pill--note">claude</span>`
+      : "";
+    return `
+      <article class="admin-note-card">
+        <div class="admin-note-card__top">
+          <strong>${escapeHtml(note.scopeTitle || "Context note")}</strong>
+          ${appliedPill}
+          ${authorTag}
+        </div>
+        <small>${escapeHtml(formatDate(note.createdAt))} · target: ${escapeHtml(note.target || "claude")}</small>
+        <pre>${escapeHtml(note.body || "")}</pre>
+      </article>
+    `;
+  }).join("");
 }
 
 function itemNoteMatches(note, item) {
+  // Phase 4: live entities expose ids under different keys per surface.
+  // Quiz: id (e.g. "q3_heating_fuel"). Templates: templateKey / stableId.
+  // Systems: categoryKey. Routines: rawValue / swiftCase. Edge fns:
+  // functionName. Vehicles: synthetic "vehicle-prompt".
   const possibleIds = new Set([
     item.id,
+    item.payload?.id,
     item.payload?.questionId,
     item.payload?.templateKey,
     item.payload?.stableId,
+    item.payload?.categoryKey,
+    item.payload?.functionName,
+    item.payload?.rawValue,
+    item.payload?.swiftCase,
     `${item.category || ""}:${item.title || ""}`,
   ].filter(Boolean).map(String));
   return note.scopeType === item.itemType
@@ -632,12 +832,24 @@ function itemRowHtml(item) {
     item.payload?.kind,
     item.payload?.operationalType,
     item.payload?.cadence,
+    item.payload?.routing,
+    item.payload?.assignmentType,
+    item.payload?.frequency,
   ].filter(Boolean);
+  const noteCount = state.notes.filter((n) => itemNoteMatches(n, item)).length;
+  const noteBadge = noteCount > 0
+    ? `<span class="admin-pill admin-pill--note">${noteCount} note${noteCount === 1 ? "" : "s"}</span>`
+    : "";
+  const lintBadge = item.lintCount > 0
+    ? `<span class="admin-pill admin-pill--lint" title="${item.lintCount} voice-lint hit(s)">${item.lintCount} lint</span>`
+    : "";
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
         <strong>${escapeHtml(item.title)}</strong>
         <span class="admin-pill" data-tone="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+        ${lintBadge}
+        ${noteBadge}
       </div>
       <p>${escapeHtml(item.description || "").slice(0, 220)}</p>
       <div class="admin-list-item__meta">
@@ -901,28 +1113,51 @@ async function saveContextNote() {
     alert("Select an item and write a note first.");
     return;
   }
+  const intent = el.fieldIntent?.value || "feedback";
+  const target = el.fieldTarget?.value || "claude";
   await writeNote({
     scopeType: item.itemType,
-    scopeId: item.payload?.questionId || item.payload?.templateKey || item.payload?.stableId || item.id,
+    scopeId: item.payload?.id || item.payload?.questionId || item.payload?.templateKey || item.payload?.stableId || item.payload?.categoryKey || item.payload?.functionName || item.payload?.rawValue || item.id,
     scopeTitle: item.title,
     body,
+    intent,
+    target,
     snapshot: {
       itemType: item.itemType,
       status: item.status,
       category: item.category,
       description: item.description,
+      // Phase 4: full Swift-derived entity snapshot so Claude can read the
+      // note next session with complete context (impact, lint, raw fields).
       payload: item.payload,
+      capturedAt: new Date().toISOString(),
+      capturedFrom: window.location.origin,
     },
   });
   el.contextNote.value = "";
   renderContextNotes(item);
-  alert("Saved note for Codex.");
+  flashSavePill();
+}
+
+function flashSavePill() {
+  const btn = el.saveNote;
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.textContent = "Saved ✓";
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.disabled = false;
+  }, 1500);
 }
 
 async function writeNote(note) {
   const full = {
     id: `note-${Date.now()}`,
     createdAt: new Date().toISOString(),
+    intent: note.intent || "feedback",
+    target: note.target || "claude",
+    author: "tom",
     ...note,
   };
   if (state.storageMode === "cloud") {
@@ -935,6 +1170,11 @@ async function writeNote(note) {
           scope_title: full.scopeTitle,
           body: full.body,
           snapshot: full.snapshot ?? {},
+          // Admin Lab v2 columns
+          intent: full.intent,
+          target: full.target,
+          author: full.author,
+          proposed_diff: full.proposedDiff ?? null,
         })
         .select("*")
         .single();
@@ -1043,6 +1283,14 @@ function dbNoteToUi(row) {
     body: row.body,
     snapshot: row.snapshot ?? {},
     createdAt: row.created_at,
+    intent: row.intent || "feedback",
+    target: row.target || "claude",
+    author: row.author || "tom",
+    appliedAt: row.applied_at || null,
+    appliedCommit: row.applied_commit || null,
+    proposedDiff: row.proposed_diff ?? null,
+    parentNoteId: row.parent_note_id ?? null,
+    revertedAt: row.reverted_at ?? null,
   };
 }
 

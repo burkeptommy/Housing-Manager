@@ -450,6 +450,64 @@
   color: #9c6322;
 }
 
+/* Admin Lab v2 — Phase 4 list-row badges */
+.admin-pill--note {
+  background: rgba(69, 58, 112, 0.12);
+  color: var(--indigo-700);
+}
+
+.admin-pill--lint {
+  background: rgba(237, 105, 85, 0.14);
+  color: var(--salmon-dark);
+}
+
+/* Admin Lab v2 — admin-note-card layout */
+.admin-note-card__top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.admin-note-card__top strong {
+  flex: 1;
+  font: 700 13px var(--sans);
+}
+
+/* Admin Lab v2 — note form intent + target controls */
+.admin-note-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 8px;
+}
+
+.admin-note-controls label {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-note-controls span {
+  color: var(--text-muted);
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-note-controls select {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 600 13px var(--sans);
+  padding: 8px 10px;
+}
+
+.admin-note-controls select:focus {
+  border-color: var(--indigo-700);
+  outline: none;
+}
+
 .admin-empty-detail,
 .admin-detail {
   background: #fff;
