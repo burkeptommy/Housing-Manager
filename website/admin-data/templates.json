@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-29T19:27:59.561Z",
+  "generatedAt": "2026-04-29T20:38:35.052Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift",
-  "sourceCommit": "f46e7919",
+  "sourceCommit": "274713d0",
   "count": 221,
   "entries": [
     {
@@ -111,14 +111,14 @@
       "stableId": null,
       "systemCategory": "Roofing",
       "title": "Reseal flashing and seams",
-      "description": "Inspect and reseal flashing, seams, and penetrations on flat/membrane roof.",
+      "description": "Roofer inspects every flashing detail (chimney, vent stacks, parapet walls, equipment curbs) and re-applies sealant where the original membrane has lifted, cracked, or pulled away. Pays particular attention to scuppers and drains where ponding water finds the smallest gap. Critical on flat / membrane roofs because gravity isn't helping you here.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$150–$400",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Critical on flat roofs to prevent ponding leaks",
+      "notes": "Schedule before the spring rains. A skipped year can mean a leak path that isn't visible from inside until it's done $5K+ of damage to the ceiling and contents below.",
       "requiredSubtypes": [
         "roof_flat"
       ],
@@ -615,14 +615,14 @@
       "stableId": "HVAC:Professional HVAC tune-up (cooling)",
       "systemCategory": "HVAC",
       "title": "HVAC tune-up (cooling)",
-      "description": "HVAC tech inspects and services the air conditioning system before summer.",
+      "description": "HVAC tech inspects and services the air conditioning system before summer. Includes refrigerant level check, condenser coil cleaning, capacitor and contactor inspection, blower motor lubrication, condensate drain flush, and a full system performance test under load. Catches small issues before they become a hot-day breakdown.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Schedule before summer heat",
+      "notes": "Book in February or early March. Most HVAC vendors are fully booked by April once the first warm week hits, and you don't want to be calling around the day your AC stops working in July. Most manufacturer warranties require documented annual service to stay valid.",
       "requiredSubtypes": [
         "has_ac"
       ],
@@ -659,14 +659,14 @@
       "stableId": "HVAC:Professional HVAC tune-up (heating)",
       "systemCategory": "HVAC",
       "title": "HVAC tune-up (heating)",
-      "description": "HVAC tech inspects and services the heating system before winter.",
+      "description": "HVAC tech inspects and services the heating system before winter. Includes burner inspection and cleaning, heat exchanger check for cracks (carbon monoxide risk), gas valve and pilot test, blower motor service, thermostat calibration, and a full ignition cycle test. Critical safety check for gas-fired systems.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Schedule before cold weather",
+      "notes": "Book in August or early September. The first cold snap floods every HVAC vendor's voicemail and turns a routine $200 tune-up into a 2-week wait. Annual service is required to maintain most manufacturer warranties.",
       "requiredSubtypes": [
         "has_furnace"
       ],
@@ -747,14 +747,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Inspect mini-split outdoor unit",
-      "description": "HVAC tech clears debris from the condenser, checks refrigerant lines, and cleans the coil.",
+      "description": "HVAC tech clears leaves and debris from the outdoor condenser, checks refrigerant line insulation for cracks, washes the coil, verifies the disconnect switch and surge protector, and confirms the unit is level on its pad. Mini-splits can lose 10-20% efficiency to a dirty coil alone.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$100–$200",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Often bundled into the spring AC tune-up if your HVAC vendor handles both ducted and ductless. Confirm before booking separately.",
       "requiredSubtypes": [
         "mini_split"
       ],
@@ -791,14 +791,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Bleed radiators",
-      "description": "Boiler tech bleeds trapped air from each radiator. Usually included in the annual boiler service visit.",
+      "description": "Boiler tech opens each radiator's bleed valve in turn to release trapped air, then tops off boiler pressure to spec. Trapped air at the top of a radiator means the bottom half can heat fine while the top stays cold — the room never gets warm even though the system runs constantly.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$50–$150",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Most boiler owners include this in their annual service visit",
+      "notes": "Most boiler owners include this in the annual boiler service visit instead of a separate appointment — no point paying two trip charges. If you've noticed any radiator running cold or only warming halfway, it's worth flagging to the tech.",
       "requiredSubtypes": [
         "boiler"
       ],
@@ -827,7 +827,22 @@
           "displayPriority": 20
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Boiler tech opens each radiator's bleed valve in turn to release trapped air,..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Most boiler owners include this in the annual boiler service visit instead of..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -835,14 +850,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Annual boiler service",
-      "description": "Combustion check, clean burners, inspect heat exchanger, check pressure relief valve, verify exhaust draft.",
+      "description": "Boiler tech runs a full combustion analysis, cleans the burners and combustion chamber, inspects the heat exchanger for cracks (carbon monoxide risk), tests the pressure relief valve, verifies exhaust draft and flue integrity, and checks the expansion tank charge. The most consequential heating-system service in the house — a cracked heat exchanger can leak CO into living spaces.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$200–$400",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Required for warranty on most boilers",
+      "notes": "Required for warranty on most boilers — the manufacturer pulls service records when a claim is filed. Schedule in August or early September. Once the first cold snap hits, every boiler tech is booked solid for 2–3 weeks and a routine service turns into an emergency call.",
       "requiredSubtypes": [
         "boiler"
       ],
@@ -871,7 +886,22 @@
           "displayPriority": 20
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Boiler tech runs a full combustion analysis, cleans the burners and combustio..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Required for warranty on most boilers — the manufacturer pulls service record..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -879,14 +909,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Geothermal loop pressure check",
-      "description": "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak.",
+      "description": "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak — could be a pinhole in the ground loop, fittings at the manifold, or the heat pump's internal pressure switch. Catching this early prevents a full system shutdown.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Use the original installer if possible. Geothermal is specialized — most general HVAC techs don't have the loop testing equipment or the training to diagnose ground-side issues.",
       "requiredSubtypes": [
         "geothermal"
       ],
@@ -915,7 +945,22 @@
           "displayPriority": 20
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Geothermal installer verifies ground loop pressure and antifreeze concentrati..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Use the original installer if possible. Geothermal is specialized — most gene..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1063,14 +1108,14 @@
       "stableId": "Plumbing:Professional drain cleaning",
       "systemCategory": "Plumbing",
       "title": "Drain cleaning",
-      "description": "Plumber clears main drains to prevent backups.",
+      "description": "Plumber runs a power auger or hydro-jet through the main waste line to clear accumulated grease, soap scum, hair, and root intrusion before it becomes a backup. Includes a camera scope on the cleanout if any line shows resistance. Older homes with cast-iron or clay laterals benefit most.",
       "frequency": "Every 2 years",
       "priority": "Medium",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this — the same root that's slowing one drain will eventually back up the whole house.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1097,7 +1142,15 @@
           "displayPriority": 30
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Houses with mature trees out front are highest-risk for root intrusion. If yo..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1306,14 +1359,14 @@
       "stableId": null,
       "systemCategory": "Water Heater",
       "title": "Descale tankless heater",
-      "description": "Flush vinegar/descaler through the tankless unit to remove mineral buildup.",
+      "description": "Plumber flushes a vinegar or commercial descaler solution through the tankless unit's heat exchanger for 30–45 minutes, then rinses with fresh water. Removes mineral scale that builds up on the heat exchanger plates and slowly chokes flow rate, drives up gas/electric usage, and shortens lifespan. Critical for warranty.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$0–$150",
       "isDIY": true,
       "seasonalTiming": null,
       "professionalRequired": false,
-      "notes": "Hard water areas may need every 6 months",
+      "notes": "Hard water areas (well water + most municipal water in the Northeast) may need every 6 months. If you notice the unit cycling more often or hot water taking longer to arrive, you're already overdue. Most manufacturer warranties require documented annual descaling.",
       "requiredSubtypes": [
         "tankless"
       ],
@@ -1448,14 +1501,14 @@
       "stableId": null,
       "systemCategory": "Well System",
       "title": "Test water quality",
-      "description": "Lab test for bacteria, nitrates, pH, and other contaminants.",
+      "description": "Certified lab tests a sample for total coliform bacteria, E. coli, nitrates, nitrites, lead, and pH. Iron, manganese, hardness, and arsenic add-on panels are recommended in the Northeast and parts of the Midwest where geology drives elevated levels. Results take 5–10 business days.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$50–$200",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Test more frequently if you notice taste/odor changes",
+      "notes": "Test in spring after the snowmelt and seasonal water-table shifts have moved through. Test sooner if you notice taste, odor, or color changes — those are the canary signs of a contamination event. State health departments often offer free or subsidized testing for private wells.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1482,7 +1535,15 @@
           "displayPriority": 60
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Test in spring after the snowmelt and seasonal water-table shifts have moved ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1490,14 +1551,14 @@
       "stableId": "Well System:Professional well inspection",
       "systemCategory": "Well System",
       "title": "Well system inspection",
-      "description": "Well service comprehensively inspects pump, casing, pressure tank, and water flow.",
+      "description": "Well service comprehensively inspects the submersible pump, well casing integrity, pressure tank pre-charge and bladder, pressure switch and gauge, electrical connections at the well head, and total water output (gallons per minute). Catches a failing pump before it dies on a Saturday night.",
       "frequency": "Every 3-5 years",
       "priority": "High",
       "estimatedCostRange": "$300–$500",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Pump replacement is $1,500–$3,500 — annual inspection catches the early warning signs (cycling more often, lower flow, casing seal issues) and lets you plan the replacement on your schedule rather than during an emergency.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1524,7 +1585,15 @@
           "displayPriority": 60
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Pump replacement is $1,500–$3,500 — annual inspection catches the early warni..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -2623,14 +2692,14 @@
       "stableId": null,
       "systemCategory": "Landscaping",
       "title": "Top up turf infill",
-      "description": "Turf specialist refreshes the rubber or sand infill that supports the fibers. Infill migrates over time from rain, foot traffic, and grooming.",
+      "description": "Turf specialist refreshes the rubber or silica sand infill that holds the synthetic fibers upright. Infill migrates over time from rain runoff, foot traffic, and seasonal grooming. Without it, fibers mat down and the turf looks worn long before its 12–15 year design life.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$150–$400",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Most synthetic-turf vendors offer this as part of an annual service plan. If you've noticed footprints staying visible after walking on the turf, you're already overdue.",
       "requiredSubtypes": [
         "synthetic_turf"
       ],
@@ -2667,14 +2736,14 @@
       "stableId": null,
       "systemCategory": "Landscaping",
       "title": "Power rake and groom turf",
-      "description": "Turf specialist power-rakes and grooms the turf to lift fibers and redistribute infill. Keeps the turf looking new through year 15+.",
+      "description": "Turf specialist runs a power rake or groomer across the surface to lift matted fibers, redistribute migrated infill, and remove debris that's worked into the pile. Keeps the turf looking new and bouncy through year 15+ instead of going flat at year 5.",
       "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "$150–$400",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Twice-a-year is the manufacturer recommendation for most premium turf. Spring grooming opens up the pile after winter compaction; fall grooming clears leaves and acorns before they break down into organic matter (which then feeds weed growth between blades).",
       "requiredSubtypes": [
         "synthetic_turf"
       ],
@@ -3027,14 +3096,14 @@
       "stableId": null,
       "systemCategory": "Irrigation",
       "title": "Winterize irrigation system",
-      "description": "Professional blow-out of irrigation lines to prevent freeze damage.",
+      "description": "Irrigation tech connects an air compressor to the system, isolates each zone in turn, and blows compressed air through the lines until water stops emerging from the heads. Drains the backflow preventer and shuts the main supply at the curb stop. A single skipped year on a freeze-prone climate can split mainlines underground.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$75–$150",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Must be done before first freeze",
+      "notes": "Must be done before the first hard freeze. Once water freezes inside a head or valve, it cracks the brass — and you don't find out until spring startup when the system pressurizes and the leaks reveal themselves. In the Northeast, target mid-October.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -3061,7 +3130,15 @@
           "displayPriority": 0
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Must be done before the first hard freeze. Once water freezes inside a head o..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -3069,14 +3146,14 @@
       "stableId": null,
       "systemCategory": "Irrigation",
       "title": "Spring startup irrigation",
-      "description": "Irrigation service gradually pressurizes the system, checks for leaks, and adjusts heads.",
+      "description": "Irrigation service gradually pressurizes the system zone by zone, watching for unexpected geysers from cracked heads or split lines that froze over winter. Adjusts spray patterns for fresh landscape growth, replaces broken heads, and tests the rain sensor and controller. Sets the seasonal watering schedule.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$75–$150",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Schedule for after the last hard freeze (mid-April in the Northeast, earlier south). If your vendor pressurizes before the ground thaws fully you risk a burst on a still-frozen line.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -3441,14 +3518,14 @@
       "stableId": null,
       "systemCategory": "Pool/Spa",
       "title": "Inspect hot tub cover and jets",
-      "description": "Check the cover for cracks or waterlogging. Test each jet for pressure and aim.",
+      "description": "Check the cover for cracks, waterlogging (lift one corner — if it's noticeably heavier than the opposite corner, the foam is saturated), and torn vinyl. Test each jet for pressure and verify the aim hasn't drifted. Inspect the cover lifter mechanism if equipped.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$0–$400 (if cover replacement)",
       "isDIY": true,
       "seasonalTiming": "Spring",
       "professionalRequired": false,
-      "notes": "A waterlogged cover is inefficient and should be replaced.",
+      "notes": "A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/month in extra heating during cool months. Replacement covers run $300–$500 — pays for itself in 6–12 months. Soaked covers also start to mold inside, which is gross to rest your face on.",
       "requiredSubtypes": [
         "hot_tub"
       ],
@@ -3477,7 +3554,22 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Check the cover for cracks, waterlogging (lift one corner — if it's noticeabl..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/mon..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -3667,14 +3759,14 @@
       "stableId": "Pest Control:Professional termite inspection",
       "systemCategory": "Pest Control",
       "title": "Termite inspection",
-      "description": "Pest control company inspects for termite and wood-destroying insect activity.",
+      "description": "Pest control inspector walks the perimeter looking for mud tubes, swarmer wings near windows, frass, and damaged wood. Probes accessible sills, joists, and structural members in the basement / crawl space. Pulls back mulch and inspects siding contact points. The visible signs are usually small and easy to miss until they're catastrophic.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$75–$150",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Required for many home warranties",
+      "notes": "Spring is termite swarming season — the easiest time to spot active colonies. Required to maintain most home warranties. If the inspector finds activity, treatment runs $1,500–$5,000 depending on severity, but skipping the inspection can mean a $30K+ structural repair down the line.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -3701,7 +3793,15 @@
           "displayPriority": 60
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Spring is termite swarming season — the easiest time to spot active colonies...."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -4013,14 +4113,14 @@
       "stableId": "Solar:Professional panel cleaning",
       "systemCategory": "Solar",
       "title": "Solar panel cleaning",
-      "description": "Cleaning to remove dirt, pollen, and bird droppings.",
+      "description": "Roof-trained crew cleans accumulated pollen, dust, bird droppings, and pine sap off the array using deionized water and soft brushes. Avoids harsh detergents and pressure-washing that can strip the anti-reflective coating. Output gain after a thorough cleaning is typically 5–15% on heavily soiled panels.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Can significantly improve output",
+      "notes": "Output drops gradually so it's hard to notice from monthly bills alone — but a year of accumulated soiling can cost $200–$500 in lost generation depending on system size. Spring is ideal (after pollen settles, before peak production months).",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -4047,7 +4147,15 @@
           "displayPriority": 40
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Output drops gradually so it's hard to notice from monthly bills alone — but ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -4055,14 +4163,14 @@
       "stableId": "Solar:Professional inspection",
       "systemCategory": "Solar",
       "title": "Solar system inspection",
-      "description": "Comprehensive inspection of panels, wiring, inverter, and mounting.",
+      "description": "Solar tech checks panel integrity (microcracks, hot spots, junction box issues), DC and AC wiring at the combiner box and inverter, mounting hardware torque on the rails and roof attachments, and inverter performance against expected output curves. Catches degraded panels before they take down a string and tank production.",
       "frequency": "Every 3-5 years",
       "priority": "Medium",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Most production warranties require inspection records to honor a claim. If your inverter is approaching 8–10 years old, ask the inspector to flag whether it's nearing replacement age — inverter failure is the #1 cause of unexpected solar downtime.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -4089,7 +4197,15 @@
           "displayPriority": 40
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Most production warranties require inspection records to honor a claim. If yo..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -10069,14 +10185,14 @@
       "stableId": null,
       "systemCategory": "Elevator",
       "title": "Annual elevator inspection",
-      "description": "State-required annual inspection of residential elevator. Required by law in most states for private residential elevators.",
+      "description": "Certified elevator inspector verifies code compliance: emergency stop, door sensors and interlocks, governor and safety brake, hoist cable wear, machine room ventilation, and updated certificate posting. Required by state law in most jurisdictions for residential elevators — failing to keep current can void homeowner's insurance for elevator-related claims.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$300-500",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Certified elevator inspector. Keep the certificate on file with other estate documents.",
+      "notes": "Keep the certificate on file with other estate documents. If your home is on a service contract with an elevator company (Otis, ThyssenKrupp, etc.), the inspection is usually included — but the certificate is something you need to pull and file yourself.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -10103,7 +10219,22 @@
           "displayPriority": 90
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Certified elevator inspector verifies code compliance: emergency stop, door s..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Keep the certificate on file with other estate documents. If your home is on ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -10111,14 +10242,14 @@
       "stableId": null,
       "systemCategory": "Elevator",
       "title": "Quarterly elevator service",
-      "description": "Routine service visit covering cable tension, lubrication, door sensors, and emergency phone/alarm test.",
+      "description": "Routine service visit covering cable tension and inspection, rail and roller lubrication, door sensor calibration, emergency phone test, and cab leveling check. Catches wear before a small issue becomes a stuck-between-floors call.",
       "frequency": "Quarterly",
       "priority": "Medium",
       "estimatedCostRange": "$150-300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Most homes are on a quarterly service contract with the installer or a local specialist. If you've never used the emergency phone, this visit is when to test it — phone batteries die silently and you don't want to find out you can't call out from inside the cab during the next power blip.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -10145,7 +10276,15 @@
           "displayPriority": 90
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Most homes are on a quarterly service contract with the installer or a local ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -10153,14 +10292,14 @@
       "stableId": null,
       "systemCategory": "Wine Cellar",
       "title": "Annual cooling unit service",
-      "description": "Wine cellar tech services the cooling unit: cleans coils, checks refrigerant, verifies temperature and humidity calibration.",
+      "description": "Wine cellar specialist services the dedicated cooling unit: cleans evaporator and condenser coils (a clogged coil silently raises cellar temp by 5–10°F), checks refrigerant charge against spec, verifies thermostat calibration to within 1°F, tests humidity controls (ideal: 60–70% RH), and inspects the drain line for the condensate.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$200-400",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Cooling unit failures can ruin a collection overnight. This is not a category to skip.",
+      "notes": "Cooling unit failures can ruin a collection overnight — fine wine starts heat-damaging at 75°F+, and most modern units have no built-in alarm if the compressor fails on a Friday night. This is not a category to skip. Most manufacturer warranties require annual documented service.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -10187,7 +10326,15 @@
           "displayPriority": 95
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Cooling unit failures can ruin a collection overnight — fine wine starts heat..."
+        }
+      ],
       "_recommendation": null
     },
     {
