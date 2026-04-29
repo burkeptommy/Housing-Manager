@@ -38,5 +38,19 @@ COPY favicon.svg /usr/share/nginx/html/
 # Operations Desk SPA — produced by stage 1.
 COPY --from=ops-build /app/dist /usr/share/nginx/html/operations
 
+# Admin Lab (private, Tom-only via Supabase Auth + RLS). Vanilla HTML +
+# vanilla ES modules. Requires the Swift→JSON snapshots in admin-data/
+# to be present at build time — refresh with
+# `node scripts/export_swift_admin_data.mjs` before docker build.
+COPY admin.html /usr/share/nginx/html/
+COPY admin.css /usr/share/nginx/html/
+COPY admin.js /usr/share/nginx/html/
+COPY admin-forms.js /usr/share/nginx/html/
+COPY admin-preview.js /usr/share/nginx/html/
+COPY admin-simulator.js /usr/share/nginx/html/
+COPY admin-data /usr/share/nginx/html/admin-data
+COPY chez-logo.png /usr/share/nginx/html/
+COPY alfred-mark.svg /usr/share/nginx/html/
+
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

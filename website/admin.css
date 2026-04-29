@@ -1371,6 +1371,177 @@
 }
 
 /* =============================================================================
+   Phase 7 — Reconciler simulator
+   ============================================================================= */
+
+.admin-sim__form {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-sim__form fieldset {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.admin-sim__form legend {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 999px;
+  color: var(--indigo-700);
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.16em;
+  padding: 4px 10px;
+  text-transform: uppercase;
+}
+
+.admin-sim__form label {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-sim__form label > span {
+  color: var(--text-muted);
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-sim__form input,
+.admin-sim__form select {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 600 13px var(--sans);
+  padding: 8px 10px;
+}
+
+.admin-sim__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-sim__output {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-sim__summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.admin-sim__filter-summary {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 10px;
+  font: 500 12px var(--sans);
+  line-height: 1.6;
+  padding: 10px 12px;
+}
+
+.admin-sim__lane {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.admin-sim__lane header {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-sim__lane h4 {
+  color: var(--indigo-700);
+  font: 700 12px var(--sans);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.admin-sim__tasks {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-sim__task {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.admin-sim__task[data-lane="vendor"] {
+  border-left: 3px solid var(--indigo-700);
+}
+
+.admin-sim__task[data-lane="findContractor"] {
+  border-left: 3px solid var(--salmon, #ed6955);
+}
+
+.admin-sim__task[data-lane="personal"] {
+  border-left: 3px solid #4a7c59;
+}
+
+.admin-sim__task-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-sim__task-meta span {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+  padding: 1px 7px;
+}
+
+.admin-sim__children {
+  font: 500 12px var(--sans);
+}
+
+.admin-sim__children summary {
+  color: var(--indigo-700);
+  cursor: pointer;
+  font: 600 12px var(--sans);
+}
+
+.admin-sim__children ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.admin-sim__children li {
+  color: var(--text);
+  font: 500 12px var(--sans);
+  margin-bottom: 2px;
+}
+
+.admin-sim__children code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 5px;
+  color: var(--indigo-700);
+  font: 600 10px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+
+/* =============================================================================
    Phase 4b — Detail panel tabs (Edit / Impact / Usage)
    ============================================================================= */
 

@@ -1,0 +1,86 @@
+name: Admin Apply Validate
+
+# Headless xcodebuild for the working branch. Triggered on pushes that
+# touch Swift sources. After build, posts back to Supabase to mark any
+# admin_codex_notes rows whose applied_commit matches this SHA as
+# success / failed. Closes the safety-net loop on Claude-applied
+# proposals: if I ship a typo, the note flips red in Tom's Activity feed.
+
+on:
+  push:
+    branches:
+      - claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG
+    paths:
+      - "Haven/**"
+      - "HavenTests/**"
+      - "Haven.xcodeproj/**"
+      - ".github/workflows/admin_apply_validate.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: admin-apply-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: xcodebuild iPhone 15 Simulator
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Generate Xcode project (xcodegen if present)
+        run: |
+          if [ -f project.yml ] && command -v xcodegen >/dev/null; then
+            xcodegen generate
+          else
+            echo "xcodegen not present or no project.yml — using checked-in .xcodeproj"
+          fi
+
+      - name: Build (Haven scheme)
+        id: xcodebuild
+        run: |
+          set +e
+          xcodebuild \
+            -scheme Haven \
+            -destination "platform=iOS Simulator,name=iPhone 15,OS=latest" \
+            -configuration Debug \
+            -derivedDataPath build/DerivedData \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee build.log
+          STATUS=${PIPESTATUS[0]}
+          echo "build_status=$STATUS" >> "$GITHUB_OUTPUT"
+          tail -200 build.log > build_excerpt.log || true
+          exit $STATUS
+        continue-on-error: true
+
+      - name: Setup Node (for posting back to Supabase)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Post validation status to Supabase
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_SHA_FULL: ${{ github.sha }}
+          BUILD_STATUS: ${{ steps.xcodebuild.outputs.build_status }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::warning::SUPABASE_SERVICE_ROLE_KEY secret not set — skipping post-back."
+            exit 0
+          fi
+          STATUS_LABEL="success"
+          if [ "$BUILD_STATUS" != "0" ]; then STATUS_LABEL="failed"; fi
+          LOG_EXCERPT=$(tail -50 build_excerpt.log 2>/dev/null || echo "")
+          node scripts/post_apply_validation.mjs "$STATUS_LABEL" "$GITHUB_SHA_FULL" "$LOG_EXCERPT" || true
+
+      - name: Fail job if build failed
+        if: steps.xcodebuild.outputs.build_status != '0'
+        run: exit 1

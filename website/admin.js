@@ -11,6 +11,13 @@ import {
   openQuizFlowPreview,
   closePreview,
 } from "/admin-preview.js";
+import {
+  DEFAULT_FACTS,
+  runSimulation,
+  renderSimulatorUI,
+  renderFactForm,
+  attachFactFormHandlers,
+} from "/admin-simulator.js";
 
 const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -99,6 +106,14 @@ const VIEWS = [
     eyebrow: "supabase/functions/*/index.ts",
     subtitle: "All 50+ Edge Functions — first system prompt, model, and notes.",
     liveSource: "edge-function-prompts",
+  },
+  {
+    id: "simulator",
+    label: "Simulate",
+    type: "simulator",
+    title: "Reconciler Simulator",
+    eyebrow: "What would seed?",
+    subtitle: "Pick property facts and see what tasks the reconciler would create. JS port of MaintenanceTaskReconciler + Day1TaskCurator.",
   },
   {
     id: "searches",
@@ -202,7 +217,15 @@ const state = {
   selected: null,
   search: "",
   statusFilter: "all",
+  // Phase 7 — simulator scratch state. Fact bundle + last result so
+  // re-rendering the surface doesn't reset Tom's edits.
+  simFacts: structuredCloneSafePure(DEFAULT_FACTS),
+  simResult: null,
 };
+
+function structuredCloneSafePure(value) {
+  return JSON.parse(JSON.stringify(value ?? {}));
+}
 
 const el = {
   login: document.querySelector("[data-login]"),
@@ -818,11 +841,69 @@ function render() {
     renderDecisionsView();
   } else if (state.view === "activity") {
     renderActivityView();
+  } else if (state.view === "simulator") {
+    renderSimulatorView();
   } else {
     renderList();
     renderDetail();
   }
   renderReadiness();
+}
+
+// =============================================================================
+// Phase 7 — Reconciler simulator surface
+// =============================================================================
+
+function renderSimulatorView() {
+  // Repurpose the list panel for the fact form, the detail panel for the
+  // simulated output. Keeps the existing two-column layout intact.
+  el.list.innerHTML = renderFactForm(state.simFacts);
+  el.stats.innerHTML = `<div class="admin-stat"><strong>${state.simResult?.counts.total ?? "—"}</strong><span>Tasks if seeded</span></div>`;
+
+  attachFactFormHandlers(el.list, state.simFacts, () => {
+    runAndRenderSimulation();
+  });
+
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.remove("is-hidden");
+  // Hide everything in the detail panel that doesn't apply here.
+  el.curatedForm?.classList.add("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  el.detailKind.textContent = "simulator";
+  el.detailTitle.textContent = "What would seed?";
+  el.detailSubtitle.textContent = "Edit the property facts on the left to see the reconciler's output update live.";
+  el.detailStatus.textContent = "preview";
+  el.detailStatus.dataset.tone = "active";
+  if (el.lockToggle) el.lockToggle.classList.add("is-hidden");
+  if (el.previewQuestion) el.previewQuestion.classList.add("is-hidden");
+  if (el.launchPill) el.launchPill.classList.add("is-hidden");
+
+  // Hide tabs — simulator is a single-pane view.
+  if (el.detailTabs) el.detailTabs.classList.add("is-hidden");
+  document.querySelectorAll("[data-tab-pane]").forEach((p) => {
+    if (p.dataset.tabPane === "edit") {
+      p.classList.add("is-active");
+      p.removeAttribute("hidden");
+    }
+  });
+
+  runAndRenderSimulation();
+}
+
+function runAndRenderSimulation() {
+  const templatesJSON = state.liveData["templates"];
+  const systemsJSON = state.liveData["system-categories"];
+  if (!templatesJSON?.entries) {
+    el.formHost.innerHTML = `<p class="admin-muted">Templates JSON not loaded yet. Run scripts/export_swift_admin_data.mjs and refresh.</p>`;
+    return;
+  }
+  state.simResult = runSimulation(state.simFacts, templatesJSON, systemsJSON);
+  if (el.formHost) el.formHost.innerHTML = renderSimulatorUI(state.simResult);
+  el.stats.innerHTML = `<div class="admin-stat"><strong>${state.simResult.counts.total}</strong><span>Tasks</span></div>
+    <div class="admin-stat"><strong>${state.simResult.counts.bundles}</strong><span>Bundles</span></div>
+    <div class="admin-stat"><strong>${state.simResult.counts.vendor + state.simResult.counts.findContractor}</strong><span>Vendor</span></div>
+    <div class="admin-stat"><strong>${state.simResult.counts.personal}</strong><span>Personal</span></div>`;
 }
 
 function renderNav() {
@@ -872,6 +953,10 @@ function renderStats(all, filtered) {
 }
 
 function renderDetail() {
+  // Re-show the tabs strip in case the simulator view hid it on the
+  // previous render.
+  el.detailTabs?.classList.remove("is-hidden");
+
   const item = state.selected;
   if (!item) {
     el.emptyDetail.classList.remove("is-hidden");
