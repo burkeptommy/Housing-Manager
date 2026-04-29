@@ -3269,21 +3269,17 @@ function itemRowHtml(item) {
       handymanBadge = `<span class="admin-pill admin-pill--library" title="Library item — opt-in via Recommended Services">🛠️ Library</span>`;
     }
   }
-  // Phase 5q — task lifecycle + season pills with concrete "how to opt
-  // in" / "rolls up into X" context so the row is self-explanatory.
+  // Phase 5q — Lifecycle badge handles when-this-enters semantics
+  // (Opt-in only). Bundle children fall through to the routingBadge
+  // below, which shows the parent visit + sibling count + reason.
   let lifecycleBadge = "";
   let seasonBadge = "";
   if (["task", "recommended", "handyman"].includes(item.itemType)) {
     const t = item.payload || {};
-    if (t.bundleId) {
-      const parentTitle = prettyBundleTitle(t.bundleId);
-      const siblingCount = countBundleSiblings(t.bundleId);
-      const tooltip = `Never seeds as its own task. Rolls up into "${parentTitle}" alongside ${siblingCount - 1} sibling${siblingCount - 1 === 1 ? "" : "s"}. The homeowner sees ONE scheduled visit, not ${siblingCount} separate tasks.`;
-      lifecycleBadge = `<span class="admin-pill admin-pill--bundle-child" title="${escapeHtml(tooltip)}">↳ ${escapeHtml(parentTitle)} (${siblingCount} items)</span>`;
-    } else if (t.isEssential === false) {
-      // Phase 5q — surface HOW the opt-in surfaces. Handyman-category
-      // opt-ins land on the punch list "Recommended" section; everything
-      // else lands in the Recommended Services view (Phase 54C).
+    if (!t.bundleId && t.isEssential === false) {
+      // Surface HOW the opt-in is offered. Handyman-category opt-ins
+      // land on the punch list "Recommended" section; everything else
+      // lands in the Recommended Services view (Phase 54C).
       const optInSurface = t.systemCategory === "Handyman"
         ? "Surfaced in the handyman punch list 'Recommended' section. Homeowner taps + to add it to the next handyman visit."
         : "Surfaced in PropertyDetailView → Recommended Services. Homeowner taps + on the card to schedule it.";
@@ -3296,6 +3292,16 @@ function itemRowHtml(item) {
         : "";
     }
   }
+  // Phase 5q — Routing-reason badge: shows WHICH lane this template
+  // lands in AND WHY (which template-author rule matched). Every row
+  // gets one so the routing taxonomy is scannable, not a black box.
+  let routingBadge = "";
+  if (["task", "recommended", "handyman"].includes(item.itemType)) {
+    const reason = routingReason(item.payload || {});
+    if (reason) {
+      routingBadge = `<span class="admin-pill admin-pill--routing-${reason.tier}" title="${escapeHtml(reason.tooltip)}">${escapeHtml(reason.label)}</span>`;
+    }
+  }
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
@@ -3303,6 +3309,7 @@ function itemRowHtml(item) {
         <span class="admin-pill" data-tone="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
         ${handymanBadge}
         ${lifecycleBadge}
+        ${routingBadge}
         ${seasonBadge}
         ${launchBadge}
         ${lintBadge}
@@ -3314,6 +3321,93 @@ function itemRowHtml(item) {
       </div>
     </button>
   `;
+}
+
+// Phase 5q — Why does this template route the way it does? Returns
+// { tier, label, tooltip } where tooltip is a plain-English explanation
+// of which template-author rule (in MaintenanceTemplates.swift) matched.
+// Tooltip is what shows on hover — full sentence so Tom can read the
+// rationale without opening the row.
+function routingReason(t) {
+  if (!t) return null;
+  if (t.bundleId) {
+    const parentTitle = prettyBundleTitle(t.bundleId);
+    const siblings = countBundleSiblings(t.bundleId);
+    return {
+      tier: "bundled",
+      label: `↳ ${parentTitle}`,
+      tooltip:
+        `Bundled into "${parentTitle}" with ${siblings - 1} sibling${siblings - 1 === 1 ? "" : "s"}. ` +
+        `The vendor handles ${siblings} items in ONE scheduled visit instead of ${siblings} separate task rows. ` +
+        `Trigger: bundleId = "${t.bundleId}" in MaintenanceTemplates.swift.`,
+    };
+  }
+  if (t.safetyFloor === true) {
+    return {
+      tier: "vendor",
+      label: "Vendor",
+      tooltip:
+        "Vendor — safety floor. Hard-stop rule: tasks marked safetyFloor: true (gas service, panel work, " +
+        "roof, septic, generator) always route to a pro regardless of homeowner preference tier. " +
+        "Trigger: safetyFloor: true in MaintenanceTemplates.swift.",
+    };
+  }
+  if (t.routingOverride === "vendorOnly") {
+    return {
+      tier: "vendor",
+      label: "Vendor",
+      tooltip:
+        "Vendor — locked by template author. routingOverride: .vendorOnly explicitly excludes the handyman lane. " +
+        "Trigger: routingOverride: .vendorOnly in MaintenanceTemplates.swift.",
+    };
+  }
+  if (t.assignmentType === "vendor" && !t.routingOverride) {
+    return {
+      tier: "vendor",
+      label: "Vendor",
+      tooltip:
+        "Vendor — explicitly classified as pro work. The template author marked this assignmentType: .vendor " +
+        "without a routing override. Trigger: assignmentType: .vendor in MaintenanceTemplates.swift.",
+    };
+  }
+  if (t.routingOverride === "diyDefault") {
+    return {
+      tier: "handyman",
+      label: "Handyman",
+      tooltip:
+        "Handyman — homeowner default. routingOverride: .diyDefault means this template lands in 'Your tasks' " +
+        "even for hire-out users (replace HVAC filters, weather-stripping checks, generator oil checks). " +
+        "Hard-floor: never flips to vendor. Trigger: routingOverride: .diyDefault in MaintenanceTemplates.swift.",
+    };
+  }
+  if (t.routingOverride === "diyCapable") {
+    return {
+      tier: "handyman",
+      label: "Handyman",
+      tooltip:
+        "Handyman — DIY-friendly fallback. routingOverride: .diyCapable means the handyman handles it on a " +
+        "punch-list visit by default, but the homeowner can claim it as DIY if they want. " +
+        "Trigger: routingOverride: .diyCapable in MaintenanceTemplates.swift.",
+    };
+  }
+  if (t.assignmentType === "personal") {
+    return {
+      tier: "handyman",
+      label: "Handyman",
+      tooltip:
+        "Handyman — explicitly personal. The template author marked this assignmentType: .personal. " +
+        "Trigger: assignmentType: .personal in MaintenanceTemplates.swift.",
+    };
+  }
+  return {
+    tier: "vendor_or_handyman",
+    label: "Vendor or Handyman",
+    tooltip:
+      "Vendor or Handyman — flexible default. The template has assignmentType: .either with no special " +
+      "routingOverride, so the iOS reconciler resolves it against Q36 preference tier: hire_out → vendor, " +
+      "mixed → vendor if effort >30min else personal, diy → personal. " +
+      "Trigger: assignmentType: .either + no override in MaintenanceTemplates.swift.",
+  };
 }
 
 // Phase 5q — Count siblings in a bundle so a "Bundle child" row can

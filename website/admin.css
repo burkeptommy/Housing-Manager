@@ -494,6 +494,29 @@
   color: #2f5e3f;
 }
 
+/* Phase 5q — routing-tier pills, color-coded for fast scanning */
+.admin-pill--routing-vendor {
+  background: rgba(69, 58, 112, 0.14);
+  color: var(--indigo-700);
+}
+.admin-pill--routing-vendor_or_handyman {
+  background: rgba(120, 130, 150, 0.16);
+  color: #4a5365;
+}
+.admin-pill--routing-handyman {
+  background: rgba(237, 105, 85, 0.14);
+  color: var(--salmon-dark);
+}
+.admin-pill--routing-bundled {
+  background: rgba(150, 90, 200, 0.12);
+  color: #5b3585;
+  font: 600 11px var(--sans);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .admin-facets {
   background: rgba(0, 0, 0, 0.025);
   border: 1px solid var(--neutral-200);
