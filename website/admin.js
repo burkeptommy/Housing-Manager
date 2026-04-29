@@ -1270,7 +1270,7 @@ function runAndRenderSimulation() {
   state.simResult = runSimulation(factsForSim, templatesJSON, systemsJSON);
   if (el.formHost) el.formHost.innerHTML = renderSimulatorUI(state.simResult);
 
-  // Stats bar reflects the 5-tier breakdown including routine collapse.
+  // Stats bar — Tasks / Routines / Punch list / Vendor only / Vendor or Handyman
   const lanes = state.simResult.lanes;
   const allTasks = [...(lanes.bundles || []), ...(lanes.vendor || []), ...(lanes.findContractor || []), ...(lanes.personal || [])];
   const ROUTINE_CATS = new Set(["Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub", "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste", "Window Cleaning", "Gutter Cleaning", "Trash & Recycling"]);
@@ -1295,12 +1295,13 @@ function runAndRenderSimulation() {
       tierCounts.vendor_or_handyman++;
     }
   }
+  const punchTotal = state.simResult.counts.punchList || 0;
   el.stats.innerHTML = `
     <div class="admin-stat"><strong>${state.simResult.counts.total}</strong><span>Tasks</span></div>
     <div class="admin-stat"><strong>${routineCats.size}</strong><span>Routines</span></div>
+    <div class="admin-stat"><strong>${punchTotal}</strong><span>Punch list</span></div>
     <div class="admin-stat"><strong>${tierCounts.vendor_only}</strong><span>Vendor only</span></div>
     <div class="admin-stat"><strong>${tierCounts.vendor_or_handyman}</strong><span>Vendor or Handyman</span></div>
-    <div class="admin-stat"><strong>${tierCounts.handyman_only}</strong><span>Handyman only</span></div>
   `;
 }
 

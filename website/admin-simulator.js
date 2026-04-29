@@ -502,6 +502,14 @@ export const QUIZ_PRESETS = [
 // Public API
 // =============================================================================
 
+// Phase 5o — Handyman bundles aren't tasks. Their children become punch
+// list items, and the visit itself is a seasonal home-screen reminder
+// (driven by a singleton handymanRecurring routine). The simulator
+// filters them out of the task lanes and shows the punch list separately.
+function isHandymanBundleId(bundleId) {
+  return bundleId === "Handyman:spring" || bundleId === "Handyman:fall";
+}
+
 export function runSimulation(facts, templatesJSON, systemsJSON) {
   const templates = templatesJSON?.entries || [];
   const systems = systemsJSON?.entries || [];
@@ -517,10 +525,23 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
     return true;
   });
 
+  // Phase 5o — separate handyman bundle children into the punch list before
+  // bucketing the rest. Handyman:spring and Handyman:fall children become
+  // handyman_punch_items rows, not maintenance_tasks.
+  const punchList = [];
+  const taskEligible = [];
+  for (const t of eligible) {
+    if (isHandymanBundleId(t.bundleId)) {
+      punchList.push(t);
+    } else {
+      taskEligible.push(t);
+    }
+  }
+
   // Group by bundle so children roll up.
   const bundleMap = new Map();
   const standalone = [];
-  for (const t of eligible) {
+  for (const t of taskEligible) {
     if (t.bundleId) {
       if (!bundleMap.has(t.bundleId)) bundleMap.set(t.bundleId, []);
       bundleMap.get(t.bundleId).push(t);
@@ -588,6 +609,9 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
     });
   }
 
+  // Phase 5o — punch list groups by season (spring-only, fall-only, both)
+  const punchListGrouped = groupPunchListBySeason(punchList);
+
   return {
     // facts is exposed so the UI's tier breakdown can check
     // hasContractorsFor when collapsing routines.
@@ -605,8 +629,14 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
       findContractor: lanes.findContractor.length,
       personal: lanes.personal.length,
       bundles: lanes.bundles.length,
+      punchList: punchList.length,
     },
     lanes,
+    punchList: {
+      total: punchList.length,
+      hasHandymanOnFile: !!facts?.hasContractorsFor?.["Handyman"],
+      grouped: punchListGrouped,
+    },
     rules: {
       regionalFiltered: templates.filter((t) => t.regionalPack && t.regionalPack !== region).length,
       essentialOnlyFiltered: templates.filter((t) => t.isEssential === false).length,
@@ -617,6 +647,14 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
         templates.filter((t) => t.isEssential === false).length,
     },
   };
+}
+
+function groupPunchListBySeason(items) {
+  const spring = items.filter((t) => t.bundleId === "Handyman:spring");
+  const fall = items.filter((t) => t.bundleId === "Handyman:fall");
+  spring.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  fall.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  return { spring, fall };
 }
 
 // =============================================================================
@@ -732,10 +770,10 @@ export function renderSimulatorUI(result) {
   return `
     <div class="admin-sim__output">
       <div class="admin-sim__summary">
-        <div class="admin-stat-tile"><strong>${result.counts.total}</strong><span>Total tasks</span></div>
+        <div class="admin-stat-tile"><strong>${result.counts.total}</strong><span>Tasks</span></div>
         <div class="admin-stat-tile"><strong>${routineGroups.length}</strong><span>Routines</span></div>
+        <div class="admin-stat-tile"><strong>${result.counts.punchList || 0}</strong><span>Punch list items</span></div>
         <div class="admin-stat-tile"><strong>${tier.vendor_only.length}</strong><span>Vendor only</span></div>
-        <div class="admin-stat-tile"><strong>${tier.vendor_or_handyman.length}</strong><span>Vendor or Handyman</span></div>
       </div>
 
       <div class="admin-sim__filter-summary admin-muted">
@@ -748,10 +786,76 @@ export function renderSimulatorUI(result) {
       </div>
 
       ${renderRoutineSection(routineGroups)}
+      ${renderPunchListSection(result.punchList)}
       ${tierSection("🚫 Vendor only", "Always a pro — gas, panel, roof, septic. One-off work, not recurring.", tier.vendor_only)}
       ${tierSection("👥 Vendor or Handyman", "Defaults to a vendor visit but the homeowner can flip to handyman.", tier.vendor_or_handyman)}
-      ${tierSection("🔨 Handyman only", "Small DIY-friendly items. Usually bundled into a handyman visit.", tier.handyman_only)}
+      ${tierSection("🔨 Handyman only (unbundled)", "DIY-friendly templates that aren't in the spring/fall handyman bundle. These DO seed as tasks today; if you want them on the punch list instead, flag them with bundleId Handyman:spring or Handyman:fall.", tier.handyman_only)}
       ${tierSection("✋ I'll do it myself", "Templates never seed here — runtime-only. (Should always be empty.)", tier.homeowner_only)}
+    </div>
+  `;
+}
+
+// Phase 5o — Handyman punch list section. Shows what the spring/fall
+// handyman bundles' children would auto-populate as handyman_punch_items
+// rows on the homeowner's punch list. The bundle parents themselves
+// ("Schedule Spring Handyman Visit" / "Schedule Fall Handyman Visit")
+// are NOT seeded as tasks anymore — they become seasonal home-screen
+// reminders that route into the handyman view.
+function renderPunchListSection(punch) {
+  const total = punch?.total || 0;
+  if (!total) {
+    return `
+      <section class="admin-sim__lane admin-sim__lane--punch">
+        <header><h4>📋 Handyman punch list</h4><span class="admin-muted">No items</span></header>
+        <p class="admin-sim__lane-blurb admin-muted">Spring + fall handyman bundle children would land on the punch list. None of those templates passed the gating filters for these answers.</p>
+      </section>
+    `;
+  }
+  const handymanLine = punch.hasHandymanOnFile
+    ? `Handyman on file from Q15b — these auto-populate the punch list and the handyman tackles them on the next visit.`
+    : `No handyman on file yet — items still seed on the punch list. Homeowner picks a handyman later (or via the Vendor Coverage card) to assign them to.`;
+  return `
+    <section class="admin-sim__lane admin-sim__lane--punch">
+      <header><h4>📋 Handyman punch list</h4><span class="admin-muted">${total} items auto-populated</span></header>
+      <p class="admin-sim__lane-blurb">
+        ${escapeHtml(handymanLine)}<br/>
+        <strong>Note:</strong> "Schedule Spring Handyman Visit" / "Schedule Fall Handyman Visit" tasks are NOT created. Those become twice-a-year "Time to book your handyman" reminders on the home screen that push the homeowner into the handyman tab to coordinate this list.
+      </p>
+      <div class="admin-sim__punch-grid">
+        ${renderPunchSeasonCol("🌷 Spring auto-populated", punch.grouped.spring)}
+        ${renderPunchSeasonCol("🍂 Fall auto-populated", punch.grouped.fall)}
+      </div>
+    </section>
+  `;
+}
+
+function renderPunchSeasonCol(title, items) {
+  if (!items.length) {
+    return `
+      <div class="admin-sim__punch-col">
+        <header>${escapeHtml(title)}</header>
+        <p class="admin-muted">No items pass the gating filter for these answers.</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="admin-sim__punch-col">
+      <header>${escapeHtml(title)} <span class="admin-muted">${items.length}</span></header>
+      <ul>
+        ${items
+          .map(
+            (t) => `
+              <li>
+                <span class="admin-sim__punch-check">☑</span>
+                <span class="admin-sim__punch-title">${escapeHtml(t.title || "(untitled)")}</span>
+                <span class="admin-sim__punch-meta">
+                  ${t.diyEffortMinutes ? `${t.diyEffortMinutes} min · ` : ""}${escapeHtml(t.systemCategory || "")}
+                </span>
+              </li>
+            `
+          )
+          .join("")}
+      </ul>
     </div>
   `;
 }

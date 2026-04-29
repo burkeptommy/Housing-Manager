@@ -2557,6 +2557,74 @@
 }
 
 /* =============================================================================
+   Phase 5o — Handyman punch list section in simulator output
+   ============================================================================= */
+
+.admin-sim__lane--punch {
+  background: linear-gradient(135deg, rgba(199, 126, 46, 0.06), rgba(199, 126, 46, 0.01));
+  border-color: rgba(199, 126, 46, 0.32);
+}
+
+.admin-sim__punch-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.admin-sim__punch-col {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.admin-sim__punch-col header {
+  align-items: baseline;
+  border-bottom: 1px dashed var(--neutral-200);
+  display: flex;
+  font: 800 11px var(--sans);
+  gap: 6px;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.admin-sim__punch-col ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-sim__punch-col li {
+  align-items: baseline;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 16px 1fr;
+  padding: 4px 0;
+}
+
+.admin-sim__punch-check {
+  color: #4a7c59;
+  font: 700 13px var(--sans);
+}
+
+.admin-sim__punch-title {
+  color: var(--text);
+  font: 600 13px var(--sans);
+  line-height: 1.35;
+}
+
+.admin-sim__punch-meta {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+  grid-column: 2;
+  margin-top: 2px;
+}
+
+/* =============================================================================
    Phase 5m — Routine bucket in simulator output
    ============================================================================= */
 
