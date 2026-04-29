@@ -59,14 +59,21 @@ jobs:
             echo "xcodegen not present or no project.yml — using checked-in .xcodeproj"
           fi
 
-      - name: Build (Haven scheme)
+      - name: List schemes
+        run: |
+          xcodebuild -list -project Haven.xcodeproj || true
+
+      - name: Build (Chez scheme — homeowner app)
         id: xcodebuild
         run: |
           set +e
-          # generic/platform avoids hard-coding a simulator device name
-          # so this keeps working as Apple ships new simulators.
+          # The homeowner-app scheme is "Chez" (project.yml lines 123-135);
+          # it builds the "Haven" target which produces Chez.app. The
+          # Field-tech scheme "Chez Field" stays out of validation for now.
+          # generic/platform avoids hard-coding a simulator device name so
+          # this keeps working as Apple ships new simulators.
           xcodebuild \
-            -scheme Haven \
+            -scheme "Chez" \
             -destination "generic/platform=iOS Simulator" \
             -configuration Debug \
             -derivedDataPath build/DerivedData \
