@@ -69,14 +69,17 @@ export const ENUMS = {
     { value: "vendor", label: "Vendor — pro only" },
     { value: "either", label: "Either — defaults to DIY, flippable" },
   ],
-  // Phase 5d — Tom-facing renaming of the underlying assignmentType +
-  // routingOverride + safetyFloor combo into a single 4-tier choice.
-  // homeowner_only is intentionally never the default for a template —
-  // homeowners pull tasks into that bucket explicitly at runtime.
+  // Phase 5d/5m — Tom-facing renaming of the underlying assignmentType +
+  // routingOverride + safetyFloor combo. Five tiers, with Routine as a
+  // first-class option for recurring vendor work that should auto-collapse
+  // into a per-category routine when a contractor is on file (instead of
+  // seeding 5 separate "Schedule lawn mow" / "Schedule lawn fertilize"
+  // tasks). homeowner_only is runtime-only — templates never seed there.
   assignmentTier: [
-    { value: "vendor_only", label: "Vendor only" },
+    { value: "routine", label: "Routine — recurring vendor work (auto-routine when vendor assigned)" },
+    { value: "vendor_only", label: "Vendor only — one-off pro work (gas, panel, roof, septic)" },
     { value: "vendor_or_handyman", label: "Vendor or Handyman (default)" },
-    { value: "handyman_only", label: "Handyman only" },
+    { value: "handyman_only", label: "Handyman only — small DIY-friendly items" },
     { value: "homeowner_only", label: "I'll do it myself (runtime only — never seeded)" },
   ],
   taskRoutingOverride: [
@@ -960,8 +963,56 @@ function escapeHtml(value) {
 // pull tasks in via the per-task button. We allow it in the dropdown
 // for completeness but warn at save time.
 
+// Categories that map to a Routine when a contractor is on file. These
+// are the recurring vendor services where the homeowner shouldn't see
+// 5 separate tasks per month — they pick visit days/dates once and the
+// app handles the rest.
+const ROUTINE_CATEGORIES = new Set([
+  "Landscaping",
+  "Cleaning Service",
+  "Pool/Spa",
+  "Hot Tub",
+  "Pest Control",
+  "Snow Removal",
+  "Mosquito & Tick",
+  "Pet Waste",
+  "Window Cleaning",
+  "Gutter Cleaning",
+  "Trash & Recycling",
+]);
+
+const ROUTINE_FREQUENCIES = new Set([
+  "Weekly", "Biweekly", "Triweekly",
+  "Monthly", "Bi-monthly",
+  "Per event", "On demand",
+]);
+
+export function isRoutineCandidate(entity) {
+  if (!entity) return false;
+  if (entity.assignmentType === "personal") return false;
+  if (entity.safetyFloor === true) return false;
+  if (entity.routingOverride === "diyDefault") return false;
+
+  // Explicit signal: bundle ending in :ongoing
+  if (typeof entity.bundleId === "string" && entity.bundleId.endsWith(":ongoing")) return true;
+
+  // Heuristic: recurring frequency in a routine category
+  if (
+    ROUTINE_CATEGORIES.has(entity.systemCategory) &&
+    ROUTINE_FREQUENCIES.has(entity.frequency)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export function readAssignmentTier(entity) {
   if (!entity) return "vendor_or_handyman";
+  // Routine candidate detection takes priority over the legacy fields —
+  // recurring vendor work should surface as a routine even if the Swift
+  // template still ships with assignmentType=vendor.
+  if (isRoutineCandidate(entity)) return "routine";
   if (entity.safetyFloor === true) return "vendor_only";
   const ro = entity.routingOverride;
   if (ro === "vendorOnly") return "vendor_only";
@@ -980,6 +1031,17 @@ export function readAssignmentTier(entity) {
 export function writeAssignmentTier(entity, tier) {
   if (!entity) return;
   switch (tier) {
+    case "routine":
+      // Recurring vendor work — when the homeowner has a contractor on
+      // file, the reconciler should fold these templates into one
+      // routine instead of seeding individual tasks. Until the iOS
+      // reconciler honors this, the Swift fields stay vendor-default
+      // so legacy installs don't break.
+      entity.assignmentType = "vendor";
+      entity.routingOverride = "vendorDefault";
+      entity.safetyFloor = false;
+      entity._tierHint = "Routine candidate — should auto-collapse into a routine when contractor is on file.";
+      break;
     case "vendor_only":
       entity.assignmentType = "vendor";
       entity.routingOverride = "vendorOnly";

@@ -2557,6 +2557,106 @@
 }
 
 /* =============================================================================
+   Phase 5m — Routine bucket in simulator output
+   ============================================================================= */
+
+.admin-sim__lane--routine {
+  background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), rgba(74, 124, 89, 0.01));
+  border-color: rgba(74, 124, 89, 0.3);
+}
+
+.admin-sim__routines {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-sim__routine {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.admin-sim__routine.is-active {
+  border-left-color: #4a7c59;
+  background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), #fff);
+}
+
+.admin-sim__routine.is-pending {
+  border-left-color: rgba(199, 126, 46, 0.85);
+  background: linear-gradient(135deg, rgba(199, 126, 46, 0.06), #fff);
+}
+
+.admin-sim__routine header {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.admin-sim__routine header strong {
+  flex: 1;
+  font: 700 14px var(--sans);
+}
+
+.admin-sim__routine-status {
+  border-radius: 999px;
+  font: 800 9.5px var(--sans);
+  letter-spacing: 0.1em;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.admin-sim__routine.is-active .admin-sim__routine-status {
+  background: rgba(74, 124, 89, 0.18);
+  color: #3a6048;
+}
+
+.admin-sim__routine.is-pending .admin-sim__routine-status {
+  background: rgba(199, 126, 46, 0.18);
+  color: #9c6322;
+}
+
+.admin-sim__routine-blurb {
+  color: var(--text);
+  font: 500 12px var(--sans);
+  line-height: 1.45;
+  margin: 0 0 6px;
+}
+
+.admin-sim__routine details summary {
+  color: var(--indigo-700);
+  cursor: pointer;
+  font: 600 11px var(--sans);
+}
+
+.admin-sim__routine details ul {
+  display: grid;
+  gap: 3px;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.admin-sim__routine details li {
+  align-items: baseline;
+  display: flex;
+  font: 500 12px var(--sans);
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.admin-sim__routine details code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 4px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+
+/* =============================================================================
    Phase 5k — Quiz Mode in simulator
    ============================================================================= */
 

@@ -1270,17 +1270,33 @@ function runAndRenderSimulation() {
   state.simResult = runSimulation(factsForSim, templatesJSON, systemsJSON);
   if (el.formHost) el.formHost.innerHTML = renderSimulatorUI(state.simResult);
 
-  // Stats bar above the list reflects the 4-tier breakdown
+  // Stats bar reflects the 5-tier breakdown including routine collapse.
   const lanes = state.simResult.lanes;
   const allTasks = [...(lanes.bundles || []), ...(lanes.vendor || []), ...(lanes.findContractor || []), ...(lanes.personal || [])];
-  const tierCounts = { vendor_only: 0, vendor_or_handyman: 0, handyman_only: 0 };
+  const ROUTINE_CATS = new Set(["Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub", "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste", "Window Cleaning", "Gutter Cleaning", "Trash & Recycling"]);
+  const ROUTINE_FREQS = new Set(["Weekly", "Biweekly", "Triweekly", "Monthly", "Bi-monthly", "Per event", "On demand"]);
+  const isRoutineCandidate = (t) => {
+    if (t.assignmentType === "personal" || t.safetyFloor === true || t.routingOverride === "diyDefault") return false;
+    if (typeof t.bundleId === "string" && t.bundleId.endsWith(":ongoing")) return true;
+    return ROUTINE_CATS.has(t.systemCategory) && ROUTINE_FREQS.has(t.frequency);
+  };
+  const tierCounts = { routine: 0, vendor_only: 0, vendor_or_handyman: 0, handyman_only: 0 };
+  const routineCats = new Set();
   for (const t of allTasks) {
-    if (t.safetyFloor === true || t.routingOverride === "vendorOnly" || (t.assignmentType === "vendor" && !t.routingOverride)) tierCounts.vendor_only++;
-    else if (t.routingOverride === "diyDefault" || t.assignmentType === "personal") tierCounts.handyman_only++;
-    else tierCounts.vendor_or_handyman++;
+    if (isRoutineCandidate(t)) {
+      routineCats.add(t.systemCategory);
+      tierCounts.routine++;
+    } else if (t.safetyFloor === true || t.routingOverride === "vendorOnly" || (t.assignmentType === "vendor" && !t.routingOverride)) {
+      tierCounts.vendor_only++;
+    } else if (t.routingOverride === "diyDefault" || t.assignmentType === "personal") {
+      tierCounts.handyman_only++;
+    } else {
+      tierCounts.vendor_or_handyman++;
+    }
   }
   el.stats.innerHTML = `
     <div class="admin-stat"><strong>${state.simResult.counts.total}</strong><span>Tasks</span></div>
+    <div class="admin-stat"><strong>${routineCats.size}</strong><span>Routines</span></div>
     <div class="admin-stat"><strong>${tierCounts.vendor_only}</strong><span>Vendor only</span></div>
     <div class="admin-stat"><strong>${tierCounts.vendor_or_handyman}</strong><span>Vendor or Handyman</span></div>
     <div class="admin-stat"><strong>${tierCounts.handyman_only}</strong><span>Handyman only</span></div>

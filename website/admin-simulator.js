@@ -589,6 +589,8 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
   }
 
   return {
+    // facts is exposed so the UI's tier breakdown can check
+    // hasContractorsFor when collapsing routines.
     facts,
     region,
     tier,
@@ -721,16 +723,17 @@ function prettifyBundleId(bundleId) {
 
 export function renderSimulatorUI(result) {
   const lanes = result.lanes;
-  // Phase 5l — 4-tier breakdown using assignment-tier semantics, not the
-  // old vendor/findContractor/personal split. Maps each task to one of:
-  //   Vendor only · Vendor or Handyman · Handyman only · I'll do it myself
-  const tier = bucketByAssignmentTier(lanes);
+  // Phase 5l/5m — 5-tier breakdown including routine collapse. Recurring
+  // vendor work folds into per-category routine cards instead of
+  // showing as 5 separate "Schedule weekly mow" tasks.
+  const tier = bucketByAssignmentTier(lanes, result.facts);
+  const routineGroups = collapseRoutines(tier.routine);
 
   return `
     <div class="admin-sim__output">
       <div class="admin-sim__summary">
         <div class="admin-stat-tile"><strong>${result.counts.total}</strong><span>Total tasks</span></div>
-        <div class="admin-stat-tile"><strong>${result.counts.bundles}</strong><span>Bundle visits</span></div>
+        <div class="admin-stat-tile"><strong>${routineGroups.length}</strong><span>Routines</span></div>
         <div class="admin-stat-tile"><strong>${tier.vendor_only.length}</strong><span>Vendor only</span></div>
         <div class="admin-stat-tile"><strong>${tier.vendor_or_handyman.length}</strong><span>Vendor or Handyman</span></div>
       </div>
@@ -744,7 +747,8 @@ export function renderSimulatorUI(result) {
         ${result.rules.subtypeFiltered} filtered by subtype gating
       </div>
 
-      ${tierSection("🚫 Vendor only", "Always a pro — gas, panel, roof, septic.", tier.vendor_only)}
+      ${renderRoutineSection(routineGroups)}
+      ${tierSection("🚫 Vendor only", "Always a pro — gas, panel, roof, septic. One-off work, not recurring.", tier.vendor_only)}
       ${tierSection("👥 Vendor or Handyman", "Defaults to a vendor visit but the homeowner can flip to handyman.", tier.vendor_or_handyman)}
       ${tierSection("🔨 Handyman only", "Small DIY-friendly items. Usually bundled into a handyman visit.", tier.handyman_only)}
       ${tierSection("✋ I'll do it myself", "Templates never seed here — runtime-only. (Should always be empty.)", tier.homeowner_only)}
@@ -752,26 +756,143 @@ export function renderSimulatorUI(result) {
   `;
 }
 
-// Map a simulator task to its 4-tier category.
+function renderRoutineSection(groups) {
+  if (!groups.length) {
+    return `
+      <section class="admin-sim__lane">
+        <header><h4>🔁 Routines</h4><span class="admin-muted">No routine candidates</span></header>
+        <p class="admin-sim__lane-blurb admin-muted">Recurring vendor work (lawn care, cleaning, pool service) collapses into per-category routines instead of seeding individual tasks. Pick answers like Q11 (lawn = pro) or Q12 (pool) to see this fill.</p>
+      </section>
+    `;
+  }
+  return `
+    <section class="admin-sim__lane admin-sim__lane--routine">
+      <header><h4>🔁 Routines</h4><span class="admin-muted">${groups.length}</span></header>
+      <p class="admin-sim__lane-blurb admin-muted">Recurring vendor work — collapses into ONE routine per category instead of N separate tasks. Homeowner just picks visit days/dates after assigning a vendor.</p>
+      <div class="admin-sim__routines">
+        ${groups
+          .map(
+            (g) => `
+              <article class="admin-sim__routine ${g.hasVendor ? "is-active" : "is-pending"}">
+                <header>
+                  <span class="admin-sim__routine-status">${g.hasVendor ? "Active routine" : "Pending vendor"}</span>
+                  <strong>${escapeHtml(g.category)}</strong>
+                  <span class="admin-muted">${g.tasks.length} template${g.tasks.length === 1 ? "" : "s"} collapsed</span>
+                </header>
+                <p class="admin-sim__routine-blurb">
+                  ${
+                    g.hasVendor
+                      ? "Vendor on file — auto-creates a routine. Homeowner picks visit days/dates and the app schedules the rest."
+                      : "No vendor on file yet — surfaces as a single 'Pick a pro for X' card. Once they pick a vendor, the routine auto-creates."
+                  }
+                </p>
+                <details>
+                  <summary>What folds into this routine</summary>
+                  <ul>
+                    ${g.tasks
+                      .map(
+                        (t) => `
+                          <li>
+                            <code>${escapeHtml(t.title || t.bundleTitle || "(untitled)")}</code>
+                            <span class="admin-muted">${escapeHtml(t.frequency || "")}${t.bundleId ? " · " + escapeHtml(t.bundleId) : ""}</span>
+                          </li>
+                        `
+                      )
+                      .join("")}
+                  </ul>
+                </details>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+// Phase 5m — categories whose recurring vendor work should auto-collapse
+// into a routine instead of seeding individual tasks. Mirrors the
+// allowlist in admin-forms.js.
+const SIM_ROUTINE_CATEGORIES = new Set([
+  "Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub",
+  "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste",
+  "Window Cleaning", "Gutter Cleaning", "Trash & Recycling",
+]);
+const SIM_ROUTINE_FREQUENCIES = new Set([
+  "Weekly", "Biweekly", "Triweekly",
+  "Monthly", "Bi-monthly",
+  "Per event", "On demand",
+]);
+
+function simIsRoutineCandidate(task) {
+  if (!task) return false;
+  if (task.assignmentType === "personal") return false;
+  if (task.safetyFloor === true) return false;
+  if (task.routingOverride === "diyDefault") return false;
+  if (typeof task.bundleId === "string" && task.bundleId.endsWith(":ongoing")) return true;
+  if (
+    SIM_ROUTINE_CATEGORIES.has(task.systemCategory) &&
+    SIM_ROUTINE_FREQUENCIES.has(task.frequency)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+// Map a simulator task to its 5-tier category. Routines take priority
+// over the underlying Swift fields — recurring vendor work surfaces as
+// a routine even if the template ships as `vendorDefault`.
 function tierForTask(task) {
+  if (simIsRoutineCandidate(task)) return "routine";
   if (task.safetyFloor === true) return "vendor_only";
   if (task.routingOverride === "vendorOnly") return "vendor_only";
   if (task.assignmentType === "vendor" && !task.routingOverride) return "vendor_only";
   if (task.routingOverride === "diyDefault") return "handyman_only";
   if (task.assignmentType === "personal") return "handyman_only";
-  // Default: vendor_or_handyman (3-option picker)
   return "vendor_or_handyman";
 }
 
-function bucketByAssignmentTier(lanes) {
-  const out = { vendor_only: [], vendor_or_handyman: [], handyman_only: [], homeowner_only: [] };
-  // Bundles + standalone tasks all flow through the same bucketer.
-  const all = [...(lanes.bundles || []), ...(lanes.vendor || []), ...(lanes.findContractor || []), ...(lanes.personal || [])];
+function bucketByAssignmentTier(lanes, facts) {
+  const out = {
+    routine: [],
+    vendor_only: [],
+    vendor_or_handyman: [],
+    handyman_only: [],
+    homeowner_only: [],
+  };
+  const all = [
+    ...(lanes.bundles || []),
+    ...(lanes.vendor || []),
+    ...(lanes.findContractor || []),
+    ...(lanes.personal || []),
+  ];
   for (const task of all) {
     const tier = tierForTask(task);
+    if (tier === "routine") {
+      // Tag whether the homeowner has a vendor on file for this category
+      // so the routine card can show "Auto-create" vs "Pending vendor".
+      task._routineHasVendor = !!facts?.hasContractorsFor?.[task.systemCategory];
+    }
     out[tier].push(task);
   }
   return out;
+}
+
+// Collapse routine-tier tasks into one summary entry per category.
+function collapseRoutines(routineTasks) {
+  const groups = new Map();
+  for (const t of routineTasks) {
+    const cat = t.systemCategory || "Other";
+    if (!groups.has(cat)) {
+      groups.set(cat, {
+        category: cat,
+        hasVendor: t._routineHasVendor === true,
+        tasks: [],
+      });
+    }
+    groups.get(cat).tasks.push(t);
+  }
+  return [...groups.values()].sort((a, b) => a.category.localeCompare(b.category));
 }
 
 function tierSection(title, blurb, items) {
