@@ -1370,6 +1370,298 @@
   .qf__list { gap: 8px; }
 }
 
+/* =============================================================================
+   Phase 5d — Assignment tier callout
+   ============================================================================= */
+
+.admin-form__field[data-field-key="_tier"] select,
+[data-control="assignment-tier"] {
+  background: rgba(237, 105, 85, 0.06);
+  border-color: rgba(237, 105, 85, 0.32);
+  color: var(--indigo-800, #453a70);
+  font: 700 14px var(--sans);
+  padding: 11px 12px;
+}
+
+[data-control="assignment-tier"]:focus {
+  border-color: var(--salmon, #ed6955);
+}
+
+/* Phase 5d — System picker: render as full-width select */
+.admin-form__system-picker select {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 600 13px var(--sans);
+  padding: 9px 11px;
+  width: 100%;
+}
+
+/* =============================================================================
+   Phase 5e — Architecture view
+   ============================================================================= */
+
+.admin-arch {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-arch__intro {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+
+.admin-arch__intro p {
+  font: 500 14px var(--sans);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.admin-arch__cluster {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-arch__cluster header {
+  border-bottom: 1px solid var(--neutral-200);
+  padding-bottom: 6px;
+}
+
+.admin-arch__cluster header h3 {
+  font: 700 22px Fraunces, Georgia, serif;
+  margin: 0 0 4px;
+}
+
+.admin-arch__cluster header p {
+  color: var(--text-muted);
+  font: 500 13px var(--sans);
+  margin: 0;
+}
+
+.admin-arch__grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.admin-arch__card {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  transition: box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.admin-arch__card.is-flashing {
+  border-color: var(--salmon, #ed6955);
+  box-shadow: 0 0 0 4px rgba(237, 105, 85, 0.18);
+}
+
+.admin-arch__card header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.admin-arch__emoji {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 10px;
+  font-size: 22px;
+  height: 36px;
+  line-height: 36px;
+  text-align: center;
+  width: 36px;
+}
+
+.admin-arch__card header h4 {
+  font: 700 16px Fraunces, Georgia, serif;
+  margin: 0;
+}
+
+.admin-arch__card header code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 5px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 1px 6px;
+}
+
+.admin-arch__purpose {
+  color: var(--text);
+  font: 500 13px var(--sans);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.admin-arch__keys {
+  background: rgba(69, 58, 112, 0.05);
+  border-radius: 8px;
+  font: 500 11px var(--sans);
+  padding: 6px 10px;
+}
+
+.admin-arch__keys strong {
+  color: var(--text-muted);
+  font: 800 10px var(--sans);
+  letter-spacing: 0.1em;
+  margin-right: 8px;
+  text-transform: uppercase;
+}
+
+.admin-arch__keys code {
+  background: transparent;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+}
+
+.admin-arch__fields summary {
+  color: var(--indigo-700);
+  cursor: pointer;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-arch__fields ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.admin-arch__fields li {
+  background: rgba(69, 58, 112, 0.03);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.admin-arch__fields li strong {
+  color: var(--indigo-700);
+  display: block;
+  font: 600 12px ui-monospace, monospace;
+  margin-bottom: 2px;
+}
+
+.admin-arch__fields li span {
+  color: var(--text);
+  font: 500 12px var(--sans);
+}
+
+.admin-arch__rels {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-arch__rels strong {
+  color: var(--text-muted);
+  font: 800 10px var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-arch__rels ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-arch__rels li {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-arch__rel-link {
+  background: var(--indigo-700);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font: 700 11px var(--sans);
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.admin-arch__rel-link:hover {
+  background: var(--indigo-800, #453a70);
+}
+
+.admin-arch__rels--owns .admin-arch__rel-link {
+  background: #4a7c59;
+}
+
+.admin-arch__rels--belongs-to .admin-arch__rel-link {
+  background: var(--salmon, #ed6955);
+}
+
+.admin-arch__rels--references .admin-arch__rel-link {
+  background: rgba(199, 126, 46, 0.85);
+}
+
+.admin-arch__rel-label {
+  color: var(--text);
+  font: 500 12px var(--sans);
+  line-height: 1.45;
+}
+
+.admin-arch__rel-label em {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.admin-arch__nav {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  padding: 14px 16px;
+  position: sticky;
+  top: 8px;
+}
+
+.admin-arch__nav strong {
+  color: var(--text-muted);
+  display: block;
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.admin-arch__nav ul {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-arch__nav button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font: 600 12px var(--sans);
+  gap: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-arch__nav button:hover {
+  background: rgba(69, 58, 112, 0.06);
+  color: var(--indigo-800, #453a70);
+}
+
 /* Notes view — "Open X →" jump hint */
 .admin-list-item__jump {
   background: rgba(237, 105, 85, 0.1);

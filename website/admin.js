@@ -5,6 +5,7 @@ import {
   attachFormHandlers,
   computeProposedDiff,
   renderDiffStrip,
+  titleCase,
 } from "/admin-forms.js";
 import {
   openQuestionPreview,
@@ -18,6 +19,10 @@ import {
   renderFactForm,
   attachFactFormHandlers,
 } from "/admin-simulator.js";
+import {
+  renderArchitectureView,
+  attachArchitectureHandlers,
+} from "/admin-architecture.js";
 
 const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -130,6 +135,14 @@ const VIEWS = [
     title: "Recent Activity",
     eyebrow: "Applied + reverted timeline",
     subtitle: "Every change Claude has shipped, in reverse-chronological order.",
+  },
+  {
+    id: "architecture",
+    label: "Architecture",
+    type: "architecture",
+    title: "Object Architecture",
+    eyebrow: "What objects exist + how they relate",
+    subtitle: "Walkable map of every entity, its key fields, and its relationships. Click any “→ X” link to jump to the related object's card.",
   },
   {
     id: "claude_file",
@@ -600,7 +613,9 @@ const LIVE_MAPPERS = {
     id: `live-task-${slug(t.templateKey)}`,
     source: "live",
     itemType: "task",
-    title: t.title,
+    // Title Case for task display — Swift source stays as-is until a
+    // change_request lands, but the lab UI reads cleaner this way.
+    title: titleCase(t.title),
     status: t.isEssential ? "active" : "draft",
     category: t.systemCategory,
     sortOrder: idx + 1,
@@ -612,7 +627,7 @@ const LIVE_MAPPERS = {
     id: `live-routine-${r.rawValue || r.swiftCase}`,
     source: "live",
     itemType: "routine",
-    title: r.displayLabel || r.rawValue,
+    title: titleCase(r.displayLabel || r.rawValue),
     status: "active",
     category: r.isVendorBased ? "Vendor-based" : "Cadence-based",
     sortOrder: idx + 1,
@@ -628,7 +643,7 @@ const LIVE_MAPPERS = {
     id: `live-handyman-${slug(t.templateKey)}`,
     source: "live",
     itemType: "handyman",
-    title: t.title,
+    title: titleCase(t.title),
     status: t.isEssential ? "active" : "draft",
     category: t.bundleId || t.systemCategory,
     sortOrder: idx + 1,
@@ -640,7 +655,7 @@ const LIVE_MAPPERS = {
     id: `live-system-${s.categoryKey}`,
     source: "live",
     itemType: "system",
-    title: s.displayName || s.categoryKey,
+    title: titleCase(s.displayName || s.categoryKey),
     status: s.tier === "universal" ? "active" : s.tier === "conditional" ? "draft" : "defer",
     category: `Tier ${s.tier || "?"}${s.specialtyGroup ? ` · ${s.specialtyGroup}` : ""}`,
     sortOrder: s.displayPriority || idx + 1,
@@ -871,6 +886,8 @@ function render() {
     renderActivityView();
   } else if (state.view === "claude_file") {
     renderClaudeFileView();
+  } else if (state.view === "architecture") {
+    renderArchitectureSurface();
   } else if (state.view === "simulator") {
     renderSimulatorView();
   } else {
@@ -1853,6 +1870,90 @@ function activityRowHtml(event) {
   }
   return "";
 }
+
+// =============================================================================
+// Phase 5e — Architecture surface
+// =============================================================================
+// Walkable object-relationship map. Renders the OBJECT_MAP as a single
+// scrollable surface (no list/detail split — it's already self-organized
+// by cluster). The list panel is hidden; everything goes in the right
+// pane.
+
+function renderArchitectureSurface() {
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.remove("is-hidden");
+
+  // Hide everything else in the detail panel that doesn't apply.
+  el.curatedForm?.classList.add("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  el.detailKind.textContent = "object map";
+  el.detailTitle.textContent = "How everything connects";
+  el.detailSubtitle.textContent = "Read top to bottom or click any “→ Object” to jump.";
+  el.detailStatus.textContent = "browse";
+  el.detailStatus.dataset.tone = "active";
+  if (el.lockToggle) el.lockToggle.classList.add("is-hidden");
+  if (el.previewQuestion) el.previewQuestion.classList.add("is-hidden");
+  if (el.launchPill) el.launchPill.classList.add("is-hidden");
+  if (el.detailTabs) el.detailTabs.classList.add("is-hidden");
+
+  // Show the architecture content in the form host slot.
+  if (el.formHost) {
+    el.formHost.innerHTML = renderArchitectureView();
+    attachArchitectureHandlers(el.formHost);
+  }
+
+  // List panel: surface a quick-jump nav of all objects.
+  el.list.innerHTML = `
+    <div class="admin-arch__nav">
+      <strong>Quick jump</strong>
+      <ul>
+        ${OBJECT_MAP_LITE.map((o) => `
+          <li>
+            <button type="button" data-arch-jump="${escapeHtml(o.key)}">
+              <span>${o.emoji}</span> ${escapeHtml(o.name)}
+            </button>
+          </li>
+        `).join("")}
+      </ul>
+    </div>
+  `;
+  el.list.querySelectorAll("[data-arch-jump]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = el.formHost.querySelector(`#arch-${CSS.escape(btn.dataset.archJump)}`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        target.classList.add("is-flashing");
+        setTimeout(() => target.classList.remove("is-flashing"), 1800);
+      }
+    });
+  });
+
+  el.stats.innerHTML = `<div class="admin-stat"><strong>${OBJECT_MAP_LITE.length}</strong><span>Objects mapped</span></div>`;
+}
+
+// Lightweight list for the quick-jump nav (avoids re-importing the full map).
+const OBJECT_MAP_LITE = [
+  { key: "property", name: "Property", emoji: "🏠" },
+  { key: "home_system", name: "Home System", emoji: "⚙️" },
+  { key: "maintenance_task", name: "Maintenance Task", emoji: "✅" },
+  { key: "maintenance_template", name: "Maintenance Template", emoji: "📋" },
+  { key: "routine", name: "Routine", emoji: "🔁" },
+  { key: "routine_visit", name: "Routine Visit", emoji: "📅" },
+  { key: "handyman_punch_item", name: "Handyman Punch Item", emoji: "🔨" },
+  { key: "system_category", name: "System Category", emoji: "🏷️" },
+  { key: "routine_kind", name: "Routine Kind", emoji: "🌀" },
+  { key: "contractor", name: "Contractor", emoji: "🛠" },
+  { key: "family_member", name: "Family Member", emoji: "👤" },
+  { key: "vehicle", name: "Vehicle", emoji: "🚗" },
+  { key: "vehicle_service_record", name: "Vehicle Service Record", emoji: "🧾" },
+  { key: "document", name: "Document", emoji: "📄" },
+  { key: "project", name: "Project", emoji: "🛠" },
+  { key: "project_quote", name: "Project Quote", emoji: "💵" },
+  { key: "quiz_question", name: "Quiz Question", emoji: "❓" },
+  { key: "quiz_answer", name: "Quiz Answer", emoji: "🟢" },
+  { key: "edge_function_prompt", name: "Edge Function Prompt", emoji: "🧠" },
+];
 
 // =============================================================================
 // Phase 5b — CLAUDE_ADMIN_NOTES.md live preview

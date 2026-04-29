@@ -69,6 +69,16 @@ export const ENUMS = {
     { value: "vendor", label: "Vendor — pro only" },
     { value: "either", label: "Either — defaults to DIY, flippable" },
   ],
+  // Phase 5d — Tom-facing renaming of the underlying assignmentType +
+  // routingOverride + safetyFloor combo into a single 4-tier choice.
+  // homeowner_only is intentionally never the default for a template —
+  // homeowners pull tasks into that bucket explicitly at runtime.
+  assignmentTier: [
+    { value: "vendor_only", label: "Vendor only" },
+    { value: "vendor_or_handyman", label: "Vendor or Handyman (default)" },
+    { value: "handyman_only", label: "Handyman only" },
+    { value: "homeowner_only", label: "I'll do it myself (runtime only — never seeded)" },
+  ],
   taskRoutingOverride: [
     { value: "", label: "(use default — vendorDefault)" },
     { value: "vendorOnly", label: "Vendor only (no DIY path)" },
@@ -203,15 +213,18 @@ export const SCHEMAS = {
   tasks: {
     title: "Maintenance Template",
     groups: [
+      { id: "tier", label: "Who handles this" },
       { id: "identity", label: "Identity" },
       { id: "copy", label: "User-facing copy" },
       { id: "schedule", label: "Schedule + cost" },
-      { id: "routing", label: "Assignment + routing" },
+      { id: "routing", label: "Assignment + routing (advanced)" },
       { id: "gating", label: "Gating + scope" },
       { id: "bundle", label: "Bundle membership" },
       { id: "extras", label: "Advanced" },
     ],
     fields: [
+      { key: "_tier", label: "Who handles this task", group: "tier", type: "assignment-tier",
+        usage: "The single field that decides how this task lands on a homeowner's screen. Vendor only = always a pro (gas, panel, roof). Vendor or Handyman = the homeowner can pick (default for most maintenance). Handyman only = small DIY-friendly items that bundle into a handyman visit. I'll do it myself = runtime-only — homeowners pull tasks here themselves; templates never ship in this state. Changing this here updates the underlying assignment type, routing override, and safety floor all at once." },
       { key: "templateKey", label: "Template key (Swift-derived)", group: "identity", type: "text", readonly: true,
         usage: "Internal ID for this template. Every actual task we create from it carries this ID, so we can count completions, attach notes, and remember the homeowner's history. Don't rename without setting a stable ID override below — you'd lose all the history." },
       { key: "stableId", label: "Stable ID override (rename safety)", group: "identity", type: "text",
@@ -306,12 +319,15 @@ export const SCHEMAS = {
   handyman: {
     title: "Handyman Template",
     groups: [
+      { id: "tier", label: "Who handles this" },
       { id: "identity", label: "Identity" },
       { id: "copy", label: "User-facing copy" },
       { id: "schedule", label: "Schedule + effort" },
-      { id: "routing", label: "Routing" },
+      { id: "routing", label: "Routing (advanced)" },
     ],
     fields: [
+      { key: "_tier", label: "Who handles this task", group: "tier", type: "assignment-tier",
+        usage: "Same as the Tasks surface — picks Vendor only / Vendor or Handyman / Handyman only / I'll do it myself. Most handyman items default to Handyman only since they're small and DIY-friendly. Changes here update the underlying assignment type, routing override, and safety floor together." },
       { key: "templateKey", label: "Template key", group: "identity", type: "text", readonly: true,
         usage: "Same internal ID as a regular maintenance template — these are just the subset that the homeowner can add to a handyman visit." },
       { key: "systemCategory", label: "System category", group: "identity", type: "system-picker",
@@ -443,8 +459,17 @@ function renderGroup(group, schema, entity, original) {
 }
 
 function renderField(field, entity, original) {
-  const value = readPath(entity, field.key);
-  const originalValue = readPath(original, field.key);
+  // Phase 5d — virtual fields (assignment-tier) compute their value
+  // from the entity's existing fields rather than reading a key.
+  let value;
+  let originalValue;
+  if (field.type === "assignment-tier") {
+    value = readAssignmentTier(entity);
+    originalValue = readAssignmentTier(original);
+  } else {
+    value = readPath(entity, field.key);
+    originalValue = readPath(original, field.key);
+  }
   const changed = !equalDeep(value, originalValue);
   const help = field.help
     ? `<small class="admin-form__help">${escapeHtml(field.help)}</small>`
@@ -492,6 +517,14 @@ function renderControl(field, value) {
         </span>
       `;
     }
+    case "assignment-tier": {
+      const opts = ENUMS.assignmentTier;
+      const stringValue = stringify(value);
+      const optionsHtml = opts
+        .map((o) => `<option value="${escapeHtml(o.value)}" ${o.value === stringValue ? "selected" : ""}>${escapeHtml(o.label)}</option>`)
+        .join("");
+      return `<select ${dataKey} data-control="assignment-tier" ${readonlyAttr}>${optionsHtml}</select>`;
+    }
     case "select": {
       const opts = ENUMS[field.enumKey] || [];
       const stringValue = stringify(value);
@@ -516,8 +549,40 @@ function renderControl(field, value) {
       return renderEnumList(value || [], field, readonlyAttr);
     case "month-picker":
       return renderMonthPicker(value || [], field, readonlyAttr);
-    case "system-picker":
-      return `<input type="text" ${dataKey} value="${escapeHtml(stringify(value))}" list="admin-system-options" ${readonlyAttr} />`;
+    case "system-picker": {
+      const stringValue = stringify(value) || "";
+      // Pull known categories from the datalist that admin.js populates
+      // at startup. Building from a single source keeps the dropdown in
+      // sync with system-categories.json.
+      const datalist = typeof document !== "undefined"
+        ? document.querySelector("#admin-system-options")
+        : null;
+      const opts = datalist
+        ? Array.from(datalist.querySelectorAll("option")).map((o) => ({ value: o.value, label: o.textContent || o.value }))
+        : [];
+      const known = new Set(opts.map((o) => o.value));
+      const includeCustom = stringValue && !known.has(stringValue);
+      const optionsHtml = opts
+        .map((o) => `<option value="${escapeHtml(o.value)}" ${o.value === stringValue ? "selected" : ""}>${escapeHtml(o.label)}</option>`)
+        .join("");
+      const customOpt = includeCustom
+        ? `<option value="${escapeHtml(stringValue)}" selected>${escapeHtml(stringValue)} (custom)</option>`
+        : "";
+      const placeholderOpt = !stringValue
+        ? `<option value="" selected disabled>Pick a system…</option>`
+        : "";
+      const addNewOpt = `<option value="__add_new__">+ Add new system…</option>`;
+      return `
+        <span class="admin-form__system-picker">
+          <select ${dataKey} data-control="system-picker" ${readonlyAttr}>
+            ${placeholderOpt}
+            ${optionsHtml}
+            ${customOpt}
+            ${addNewOpt}
+          </select>
+        </span>
+      `;
+    }
     case "code":
       return `<pre class="admin-form__code" ${dataKey}>${escapeHtml(stringify(value)) || "<em>(none)</em>"}</pre>`;
     case "json-readonly":
@@ -616,6 +681,37 @@ export function attachFormHandlers(container, viewId, original, current, onChang
     const handler = () => {
       let v = input.value;
       if (input.type === "number") v = v === "" ? null : Number(v);
+      // Assignment-tier: write back to the underlying assignmentType +
+      // routingOverride + safetyFloor combo via the helper, then bail
+      // (we don't want to write the literal tier value to a field).
+      if (input.dataset.control === "assignment-tier") {
+        writeAssignmentTier(current, v);
+        onChange?.(current);
+        return;
+      }
+      // System-picker: trap the "+ Add new system…" sentinel and prompt
+      // for a fresh value before committing.
+      if (input.dataset.control === "system-picker" && v === "__add_new__") {
+        const fresh = window.prompt("New system category name:", "");
+        if (!fresh || !fresh.trim()) {
+          // Revert to the previous value.
+          input.value = readPath(current, input.dataset.fieldKey) || "";
+          return;
+        }
+        v = fresh.trim();
+        // Add a custom <option> so the dropdown still shows it after
+        // selection. The exporter's next pass will pick it up if the
+        // proposal lands.
+        const customOption = document.createElement("option");
+        customOption.value = v;
+        customOption.textContent = `${v} (proposed new)`;
+        customOption.selected = true;
+        // Insert before the "+ Add new" sentinel.
+        const sentinel = input.querySelector('option[value="__add_new__"]');
+        if (sentinel) input.insertBefore(customOption, sentinel);
+        else input.appendChild(customOption);
+        input.value = v;
+      }
       writePath(current, input.dataset.fieldKey, v);
       onChange?.(current);
     };
@@ -736,8 +832,15 @@ export function computeProposedDiff(viewId, original, current) {
   const diff = {};
   for (const field of schema.fields) {
     if (field.readonly) continue;
-    const from = readPath(original, field.key);
-    const to = readPath(current, field.key);
+    let from;
+    let to;
+    if (field.type === "assignment-tier") {
+      from = readAssignmentTier(original);
+      to = readAssignmentTier(current);
+    } else {
+      from = readPath(original, field.key);
+      to = readPath(current, field.key);
+    }
     if (!equalDeep(from, to)) diff[field.key] = { from, to };
   }
   return diff;
@@ -849,4 +952,106 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-export const __forTesting = { readPath, writePath, equalDeep, escapeHtml };
+// Phase 5d — Assignment tier helpers.
+//
+// Maps the underlying `assignmentType + routingOverride + safetyFloor`
+// combo into one of 4 user-facing tiers. The 4th tier ("homeowner_only")
+// is reserved for runtime — templates never ship as that, homeowners
+// pull tasks in via the per-task button. We allow it in the dropdown
+// for completeness but warn at save time.
+
+export function readAssignmentTier(entity) {
+  if (!entity) return "vendor_or_handyman";
+  if (entity.safetyFloor === true) return "vendor_only";
+  const ro = entity.routingOverride;
+  if (ro === "vendorOnly") return "vendor_only";
+  if (ro === "diyDefault") return "handyman_only";
+  if (ro === "bundledIntoParent") {
+    // Bundle children inherit their parent's tier. Fall through to
+    // assignmentType reading.
+  }
+  if (entity.assignmentType === "vendor") return "vendor_only";
+  if (entity.assignmentType === "personal" && ro !== "diyCapable") {
+    return "handyman_only";
+  }
+  return "vendor_or_handyman";
+}
+
+export function writeAssignmentTier(entity, tier) {
+  if (!entity) return;
+  switch (tier) {
+    case "vendor_only":
+      entity.assignmentType = "vendor";
+      entity.routingOverride = "vendorOnly";
+      entity.safetyFloor = true;
+      break;
+    case "vendor_or_handyman":
+      entity.assignmentType = "either";
+      entity.routingOverride = "vendorDefault";
+      entity.safetyFloor = false;
+      break;
+    case "handyman_only":
+      entity.assignmentType = "personal";
+      entity.routingOverride = "diyDefault";
+      entity.safetyFloor = false;
+      break;
+    case "homeowner_only":
+      // Same Swift mapping as handyman_only, but with a homeowner-only
+      // hint in the entity for downstream validation. Templates should
+      // not actually ship in this state — handled by save-time warning.
+      entity.assignmentType = "personal";
+      entity.routingOverride = "diyDefault";
+      entity.safetyFloor = false;
+      entity._tierWarning = "This tier is runtime-only — templates shouldn't seed in 'I'll do it myself'.";
+      break;
+  }
+}
+
+// Phase 5d — Title case helper. Capitalises content words while leaving
+// short prepositions/articles lowercase (except first/last). Used on
+// task/template/routine/system display titles to keep the lab tidy.
+const TITLE_CASE_LOWERCASE_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into",
+  "nor", "of", "on", "or", "out", "the", "to", "via", "vs", "with",
+]);
+
+export function titleCase(input) {
+  if (input == null) return "";
+  const s = String(input);
+  if (!s.trim()) return s;
+  // Preserve leading/trailing whitespace.
+  const tokens = s.split(/(\s+)/);
+  let firstWord = -1;
+  let lastWord = -1;
+  tokens.forEach((tok, i) => {
+    if (/\S/.test(tok)) {
+      if (firstWord < 0) firstWord = i;
+      lastWord = i;
+    }
+  });
+  return tokens
+    .map((tok, i) => {
+      if (!/\S/.test(tok)) return tok;
+      // Preserve URLs / template-key patterns / tokens (e.g. {state})
+      if (/^https?:\/\//i.test(tok)) return tok;
+      if (tok.startsWith("{") && tok.endsWith("}")) return tok;
+      // Hyphenated words capitalize each part
+      const parts = tok.split("-").map((p, j) => capitalizeWord(p, i === firstWord || i === lastWord || j > 0));
+      return parts.join("-");
+    })
+    .join("");
+}
+
+function capitalizeWord(word, forceCapital) {
+  if (!word) return word;
+  const lower = word.toLowerCase();
+  if (!forceCapital && TITLE_CASE_LOWERCASE_WORDS.has(lower)) return lower;
+  // Preserve all-caps acronyms (HVAC, EV, GFCI, etc.) — if the original
+  // word is 2+ chars and ALL upper, leave it alone.
+  if (word.length >= 2 && word === word.toUpperCase() && /[A-Z]/.test(word)) {
+    return word;
+  }
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+export const __forTesting = { readPath, writePath, equalDeep, escapeHtml, titleCase };
