@@ -1274,10 +1274,11 @@ function runAndRenderSimulation() {
   const lanes = state.simResult.lanes;
   const allTasks = [...(lanes.bundles || []), ...(lanes.vendor || []), ...(lanes.findContractor || []), ...(lanes.personal || [])];
   const ROUTINE_CATS = new Set(["Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub", "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste", "Window Cleaning", "Gutter Cleaning", "Trash & Recycling"]);
-  const ROUTINE_FREQS = new Set(["Weekly", "Biweekly", "Triweekly", "Monthly", "Bi-monthly", "Per event", "On demand"]);
+  // Routine cadences (Tom's rule): weekly / biweekly / monthly / quarterly only.
+  // Semi-annual / annual / multi-year are tasks (need explicit coordination).
+  const ROUTINE_FREQS = new Set(["Weekly", "Biweekly", "Triweekly", "Monthly", "Bi-monthly", "Quarterly"]);
   const isRoutineCandidate = (t) => {
     if (t.assignmentType === "personal" || t.safetyFloor === true || t.routingOverride === "diyDefault") return false;
-    if (typeof t.bundleId === "string" && t.bundleId.endsWith(":ongoing")) return true;
     return ROUTINE_CATS.has(t.systemCategory) && ROUTINE_FREQS.has(t.frequency);
   };
   const tierCounts = { routine: 0, vendor_only: 0, vendor_or_handyman: 0, handyman_only: 0 };

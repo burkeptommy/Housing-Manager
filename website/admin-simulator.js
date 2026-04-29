@@ -818,10 +818,13 @@ const SIM_ROUTINE_CATEGORIES = new Set([
   "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste",
   "Window Cleaning", "Gutter Cleaning", "Trash & Recycling",
 ]);
+// Phase 5n — Tom's rule: routines are weekly / biweekly / monthly /
+// quarterly only. Semi-annual / annual / multi-year are tasks. No
+// bundleId shortcut — frequency is the ground truth.
 const SIM_ROUTINE_FREQUENCIES = new Set([
   "Weekly", "Biweekly", "Triweekly",
   "Monthly", "Bi-monthly",
-  "Per event", "On demand",
+  "Quarterly",
 ]);
 
 function simIsRoutineCandidate(task) {
@@ -829,14 +832,9 @@ function simIsRoutineCandidate(task) {
   if (task.assignmentType === "personal") return false;
   if (task.safetyFloor === true) return false;
   if (task.routingOverride === "diyDefault") return false;
-  if (typeof task.bundleId === "string" && task.bundleId.endsWith(":ongoing")) return true;
-  if (
-    SIM_ROUTINE_CATEGORIES.has(task.systemCategory) &&
-    SIM_ROUTINE_FREQUENCIES.has(task.frequency)
-  ) {
-    return true;
-  }
-  return false;
+  if (!SIM_ROUTINE_FREQUENCIES.has(task.frequency)) return false;
+  if (!SIM_ROUTINE_CATEGORIES.has(task.systemCategory)) return false;
+  return true;
 }
 
 // Map a simulator task to its 5-tier category. Routines take priority

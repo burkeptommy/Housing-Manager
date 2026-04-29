@@ -981,10 +981,15 @@ const ROUTINE_CATEGORIES = new Set([
   "Trash & Recycling",
 ]);
 
+// Phase 5n — Tom's rule: routines are weekly, biweekly, monthly, or
+// quarterly work. Anything semi-annual / annual / multi-year is a TASK
+// the homeowner coordinates with their vendor explicitly. Triweekly +
+// bi-monthly fall in the routine band as they're just cadence variations
+// of weekly / monthly.
 const ROUTINE_FREQUENCIES = new Set([
   "Weekly", "Biweekly", "Triweekly",
   "Monthly", "Bi-monthly",
-  "Per event", "On demand",
+  "Quarterly",
 ]);
 
 export function isRoutineCandidate(entity) {
@@ -993,18 +998,13 @@ export function isRoutineCandidate(entity) {
   if (entity.safetyFloor === true) return false;
   if (entity.routingOverride === "diyDefault") return false;
 
-  // Explicit signal: bundle ending in :ongoing
-  if (typeof entity.bundleId === "string" && entity.bundleId.endsWith(":ongoing")) return true;
-
-  // Heuristic: recurring frequency in a routine category
-  if (
-    ROUTINE_CATEGORIES.has(entity.systemCategory) &&
-    ROUTINE_FREQUENCIES.has(entity.frequency)
-  ) {
-    return true;
-  }
-
-  return false;
+  // Strict: frequency must be in the routine band AND category must be
+  // routine-eligible. No bundleId shortcuts — if a template lives in a
+  // ":ongoing" bundle with semi-annual cadence, that's a template
+  // authoring issue and the simulator shows it as a task to surface it.
+  if (!ROUTINE_FREQUENCIES.has(entity.frequency)) return false;
+  if (!ROUTINE_CATEGORIES.has(entity.systemCategory)) return false;
+  return true;
 }
 
 export function readAssignmentTier(entity) {
