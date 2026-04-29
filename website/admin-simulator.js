@@ -510,6 +510,151 @@ function isHandymanBundleId(bundleId) {
   return bundleId === "Handyman:spring" || bundleId === "Handyman:fall";
 }
 
+// Phase 5p — Routines are FACT-DRIVEN, not template-driven. The reconciler
+// (and this simulator) creates a routine for every applicable category
+// based on the homeowner's quiz answers, regardless of whether matching
+// templates exist. Vendor status (active vs pending_vendor) is determined
+// by Q15b / Q11 / Q12 / Q13 / Q15 / Q18 / Q19 captures. Cadence + days
+// default to seeder values; homeowner confirms post-quiz at Q37.
+const ROUTINE_AUTO_CREATE_RULES = [
+  {
+    category: "Landscaping",
+    kind: "landscaping",
+    label: "Landscaping",
+    icon: "🌿",
+    defaultCadence: "Weekly",
+    defaultDay: "Tuesday",
+    activeMonths: "Apr–Nov",
+    // q11_lawn captures presence (has_lawn / has_garden); q11b captures
+    // type. Don't gate on natural_lawn / synthetic_turf because those
+    // default to true in DEFAULT_FACTS and would leak through no_lawn.
+    activeIf: (s) => s.has_lawn === true || s.has_garden === true,
+  },
+  {
+    category: "Cleaning Service",
+    kind: "cleaning",
+    label: "House cleaning",
+    icon: "🧹",
+    defaultCadence: "Biweekly",
+    defaultDay: "Wednesday",
+    activeMonths: "Year-round",
+    activeIf: () => true,  // Every home benefits — surfaced as suggestion
+  },
+  {
+    category: "Pool/Spa",
+    kind: "poolService",
+    label: "Pool service",
+    icon: "💦",
+    defaultCadence: "Weekly",
+    defaultDay: "Tuesday",
+    activeMonths: "May–Sep",
+    activeIf: (s) => s.has_pool === true || s.pool_inground === true || s.pool_above_ground === true,
+  },
+  {
+    category: "Hot Tub",
+    kind: "hotTubService",
+    label: "Hot tub service",
+    icon: "♨️",
+    defaultCadence: "Monthly",
+    defaultDay: null,
+    activeMonths: "Year-round",
+    activeIf: (s) => s.hot_tub === true,
+  },
+  {
+    category: "Pest Control",
+    kind: "pestControl",
+    label: "Pest control",
+    icon: "🐜",
+    defaultCadence: "Quarterly",
+    defaultDay: null,
+    activeMonths: "Year-round",
+    activeIf: () => true,  // Common in all regions; surfaced as suggestion
+  },
+  {
+    category: "Mosquito & Tick",
+    kind: "mosquitoTick",
+    label: "Mosquito & tick spraying",
+    icon: "🐛",
+    defaultCadence: "Triweekly",
+    defaultDay: null,
+    activeMonths: "Apr–Oct",
+    activeIf: (s, region) => region === "northeast" || region === "southeast",
+  },
+  {
+    category: "Snow Removal",
+    kind: "snowRemoval",
+    label: "Snow removal",
+    icon: "❄️",
+    defaultCadence: "As scheduled",
+    defaultDay: null,
+    activeMonths: "Dec–Apr",
+    activeIf: (s, region) => region === "northeast" || region === "midwest",
+  },
+  {
+    category: "Pet Waste",
+    kind: "petWaste",
+    label: "Pet waste pickup",
+    icon: "🐾",
+    defaultCadence: "Weekly",
+    defaultDay: "Friday",
+    activeMonths: "Year-round",
+    activeIf: (s) => s.has_pets === true,
+  },
+  {
+    category: "Window Cleaning",
+    kind: "windowCleaning",
+    label: "Window cleaning",
+    icon: "🪟",
+    defaultCadence: "Quarterly",
+    defaultDay: null,
+    activeMonths: "Year-round",
+    activeIf: () => true,
+  },
+  {
+    category: "Gutter Cleaning",
+    kind: "gutterCleaning",
+    label: "Gutter cleaning",
+    icon: "🍂",
+    defaultCadence: "Quarterly",
+    defaultDay: null,
+    activeMonths: "Year-round",
+    activeIf: (s, region) => region === "northeast" || region === "midwest" || region === "southeast",
+  },
+  {
+    category: "Trash & Recycling",
+    kind: "trash",
+    label: "Trash & recycling",
+    icon: "♻️",
+    defaultCadence: "Weekly",
+    defaultDay: "Wednesday",
+    activeMonths: "Year-round",
+    activeIf: () => true,  // Every home
+  },
+];
+
+function buildAutoRoutines(facts, region) {
+  const subtypes = facts.subtypes || {};
+  const out = [];
+  for (const rule of ROUTINE_AUTO_CREATE_RULES) {
+    if (!rule.activeIf(subtypes, region)) continue;
+    const hasVendor = !!facts.hasContractorsFor?.[rule.category];
+    out.push({
+      category: rule.category,
+      kind: rule.kind,
+      label: rule.label,
+      icon: rule.icon,
+      defaultCadence: rule.defaultCadence,
+      defaultDay: rule.defaultDay,
+      activeMonths: rule.activeMonths,
+      hasVendor,
+      setupState: hasVendor ? "active" : "pending_vendor",
+      templateRollup: [],
+      source: hasVendor ? "vendor_captured" : "auto_suggested",
+    });
+  }
+  return out;
+}
+
 export function runSimulation(facts, templatesJSON, systemsJSON) {
   const templates = templatesJSON?.entries || [];
   const systems = systemsJSON?.entries || [];
@@ -525,17 +670,26 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
     return true;
   });
 
-  // Phase 5o — separate handyman bundle children into the punch list before
-  // bucketing the rest. Handyman:spring and Handyman:fall children become
-  // handyman_punch_items rows, not maintenance_tasks.
+  // Phase 5p — Build fact-driven routines first so we know which templates
+  // get folded into which routine vs. left as tasks.
+  const autoRoutines = buildAutoRoutines(facts, region);
+  const routineByCategory = new Map(autoRoutines.map((r) => [r.category, r]));
+
+  // Phase 5o — separate handyman bundle children into the punch list.
+  // Phase 5p — also pull routine-candidate templates out of task lanes
+  // and fold them into the matching auto-created routine's templateRollup.
   const punchList = [];
   const taskEligible = [];
   for (const t of eligible) {
     if (isHandymanBundleId(t.bundleId)) {
       punchList.push(t);
-    } else {
-      taskEligible.push(t);
+      continue;
     }
+    if (simIsRoutineCandidate(t) && routineByCategory.has(t.systemCategory)) {
+      routineByCategory.get(t.systemCategory).templateRollup.push(t);
+      continue;
+    }
+    taskEligible.push(t);
   }
 
   // Group by bundle so children roll up.
@@ -630,8 +784,16 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
       personal: lanes.personal.length,
       bundles: lanes.bundles.length,
       punchList: punchList.length,
+      routines: autoRoutines.length,
+      routinesActive: autoRoutines.filter((r) => r.hasVendor).length,
+      routinesPending: autoRoutines.filter((r) => !r.hasVendor).length,
     },
     lanes,
+    // Phase 5p — fact-driven routines (replaces template-driven detection).
+    // Every applicable category gets a routine card; vendor presence
+    // flips active vs pending_vendor. Cadence + days are seeder defaults
+    // the homeowner confirms post-quiz.
+    routines: autoRoutines,
     punchList: {
       total: punchList.length,
       hasHandymanOnFile: !!facts?.hasContractorsFor?.["Handyman"],
@@ -761,18 +923,16 @@ function prettifyBundleId(bundleId) {
 
 export function renderSimulatorUI(result) {
   const lanes = result.lanes;
-  // Phase 5l/5m — 5-tier breakdown including routine collapse. Recurring
-  // vendor work folds into per-category routine cards instead of
-  // showing as 5 separate "Schedule weekly mow" tasks.
+  // Phase 5p — routines are fact-driven and pre-extracted; no more
+  // template-walk collapse. result.routines IS the routine list.
   const tier = bucketByAssignmentTier(lanes, result.facts);
-  const routineGroups = collapseRoutines(tier.routine);
 
   return `
     <div class="admin-sim__output">
       <div class="admin-sim__summary">
         <div class="admin-stat-tile"><strong>${result.counts.total}</strong><span>Tasks</span></div>
-        <div class="admin-stat-tile"><strong>${routineGroups.length}</strong><span>Routines</span></div>
-        <div class="admin-stat-tile"><strong>${result.counts.punchList || 0}</strong><span>Punch list items</span></div>
+        <div class="admin-stat-tile"><strong>${result.counts.routines || 0}</strong><span>Routines</span></div>
+        <div class="admin-stat-tile"><strong>${result.counts.punchList || 0}</strong><span>Punch list</span></div>
         <div class="admin-stat-tile"><strong>${tier.vendor_only.length}</strong><span>Vendor only</span></div>
       </div>
 
@@ -785,7 +945,7 @@ export function renderSimulatorUI(result) {
         ${result.rules.subtypeFiltered} filtered by subtype gating
       </div>
 
-      ${renderRoutineSection(routineGroups)}
+      ${renderRoutineSection(result.routines || [], result.counts)}
       ${renderPunchListSection(result.punchList)}
       ${tierSection("🚫 Vendor only", "Always a pro — gas, panel, roof, septic. One-off work, not recurring.", tier.vendor_only)}
       ${tierSection("👥 Vendor or Handyman", "Defaults to a vendor visit but the homeowner can flip to handyman.", tier.vendor_or_handyman)}
@@ -845,7 +1005,7 @@ function renderPunchSeasonCol(title, items) {
         ${items
           .map(
             (t) => `
-              <li>
+              <li data-jump-template-key="${escapeHtml(t.templateKey || `${t.systemCategory}:${t.title}`)}" title="Click to open this punch-list template and add a note">
                 <span class="admin-sim__punch-check">☑</span>
                 <span class="admin-sim__punch-title">${escapeHtml(t.title || "(untitled)")}</span>
                 <span class="admin-sim__punch-meta">
@@ -860,51 +1020,64 @@ function renderPunchSeasonCol(title, items) {
   `;
 }
 
-function renderRoutineSection(groups) {
-  if (!groups.length) {
+function renderRoutineSection(routines, counts) {
+  if (!routines.length) {
     return `
-      <section class="admin-sim__lane">
-        <header><h4>🔁 Routines</h4><span class="admin-muted">No routine candidates</span></header>
-        <p class="admin-sim__lane-blurb admin-muted">Recurring vendor work (lawn care, cleaning, pool service) collapses into per-category routines instead of seeding individual tasks. Pick answers like Q11 (lawn = pro) or Q12 (pool) to see this fill.</p>
+      <section class="admin-sim__lane admin-sim__lane--routine">
+        <header><h4>🔁 Routines</h4><span class="admin-muted">No routines apply</span></header>
+        <p class="admin-sim__lane-blurb admin-muted">No routine categories matched these facts. Toggle quiz answers like q11_lawn (pro), q12_pool (in-ground), q28b_pets (yes), etc. to add routines.</p>
       </section>
     `;
   }
+  const active = counts?.routinesActive ?? routines.filter((r) => r.hasVendor).length;
+  const pending = counts?.routinesPending ?? routines.filter((r) => !r.hasVendor).length;
   return `
     <section class="admin-sim__lane admin-sim__lane--routine">
-      <header><h4>🔁 Routines</h4><span class="admin-muted">${groups.length}</span></header>
-      <p class="admin-sim__lane-blurb admin-muted">Recurring vendor work — collapses into ONE routine per category instead of N separate tasks. Homeowner just picks visit days/dates after assigning a vendor.</p>
+      <header>
+        <h4>🔁 Routines</h4>
+        <span class="admin-muted">${routines.length} · ${active} active · ${pending} pending vendor</span>
+      </header>
+      <p class="admin-sim__lane-blurb admin-muted">
+        Routines are created from quiz facts (has lawn, has pool, has pets, region) — not by walking templates.
+        Active = vendor on file from Q15b/Q11/Q12/etc. Pending vendor = routine still gets created in pending state;
+        homeowner picks a pro post-quiz via Find a Pro, Q37, or Settings → Routines.
+      </p>
       <div class="admin-sim__routines">
-        ${groups
+        ${routines
           .map(
-            (g) => `
-              <article class="admin-sim__routine ${g.hasVendor ? "is-active" : "is-pending"}">
+            (r) => `
+              <article class="admin-sim__routine ${r.hasVendor ? "is-active" : "is-pending"}" data-jump-routine-kind="${escapeHtml(r.kind)}" title="Click to open this routine's detail panel and add a note">
                 <header>
-                  <span class="admin-sim__routine-status">${g.hasVendor ? "Active routine" : "Pending vendor"}</span>
-                  <strong>${escapeHtml(g.category)}</strong>
-                  <span class="admin-muted">${g.tasks.length} template${g.tasks.length === 1 ? "" : "s"} collapsed</span>
+                  <span class="admin-sim__routine-status">${r.hasVendor ? "Active — vendor on file" : "Pending — pick vendor post-quiz"}</span>
+                  <strong>${r.icon} ${escapeHtml(r.label)}</strong>
+                  <span class="admin-muted">${escapeHtml(r.defaultCadence)}${r.defaultDay ? ` · ${escapeHtml(r.defaultDay)}` : ""} · ${escapeHtml(r.activeMonths)}</span>
                 </header>
                 <p class="admin-sim__routine-blurb">
                   ${
-                    g.hasVendor
-                      ? "Vendor on file — auto-creates a routine. Homeowner picks visit days/dates and the app schedules the rest."
-                      : "No vendor on file yet — surfaces as a single 'Pick a pro for X' card. Once they pick a vendor, the routine auto-creates."
+                    r.hasVendor
+                      ? "Vendor captured at Q15b/Q11/Q12/etc. Routine auto-creates with vendor linked. Homeowner just confirms days post-quiz at Q37."
+                      : "No vendor captured. Routine still creates in pending_vendor state — homeowner picks a pro later via Find a Pro / Q37 / Settings → Routines."
                   }
                 </p>
-                <details>
-                  <summary>What folds into this routine</summary>
-                  <ul>
-                    ${g.tasks
-                      .map(
-                        (t) => `
-                          <li>
-                            <code>${escapeHtml(t.title || t.bundleTitle || "(untitled)")}</code>
-                            <span class="admin-muted">${escapeHtml(t.frequency || "")}${t.bundleId ? " · " + escapeHtml(t.bundleId) : ""}</span>
-                          </li>
-                        `
-                      )
-                      .join("")}
-                  </ul>
-                </details>
+                ${
+                  r.templateRollup.length
+                    ? `<details>
+                        <summary>${r.templateRollup.length} template${r.templateRollup.length === 1 ? "" : "s"} fold into this routine</summary>
+                        <ul>
+                          ${r.templateRollup
+                            .map(
+                              (t) => `
+                                <li data-jump-template-key="${escapeHtml(t.templateKey || `${t.systemCategory}:${t.title}`)}">
+                                  <code>${escapeHtml(t.title || t.bundleTitle || "(untitled)")}</code>
+                                  <span class="admin-muted">${escapeHtml(t.frequency || "")}</span>
+                                </li>
+                              `
+                            )
+                            .join("")}
+                        </ul>
+                      </details>`
+                    : ""
+                }
               </article>
             `
           )
@@ -955,6 +1128,9 @@ function tierForTask(task) {
 }
 
 function bucketByAssignmentTier(lanes, facts) {
+  // Phase 5p — Routine bucket is empty here because routines are now
+  // built fact-driven and pre-extracted from the task lanes upstream.
+  // Anything that lands in `lanes` is genuinely a task.
   const out = {
     routine: [],
     vendor_only: [],
@@ -970,31 +1146,9 @@ function bucketByAssignmentTier(lanes, facts) {
   ];
   for (const task of all) {
     const tier = tierForTask(task);
-    if (tier === "routine") {
-      // Tag whether the homeowner has a vendor on file for this category
-      // so the routine card can show "Auto-create" vs "Pending vendor".
-      task._routineHasVendor = !!facts?.hasContractorsFor?.[task.systemCategory];
-    }
     out[tier].push(task);
   }
   return out;
-}
-
-// Collapse routine-tier tasks into one summary entry per category.
-function collapseRoutines(routineTasks) {
-  const groups = new Map();
-  for (const t of routineTasks) {
-    const cat = t.systemCategory || "Other";
-    if (!groups.has(cat)) {
-      groups.set(cat, {
-        category: cat,
-        hasVendor: t._routineHasVendor === true,
-        tasks: [],
-      });
-    }
-    groups.get(cat).tasks.push(t);
-  }
-  return [...groups.values()].sort((a, b) => a.category.localeCompare(b.category));
 }
 
 function tierSection(title, blurb, items) {
@@ -1044,13 +1198,19 @@ function simTaskRow(task, isBundle) {
     task.routingOverride || null,
     task.safetyFloor ? "safety-floor" : null,
   ].filter(Boolean);
+  // Use the parent template's key for bundle parents (children are listed
+  // in the disclosure but the row itself jumps to the bundle parent's
+  // template). Standalone tasks jump to their own template.
+  const jumpKey = task.parentTemplate?.templateKey
+    || task.templateKey
+    || (task.systemCategory && task.title ? `${task.systemCategory}:${task.title.replace(/^Schedule\s+/i, "")}` : "");
   const childList = isBundle && task.children
     ? `<details class="admin-sim__children"><summary>${task.children.length} item${task.children.length === 1 ? "" : "s"} in this visit</summary><ul>${task.children
-        .map((c) => `<li><code>${escapeHtml(c.systemCategory)}</code> ${escapeHtml(c.title)}</li>`)
+        .map((c) => `<li data-jump-template-key="${escapeHtml(c.templateKey || `${c.systemCategory}:${c.title}`)}"><code>${escapeHtml(c.systemCategory)}</code> ${escapeHtml(c.title)}</li>`)
         .join("")}</ul></details>`
     : "";
   return `
-    <li class="admin-sim__task" data-lane="${escapeHtml(task._lane)}">
+    <li class="admin-sim__task" data-lane="${escapeHtml(task._lane)}" data-jump-template-key="${escapeHtml(jumpKey)}" title="Click to open this template's detail panel and add a note">
       <div class="admin-sim__task-top">
         <strong>${escapeHtml(task.title)}</strong>
       </div>

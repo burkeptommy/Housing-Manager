@@ -88,9 +88,10 @@ const VIEWS = [
     id: "handyman",
     label: "Handyman",
     type: "handyman",
-    title: "Handyman-Eligible Templates",
-    eyebrow: "diyDefault + diyCapable + Handyman bundles",
-    subtitle: "The subset of templates that flow into the punch-list / handyman visit path.",
+    title: "Handyman Library + Punch List",
+    eyebrow: "Spring auto-pops · Fall auto-pops · Library opt-in",
+    subtitle:
+      "Every template that can land on the handyman's plate. 🌷 Spring + 🍂 Fall items auto-populate the punch list at season anchors. 🛠️ Library items are opt-in — the homeowner picks them up via Recommended Services.",
     liveSource: "handyman-templates",
   },
   {
@@ -912,18 +913,36 @@ const LIVE_MAPPERS = {
     payload: r,
     lintCount: (r._lint || []).length,
   }),
-  handyman: (t, idx) => ({
-    id: `live-handyman-${slug(t.templateKey)}`,
-    source: "live",
-    itemType: "handyman",
-    title: titleCase(t.title),
-    status: t.isEssential ? "active" : "draft",
-    category: t.bundleId || t.systemCategory,
-    sortOrder: idx + 1,
-    description: t.description || "",
-    payload: t,
-    lintCount: (t._lint || []).length,
-  }),
+  handyman: (t, idx) => {
+    // Phase 5p — Surface bundle membership clearly so Tom can scan the
+    // library and know which items auto-populate vs. which are available
+    // for the homeowner / handyman to opt into. Sort order pulls
+    // auto-populating bundles to the top: Spring → Fall → Library.
+    const bundleSpring = t.bundleId === "Handyman:spring";
+    const bundleFall = t.bundleId === "Handyman:fall";
+    const isLibrary = !t.bundleId;
+    const bucketLabel = bundleSpring
+      ? "🌷 Auto-populates Spring punch list"
+      : bundleFall
+      ? "🍂 Auto-populates Fall punch list"
+      : "🛠️ Library — homeowner opt-in";
+    const sortBucket = bundleSpring ? 0 : bundleFall ? 1 : 2;
+    return {
+      id: `live-handyman-${slug(t.templateKey)}`,
+      source: "live",
+      itemType: "handyman",
+      title: titleCase(t.title),
+      status: t.isEssential ? "active" : "draft",
+      category: bucketLabel,
+      // Sort: bundle-spring first, then bundle-fall, then library — and
+      // alphabetically within each bucket so the list reads as 3 grouped
+      // sections without needing real <h2> dividers.
+      sortOrder: sortBucket * 1000 + (titleCase(t.title) || "").charCodeAt(0),
+      description: t.description || "",
+      payload: { ...t, _autoPopulates: bundleSpring ? "spring" : bundleFall ? "fall" : null, _libraryOnly: isLibrary },
+      lintCount: (t._lint || []).length,
+    };
+  },
   systems: (s, idx) => ({
     id: `live-system-${s.categoryKey}`,
     source: "live",
@@ -1303,6 +1322,78 @@ function runAndRenderSimulation() {
     <div class="admin-stat"><strong>${tierCounts.vendor_only}</strong><span>Vendor only</span></div>
     <div class="admin-stat"><strong>${tierCounts.vendor_or_handyman}</strong><span>Vendor or Handyman</span></div>
   `;
+
+  attachSimulatorJumpHandlers(el.formHost);
+}
+
+// Phase 5p — Click any simulator row (task / routine / punch list item /
+// bundle child) and jump straight to that entity's detail panel so Tom
+// can leave a note in the same spot the proposal needs to land. Handlers
+// re-attach on every simulator render.
+function attachSimulatorJumpHandlers(host) {
+  if (!host) return;
+
+  // Template-key jumps (tasks, handyman items, bundle children, punch list)
+  host.querySelectorAll("[data-jump-template-key]").forEach((node) => {
+    const key = node.getAttribute("data-jump-template-key");
+    if (!key) return;
+    node.classList.add("is-clickable");
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      jumpToTemplate(key);
+    });
+  });
+
+  // Routine-kind jumps (routine cards in the routine section)
+  host.querySelectorAll("[data-jump-routine-kind]").forEach((node) => {
+    const kind = node.getAttribute("data-jump-routine-kind");
+    if (!kind) return;
+    node.classList.add("is-clickable");
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      jumpToRoutine(kind);
+    });
+  });
+}
+
+function jumpToTemplate(templateKey) {
+  // Match by payload.templateKey since admin.js's live mapper keeps the
+  // canonical key in payload. Try Handyman surface first — handyman-
+  // templates.json is a filtered subset of templates.json, so any key
+  // that lives there is a DIY/bundle entity that belongs in the
+  // Handyman view. Tasks surface picks up the rest.
+  for (const surfaceId of ["handyman", "tasks"]) {
+    const items = liveItemsForView(surfaceId) || [];
+    const hit = items.find((i) => i.payload?.templateKey === templateKey);
+    if (hit) {
+      state.view = surfaceId;
+      state.selected = hit;
+      state.search = "";
+      state.statusFilter = "all";
+      render();
+      return;
+    }
+  }
+  console.warn(`[admin] No live item matched templateKey="${templateKey}"`);
+}
+
+function jumpToRoutine(kind) {
+  // Simulator's kind values like "landscaping", "poolService" should
+  // match either rawValue (snake_case: "pool_service") or swiftCase
+  // (camelCase: "poolService") on the live routine entry.
+  const items = liveItemsForView("routines") || [];
+  const hit = items.find(
+    (i) => i.payload?.rawValue === kind || i.payload?.swiftCase === kind
+  );
+  if (hit) {
+    state.view = "routines";
+    state.selected = hit;
+    state.search = "";
+    state.statusFilter = "all";
+    render();
+    return;
+  }
+  console.warn(`[admin] No live routine matched kind="${kind}"`);
 }
 
 function renderNav() {
@@ -2954,11 +3045,24 @@ function itemRowHtml(item) {
   const launchBadge = launch && launch !== "draft"
     ? `<span class="admin-pill admin-pill--launch" data-tone="${launch}">${escapeHtml(launch)}</span>`
     : "";
+  // Phase 5p — handyman bucket pill so Tom can scan the library for
+  // auto-populating items vs. opt-in library items at a glance.
+  let handymanBadge = "";
+  if (item.itemType === "handyman") {
+    if (item.payload?._autoPopulates === "spring") {
+      handymanBadge = `<span class="admin-pill admin-pill--bundle-spring" title="Auto-populates the spring handyman punch list">🌷 Auto-pops</span>`;
+    } else if (item.payload?._autoPopulates === "fall") {
+      handymanBadge = `<span class="admin-pill admin-pill--bundle-fall" title="Auto-populates the fall handyman punch list">🍂 Auto-pops</span>`;
+    } else if (item.payload?._libraryOnly) {
+      handymanBadge = `<span class="admin-pill admin-pill--library" title="Library item — opt-in via Recommended Services">🛠️ Library</span>`;
+    }
+  }
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
         <strong>${escapeHtml(item.title)}</strong>
         <span class="admin-pill" data-tone="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+        ${handymanBadge}
         ${launchBadge}
         ${lintBadge}
         ${noteBadge}
