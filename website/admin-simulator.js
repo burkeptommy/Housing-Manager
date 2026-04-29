@@ -799,6 +799,21 @@ export function runSimulation(facts, templatesJSON, systemsJSON) {
       hasHandymanOnFile: !!facts?.hasContractorsFor?.["Handyman"],
       grouped: punchListGrouped,
     },
+    // Phase 5q — explicit funnel numbers so the simulator UI can show
+    // "221 templates → 91 essential → 75 after region/subtype → 50 unique
+    // tasks → 31 task rows + 21 punch list + 10 routines" without
+    // re-deriving anything in the renderer.
+    funnel: {
+      totalTemplates: templates.length,
+      essentialTemplates: templates.filter((t) => t.isEssential !== false).length,
+      eligibleAfterGating: eligible.length,                  // essential ∧ region match ∧ subtypes met
+      bundleChildrenRolledUp: eligible.filter((t) => t.bundleId && !isHandymanBundleId(t.bundleId)).length,
+      handymanBundleChildrenToPunch: punchList.length,
+      uniqueTasksAfterBundling:
+        lanes.vendor.length + lanes.findContractor.length + lanes.personal.length + lanes.bundles.length,
+      bundleParentVisits: lanes.bundles.length,
+      routinesExtracted: autoRoutines.length,
+    },
     rules: {
       regionalFiltered: templates.filter((t) => t.regionalPack && t.regionalPack !== region).length,
       essentialOnlyFiltered: templates.filter((t) => t.isEssential === false).length,
@@ -939,11 +954,10 @@ export function renderSimulatorUI(result) {
       <div class="admin-sim__filter-summary admin-muted">
         Region: <strong>${escapeHtml(result.region || "?")}</strong> ·
         Tier: <strong>${escapeHtml(result.tier)}</strong> ·
-        ${result.activeSubtypes.length} active subtypes ·
-        ${result.rules.regionalFiltered} filtered by regional pack ·
-        ${result.rules.essentialOnlyFiltered} non-essential excluded ·
-        ${result.rules.subtypeFiltered} filtered by subtype gating
+        ${result.activeSubtypes.length} active subtypes
       </div>
+
+      ${renderFunnelBreakdown(result.funnel)}
 
       ${renderRoutineSection(result.routines || [], result.counts)}
       ${renderPunchListSection(result.punchList)}
@@ -951,6 +965,64 @@ export function renderSimulatorUI(result) {
       ${tierSection("👥 Vendor or Handyman", "Defaults to a vendor visit but the homeowner can flip to handyman.", tier.vendor_or_handyman)}
       ${tierSection("🔨 Handyman only (unbundled)", "DIY-friendly templates that aren't in the spring/fall handyman bundle. These DO seed as tasks today; if you want them on the punch list instead, flag them with bundleId Handyman:spring or Handyman:fall.", tier.handyman_only)}
       ${tierSection("✋ I'll do it myself", "Templates never seed here — runtime-only. (Should always be empty.)", tier.homeowner_only)}
+    </div>
+  `;
+}
+
+// Phase 5q — Step funnel showing how 220+ templates collapse into the
+// task list the homeowner actually sees. Tom flagged confusion about
+// "why does only X% of templates fire?" — every step here explains a
+// real piece of the gating + bundling pipeline.
+function renderFunnelBreakdown(f) {
+  if (!f) return "";
+  const dropEssential = f.totalTemplates - f.essentialTemplates;
+  const dropGated = f.essentialTemplates - f.eligibleAfterGating;
+  const dropBundles = f.bundleChildrenRolledUp;
+  const dropHandymanPunch = f.handymanBundleChildrenToPunch;
+  return `
+    <div class="admin-sim__funnel">
+      <header>
+        <h4>Why these tasks (and not the others)</h4>
+        <span class="admin-muted">220+ templates collapse into a manageable list. Each step below cuts a real chunk.</span>
+      </header>
+      <ol class="admin-sim__funnel-steps">
+        <li>
+          <strong>${f.totalTemplates}</strong>
+          <span>total templates in the library</span>
+        </li>
+        <li class="admin-sim__funnel-step--cut">
+          <strong>−${dropEssential}</strong>
+          <span>opt-in only (isEssential: false). Homeowner adds via Recommended.</span>
+        </li>
+        <li>
+          <strong>${f.essentialTemplates}</strong>
+          <span>auto-seed candidates</span>
+        </li>
+        <li class="admin-sim__funnel-step--cut">
+          <strong>−${dropGated}</strong>
+          <span>gated out by region or missing subtypes (no pool, no boiler, etc.)</span>
+        </li>
+        <li>
+          <strong>${f.eligibleAfterGating}</strong>
+          <span>eligible for this property</span>
+        </li>
+        <li class="admin-sim__funnel-step--cut">
+          <strong>−${dropHandymanPunch}</strong>
+          <span>handyman bundle children → punch list (NOT individual tasks)</span>
+        </li>
+        <li class="admin-sim__funnel-step--cut">
+          <strong>−${dropBundles}</strong>
+          <span>vendor bundle children → roll up into 1 parent visit each</span>
+        </li>
+        <li class="admin-sim__funnel-step--final">
+          <strong>${f.uniqueTasksAfterBundling}</strong>
+          <span>final task rows the homeowner sees (${f.bundleParentVisits} of those are multi-item parent visits)</span>
+        </li>
+      </ol>
+      <p class="admin-sim__funnel-note admin-muted">
+        Plus <strong>${f.handymanBundleChildrenToPunch}</strong> punch-list items the handyman tackles in one visit, and
+        <strong>${f.routinesExtracted}</strong> recurring routines (landscaper, cleaner, pool service, etc.).
+      </p>
     </div>
   `;
 }

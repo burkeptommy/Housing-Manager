@@ -475,6 +475,84 @@
   color: var(--indigo-700);
 }
 
+/* Phase 5q — Tasks/Recommended/Handyman row badges + facet pill rows */
+.admin-pill--bundle-child {
+  background: rgba(150, 90, 200, 0.12);
+  color: #5b3585;
+  font: 600 11px var(--sans);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-pill--optin {
+  background: rgba(160, 120, 30, 0.14);
+  color: #8a6213;
+}
+.admin-pill--season {
+  background: rgba(70, 110, 90, 0.12);
+  color: #2f5e3f;
+}
+
+.admin-facets {
+  background: rgba(0, 0, 0, 0.025);
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+.admin-facet-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.admin-facet-row__label {
+  color: var(--text-muted);
+  font: 700 10px var(--sans);
+  letter-spacing: 0.06em;
+  margin-right: 6px;
+  text-transform: uppercase;
+  width: 60px;
+}
+.admin-facet-pill {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font: 600 12px var(--sans);
+  gap: 6px;
+  padding: 4px 10px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.admin-facet-pill:hover {
+  background: rgba(237, 105, 85, 0.06);
+  border-color: rgba(237, 105, 85, 0.4);
+}
+.admin-facet-pill.is-active {
+  background: var(--indigo-700);
+  border-color: var(--indigo-700);
+  color: #fff;
+}
+.admin-facet-pill.is-active .admin-facet-pill__count {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.admin-facet-pill__label {
+  white-space: nowrap;
+}
+.admin-facet-pill__count {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font: 700 10px var(--sans);
+  padding: 1px 7px;
+}
+
 /* =============================================================================
    Admin Lab v2 — Phase 4b: schema-driven form, diff strip, preview modal
    ============================================================================= */
@@ -2639,6 +2717,61 @@
 }
 
 /* =============================================================================
+   Phase 67 (C4) — Vendor coverage gaps callout. Mirrors VendorCoverageSheet
+   on the iOS dashboard: a single section per system category that needs a
+   contractor, replacing the legacy "Find a contractor for X" tasks in the
+   vendor lane.
+   ============================================================================= */
+
+.admin-sim__lane--gaps {
+  background: linear-gradient(135deg, rgba(220, 130, 50, 0.07), rgba(220, 130, 50, 0.01));
+  border-color: rgba(220, 130, 50, 0.34);
+}
+
+.admin-sim__gap-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.admin-sim__gap-card {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.admin-sim__gap-card header {
+  align-items: baseline;
+  border-bottom: 1px dashed var(--neutral-200);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+}
+
+.admin-sim__gap-card h5 {
+  font: 800 13px var(--sans);
+  margin: 0;
+}
+
+.admin-pill--warn {
+  background: rgba(220, 130, 50, 0.14);
+  color: #a55a16;
+}
+
+.admin-sim__gap-list {
+  color: var(--text);
+  display: grid;
+  font: 500 12px var(--sans);
+  gap: 3px;
+  list-style: disc;
+  margin: 4px 0 0 18px;
+  padding: 0;
+}
+
+/* =============================================================================
    Phase 5m — Routine bucket in simulator output
    ============================================================================= */
 
@@ -2736,6 +2869,72 @@
   color: var(--indigo-700);
   font: 600 11px ui-monospace, monospace;
   padding: 1px 5px;
+}
+
+/* Phase 5q — Funnel breakdown card in the simulator. Visualizes why
+   only X% of templates fire as tasks: each step shows a real cut. */
+.admin-sim__funnel {
+  background: linear-gradient(135deg, rgba(69, 58, 112, 0.04), rgba(237, 105, 85, 0.04));
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px 18px;
+}
+.admin-sim__funnel header {
+  display: grid;
+  gap: 4px;
+}
+.admin-sim__funnel header h4 {
+  color: var(--text);
+  font: 700 14px var(--sans);
+  margin: 0;
+}
+.admin-sim__funnel header span {
+  font: 500 12px var(--sans);
+}
+.admin-sim__funnel-steps {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.admin-sim__funnel-steps li {
+  align-items: baseline;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 60px 1fr;
+  padding: 6px 12px;
+}
+.admin-sim__funnel-steps li strong {
+  color: var(--text);
+  font: 800 18px var(--sans);
+  text-align: right;
+}
+.admin-sim__funnel-steps li span {
+  color: var(--text-muted);
+  font: 500 12px var(--sans);
+  line-height: 1.4;
+}
+.admin-sim__funnel-step--cut {
+  background: rgba(237, 105, 85, 0.06);
+}
+.admin-sim__funnel-step--cut strong {
+  color: var(--salmon-dark);
+}
+.admin-sim__funnel-step--final {
+  background: rgba(74, 124, 89, 0.10);
+}
+.admin-sim__funnel-step--final strong {
+  color: #2f5e3f;
+}
+.admin-sim__funnel-note {
+  font: 500 12px var(--sans);
+  margin: 0;
 }
 
 /* Phase 5p — clickable simulator rows jump to entity detail panels.

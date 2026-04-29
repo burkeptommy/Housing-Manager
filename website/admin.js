@@ -257,6 +257,12 @@ const state = {
   selected: null,
   search: "",
   statusFilter: "all",
+  // Phase 5q — extra filter axes for Tasks / Recommended / Handyman so
+  // Tom can narrow 220+ templates down by lifecycle + season + routing
+  // without scrolling. Reset to "all" on view change.
+  lifecycleFilter: "all", // all | auto_seed | opt_in | bundle_child | bundle_parent
+  seasonFilter: "all",    // all | Spring | Summer | Fall | Winter | year_round | Spring/Fall
+  routingFilter: "all",   // all | vendor_only | vendor_or_handyman | handyman_only | bundled
   // Phase 7 — simulator scratch state. Fact bundle + last result so
   // re-rendering the surface doesn't reset Tom's edits.
   simFacts: structuredCloneSafePure(DEFAULT_FACTS),
@@ -1405,6 +1411,9 @@ function jumpToTemplate(templateKey) {
       state.selected = hit;
       state.search = "";
       state.statusFilter = "all";
+      state.lifecycleFilter = "all";
+      state.seasonFilter = "all";
+      state.routingFilter = "all";
       render();
       return;
     }
@@ -1425,6 +1434,9 @@ function jumpToRoutine(kind) {
     state.selected = hit;
     state.search = "";
     state.statusFilter = "all";
+    state.lifecycleFilter = "all";
+    state.seasonFilter = "all";
+    state.routingFilter = "all";
     render();
     return;
   }
@@ -1445,6 +1457,9 @@ function renderNav() {
       state.selected = null;
       state.search = "";
       state.statusFilter = "all";
+      state.lifecycleFilter = "all";
+      state.seasonFilter = "all";
+      state.routingFilter = "all";
       render();
     });
   });
@@ -1454,7 +1469,9 @@ function renderList() {
   const all = itemsForCurrentView();
   const filtered = filterItems(all);
   renderStats(all, filtered);
-  el.list.innerHTML = filtered.map((item) => itemRowHtml(item)).join("") || emptyListHtml();
+  const facets = renderFacetPills(all);
+  el.list.innerHTML = (facets ? facets : "") + (filtered.map((item) => itemRowHtml(item)).join("") || emptyListHtml());
+  attachFacetPillHandlers(el.list);
   el.list.querySelectorAll("[data-item-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selected = all.find((item) => item.id === button.dataset.itemId) ?? null;
@@ -1462,6 +1479,122 @@ function renderList() {
       renderDetail();
     });
   });
+}
+
+// Phase 5q — Facet pill rows for Tasks / Handyman / Recommended.
+// Surfaces lifecycle (auto-seed / opt-in / bundle child / bundle parent),
+// season, and routing filters with live counts so Tom can drill into
+// the 220+ template library without scrolling.
+function renderFacetPills(allItems) {
+  if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
+  // Compute counts on the FULL view (all items) so the pill counts stay
+  // stable across filter selections — same UX as Apple Mail / Linear.
+  const lifecycleCounts = countByLifecycle(allItems);
+  const seasonCounts = countBySeason(allItems);
+  const routingCounts = countByRouting(allItems);
+
+  const pill = (axis, value, label, count, extraClass = "") => {
+    if (count === 0 && value !== "all") return "";
+    const isActive = state[`${axis}Filter`] === value;
+    return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""} ${extraClass}" data-facet-axis="${escapeHtml(axis)}" data-facet-value="${escapeHtml(value)}">
+      <span class="admin-facet-pill__label">${label}</span>
+      <span class="admin-facet-pill__count">${count}</span>
+    </button>`;
+  };
+
+  return `
+    <div class="admin-facets">
+      <div class="admin-facet-row">
+        <span class="admin-facet-row__label">Lifecycle</span>
+        ${pill("lifecycle", "all", "All", allItems.length)}
+        ${pill("lifecycle", "auto_seed", "Auto-seeds", lifecycleCounts.auto_seed)}
+        ${pill("lifecycle", "opt_in", "Opt-in", lifecycleCounts.opt_in)}
+        ${pill("lifecycle", "bundle_child", "Bundle child", lifecycleCounts.bundle_child)}
+        ${pill("lifecycle", "bundle_parent", "Has children", lifecycleCounts.bundle_parent)}
+      </div>
+      <div class="admin-facet-row">
+        <span class="admin-facet-row__label">Season</span>
+        ${pill("season", "all", "All", allItems.length)}
+        ${pill("season", "Spring", "🌷 Spring", seasonCounts.Spring)}
+        ${pill("season", "Summer", "☀️ Summer", seasonCounts.Summer)}
+        ${pill("season", "Fall", "🍂 Fall", seasonCounts.Fall)}
+        ${pill("season", "Winter", "❄️ Winter", seasonCounts.Winter)}
+        ${pill("season", "Spring/Fall", "🔁 Spring/Fall", seasonCounts["Spring/Fall"])}
+        ${pill("season", "year_round", "🔄 Year-round", seasonCounts.year_round)}
+      </div>
+      <div class="admin-facet-row">
+        <span class="admin-facet-row__label">Routing</span>
+        ${pill("routing", "all", "All", allItems.length)}
+        ${pill("routing", "vendor_only", "Vendor only", routingCounts.vendor_only)}
+        ${pill("routing", "vendor_or_handyman", "Vendor or DIY", routingCounts.vendor_or_handyman)}
+        ${pill("routing", "handyman_only", "DIY only", routingCounts.handyman_only)}
+        ${pill("routing", "bundled", "Bundled", routingCounts.bundled)}
+      </div>
+    </div>
+  `;
+}
+
+function attachFacetPillHandlers(host) {
+  host.querySelectorAll("[data-facet-axis]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const axis = btn.dataset.facetAxis;
+      const value = btn.dataset.facetValue;
+      state[`${axis}Filter`] = value;
+      renderList();
+    });
+  });
+}
+
+function lifecycleOf(item) {
+  const t = item.payload || {};
+  if (t.bundleId) return "bundle_child";
+  if (t.isEssential === false) return "opt_in";
+  // "Has children" = a category that owns 2+ children with the same
+  // bundleId. Phase 5q surfaces this as a virtual lifecycle so Tom can
+  // see which bundles exist without manually grouping.
+  return "auto_seed";
+}
+
+function countByLifecycle(items) {
+  const out = { auto_seed: 0, opt_in: 0, bundle_child: 0, bundle_parent: 0 };
+  const bundleSizes = new Map();
+  for (const i of items) {
+    if (i.payload?.bundleId) {
+      bundleSizes.set(i.payload.bundleId, (bundleSizes.get(i.payload.bundleId) || 0) + 1);
+    }
+    out[lifecycleOf(i)]++;
+  }
+  // bundle_parent count = number of distinct bundleIds with 2+ children.
+  for (const size of bundleSizes.values()) if (size >= 2) out.bundle_parent++;
+  return out;
+}
+
+function countBySeason(items) {
+  const out = { Spring: 0, Summer: 0, Fall: 0, Winter: 0, "Spring/Fall": 0, year_round: 0 };
+  for (const i of items) {
+    const s = i.payload?.seasonalTiming;
+    if (!s) out.year_round++;
+    else if (out[s] !== undefined) out[s]++;
+    else out.year_round++;
+  }
+  return out;
+}
+
+function routingOf(item) {
+  const t = item.payload || {};
+  if (t.bundleId) return "bundled";
+  if (t.safetyFloor === true) return "vendor_only";
+  if (t.routingOverride === "vendorOnly") return "vendor_only";
+  if (t.assignmentType === "vendor" && !t.routingOverride) return "vendor_only";
+  if (t.routingOverride === "diyDefault") return "handyman_only";
+  if (t.assignmentType === "personal") return "handyman_only";
+  return "vendor_or_handyman";
+}
+
+function countByRouting(items) {
+  const out = { vendor_only: 0, vendor_or_handyman: 0, handyman_only: 0, bundled: 0 };
+  for (const i of items) out[routingOf(i)]++;
+  return out;
 }
 
 function renderStats(all, filtered) {
@@ -3093,12 +3226,34 @@ function itemRowHtml(item) {
       handymanBadge = `<span class="admin-pill admin-pill--library" title="Library item — opt-in via Recommended Services">🛠️ Library</span>`;
     }
   }
+  // Phase 5q — task lifecycle + season pills. "Won't auto-seed" makes
+  // opt-in items obvious; "→ rolls up into X" makes bundle children's
+  // hidden parent visible without opening the row.
+  let lifecycleBadge = "";
+  let seasonBadge = "";
+  if (["task", "recommended", "handyman"].includes(item.itemType)) {
+    const t = item.payload || {};
+    if (t.bundleId) {
+      const parentTitle = prettyBundleTitle(t.bundleId);
+      lifecycleBadge = `<span class="admin-pill admin-pill--bundle-child" title="This template never seeds as its own task — it rolls up into the bundle parent visit">↳ ${escapeHtml(parentTitle)}</span>`;
+    } else if (t.isEssential === false) {
+      lifecycleBadge = `<span class="admin-pill admin-pill--optin" title="Won't auto-seed at quiz completion. Homeowner picks via Recommended Services / handyman punch list">Opt-in</span>`;
+    }
+    if (t.seasonalTiming) {
+      const seasonEmoji = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️", "Spring/Fall": "🔁" }[t.seasonalTiming] || "";
+      seasonBadge = seasonEmoji
+        ? `<span class="admin-pill admin-pill--season" title="${escapeHtml(t.seasonalTiming)} task">${seasonEmoji} ${escapeHtml(t.seasonalTiming)}</span>`
+        : "";
+    }
+  }
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
         <strong>${escapeHtml(item.title)}</strong>
         <span class="admin-pill" data-tone="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
         ${handymanBadge}
+        ${lifecycleBadge}
+        ${seasonBadge}
         ${launchBadge}
         ${lintBadge}
         ${noteBadge}
@@ -3111,14 +3266,41 @@ function itemRowHtml(item) {
   `;
 }
 
+// Phase 5q — Map a bundleId like "Pool/Spa:opening" or "Landscaping:spring"
+// into a homeowner-readable parent visit title. Mirrors the simulator's
+// prettifyBundleId() helper but keeps it here so admin.js stays self-
+// contained without importing simulator code.
+function prettyBundleTitle(bundleId) {
+  if (!bundleId) return "";
+  const [category, season] = bundleId.split(":");
+  const seasonLabel = {
+    spring: "Spring", fall: "Fall", summer: "Summer", winter: "Winter",
+    annual: "Annual", ongoing: "Ongoing", triennial: "Every 3 yrs",
+    opening: "Opening", closing: "Closing",
+  }[season] || (season || "").charAt(0).toUpperCase() + (season || "").slice(1);
+  return `${seasonLabel} ${category} visit`;
+}
+
 function emptyListHtml(text = "Nothing matches this filter.") {
   return `<div class="admin-empty-detail" style="min-height:220px"><h3>${escapeHtml(text)}</h3></div>`;
 }
 
 function filterItems(items) {
   const q = state.search.trim().toLowerCase();
+  // Phase 5q — facet filters apply on Tasks / Handyman / Recommended
+  // surfaces. Other surfaces ignore them so legacy behavior is unchanged.
+  const facetSurface = ["tasks", "handyman", "recommended"].includes(state.view);
   return items.filter((item) => {
     if (state.statusFilter !== "all" && item.status !== state.statusFilter) return false;
+    if (facetSurface) {
+      if (state.lifecycleFilter !== "all" && lifecycleOf(item) !== state.lifecycleFilter) return false;
+      if (state.seasonFilter !== "all") {
+        const s = item.payload?.seasonalTiming;
+        if (state.seasonFilter === "year_round" && s) return false;
+        if (state.seasonFilter !== "year_round" && s !== state.seasonFilter) return false;
+      }
+      if (state.routingFilter !== "all" && routingOf(item) !== state.routingFilter) return false;
+    }
     if (!q) return true;
     return [item.title, item.category, item.description, JSON.stringify(item.payload ?? {})]
       .join(" ")
