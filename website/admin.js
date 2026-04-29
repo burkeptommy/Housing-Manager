@@ -95,6 +95,16 @@ const VIEWS = [
     liveSource: "handyman-templates",
   },
   {
+    id: "recommended",
+    label: "Recommended",
+    type: "recommended",
+    title: "Recommended Services + Optional Tasks",
+    eyebrow: "isEssential: false — homeowner opts in",
+    subtitle:
+      "Every opt-in template in the library. None of these auto-seed at quiz completion — the homeowner adds them via Recommended Services or the handyman punch list. Use this surface to audit voice and gating before the homeowner sees the menu.",
+    liveSource: "templates",
+  },
+  {
     id: "systems",
     label: "Systems",
     type: "system",
@@ -940,6 +950,31 @@ const LIVE_MAPPERS = {
       sortOrder: sortBucket * 1000 + (titleCase(t.title) || "").charCodeAt(0),
       description: t.description || "",
       payload: { ...t, _autoPopulates: bundleSpring ? "spring" : bundleFall ? "fall" : null, _libraryOnly: isLibrary },
+      lintCount: (t._lint || []).length,
+    };
+  },
+  // Phase 5q — Recommended view shares the templates JSON with the
+  // Tasks view but filters down to isEssential: false (homeowner opts
+  // in). Returning null for essentials skips them via .filter(Boolean)
+  // in liveItemsForView.
+  recommended: (t, idx) => {
+    if (t.isEssential !== false) return null;
+    const inHandymanBundle = t.bundleId?.startsWith("Handyman:");
+    if (inHandymanBundle) return null; // bundle children belong on the Handyman surface
+    const isHandymanLibrary = t.systemCategory === "Handyman" && !t.bundleId;
+    const bucket = isHandymanLibrary ? "🛠️ Handyman library" : `✨ ${t.systemCategory}`;
+    return {
+      id: `live-recommended-${slug(t.templateKey)}`,
+      source: "live",
+      itemType: "recommended",
+      title: titleCase(t.title),
+      status: "draft", // never active by default — opt-in only
+      category: bucket,
+      // Group by bucket (Handyman library first, then alpha by category),
+      // alpha within each bucket.
+      sortOrder: (isHandymanLibrary ? 0 : 1) * 1000 + (titleCase(t.title) || "").charCodeAt(0),
+      description: t.description || t.notes || "",
+      payload: { ...t, _isHandymanLibrary: isHandymanLibrary },
       lintCount: (t._lint || []).length,
     };
   },
@@ -2165,6 +2200,7 @@ function viewIdForType(type) {
       question: "quiz",
       task: "tasks",
       handyman: "handyman",
+      recommended: "recommended",
       routine: "routines",
       system: "systems",
       vehicle: "vehicles",

@@ -254,6 +254,103 @@ struct MaintenanceTemplate: Identifiable {
     }
 }
 
+// MARK: - Phase 67 reconciler v2 — 5-tier assignment model
+
+/// Phase 67: User-facing classification for every template. Mirrors
+/// `readAssignmentTier()` in `website/admin-forms.js` so the iOS reconciler
+/// and the admin lab simulator agree on the same tier per template.
+///
+/// The 5th tier (`homeownerOnly`) is runtime-only — templates never ship
+/// in that tier. Users pull tasks into their personal list via the per-task
+/// routing picker.
+enum AssignmentTier: String {
+    /// Recurring vendor work that auto-collapses into one routine per
+    /// category. Reconciler creates a `routines` row instead of seeding
+    /// individual `maintenance_tasks`.
+    case routine
+    /// Pro-only — DIY isn't safe or sensible. Always tries to link to a
+    /// contractor; when none exists, the home_system row is marked as
+    /// needing vendor coverage instead of seeding a "Find a contractor"
+    /// task.
+    case vendorOnly = "vendor_only"
+    /// Defaults to a vendor visit but the homeowner can flip via the
+    /// routing picker. Most general maintenance.
+    case vendorOrHandyman = "vendor_or_handyman"
+    /// Small DIY-friendly items, ≤60 min. NOT surfaced as tasks. Lives
+    /// on the handyman punch list (Q38 captures defaults at quiz time).
+    case handymanOnly = "handyman_only"
+}
+
+extension MaintenanceTemplate {
+    /// Phase 67: Categories that map to a Routine when work is recurring.
+    /// Source of truth shared with `website/admin-forms.js:ROUTINE_CATEGORIES`.
+    static let routineEligibleCategories: Set<String> = [
+        "Landscaping",
+        "Cleaning Service",
+        "Pool/Spa",
+        "Hot Tub",
+        "Pest Control",
+        "Snow Removal",
+        "Mosquito & Tick",
+        "Pet Waste",
+        "Window Cleaning",
+        "Gutter Cleaning",
+        "Trash & Recycling",
+    ]
+
+    /// Phase 67: Tom's rule — routines are weekly / biweekly / triweekly /
+    /// monthly / bi-monthly / quarterly. Anything semi-annual / annual /
+    /// multi-year is a TASK that needs explicit homeowner-vendor coordination.
+    /// Source of truth shared with `website/admin-forms.js:ROUTINE_FREQUENCIES`.
+    static let routineEligibleFrequencies: Set<String> = [
+        "weekly",
+        "biweekly", "bi-weekly", "every 2 weeks",
+        "triweekly", "tri-weekly", "every 3 weeks",
+        "monthly",
+        "bi-monthly", "every 2 months",
+        "quarterly",
+    ]
+
+    /// Phase 67: Whether this template should auto-collapse into a routine
+    /// instead of seeding individual tasks. Mirrors
+    /// `website/admin-forms.js:isRoutineCandidate`.
+    var isRoutineCandidate: Bool {
+        if assignmentType == .personal { return false }
+        if safetyFloor { return false }
+        if routingOverride == .diyDefault { return false }
+        let freq = frequency.lowercased()
+        guard MaintenanceTemplate.routineEligibleFrequencies.contains(freq) else {
+            return false
+        }
+        return MaintenanceTemplate.routineEligibleCategories.contains(systemCategory)
+    }
+
+    /// Phase 67: Derived tier. Routine candidates take priority — recurring
+    /// vendor work surfaces as a routine even if the template ships as
+    /// `assignmentType: .vendor`. Mirrors
+    /// `website/admin-forms.js:readAssignmentTier`.
+    var assignmentTier: AssignmentTier {
+        if isRoutineCandidate { return .routine }
+        if safetyFloor { return .vendorOnly }
+        if routingOverride == .vendorOnly { return .vendorOnly }
+        if routingOverride == .diyDefault { return .handymanOnly }
+        // Bundle children fall through to assignmentType reading.
+        switch assignmentType {
+        case .vendor:
+            return .vendorOnly
+        case .personal:
+            // `.diyCapable` is the one routingOverride that keeps a personal
+            // template in the picker-driven middle tier instead of demoting
+            // it to handyman-only. Anything else with `.personal` lands in
+            // handyman-only and never surfaces as a task.
+            if routingOverride == .diyCapable { return .vendorOrHandyman }
+            return .handymanOnly
+        case .either:
+            return .vendorOrHandyman
+        }
+    }
+}
+
 // MARK: - Template Library
 
 enum MaintenanceTemplates {
@@ -2153,6 +2250,117 @@ Add anything you've been meaning to get to.
                 isEssential: false,
                 assignmentType: .vendor
             ),
+
+            // ─────────────────────────────────────────────
+            // Phase 67B: Handyman LIBRARY — 75 opt-in punch-list items.
+            //
+            // None of these auto-seed (`isEssential: false`). Homeowners
+            // pick them via Recommended Services or directly add to the
+            // handyman punch list. All are `routingOverride: .diyCapable`
+            // so they show on the homeowner's "Your tasks" section if
+            // claimed as DIY, and route to the handyman if they're not.
+            // No `bundleId` — these are individual library items, not
+            // bundle children.
+            //
+            // Sub-grouping is by use case, not strict category. All live
+            // under "Handyman" so the auto-created Handyman home_system
+            // row picks them up at opt-in time.
+            // ─────────────────────────────────────────────
+
+            // Interior touch-ups (12)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Patch nail holes and small drywall dings", description: "Fill, sand, and prime small holes from previous artwork or scuffs. The handyman runs the room with spackle, a putty knife, and a touch-up paint match.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "About 5 minutes per hole; bundle multiple rooms into one visit.", isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Touch up scuffed wall paint", description: "Match and feather paint into scuffs, kid marks, and high-traffic wear spots. Best on flat or eggshell finishes; satin and semi-gloss often need a full wall.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Recaulk interior trim and baseboards", description: "Cut out old caulk that's separated from the wall or trim, lay a fresh bead, and tool it clean. Restores a tight, finished look at the seams.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$300", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Patch stuck or sticking interior doors", description: "Plane the door edge or shim hinges so doors close cleanly. Common after a humid summer or a foundation settle.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Repair damaged drywall corner bead", description: "Replace dented or bent corner bead and refloat the corner. The repair disappears once the new compound dries and gets a touch-up coat.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Spot-paint interior trim and baseboards", description: "Touch up scuffs and chips on trim, baseboards, and door casings. The handyman matches sheen and color from your existing paint can.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Re-caulk around tubs and tile", description: "Strip old caulk along tub-to-tile and tile-to-wall seams, sanitize, and lay a fresh mildew-resistant bead. Prevents water seepage behind the tile.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$100–$250", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Re-grout small tile sections", description: "Remove failing or stained grout from a defined section and re-grout. Sealing afterward extends the life of the new grout.", frequency: "As needed", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 75, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Lubricate squeaky door hinges", description: "Apply a dry lubricant or graphite to hinges throughout the house. Quick to do but easy to overlook. Handyman often catches it on a punch-list visit.", frequency: "As needed", priority: "Low", estimatedCostRange: "$40–$100", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Tighten loose stair balusters and handrails", description: "Re-secure wobbly stair components. Most fixes are tightening hidden screws or re-gluing where the joinery has loosened.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$50–$200", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Wax hardwood floors in high-traffic areas", description: "Buff and wax sections of hardwood that show wear (entryways, hallways, in front of sinks). Restores sheen without a full refinish.", frequency: "Annually", priority: "Low", estimatedCostRange: "$100–$300", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace torn window screens", description: "Restretch or replace damaged window-screen mesh. The handyman cuts new mesh, secures it with spline, and trims the excess.", frequency: "As needed", priority: "Low", estimatedCostRange: "$25–$75 per screen", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+
+            // Doors & windows (8)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace exterior door weatherstripping", description: "Swap weatherstripping that's compressed, torn, or no longer sealing. Prevents drafts and cuts heating/cooling waste at the door.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "$60–$180 per door", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Adjust door strike plates", description: "Move or shim strike plates so doors latch cleanly without pushing. Common after seasonal humidity shifts move the door slightly.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$100", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Lubricate sliding door tracks", description: "Vacuum the track, clean the rollers, and apply a silicone lubricant. Restores smooth glide on patio doors and pocket doors.", frequency: "Annually", priority: "Low", estimatedCostRange: "$40–$100", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Re-key a deadbolt or door knob", description: "Replace the lock cylinder pins so old keys no longer work. Common after move-in, contractor handoff, or lost keys.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$25–$75 per lock", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: "A locksmith is faster for matched key sets across multiple doors.", isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace exterior door bottom sweep", description: "Swap the sweep on the bottom of an exterior door. Restores the seal against the threshold and stops light or draft at the floor.", frequency: "Every 3-5 years", priority: "Low", estimatedCostRange: "$25–$75 per door", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Tighten loose door handles and knockers", description: "Re-secure door handles, knockers, and other exterior hardware that's worked loose over time.", frequency: "As needed", priority: "Low", estimatedCostRange: "$40–$100", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Repair or replace casement window cranks", description: "Swap a casement crank that's stripped, broken, or no longer engaging the operator. Restores full open/close range.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150 per window", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 25, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Reseal a stuck or sticking window", description: "Free a window that's painted shut or swollen, clean the channel, and lubricate. Often the fix is a utility knife and silicone spray.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+
+            // Hardware swaps (10)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Swap a single light fixture", description: "Replace a sconce, flush mount, or pendant. The handyman handles the wiring, mounting, and bulb test.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200 plus fixture", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a ceiling fan", description: "Remove the existing fan and install a replacement. Includes balancing the new blades and confirming the mounting box is rated for fans.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$150–$300 plus fan", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a bathroom or vanity light fixture", description: "Swap a vanity bar or sconce. The handyman matches the existing junction box footprint and confirms ground continuity.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200 plus fixture", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install USB-equipped outlets", description: "Replace existing duplex outlets with USB-A or USB-C outlets in nightstands, kitchen counters, or desks. Handles the load calc to confirm the circuit can support it.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$100 plus outlets", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 25, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install or replace dimmer switches", description: "Swap a single-pole or three-way switch with a dimmer. The handyman confirms compatibility with LED loads to prevent flicker.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$100 per switch", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 25, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace cabinet pulls and knobs", description: "Update the kitchen, bath, or built-in cabinet hardware. The handyman handles drilling new holes if the spread changes.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200 plus hardware", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "About 2 minutes per pull if existing holes match; 5 minutes per pull if drilling new holes.", isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a basic thermostat", description: "Swap a non-line-voltage thermostat. The handyman confirms wiring (R/C/W/Y/G) and verifies heating and cooling commands.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200 plus thermostat", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install smart light switches", description: "Swap dumb single-pole or three-way switches for smart equivalents (Lutron Caséta, Leviton Decora, Kasa). The handyman handles the neutral check and app pairing.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$150 per switch", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: "Often paired with new dimmer install; bundle multiple rooms into one visit.", isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a porch or pendant fixture", description: "Swap an exterior sconce, post lantern, or front-porch pendant. Includes a check for adequate weather sealing on the housing.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$250 plus fixture", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install a video doorbell", description: "Mount and configure a battery- or wired-doorbell camera. Includes connecting to home Wi-Fi and verifying the chime or app feed.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$200 plus device", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+
+            // Cabinet & built-in fixes (7)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace cabinet door hinges", description: "Swap matching hinges that have rusted, sagged, or stripped out. The handyman matches cup size and overlay for a clean fit.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Adjust cabinet doors so they close evenly", description: "Tighten or shim cabinet doors that have drifted out of alignment. Quick adjustment screws on European hinges fix most cases.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Add soft-close adapters to cabinet doors", description: "Retrofit existing cabinet doors with soft-close hinge adapters or pads. Quiets slamming and protects the cabinet edges.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$300", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace drawer slides", description: "Swap broken or sagging slides for full-extension or soft-close replacements. The handyman matches mount type (side, bottom, undermount).", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200 per drawer", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Repair a sagging or broken cabinet door", description: "Re-glue a separated joint, replace a cracked panel, or shim a hinge plate. Restores the door without a full replacement.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Tighten loose cabinet pulls and knobs", description: "Snug up hardware throughout the kitchen, bath, and built-ins. Often paired with a hinge tune-up on the same visit.", frequency: "Annually", priority: "Low", estimatedCostRange: "$50–$100", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace damaged shelf supports", description: "Swap stripped or broken shelf pins and clips. The handyman confirms the new pin matches the shelf-hole diameter.", frequency: "As needed", priority: "Low", estimatedCostRange: "$25–$75", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+
+            // Bathroom fixes (8)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a toilet seat", description: "Swap a worn, stained, or wobbly toilet seat. The handyman matches round vs. elongated and confirms hardware torque.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150 plus seat", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Swap a shower head", description: "Replace an existing shower head with a new fixture (rain, handheld, dual). Includes pipe-thread sealing to prevent leaks.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150 plus head", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Clean and replace faucet aerators", description: "Unscrew aerators on bathroom and kitchen faucets, soak in vinegar to dissolve mineral build-up, and reinstall (or replace if corroded).", frequency: "Annually", priority: "Low", estimatedCostRange: "$25–$75", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Cheap fix that often restores full pressure on a faucet that feels weak.", isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Re-caulk perimeter of tub or shower", description: "Cut out failing caulk along the tub-tile or pan-wall seam, sanitize, and lay a fresh mildew-resistant bead. Stops water from getting behind the surround.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$100–$250", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Clean and reseal shower grout", description: "Scrub stained or mildewed grout, neutralize with a grout cleaner, and apply a penetrating sealer. Extends the life of the existing grout for years.", frequency: "Annually", priority: "Low", estimatedCostRange: "$100–$250", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 75, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace bathroom exhaust fan grille", description: "Swap a stained, yellowed, or noisy grille on a bath fan. Includes vacuuming the housing while the cover is off.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$125", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a toilet flapper or fill valve", description: "Swap the rubber flapper, fill valve, or both on a toilet that runs continuously or won't fully fill. Most fixes use a universal kit.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$50–$125", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Stabilize a rocking toilet", description: "Reseat the toilet on a fresh wax ring and shim the base so it's level. Stops the rocking that breaks the wax seal and starts a slow leak.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+
+            // Kitchen fixes (6)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Reset a stuck garbage disposal", description: "Use the underside reset button and the manual hex key to free a jammed disposal. Quick fix when the disposal hums but won't spin.", frequency: "As needed", priority: "Low", estimatedCostRange: "$0–$75", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 10, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace kitchen faucet aerator", description: "Unscrew the kitchen aerator, descale or replace, and reinstall. Restores full flow on a faucet that's lost pressure.", frequency: "Annually", priority: "Low", estimatedCostRange: "$15–$50", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 10, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Clean range hood grease filters", description: "Remove the metal mesh filters and run them through the dishwasher or soak in degreaser. Restores hood efficiency and cuts fire risk.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$0–$50", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Replace charcoal filters annually if your hood recirculates instead of vents outside.", isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace refrigerator door gasket", description: "Swap a torn or compressed door seal so the fridge holds temperature. Compressor cycles less; ice and frost stop forming around the door.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$75–$200", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Tighten a loose kitchen sink", description: "Re-secure a sink that's pulled away from the countertop or shifted in the cutout. Stops water from running behind the cabinet.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$75–$200", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace a worn dish soap or instant-hot pump", description: "Swap a dish soap dispenser pump or instant-hot dispenser that's leaking or no longer pumping. Bottle stays in place under the sink.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+
+            // Exterior touch-ups (8)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Touch up exterior trim paint", description: "Spot-paint chips, peeling spots, and weather wear on door frames, window casings, and porch posts. Catches the next paint cycle before water damage starts.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace damaged deck boards", description: "Swap warped, split, or rotted deck boards. The handyman matches species and stain so the patch blends with the rest of the deck.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$100–$300 per board", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Repair or replace mailbox post", description: "Reset a leaning mailbox post or install a fresh one. Includes confirming the address numbers are visible from the street.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$300", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install house numbers or address plaque", description: "Mount new address numbers or a plaque on the house, mailbox, or gate post. Improves visibility for emergency response and deliveries.", frequency: "As needed", priority: "Low", estimatedCostRange: "$50–$150 plus hardware", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace exterior light fixtures", description: "Swap a worn or dated porch, garage, or post light. Includes confirming the wiring is rated for the new fixture's wattage and the gasket seals against weather.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$250 plus fixture", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Patch concrete steps and small cracks", description: "Fill chips, spalled corners, and surface cracks in concrete steps, walkways, or patios using a polymer-modified patch.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$100–$300", isDIY: false, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace damaged fence pickets", description: "Swap rotted, broken, or warped fence pickets without replacing the whole run. Color-match stain so the repair blends.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$250", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Spot re-stain a deck section", description: "Re-stain the highest-wear sections of a deck (rail tops, in front of doors, around the grill) without redoing the whole deck.", frequency: "Annually", priority: "Low", estimatedCostRange: "$100–$300", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+
+            // Garage & basement (5)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace garage door bottom seal", description: "Swap the rubber threshold seal on the bottom of the garage door. Stops drafts, water, and pests from getting under the door.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Lubricate garage door rollers and hinges", description: "Apply silicone or lithium-based lubricant to rollers, hinges, and the spring shaft. Quiets the door and extends opener and spring life.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0–$50 (DIY) or $75 (pro)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: "Skip the springs unless you're a pro. High tension and risk of injury.", isEssential: false, assignmentType: .either, diyEffortMinutes: 20, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Repair pull-down attic stairs", description: "Tighten or replace springs, replace a broken tread, or reset the latch on pull-down attic stairs. Restores safe access to attic storage.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$100–$300", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Patch chipped epoxy garage floor", description: "Spot-patch chipped or peeling epoxy in high-traffic areas of the garage. Re-coat the patch and feather into the surrounding finish.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$300", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install garage shelving or wall-mounted racks", description: "Mount garage shelving units, slatwall, ceiling-mounted overhead racks, or pegboard. Includes confirming wall studs / ceiling joists for safe load.", frequency: "As needed", priority: "Low", estimatedCostRange: "$150–$400 plus hardware", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+
+            // Smart home & low-voltage (5)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace doorbell button (low-voltage)", description: "Swap a worn or dated doorbell button at the front door. Easy fix when the button no longer rings consistently.", frequency: "As needed", priority: "Low", estimatedCostRange: "$25–$75", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 15, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install smart smoke and CO detectors", description: "Replace older battery detectors with hardwired or interconnected smart detectors (Nest, First Alert) and confirm the network reports correctly.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$150–$400 plus devices", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Replace thermostat batteries", description: "Swap the AA or AAA backup batteries in a battery-powered or hybrid-power thermostat. Prevents the mid-cold-snap thermostat blackout.", frequency: "Annually", priority: "Low", estimatedCostRange: "$10–$30", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 10, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Place or relocate smart leak sensors", description: "Move existing smart leak sensors to higher-risk spots (under sinks, behind washing machine, near water heater) or add a new round of placements.", frequency: "As needed", priority: "Medium", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Mount and configure a smart camera", description: "Install a battery- or wired smart camera, secure to the mount, and configure motion zones in the app.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$250 plus device", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 60, routingOverride: .diyCapable),
+
+            // Furniture & shelving (6)
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Mount a TV on the wall", description: "Install a wall-mount TV bracket, secure to studs, hang the TV, and route the cables. Includes confirming the bracket is rated for the TV weight.", frequency: "As needed", priority: "Low", estimatedCostRange: "$150–$400 plus mount", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 75, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install floating shelves", description: "Hang floating shelves with concealed brackets. Includes confirming the wall stud or anchor type matches the load rating of the shelf.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 45, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Hang a gallery wall (3+ frames)", description: "Lay out, level, and hang a multi-frame arrangement. Includes a paper template pass so you see the layout before any holes go in the wall.", frequency: "As needed", priority: "Low", estimatedCostRange: "$100–$300", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Assemble flat-pack furniture", description: "Assemble desk, dresser, bookcase, or other knock-down furniture. Includes leveling and confirming all hardware is fully torqued.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$250", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Install a closet organizer system", description: "Install a wire, melamine, or wood closet system. Includes layout planning, anchor placement, and final shelf and rod adjustment.", frequency: "As needed", priority: "Low", estimatedCostRange: "$200–$600 plus system", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 90, routingOverride: .diyCapable),
+            MaintenanceTemplate(systemCategory: "Handyman", title: "Mount curtain rods and hardware", description: "Install curtain or drapery rods, hold-backs, and finials. Includes confirming the bracket is anchored to a stud or rated drywall anchor.", frequency: "As needed", priority: "Low", estimatedCostRange: "$75–$200", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false, assignmentType: .either, diyEffortMinutes: 30, routingOverride: .diyCapable),
         ]),
 
         // ──────────────────────────────────────────────
