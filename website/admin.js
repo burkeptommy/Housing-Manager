@@ -2070,47 +2070,101 @@ function renderNotesView() {
     <div class="admin-stat"><strong>${state.storageMode}</strong><span>Storage</span></div>
     <div class="admin-stat"><strong>${new Date().toLocaleDateString()}</strong><span>Today</span></div>
   `;
-  el.list.innerHTML = state.notes.map((note) => `
-    <button class="admin-list-item ${state.selected?.id === note.id ? "is-active" : ""}" data-note-id="${escapeHtml(note.id)}">
-      <div class="admin-list-item__top">
-        <strong>${escapeHtml(note.scopeTitle || "General note")}</strong>
-        <span class="admin-pill">${escapeHtml(note.scopeType || "note")}</span>
-      </div>
-      <p>${escapeHtml(note.body).slice(0, 180)}</p>
-      <div class="admin-list-item__meta">
-        <span>${escapeHtml(formatDate(note.createdAt))}</span>
-      </div>
-    </button>
-  `).join("") || emptyListHtml("No notes yet.");
+
+  // Top-level notes only; replies stay nested under their parents on the
+  // entity's detail panel.
+  const topLevel = state.notes.filter((n) => !n.parentNoteId);
+
+  el.list.innerHTML = topLevel.map((note) => {
+    const canJump = noteCanJumpToEntity(note);
+    const intent = note.intent || "feedback";
+    const author = note.author || "tom";
+    const appliedPill = note.appliedAt
+      ? `<span class="admin-pill" data-tone="active">applied</span>`
+      : note.revertedAt
+      ? `<span class="admin-pill" data-tone="cut">reverted</span>`
+      : "";
+    const jumpHint = canJump
+      ? `<span class="admin-list-item__jump" title="Open the ${escapeHtml(note.scopeType)} this note is about">Open ${escapeHtml(note.scopeType)} →</span>`
+      : `<span class="admin-pill">general</span>`;
+    return `
+      <button class="admin-list-item" data-note-id="${escapeHtml(note.id)}">
+        <div class="admin-list-item__top">
+          <strong>${escapeHtml(note.scopeTitle || "General note")}</strong>
+          <span class="admin-pill admin-pill--note">${escapeHtml(intent)}</span>
+          ${author === "claude" ? `<span class="admin-pill admin-pill--note">claude</span>` : ""}
+          ${appliedPill}
+        </div>
+        <p>${escapeHtml((note.body || "").slice(0, 220))}</p>
+        <div class="admin-list-item__meta">
+          <span>${escapeHtml(formatDate(note.createdAt))}</span>
+          ${jumpHint}
+        </div>
+      </button>
+    `;
+  }).join("") || emptyListHtml("No notes yet.");
 
   el.list.querySelectorAll("[data-note-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.selected = state.notes.find((note) => note.id === button.dataset.noteId) ?? null;
-      renderNotesView();
+      const note = state.notes.find((n) => n.id === button.dataset.noteId);
+      if (!note) return;
+      // Phase 5c — clicking a note jumps to the entity it was placed on so
+      // Tom can read the existing thread + write a new note in the same
+      // place. General notes (no scope) keep the legacy in-pane editor.
+      if (noteCanJumpToEntity(note)) {
+        const targetView = viewIdForType(note.scopeType);
+        const targetItem = locateLiveItemByScope(note);
+        if (targetView && targetItem) {
+          state.view = targetView;
+          state.selected = targetItem;
+          render();
+          return;
+        }
+      }
+      // Fallback for general notes / orphaned scope: show in pane.
+      state.selected = note;
+      renderGeneralNoteFallback(note);
     });
   });
 
+  // Initial pane state — empty until a note is clicked.
+  el.emptyDetail.classList.remove("is-hidden");
+  el.detail.classList.add("is-hidden");
+  el.emptyDetail.querySelector("h3").textContent = "Pick a note to open its entity.";
+  el.emptyDetail.querySelector("p").textContent =
+    "Notes are written about a specific quiz question, template, system, or routine. Click one to open that entity's detail panel — you'll see the full thread and can add another note right there. General notes (no entity scope) stay in this pane.";
+}
+
+function noteCanJumpToEntity(note) {
+  if (!note?.scopeType || !note?.scopeId) return false;
+  return ["question", "task", "handyman", "routine", "system", "vehicle", "prompt"].includes(note.scopeType);
+}
+
+function renderGeneralNoteFallback(note) {
   el.emptyDetail.classList.add("is-hidden");
   el.detail.classList.remove("is-hidden");
-  const note = state.selected?.body ? state.selected : null;
-  el.detailKind.textContent = "codex note";
-  el.detailTitle.textContent = note?.scopeTitle || "Running notes";
-  el.detailSubtitle.textContent = note ? formatDate(note.createdAt) : "Save a general note or export all notes as Markdown.";
-  el.detailStatus.textContent = state.storageMode;
-  el.detailStatus.dataset.tone = state.storageMode === "cloud" ? "active" : "defer";
-  el.fieldTitle.value = note?.scopeTitle || "General admin note";
+  el.detailTabs?.classList.add("is-hidden");
+  el.curatedForm?.classList.remove("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  el.detailKind.textContent = "general note";
+  el.detailTitle.textContent = note.scopeTitle || "Running notes";
+  el.detailSubtitle.textContent = note.createdAt ? formatDate(note.createdAt) : "Saved general note.";
+  el.detailStatus.textContent = note.intent || "feedback";
+  el.detailStatus.dataset.tone = note.appliedAt ? "active" : "draft";
+  el.fieldTitle.value = note.scopeTitle || "General admin note";
   el.fieldStatus.value = "active";
-  el.fieldCategory.value = note?.scopeType || "general";
+  el.fieldCategory.value = note.scopeType || "general";
   el.fieldSort.value = "0";
-  el.fieldDescription.value = note?.body || "";
-  el.fieldPayload.value = JSON.stringify(note?.snapshot ?? { source: "admin-notes" }, null, 2);
+  el.fieldDescription.value = note.body || "";
+  if (el.fieldPayload) el.fieldPayload.value = JSON.stringify(note.snapshot ?? {}, null, 2);
   el.contextNote.value = "";
   el.contextNotes.innerHTML = "";
   el.promoteItem.disabled = true;
   el.duplicateItem.disabled = true;
   el.deleteItem.disabled = true;
   el.saveItem.textContent = "Save general note";
-  el.saveNote.textContent = "Save note for Codex";
+  el.saveNote.textContent = "Save note";
 }
 
 function renderContextNotes(item) {

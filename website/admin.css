@@ -1370,6 +1370,23 @@
   .qf__list { gap: 8px; }
 }
 
+/* Notes view — "Open X →" jump hint */
+.admin-list-item__jump {
+  background: rgba(237, 105, 85, 0.1);
+  border-radius: 999px;
+  color: var(--salmon-dark, #c25a4a);
+  font: 700 10px var(--sans);
+  letter-spacing: 0.06em;
+  margin-left: auto;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.admin-list-item:hover .admin-list-item__jump {
+  background: var(--salmon, #ed6955);
+  color: #fff;
+}
+
 /* =============================================================================
    Phase 5b — CLAUDE_ADMIN_NOTES.md live preview view
    ============================================================================= */
