@@ -2557,6 +2557,191 @@
 }
 
 /* =============================================================================
+   Phase 5k — Quiz Mode in simulator
+   ============================================================================= */
+
+.admin-sim__mode-toggle {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999px;
+  display: flex;
+  margin-bottom: 14px;
+  padding: 3px;
+}
+
+.admin-sim__mode {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex: 1;
+  font: 700 12px var(--sans);
+  padding: 8px 12px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.admin-sim__mode.is-active {
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(20, 12, 40, 0.12);
+  color: var(--indigo-800, #453a70);
+}
+
+.admin-sim__lane-blurb {
+  font: 500 11px var(--sans);
+  margin: -4px 0 6px;
+}
+
+.admin-quizsim {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-quizsim__presets {
+  background: linear-gradient(135deg, rgba(237, 105, 85, 0.06), rgba(237, 105, 85, 0.01));
+  border: 1px solid rgba(237, 105, 85, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.admin-quizsim__presets > strong {
+  color: var(--salmon-dark, #c25a4a);
+  display: block;
+  font: 800 10px var(--sans);
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.admin-quizsim__preset-row {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-quizsim__preset {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 2px;
+  padding: 8px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-quizsim__preset:hover {
+  background: rgba(237, 105, 85, 0.04);
+  border-color: var(--salmon, #ed6955);
+}
+
+.admin-quizsim__preset strong {
+  color: var(--text);
+  font: 700 13px var(--sans);
+}
+
+.admin-quizsim__preset span {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+  line-height: 1.4;
+}
+
+.admin-quizsim__preset--reset {
+  border-style: dashed;
+}
+
+.admin-quizsim__section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.admin-quizsim__section > strong {
+  color: var(--indigo-700);
+  display: block;
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.admin-quizsim__hint {
+  font: 500 11px var(--sans);
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+
+.admin-quizsim__question {
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+  padding: 6px 0;
+}
+
+.admin-quizsim__question:last-child {
+  border-bottom: 0;
+}
+
+.admin-quizsim__question header {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.admin-quizsim__q-label {
+  color: var(--indigo-800, #453a70);
+  font: 700 12px var(--sans);
+}
+
+.admin-quizsim__question header code {
+  background: rgba(69, 58, 112, 0.06);
+  border-radius: 4px;
+  color: var(--indigo-700);
+  font: 600 9px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+
+.admin-quizsim__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.admin-quizsim__chip {
+  background: rgba(69, 58, 112, 0.06);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  padding: 3px 9px;
+}
+
+.admin-quizsim__chip:hover {
+  background: rgba(69, 58, 112, 0.14);
+}
+
+.admin-quizsim__chip.is-active {
+  background: var(--indigo-700);
+  color: #fff;
+}
+
+.admin-quizsim__clear {
+  background: transparent;
+  border: 1px dashed var(--neutral-300);
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 500 10px var(--sans);
+  padding: 2px 8px;
+}
+
+.admin-quizsim__clear:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* =============================================================================
    Phase 7 — Reconciler simulator
    ============================================================================= */
 

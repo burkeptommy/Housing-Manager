@@ -18,6 +18,10 @@ import {
   renderSimulatorUI,
   renderFactForm,
   attachFactFormHandlers,
+  renderQuizModeUI,
+  attachQuizModeHandlers,
+  quizAnswerToFacts,
+  QUIZ_PRESETS,
 } from "/admin-simulator.js";
 import {
   renderArchitectureOverview,
@@ -246,6 +250,9 @@ const state = {
   // re-rendering the surface doesn't reset Tom's edits.
   simFacts: structuredCloneSafePure(DEFAULT_FACTS),
   simResult: null,
+  // Phase 5k — Quiz Mode state.
+  simMode: "quiz",  // "quiz" | "facts"
+  simQuizAnswers: {},
   // Phase 5e — currently-focused architecture object (null = overview).
   archSelectedKey: null,
 };
@@ -1168,13 +1175,31 @@ function render() {
 // =============================================================================
 
 function renderSimulatorView() {
-  // Repurpose the list panel for the fact form, the detail panel for the
-  // simulated output. Keeps the existing two-column layout intact.
-  el.list.innerHTML = renderFactForm(state.simFacts);
-  el.stats.innerHTML = `<div class="admin-stat"><strong>${state.simResult?.counts.total ?? "—"}</strong><span>Tasks if seeded</span></div>`;
+  // Phase 5k — Quiz Mode lives on the left rail (presets + chip pickers
+  // for system-creating answers + Q15b contractors). Facts Mode is the
+  // legacy raw-subtype-toggle view. Toggle in the topbar of the list.
+  const modeToggle = `
+    <div class="admin-sim__mode-toggle">
+      <button type="button" class="admin-sim__mode ${state.simMode === "quiz" ? "is-active" : ""}" data-sim-mode="quiz">Quiz Mode</button>
+      <button type="button" class="admin-sim__mode ${state.simMode === "facts" ? "is-active" : ""}" data-sim-mode="facts">Facts Mode (advanced)</button>
+    </div>
+  `;
 
-  attachFactFormHandlers(el.list, state.simFacts, () => {
-    runAndRenderSimulation();
+  if (state.simMode === "quiz") {
+    el.list.innerHTML = `${modeToggle}${renderQuizModeUI(state.simQuizAnswers, state.liveData["quiz-questions"])}`;
+    attachQuizModeHandlers(el.list, state.simQuizAnswers, () => {
+      runAndRenderSimulation();
+    });
+  } else {
+    el.list.innerHTML = `${modeToggle}${renderFactForm(state.simFacts)}`;
+    attachFactFormHandlers(el.list, state.simFacts, () => runAndRenderSimulation());
+  }
+
+  el.list.querySelectorAll("[data-sim-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.simMode = btn.dataset.simMode;
+      renderSimulatorView();
+    });
   });
 
   el.emptyDetail.classList.add("is-hidden");
@@ -1184,8 +1209,12 @@ function renderSimulatorView() {
   if (el.formHost) el.formHost.innerHTML = "";
   if (el.diffHost) el.diffHost.innerHTML = "";
   el.detailKind.textContent = "simulator";
-  el.detailTitle.textContent = "What would seed?";
-  el.detailSubtitle.textContent = "Edit the property facts on the left to see the reconciler's output update live.";
+  el.detailTitle.textContent =
+    state.simMode === "quiz" ? "What seeds for these quiz answers?" : "What seeds for these facts?";
+  el.detailSubtitle.textContent =
+    state.simMode === "quiz"
+      ? "Pick answers on the left (or load a preset) to see what tasks get created and how they route. The 4-tier breakdown shows who ends up handling each task."
+      : "Toggle subtypes directly to test reconciler edge cases.";
   el.detailStatus.textContent = "preview";
   el.detailStatus.dataset.tone = "active";
   if (el.lockToggle) el.lockToggle.classList.add("is-hidden");
@@ -1211,12 +1240,51 @@ function runAndRenderSimulation() {
     el.formHost.innerHTML = `<p class="admin-muted">Templates JSON not loaded yet. Run scripts/export_swift_admin_data.mjs and refresh.</p>`;
     return;
   }
-  state.simResult = runSimulation(state.simFacts, templatesJSON, systemsJSON);
+
+  // Phase 5k — when Quiz Mode is active, derive facts from quiz answers
+  // (with any preset's factsOverride applied) before running the sim.
+  let factsForSim = state.simFacts;
+  if (state.simMode === "quiz") {
+    // Find a preset whose answers exactly match — used to apply
+    // state/yearBuilt/sqft overrides automatically.
+    const matchingPreset = QUIZ_PRESETS.find((p) =>
+      Object.entries(p.answers).every(([k, v]) => {
+        const cur = state.simQuizAnswers[k];
+        if (typeof v === "string") return cur === v;
+        if (v && typeof v === "object" && v.selectedIds) {
+          const curIds = new Set(cur?.selectedIds || []);
+          const wantIds = new Set(v.selectedIds);
+          if (curIds.size !== wantIds.size) return false;
+          for (const x of wantIds) if (!curIds.has(x)) return false;
+          return true;
+        }
+        return false;
+      })
+    );
+    const baseFacts = matchingPreset?.factsOverride
+      ? { ...DEFAULT_FACTS, ...matchingPreset.factsOverride, subtypes: {}, hasContractorsFor: {} }
+      : { ...DEFAULT_FACTS, subtypes: {}, hasContractorsFor: {} };
+    factsForSim = quizAnswerToFacts(state.simQuizAnswers, baseFacts);
+  }
+
+  state.simResult = runSimulation(factsForSim, templatesJSON, systemsJSON);
   if (el.formHost) el.formHost.innerHTML = renderSimulatorUI(state.simResult);
-  el.stats.innerHTML = `<div class="admin-stat"><strong>${state.simResult.counts.total}</strong><span>Tasks</span></div>
-    <div class="admin-stat"><strong>${state.simResult.counts.bundles}</strong><span>Bundles</span></div>
-    <div class="admin-stat"><strong>${state.simResult.counts.vendor + state.simResult.counts.findContractor}</strong><span>Vendor</span></div>
-    <div class="admin-stat"><strong>${state.simResult.counts.personal}</strong><span>Personal</span></div>`;
+
+  // Stats bar above the list reflects the 4-tier breakdown
+  const lanes = state.simResult.lanes;
+  const allTasks = [...(lanes.bundles || []), ...(lanes.vendor || []), ...(lanes.findContractor || []), ...(lanes.personal || [])];
+  const tierCounts = { vendor_only: 0, vendor_or_handyman: 0, handyman_only: 0 };
+  for (const t of allTasks) {
+    if (t.safetyFloor === true || t.routingOverride === "vendorOnly" || (t.assignmentType === "vendor" && !t.routingOverride)) tierCounts.vendor_only++;
+    else if (t.routingOverride === "diyDefault" || t.assignmentType === "personal") tierCounts.handyman_only++;
+    else tierCounts.vendor_or_handyman++;
+  }
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${state.simResult.counts.total}</strong><span>Tasks</span></div>
+    <div class="admin-stat"><strong>${tierCounts.vendor_only}</strong><span>Vendor only</span></div>
+    <div class="admin-stat"><strong>${tierCounts.vendor_or_handyman}</strong><span>Vendor or Handyman</span></div>
+    <div class="admin-stat"><strong>${tierCounts.handyman_only}</strong><span>Handyman only</span></div>
+  `;
 }
 
 function renderNav() {
