@@ -1371,6 +1371,230 @@
 }
 
 /* =============================================================================
+   Phase 4b — Detail panel tabs (Edit / Impact / Usage)
+   ============================================================================= */
+
+.admin-tabs {
+  border-bottom: 1px solid var(--neutral-200);
+  display: flex;
+  gap: 0;
+  margin: 0 -22px;
+  padding: 0 22px;
+}
+
+.admin-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 700 13px var(--sans);
+  letter-spacing: 0.04em;
+  margin-bottom: -1px;
+  padding: 12px 16px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.admin-tab:hover {
+  color: var(--indigo-700);
+}
+
+.admin-tab.is-active {
+  border-bottom-color: var(--salmon, #ed6955);
+  color: var(--indigo-800, #453a70);
+}
+
+.admin-tab-pane {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-tab-pane:not(.is-active) {
+  display: none;
+}
+
+/* Impact panel */
+.admin-impact__section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.admin-impact__section h4 {
+  color: var(--indigo-700);
+  font: 700 12px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.admin-impact__section--lint {
+  background: rgba(237, 105, 85, 0.05);
+  border-color: rgba(237, 105, 85, 0.32);
+}
+
+.admin-impact__section--lint h4 {
+  color: var(--salmon-dark, #c25a4a);
+}
+
+.admin-impact__section--lint code {
+  background: rgba(237, 105, 85, 0.14);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.admin-impact__list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-impact__list li {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-impact__label {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 6px;
+  color: var(--indigo-700);
+  font: 600 12px ui-monospace, "SF Mono", Menlo, monospace;
+  padding: 2px 8px;
+}
+
+.admin-impact__label[data-nav-to] {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(69, 58, 112, 0.3);
+  text-underline-offset: 3px;
+}
+
+.admin-impact__label[data-nav-to]:hover {
+  background: rgba(69, 58, 112, 0.16);
+}
+
+.admin-impact__hint {
+  color: var(--text-muted);
+  font: 500 12px var(--sans);
+}
+
+/* Usage panel */
+.admin-usage {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-usage__row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.admin-stat-tile {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.admin-stat-tile strong {
+  color: var(--indigo-800, #453a70);
+  font: 700 22px Fraunces, Georgia, serif;
+}
+
+.admin-stat-tile span {
+  color: var(--text-muted);
+  font: 600 11px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-usage__list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-usage__list li {
+  align-items: center;
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 8px;
+  display: flex;
+  font: 500 13px var(--sans);
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 12px;
+}
+
+.admin-usage__list code {
+  background: rgba(69, 58, 112, 0.1);
+  border-radius: 5px;
+  color: var(--indigo-700);
+  font: 600 12px ui-monospace, monospace;
+  padding: 1px 6px;
+}
+
+.admin-usage__recommendation {
+  border: 1px solid;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.admin-usage__recommendation strong {
+  display: block;
+  font: 800 11px var(--sans);
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.admin-usage__recommendation p {
+  font: 500 13px var(--sans);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.admin-usage__recommendation[data-tone="active"] {
+  background: rgba(74, 124, 89, 0.08);
+  border-color: rgba(74, 124, 89, 0.32);
+  color: #3a6048;
+}
+
+.admin-usage__recommendation[data-tone="reshape"] {
+  background: rgba(199, 126, 46, 0.08);
+  border-color: rgba(199, 126, 46, 0.32);
+  color: #9c6322;
+}
+
+.admin-usage__recommendation[data-tone="cut"] {
+  background: rgba(194, 90, 94, 0.08);
+  border-color: rgba(194, 90, 94, 0.32);
+  color: #a9444b;
+}
+
+.admin-usage__recommendation[data-tone="defer"] {
+  background: rgba(69, 58, 112, 0.08);
+  border-color: rgba(69, 58, 112, 0.32);
+  color: var(--indigo-700);
+}
+
+.admin-usage__recommendation[data-tone="draft"] {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--neutral-200);
+  color: var(--text-muted);
+}
+
+/* =============================================================================
    Phase 7.5 — Launch lifecycle, Decisions, Activity, Readiness
    ============================================================================= */
 

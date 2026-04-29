@@ -263,6 +263,10 @@ const el = {
   // Phase 5 — note attachments
   fieldAttachment: document.querySelector("[data-field-attachment]"),
   attachmentStatus: document.querySelector("[data-attachment-status]"),
+  // Phase 4b — Impact + Usage tabs
+  detailTabs: document.querySelector("[data-detail-tabs]"),
+  impactHost: document.querySelector("[data-impact-host]"),
+  usageHost: document.querySelector("[data-usage-host]"),
 };
 
 // Phase 5 — pending file uploads queued for the next note save
@@ -309,6 +313,11 @@ function wireEvents() {
 
   // Phase 5 — file attachment uploader
   el.fieldAttachment?.addEventListener("change", handleAttachmentSelect);
+
+  // Phase 4b — detail-panel tab switching
+  el.detailTabs?.querySelectorAll("[data-detail-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => switchDetailTab(btn.dataset.detailTab));
+  });
 
   // Phase 7.5 — keyboard shortcuts (only when no input has focus)
   document.addEventListener("keydown", (event) => {
@@ -955,6 +964,17 @@ function renderDetail() {
   el.contextNote.value = "";
   renderContextNotes(item);
   el.saveNote.textContent = "Save note";
+
+  // Phase 4b — reset to Edit tab whenever the selection changes; clear
+  // cached usage stats only if the entity changed.
+  const cacheKey = entityCacheKey(item);
+  if (cacheKey !== TAB_STATE.lastEntityKey) {
+    TAB_STATE.lastEntityKey = cacheKey;
+    switchDetailTab("edit");
+  } else {
+    if (TAB_STATE.active === "impact") renderImpactTab();
+    if (TAB_STATE.active === "usage") renderUsageTab();
+  }
 }
 
 // Phase 7.5 — show "X of Y approved" + progress bar in the topbar for
@@ -976,6 +996,369 @@ function renderReadiness() {
   el.readinessHint.textContent = approved === total
     ? "Surface ready to ship."
     : `${total - approved} entities still need your call.`;
+}
+
+// =============================================================================
+// Phase 4b — Detail panel tabs (Edit / Impact / Usage)
+// =============================================================================
+
+const TAB_STATE = { active: "edit", lastEntityKey: null, usageCache: new Map() };
+
+function switchDetailTab(tabId) {
+  if (!tabId) return;
+  TAB_STATE.active = tabId;
+  el.detailTabs?.querySelectorAll("[data-detail-tab]").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.detailTab === tabId);
+  });
+  document.querySelectorAll("[data-tab-pane]").forEach((pane) => {
+    const match = pane.dataset.tabPane === tabId;
+    pane.classList.toggle("is-active", match);
+    if (match) pane.removeAttribute("hidden");
+    else pane.setAttribute("hidden", "");
+  });
+  if (tabId === "impact") renderImpactTab();
+  if (tabId === "usage") renderUsageTab();
+}
+
+function entityCacheKey(item) {
+  if (!item) return null;
+  return `${item.itemType}::${liveEntityIdFor(item)}`;
+}
+
+// -- Impact tab -------------------------------------------------------------
+// Renders cross-entity references baked into _impact at export time.
+
+function renderImpactTab() {
+  if (!el.impactHost) return;
+  const item = state.selected;
+  if (!item) {
+    el.impactHost.innerHTML = `<p class="admin-muted">Select an entity to see what depends on it.</p>`;
+    return;
+  }
+  const p = item.payload || {};
+  const impact = p._impact || {};
+  const sections = [];
+
+  if (item.itemType === "question") {
+    if (impact.creates_systems?.length) {
+      sections.push(impactSection("Creates systems", impact.creates_systems.map((s) => ({ label: s, hint: "home_systems.category" }))));
+    }
+    if (impact.unlocks_templates?.length) {
+      sections.push(impactSection("Unlocks templates", impact.unlocks_templates.map((s) => ({ label: s }))));
+    }
+    if (impact.gates_questions?.length) {
+      sections.push(impactSection("Gates these questions via dynamicSkip", impact.gates_questions.map((s) => ({ label: s }))));
+    }
+    // Heuristic — find templates whose requiredSubtypes mention answer ids
+    const tmplLinked = templatesGatedByQuestion(item);
+    if (tmplLinked.length) {
+      sections.push(impactSection(`Templates that may gate on this Q's answer IDs (${tmplLinked.length})`, tmplLinked.map((t) => ({ label: t.title, hint: t.systemCategory, navTo: { view: "tasks", id: t.templateKey } }))));
+    }
+  } else if (item.itemType === "task" || item.itemType === "handyman") {
+    const meta = impact.system_category_meta;
+    if (meta) {
+      sections.push(impactSection("System category", [{ label: meta.categoryKey, hint: `Tier ${meta.tier} · priority ${meta.displayPriority}`, navTo: { view: "systems", id: meta.categoryKey } }]));
+    }
+    if (impact.in_bundle) {
+      sections.push(impactSection(`Bundle: ${impact.in_bundle.bundleId}${impact.in_bundle.bundleTitle ? " — " + impact.in_bundle.bundleTitle : ""}`, (impact.in_bundle.siblings || []).map((s) => ({ label: s, hint: "sibling template" }))));
+    }
+    const matchingQ = questionsCreatingCategory(p.systemCategory);
+    if (matchingQ.length) {
+      sections.push(impactSection("Quiz questions that create this system", matchingQ.map((q) => ({ label: q.id, hint: q.title, navTo: { view: "quiz", id: q.id } }))));
+    }
+  } else if (item.itemType === "system") {
+    if (impact.templates_in_category?.length) {
+      sections.push(impactSection(`${impact.templates_in_category.length} templates in this category`, impact.templates_in_category.map((k) => ({ label: k, navTo: { view: "tasks", id: k } }))));
+    }
+    if (impact.created_by_questions?.length) {
+      sections.push(impactSection("Created by these quiz questions", impact.created_by_questions.map((q) => ({ label: q, navTo: { view: "quiz", id: q } }))));
+    } else {
+      const matchingQ = questionsCreatingCategory(p.categoryKey);
+      if (matchingQ.length) {
+        sections.push(impactSection("Created by these quiz questions", matchingQ.map((q) => ({ label: q.id, hint: q.title, navTo: { view: "quiz", id: q.id } }))));
+      }
+    }
+  } else if (item.itemType === "routine") {
+    if (impact.categories_served?.length) {
+      sections.push(impactSection("System categories served", impact.categories_served.map((c) => ({ label: c, navTo: { view: "systems", id: c } }))));
+    }
+    if (impact.handyman_singleton) {
+      sections.push(impactSection("Special status", [{ label: "Singleton — one active handyman routine per property" }]));
+    }
+  }
+
+  // Always-on lint summary
+  const lints = p._lint || [];
+  if (lints.length) {
+    sections.push(`
+      <section class="admin-impact__section admin-impact__section--lint">
+        <h4>Voice lint warnings (${lints.length})</h4>
+        <ul>
+          ${lints.map((l) => `<li><code>${escapeHtml(l.ruleId)}</code> on ${escapeHtml(l.field)} — ${escapeHtml(l.message)}<br/><small>${escapeHtml(l.snippet || "")}</small></li>`).join("")}
+        </ul>
+      </section>
+    `);
+  }
+
+  // Notes summary
+  const noteCount = state.notes.filter((n) => itemNoteMatches(n, item)).length;
+  sections.push(`
+    <section class="admin-impact__section">
+      <h4>Notes on this entity</h4>
+      <p class="admin-muted">${noteCount} note${noteCount === 1 ? "" : "s"} captured. Switch to the Edit tab to read or add.</p>
+    </section>
+  `);
+
+  el.impactHost.innerHTML = sections.length
+    ? sections.join("")
+    : `<p class="admin-muted">No cross-entity impact captured for this entity yet. The exporter's backreference pass is heuristic — v2 will deepen the graph.</p>`;
+
+  // Wire navTo links
+  el.impactHost.querySelectorAll("[data-nav-to]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const view = node.dataset.navTo;
+      const id = node.dataset.navId;
+      jumpToEntity(view, id);
+    });
+  });
+}
+
+function impactSection(title, items) {
+  return `
+    <section class="admin-impact__section">
+      <h4>${escapeHtml(title)}</h4>
+      <ul class="admin-impact__list">
+        ${items
+          .map(
+            (it) => `
+              <li>
+                <span class="admin-impact__label" ${it.navTo ? `data-nav-to="${escapeHtml(it.navTo.view)}" data-nav-id="${escapeHtml(it.navTo.id)}"` : ""}>${escapeHtml(it.label)}</span>
+                ${it.hint ? `<span class="admin-impact__hint">${escapeHtml(it.hint)}</span>` : ""}
+              </li>
+            `
+          )
+          .join("")}
+      </ul>
+    </section>
+  `;
+}
+
+function templatesGatedByQuestion(question) {
+  const answerIds = (question.payload?.answerOptions || []).map((o) => o.id).filter(Boolean);
+  if (!answerIds.length) return [];
+  const templates = state.liveData["templates"]?.entries || [];
+  const matched = [];
+  for (const t of templates) {
+    const subs = t.requiredSubtypes || [];
+    if (subs.some((s) => answerIds.includes(s))) matched.push(t);
+    if (matched.length >= 30) break;
+  }
+  return matched;
+}
+
+function questionsCreatingCategory(categoryKey) {
+  if (!categoryKey) return [];
+  const questions = state.liveData["quiz-questions"]?.entries || [];
+  return questions.filter((q) => (q._impact?.creates_systems || []).includes(categoryKey));
+}
+
+function jumpToEntity(view, id) {
+  if (!view || !id) return;
+  state.view = view;
+  const items = liveItemsForView(view) || [];
+  const target = items.find((i) =>
+    [i.payload?.id, i.payload?.templateKey, i.payload?.categoryKey, i.payload?.functionName, i.payload?.rawValue]
+      .filter(Boolean)
+      .includes(id)
+  );
+  if (target) state.selected = target;
+  TAB_STATE.active = "edit";
+  render();
+}
+
+// -- Usage tab --------------------------------------------------------------
+// Lazy-fetches the matching admin_*_stats RPC for the current entity.
+
+async function renderUsageTab() {
+  if (!el.usageHost) return;
+  const item = state.selected;
+  if (!item) {
+    el.usageHost.innerHTML = `<p class="admin-muted">Select an entity to see live usage stats.</p>`;
+    return;
+  }
+  const cacheKey = entityCacheKey(item);
+  if (TAB_STATE.usageCache.has(cacheKey)) {
+    renderUsageStats(TAB_STATE.usageCache.get(cacheKey), item);
+    return;
+  }
+  el.usageHost.innerHTML = `<p class="admin-muted">Loading live stats from production…</p>`;
+  try {
+    const stats = await fetchUsageStats(item);
+    TAB_STATE.usageCache.set(cacheKey, stats);
+    renderUsageStats(stats, item);
+  } catch (err) {
+    el.usageHost.innerHTML = `<p class="admin-muted">Stats unavailable: ${escapeHtml(err.message || String(err))}</p>`;
+  }
+}
+
+async function fetchUsageStats(item) {
+  const liveId = liveEntityIdFor(item);
+  if (item.itemType === "question") {
+    const { data, error } = await supabase.rpc("admin_quiz_question_stats", { p_question_id: liveId });
+    if (error) throw error;
+    return { kind: "question", data };
+  }
+  if (item.itemType === "task" || item.itemType === "handyman") {
+    const { data, error } = await supabase.rpc("admin_template_stats", { p_template_key: liveId });
+    if (error) throw error;
+    return { kind: "template", data };
+  }
+  if (item.itemType === "system") {
+    const { data, error } = await supabase.rpc("admin_system_category_stats", { p_category_key: liveId });
+    if (error) throw error;
+    return { kind: "system", data };
+  }
+  if (item.itemType === "routine") {
+    const { data, error } = await supabase.rpc("admin_routine_kind_stats", { p_kind: liveId });
+    if (error) throw error;
+    return { kind: "routine", data };
+  }
+  return { kind: "none", data: null };
+}
+
+function renderUsageStats(stats, item) {
+  if (!el.usageHost) return;
+  if (!stats || stats.kind === "none") {
+    el.usageHost.innerHTML = `<p class="admin-muted">No usage stats are tracked for ${escapeHtml(item.itemType)} entities.</p>`;
+    return;
+  }
+  const d = stats.data || {};
+
+  if (stats.kind === "question") {
+    const dist = d.distribution || {};
+    const distItems = Object.entries(dist)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `<li><code>${escapeHtml(k)}</code> <strong>${n}</strong></li>`)
+      .join("");
+    el.usageHost.innerHTML = `
+      <div class="admin-usage">
+        <div class="admin-usage__row">
+          ${statTile("Quiz starts", d.started_count)}
+          ${statTile("Quiz completions", d.completed_count)}
+          ${statTile("Answered this Q", d.answered_count)}
+          ${statTile("Drop-off rate", d.drop_off_rate != null ? `${Math.round(d.drop_off_rate * 100)}%` : "—")}
+        </div>
+        <h4>Answer distribution</h4>
+        <ul class="admin-usage__list">${distItems || `<li class="admin-muted">No answers recorded yet.</li>`}</ul>
+        ${recommendationFor(stats, item)}
+      </div>
+    `;
+    return;
+  }
+
+  if (stats.kind === "template") {
+    el.usageHost.innerHTML = `
+      <div class="admin-usage">
+        <div class="admin-usage__row">
+          ${statTile("Seeded", d.seeded_count)}
+          ${statTile("Completed", d.completed_count)}
+          ${statTile("Archived", d.archived_count)}
+          ${statTile("Overdue", d.overdue_count)}
+        </div>
+        <div class="admin-usage__row">
+          ${statTile("Distinct properties", d.distinct_properties)}
+          ${statTile("Completion rate", d.completion_rate != null ? `${Math.round(d.completion_rate * 100)}%` : "—")}
+          ${statTile("Archive rate", d.archive_rate != null ? `${Math.round(d.archive_rate * 100)}%` : "—")}
+        </div>
+        ${recommendationFor(stats, item)}
+      </div>
+    `;
+    return;
+  }
+
+  if (stats.kind === "system") {
+    el.usageHost.innerHTML = `
+      <div class="admin-usage">
+        <div class="admin-usage__row">
+          ${statTile("Properties carrying", d.property_count)}
+          ${statTile("With vendor linked", d.with_vendor_count)}
+          ${statTile("With open task", d.with_open_task_count)}
+          ${statTile("Vendor coverage rate", d.vendor_coverage_rate != null ? `${Math.round(d.vendor_coverage_rate * 100)}%` : "—")}
+        </div>
+        ${recommendationFor(stats, item)}
+      </div>
+    `;
+    return;
+  }
+
+  if (stats.kind === "routine") {
+    el.usageHost.innerHTML = `
+      <div class="admin-usage">
+        <div class="admin-usage__row">
+          ${statTile("Active routines", d.active_count)}
+          ${statTile("Paused", d.paused_count)}
+          ${statTile("Archived", d.archived_count)}
+          ${statTile("Avg confidence", d.avg_confidence_score != null ? d.avg_confidence_score : "—")}
+        </div>
+        ${recommendationFor(stats, item)}
+      </div>
+    `;
+    return;
+  }
+}
+
+function statTile(label, value) {
+  return `
+    <div class="admin-stat-tile">
+      <strong>${escapeHtml(value == null ? "—" : String(value))}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
+// Heuristic recommendation given stats — keep / rewrite / cut / investigate.
+function recommendationFor(stats, item) {
+  const d = stats?.data || {};
+  let level = "keep";
+  let reason = "Looks healthy.";
+  if (stats.kind === "question") {
+    if (d.started_count >= 10 && d.drop_off_rate != null && d.drop_off_rate > 0.25) {
+      level = "rewrite";
+      reason = `${Math.round(d.drop_off_rate * 100)}% drop-off across ${d.started_count} starts. Copy or skip rule may be failing.`;
+    } else if (d.answered_count === 0 && d.started_count >= 10) {
+      level = "cut";
+      reason = `Zero answers across ${d.started_count} quiz starts. Strong cut candidate.`;
+    } else if (d.started_count < 10) {
+      level = "n/a";
+      reason = "Too new to call (fewer than 10 quiz starts).";
+    }
+  } else if (stats.kind === "template") {
+    if (d.seeded_count >= 10 && (d.completion_rate || 0) < 0.05) {
+      level = "cut";
+      reason = `${Math.round((d.completion_rate || 0) * 100)}% completion across ${d.seeded_count} seedings. Strong cut candidate.`;
+    } else if (d.seeded_count >= 10 && (d.archive_rate || 0) > 0.4) {
+      level = "rewrite";
+      reason = `${Math.round((d.archive_rate || 0) * 100)}% archive rate. Users keep dismissing this — copy or relevance issue.`;
+    } else if (d.seeded_count < 10) {
+      level = "n/a";
+      reason = "Too new to call (fewer than 10 seedings).";
+    }
+  } else if (stats.kind === "system") {
+    if (d.property_count >= 10 && (d.vendor_coverage_rate || 0) < 0.1) {
+      level = "investigate";
+      reason = `Only ${Math.round((d.vendor_coverage_rate || 0) * 100)}% of properties have a vendor for this. Quiz/contractor flow may be missing this category.`;
+    } else if (d.property_count < 10) {
+      level = "n/a";
+      reason = "Too new to call.";
+    }
+  }
+  const tone = { keep: "active", rewrite: "reshape", cut: "cut", investigate: "defer", "n/a": "draft" }[level] || "draft";
+  return `
+    <div class="admin-usage__recommendation" data-tone="${tone}">
+      <strong>Recommendation: ${escapeHtml(level)}</strong>
+      <p>${escapeHtml(reason)}</p>
+    </div>
+  `;
 }
 
 function resetEditingState() {

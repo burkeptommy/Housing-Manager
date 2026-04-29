@@ -153,6 +153,16 @@
                   <span class="admin-pill admin-pill--launch is-hidden" data-launch-pill></span>
                 </div>
 
+                <!-- Phase 4b — Tab strip on every detail panel -->
+                <div class="admin-tabs" role="tablist" data-detail-tabs>
+                  <button type="button" class="admin-tab is-active" data-detail-tab="edit" role="tab">Edit</button>
+                  <button type="button" class="admin-tab" data-detail-tab="impact" role="tab">Impact</button>
+                  <button type="button" class="admin-tab" data-detail-tab="usage" role="tab">Usage</button>
+                </div>
+
+                <!-- Edit tab content (default) -->
+                <div class="admin-tab-pane is-active" data-tab-pane="edit">
+
                 <!-- Schema-driven form (live entities — Quiz / Tasks / etc.). -->
                 <div class="admin-form-host" data-form-host></div>
 
@@ -259,6 +269,23 @@
                     Save note
                   </button>
                 </section>
+
+                </div><!-- /tab-pane edit -->
+
+                <!-- Impact tab — cross-entity backreferences (computed at export time) -->
+                <div class="admin-tab-pane" data-tab-pane="impact" hidden>
+                  <div class="admin-impact-host" data-impact-host>
+                    <p class="admin-muted">Select an entity to see what depends on it.</p>
+                  </div>
+                </div>
+
+                <!-- Usage tab — real-data stats (lazy-loaded from admin_*_stats RPCs) -->
+                <div class="admin-tab-pane" data-tab-pane="usage" hidden>
+                  <div class="admin-usage-host" data-usage-host>
+                    <p class="admin-muted">Select an entity to see live usage stats.</p>
+                  </div>
+                </div>
+
               </article>
             </div>
           </section>
