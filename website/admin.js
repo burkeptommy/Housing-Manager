@@ -891,7 +891,10 @@ const LIVE_MAPPERS = {
     id: `live-quiz-${q.id}`,
     source: "live",
     itemType: "question",
-    title: q.title || q.id,
+    // Prefix with order number so Tom can scan the actual sequence at
+    // a glance. idx comes from the JSON's source order, which mirrors
+    // HouseQuizQuestionLibrary.swift declaration order.
+    title: `${idx + 1}. ${q.title || q.id}`,
     status: "active",
     category: `${q.chapter || "?"} · ${q.section || "?"}`,
     sortOrder: idx + 1,
