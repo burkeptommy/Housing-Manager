@@ -497,7 +497,12 @@ export function renderArchitectureOverview() {
 }
 
 // Render the focused single-object detail panel.
-export function renderArchitectureObject(key) {
+//
+// `extras` is an optional object of `{ [objectKey]: extraHtmlString }`
+// supplied by admin.js. Used to inject the live edge-function inventory
+// into the Edge Function Prompt detail page without giving this module
+// direct knowledge of admin.js's state.
+export function renderArchitectureObject(key, extras = {}) {
   const obj = findObject(key);
   if (!obj) return renderArchitectureOverview();
 
@@ -563,6 +568,8 @@ export function renderArchitectureObject(key) {
         ${renderRelPanel("References", refs, "references", "Optional links — may or may not be set.")}
         ${renderIncomingPanel(incoming)}
       </div>
+
+      ${extras[key] || ""}
 
       ${
         siblings.length

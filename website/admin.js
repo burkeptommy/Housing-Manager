@@ -317,7 +317,14 @@ const el = {
   detailTabs: document.querySelector("[data-detail-tabs]"),
   impactHost: document.querySelector("[data-impact-host]"),
   usageHost: document.querySelector("[data-usage-host]"),
+  // Phase 5i — Global search palette
+  palette: document.querySelector("[data-palette]"),
+  paletteInput: document.querySelector("[data-palette-input]"),
+  paletteResults: document.querySelector("[data-palette-results]"),
+  paletteHint: document.querySelector("[data-palette-hint]"),
 };
+
+const paletteState = { open: false, results: [], activeIndex: 0 };
 
 // Phase 5 — pending file uploads queued for the next note save
 const pendingAttachments = [];
@@ -377,6 +384,13 @@ function wireEvents() {
       target instanceof HTMLTextAreaElement ||
       target instanceof HTMLSelectElement ||
       (target?.isContentEditable);
+    // Cmd+K / Ctrl+K opens the global palette regardless of focus
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openPalette();
+      return;
+    }
+    if (paletteState.open) return; // palette has its own keymap
     if (event.key === "?" && event.shiftKey && !inField) {
       event.preventDefault();
       showShortcutHelp();
@@ -397,6 +411,39 @@ function wireEvents() {
         state.selected = null;
         render();
       }
+    }
+  });
+
+  // Phase 5i — Palette wiring
+  el.palette?.querySelectorAll("[data-palette-dismiss]").forEach((node) => {
+    node.addEventListener("click", () => closePalette());
+  });
+  el.paletteInput?.addEventListener("input", () => {
+    paletteState.activeIndex = 0;
+    renderPaletteResults();
+  });
+  el.paletteInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePalette();
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      paletteState.activeIndex = Math.min(paletteState.results.length - 1, paletteState.activeIndex + 1);
+      renderPaletteResults();
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      paletteState.activeIndex = Math.max(0, paletteState.activeIndex - 1);
+      renderPaletteResults();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const r = paletteState.results[paletteState.activeIndex];
+      if (r) activatePaletteResult(r);
     }
   });
 
@@ -455,16 +502,229 @@ function buildPreviewOptions() {
   };
 }
 
+// =============================================================================
+// Phase 5i — Cmd+K global palette
+// =============================================================================
+// Indexes every entity (quiz / tasks / handyman / routines / systems /
+// vehicles / prompts) plus every saved note + every architecture object.
+// Match score = simple substring presence with a tier preference (titles
+// rank above bodies). Result list capped at 25 to keep rendering fast.
+
+function openPalette() {
+  if (!el.palette) return;
+  paletteState.open = true;
+  paletteState.activeIndex = 0;
+  el.palette.hidden = false;
+  el.palette.classList.add("is-open");
+  el.paletteInput.value = "";
+  renderPaletteResults();
+  setTimeout(() => el.paletteInput.focus(), 10);
+}
+
+function closePalette() {
+  if (!el.palette) return;
+  paletteState.open = false;
+  el.palette.hidden = true;
+  el.palette.classList.remove("is-open");
+  paletteState.results = [];
+  paletteState.activeIndex = 0;
+}
+
+function buildPaletteIndex() {
+  const out = [];
+  // Live entities
+  for (const surfaceId of ["quiz", "tasks", "handyman", "routines", "systems", "vehicles", "prompts"]) {
+    const items = liveItemsForView(surfaceId) || [];
+    for (const item of items) {
+      out.push({
+        kind: "entity",
+        view: surfaceId,
+        item,
+        emoji: surfaceEmoji(surfaceId),
+        title: item.title,
+        subtitle: `${surfaceLabel(surfaceId)} · ${item.category || ""}`,
+        searchText: [
+          item.title,
+          item.category,
+          item.description,
+          item.payload?.id,
+          item.payload?.templateKey,
+          item.payload?.categoryKey,
+          item.payload?.functionName,
+          item.payload?.rawValue,
+          item.payload?.systemCategory,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase(),
+      });
+    }
+  }
+  // Architecture objects
+  for (const obj of getObjectMapLite()) {
+    out.push({
+      kind: "architecture",
+      archKey: obj.key,
+      emoji: obj.emoji,
+      title: obj.name,
+      subtitle: `Architecture · ${obj.cluster}`,
+      searchText: `${obj.name} ${obj.cluster} ${obj.key}`.toLowerCase(),
+    });
+  }
+  // Notes
+  for (const note of state.notes) {
+    if (note.parentNoteId) continue;
+    out.push({
+      kind: "note",
+      note,
+      emoji: "📝",
+      title: note.scopeTitle || note.body?.slice(0, 60) || "(untitled note)",
+      subtitle: `Note · ${note.intent || "feedback"} · ${note.scopeType || "general"}${note.appliedAt ? " · applied" : ""}`,
+      searchText: [note.body, note.scopeTitle, note.scopeId, note.intent, note.scopeType]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    });
+  }
+  return out;
+}
+
+function surfaceEmoji(viewId) {
+  return (
+    {
+      quiz: "❓",
+      tasks: "✅",
+      handyman: "🔨",
+      routines: "🔁",
+      systems: "🏷️",
+      vehicles: "🚗",
+      prompts: "🧠",
+    }[viewId] || "•"
+  );
+}
+
+function surfaceLabel(viewId) {
+  return (
+    {
+      quiz: "Quiz",
+      tasks: "Tasks",
+      handyman: "Handyman",
+      routines: "Routines",
+      systems: "Systems",
+      vehicles: "Vehicles",
+      prompts: "Prompts",
+    }[viewId] || viewId
+  );
+}
+
+function renderPaletteResults() {
+  if (!el.paletteResults) return;
+  const query = (el.paletteInput?.value || "").trim().toLowerCase();
+  const tokens = query.split(/\s+/).filter(Boolean);
+  const all = buildPaletteIndex();
+
+  const scored = tokens.length
+    ? all
+        .map((r) => {
+          let score = 0;
+          for (const tok of tokens) {
+            if (r.title.toLowerCase().includes(tok)) score += 4;
+            if (r.searchText.includes(tok)) score += 2;
+          }
+          return { r, score };
+        })
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.r)
+    : all.filter((r) => r.kind === "entity" && (r.view === "quiz" || r.view === "tasks")).slice(0, 12);
+
+  paletteState.results = scored.slice(0, 25);
+  if (paletteState.activeIndex >= paletteState.results.length) {
+    paletteState.activeIndex = Math.max(0, paletteState.results.length - 1);
+  }
+
+  if (!paletteState.results.length) {
+    el.paletteResults.innerHTML = `<div class="admin-palette__empty">${query ? `No matches for "${escapeHtml(query)}"` : "Type to search any entity, note, or edge function…"}</div>`;
+    if (el.paletteHint) {
+      el.paletteHint.textContent = query
+        ? "Try a partial title or a question id like 'q3' or 'roof'."
+        : "Start typing to search across every quiz question, template, system, routine, edge function, and saved note.";
+    }
+    return;
+  }
+
+  el.paletteResults.innerHTML = paletteState.results
+    .map(
+      (r, i) => `
+        <button type="button" class="admin-palette__result ${i === paletteState.activeIndex ? "is-active" : ""}" data-palette-index="${i}">
+          <span class="admin-palette__result-emoji">${r.emoji}</span>
+          <span class="admin-palette__result-body">
+            <span class="admin-palette__result-title">${escapeHtml(r.title)}</span>
+            <span class="admin-palette__result-subtitle">${escapeHtml(r.subtitle)}</span>
+          </span>
+        </button>
+      `
+    )
+    .join("");
+
+  el.paletteResults.querySelectorAll("[data-palette-index]").forEach((btn) => {
+    btn.addEventListener("mouseenter", () => {
+      paletteState.activeIndex = Number(btn.dataset.paletteIndex);
+      renderPaletteResults();
+    });
+    btn.addEventListener("click", () => {
+      const r = paletteState.results[Number(btn.dataset.paletteIndex)];
+      if (r) activatePaletteResult(r);
+    });
+  });
+
+  if (el.paletteHint) {
+    el.paletteHint.textContent = `${paletteState.results.length} match${paletteState.results.length === 1 ? "" : "es"} · Enter to open · Esc to close`;
+  }
+}
+
+function activatePaletteResult(r) {
+  closePalette();
+  if (r.kind === "entity") {
+    state.view = r.view;
+    state.selected = r.item;
+    render();
+    return;
+  }
+  if (r.kind === "architecture") {
+    state.view = "architecture";
+    state.archSelectedKey = r.archKey;
+    render();
+    return;
+  }
+  if (r.kind === "note") {
+    if (noteCanJumpToEntity(r.note)) {
+      const targetView = viewIdForType(r.note.scopeType);
+      const targetItem = locateLiveItemByScope(r.note);
+      if (targetView && targetItem) {
+        state.view = targetView;
+        state.selected = targetItem;
+        render();
+        return;
+      }
+    }
+    state.view = "notes";
+    state.selected = r.note;
+    render();
+  }
+}
+
 function showShortcutHelp() {
   alert(
     [
       "Keyboard shortcuts",
       "",
-      "/ — focus the search input",
-      "Esc — clear search, then deselect, then close any open preview",
+      "Cmd/Ctrl+K — open the global search palette (any entity, note, edge fn)",
+      "/ — focus the surface search input",
+      "Esc — close palette, then clear search, then deselect, then close preview",
+      "↑↓ — navigate palette results",
+      "Enter — open the highlighted palette result",
       "? — this help",
-      "",
-      "(More shortcuts coming — keyboard-only review pass is on the roadmap.)",
     ].join("\n")
   );
 }
@@ -1622,22 +1882,26 @@ function computeDecisionQueue() {
     }
   }
 
-  // 3. Lint violations on un-approved live entities
+  // 3. Lint violations on un-approved live entities — emit one queue
+  // entry per actual lint hit so Tom sees the specific issue + the
+  // offending snippet, not 35 rows of canned copy.
   for (const surfaceId of surfaces) {
     const items = liveItemsForView(surfaceId) || [];
     for (const item of items) {
-      const lintCount = item.lintCount || 0;
+      const lintHits = item.payload?._lint || [];
+      if (!lintHits.length) continue;
       const launch = effectiveLaunchStatus(item);
-      if (lintCount > 0 && launch !== "approved" && launch !== "shipped") {
+      if (launch === "approved" || launch === "shipped") continue;
+      for (const hit of lintHits) {
         queue.push({
-          id: `lint-${surfaceId}-${item.id}`,
+          id: `lint-${surfaceId}-${item.id}-${hit.ruleId}-${hit.field}`,
           severity: "lint",
           title: item.title,
-          reason: `${lintCount} voice-lint hit${lintCount === 1 ? "" : "s"}.`,
+          reason: lintReasonFor(hit),
           itemType: item.itemType,
           targetView: surfaceId,
           targetItem: item,
-          recommendation: "Fix the voice issue, then lock as approved.",
+          recommendation: lintRecommendationFor(hit),
           primaryActions: ["open", "approve", "cut"],
         });
       }
@@ -1674,6 +1938,36 @@ function computeDecisionQueue() {
   }
 
   return queue;
+}
+
+// Phase 5f — turn raw lint hits into specific, actionable rows.
+function lintReasonFor(hit) {
+  const fieldLabel = (hit.field || "").replace("answerOption.", "answer label ");
+  const snippet = (hit.snippet || "").trim();
+  const trimmed = snippet.length > 140 ? snippet.slice(0, 137) + "…" : snippet;
+  if (hit.ruleId === "no-em-dash") {
+    return `Em-dash in ${fieldLabel}: "${trimmed}"`;
+  }
+  if (hit.ruleId === "no-professional-x-titles") {
+    return `Title starts with "Professional X": "${trimmed}"`;
+  }
+  if (hit.ruleId === "answer-label-max-words") {
+    return `Answer label is too long: "${trimmed}"`;
+  }
+  return `${hit.ruleId} on ${fieldLabel}: "${trimmed}"`;
+}
+
+function lintRecommendationFor(hit) {
+  if (hit.ruleId === "no-em-dash") {
+    return "Replace the em-dash with a comma or hyphen — em-dashes read as AI-generated to HNW readers.";
+  }
+  if (hit.ruleId === "no-professional-x-titles") {
+    return 'Use action-first phrasing instead — "Annual X" or "Schedule X".';
+  }
+  if (hit.ruleId === "answer-label-max-words") {
+    return "Trim the label to 7 or fewer words. Long answer chips wrap awkwardly.";
+  }
+  return "Open the entity, fix the flagged copy, then approve.";
 }
 
 function isHighImpact(item) {
@@ -1915,12 +2209,25 @@ function renderArchitectureSurface() {
 
   // Render the appropriate body into formHost.
   if (el.formHost) {
+    const extras = focused?.key === "edge_function_prompt"
+      ? { edge_function_prompt: renderEdgeFunctionInventory() }
+      : {};
     el.formHost.innerHTML = focused
-      ? renderArchitectureObject(focused.key)
+      ? renderArchitectureObject(focused.key, extras)
       : renderArchitectureOverview();
     attachArchitectureHandlers(el.formHost, {
       onOpen: openArchitectureObject,
       onBack: clearArchitectureObject,
+    });
+    // Wire edge-function click-throughs to jump to the Prompts surface.
+    el.formHost.querySelectorAll("[data-edge-fn-jump]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const fnName = btn.dataset.edgeFnJump;
+        state.view = "prompts";
+        const items = liveItemsForView("prompts") || [];
+        state.selected = items.find((i) => i.payload?.functionName === fnName) || null;
+        render();
+      });
     });
   }
 
@@ -1966,6 +2273,107 @@ function renderArchitectureSurface() {
        <div class="admin-stat"><strong>${(focused.relationships || []).length}</strong><span>Outgoing links</span></div>`
     : `<div class="admin-stat"><strong>${lite.length}</strong><span>Objects mapped</span></div>
        <div class="admin-stat"><strong>${clusters.length}</strong><span>Clusters</span></div>`;
+}
+
+// Phase 5g — render the edge functions inventory injected into the
+// Edge Function Prompt architecture detail. Groups the 50+ functions
+// by purpose so the page reads cleanly. Click any row to jump straight
+// to that prompt on the Prompts surface.
+function renderEdgeFunctionInventory() {
+  const fns = state.liveData["edge-function-prompts"]?.entries || [];
+  if (!fns.length) {
+    return `<section class="admin-arch__panel"><h4>Edge function inventory</h4><p class="admin-muted">No edge functions exported yet — run scripts/export_swift_admin_data.mjs and refresh.</p></section>`;
+  }
+  const buckets = bucketEdgeFunctions(fns);
+  const totalFns = fns.length;
+  const withPrompt = fns.filter((f) => f.systemPrompt).length;
+  const sectionsHtml = buckets
+    .filter((b) => b.fns.length)
+    .map(
+      (b) => `
+        <section class="admin-arch__edge-bucket">
+          <header>
+            <h5>${escapeHtml(b.label)}</h5>
+            <span class="admin-muted">${b.fns.length} function${b.fns.length === 1 ? "" : "s"}</span>
+          </header>
+          <ul>
+            ${b.fns
+              .map((fn) => `
+                <li>
+                  <button type="button" class="admin-arch__edge-fn" data-edge-fn-jump="${escapeHtml(fn.functionName)}">
+                    <code>${escapeHtml(fn.functionName)}</code>
+                    <span class="admin-arch__edge-fn-meta">
+                      ${fn.model ? `<span>${escapeHtml(fn.model)}</span>` : ""}
+                      ${fn.systemPrompt ? `<span>${fn.systemPrompt.length} char prompt</span>` : `<span class="admin-arch__edge-fn-warn">no prompt detected</span>`}
+                    </span>
+                  </button>
+                </li>
+              `).join("")}
+          </ul>
+        </section>
+      `
+    )
+    .join("");
+  return `
+    <section class="admin-arch__panel admin-arch__panel--edge">
+      <h4>Edge function inventory (${totalFns})</h4>
+      <p class="admin-muted">${withPrompt} of ${totalFns} have a detected system prompt. Click any function to open it on the Prompts surface.</p>
+      <div class="admin-arch__edge-buckets">
+        ${sectionsHtml}
+      </div>
+    </section>
+  `;
+}
+
+const EDGE_FUNCTION_BUCKETS = [
+  {
+    key: "doc_ai",
+    label: "📄 Document + AI insights",
+    match: /^(analyze|process-invoice|gap-analysis|simulate-scenario|proactive-scan|chat|extract-vendor)/,
+  },
+  {
+    key: "email",
+    label: "📧 Email pipeline",
+    match: /^(receive-email|process-inbox-item|send-)/,
+  },
+  {
+    key: "vehicle",
+    label: "🚗 Vehicle",
+    match: /^(vehicle-|check-vehicle)/,
+  },
+  {
+    key: "property",
+    label: "🏠 Property + lookup",
+    match: /^(property-lookup|brand-logo|find-local-vendors|view-document|verify-)/,
+  },
+  {
+    key: "equipment",
+    label: "🛠 Equipment + manuals",
+    match: /^(search-equipment|identify-equipment|lookup-manual|score-equipment|enrich-catalog|expand-catalog|scrape-manuals|download-manuals|upload-manual|send-catalog-request)/,
+  },
+  {
+    key: "quote",
+    label: "💵 Quote + project",
+    match: /^(analyze-quote|draft-negotiation-email|research-project|project-feasibility|visualize-room|score-property)/,
+  },
+  {
+    key: "household",
+    label: "👥 Household + account",
+    match: /^(merge-households|delete-account|send-push|cadence-notifications|handyman-portal|find-network-handymen)/,
+  },
+];
+
+function bucketEdgeFunctions(fns) {
+  const buckets = EDGE_FUNCTION_BUCKETS.map((b) => ({ label: b.label, fns: [] }));
+  const other = { label: "🧩 Other", fns: [] };
+  fns.forEach((fn) => {
+    const idx = EDGE_FUNCTION_BUCKETS.findIndex((b) => b.match.test(fn.functionName));
+    if (idx >= 0) buckets[idx].fns.push(fn);
+    else other.fns.push(fn);
+  });
+  buckets.forEach((b) => b.fns.sort((a, c) => a.functionName.localeCompare(c.functionName)));
+  other.fns.sort((a, c) => a.functionName.localeCompare(c.functionName));
+  return [...buckets, other];
 }
 
 function openArchitectureObject(key) {
@@ -2191,15 +2599,26 @@ function claudeFileNoteHtml(note, depth = 0) {
 }
 
 function renderNotesView() {
-  el.stats.innerHTML = `
-    <div class="admin-stat"><strong>${state.notes.length}</strong><span>Notes</span></div>
-    <div class="admin-stat"><strong>${state.storageMode}</strong><span>Storage</span></div>
-    <div class="admin-stat"><strong>${new Date().toLocaleDateString()}</strong><span>Today</span></div>
-  `;
+  // Phase 5h — text search across body + scope title + scope id. Reuses
+  // the existing list-tools search input (state.search) so the same
+  // box that filters every other surface filters notes too.
+  const query = (state.search || "").trim().toLowerCase();
+  const matchesQuery = (n) => {
+    if (!query) return true;
+    return [n.body, n.scopeTitle, n.scopeId, n.intent, n.scopeType]
+      .filter(Boolean)
+      .some((s) => String(s).toLowerCase().includes(query));
+  };
 
   // Top-level notes only; replies stay nested under their parents on the
   // entity's detail panel.
-  const topLevel = state.notes.filter((n) => !n.parentNoteId);
+  const topLevel = state.notes.filter((n) => !n.parentNoteId).filter(matchesQuery);
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${topLevel.length}</strong><span>${query ? "Matching" : "Notes"}</span></div>
+    <div class="admin-stat"><strong>${state.notes.filter((n) => !n.appliedAt && ["change_request","proposal_add","proposal_delete"].includes(n.intent)).length}</strong><span>Pending</span></div>
+    <div class="admin-stat"><strong>${state.notes.filter((n) => n.appliedAt).length}</strong><span>Applied</span></div>
+  `;
 
   el.list.innerHTML = topLevel.map((note) => {
     const canJump = noteCanJumpToEntity(note);
@@ -2256,9 +2675,12 @@ function renderNotesView() {
   // Initial pane state — empty until a note is clicked.
   el.emptyDetail.classList.remove("is-hidden");
   el.detail.classList.add("is-hidden");
-  el.emptyDetail.querySelector("h3").textContent = "Pick a note to open its entity.";
-  el.emptyDetail.querySelector("p").textContent =
-    "Notes are written about a specific quiz question, template, system, or routine. Click one to open that entity's detail panel — you'll see the full thread and can add another note right there. General notes (no entity scope) stay in this pane.";
+  el.emptyDetail.querySelector("h3").textContent = query
+    ? `${topLevel.length} note${topLevel.length === 1 ? "" : "s"} matching "${query}"`
+    : "Pick a note to open its entity.";
+  el.emptyDetail.querySelector("p").textContent = query
+    ? "Click any matching note to open the entity it's about. Search clears when you switch surfaces or hit Esc."
+    : "Notes are written about a specific quiz question, template, system, or routine. Click one to open that entity's detail panel — you'll see the full thread and can add another note right there. General notes (no entity scope) stay in this pane. Type in the search box above to filter by body or entity.";
 }
 
 function noteCanJumpToEntity(note) {

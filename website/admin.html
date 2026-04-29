@@ -296,6 +296,23 @@
     <!-- Datalist for system-picker controls in the schema-driven form. Populated at runtime from system-categories.json. -->
     <datalist id="admin-system-options"></datalist>
 
+    <!-- Phase 5i — Global search palette (Cmd/Ctrl+K). Hidden by default. -->
+    <div class="admin-palette" data-palette hidden>
+      <div class="admin-palette__scrim" data-palette-dismiss></div>
+      <div class="admin-palette__panel" role="dialog" aria-modal="true" aria-label="Global search">
+        <input
+          type="text"
+          class="admin-palette__input"
+          data-palette-input
+          placeholder="Search any entity, note, or edge function… (Esc to close, ↑↓ to navigate, Enter to open)"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="admin-palette__results" data-palette-results></div>
+        <p class="admin-palette__hint admin-muted" data-palette-hint>Start typing to search across every quiz question, template, system, routine, edge function, and saved note.</p>
+      </div>
+    </div>
+
     <script type="module" src="/admin.js"></script>
   </body>
 </html>
