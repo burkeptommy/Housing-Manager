@@ -1,0 +1,458 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.066Z",
+  "sourceCommit": "28d1fbd4",
+  "count": 50,
+  "entries": [
+    {
+      "functionName": "analyze-document",
+      "sourceFile": "supabase/functions/analyze-document/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "analyze-quote",
+      "sourceFile": "supabase/functions/analyze-quote/index.ts",
+      "model": "claude-opus-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "auto-resume-standing-appointments",
+      "sourceFile": "supabase/functions/auto-resume-standing-appointments/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "brand-logo",
+      "sourceFile": "supabase/functions/brand-logo/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "cadence-notifications",
+      "sourceFile": "supabase/functions/cadence-notifications/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "chat",
+      "sourceFile": "supabase/functions/chat/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "check-vehicle-recalls",
+      "sourceFile": "supabase/functions/check-vehicle-recalls/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "debug-research",
+      "sourceFile": "supabase/functions/debug-research/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "delete-account",
+      "sourceFile": "supabase/functions/delete-account/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "download-manuals",
+      "sourceFile": "supabase/functions/download-manuals/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "draft-negotiation-email",
+      "sourceFile": "supabase/functions/draft-negotiation-email/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "enrich-catalog",
+      "sourceFile": "supabase/functions/enrich-catalog/index.ts",
+      "model": "claude-sonnet-4-20250514",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "enrich-provider-logos",
+      "sourceFile": "supabase/functions/enrich-provider-logos/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "expand-catalog",
+      "sourceFile": "supabase/functions/expand-catalog/index.ts",
+      "model": "claude-sonnet-4-20250514",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "extract-vendor",
+      "sourceFile": "supabase/functions/extract-vendor/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "find-local-advisors",
+      "sourceFile": "supabase/functions/find-local-advisors/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "find-local-vendors",
+      "sourceFile": "supabase/functions/find-local-vendors/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "find-network-handymen",
+      "sourceFile": "supabase/functions/find-network-handymen/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "gap-analysis",
+      "sourceFile": "supabase/functions/gap-analysis/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "get-invitation-preview",
+      "sourceFile": "supabase/functions/get-invitation-preview/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "handyman-portal",
+      "sourceFile": "supabase/functions/handyman-portal/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "handyman-provider",
+      "sourceFile": "supabase/functions/handyman-provider/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "identify-equipment",
+      "sourceFile": "supabase/functions/identify-equipment/index.ts",
+      "model": "claude-sonnet-4-20250514",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "lookup-manual",
+      "sourceFile": "supabase/functions/lookup-manual/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "merge-households",
+      "sourceFile": "supabase/functions/merge-households/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "proactive-scan",
+      "sourceFile": "supabase/functions/proactive-scan/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "process-inbox-item",
+      "sourceFile": "supabase/functions/process-inbox-item/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "process-invoice",
+      "sourceFile": "supabase/functions/process-invoice/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "project-feasibility",
+      "sourceFile": "supabase/functions/project-feasibility/index.ts",
+      "model": "claude-haiku-4-5-20251001",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "property-lookup",
+      "sourceFile": "supabase/functions/property-lookup/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "receive-email",
+      "sourceFile": "supabase/functions/receive-email/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "research-item-alternative",
+      "sourceFile": "supabase/functions/research-item-alternative/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "research-project",
+      "sourceFile": "supabase/functions/research-project/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "resend-household-invite",
+      "sourceFile": "supabase/functions/resend-household-invite/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "roll-forward-standing-visits",
+      "sourceFile": "supabase/functions/roll-forward-standing-visits/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "score-equipment",
+      "sourceFile": "supabase/functions/score-equipment/index.ts",
+      "model": "claude-sonnet-4-20250514",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "score-property",
+      "sourceFile": "supabase/functions/score-property/index.ts",
+      "model": "claude-sonnet-4-20250514",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "scrape-manuals",
+      "sourceFile": "supabase/functions/scrape-manuals/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "search-equipment",
+      "sourceFile": "supabase/functions/search-equipment/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "send-catalog-request",
+      "sourceFile": "supabase/functions/send-catalog-request/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "send-household-invite",
+      "sourceFile": "supabase/functions/send-household-invite/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "send-push-notification",
+      "sourceFile": "supabase/functions/send-push-notification/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "send-reminder-batch",
+      "sourceFile": "supabase/functions/send-reminder-batch/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "simulate-scenario",
+      "sourceFile": "supabase/functions/simulate-scenario/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "test-ai",
+      "sourceFile": "supabase/functions/test-ai/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "upload-manual",
+      "sourceFile": "supabase/functions/upload-manual/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "vehicle-lookup",
+      "sourceFile": "supabase/functions/vehicle-lookup/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "vehicle-value",
+      "sourceFile": "supabase/functions/vehicle-value/index.ts",
+      "model": "claude-sonnet-4-6",
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "view-document",
+      "sourceFile": "supabase/functions/view-document/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    },
+    {
+      "functionName": "visualize-room",
+      "sourceFile": "supabase/functions/visualize-room/index.ts",
+      "model": null,
+      "systemPrompt": null,
+      "cachedSamples": [],
+      "_impact": {},
+      "_lint": []
+    }
+  ],
+  "note": "Heuristic prompt extraction (first system role). v2 will capture structured response shapes, all message roles, and table read/write footprints."
+}

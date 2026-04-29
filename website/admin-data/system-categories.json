@@ -1,0 +1,887 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.006Z",
+  "sourceFile": "Haven/Features/Property/Services/SystemCategoryRegistry.swift",
+  "sourceCommit": "28d1fbd4",
+  "count": 44,
+  "entries": [
+    {
+      "categoryKey": "Roofing",
+      "displayName": "Roof",
+      "tier": "universal",
+      "displayPriority": 10,
+      "icon": "house.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 78,
+      "_impact": {
+        "templates_in_category": [
+          "Roofing:Professional roof inspection",
+          "Roofing:Check for damaged shingles",
+          "Roofing:Reseal flashing and seams",
+          "Roofing:Treat moss and algae",
+          "Roofing:Clean gutters and downspouts",
+          "Roofing:Inspect flashing around chimney/vents",
+          "Roofing:Inspect attic ventilation and insulation"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "HVAC",
+      "displayName": "Central HVAC",
+      "tier": "universal",
+      "displayPriority": 20,
+      "icon": "wind",
+      "defaultCadence": "Semi-annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 80,
+      "_impact": {
+        "templates_in_category": [
+          "HVAC:Professional HVAC tune-up (cooling)",
+          "HVAC:Professional HVAC tune-up (heating)",
+          "HVAC:Inspect ductwork for leaks",
+          "HVAC:Inspect mini-split outdoor unit",
+          "HVAC:Bleed radiators",
+          "HVAC:Annual boiler service",
+          "HVAC:Geothermal loop pressure check",
+          "HVAC:Air duct cleaning",
+          "HVAC:Flush HVAC condensate drain line",
+          "HVAC:Whole-home humidifier service"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Plumbing",
+      "displayName": "Plumbing",
+      "tier": "universal",
+      "displayPriority": 30,
+      "icon": "drop.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 82,
+      "_impact": {
+        "templates_in_category": [
+          "Plumbing:Professional drain cleaning",
+          "Plumbing:Test sump pump battery backup"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Electrical",
+      "displayName": "Electrical",
+      "tier": "universal",
+      "displayPriority": 40,
+      "icon": "bolt.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 84,
+      "_impact": {
+        "templates_in_category": [
+          "Electrical:Replace smoke detectors",
+          "Electrical:Inspect electrical panel",
+          "Electrical:EV charger inspection",
+          "Electrical:IR scan of main electrical panel",
+          "Electrical:Heat cable inspection",
+          "Electrical:Outdoor lighting system service",
+          "Electrical:Fire extinguisher annual check"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Water Heater",
+      "displayName": "Water Heater",
+      "tier": "universal",
+      "displayPriority": 50,
+      "icon": "flame.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 86,
+      "_impact": {
+        "templates_in_category": [
+          "Water Heater:Flush water heater",
+          "Water Heater:Inspect anode rod",
+          "Water Heater:Test T&P relief valve",
+          "Water Heater:Descale tankless heater"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Pest Control",
+      "displayName": "Pest Control",
+      "tier": "universal",
+      "displayPriority": 60,
+      "icon": "ant",
+      "defaultCadence": "Quarterly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 88,
+      "_impact": {
+        "templates_in_category": [
+          "Pest Control:Professional termite inspection"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Security System",
+      "displayName": "Security System",
+      "tier": "universal",
+      "displayPriority": 70,
+      "icon": "lock.shield",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 90,
+      "_impact": {
+        "templates_in_category": [
+          "Security System:Verify alarm system",
+          "Security System:Replace sensor batteries"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Cleaning Service",
+      "displayName": "Cleaning Service",
+      "tier": "universal",
+      "displayPriority": 80,
+      "icon": "sparkles",
+      "defaultCadence": "Biweekly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 92,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Handyman",
+      "displayName": "Handyman",
+      "tier": "universal",
+      "displayPriority": 85,
+      "icon": "hammer.fill",
+      "defaultCadence": "Semi-annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 94,
+      "_impact": {
+        "templates_in_category": [
+          "Handyman:Spring handyman visit",
+          "Handyman:Fall handyman visit",
+          "Handyman:Test smart water leak system",
+          "Handyman:Service central vacuum system",
+          "Handyman:Verify radon mitigation fan",
+          "Handyman:smoke_co_batteries_spring",
+          "Handyman:caulking_inspect_spring",
+          "Handyman:foundation_walkaround_spring",
+          "Handyman:washer_hoses_spring",
+          "Handyman:sump_pump_test_spring",
+          "Handyman:gfci_test_spring",
+          "Handyman:smoke_co_alarm_test_spring",
+          "Handyman:hvac_filter_spring",
+          "Handyman:ceiling_fan_summer",
+          "Handyman:exterior_faucets_reopen",
+          "Handyman:smoke_co_batteries_fall",
+          "Handyman:winterize_hose_bibs",
+          "Handyman:drain_hoses_fall",
+          "Handyman:weatherstripping_fall",
+          "Handyman:foundation_gutter_fall",
+          "Handyman:attic_insulation_fall",
+          "Handyman:smoke_co_alarm_test_fall",
+          "Handyman:hvac_filter_fall",
+          "Handyman:ceiling_fan_winter",
+          "Handyman:pipe_insulation_fall",
+          "Handyman:Interior paint touch-up walkaround",
+          "Handyman:Cabinet and door hardware tune-up",
+          "Handyman:Smart home battery sweep",
+          "Handyman:Whole-house relamping",
+          "Handyman:Ceiling fan cleaning and balancing",
+          "Handyman:Drywall patch and paint touch-up visit",
+          "Handyman:Door, latch, and hinge tune-up",
+          "Handyman:Window screen and hardware repair",
+          "Handyman:Interior caulk refresh",
+          "Handyman:Hang mirrors, art, and shelving",
+          "Handyman:TV mounting and cord cleanup",
+          "Handyman:Furniture, playset, or shed assembly",
+          "Handyman:Grab bar and safety hardware install",
+          "Handyman:Fixture swap and hardware refresh",
+          "Handyman:Fence, gate, and deck repair sweep",
+          "Handyman:Blind and curtain hardware install"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Trash & Recycling",
+      "displayName": "Trash & Recycling",
+      "tier": "universal",
+      "displayPriority": 90,
+      "icon": "trash.fill",
+      "defaultCadence": "Weekly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 102,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Landscaping",
+      "displayName": "Landscaping",
+      "tier": "conditional",
+      "displayPriority": 10,
+      "icon": "leaf",
+      "defaultCadence": "Biweekly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 109,
+      "_impact": {
+        "templates_in_category": [
+          "Landscaping:Mulch garden beds",
+          "Landscaping:Prune shrubs and hedges",
+          "Landscaping:Fertilize natural lawn",
+          "Landscaping:Core aerate natural lawn",
+          "Landscaping:Overseed bare patches",
+          "Landscaping:Pre-emergent weed control",
+          "Landscaping:Dethatch lawn",
+          "Landscaping:Soil pH test and lime application",
+          "Landscaping:Fall leaf cleanup",
+          "Landscaping:Top up turf infill",
+          "Landscaping:Power rake and groom turf",
+          "Landscaping:Deep clean synthetic turf",
+          "Landscaping:Outdoor lighting service",
+          "Landscaping:Arborist tree health inspection",
+          "landscaping:hardscape_pressure_wash",
+          "landscaping:hardscape_joint_sand",
+          "landscaping:hardscape_weed_treatment",
+          "landscaping:hardscape_drainage_check"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Snow Removal",
+      "displayName": "Snow Removal",
+      "tier": "conditional",
+      "displayPriority": 20,
+      "icon": "snowflake",
+      "defaultCadence": "Per event",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 111,
+      "_impact": {
+        "templates_in_category": [
+          "Snow Removal:Renew snow plowing contract"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Gutter Cleaning",
+      "displayName": "Gutter Cleaning",
+      "tier": "conditional",
+      "displayPriority": 30,
+      "icon": "arrow.down.to.line",
+      "defaultCadence": "Semi-annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 113,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Chimney",
+      "displayName": "Chimney Service",
+      "tier": "conditional",
+      "displayPriority": 40,
+      "icon": "fireplace.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 115,
+      "_impact": {
+        "templates_in_category": [
+          "Chimney:Annual chimney sweep",
+          "Chimney:Inspect chimney cap and crown",
+          "Chimney:Annual gas fireplace service"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Septic System",
+      "displayName": "Septic System",
+      "tier": "conditional",
+      "displayPriority": 50,
+      "icon": "arrow.down.to.line",
+      "defaultCadence": "Every 3 years",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 117,
+      "_impact": {
+        "templates_in_category": [
+          "Septic System:Septic tank pumping",
+          "Septic System:Inspect septic baffles"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Well System",
+      "displayName": "Well System",
+      "tier": "conditional",
+      "displayPriority": 60,
+      "icon": "drop.circle.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 119,
+      "_impact": {
+        "templates_in_category": [
+          "Well System:Test water quality",
+          "Well System:Professional well inspection"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Generator",
+      "displayName": "Backup Generator",
+      "tier": "conditional",
+      "displayPriority": 70,
+      "icon": "bolt.batteryblock.fill",
+      "defaultCadence": "Quarterly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 121,
+      "_impact": {
+        "templates_in_category": [
+          "Generator:Change generator oil",
+          "Generator:Replace spark plugs",
+          "Generator:Professional generator service",
+          "Generator:Test automatic transfer switch"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Tree Service",
+      "displayName": "Tree Service",
+      "tier": "conditional",
+      "displayPriority": 80,
+      "icon": "tree.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 123,
+      "_impact": {
+        "templates_in_category": [
+          "Tree Service:Annual tree assessment",
+          "Tree Service:Pruning and crown thinning",
+          "Tree Service:Trim trees away from roof"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Window Cleaning",
+      "displayName": "Window Cleaning",
+      "tier": "conditional",
+      "displayPriority": 90,
+      "icon": "window.vertical.open",
+      "defaultCadence": "Semi-annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 125,
+      "_impact": {
+        "templates_in_category": [
+          "Window Cleaning:Exterior window washing"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Pet Waste",
+      "displayName": "Pet Waste Removal",
+      "tier": "conditional",
+      "displayPriority": 100,
+      "icon": "pawprint.fill",
+      "defaultCadence": "Weekly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 127,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Mosquito & Tick",
+      "displayName": "Mosquito & Tick Spraying",
+      "tier": "conditional",
+      "displayPriority": 110,
+      "icon": "ladybug.fill",
+      "defaultCadence": "Every 3 weeks",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 129,
+      "_impact": {
+        "templates_in_category": [
+          "Mosquito & Tick:Sign up for mosquito and tick season"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Air Quality",
+      "displayName": "Air Quality",
+      "tier": "conditional",
+      "displayPriority": 140,
+      "icon": "wind",
+      "defaultCadence": "Every 2 years",
+      "showInVendorCoverage": true,
+      "specialtyGroup": null,
+      "_sourceLine": 136,
+      "_impact": {
+        "templates_in_category": [
+          "Air Quality:Annual radon test",
+          "Air Quality:Service whole-home or basement dehumidifier"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Pool/Spa",
+      "displayName": "Pool Service",
+      "tier": "specialty",
+      "displayPriority": 10,
+      "icon": "drop.triangle.fill",
+      "defaultCadence": "Weekly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Outdoor Amenities",
+      "_sourceLine": 144,
+      "_impact": {
+        "templates_in_category": [
+          "Pool/Spa:Professional pool opening",
+          "Pool/Spa:Professional pool closing/winterization",
+          "Pool/Spa:Inspect pool equipment",
+          "Pool/Spa:Pool heater service",
+          "Pool/Spa:Test and sanitize hot tub water",
+          "Pool/Spa:Drain and refill hot tub",
+          "Pool/Spa:Inspect hot tub cover and jets",
+          "Pool/Spa:Pool safety fence inspection"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Hot Tub",
+      "displayName": "Spa / Hot Tub",
+      "tier": "specialty",
+      "displayPriority": 15,
+      "icon": "bathtub.fill",
+      "defaultCadence": "Monthly",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Outdoor Amenities",
+      "_sourceLine": 147,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Deck/Outdoor",
+      "displayName": "Deck / Outdoor Maintenance",
+      "tier": "specialty",
+      "displayPriority": 20,
+      "icon": "square.split.bottomrightquarter.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Outdoor Amenities",
+      "_sourceLine": 150,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Driveway Sealcoating",
+      "displayName": "Driveway Sealcoating",
+      "tier": "specialty",
+      "displayPriority": 25,
+      "icon": "road.lanes",
+      "defaultCadence": "Every 3 years",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Outdoor Amenities",
+      "_sourceLine": 153,
+      "_impact": {
+        "templates_in_category": [
+          "Driveway Sealcoating:Asphalt driveway sealcoat"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Pressure Washing",
+      "displayName": "Pressure Washing",
+      "tier": "specialty",
+      "displayPriority": 30,
+      "icon": "drop.degreesign.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Outdoor Amenities",
+      "_sourceLine": 156,
+      "_impact": {
+        "templates_in_category": [
+          "Pressure Washing:Annual exterior power washing"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Solar",
+      "displayName": "Solar Panels",
+      "tier": "specialty",
+      "displayPriority": 40,
+      "icon": "sun.max.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Smart Home & Energy",
+      "_sourceLine": 161,
+      "_impact": {
+        "templates_in_category": [
+          "Solar:Professional panel cleaning",
+          "Solar:Professional inspection"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "EV Charger",
+      "displayName": "EV Charger Maintenance",
+      "tier": "specialty",
+      "displayPriority": 45,
+      "icon": "ev.charger.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Smart Home & Energy",
+      "_sourceLine": 164,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Smart Home",
+      "displayName": "Smart Home Network",
+      "tier": "specialty",
+      "displayPriority": 50,
+      "icon": "wifi.router.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Smart Home & Energy",
+      "_sourceLine": 167,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Water Treatment",
+      "displayName": "Water Softener / Filtration",
+      "tier": "specialty",
+      "displayPriority": 60,
+      "icon": "drop.halffull",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Water & Climate",
+      "_sourceLine": 172,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Boiler",
+      "displayName": "Boiler (Steam Heat)",
+      "tier": "specialty",
+      "displayPriority": 65,
+      "icon": "flame.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Water & Climate",
+      "_sourceLine": 175,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Radiant Floor",
+      "displayName": "Radiant Floor Heating",
+      "tier": "specialty",
+      "displayPriority": 70,
+      "icon": "thermometer.medium",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Water & Climate",
+      "_sourceLine": 178,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Painting",
+      "displayName": "Painting (Interior/Exterior)",
+      "tier": "specialty",
+      "displayPriority": 80,
+      "icon": "paintbrush.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Exterior Services",
+      "_sourceLine": 183,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Siding/Exterior",
+      "displayName": "Siding / Exterior",
+      "tier": "specialty",
+      "displayPriority": 85,
+      "icon": "building.2.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Exterior Services",
+      "_sourceLine": 186,
+      "_impact": {
+        "templates_in_category": [
+          "Siding/Exterior:Power wash exterior siding",
+          "Siding/Exterior:Deck and patio annual service",
+          "Siding/Exterior:Exterior paint touch-up walkaround",
+          "Siding/Exterior:Deck or fence staining",
+          "Siding/Exterior:Exterior painting refresh",
+          "Siding/Exterior:Driveway seal coat"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Elevator",
+      "displayName": "Residential Elevator",
+      "tier": "specialty",
+      "displayPriority": 90,
+      "icon": "arrow.up.and.down.circle.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Lifestyle Amenities",
+      "_sourceLine": 191,
+      "_impact": {
+        "templates_in_category": [
+          "Elevator:Annual elevator inspection",
+          "Elevator:Quarterly elevator service"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Wine Cellar",
+      "displayName": "Wine Cellar",
+      "tier": "specialty",
+      "displayPriority": 95,
+      "icon": "wineglass.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Lifestyle Amenities",
+      "_sourceLine": 194,
+      "_impact": {
+        "templates_in_category": [
+          "Wine Cellar:Annual cooling unit service"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Attic & Foundation",
+      "displayName": "Attic & Foundation",
+      "tier": "specialty",
+      "displayPriority": 105,
+      "icon": "house.lodge.fill",
+      "defaultCadence": "Annually",
+      "showInVendorCoverage": true,
+      "specialtyGroup": "Exterior Services",
+      "_sourceLine": 202,
+      "_impact": {
+        "templates_in_category": [
+          "Attic & Foundation:Annual attic inspection"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Appliance",
+      "displayName": "Appliance",
+      "tier": "subSystem",
+      "displayPriority": 0,
+      "icon": "refrigerator.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": false,
+      "specialtyGroup": null,
+      "_sourceLine": 210,
+      "_impact": {
+        "templates_in_category": [
+          "Appliance:Deep clean dryer vent duct",
+          "Appliance:Replace refrigerator water filter",
+          "Appliance:Built-in grill service"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Crawl Space",
+      "displayName": "Crawl Space",
+      "tier": "subSystem",
+      "displayPriority": 0,
+      "icon": "square.bottomhalf.filled",
+      "defaultCadence": null,
+      "showInVendorCoverage": false,
+      "specialtyGroup": null,
+      "_sourceLine": 212,
+      "_impact": {
+        "templates_in_category": [
+          "Crawl Space:Check vapor barrier condition",
+          "Crawl Space:Inspect for mold or mildew",
+          "Crawl Space:Check foundation for cracks"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Garage Door",
+      "displayName": "Garage Door",
+      "tier": "subSystem",
+      "displayPriority": 0,
+      "icon": "door.garage.closed",
+      "defaultCadence": null,
+      "showInVendorCoverage": false,
+      "specialtyGroup": null,
+      "_sourceLine": 214,
+      "_impact": {
+        "templates_in_category": [
+          "Garage Door:Test garage door auto-reverse",
+          "Garage Door:Lubricate garage door tracks and hardware",
+          "Garage Door:Professional garage door tune-up"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Sump Pump",
+      "displayName": "Sump Pump",
+      "tier": "subSystem",
+      "displayPriority": 0,
+      "icon": "arrow.up.circle.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": false,
+      "specialtyGroup": null,
+      "_sourceLine": 216,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Irrigation",
+      "displayName": "Sprinkler / Irrigation",
+      "tier": "subSystem",
+      "displayPriority": 0,
+      "icon": "sprinkler.and.droplets.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": false,
+      "specialtyGroup": null,
+      "_sourceLine": 218,
+      "_impact": {
+        "templates_in_category": [
+          "Irrigation:Winterize irrigation system",
+          "Irrigation:Spring startup irrigation",
+          "Irrigation:Backflow preventer test"
+        ],
+        "created_by_questions": []
+      },
+      "_lint": []
+    },
+    {
+      "categoryKey": "Fire Protection",
+      "displayName": "Fire Protection",
+      "tier": "subSystem",
+      "displayPriority": 0,
+      "icon": "flame.circle.fill",
+      "defaultCadence": null,
+      "showInVendorCoverage": false,
+      "specialtyGroup": null,
+      "_sourceLine": 220,
+      "_impact": {
+        "templates_in_category": [],
+        "created_by_questions": []
+      },
+      "_lint": []
+    }
+  ]
+}

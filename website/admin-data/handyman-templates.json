@@ -1,0 +1,1783 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.076Z",
+  "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift (filtered)",
+  "sourceCommit": "28d1fbd4",
+  "count": 31,
+  "entries": [
+    {
+      "templateKey": "Siding/Exterior:Driveway seal coat",
+      "stableId": null,
+      "systemCategory": "Siding/Exterior",
+      "title": "Driveway seal coat",
+      "description": "Apply asphalt sealer to protect the driveway against UV, water, and oil damage. Extends driveway life significantly over unsealed asphalt.",
+      "frequency": "Every 2-3 years",
+      "priority": "Medium",
+      "estimatedCostRange": "$300–$600",
+      "isDIY": true,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": "Early fall while daytime temps are still warm enough for the sealer to cure. About 3 hours DIY for a typical driveway, or book an asphalt service for a no-effort finish.",
+      "requiredSubtypes": [
+        "driveway_asphalt"
+      ],
+      "isEssential": false,
+      "equipmentKeywords": [],
+      "assignmentType": "either",
+      "diyEffortMinutes": 180,
+      "diyEffortLabel": null,
+      "bundleId": null,
+      "bundleTitle": null,
+      "routingOverride": "diyCapable",
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "diyCapable",
+      "_sourceLine": 695,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": null,
+        "system_category_meta": {
+          "categoryKey": "Siding/Exterior",
+          "tier": "specialty",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "HVAC:Flush HVAC condensate drain line",
+      "stableId": null,
+      "systemCategory": "HVAC",
+      "title": "Flush HVAC condensate drain line",
+      "description": "Pour a cup of distilled white vinegar down the condensate drain access tee to clear algae and biofilm. Prevents the summer clog that trips the float switch and leaks water into the pan.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "$0 (DIY) or $50 (pro)",
+      "isDIY": true,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": "Often bundled into the spring cooling tune-up. DIY: locate the white PVC pipe with a threaded cap near the indoor air handler, unscrew the cap, pour vinegar.",
+      "requiredSubtypes": [
+        "has_ac"
+      ],
+      "isEssential": false,
+      "equipmentKeywords": [],
+      "assignmentType": "either",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": null,
+      "bundleTitle": null,
+      "routingOverride": "diyCapable",
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "diyCapable",
+      "_sourceLine": 753,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": null,
+        "system_category_meta": {
+          "categoryKey": "HVAC",
+          "tier": "universal",
+          "displayPriority": 20
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Plumbing:Test sump pump battery backup",
+      "stableId": null,
+      "systemCategory": "Plumbing",
+      "title": "Test sump pump battery backup",
+      "description": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years — if it doesn't hold charge, replace before spring rains.",
+      "frequency": "Semi-annually",
+      "priority": "High",
+      "estimatedCostRange": "$0 (DIY)",
+      "isDIY": true,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": "About 10 minutes DIY. Test in spring before wet season and in fall before storm season.",
+      "requiredSubtypes": [
+        "sump_pump",
+        "has_sump_battery_backup"
+      ],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "either",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": null,
+      "bundleTitle": null,
+      "routingOverride": "diyDefault",
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "diyDefault",
+      "_sourceLine": 802,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": null,
+        "system_category_meta": {
+          "categoryKey": "Plumbing",
+          "tier": "universal",
+          "displayPriority": 30
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Unplug the primary sump pump to verify the battery backup engages and can mov..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Electrical:Fire extinguisher annual check",
+      "stableId": null,
+      "systemCategory": "Electrical",
+      "title": "Fire extinguisher annual check",
+      "description": "Walk to every extinguisher, verify the pressure gauge is in the green, the tamper seal is intact, and the inspection tag is signed for the current year. Replace any unit past its 12-year service life.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "$0 (DIY) or $50 (service)",
+      "isDIY": true,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": "Log inspection dates on the tag so you can track service history. Commercial recharge runs $25-75 per extinguisher.",
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "either",
+      "diyEffortMinutes": 15,
+      "diyEffortLabel": null,
+      "bundleId": null,
+      "bundleTitle": null,
+      "routingOverride": "diyDefault",
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "diyDefault",
+      "_sourceLine": 939,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": null,
+        "system_category_meta": {
+          "categoryKey": "Electrical",
+          "tier": "universal",
+          "displayPriority": 40
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Appliance:Replace refrigerator water filter",
+      "stableId": null,
+      "systemCategory": "Appliance",
+      "title": "Replace refrigerator water filter",
+      "description": "Replace the built-in water/ice filter per the manufacturer's schedule. Most fridge filters are rated for 6 months regardless of throughput.",
+      "frequency": "Semi-annually",
+      "priority": "Medium",
+      "estimatedCostRange": "$30–$60",
+      "isDIY": true,
+      "seasonalTiming": null,
+      "professionalRequired": false,
+      "notes": "Check your fridge manual for the exact filter part number. Some manufacturers offer subscriptions that auto-ship.",
+      "requiredSubtypes": [
+        "has_fridge_water_dispenser"
+      ],
+      "isEssential": true,
+      "equipmentKeywords": [
+        "refrigerator",
+        "fridge"
+      ],
+      "assignmentType": "either",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": null,
+      "bundleTitle": null,
+      "routingOverride": "diyDefault",
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "diyDefault",
+      "_sourceLine": 1310,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": null,
+        "system_category_meta": {
+          "categoryKey": "Appliance",
+          "tier": "subSystem",
+          "displayPriority": 0
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:Spring handyman visit",
+      "stableId": null,
+      "systemCategory": "Handyman",
+      "title": "Spring handyman visit",
+      "description": "Seasonal walkthrough and punch list. Your handyman handles small repairs, caulking touch-ups, filter swaps, and anything that's accumulated since the last visit.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "$300-800",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": true,
+      "notes": "\nWhat's typically covered in a spring handyman visit:\n\nHVAC\n• Air filter swap (buy a case, swap during visit)\n• Mini-split filter rinse (if applicable)\n\nPlumbing\n• Washing machine supply hose visual check\n• Sump pump test (if applicable)\n• Well cap and pressure tank visual (if well home)\n• Water softener brine tank visual (if applicable)\n• Whole-house filter swap (if applicable)\n\nExterior\n• Caulking touch-up around windows and doors\n• Driveway crack sealcoat spot-fill\n• Deck/fence screw check\n• Foundation grading walkaround\n• Retaining wall condition check\n\nSafety\n• Smoke and CO detector battery swap\n• Fire extinguisher gauge check\n• Camera perimeter walk-past\n• Verify smoke and CO detectors (self-test confirmation)\n• Test GFCI outlets\n\nAppliances\n• Refrigerator coil vacuum (if accessible)\n• Dishwasher spray arm clean (if not covered by housekeeper)\n• Ice maker filter replacement (if due)\n\nOther (conditional)\n• Crawl space visual for moisture (if applicable)\n• Dehumidifier operation test (if applicable)\n• Septic drain field walkaround (if applicable)\n• Smart leak system test (if applicable)\n• Turf drainage spot-check (synthetic turf homes)\n\nAdd anything you've been meaning to get to — that's what the handyman is for.\n",
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": null,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": "Spring Handyman Visit",
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1442,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": "Spring Handyman Visit",
+          "siblings": [
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "\nWhat's typically covered in a spring handyman visit:\n\nHVAC\n• Air filter swap..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:Fall handyman visit",
+      "stableId": null,
+      "systemCategory": "Handyman",
+      "title": "Fall handyman visit",
+      "description": "Pre-winter walkthrough and punch list. Your handyman handles weatherproofing, hose-bib winterization, storm door prep, attic insulation check, and any accumulated punch-list items.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "$300-800",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": true,
+      "notes": "\nWhat's typically covered in a fall handyman visit:\n\nWeatherization\n• Exterior faucet winterization and hose bib covers\n• Storm door and weatherstripping check (windows + doors)\n• Window AC removal and storage (if applicable)\n• Door hinge and lock lubrication\n\nHVAC\n• Air filter swap (heating season)\n• Attic insulation check before heating season\n\nGenerator (if applicable)\n• Oil level check\n• Confirm weekly exercise cycle visually\n\nSafety\n• Smoke and CO detector battery swap\n• Smoke detector age check (replace if 9+ years — bring spares)\n• Fire extinguisher gauge check\n• Camera perimeter walk-past\n• Verify smoke and CO detectors (self-test confirmation)\n\nPlumbing\n• Drain cleaning and sink trap check\n• Hose bib shutoff valve test\n\nExterior\n• Seal gaps around pipes and utility entries (pest prevention)\n• Firebox and damper check (wood-burning fireplaces)\n\nOther (conditional)\n• Central vacuum service (if applicable)\n• Radon mitigation fan check (if applicable)\n\nAdd anything you've been meaning to get to.\n",
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": null,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": "Fall Handyman Visit",
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1484,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": "Fall Handyman Visit",
+          "siblings": [
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "\nWhat's typically covered in a fall handyman visit:\n\nWeatherization\n• Exterio..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:Test smart water leak system",
+      "stableId": null,
+      "systemCategory": "Handyman",
+      "title": "Test smart water leak system",
+      "description": "Exercise the shutoff valve, test each leak sensor, confirm the app connectivity (Moen Flo, Phyn, etc.). Quick handyman task that lands on the spring visit.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [
+        "has_leak_detector"
+      ],
+      "isEssential": false,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": null,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1527,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:Service central vacuum system",
+      "stableId": null,
+      "systemCategory": "Handyman",
+      "title": "Service central vacuum system",
+      "description": "Empty the canister, replace the bag or filter, inspect the hose and attachments, and clear any wall-port clogs. Easy to overlook — lands on the fall handyman visit.",
+      "frequency": "Annually",
+      "priority": "Low",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [
+        "has_central_vacuum"
+      ],
+      "isEssential": false,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": null,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1543,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Empty the canister, replace the bag or filter, inspect the hose and attachmen..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:Verify radon mitigation fan",
+      "stableId": null,
+      "systemCategory": "Handyman",
+      "title": "Verify radon mitigation fan",
+      "description": "Confirm the mitigation fan reads correctly on its manometer — the fan should run continuously. If the manometer is flat on both sides, the fan has failed and needs replacement.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": "Lands on the fall handyman visit alongside smoke detector checks.",
+      "requiredSubtypes": [
+        "has_radon_mitigation"
+      ],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": null,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": "northeast",
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1559,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Confirm the mitigation fan reads correctly on its manometer — the fan should ..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:smoke_co_batteries_spring",
+      "stableId": "Handyman:smoke_co_batteries_spring",
+      "systemCategory": "Handyman",
+      "title": "Replace smoke & CO detector batteries",
+      "description": "Swap batteries in every smoke and CO detector. Modern sealed 10-year detectors don't need this, but most homes still have a mix of battery-powered units that the handyman catches in one visit.",
+      "frequency": "Semi-annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 15,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1595,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:caulking_inspect_spring",
+      "stableId": "Handyman:caulking_inspect_spring",
+      "systemCategory": "Handyman",
+      "title": "Inspect exterior caulking around windows & doors",
+      "description": "Walk the exterior and check the caulk bead around every window and door. The handyman spot-recaulks any gaps or separations before spring rains.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 30,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1611,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:foundation_walkaround_spring",
+      "stableId": "Handyman:foundation_walkaround_spring",
+      "systemCategory": "Handyman",
+      "title": "Foundation walkaround: cracks and grading",
+      "description": "Walk the foundation perimeter. Check for new cracks, signs of efflorescence, and areas where soil has settled and now slopes toward the house.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 20,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1627,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:washer_hoses_spring",
+      "stableId": "Handyman:washer_hoses_spring",
+      "systemCategory": "Handyman",
+      "title": "Check washing machine supply hoses",
+      "description": "Inspect the hot and cold supply hoses behind the washing machine for bulges, cracks, or moisture. Burst hoses are the #1 source of catastrophic laundry-room water damage.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1643,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:sump_pump_test_spring",
+      "stableId": "Handyman:sump_pump_test_spring",
+      "systemCategory": "Handyman",
+      "title": "Test sump pump function",
+      "description": "Pour a few gallons of water into the sump pit and confirm the pump kicks on and discharges. Catches pumps that have silently seized over winter.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": "Distinct from the Phase 62 battery backup test — this one confirms the primary pump still cycles.",
+      "requiredSubtypes": [
+        "sump_pump"
+      ],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1659,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Distinct from the Phase 62 battery backup test — this one confirms the primar..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:gfci_test_spring",
+      "stableId": "Handyman:gfci_test_spring",
+      "systemCategory": "Handyman",
+      "title": "Test GFCI outlets throughout house",
+      "description": "Press the TEST button on every GFCI outlet (kitchen, bathrooms, garage, exterior) and confirm it trips and resets. A GFCI that won't trip is a safety failure.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 15,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1676,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:smoke_co_alarm_test_spring",
+      "stableId": "Handyman:smoke_co_alarm_test_spring",
+      "systemCategory": "Handyman",
+      "title": "Test smoke and CO detector alarms",
+      "description": "Hold the TEST button on every alarm to confirm the sounder works. Separate from battery swap — this verifies the audio circuit.",
+      "frequency": "Semi-annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1692,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Hold the TEST button on every alarm to confirm the sounder works. Separate fr..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:hvac_filter_spring",
+      "stableId": "Handyman:hvac_filter_spring",
+      "systemCategory": "Handyman",
+      "title": "Replace HVAC filter (cooling season)",
+      "description": "Swap to a fresh filter heading into cooling season. The handyman stocks the right size for your system so you don't have to remember.",
+      "frequency": "Semi-annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [
+        "ducted"
+      ],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 5,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1708,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:ceiling_fan_summer",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:ceiling_fan_summer",
+      "stableId": "Handyman:ceiling_fan_summer",
+      "systemCategory": "Handyman",
+      "title": "Ceiling fan direction switch (summer)",
+      "description": "Flip ceiling fans to counter-clockwise for downward airflow during cooling season. Reachable units only — the handyman handles the ones requiring a ladder.",
+      "frequency": "Semi-annually",
+      "priority": "Low",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1725,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:exterior_faucets_reopen"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Flip ceiling fans to counter-clockwise for downward airflow during cooling se..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:exterior_faucets_reopen",
+      "stableId": "Handyman:exterior_faucets_reopen",
+      "systemCategory": "Handyman",
+      "title": "Reopen exterior faucets post-winter",
+      "description": "Confirm every exterior faucet reopens without leaks after winter. Split pipes behind the spigot reveal themselves the first time you turn on the hose.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:spring",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": "northeast",
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1741,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:spring",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Spring handyman visit",
+            "Handyman:Test smart water leak system",
+            "Handyman:smoke_co_batteries_spring",
+            "Handyman:caulking_inspect_spring",
+            "Handyman:foundation_walkaround_spring",
+            "Handyman:washer_hoses_spring",
+            "Handyman:sump_pump_test_spring",
+            "Handyman:gfci_test_spring",
+            "Handyman:smoke_co_alarm_test_spring",
+            "Handyman:hvac_filter_spring",
+            "Handyman:ceiling_fan_summer"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:smoke_co_batteries_fall",
+      "stableId": "Handyman:smoke_co_batteries_fall",
+      "systemCategory": "Handyman",
+      "title": "Replace smoke & CO detector batteries",
+      "description": "Fall battery swap — daylight-saving is the industry's mnemonic. The handyman handles the high-reach units you can't get to safely.",
+      "frequency": "Semi-annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 15,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1761,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Fall battery swap — daylight-saving is the industry's mnemonic. The handyman ..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:winterize_hose_bibs",
+      "stableId": "Handyman:winterize_hose_bibs",
+      "systemCategory": "Handyman",
+      "title": "Winterize outdoor faucets and hose bibs",
+      "description": "Shut off interior supply valves to exterior faucets, open the spigots to drain, install insulated covers. A split pipe behind the bib is a $2-5K repair.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 20,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": "northeast",
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1777,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:drain_hoses_fall",
+      "stableId": "Handyman:drain_hoses_fall",
+      "systemCategory": "Handyman",
+      "title": "Drain and store exterior hoses",
+      "description": "Drain every exterior hose, coil, and store in a garage or shed so they don't crack from freeze-thaw cycles.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 20,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": "northeast",
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1794,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:weatherstripping_fall",
+      "stableId": "Handyman:weatherstripping_fall",
+      "systemCategory": "Handyman",
+      "title": "Inspect weatherstripping pre-heating season",
+      "description": "Check door and window weatherstripping for gaps, compression, or tears. Replace any compromised sections before the heating bill reflects them.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 25,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1811,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:foundation_gutter_fall",
+      "stableId": "Handyman:foundation_gutter_fall",
+      "systemCategory": "Handyman",
+      "title": "Pre-winter foundation and gutter walkaround",
+      "description": "Check foundation + gutters before freeze season. Any cracks that need sealing + any gutter hangers that loosened over the summer.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 30,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1827,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:attic_insulation_fall",
+      "stableId": "Handyman:attic_insulation_fall",
+      "systemCategory": "Handyman",
+      "title": "Check attic insulation coverage",
+      "description": "Eye-check the attic — look for areas where insulation has been compressed, blown aside, or compromised by pests. Snap a photo for later reference.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 20,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1843,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Eye-check the attic — look for areas where insulation has been compressed, bl..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:smoke_co_alarm_test_fall",
+      "stableId": "Handyman:smoke_co_alarm_test_fall",
+      "systemCategory": "Handyman",
+      "title": "Test smoke and CO detector alarms",
+      "description": "Fall audio-circuit verification. Press TEST on every alarm — especially important before the heating system starts producing CO.",
+      "frequency": "Semi-annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1859,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Fall audio-circuit verification. Press TEST on every alarm — especially impor..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:hvac_filter_fall",
+      "stableId": "Handyman:hvac_filter_fall",
+      "systemCategory": "Handyman",
+      "title": "Replace HVAC filter (heating season)",
+      "description": "Swap to a fresh filter before the furnace starts running. A loaded filter slows airflow and costs runtime.",
+      "frequency": "Semi-annually",
+      "priority": "Medium",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [
+        "ducted"
+      ],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 5,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1875,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:ceiling_fan_winter",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:ceiling_fan_winter",
+      "stableId": "Handyman:ceiling_fan_winter",
+      "systemCategory": "Handyman",
+      "title": "Ceiling fan direction switch (winter)",
+      "description": "Flip ceiling fans to clockwise for gentle upward airflow — pushes warm air pooling at the ceiling back down into the room.",
+      "frequency": "Semi-annually",
+      "priority": "Low",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 10,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1892,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:pipe_insulation_fall"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Flip ceiling fans to clockwise for gentle upward airflow — pushes warm air po..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Handyman:pipe_insulation_fall",
+      "stableId": "Handyman:pipe_insulation_fall",
+      "systemCategory": "Handyman",
+      "title": "Pipe insulation check in unheated spaces",
+      "description": "Confirm pipe insulation is intact in garages, crawl spaces, attics, and unheated basements. Replace any sections that have fallen away or been chewed on.",
+      "frequency": "Annually",
+      "priority": "High",
+      "estimatedCostRange": "(bundled)",
+      "isDIY": false,
+      "seasonalTiming": "Fall",
+      "professionalRequired": false,
+      "notes": null,
+      "requiredSubtypes": [],
+      "isEssential": true,
+      "equipmentKeywords": [],
+      "assignmentType": "vendor",
+      "diyEffortMinutes": 25,
+      "diyEffortLabel": null,
+      "bundleId": "Handyman:fall",
+      "bundleTitle": null,
+      "routingOverride": null,
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": "northeast",
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1908,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": {
+          "bundleId": "Handyman:fall",
+          "bundleTitle": null,
+          "siblings": [
+            "Handyman:Fall handyman visit",
+            "Handyman:Service central vacuum system",
+            "Handyman:Verify radon mitigation fan",
+            "Handyman:smoke_co_batteries_fall",
+            "Handyman:winterize_hose_bibs",
+            "Handyman:drain_hoses_fall",
+            "Handyman:weatherstripping_fall",
+            "Handyman:foundation_gutter_fall",
+            "Handyman:attic_insulation_fall",
+            "Handyman:smoke_co_alarm_test_fall",
+            "Handyman:hvac_filter_fall",
+            "Handyman:ceiling_fan_winter"
+          ]
+        },
+        "system_category_meta": {
+          "categoryKey": "Handyman",
+          "tier": "universal",
+          "displayPriority": 85
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "templateKey": "Air Quality:Service whole-home or basement dehumidifier",
+      "stableId": null,
+      "systemCategory": "Air Quality",
+      "title": "Service whole-home or basement dehumidifier",
+      "description": "Clean the filter, wipe the coils, check the drain line for clogs, and verify the humidistat calibration. Catches silent failures that let basements creep above 60% RH and invite mold.",
+      "frequency": "Annually",
+      "priority": "Medium",
+      "estimatedCostRange": "$0 (DIY) to $150 (pro)",
+      "isDIY": true,
+      "seasonalTiming": "Spring",
+      "professionalRequired": false,
+      "notes": "Pair with the spring handyman visit; run a humidity reading after service to confirm.",
+      "requiredSubtypes": [
+        "has_dehumidifier"
+      ],
+      "isEssential": false,
+      "equipmentKeywords": [],
+      "assignmentType": "either",
+      "diyEffortMinutes": 30,
+      "diyEffortLabel": null,
+      "bundleId": null,
+      "bundleTitle": null,
+      "routingOverride": "diyCapable",
+      "safetyFloor": false,
+      "maxIntervalDays": null,
+      "warrantyLinked": false,
+      "regionalPack": null,
+      "routing": "diyCapable",
+      "_sourceLine": 2411,
+      "_impact": {
+        "gated_by": [],
+        "in_bundle": null,
+        "system_category_meta": {
+          "categoryKey": "Air Quality",
+          "tier": "conditional",
+          "displayPriority": 140
+        }
+      },
+      "_lint": [],
+      "_recommendation": null
+    }
+  ]
+}

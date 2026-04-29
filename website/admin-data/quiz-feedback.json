@@ -1,0 +1,9 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.029Z",
+  "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizFeedbackLibrary.swift",
+  "sourceCommit": "28d1fbd4",
+  "sourceExists": true,
+  "feedbackByQuestion": {},
+  "chipFeedbackByQuestion": {},
+  "note": "Stub: rich AnswerFeedback parsing deferred. v2 will walk the feedbackByQuestion + chipFeedbackByQuestion literals."
+}

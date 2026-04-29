@@ -1,0 +1,9 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.051Z",
+  "sourceFile": "supabase/functions/vehicle-lookup/index.ts",
+  "sourceCommit": "28d1fbd4",
+  "sourceExists": true,
+  "systemPrompt": null,
+  "cachedSamples": [],
+  "note": "Pass --refresh-samples to populate cachedSamples (v2)."
+}

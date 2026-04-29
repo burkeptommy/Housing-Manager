@@ -1,0 +1,278 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.041Z",
+  "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizAnswerMapper.swift",
+  "sourceCommit": "28d1fbd4",
+  "note": "Heuristic side-effect digest from regex scan. v2 will parse case bodies with the Swift expression parser.",
+  "effectsByQuestion": {
+    "q1_roof_material": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute",
+        "triggers reconciler"
+      ],
+      "rawSnippet": "case \"q1_roof_material\":\n                try await persistAttribute(\"roof_material\", value: answer.answerId)\n                if let mat = answer.answerId, mat != \"not_sure\" {\n                    let subtype = Self.roofingSubtype(forQuizAnswer: mat)\n                    let systemId = try await ensure"
+    },
+    "q2_siding": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q2_siding\":\n                try await persistAttribute(\"siding_material\", value: answer.answerId)\n\n            "
+    },
+    "q3_heating_fuel": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q3_heating_fuel\":\n                \n                \n                \n                \n                try await persistAttribute(\"heating_fuel\", value: answer.answerId)\n\n            "
+    },
+    "q3b_hvac_type": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute",
+        "triggers reconciler"
+      ],
+      "rawSnippet": "case \"q3b_hvac_type\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                guard let typeId = answer.answerId else { break }\n                try await"
+    },
+    "q4_purchase": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q4_purchase\":\n                if let custom = answer.customText, let price = Double(digitsOnly(custom)) {\n                    var update = PropertyUpdate()\n                    update.purchasePrice = price\n                    if let kind = answer.answerId {\n                        try await per"
+    },
+    "q5_mortgage": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q5_mortgage\":\n                let hasMortgage = answer.answerId == \"yes\"\n                try await persistAttribute(\"has_mortgage\", value: hasMortgage ? \"yes\" : \"no\")\n\n            "
+    },
+    "q6_water_source": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute",
+        "triggers reconciler"
+      ],
+      "rawSnippet": "case \"q6_water_source\":\n                try await persistAttribute(\"water_source\", value: answer.answerId)\n                if answer.answerId == \"private_well\" || answer.answerId == \"shared_well\" {\n                    let wellId = try await ensureHomeSystem(name: \"Well System\", category: \"Well Syste"
+    },
+    "q7_sewer_septic": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute",
+        "triggers reconciler"
+      ],
+      "rawSnippet": "case \"q7_sewer_septic\":\n                try await persistAttribute(\"sewer_or_septic\", value: answer.answerId)\n                if answer.answerId == \"septic\" {\n                    let septicId = try await ensureHomeSystem(name: \"Septic System\", category: \"Septic System\")\n                    let septi"
+    },
+    "q8_water_heater": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q8_water_heater\":\n                try await persistAttribute(\"water_heater_type\", value: answer.answerId)\n                let heaterName: String\n                let heaterSubtype: String?\n                switch answer.answerId {\n                case \"tank_gas\", \"tank_electric\":\n               "
+    },
+    "q9_basement": {
+      "effects": [
+        "(no recognized side effects)"
+      ],
+      "rawSnippet": "case \"q9_basement\":\n                \n                \n                \n                let basementSelections: [String] = {\n                    if let ids = answer.selectedIds, !ids.isEmpty { return ids }\n                    if let id = answer.answerId { return [id] }\n                    return []\n"
+    },
+    "q10_appliances": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q10_appliances\":\n                if let selected = answer.selectedIds {\n                    \n                    \n                    let realSelections = selected.filter { $0 != \"other\" }\n                    let customEntries = answer.customEntries ?? []\n                    let combined = rea"
+    },
+    "q11_lawn": {
+      "effects": [
+        "creates utility_account",
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q11_lawn\":\n                try await persistAttribute(\"lawn_status\", value: answer.answerId)\n                if answer.answerId == \"diy\" || answer.answerId == \"pro\" {\n                    let lawnSystemId = try await ensureHomeSystem(\n                        name: \"Landscaping\",\n               "
+    },
+    "q11b_lawn_type": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute",
+        "triggers reconciler"
+      ],
+      "rawSnippet": "case \"q11b_lawn_type\":\n                \n                \n                \n                \n                \n                \n                \n                \n                try await persistAttribute(\"lawn_type\", value: answer.answerId)\n                guard let lawnType = answer.answerId, lawnTyp"
+    },
+    "q11c_landscaping_months": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q11c_landscaping_months\":\n                let selectedIds = answer.selectedIds ?? []\n                guard !selectedIds.isEmpty else { break }\n\n                let activeMonths = monthsForRoutineSeasonAnswer(selectedIds)\n                guard !activeMonths.isEmpty else { break }\n\n             "
+    },
+    "q12_pool": {
+      "effects": [
+        "creates utility_account",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q12_pool\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n           "
+    },
+    "q12b_pool_chemistry": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q12b_pool_chemistry\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                t"
+    },
+    "q12c_pool_months": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q12c_pool_months\":\n                let selectedIds = answer.selectedIds ?? []\n                guard !selectedIds.isEmpty else { break }\n\n                let activeMonths = monthsForRoutineSeasonAnswer(selectedIds)\n                guard !activeMonths.isEmpty else { break }\n\n                try "
+    },
+    "q13_pest": {
+      "effects": [
+        "creates utility_account",
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q13_pest\":\n                try await persistAttribute(\"pest_control\", value: answer.answerId)\n                if answer.answerId == \"quarterly_pro\" || answer.answerId == \"termite_bond\" {\n                    let pestSystemId = try await ensureHomeSystem(\n                        name: \"Pest Cont"
+    },
+    "q14_irrigation": {
+      "effects": [
+        "creates utility_account",
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q14_irrigation\":\n                try await persistAttribute(\"irrigation\", value: answer.answerId)\n                if answer.answerId == \"full\" || answer.answerId == \"drip\" {\n                    let irrigationSystemId = try await ensureHomeSystem(\n                        name: \"Irrigation Syste"
+    },
+    "q14b_irrigation_months": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q14b_irrigation_months\":\n                let selectedIds = answer.selectedIds ?? []\n                guard !selectedIds.isEmpty else { break }\n\n                let activeMonths = monthsForRoutineSeasonAnswer(selectedIds)\n                guard !activeMonths.isEmpty else { break }\n\n              "
+    },
+    "q15_security": {
+      "effects": [
+        "creates utility_account",
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q15_security\":\n                try await persistAttribute(\"security_system\", value: answer.answerId)\n                if let id = answer.answerId, id != \"none\" {\n                    let securitySystemId = try await ensureHomeSystem(\n                        name: \"Security System\",\n             "
+    },
+    "q15b_household_contractors": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q15b_household_contractors\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                if let sele"
+    },
+    "q16_electric": {
+      "effects": [
+        "creates utility_account"
+      ],
+      "rawSnippet": "case \"q16_electric\":\n                \n                \n                _ = try await createUtilityAccount(from: answer, fallbackType: \"electric\")\n\n            "
+    },
+    "q17_internet": {
+      "effects": [
+        "creates utility_account"
+      ],
+      "rawSnippet": "case \"q17_internet\":\n                _ = try await createUtilityAccount(from: answer, fallbackType: \"internet_cable\")\n\n            "
+    },
+    "q18_trash": {
+      "effects": [
+        "creates utility_account",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q18_trash\":\n                try await persistAttribute(\"trash_service\", value: answer.answerId)\n                if answer.answerId == \"private\", let provider = answer.customText, !provider.isEmpty {\n                    \n                    \n                    if answer.selectedProviderId != n"
+    },
+    "q18b_trash_day": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q18b_trash_day\":\n                let selectedIds = answer.selectedIds ?? []\n                guard !selectedIds.isEmpty else { break }\n\n                try await persistAttribute(\"trash_pickup_days\", value: selectedIds.joined(separator: \",\"))\n                let weekdays = weekdaysForTrashAnswe"
+    },
+    "q19_heating_provider": {
+      "effects": [
+        "(no recognized side effects)"
+      ],
+      "rawSnippet": "case \"q19_heating_provider\":\n                \n                \n                \n                var fallbackType = \"oil\"\n                if let property = try? await db.fetchProperty(id: propertyId),\n                   let fuel = property.attributes?[\"heating_fuel\"]?.stringValue {\n                  "
+    },
+    "q20_other_fuels": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q20_other_fuels\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                if let selected = answer.selectedIds {\n                    try await persistAttribute(\"oth"
+    },
+    "q21_solar": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q21_solar\":\n                try await persistAttribute(\"solar\", value: answer.answerId)\n                if answer.answerId == \"owned\" || answer.answerId == \"leased\" {\n                    try await ensureHomeSystem(name: \"Solar Panels\", category: \"Solar\")\n"
+    },
+    "q22_generator": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q22_generator\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                \n                try await persistAttribute(\"generator\", value: answer.answerId)\n\n                guard let t"
+    },
+    "q23_vehicle_count": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q23_vehicle_count\":\n                if let id = answer.answerId {\n                    try await persistAttribute(\"vehicle_count\", value: id)\n"
+    },
+    "q24_vehicle_add": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q24_vehicle_add\":\n                \n                \n                \n                try await persistAttribute(\"primary_vehicle_added\", value: \"true\")\n\n            "
+    },
+    "q25_garage_ev": {
+      "effects": [
+        "(no recognized side effects)"
+      ],
+      "rawSnippet": "case \"q25_garage_ev\":\n                \n                \n                \n                \n                \n                \n                \n                \n                let normalizedGarage: String? = {\n                    switch answer.answerId {\n                    case \"attached_1\", \"attache"
+    },
+    "q25b_ev_charger": {
+      "effects": [
+        "ensures home_system",
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q25b_ev_charger\":\n                \n                \n                \n                \n                \n                try await persistAttribute(\"ev_charger_l2\", value: answer.answerId)\n                if answer.answerId == \"yes\" {\n                    try await ensureHomeSystem(name: \"EV Char"
+    },
+    "q26_auto_insurance": {
+      "effects": [
+        "creates utility_account"
+      ],
+      "rawSnippet": "case \"q26_auto_insurance\":\n                \n                \n                _ = try await createUtilityAccount(from: answer, fallbackType: \"auto_insurance\")\n\n            "
+    },
+    "q27_homeowners_insurance": {
+      "effects": [
+        "creates utility_account"
+      ],
+      "rawSnippet": "case \"q27_homeowners_insurance\":\n                \n                \n                \n                \n                _ = try await createUtilityAccount(from: answer, fallbackType: \"home_insurance\")\n\n            "
+    },
+    "q28_household": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q28_household\":\n                if let id = answer.answerId {\n                    try await persistAttribute(\"household_residents\", value: id)\n"
+    },
+    "q28b_pets": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q28b_pets\":\n                \n                \n                \n                \n                \n                \n                try await persistAttribute(\"pets\", value: answer.answerId)\n                let hasPets = (answer.answerId != \"no_pets\" && answer.answerId != nil)\n                tr"
+    },
+    "q29_estate_docs": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q29_estate_docs\":\n                if let selected = answer.selectedIds {\n                    try await persistAttribute(\"estate_documents_on_hand\", value: selected.joined(separator: \",\"))\n"
+    },
+    "q30_priorities": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q30_priorities\":\n                if let selected = answer.selectedIds {\n                    try await persistAttribute(\"priorities\", value: selected.joined(separator: \",\"))\n"
+    },
+    "q36_diy_vs_vendor": {
+      "effects": [
+        "persists property attribute",
+        "triggers reconciler"
+      ],
+      "rawSnippet": "case \"q36_diy_vs_vendor\":\n                \n                \n                \n                \n                \n                if let tierId = answer.answerId {\n                    try await persistAttribute(\"vendor_preference_tier\", value: tierId)\n                    let result = await MaintenanceT"
+    }
+  }
+}

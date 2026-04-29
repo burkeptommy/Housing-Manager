@@ -1,0 +1,2293 @@
+{
+  "generatedAt": "2026-04-29T00:27:54.966Z",
+  "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift",
+  "sourceCommit": "28d1fbd4",
+  "count": 41,
+  "entries": [
+    {
+      "id": "q1_roof_material",
+      "section": "homeBasics",
+      "chapter": "yourHome",
+      "title": "Your {yearBuilt} {street} roof: what's on top?",
+      "fallbackTitle": "What kind of roof do you have?",
+      "subtitle": "We'll set the right inspection cadence for your material.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "asphalt",
+          "label": "Asphalt Shingle",
+          "icon": "house.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "metal",
+          "label": "Metal",
+          "icon": "square.grid.3x3.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "tile",
+          "label": "Tile",
+          "icon": "square.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "slate",
+          "label": "Slate",
+          "icon": "rectangle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wood_shake",
+          "label": "Wood Shake",
+          "icon": "leaf.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "flat_membrane",
+          "label": "Flat Membrane",
+          "icon": "rectangle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": "questionmark.circle",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 138,
+      "_impact": {
+        "creates_systems": [
+          "Roofing"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q2_siding",
+      "section": "homeBasics",
+      "chapter": "yourHome",
+      "title": "What's your exterior siding?",
+      "fallbackTitle": null,
+      "subtitle": "Some materials need yearly attention, others just once a decade.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "vinyl",
+          "label": "Vinyl",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wood",
+          "label": "Wood",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "brick",
+          "label": "Brick",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "stucco",
+          "label": "Stucco",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "fiber_cement",
+          "label": "Fiber Cement",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "stone",
+          "label": "Stone",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "mixed",
+          "label": "Mixed",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 155,
+      "_impact": {
+        "creates_systems": [
+          "Siding/Exterior"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q3_heating_fuel",
+      "section": "homeBasics",
+      "chapter": "yourHome",
+      "title": "Heat in a {state} home: what's yours running on?",
+      "fallbackTitle": "How do you heat your home?",
+      "subtitle": "We use this to schedule fuel deliveries and tank inspections.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "natural_gas",
+          "label": "Natural Gas",
+          "icon": "flame.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "oil",
+          "label": "Oil",
+          "icon": "fuelpump.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "electric",
+          "label": "Electric",
+          "icon": "bolt.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "propane",
+          "label": "Propane",
+          "icon": "flame",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "geothermal",
+          "label": "Geothermal",
+          "icon": "thermometer.sun.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 171,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q3b_hvac_type",
+      "section": "homeBasics",
+      "chapter": "yourHome",
+      "title": "What kind of HVAC system?",
+      "fallbackTitle": null,
+      "subtitle": "We use this to set the right maintenance schedule for your specific setup.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "central_ducted",
+          "label": "Central AC + furnace",
+          "icon": "wind",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "mini_split",
+          "label": "Mini-split / ductless",
+          "icon": "fan",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "boiler_with_central_ac",
+          "label": "Boiler + central AC",
+          "icon": "thermometer.snowflake",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "boiler_radiant",
+          "label": "Boiler / radiators (no AC)",
+          "icon": "drop.degreesign",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "boiler_with_window_ac",
+          "label": "Boiler + window AC units",
+          "icon": "wind",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "heat_pump",
+          "label": "Heat pump (one system)",
+          "icon": "thermometer.medium",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "geothermal",
+          "label": "Geothermal",
+          "icon": "leaf",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 192,
+      "_impact": {
+        "creates_systems": [
+          "HVAC"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q4_purchase",
+      "section": "homeBasics",
+      "chapter": "yourHome",
+      "title": "How did you get this home?",
+      "fallbackTitle": null,
+      "subtitle": "Add a purchase price if you have it. We'll use it for your investment dashboard.",
+      "kind": "currency",
+      "answerOptions": [
+        {
+          "id": "bought",
+          "label": "Bought existing",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "custom_build",
+          "label": "Custom build",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "inherited",
+          "label": "Inherited",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "other",
+          "label": "Other",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": "mortgage",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 209,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q5_mortgage",
+      "section": "homeBasics",
+      "chapter": "yourHome",
+      "title": "Do you have a mortgage on this home?",
+      "fallbackTitle": null,
+      "subtitle": "We'll surface refinance opportunities when rates move.",
+      "kind": "yesNoLender",
+      "answerOptions": [
+        {
+          "id": "yes",
+          "label": "Yes",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "no",
+          "label": "No, paid off",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "skip",
+          "label": "Prefer not to say",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 223,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q6_water_source",
+      "section": "inside",
+      "chapter": "yourHome",
+      "title": "Where does your water come from?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "municipal",
+          "label": "Municipal",
+          "icon": "drop.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "private_well",
+          "label": "Private well",
+          "icon": "drop.triangle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "shared_well",
+          "label": "Shared well",
+          "icon": "drop.circle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": "questionmark.circle",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 240,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q7_sewer_septic",
+      "section": "inside",
+      "chapter": "yourHome",
+      "title": "Sewer or septic?",
+      "fallbackTitle": null,
+      "subtitle": "Septic systems need pumping every 3-5 years.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "sewer",
+          "label": "Municipal sewer",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "septic",
+          "label": "Septic",
+          "icon": "arrow.down.to.line",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 252,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q8_water_heater",
+      "section": "inside",
+      "chapter": "yourHome",
+      "title": "What kind of water heater do you have?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "tank_gas",
+          "label": "Tank, gas",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "tank_electric",
+          "label": "Tank, electric",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "tankless_gas",
+          "label": "Tankless, gas",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "tankless_electric",
+          "label": "Tankless, electric",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "heat_pump",
+          "label": "Heat pump",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 264,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q9_basement",
+      "section": "inside",
+      "chapter": "yourHome",
+      "title": "Do you have a basement or crawl space?",
+      "fallbackTitle": null,
+      "subtitle": "Pick all that apply.",
+      "kind": "multiSelect",
+      "answerOptions": [
+        {
+          "id": "finished_basement",
+          "label": "Finished basement",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "unfinished_basement",
+          "label": "Unfinished basement",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "crawl_space",
+          "label": "Crawl space",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "slab",
+          "label": "Slab",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 278,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q10_appliances",
+      "section": "inside",
+      "chapter": "yourHome",
+      "title": "What's in your {street} kitchen and laundry?",
+      "fallbackTitle": "Which major appliances do you have?",
+      "subtitle": "We'll track manuals, maintenance, and recalls for each, and let you know when anything is still under warranty.",
+      "kind": "multiSelect",
+      "answerOptions": [
+        {
+          "id": "refrigerator",
+          "label": "Refrigerator",
+          "icon": "refrigerator.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "dishwasher",
+          "label": "Dishwasher",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "range",
+          "label": "Range / cooktop",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wall_oven",
+          "label": "Wall oven",
+          "icon": "oven.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "washer",
+          "label": "Washer",
+          "icon": "washer.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "dryer",
+          "label": "Dryer",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "microwave",
+          "label": "Microwave",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wine_fridge",
+          "label": "Wine fridge",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "other",
+          "label": "Other",
+          "icon": "plus.circle",
+          "acceptsCustomInput": true
+        },
+        {
+          "id": "none",
+          "label": "None of these",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": "applianceManual",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": true,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 292,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q11_lawn",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Keeping up the {street} yard: you or a pro?",
+      "fallbackTitle": "Do you have a lawn?",
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "diy",
+          "label": "Yes, I maintain it",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "pro",
+          "label": "Yes, pro service",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "no_lawn",
+          "label": "No",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "garden",
+          "label": "Mostly garden",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hardscape",
+          "label": "Mostly hardscape (patio, gravel, pavers)",
+          "icon": "square.grid.3x3.fill",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [
+        "pro"
+      ],
+      "providerTypes": [
+        "landscaping"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": "TruGreen, BrightView, your local crew...",
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 319,
+      "_impact": {
+        "creates_systems": [
+          "Landscaping"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q11b_lawn_type",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Natural grass, turf, or both?",
+      "fallbackTitle": null,
+      "subtitle": "We'll set up the right care schedule for what you actually have.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "natural",
+          "label": "Natural grass",
+          "icon": "leaf.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "turf",
+          "label": "Synthetic turf",
+          "icon": "square.grid.3x3.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "mixed",
+          "label": "Mixed (both)",
+          "icon": "circle.lefthalf.filled",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                let q11 = state.answers[\"q11_lawn\"]?.answerId\n                return q11 == \"no_lawn\" || q11 == \"garden\" || q11 == \"hardscape\"\n            }",
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 343,
+      "_impact": {
+        "creates_systems": [
+          "Landscaping"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q11c_landscaping_months",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Which months does your landscaping crew usually come?",
+      "fallbackTitle": null,
+      "subtitle": "Select all that apply. Use Select all if they run year-round.",
+      "kind": "multiSelect",
+      "answerOptions": [],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                guard state.answers[\"q11_lawn\"]?.answerId == \"pro\" else { return true }\n                return !hasProviderContext(state.answers[\"q11_lawn\"])\n            }",
+      "supportsSelectAll": true,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 360,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q12_pool",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Pool or hot tub?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "in_ground",
+          "label": "In-ground pool",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "above_ground",
+          "label": "Above-ground",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hot_tub",
+          "label": "Hot tub only",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "both",
+          "label": "Both",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [
+        "in_ground",
+        "above_ground",
+        "hot_tub",
+        "both"
+      ],
+      "providerTypes": [
+        "pool_service"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": "Leslie's, Pinch A Penny, your pool company...",
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 373,
+      "_impact": {
+        "creates_systems": [
+          "Pool/Spa",
+          "Hot Tub"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q12b_pool_chemistry",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Saltwater or chlorine?",
+      "fallbackTitle": null,
+      "subtitle": "We'll set up the right care schedule for your pool's chemistry.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "saltwater",
+          "label": "Saltwater",
+          "icon": "drop.circle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "chlorine",
+          "label": "Chlorine",
+          "icon": "testtube.2",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                \n                \n                \n                \n                let q12 = state.answers[\"q12_pool\"]?.answerId\n                return q12 != \"in_ground\"\n                    && q12 != \"above_ground\"\n                    && q12 != \"both\"\n            }",
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 398,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q12c_pool_months",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Which months does your pool company cover?",
+      "fallbackTitle": null,
+      "subtitle": "Select the months they handle opening, weekly care, or closing.",
+      "kind": "multiSelect",
+      "answerOptions": [],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                guard let q12 = state.answers[\"q12_pool\"]?.answerId,\n                      [\"in_ground\", \"above_ground\", \"both\"].contains(q12) else {\n                    return true\n                }\n                return !hasProviderContext(state.answers[\"q12_pool\"])\n            }",
+      "supportsSelectAll": true,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 420,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q13_pest",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Pest pressure in {state}: who's on it?",
+      "fallbackTitle": "Pest control?",
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "quarterly_pro",
+          "label": "Recurring pro service",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "termite_bond",
+          "label": "Termite bond",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "diy",
+          "label": "DIY",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [
+        "quarterly_pro",
+        "termite_bond"
+      ],
+      "providerTypes": [
+        "pest_control"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": "Terminix, Orkin, your local exterminator...",
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 436,
+      "_impact": {
+        "creates_systems": [
+          "Pest Control"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q14_irrigation",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Sprinkler or irrigation?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "full",
+          "label": "Yes, full system",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "drip",
+          "label": "Drip only",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "no",
+          "label": "No",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [
+        "full",
+        "drip"
+      ],
+      "providerTypes": [
+        "irrigation"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                let q11 = state.answers[\"q11_lawn\"]?.answerId\n                let q11b = state.answers[\"q11b_lawn_type\"]?.answerId\n                if q11 == \"no_lawn\" { return true }\n                \n                \n                if q11b == \"turf\" && (q11 == \"diy\" || q11 == \"pro\") {\n                    \n                    \n                    \n                    return false\n                }\n                return false\n            }",
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": "Your sprinkler company...",
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 457,
+      "_impact": {
+        "creates_systems": [
+          "Irrigation"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q14b_irrigation_months",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Which months does the irrigation system usually run?",
+      "fallbackTitle": null,
+      "subtitle": "We'll use this to save the active season for startup, checks, and winterization.",
+      "kind": "multiSelect",
+      "answerOptions": [],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                guard let q14 = state.answers[\"q14_irrigation\"]?.answerId,\n                      [\"full\", \"drip\"].contains(q14) else {\n                    return true\n                }\n                return !hasProviderContext(state.answers[\"q14_irrigation\"])\n            }",
+      "supportsSelectAll": true,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 489,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q15_security",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Security or alarm system?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "monitored",
+          "label": "Yes, monitored",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "self_monitored",
+          "label": "Yes, self-monitored",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "cameras_only",
+          "label": "Cameras only",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [
+        "monitored"
+      ],
+      "providerTypes": [
+        "security"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": "ADT, SimpliSafe, Ring, Vivint...",
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 505,
+      "_impact": {
+        "creates_systems": [
+          "Security System"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q15b_household_contractors",
+      "section": "outside",
+      "chapter": "yourPros",
+      "title": "Got any pros on speed dial?",
+      "fallbackTitle": null,
+      "subtitle": "Tell us who handles your HVAC, plumbing, electrical, and other home services so we can plan tasks around their schedule, not yours.",
+      "kind": "householdContractors",
+      "answerOptions": [
+        {
+          "id": "handyman",
+          "label": "Handyman",
+          "icon": "wrench.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "cleaning",
+          "label": "House cleaner",
+          "icon": "sparkles",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hvac_service",
+          "label": "HVAC service",
+          "icon": "thermometer.medium",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "plumber",
+          "label": "Plumber",
+          "icon": "drop.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "electrician",
+          "label": "Electrician",
+          "icon": "bolt.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "roofer",
+          "label": "Roofer",
+          "icon": "house.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "tree_service",
+          "label": "Tree service",
+          "icon": "tree.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "mosquito_tick",
+          "label": "Mosquito & tick",
+          "icon": "ladybug.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "snow_removal",
+          "label": "Snow removal",
+          "icon": "snowflake",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "pet_waste",
+          "label": "Pet waste",
+          "icon": "pawprint.circle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "septic_pumper",
+          "label": "Septic pumper",
+          "icon": "circle.dashed",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "well_water_service",
+          "label": "Well water service",
+          "icon": "drop.degreesign",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "chimney_sweep",
+          "label": "Chimney sweep",
+          "icon": "flame.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hardscape",
+          "label": "Hardscape / masonry",
+          "icon": "square.grid.2x2.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "generator_service",
+          "label": "Generator service",
+          "icon": "bolt.batteryblock.fill",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ _ in false }",
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 527,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q16_electric",
+      "section": "energyServices",
+      "chapter": "yourPros",
+      "title": "Who's your electric provider?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "providerSearch",
+      "answerOptions": [],
+      "documentUploadCategory": "utilityBill",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [
+        "electric"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 570,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q17_internet",
+      "section": "energyServices",
+      "chapter": "yourPros",
+      "title": "Internet provider?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "providerSearch",
+      "answerOptions": [],
+      "documentUploadCategory": "utilityBill",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [
+        "internet_cable"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 578,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q18_trash",
+      "section": "energyServices",
+      "chapter": "yourPros",
+      "title": "Trash & recycling?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "municipal",
+          "label": "Municipal",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "private",
+          "label": "Private hauler",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "not_sure",
+          "label": "Not sure",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [
+        "private"
+      ],
+      "providerTypes": [
+        "trash"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 586,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q18b_trash_day",
+      "section": "energyServices",
+      "chapter": "yourPros",
+      "title": "Which days should Chez remind you about pickup?",
+      "fallbackTitle": null,
+      "subtitle": "Pick every day bins go out if trash and recycling happen separately.",
+      "kind": "multiSelect",
+      "answerOptions": [
+        {
+          "id": "sun",
+          "label": "Sunday",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "mon",
+          "label": "Monday",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "tue",
+          "label": "Tuesday",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wed",
+          "label": "Wednesday",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "thu",
+          "label": "Thursday",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "fri",
+          "label": "Friday",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "sat",
+          "label": "Saturday",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                guard let q18 = state.answers[\"q18_trash\"]?.answerId else { return true }\n                return q18 == \"not_sure\"\n            }",
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 599,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q19_heating_provider",
+      "section": "energyServices",
+      "chapter": "yourPros",
+      "title": "Heating fuel provider?",
+      "fallbackTitle": null,
+      "subtitle": "We'll match this to your refill cadence.",
+      "kind": "providerSearch",
+      "answerOptions": [],
+      "documentUploadCategory": "utilityBill",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [
+        "oil",
+        "propane",
+        "natural_gas"
+      ],
+      "dynamicProviderTypes": "{ state in\n                guard let fuel = state.answers[\"q3_heating_fuel\"]?.answerId else {\n                    \n                    \n                    return [\"oil\", \"propane\", \"natural_gas\"]\n                }\n                switch fuel {\n                case \"oil\":         return [\"oil\"]\n                case \"propane\":     return [\"propane\"]\n                case \"natural_gas\": return [\"natural_gas\"]\n                \n                default:            return []\n                }\n            }",
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 619,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q20_other_fuels",
+      "section": "energyServices",
+      "chapter": "yourHome",
+      "title": "Any other fuel sources?",
+      "fallbackTitle": null,
+      "subtitle": "Propane for the fireplace or stove? Wood or pellets? If it's only for a generator, skip it here, we'll ask next.",
+      "kind": "multiSelect",
+      "answerOptions": [
+        {
+          "id": "propane_fireplace",
+          "label": "Propane (fireplace)",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "propane_stove",
+          "label": "Propane (stove)",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wood_logs",
+          "label": "Wood (cordwood)",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "wood_pellets",
+          "label": "Wood pellets",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 646,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q21_solar",
+      "section": "backupEnergy",
+      "chapter": "yourHome",
+      "title": "Solar panels?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "owned",
+          "label": "Yes, owned",
+          "icon": "sun.max.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "leased",
+          "label": "Yes, leased",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "no",
+          "label": "No",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "considering",
+          "label": "Considering",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 673,
+      "_impact": {
+        "creates_systems": [
+          "Solar"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q22_generator",
+      "section": "backupEnergy",
+      "chapter": "yourHome",
+      "title": "Power outages in {state}: are you ready?",
+      "fallbackTitle": "Whole-home generator?",
+      "subtitle": "Tell us the type, fuel, and supplier so we can plan refills and load tests. Separate from your home heating fuel, so we track it as its own account.",
+      "kind": "generatorAdd",
+      "answerOptions": [
+        {
+          "id": "whole_home",
+          "label": "Whole-home",
+          "icon": "powerplug.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "portable",
+          "label": "Portable",
+          "icon": "bolt.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None",
+          "icon": "minus.circle",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 685,
+      "_impact": {
+        "creates_systems": [
+          "Generator"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q23_vehicle_count",
+      "section": "vehicles",
+      "chapter": "yourPeople",
+      "title": "How many cars do you own?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "vehicleCount",
+      "answerOptions": [
+        {
+          "id": "0",
+          "label": "0",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "3",
+          "label": "3",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "4_plus",
+          "label": "4+",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 701,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q24_vehicle_add",
+      "section": "vehicles",
+      "chapter": "yourPeople",
+      "title": "Add your primary car",
+      "fallbackTitle": null,
+      "subtitle": "Type, scan, or upload an insurance card.",
+      "kind": "vehicleAdd",
+      "answerOptions": [],
+      "documentUploadCategory": "autoInsurance",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 714,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q25_garage_ev",
+      "section": "vehicles",
+      "chapter": "yourPeople",
+      "title": "What kind of garage do you have?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "attached",
+          "label": "Attached",
+          "icon": "house.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "semi_attached",
+          "label": "Semi-attached",
+          "icon": "house.lodge.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "detached",
+          "label": "Detached",
+          "icon": "building.2.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "carport",
+          "label": "Carport",
+          "icon": "car.side.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "No garage",
+          "icon": "minus.circle",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 722,
+      "_impact": {
+        "creates_systems": [
+          "Garage Door"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q25b_ev_charger",
+      "section": "vehicles",
+      "chapter": "yourPeople",
+      "title": "Do you have a Level 2 EV charger?",
+      "fallbackTitle": null,
+      "subtitle": "We'll track your charger and any EV-related maintenance.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "yes",
+          "label": "Yes, I have an L2 charger",
+          "icon": "bolt.car.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "no",
+          "label": "No EV charger",
+          "icon": "minus.circle",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": "{ state in\n                state.answers[\"q25_garage_ev\"]?.answerId == \"none\"\n            }",
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 740,
+      "_impact": {
+        "creates_systems": [
+          "EV Charger"
+        ],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q26_auto_insurance",
+      "section": "protectionPeople",
+      "chapter": "yourPeople",
+      "title": "Auto insurance provider?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "providerSearch",
+      "answerOptions": [],
+      "documentUploadCategory": "autoInsurance",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [
+        "auto_insurance"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 759,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q27_homeowners_insurance",
+      "section": "protectionPeople",
+      "chapter": "yourPeople",
+      "title": "Homeowners insurance provider?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "providerSearch",
+      "answerOptions": [],
+      "documentUploadCategory": "homeownersInsurance",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [
+        "home_insurance"
+      ],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 767,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q28_household",
+      "section": "protectionPeople",
+      "chapter": "yourPeople",
+      "title": "Who lives here, and who else helps?",
+      "fallbackTitle": null,
+      "subtitle": "Tell us about residents and any caretakers in the household.",
+      "kind": "caretakers",
+      "answerOptions": [
+        {
+          "id": "just_me",
+          "label": "Just me",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "couple",
+          "label": "Couple",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "family_with_kids",
+          "label": "Family with kids",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "multi_generational",
+          "label": "Multi-generational",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "other",
+          "label": "Other",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 777,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q28b_pets",
+      "section": "protectionPeople",
+      "chapter": "yourPeople",
+      "title": "Any pets in the household?",
+      "fallbackTitle": null,
+      "subtitle": "So your vendors know, and so we can suggest recurring services that keep pets safe.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "dogs",
+          "label": "Dogs",
+          "icon": "pawprint.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "cats",
+          "label": "Cats",
+          "icon": "cat.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "both",
+          "label": "Dogs and cats",
+          "icon": "pawprint.circle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "other_pets",
+          "label": "Other pets",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "no_pets",
+          "label": "No pets",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 795,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q29_estate_docs",
+      "section": "protectionPeople",
+      "chapter": "yourPeople",
+      "title": "Estate documents you have on hand?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "multiSelect",
+      "answerOptions": [
+        {
+          "id": "will",
+          "label": "Will",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "trust",
+          "label": "Trust",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "poa",
+          "label": "Power of attorney",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "healthcare",
+          "label": "Healthcare directive",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None yet",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": "will",
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 815,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q30_priorities",
+      "section": "protectionPeople",
+      "chapter": "yourPeople",
+      "title": "What matters most? What worries you most?",
+      "fallbackTitle": null,
+      "subtitle": null,
+      "kind": "multiSelect",
+      "answerOptions": [
+        {
+          "id": "save_money",
+          "label": "Saving money",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "avoid_emergencies",
+          "label": "Avoiding emergencies",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "resale",
+          "label": "Resale value",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "sustainability",
+          "label": "Sustainability",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "family_safety",
+          "label": "Family safety",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hidden_problems",
+          "label": "Hidden problems",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "surprise_costs",
+          "label": "Surprise costs",
+          "icon": null,
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "good_contractors",
+          "label": "Finding good contractors",
+          "icon": null,
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 829,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    },
+    {
+      "id": "q36_diy_vs_vendor",
+      "section": "protectionPeople",
+      "chapter": "yourPros",
+      "title": "How do you want to handle home maintenance?",
+      "fallbackTitle": null,
+      "subtitle": "This shapes your entire task list. You can change it anytime in Settings.",
+      "kind": "singleChoice",
+      "answerOptions": [
+        {
+          "id": "diy",
+          "label": "I handle it",
+          "icon": "wrench.and.screwdriver.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "mixed",
+          "label": "Mix of both",
+          "icon": "person.2.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hire_out",
+          "label": "Hire it out",
+          "icon": "briefcase.fill",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 850,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [],
+      "_recommendation": null
+    }
+  ]
+}

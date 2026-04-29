@@ -1,0 +1,269 @@
+{
+  "generatedAt": "2026-04-29T00:27:55.018Z",
+  "sourceFile": "Haven/Features/Property/Models/Routine.swift",
+  "seederFile": "Haven/Features/Property/Services/RoutineSeeder.swift",
+  "sourceCommit": "28d1fbd4",
+  "count": 20,
+  "entries": [
+    {
+      "rawValue": "cleaning",
+      "swiftCase": "cleaning",
+      "displayLabel": "Cleaning",
+      "icon": "sparkles",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "landscaping",
+      "swiftCase": "landscaping",
+      "displayLabel": "Landscaping",
+      "icon": "leaf.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "pool_service",
+      "swiftCase": "poolService",
+      "displayLabel": "Pool service",
+      "icon": "drop.triangle.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "pest_control",
+      "swiftCase": "pestControl",
+      "displayLabel": "Pest control",
+      "icon": "ant.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "pet_waste",
+      "swiftCase": "petWaste",
+      "displayLabel": "Pet waste removal",
+      "icon": "pawprint.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "mosquito_tick",
+      "swiftCase": "mosquitoTick",
+      "displayLabel": "Mosquito and tick spraying",
+      "icon": "ladybug.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "snow_removal",
+      "swiftCase": "snowRemoval",
+      "displayLabel": "Snow removal",
+      "icon": "snowflake",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "gutter_cleaning",
+      "swiftCase": "gutterCleaning",
+      "displayLabel": "Gutter cleaning",
+      "icon": "arrow.down.to.line",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "window_cleaning",
+      "swiftCase": "windowCleaning",
+      "displayLabel": "Window cleaning",
+      "icon": "window.vertical.open",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "tree_service",
+      "swiftCase": "treeService",
+      "displayLabel": "Tree service",
+      "icon": "tree.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "handyman_recurring",
+      "swiftCase": "handymanRecurring",
+      "displayLabel": "Recurring handyman",
+      "icon": "hammer.fill",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": true
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "trash",
+      "swiftCase": "trash",
+      "displayLabel": "Trash",
+      "icon": "trash.fill",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "recycling",
+      "swiftCase": "recycling",
+      "displayLabel": "Recycling",
+      "icon": "arrow.3.trianglepath",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "compost",
+      "swiftCase": "compost",
+      "displayLabel": "Compost",
+      "icon": "leaf.fill",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "yard_waste",
+      "swiftCase": "yardWaste",
+      "displayLabel": "Yard waste",
+      "icon": "leaf.arrow.circlepath",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "recurring_delivery",
+      "swiftCase": "recurringDelivery",
+      "displayLabel": "Recurring delivery",
+      "icon": "shippingbox.fill",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "school_dropoff",
+      "swiftCase": "schoolDropoff",
+      "displayLabel": "School dropoff",
+      "icon": "graduationcap.fill",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "school_pickup",
+      "swiftCase": "schoolPickup",
+      "displayLabel": "School pickup",
+      "icon": "graduationcap.fill",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "other_service",
+      "swiftCase": "otherService",
+      "displayLabel": "Other service",
+      "icon": "calendar",
+      "isVendorBased": true,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    },
+    {
+      "rawValue": "other_cadence",
+      "swiftCase": "otherCadence",
+      "displayLabel": "Other rhythm",
+      "icon": "calendar",
+      "isVendorBased": false,
+      "seederDefault": null,
+      "_impact": {
+        "categories_served": [],
+        "handyman_singleton": false
+      },
+      "_lint": []
+    }
+  ]
+}
