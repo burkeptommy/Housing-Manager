@@ -1551,7 +1551,7 @@ function renderFacetPills(allItems) {
           pill("routing", "vendor_or_handyman", "Vendor or Handyman", routingCounts.vendor_or_handyman, "Defaults to a vendor visit, but the handyman can knock it out on a punch-list visit too."),
           pill("routing", "handyman", "Handyman", routingCounts.handyman, "Punch-list items the handyman tackles. Homeowner can still pull any of these into 'I'll do it myself' if they want."),
           pill("routing", "homeowner_pull", "I'll do it myself", routingCounts.homeowner_pull, "Always 0 by default. Only populates when the homeowner explicitly pulls a task off another routing lane."),
-          pill("routing", "routine", "Routines", routingCounts.routine, "Recurring vendor work (landscaping, cleaning, pool service, pest control) that gets extracted into a Routine card instead of a one-off task."),
+          pill("routing", "bundled", "Bundled into a visit", routingCounts.bundled, "Bundle children that fold into a parent visit at runtime — Spring Landscaping Service, Pool Opening, Annual Generator Service, etc. The homeowner sees ONE scheduled task per bundle, not the underlying children."),
         ].join("")
       )}
     </div>
@@ -1601,32 +1601,19 @@ function countBySeason(items) {
   return out;
 }
 
-// Phase 5q — Routine-eligible categories + cadences. Mirrors the
-// simulator's SIM_ROUTINE_CATEGORIES + SIM_ROUTINE_FREQUENCIES so the
-// admin's "Routines" routing filter shows the same templates the
-// reconciler would extract into a routine card at runtime.
-const ADMIN_ROUTINE_CATEGORIES = new Set([
-  "Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub",
-  "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste",
-  "Window Cleaning", "Gutter Cleaning", "Trash & Recycling",
-]);
-const ADMIN_ROUTINE_FREQUENCIES = new Set([
-  "Weekly", "Biweekly", "Triweekly", "Monthly", "Bi-monthly", "Quarterly",
-]);
-
-function isRoutineCandidate(t) {
-  if (!t) return false;
-  if (t.assignmentType === "personal") return false;
-  if (t.safetyFloor === true) return false;
-  if (t.routingOverride === "diyDefault") return false;
-  if (!ADMIN_ROUTINE_FREQUENCIES.has(t.frequency)) return false;
-  if (!ADMIN_ROUTINE_CATEGORIES.has(t.systemCategory)) return false;
-  return true;
-}
-
-// Phase 5q — Re-mapped routing taxonomy per Tom: drop "DIY" nomenclature
+// Phase 5q — Routing taxonomy per Tom: drop "DIY" nomenclature
 // (homeowners don't DIY by default; "I'll do it myself" is a runtime pull
-// only). Add "Routines" as a first-class lane for recurring vendor work.
+// only). "Bundled into a visit" is the 5th lane for templates whose
+// bundleId is set — they fold into a parent visit at runtime instead of
+// surfacing as their own task.
+//
+// NOTE: this is distinct from the Routines admin tab (20 RoutineKind
+// enum values — landscaping / cleaning / pool service / etc.). Those
+// represent recurring vendor relationships at the homeowner level.
+// Templates that get routine-folded at runtime (e.g. "Fertilize natural
+// lawn" Quarterly → folded into Landscaping routine) still classify
+// here based on their underlying assignmentType (vendor, etc.) — the
+// fold-in is a runtime behavior, not a routing destination.
 //
 // Routing categories:
 //   vendor             — always a pro (safetyFloor, gas, panel, roof, septic)
@@ -1634,22 +1621,11 @@ function isRoutineCandidate(t) {
 //   handyman           — punch-list items the handyman handles
 //   homeowner_pull     — never the default (always 0); only set when the
 //                        homeowner explicitly pulls a task to themselves
-//   routine            — recurring vendor work that gets routine-extracted
+//   bundled            — has a bundleId; folds into a parent visit at
+//                        runtime instead of surfacing as its own task
 function routingOf(item) {
   const t = item.payload || {};
-  // Routines take priority over the underlying assignmentType — recurring
-  // vendor work surfaces as a routine even if the template ships as
-  // `vendorDefault`. Mirrors simIsRoutineCandidate in admin-simulator.js.
-  if (isRoutineCandidate(t)) return "routine";
-  // Bundle children inherit routing from the synthesized bundle parent.
-  // For filtering purposes, treat them as part of their bundle's routing
-  // lane (most bundles end up vendor_or_handyman or vendor).
-  if (t.bundleId) {
-    if (t.safetyFloor === true) return "vendor";
-    if (t.routingOverride === "vendorOnly") return "vendor";
-    if (t.assignmentType === "vendor") return "vendor";
-    return "vendor_or_handyman";
-  }
+  if (t.bundleId) return "bundled";
   if (t.safetyFloor === true) return "vendor";
   if (t.routingOverride === "vendorOnly") return "vendor";
   if (t.assignmentType === "vendor" && !t.routingOverride) return "vendor";
@@ -1659,7 +1635,7 @@ function routingOf(item) {
 }
 
 function countByRouting(items) {
-  const out = { vendor: 0, vendor_or_handyman: 0, handyman: 0, homeowner_pull: 0, routine: 0 };
+  const out = { vendor: 0, vendor_or_handyman: 0, handyman: 0, homeowner_pull: 0, bundled: 0 };
   for (const i of items) out[routingOf(i)]++;
   return out;
 }
