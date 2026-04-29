@@ -20,8 +20,9 @@ final class RoutineSeeder {
 
     /// Category string → matching RoutineKind + defaults. Lowercased for
     /// case-insensitive matching against `ContractorRow.category`.
-    private struct SeedDefaults {
+    struct SeedDefaults {
         let kind: RoutineKind
+        let serviceKey: String
         let label: String
         let cadenceType: RoutineCadenceType
         let daysOfWeek: [Int]?
@@ -32,13 +33,14 @@ final class RoutineSeeder {
         let cadenceIntervalDays: Int?
     }
 
-    private func defaults(for category: String) -> SeedDefaults? {
+    func defaults(for category: String) -> SeedDefaults? {
         let lower = category.lowercased()
 
         // Cleaning / housekeeping — biweekly year-round, morning reminder.
         if lower.contains("clean") || lower.contains("housekeep") || lower.contains("maid") {
             return SeedDefaults(
                 kind: .cleaning,
+                serviceKey: "housekeeping_program",
                 label: "cleaning service",
                 cadenceType: .biweekly,
                 daysOfWeek: [4], // Wednesday
@@ -54,6 +56,7 @@ final class RoutineSeeder {
         if lower.contains("landscap") || lower.contains("lawn") || lower.contains("mow") {
             return SeedDefaults(
                 kind: .landscaping,
+                serviceKey: "landscaping_program",
                 label: "landscaping service",
                 cadenceType: .weekly,
                 daysOfWeek: [4], // Wednesday
@@ -65,10 +68,34 @@ final class RoutineSeeder {
             )
         }
 
+        // Waste hauling / pickup — weekly year-round with an evening-before
+        // reminder because the homeowner usually needs to roll bins out.
+        if lower.contains("trash")
+            || lower.contains("recycling")
+            || lower.contains("waste")
+            || lower.contains("sanitation")
+            || lower.contains("hauler")
+            || lower.contains("compost")
+            || lower.contains("yard waste") {
+            return SeedDefaults(
+                kind: .trash,
+                serviceKey: "waste_program",
+                label: "trash and recycling program",
+                cadenceType: .weekly,
+                daysOfWeek: [4], // Wednesday
+                timeOfDay: "19:00",
+                activeMonths: Array(1...12),
+                eveningBeforeReminder: true,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
         // Pool service — weekly May-Sep.
         if lower.contains("pool") {
             return SeedDefaults(
                 kind: .poolService,
+                serviceKey: "pool_program",
                 label: "pool service",
                 cadenceType: .weekly,
                 daysOfWeek: [3], // Tuesday
@@ -84,6 +111,7 @@ final class RoutineSeeder {
         if lower.contains("pest") || lower.contains("exterminat") {
             return SeedDefaults(
                 kind: .pestControl,
+                serviceKey: "pest_and_termite_program",
                 label: "pest control service",
                 cadenceType: .customDays,
                 daysOfWeek: nil,
@@ -99,6 +127,7 @@ final class RoutineSeeder {
         if lower.contains("pet waste") || lower.contains("poop") || lower.contains("dog waste") {
             return SeedDefaults(
                 kind: .petWaste,
+                serviceKey: "custom_routine_program",
                 label: "pet waste pickup",
                 cadenceType: .weekly,
                 daysOfWeek: [4], // Wednesday
@@ -114,6 +143,7 @@ final class RoutineSeeder {
         if lower.contains("mosquito") || lower.contains("tick") {
             return SeedDefaults(
                 kind: .mosquitoTick,
+                serviceKey: "mosquito_and_tick_program",
                 label: "mosquito and tick spraying",
                 cadenceType: .triweekly,
                 daysOfWeek: [3], // Tuesday
@@ -134,6 +164,7 @@ final class RoutineSeeder {
         if lower.contains("snow") || lower.contains("plow") {
             return SeedDefaults(
                 kind: .snowRemoval,
+                serviceKey: "snow_and_ice_management_program",
                 label: "snow removal contract",
                 cadenceType: .customDays,
                 daysOfWeek: nil,
@@ -145,7 +176,83 @@ final class RoutineSeeder {
             )
         }
 
+        // Irrigation programs — startup + winterization live under one routine.
+        if lower.contains("irrigation") || lower.contains("sprinkler") {
+            return SeedDefaults(
+                kind: .otherService,
+                serviceKey: "irrigation_program",
+                label: "irrigation program",
+                cadenceType: .annual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: Array(3...11),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
+        // Security and smart-home service — typically an annual walkthrough.
+        if lower.contains("security") || lower.contains("alarm") || lower.contains("smart home") {
+            return SeedDefaults(
+                kind: .otherService,
+                serviceKey: "security_and_smart_home_program",
+                label: "security and smart home program",
+                cadenceType: .annual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: Array(1...12),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
+        // HVAC / boiler service — two seasonal visits rolled into one program.
+        if lower.contains("hvac")
+            || lower.contains("boiler")
+            || lower.contains("furnace")
+            || lower.contains("heating")
+            || lower.contains("air condition") {
+            return SeedDefaults(
+                kind: .otherService,
+                serviceKey: "hvac_program",
+                label: "hvac program",
+                cadenceType: .annual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: Array(1...12),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
+        if lower.contains("generator") {
+            return SeedDefaults(
+                kind: .otherService,
+                serviceKey: "generator_program",
+                label: "generator program",
+                cadenceType: .annual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: Array(1...12),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
         return nil
+    }
+
+    func defaults(forProviderType providerType: String) -> SeedDefaults? {
+        let normalized = providerType.lowercased()
+        if let category = UtilityContractorMirror.serviceCategory(forProviderType: normalized),
+           let defaults = defaults(for: category) {
+            return defaults
+        }
+        return defaults(for: normalized)
     }
 
     /// Seeds a routine for a newly-added or newly-matched contractor. If a
@@ -164,7 +271,8 @@ final class RoutineSeeder {
         do {
             let existing = try await db.fetchRoutines(householdId: contractor.householdId)
             let match = existing.first {
-                $0.routineKind == defaults.kind.rawValue
+                $0.resolvedServiceKey == defaults.serviceKey
+                    || ($0.routineKind == defaults.kind.rawValue && defaults.kind != .otherService)
             }
             if match != nil { return }
         } catch {
@@ -182,6 +290,7 @@ final class RoutineSeeder {
             routineKind: defaults.kind.rawValue,
             cadenceType: defaults.cadenceType.rawValue
         )
+        insert.serviceKey = defaults.serviceKey
         insert.icon = defaults.kind.icon
         insert.vendorId = contractor.id
         insert.cadenceIntervalDays = defaults.cadenceIntervalDays
@@ -202,6 +311,96 @@ final class RoutineSeeder {
         } catch {
             Secure.warn("[RoutineSeeder] createRoutine failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Chez v1: creates pending-vendor routines for the service-shaped
+    /// categories the quiz used to auto-create as `home_systems` rows
+    /// (Pet Waste, Mosquito & Tick, Trash & Recycling, Snow Removal,
+    /// Handyman). These have no install date / brand / model — they're
+    /// just recurring vendor visits — so they belong in the routines
+    /// table, not home_systems.
+    ///
+    /// Idempotent: skips any kind for which a routine already exists in
+    /// this household. Safe to call from quiz completion AND from the
+    /// legacy backfill in `AppState.runServiceSystemArchiveOnceIfNeeded`.
+    ///
+    /// Each routine is created with `setupState = "pending_vendor"` so
+    /// it surfaces as "Pick a pro for X" in Property → Systems →
+    /// Services until the user captures a contractor (which then flows
+    /// through `seedIfNeeded` to upgrade the routine to active +
+    /// vendor-linked).
+    func ensureSystemlessRoutines(
+        propertyId: UUID,
+        householdId: UUID,
+        hasPets: Bool,
+        isSnowState: Bool
+    ) async {
+        let db = DatabaseService.shared
+
+        // Build the rule list using the existing `defaults(for:)` so
+        // cadence + active months + reminders stay in lockstep with
+        // contractor-seeded routines. Only include service-shaped
+        // categories that the quiz USED to write as home_systems.
+        struct Rule {
+            let category: String
+            let label: String
+            let shouldCreate: Bool
+        }
+        let rules: [Rule] = [
+            Rule(category: "handyman", label: "handyman visits", shouldCreate: true),
+            Rule(category: "trash", label: "trash and recycling", shouldCreate: true),
+            Rule(category: "mosquito", label: "mosquito & tick spraying", shouldCreate: true),
+            Rule(category: "pet waste", label: "pet waste pickup", shouldCreate: hasPets),
+            Rule(category: "snow", label: "snow removal", shouldCreate: isSnowState),
+        ]
+
+        let existing = (try? await db.fetchRoutines(householdId: householdId)) ?? []
+
+        for rule in rules {
+            guard rule.shouldCreate else { continue }
+            guard let defaults = defaults(for: rule.category) else { continue }
+
+            // Skip if a routine of this kind already exists. Matches
+            // `seedIfNeeded`'s dedup so contractor-seeded and quiz-
+            // seeded routines never duplicate.
+            let alreadyExists = existing.contains { row in
+                row.archivedAt == nil
+                    && (row.routineKind == defaults.kind.rawValue
+                        || row.resolvedServiceKey == defaults.serviceKey)
+            }
+            if alreadyExists { continue }
+
+            let label = "Pick a pro for \(rule.label)"
+            var insert = RoutineInsert(
+                householdId: householdId,
+                propertyId: propertyId,
+                label: label,
+                routineKind: defaults.kind.rawValue,
+                cadenceType: defaults.cadenceType.rawValue
+            )
+            insert.serviceKey = defaults.serviceKey
+            insert.icon = defaults.kind.icon
+            insert.cadenceIntervalDays = defaults.cadenceIntervalDays
+            insert.daysOfWeek = defaults.daysOfWeek
+            insert.timeOfDay = defaults.timeOfDay
+            insert.activeMonths = defaults.activeMonths
+            insert.eveningBeforeReminder = defaults.eveningBeforeReminder
+            insert.morningOfReminder = defaults.morningOfReminder
+            insert.cadenceSource = "auto_seeded"
+            insert.setupState = "pending_vendor"
+
+            do {
+                _ = try await db.createRoutine(insert)
+                Analytics.track(.routineSeededFromContractor, [
+                    "kind": defaults.kind.rawValue,
+                    "source": "quiz_systemless"
+                ])
+            } catch {
+                Secure.warn("[RoutineSeeder] ensureSystemlessRoutines createRoutine failed: \(error.localizedDescription)")
+            }
+        }
+
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
     }
 
     /// One-time backfill for existing households. Walks every contractor

@@ -35,7 +35,7 @@ serve(async (req: Request) => {
 
     // Look up user info for context
     let userEmail = "Unknown";
-    let userName = "A Haven user";
+    let userName = "A Chez user";
     let householdName = "";
     if (userId) {
       const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -59,7 +59,7 @@ serve(async (req: Request) => {
     }
 
     const emailBody = `
-A Haven user couldn't find their equipment in the catalog.
+A Chez user couldn't find their equipment in the catalog.
 
 Brand: ${brand}
 System Type: ${systemType}
@@ -82,7 +82,7 @@ Please add this to the equipment database so it's available next time.
         },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: "tom@havenhome.dev" }] }],
-          from: { email: "alfred@havenhome.dev", name: "Haven Equipment Catalog" },
+          from: { email: "alfred@havenhome.dev", name: "Chez Equipment Catalog" },
           subject: `Equipment Request: ${brand} ${systemType}${modelNumber ? ` (${modelNumber})` : ""}`,
           content: [{ type: "text/plain", value: emailBody }],
         }),

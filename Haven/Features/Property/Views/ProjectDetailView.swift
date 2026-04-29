@@ -106,7 +106,7 @@ struct ProjectDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
@@ -218,7 +218,7 @@ struct ProjectDetailView: View {
                 let cat = ProjectCategory(rawValue: liveProject.category)
                 Image(systemName: cat?.icon ?? "hammer.fill")
                     .font(.title2)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(liveProject.category)
@@ -253,7 +253,7 @@ struct ProjectDetailView: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     HStack(spacing: 8) {
                         Image(systemName: "chart.line.uptrend.xyaxis")
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("ROI ESTIMATE")
                             .font(HavenTypography.uiSectionHeader)
                             .tracking(1.5)
@@ -370,7 +370,7 @@ struct ProjectDetailView: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                 HStack(spacing: 8) {
                     Image(systemName: "shield.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("CLAIM DETAILS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -521,7 +521,7 @@ struct ProjectDetailView: View {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                         HStack(spacing: 8) {
                             Image(systemName: "hammer.fill")
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text("DIY OVERVIEW")
                                 .font(HavenTypography.uiSectionHeader)
                                 .tracking(1.5)
@@ -537,7 +537,7 @@ struct ProjectDetailView: View {
                                         .foregroundStyle(HavenColors.textTertiary)
                                     Text(mc.displayRange)
                                         .font(HavenTypography.headline)
-                                        .foregroundStyle(HavenColors.navy800)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                                 Spacer()
                             }
@@ -636,7 +636,7 @@ struct ProjectDetailView: View {
                                     .foregroundStyle(HavenColors.textTertiary)
                                 Text("$\(Int(viewModel.claimTotal(for: liveProject)).formatted())")
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 4) {
@@ -661,7 +661,7 @@ struct ProjectDetailView: View {
                             if let amount = liveProject.personalPropertyAmount, amount > 0 {
                                 Text("$\(Int(amount).formatted())")
                                     .font(HavenTypography.uiLabel)
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                             Button {
                                 showPersonalPropertyEdit = true
@@ -720,7 +720,7 @@ struct ProjectDetailView: View {
                     Text("Link a Project")
                         .font(HavenTypography.uiLabel)
                 }
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(HavenColors.navy.opacity(0.08))
@@ -760,7 +760,7 @@ struct ProjectDetailView: View {
                     if let cost = projectDisplayCost(project) {
                         Text("$\(Int(cost).formatted())")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     Text(project.status.replacingOccurrences(of: "_", with: " ").capitalized)
                         .font(.system(size: 9, weight: .medium))
@@ -816,11 +816,11 @@ struct ProjectDetailView: View {
                                 if let cost = projectDisplayCost(proj) {
                                     Text("$\(Int(cost).formatted())")
                                         .font(HavenTypography.uiLabel)
-                                        .foregroundStyle(HavenColors.navy800)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                                 Image(systemName: "link.badge.plus")
                                     .font(.caption)
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                         }
                     }
@@ -908,7 +908,7 @@ struct ProjectDetailView: View {
                     HStack(spacing: 10) {
                         Image(systemName: contactRoleIcon(contact.role))
                             .font(.title3)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .frame(width: 28)
 
                         VStack(alignment: .leading, spacing: 3) {
@@ -1078,7 +1078,7 @@ struct ProjectDetailView: View {
                                 .frame(width: 24)
                             Text(group.trade)
                                 .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text("\(group.quotes.count)")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(HavenColors.navy700)
@@ -1122,11 +1122,11 @@ struct ProjectDetailView: View {
                     HStack(spacing: HavenTheme.spacing8) {
                         Image(systemName: "doc.text.magnifyingglass")
                             .font(.title3)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(viewModel.quotes.isEmpty ? "Upload a Contractor Quote" : "Upload Another Quote")
                                 .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text("Get a line-by-line deal analysis")
                                 .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textSecondary)
@@ -1134,7 +1134,7 @@ struct ProjectDetailView: View {
                         Spacer()
                         Image(systemName: "plus.circle.fill")
                             .font(.caption)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -1222,7 +1222,7 @@ struct ProjectDetailView: View {
                     if let total = quote.quoteTotal {
                         Text("$\(Int(total).formatted())")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     if let fair = quote.estimatedFairTotal {
                         Text("Fair: $\(Int(fair).formatted())")
@@ -1497,11 +1497,11 @@ struct ProjectDetailView: View {
                 HStack(spacing: HavenTheme.spacing8) {
                     Image(systemName: "bubble.left.and.text.bubble.right.fill")
                         .font(.title3)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Ask Alfred About This Project")
                             .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(isDIY ? "Get DIY tips, material advice, and planning help" : "Questions about quotes, contractors, or next steps")
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -1509,7 +1509,7 @@ struct ProjectDetailView: View {
                     Spacer()
                     Image(systemName: "arrow.right.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
@@ -1543,7 +1543,7 @@ struct ProjectDetailView: View {
                         Spacer()
                         Text("$\(Int(spend).formatted())")
                             .font(HavenTypography.title2)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
 
@@ -1590,7 +1590,7 @@ struct ProjectDetailView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "doc.fill")
                                     .font(.system(size: 16))
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .frame(width: 28)
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -1676,7 +1676,7 @@ struct ProjectDetailView: View {
                 } label: {
                     Text("Edit")
                         .font(HavenTypography.uiLabelSmall)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 .buttonStyle(.plain)
             }

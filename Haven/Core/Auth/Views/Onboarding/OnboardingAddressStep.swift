@@ -15,7 +15,7 @@ struct OnboardingAddressStep: View {
                 VStack(spacing: HavenTheme.spacing8) {
                     Image(systemName: "house.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Where's your home?")
                         .font(HavenTypography.title2)
                     Text("We'll build a personalized maintenance plan for your home in seconds.")

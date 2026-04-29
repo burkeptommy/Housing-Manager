@@ -1528,6 +1528,47 @@ final class DatabaseService {
             .value
     }
 
+    /// Phase 78: punch items for a household scoped to one visit. The
+    /// homeowner-side `HandymanVisitCard` reads this to render the
+    /// punch list as checkable subitems under each visit row.
+    func fetchHandymanPunchItemsForVisit(visitTaskId: UUID) async throws -> [HandymanPunchItemRow] {
+        try await from("handyman_punch_items")
+            .select()
+            .eq("assigned_visit_task_id", value: visitTaskId.uuidString)
+            .is("archived_at", value: nil)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    /// Phase 78: every punch item the household has, regardless of state.
+    /// Lets the homeowner side bucket items by `assigned_visit_task_id`
+    /// for the schedule-view rendering pass, AND surface pending items
+    /// (proposal_status='pending', added_after_lock=true) in the inbox.
+    func fetchAllHandymanPunchItems(householdId: UUID) async throws -> [HandymanPunchItemRow] {
+        try await from("handyman_punch_items")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .is("archived_at", value: nil)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    /// Phase 78: handyman-flagged tasks awaiting homeowner accept/decline.
+    /// `proposed_by_role='handyman'` AND `proposal_status='pending'`.
+    /// Powers the Proposals Inbox in the homeowner Handyman tab.
+    func fetchHandymanProposalTasks(householdId: UUID) async throws -> [MaintenanceTaskDBRow] {
+        try await from("maintenance_tasks")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("proposed_by_role", value: "handyman")
+            .eq("proposal_status", value: "pending")
+            .order("proposed_at", ascending: false)
+            .execute()
+            .value
+    }
+
     func createHandymanPunchItem(_ insert: HandymanPunchItemInsert) async throws -> HandymanPunchItemRow {
         try await from("handyman_punch_items")
             .insert(insert, returning: .representation)

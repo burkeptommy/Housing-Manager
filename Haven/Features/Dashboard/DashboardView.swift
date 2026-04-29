@@ -9,7 +9,6 @@ struct VendorActionItem: Identifiable {
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = DashboardViewModel()
-    @StateObject private var vaultViewModel = DocumentVaultViewModel()
     @State private var showSettings = false
     @State private var showUploadDocument = false
     @State private var showAddProperty = false
@@ -27,7 +26,6 @@ struct DashboardView: View {
     @State private var serviceContractType: String = ""
     @State private var showApplianceSetup = false
     @State private var pendingMergeRequest: [String: Any]?
-    @State private var showEstateIntake = false
     @State private var showVendorCoverage = false
     @State private var findVendorSystemName: String?
     @State private var findVendorItem: VendorActionItem?
@@ -38,8 +36,9 @@ struct DashboardView: View {
     @State private var showQuickProjectEntry = false
     @State private var quickProjectPrefill: String = ""
     @AppStorage("hasSeenEmailCallout") private var hasSeenEmailCallout = false
-    @State private var showFamilyMemberChooser = false
-    @State private var familyMemberFormMode: AddFamilyMemberMode?
+    /// Chez v1: family-member CRUD lives in Settings only post-Life-tab.
+    /// `selectedMemberForProfile` stays for tapping a family-member-joined
+    /// activity event in the recent feed; chooser + add form are gone.
     @State private var selectedMemberForProfile: FamilyMemberRow?
     @State private var showAddressCompletion = false
     @State private var activeQuizProperty: PropertyRow?
@@ -51,12 +50,6 @@ struct DashboardView: View {
     /// Phase 61: Presents the LegacyTasksView in a sheet. Opened from the
     /// "View details" button on LegacyTasksNotificationCard.
     @State private var showLegacyTasks = false
-
-    /// Phase 56.4: Session-only dismissal flag for the
-    /// HandymanSuggestionCard. Intentionally not persisted — the punch
-    /// list is real work that needs scheduling, so "Not now" comes back
-    /// next launch. Matches the Maintenance tab's behavior.
-    @State private var handymanSuggestionDismissedThisSession = false
 
     /// Phase 19l — re-fire path for the post-quiz vendor delegation sheet.
     /// When a new contractor is added mid-app (via ContractorDirectoryView
@@ -79,7 +72,7 @@ struct DashboardView: View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: HavenTheme.spacing16) {
-                    // Phase 56.2: the 32pt in-content "Haven" title was
+                    // Phase 56.2: the 32pt in-content "Chez" title was
                     // removed so the hero/greeting sit higher in the
                     // viewport. Brand identity lives in the nav bar's
                     // principal toolbar item below.
@@ -152,41 +145,40 @@ struct DashboardView: View {
                             mergeRequestBanner(merge)
                         }
 
-                        // ── Build 90 / Phase 56.2: Focused Dashboard ──
-                        //
-                        // Scroll order tightened: Hero → Quick Actions →
-                        // UP NEXT (conditional) → View full schedule →
-                        // event banners → Recent → Foundation. Quick
-                        // Actions promoted above UP NEXT so the primary
-                        // 4 actions are visible without scrolling.
-
-                        // 2 + 3. Hero + Quick Actions — conceptually one
-                        // unit ("your home status + what you can do").
-                        // Phase 56.2 Addendum Fix 6: VStack(spacing: 8)
-                        // couples them tightly so the actions sit right
-                        // below the hero without the default 16pt gap.
                         if viewModel.hasCompletedAnyQuiz {
-                            VStack(spacing: 4) {
-                                HomeCoverageHero(
-                                    coveredCount: viewModel.coveredCoverageItems.count,
-                                    totalCount: viewModel.coveredCoverageItems.count + viewModel.uncoveredCoverageItems.count,
-                                    activeVendorCount: viewModel.activeVendorCount,
-                                    nextVisit: viewModel.nextScheduledService,
-                                    uncoveredSystemNames: viewModel.uncoveredCoverageItems.map(\.systemName),
-                                    onTap: {
-                                        Haptics.light()
-                                        // Phase 56.4: the segmented filter is gone;
-                                        // route to the Maintenance list directly and
-                                        // let the user tap stats pills to scope.
-                                        navigationPath.append("maintenance")
-                                    },
-                                    onFindVendor: {
-                                        Haptics.medium()
-                                        showVendorCoverage = true
-                                    }
-                                )
+                            HomeCoverageHero(
+                                propertyName: viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId })?.name
+                                    ?? viewModel.properties.first?.name,
+                                coveredCount: viewModel.coveredCoverageItems.count,
+                                totalCount: viewModel.coveredCoverageItems.count + viewModel.uncoveredCoverageItems.count,
+                                activeVendorCount: viewModel.activeVendorCount,
+                                nextVisit: viewModel.nextScheduledService,
+                                uncoveredSystemNames: viewModel.uncoveredCoverageItems.map(\.systemName),
+                                onTap: {
+                                    Haptics.light()
+                                    navigationPath.append("maintenance")
+                                },
+                                onFindVendor: {
+                                    Haptics.medium()
+                                    showVendorCoverage = true
+                                }
+                            )
+                        }
 
-                                QuickActionsRow(
+                        if viewModel.hasCompletedAnyQuiz {
+                            thisWeekSection
+                        }
+
+                        if viewModel.hasCompletedAnyQuiz,
+                           (!viewModel.upcomingVendorVisits.isEmpty || viewModel.nextStandingVisit != nil) {
+                            upcomingScheduledSection
+                        }
+
+                        // Chez v1: HandymanSuggestionCard moved to Tasks → Handyman.
+                        // Punch list is the single source of truth there.
+
+                        if viewModel.hasCompletedAnyQuiz {
+                            QuickActionsRow(
                                 onAskAlfred: {
                                     NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3])
                                 },
@@ -199,37 +191,6 @@ struct DashboardView: View {
                                 },
                                 onAddVendor: {
                                     showDashboardAddVendor = true
-                                }
-                            )
-                            } // end hero + quick actions VStack
-                        }
-
-                        // Phase 56.4: Proactive handyman scheduling
-                        // suggestion. Surfaces when ≥3 punch items
-                        // accumulate with no upcoming handyman task
-                        // scheduled in the next 30 days and no recent
-                        // completion. Session-dismissible.
-                        if viewModel.hasCompletedAnyQuiz,
-                           viewModel.shouldShowHandymanSuggestion,
-                           !handymanSuggestionDismissedThisSession {
-                            HandymanSuggestionCard(
-                                punchItemCount: viewModel.handymanPunchItemCount,
-                                onSchedule: {
-                                    NotificationCenter.default.post(
-                                        name: .switchToTab,
-                                        object: nil,
-                                        userInfo: ["tab": 1]
-                                    )
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        NotificationCenter.default.post(
-                                            name: .navigateToPropertySection,
-                                            object: nil,
-                                            userInfo: ["section": "handyman_punch_list"]
-                                        )
-                                    }
-                                },
-                                onDismiss: {
-                                    handymanSuggestionDismissedThisSession = true
                                 }
                             )
                         }
@@ -260,48 +221,9 @@ struct DashboardView: View {
                             )
                         }
 
-                        // Phase 63: FindHandymanCard surfaces for users whose
-                        // Q15b answer captured "I need help finding a handyman"
-                        // AND the household still doesn't have a handyman
-                        // contractor on file. Tap opens Alfred with a vetting
-                        // prompt. Snoozes 30 days on "Later".
-                        if viewModel.hasCompletedAnyQuiz,
-                           viewModel.propertyAttributes["handyman_preference"]?.stringValue == "needs_help",
-                           !viewModel.dashboardContractors.contains(where: {
-                               $0.category?.caseInsensitiveCompare("Handyman") == .orderedSame
-                           }) {
-                            FindHandymanCard(
-                                onFindOptions: {
-                                    // ChatView.onReceive reads "message" from
-                                    // the userInfo — use the same key.
-                                    NotificationCenter.default.post(
-                                        name: .openAlfredWithContext,
-                                        object: nil,
-                                        userInfo: [
-                                            "message": "I need help finding a reliable handyman for routine small-fixes work around the house. What should I look for and what questions should I ask when vetting candidates?"
-                                        ]
-                                    )
-                                    Analytics.track(.findHandymanCardTapped)
-                                }
-                            )
-                        }
-
-                        // 4. YOUR TO-DOS — Phase 56.2 conditional.
-                        //   0 items: section absent, just "View full schedule"
-                        //   1 item:  compact inline strip, no titled section
-                        //   2+:      existing full titled section
-                        if viewModel.hasCompletedAnyQuiz {
-                            let itemCount = viewModel.thisWeekItems.count
-                            if itemCount == 0 {
-                                viewFullScheduleLink
-                            } else if itemCount == 1 {
-                                singleUpNextStrip
-                                viewFullScheduleLink
-                            } else {
-                                thisWeekSection
-                                viewFullScheduleLink
-                            }
-                        }
+                        // Chez v1: FindHandymanCard moved to Tasks → Handyman
+                        // hero ("Find a handyman" CTA). One canonical entry
+                        // point so users always know where the handyman lives.
 
                         // 3.5 Cadence suggestion (inline, event-driven)
                         if let suggestion = cadenceCoordinator.current {
@@ -352,7 +274,7 @@ struct DashboardView: View {
                         // "View all activity" → ActivityLogView.
                         if viewModel.hasCompletedAnyQuiz && !viewModel.dashboardActivityEvents.isEmpty {
                             RecentActivityFeed(
-                                events: viewModel.dashboardActivityEvents,
+                                events: Array(viewModel.dashboardActivityEvents.prefix(3)),
                                 totalEventCount: viewModel.allActivityEvents.count,
                                 onTap: { event in
                                     handleActivityTap(event)
@@ -370,23 +292,9 @@ struct DashboardView: View {
                         // entry points remain without the dashboard
                         // clutter.
 
-                        // 5. Foundation (contextual estate card)
-                        if viewModel.shouldShowFoundation {
-                            FoundationCard(
-                                message: viewModel.foundationMessage,
-                                icon: viewModel.foundationIcon,
-                                onTap: {
-                                    Haptics.light()
-                                    let hasStartedIntake = viewModel.estateState?.intakeState?.startedAt != nil
-                                    let isStale = viewModel.estateState?.stalenessTier == "critical" || viewModel.estateState?.stalenessTier == "amber"
-                                    if hasStartedIntake || isStale {
-                                        showEstateIntake = true
-                                    } else {
-                                        NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
-                                    }
-                                }
-                            )
-                        }
+                        // Chez v1: FoundationCard (estate intake nudge) removed.
+                        // Estate management is out of v1 scope; the card and
+                        // its supporting EstateStateService go in Phase 3.
 
                         // ── Conditional sections ──
 
@@ -409,16 +317,16 @@ struct DashboardView: View {
                 .padding(.bottom, 100)
             }
             .background(HavenColors.background)
-            .navigationTitle("Haven")
+            .navigationTitle("Chez")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     // Phase 56.2: small brand wordmark in the nav bar
                     // replaces the 32pt in-content title. Serif, navy,
                     // never competing with the hero for vertical space.
-                    Text("Haven")
+                    Text("Chez")
                         .font(HavenTypography.fraunces(size: 18, weight: 700))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -428,7 +336,7 @@ struct DashboardView: View {
                     } label: {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     .accessibilityLabel("Security")
                 }
@@ -443,7 +351,7 @@ struct DashboardView: View {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "tray.fill")
                                     .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
 
                                 let pendingCount = viewModel.inboxItems.filter { $0.isPending }.count
                                 if pendingCount > 0 {
@@ -467,7 +375,7 @@ struct DashboardView: View {
                         } label: {
                             Image(systemName: "gearshape.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                         .accessibilityLabel("Settings")
                         .accessibilityHint("Open app settings")
@@ -547,9 +455,6 @@ struct DashboardView: View {
                             propertyId: viewModel.properties.first?.id
                         )
                     }
-                } else if destination == "estate_readiness" {
-                    ReadinessDetailView()
-                        .environmentObject(vaultViewModel)
                 } else if destination == "email_forwarding" {
                     ProjectEmailView()
                 } else if destination == "vehicles" {
@@ -688,19 +593,9 @@ struct DashboardView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showFamilyMemberChooser) {
-                AddFamilyMemberChooserSheet { mode in
-                    familyMemberFormMode = mode
-                }
-                .presentationDetents([.medium])
-            }
-            .sheet(item: $familyMemberFormMode) { mode in
-                NavigationStack {
-                    FamilyMemberFormView(initialMode: mode, onSave: {
-                        Task { await viewModel.refresh() }
-                    })
-                }
-            }
+            // Chez v1: family chooser + add-form sheets moved to Settings.
+            // Profile-from-activity sheet stays so tapping a "Family member
+            // joined" event in Recent Activity still opens the profile.
             .sheet(item: $selectedMemberForProfile) { member in
                 NavigationStack {
                     FamilyMemberProfileView(member: member)
@@ -715,11 +610,6 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showPersonalQuiz) {
                 PersonalQuizView()
-            }
-            .sheet(isPresented: $showEstateIntake) {
-                if let hid = viewModel.primaryHouseholdId ?? viewModel.properties.first?.householdId {
-                    EstateIntakeFormView(householdId: hid)
-                }
             }
             .confirmationDialog("Skip the House Quiz?", isPresented: $showQuizSkipDialog, titleVisibility: .visible) {
                 Button("Skip for now") {
@@ -741,7 +631,6 @@ struct DashboardView: View {
             }
             .task {
                 await viewModel.loadDashboard()
-                await vaultViewModel.loadData()
                 hasAppeared = true
                 // Check for pending merge requests
                 do {
@@ -929,7 +818,7 @@ struct DashboardView: View {
                 NavigationLink(value: "inbox") {
                     Text("View All")
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
 
@@ -963,7 +852,7 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Text(item.title)
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(1)
                     if item.isProcessing {
                         HStack(spacing: 4) {
@@ -1065,6 +954,97 @@ struct DashboardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var upcomingScheduledSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("UPCOMING")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                Spacer()
+
+                Button(action: {
+                    Haptics.light()
+                    navigationPath.append("maintenance")
+                }) {
+                    Text("View schedule")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            HavenCard {
+                VStack(spacing: 0) {
+                    let visits = Array(viewModel.upcomingVendorVisits.prefix(3))
+                    if !visits.isEmpty {
+                        ForEach(Array(visits.enumerated()), id: \.element.id) { index, visit in
+                            Button {
+                                selectedDashboardTask = visit.task
+                            } label: {
+                                upcomingVisitRow(
+                                    title: visit.task.title,
+                                    vendor: visit.vendorName ?? "Vendor",
+                                    date: visit.task.nextDueDate.havenDateShort
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            if index < visits.count - 1 {
+                                Divider()
+                                    .background(HavenColors.beige200)
+                                    .padding(.leading, 44)
+                            }
+                        }
+                    } else if let nextStandingVisit = viewModel.nextStandingVisit {
+                        Button {
+                            navigationPath.append("maintenance")
+                        } label: {
+                            upcomingVisitRow(
+                                title: nextStandingVisit.title,
+                                vendor: nextStandingVisit.vendor,
+                                date: nextStandingVisit.date.havenDateShort
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func upcomingVisitRow(title: String, vendor: String, date: String) -> some View {
+        HStack(spacing: HavenTheme.spacing12) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HavenColors.navy700)
+                .frame(width: 32, height: 32)
+                .background(HavenColors.navy.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(date) · \(title)")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text(vendor)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(.vertical, HavenTheme.spacing12)
     }
 
     private var seasonalIcon: String {
@@ -1290,7 +1270,7 @@ struct DashboardView: View {
                     NotificationCenter.default.post(
                         name: .navigateToPropertySection,
                         object: nil,
-                        userInfo: ["section": "contacts"]
+                        userInfo: ["section": "vendors"]
                     )
                 }
             }
@@ -1364,7 +1344,7 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 Image(systemName: "envelope.arrow.triangle.branch.fill")
                     .font(.system(size: 20))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(width: 36, height: 36)
                     .background(HavenColors.navy.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -1372,8 +1352,8 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("You have a forwarding email")
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy800)
-                    Text("Forward quotes, documents, school emails & more to Haven")
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Forward quotes, documents, school emails & more to Chez")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
                         .lineLimit(2)
@@ -1433,7 +1413,7 @@ struct DashboardView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Scenario Planning")
                             .font(HavenTypography.fraunces(size: 18, weight: 700))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Explore what-if questions with your real data: estate, taxes, home, wealth")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -1461,7 +1441,7 @@ struct DashboardView: View {
                 HStack(alignment: .top, spacing: HavenTheme.spacing12) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .frame(width: 44, height: 44)
                         .background(HavenColors.creamLight)
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
@@ -1537,7 +1517,7 @@ struct DashboardView: View {
                                 .foregroundStyle(HavenColors.navy700)
                             Text("Getting Started")
                                 .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
 
                             let completed = [viewModel.hasProperty, viewModel.hasDocuments, viewModel.hasUsedAlfred].filter { $0 }.count
                             Text("\(completed)/3")
@@ -1600,7 +1580,7 @@ struct DashboardView: View {
                     AlfredLogoView(size: 24)
                     Text(title)
                         .font(HavenTypography.title2)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(2)
                 }
 
@@ -2116,110 +2096,6 @@ struct DashboardView: View {
                 })
             }
         }
-    }
-
-    // MARK: - Compact Estate Scorecard
-
-    private var compactEstateScorecard: some View {
-        let level = vaultViewModel.currentLevel
-        let progress = vaultViewModel.levelProgress
-        let levelColor: Color = level.id == 1 ? HavenColors.beige300 : level.color.color
-
-        return HStack(spacing: 12) {
-            Image(systemName: level.icon)
-                .font(.system(size: 18))
-                .foregroundStyle(levelColor)
-                .frame(width: 36, height: 36)
-                .background(levelColor.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(level.name)
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.textOnNavy)
-                if let next = vaultViewModel.nextLevel {
-                    Text("\(Int(progress * 100))% to \(next.name)")
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.beige300)
-                } else {
-                    Text("Max Level!")
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.beige300)
-                }
-            }
-
-            Spacer()
-
-            // Compact progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(height: 6)
-                    Capsule()
-                        .fill(levelColor)
-                        .frame(width: geo.size.width * progress, height: 6)
-                }
-            }
-            .frame(width: 60, height: 6)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(HavenColors.beige300)
-        }
-        .padding(.horizontal, HavenTheme.spacing16)
-        .padding(.vertical, 14)
-        .background(HavenColors.navy)
-        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
-    }
-
-    // MARK: - Compact Scenario Card
-
-    private var compactScenarioCard: some View {
-        Button {
-            Haptics.light()
-            Analytics.track(.scenarioStudioOpened, ["source": "dashboard_compact_card"])
-            showScenarioStudio = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16))
-                    .foregroundStyle(HavenColors.navy700)
-                    .frame(width: 32, height: 32)
-                    .background(HavenColors.navy.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Scenario Planning")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textPrimary)
-                    if viewModel.documentCount < 3 {
-                        Text("Upload more documents to unlock simulations")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                    } else {
-                        Text("Explore what-if questions with your real data")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(HavenColors.textTertiary)
-            }
-            .padding(.horizontal, HavenTheme.spacing16)
-            .padding(.vertical, 12)
-            .background(HavenColors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-            .overlay {
-                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                    .strokeBorder(HavenColors.beige200, lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Security Trust Badge

@@ -531,7 +531,9 @@ enum MaintenanceTemplates {
             || lower.contains(sectionName.lowercased())
             || sectionName.lowercased().contains(lower)
         }?.1 ?? []
-        return matched.filter { template in
+        let adminMatched = AdminCatalogService.shared.cachedMaintenanceTemplates(for: category)
+        return (matched + adminMatched).filter { template in
+            guard !AdminCatalogService.shared.isTaskTemplateCut(template) else { return false }
             let subtypeOK = template.requiredSubtypes.isEmpty
                 || template.requiredSubtypes.isSubset(of: activeSubtypes)
             let regionOK: Bool = {
@@ -549,11 +551,13 @@ enum MaintenanceTemplates {
     /// initial setup task list — that path must respect `activeSubtypes`.
     static func allTemplates(forCategory category: String) -> [MaintenanceTemplate] {
         let lower = category.lowercased()
-        return allTemplates.first { sectionName, _ in
+        let matched = allTemplates.first { sectionName, _ in
             sectionName.lowercased() == lower
             || lower.contains(sectionName.lowercased())
             || sectionName.lowercased().contains(lower)
         }?.1 ?? []
+        return (matched + AdminCatalogService.shared.cachedMaintenanceTemplates(for: category))
+            .filter { !AdminCatalogService.shared.isTaskTemplateCut($0) }
     }
 
     /// Lowercased titles of every template Haven knows about for a category.
@@ -570,9 +574,13 @@ enum MaintenanceTemplates {
     /// been reframed ("Schedule Petro: annual boiler service"), so we can't
     /// rely on it for the canonical wording.
     static func template(forKey key: String) -> MaintenanceTemplate? {
+        if let adminTemplate = AdminCatalogService.shared.cachedMaintenanceTemplate(forKey: key),
+           !AdminCatalogService.shared.isTaskTemplateCut(adminTemplate) {
+            return adminTemplate
+        }
         for (_, templates) in allTemplates {
             if let match = templates.first(where: { $0.templateKey == key }) {
-                return match
+                return AdminCatalogService.shared.isTaskTemplateCut(match) ? nil : match
             }
         }
         return nil
@@ -1986,6 +1994,160 @@ Add anything you've been meaning to get to.
                 estimatedCostRange: "$75–$250",
                 isDIY: false,
                 seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: nil,
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Drywall patch and paint touch-up visit",
+                description: "Bundle the nail pops, scuffs, small dents, and hairline drywall cracks into one visit so the handyman can patch, sand, and spot-paint the obvious lived-in wear all at once.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$150–$500",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Great quote-friendly add-on before guests, photos, or listing prep.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Door, latch, and hinge tune-up",
+                description: "Handyman adjusts sticking interior doors, noisy hinges, misaligned strike plates, loose closers, and dragging thresholds. Small fixes that make the whole house feel maintained.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$100–$350",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: nil,
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Window screen and hardware repair",
+                description: "Replace torn screens, tighten latches, adjust sash hardware, and fix the easy window annoyances that owners tolerate for years.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$125–$400",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Especially useful before bug season or when opening the house back up after winter.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Interior caulk refresh",
+                description: "Re-caulk the obvious failure points in kitchens, mudrooms, and baths before water gets behind trim, counters, or fixtures. Good example of low-drama work that prevents bigger repairs.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$150–$450",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Escalate to a tile setter or plumber if there is movement, active water damage, or fixture replacement hiding underneath.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Hang mirrors, art, and shelving",
+                description: "Batch the high-value finish work: picture clusters, heavy mirrors, floating shelves, coat hooks, and mudroom organization pieces.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$125–$450",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "High-margin add-on that homeowners love because it clears a long-standing to-do list fast.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "TV mounting and cord cleanup",
+                description: "Mount the TV, hide the obvious wire mess, and leave the room looking deliberate instead of half-finished. Great quote lane for handymen who already carry the right anchors and tools.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$175–$500",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Escalate to an electrician or integrator if in-wall power or major AV changes are required.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Furniture, playset, or shed assembly",
+                description: "Use the handyman for assemblies that are tedious, tool-heavy, or safer with two sets of hands. This keeps the homeowner out of half-finished box chaos.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$150–$700",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Good fit for outdoor season starts, playroom upgrades, and storage cleanup.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Grab bar and safety hardware install",
+                description: "Install grab bars, handrail returns, better closet lighting, non-slip hardware, and other aging-in-place or child-safety upgrades that do not require a specialist.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$150–$500",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "One of the strongest trust builders for families managing older parents or multigenerational homes.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Fixture swap and hardware refresh",
+                description: "Replace showerheads, faucets, cabinet pulls, towel bars, exterior house numbers, and similar finish hardware when the work stays inside the handyman lane.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$125–$450",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Escalate when shutoffs are seized, valves are leaking, or wiring/plumbing rough work appears.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Fence, gate, and deck repair sweep",
+                description: "Tighten hinges, replace a few boards, fix sagging latches, and handle the small exterior repairs that are annoying on their own but perfect when bundled together.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$175–$650",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Good seasonal add-on when the handyman is already doing the spring exterior walkthrough.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Blind and curtain hardware install",
+                description: "Install or adjust blinds, shades, curtain rods, privacy hardware, and other finish carpentry items that usually get stuck on a homeowner's list for months.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$125–$400",
+                isDIY: false,
+                seasonalTiming: nil,
                 professionalRequired: true,
                 notes: nil,
                 isEssential: false,

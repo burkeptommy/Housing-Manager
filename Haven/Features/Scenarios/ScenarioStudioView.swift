@@ -85,7 +85,7 @@ struct ScenarioStudioView: View {
                 ToolbarItem(placement: .principal) {
                     Text(selectedCategory?.rawValue ?? "Scenario Planning")
                         .font(HavenTypography.fraunces(size: 18, weight: 700))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     if selectedCategory != nil {
@@ -101,14 +101,14 @@ struct ScenarioStudioView: View {
                                 Text("Categories")
                                     .font(HavenTypography.uiLabel)
                             }
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                     } else {
                         Button("Done") {
                             dismiss()
                         }
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -203,7 +203,7 @@ struct ScenarioStudioView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Analyzing your scenario...")
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text(runner.pendingQuery ?? runner.pendingScenarioId ?? "")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
@@ -230,7 +230,7 @@ struct ScenarioStudioView: View {
                     .foregroundStyle(HavenColors.navy700)
                 Text("Scenario submitted. We'll notify you when it's ready.")
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -341,7 +341,7 @@ struct ScenarioStudioView: View {
                     .font(.title)
                 Text(category.rawValue)
                     .font(HavenTypography.title3)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
                 Text("\(category.scenarios.count)")
                     .font(HavenTypography.uiLabel)
@@ -403,7 +403,7 @@ struct ScenarioStudioView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(scenario.title)
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.leading)
                 Text(scenario.teaser)
                     .font(HavenTypography.caption)
@@ -488,7 +488,7 @@ struct ScenarioStudioView: View {
 
                     Text("No scenarios yet")
                         .font(HavenTypography.fraunces(size: 18, weight: 700))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                     Text("Run your first scenario from the Explore tab to see your history here.")
                         .font(HavenTypography.bodySmall)

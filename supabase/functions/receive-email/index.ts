@@ -215,6 +215,22 @@ async function checkDocumentDuplicate(
   } catch { return null; }
 }
 
+function lastFourDigits(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const digits = String(value).replace(/\D/g, "");
+  if (digits.length === 0) return null;
+  return digits.length <= 4 ? digits : digits.slice(-4);
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value.replace(/[^0-9.\-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 // Content types that analyze-document can process (Claude Vision supports these)
 const ANALYZABLE_CONTENT_TYPES = [
   "application/pdf",
@@ -350,7 +366,7 @@ serve(async (req: Request) => {
     if (!emailMatch) {
       console.log(`[receive-email] No matching haven address in: ${toAddress}`);
       return new Response(
-        JSON.stringify({ error: "Not a valid Haven email address" }),
+        JSON.stringify({ error: "Not a valid Chez email address" }),
         { status: 400, headers }
       );
     }
@@ -1502,7 +1518,13 @@ Respond with ONLY valid JSON:
               actions.push(`duplicate_detected:${billDuplicate.title}`);
             }
 
-            // Create document record — do NOT set property_id yet.
+            const billVendorName = billInfo.billVendor || classification.vendorName || null;
+            const billAmount = coerceNumber(billInfo.billAmount);
+            const billAccountLast4 = lastFourDigits(billInfo.billAccountNumber);
+
+            // Create document record. If we already matched the property from the
+            // forwarded email context, carry it through now so property-level
+            // utility detail screens can pick up bill history immediately.
             const { data: doc, error: docError } = await supabase
               .from("documents")
               .insert({
@@ -1514,6 +1536,10 @@ Respond with ONLY valid JSON:
                 notes: `From forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
                 ai_summary: classification.summary,
                 visible_to_home_managers: visibleToHomeManagers(docCategory),
+                ...(property ? { property_id: property.id } : {}),
+                ...(billVendorName ? { issuing_institution: billVendorName } : {}),
+                ...(billAccountLast4 ? { account_number_last4: billAccountLast4 } : {}),
+                ...(billAmount !== null ? { invoice_amount: billAmount } : {}),
                 ...(billContentHash ? { content_hash: billContentHash } : {}),
                 // Phase 58: bills usually get their contractor_id stamped
                 // later by process-invoice, but carry one through if a

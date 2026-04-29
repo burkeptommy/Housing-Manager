@@ -36,7 +36,7 @@ struct FamilyMembersView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showAddChooser = true } label: {
-                        Image(systemName: "plus").foregroundStyle(HavenColors.navy)
+                        Image(systemName: "plus").foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -165,7 +165,7 @@ struct FamilyMembersView: View {
                                     .foregroundStyle(AvatarColor.rose.color)
                                 Text("View Preparation Checklist")
                                     .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
 
                                 Spacer()
 
@@ -208,7 +208,7 @@ struct FamilyMembersView: View {
                                 Image(systemName: "link.circle.fill")
                                     .font(.system(size: 14))
                                     .foregroundStyle(HavenColors.success)
-                                    .accessibilityLabel("Connected Haven user")
+                                    .accessibilityLabel("Connected Chez user")
                             }
                         }
                         HStack(spacing: 6) {
@@ -223,7 +223,7 @@ struct FamilyMembersView: View {
                             }
                             if member.isLinkedUser {
                                 Text("•").foregroundStyle(HavenColors.textTertiary)
-                                Text("Active on Haven")
+                                Text("Active on Chez")
                                     .font(HavenTypography.uiCaption)
                                     .foregroundStyle(HavenColors.success)
                             }
@@ -242,7 +242,7 @@ struct FamilyMembersView: View {
                 Button {
                     invitingMember = member
                 } label: {
-                    Label("Invite to Haven", systemImage: "person.badge.plus")
+                    Label("Invite to Chez", systemImage: "person.badge.plus")
                 }
             }
         }

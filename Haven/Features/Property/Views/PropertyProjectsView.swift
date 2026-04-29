@@ -5,6 +5,12 @@ struct PropertyProjectsView: View {
     let propertyID: UUID
     let householdId: UUID?
     var propertyLocation: String?
+    /// Chez v1: PropertyDetailView's empty state shows curated starter
+    /// cards (Plan / Log / Import). Pass true so this view stays in the
+    /// tree (so its `.onReceive(propertyProjectsRequestAdd)` listener +
+    /// add sheets keep working) but doesn't draw its own duplicate
+    /// empty-state CTA.
+    var hideEmptyState: Bool = false
     @StateObject private var viewModel = ProjectsViewModel()
     @State private var showNewProject = false
     @State private var showLogHistorical = false
@@ -17,14 +23,20 @@ struct PropertyProjectsView: View {
                 SkeletonCard(lineCount: 2)
                 SkeletonCard(lineCount: 2)
             } else if viewModel.projects.isEmpty {
-                EmptyStateView(
-                    title: "No projects yet",
-                    message: "Plan a renovation or log past improvements to build your home's project history.",
-                    icon: "hammer.fill",
-                    actionTitle: "Add Project",
-                    action: { showAddOptions = true }
-                )
-                .frame(minHeight: 300)
+                if !hideEmptyState {
+                    EmptyStateView(
+                        title: "No projects yet",
+                        message: "Plan a renovation or log past improvements to build your home's project history.",
+                        icon: "hammer.fill",
+                        actionTitle: "Add Project",
+                        action: { showAddOptions = true }
+                    )
+                    .frame(minHeight: 300)
+                }
+                // When hideEmptyState is true the body still renders
+                // the (empty) VStack, which keeps `.task`, `.sheet`s,
+                // and `.onReceive` attached so the starter cards above
+                // can drive add-project sheets via notification.
             } else {
                 HavenButton(title: "Add Project", action: {
                     showAddOptions = true
@@ -40,7 +52,7 @@ struct PropertyProjectsView: View {
                     if viewModel.completedProjectsTotal > 0 {
                         Text("Total: $\(Int(viewModel.completedProjectsTotal).formatted())")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, HavenTheme.spacing8)
                     }
@@ -67,6 +79,20 @@ struct PropertyProjectsView: View {
             Button("Plan New Project") { showNewProject = true }
             Button("Log Completed Project") { showLogHistorical = true }
             Button("Cancel", role: .cancel) {}
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .propertyProjectsRequestAdd)) { notification in
+            // Chez v1: Property → Projects starter rows post this with
+            // a `mode` so we can route directly to the right sheet
+            // instead of bouncing through the confirmation dialog.
+            let mode = notification.userInfo?["mode"] as? String
+            switch mode {
+            case "plan":
+                showNewProject = true
+            case "log":
+                showLogHistorical = true
+            default:
+                showAddOptions = true
+            }
         }
         .confirmationDialog("Delete Project?", isPresented: .init(
             get: { projectToDelete != nil },
@@ -131,7 +157,7 @@ struct PropertyProjectsView: View {
                             if let spend = project.actualSpend, spend > 0 {
                                 Text("$\(Int(spend).formatted())")
                                     .font(HavenTypography.uiLabel)
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                         } else {
                             statusBadge(project.status)

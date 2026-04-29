@@ -106,7 +106,7 @@ struct AddRecurringServiceSheet: View {
                                 Text("Back")
                                     .font(HavenTypography.uiLabel)
                             }
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                 }
@@ -208,7 +208,7 @@ struct AddRecurringServiceSheet: View {
                     if isCreatingNewSystem {
                         Image(systemName: "checkmark")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
                 .padding(.vertical, 4)
@@ -251,7 +251,7 @@ struct AddRecurringServiceSheet: View {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .padding(.vertical, HavenTheme.spacing8)
@@ -339,7 +339,7 @@ struct AddRecurringServiceSheet: View {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .padding(.vertical, HavenTheme.spacing8)

@@ -41,7 +41,7 @@ struct ContractorLogoView: View {
             // Tier 2: Category icon
             Image(systemName: symbolName)
                 .font(.system(size: size * 0.4, weight: .medium))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         } else {
             // Tier 3: Default
             Image(systemName: "person.crop.circle.fill")

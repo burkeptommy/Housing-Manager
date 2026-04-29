@@ -19,6 +19,11 @@ struct AddMaintenanceTaskSheet: View {
     /// If provided, the new task is added optimistically through this view model.
     var viewModel: MaintenanceViewModel?
     var onSave: (() -> Void)?
+    /// Optional hub-driven presets so the sheet can open directly into
+    /// the user's intended creation flow.
+    var initialEntryMode: EntryMode? = nil
+    var initialPropertyId: UUID? = nil
+    var initialVehicleId: UUID? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -26,6 +31,25 @@ struct AddMaintenanceTaskSheet: View {
         case property = "Property"
         case vehicle = "Vehicle"
         var id: String { rawValue }
+    }
+
+    enum EntryMode: String, CaseIterable, Identifiable {
+        case seasonalService = "Service"
+        case routineProgram = "Routine"
+        case handymanItem = "Handyman"
+
+        var id: String { rawValue }
+
+        var helperText: String {
+            switch self {
+            case .seasonalService:
+                return "A one-time or seasonal service card for work like an AC check, a water-heater flush, or a spring inspection."
+            case .routineProgram:
+                return "A recurring program that lives in Your Services. Choose All or tap the active months for things like landscaping, trash, cleaning, or pool care."
+            case .handymanItem:
+                return "A small repair or punch-list item to batch into the next handyman visit."
+            }
+        }
     }
 
     /// Phase 50: Top-of-form task kind picker. Each kind pre-fills
@@ -59,6 +83,7 @@ struct AddMaintenanceTaskSheet: View {
     }
 
     @State private var title = ""
+    @State private var entryMode: EntryMode = .seasonalService
     @State private var taskKind: TaskKind = .maintenance
     @State private var targetType: TargetType = .property
     @State private var selectedPropertyId: UUID?
@@ -68,6 +93,7 @@ struct AddMaintenanceTaskSheet: View {
     @State private var assignedUserId: UUID?
     @State private var frequency = "Annually"
     @State private var dueDate = Date()
+    @State private var activeMonths: Set<Int> = Set(1...12)
     @State private var priority = "medium"
     @State private var notes = ""
     @State private var followUpReason = ""
@@ -86,6 +112,7 @@ struct AddMaintenanceTaskSheet: View {
     /// silent on failure so the form never breaks over detection.
     @State private var loadedRoutines: [RoutineRow] = []
     @State private var preventionMatch: (kind: DuplicateDetector.EntityKind, ref: DuplicateDetector.EntityRef)?
+    @State private var didApplyInitialContext = false
 
     private let db = DatabaseService.shared
 
@@ -108,35 +135,63 @@ struct AddMaintenanceTaskSheet: View {
         return hasTitle && hasTarget && !isSaving
     }
 
+    private var titlePlaceholder: String {
+        switch entryMode {
+        case .seasonalService:
+            return "Service name"
+        case .routineProgram:
+            return "Routine name"
+        case .handymanItem:
+            return "Handyman item"
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 // Phase 50: task kind picker — drives the rest of the
                 // form's defaults (frequency, assignment, notes prefix).
                 Section {
-                    Picker("Task kind", selection: $taskKind) {
-                        ForEach(TaskKind.allCases) { kind in
-                            Text(kind.rawValue).tag(kind)
+                    Picker("Create", selection: $entryMode) {
+                        ForEach(EntryMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: taskKind) { _, newValue in
-                        applyDefaults(for: newValue)
+                    .onChange(of: entryMode) { _, newValue in
+                        if newValue != .seasonalService {
+                            targetType = .property
+                        }
                     }
-                    Text(taskKind.helperText)
+                    Text(entryMode.helperText)
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
+
+                    if entryMode == .seasonalService {
+                        Picker("Service type", selection: $taskKind) {
+                            ForEach(TaskKind.allCases) { kind in
+                                Text(kind.rawValue).tag(kind)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: taskKind) { _, newValue in
+                            applyDefaults(for: newValue)
+                        }
+                        Text(taskKind.helperText)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
                 }
 
                 Section {
-                    TextField("Task name", text: $title)
+                    TextField(titlePlaceholder, text: $title)
 
-                    if taskKind == .followUp {
+                    if entryMode == .seasonalService && taskKind == .followUp {
                         TextField("Reason (optional)", text: $followUpReason, axis: .vertical)
                             .lineLimit(2...4)
                     }
 
-                    if !vehicles.isEmpty {
+                    if entryMode == .seasonalService && !vehicles.isEmpty {
                         Picker("Type", selection: $targetType) {
                             ForEach(TargetType.allCases) { t in
                                 Text(t.rawValue).tag(t)
@@ -171,44 +226,65 @@ struct AddMaintenanceTaskSheet: View {
                     }
                 }
 
-                Section("Schedule") {
+                Section(entryMode == .routineProgram ? "Cadence" : "Schedule") {
                     // Build 86: no date-range constraint. Users can add a
                     // task with a past due date (overdue backfill) or any
                     // future date. Validation happens at save time, not
                     // on the picker.
-                    DatePicker("Due date", selection: $dueDate, displayedComponents: .date)
+                    if entryMode != .handymanItem {
+                        DatePicker(
+                            entryMode == .routineProgram ? "Next expected date" : "Due date",
+                            selection: $dueDate,
+                            displayedComponents: .date
+                        )
                         .tint(HavenColors.navy800)
+                    }
 
                     // Phase 60: optional confirmed visit date. Keeps
                     // Due Date as the reminder anchor while letting
                     // the user mark a visit as already booked — the
                     // task then lands in the Maintenance tab's
                     // "Scheduled" bucket instead of "To Schedule".
-                    Toggle("Visit already scheduled", isOn: $hasScheduledVisit.animation())
-                        .tint(HavenColors.action)
+                    if entryMode == .seasonalService {
+                        Toggle("Visit already scheduled", isOn: $hasScheduledVisit.animation())
+                            .tint(HavenColors.action)
 
-                    if hasScheduledVisit {
-                        DatePicker(
-                            "Visit date",
-                            selection: $scheduledVisitDate,
-                            displayedComponents: .date
-                        )
-                        .tint(HavenColors.navy800)
-                        Text("The task will show up under \"Scheduled\" on the Maintenance tab. Your due date remains the reminder anchor.")
+                        if hasScheduledVisit {
+                            DatePicker(
+                                "Visit date",
+                                selection: $scheduledVisitDate,
+                                displayedComponents: .date
+                            )
+                            .tint(HavenColors.navy800)
+                            Text("The task will show up under \"Scheduled\" on the Maintenance tab. Your due date remains the reminder anchor.")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+
+                    if entryMode != .handymanItem {
+                        Picker(entryMode == .routineProgram ? "Cadence" : "Frequency", selection: $frequency) {
+                            ForEach(frequencies, id: \.self) { f in
+                                Text(f).tag(f)
+                            }
+                        }
+                    }
+
+                    if entryMode != .routineProgram {
+                        Picker("Priority", selection: $priority) {
+                            ForEach(priorities, id: \.self) { p in
+                                Text(p.capitalized).tag(p)
+                            }
+                        }
+                    }
+                }
+
+                if entryMode == .routineProgram {
+                    Section("Active months") {
+                        Text("Tap All for year-round programs, or choose just the months this routine actually runs.")
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textSecondary)
-                    }
-
-                    Picker("Frequency", selection: $frequency) {
-                        ForEach(frequencies, id: \.self) { f in
-                            Text(f).tag(f)
-                        }
-                    }
-
-                    Picker("Priority", selection: $priority) {
-                        ForEach(priorities, id: \.self) { p in
-                            Text(p.capitalized).tag(p)
-                        }
+                        ActiveMonthsPicker(selectedMonths: $activeMonths)
                     }
                 }
 
@@ -271,7 +347,13 @@ struct AddMaintenanceTaskSheet: View {
                         .lineLimit(3...6)
                 }
             }
-            .navigationTitle("Add Task")
+            .navigationTitle(
+                entryMode == .routineProgram
+                    ? "Add Routine"
+                    : entryMode == .handymanItem
+                        ? "Add Handyman Item"
+                        : "Add Service"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -282,15 +364,13 @@ struct AddMaintenanceTaskSheet: View {
                     Button("Save") {
                         Task { await saveTask() }
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                     .disabled(!canSave)
                 }
             }
             .task {
-                if selectedPropertyId == nil {
-                    selectedPropertyId = properties.first?.id
-                }
+                applyInitialContextIfNeeded()
                 await loadDuplicateContext()
             }
             .onChange(of: selectedContractorId) { _, _ in checkForDuplicates() }
@@ -298,6 +378,27 @@ struct AddMaintenanceTaskSheet: View {
             // Phase 56.5 patch: title similarity is part of the gate
             // now, so re-evaluate when the user edits the task title.
             .onChange(of: title) { _, _ in checkForDuplicates() }
+        }
+    }
+
+    private func applyInitialContextIfNeeded() {
+        guard !didApplyInitialContext else { return }
+        didApplyInitialContext = true
+
+        if let initialEntryMode {
+            entryMode = initialEntryMode
+        }
+
+        if let initialPropertyId {
+            targetType = .property
+            selectedPropertyId = initialPropertyId
+        } else if selectedPropertyId == nil {
+            selectedPropertyId = properties.first?.id
+        }
+
+        if let initialVehicleId {
+            targetType = .vehicle
+            selectedVehicleId = initialVehicleId
         }
     }
 
@@ -406,69 +507,134 @@ struct AddMaintenanceTaskSheet: View {
             }
         }
 
-        var insert = MaintenanceTaskInsert(
-            householdId: householdId,
-            title: trimmed,
-            frequency: frequency.lowercased(),
-            nextDueDate: formatter.string(from: dueDate)
-        )
-        if targetType == .property {
-            insert.propertyId = selectedPropertyId
-            insert.systemId = selectedSystemId
-        } else {
-            insert.vehicleId = selectedVehicleId
-        }
-        insert.priority = priority
-        insert.assignedToUserId = assignedUserId
-        insert.assignedContractorId = selectedContractorId
+        switch entryMode {
+        case .seasonalService:
+            var insert = MaintenanceTaskInsert(
+                householdId: householdId,
+                title: trimmed,
+                frequency: frequency.lowercased(),
+                nextDueDate: formatter.string(from: dueDate)
+            )
+            if targetType == .property {
+                insert.propertyId = selectedPropertyId
+                insert.systemId = selectedSystemId
+            } else {
+                insert.vehicleId = selectedVehicleId
+            }
+            insert.priority = priority
+            insert.assignedToUserId = assignedUserId
+            insert.assignedContractorId = selectedContractorId
+            insert.serviceKey = "custom_seasonal_service"
 
-        // Phase 60: if the user marked the visit as already scheduled,
-        // stamp `scheduled_date` so the task lands in "Scheduled" not
-        // "To Schedule". The due date stays the reminder anchor.
-        if hasScheduledVisit {
-            insert.scheduledDate = formatter.string(from: scheduledVisitDate)
-        }
+            if hasScheduledVisit {
+                insert.scheduledDate = formatter.string(from: scheduledVisitDate)
+            }
 
-        // Phase 50: stamp metadata so the maintenance UI can route the
-        // task to the right surface. Vendor visits and follow-ups
-        // automatically resolve to vendor assignment so they show up on
-        // the vendor schedule strip / dashboard. Follow-ups also stamp
-        // a "Vendor follow-up:" notes prefix that the
-        // PropertyDetailViewModel.vendorFollowUpTasks filter looks for.
-        switch taskKind {
-        case .maintenance:
-            insert.notes = notes.isEmpty ? nil : notes
-        case .vendorAppointment:
-            insert.assignmentType = "vendor"
-            insert.needsVendor = selectedContractorId == nil
-            let trailing = notes.isEmpty ? "" : "\n\n\(notes)"
-            insert.notes = "Custom vendor visit added by user.\(trailing)"
-        case .followUp:
-            insert.assignmentType = "vendor"
-            insert.needsVendor = selectedContractorId == nil
-            let reasonText = followUpReason.isEmpty ? trimmed : followUpReason
-            let trailing = notes.isEmpty ? "" : "\n\n\(notes)"
-            insert.notes = "Vendor follow-up: \(reasonText)\(trailing)"
-        }
+            switch taskKind {
+            case .maintenance:
+                insert.notes = notes.isEmpty ? nil : notes
+            case .vendorAppointment:
+                insert.assignmentType = "vendor"
+                insert.needsVendor = selectedContractorId == nil
+                let trailing = notes.isEmpty ? "" : "\n\n\(notes)"
+                insert.notes = "Custom vendor visit added by user.\(trailing)"
+            case .followUp:
+                insert.assignmentType = "vendor"
+                insert.needsVendor = selectedContractorId == nil
+                let reasonText = followUpReason.isEmpty ? trimmed : followUpReason
+                let trailing = notes.isEmpty ? "" : "\n\n\(notes)"
+                insert.notes = "Vendor follow-up: \(reasonText)\(trailing)"
+            }
 
-        // Optimistic save through view model if available
-        if let vm = viewModel {
-            await vm.createTask(insert)
-            onSave?()
-            dismiss()
-        } else {
-            // Fallback: direct save
+            if let vm = viewModel {
+                await vm.createTask(insert)
+                onSave?()
+                dismiss()
+            } else {
+                isSaving = true
+                do {
+                    _ = try await ServiceOrchestrator.createCustomService(insert)
+                    Haptics.success()
+                    onSave?()
+                    dismiss()
+                } catch {
+                    print("[AddTask] Failed to create task: \(error)")
+                    Haptics.error()
+                    isSaving = false
+                }
+            }
+
+        case .routineProgram:
+            guard let propertyId = selectedPropertyId else { return }
             isSaving = true
             do {
-                _ = try await db.createMaintenanceTask(insert)
+                let cadence = routineCadence(for: frequency)
+                var insert = RoutineInsert(
+                    householdId: householdId,
+                    propertyId: propertyId,
+                    label: trimmed,
+                    routineKind: RoutineKind.otherService.rawValue,
+                    cadenceType: cadence.type
+                )
+                insert.cadenceIntervalDays = cadence.intervalDays
+                insert.vendorId = selectedContractorId
+                insert.notes = notes.isEmpty ? nil : notes
+                insert.nextExpectedDate = formatter.string(from: dueDate)
+                insert.activeMonths = Array(activeMonths).sorted()
+                insert.serviceKey = "custom_routine_program"
+                _ = try await ServiceOrchestrator.createCustomRoutine(insert)
                 Haptics.success()
+                NotificationCenter.default.post(name: .routineChanged, object: nil)
                 onSave?()
                 dismiss()
             } catch {
-                print("[AddTask] Failed to create task: \(error)")
+                print("[AddTask] Failed to create routine: \(error)")
                 Haptics.error()
                 isSaving = false
             }
+
+        case .handymanItem:
+            guard let propertyId = selectedPropertyId else { return }
+            isSaving = true
+            do {
+                _ = try await ServiceOrchestrator.createHandymanItem(
+                    householdId: householdId,
+                    propertyId: propertyId,
+                    title: trimmed,
+                    description: nil,
+                    notes: notes.isEmpty ? nil : notes
+                )
+                Haptics.success()
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                NotificationCenter.default.post(name: .routineChanged, object: nil)
+                onSave?()
+                dismiss()
+            } catch {
+                print("[AddTask] Failed to create handyman item: \(error)")
+                Haptics.error()
+                isSaving = false
+            }
+        }
+    }
+
+    private func routineCadence(for frequency: String) -> (type: String, intervalDays: Int?) {
+        switch frequency.lowercased() {
+        case "weekly":
+            return (RoutineCadenceType.weekly.rawValue, nil)
+        case "every 2 weeks":
+            return (RoutineCadenceType.biweekly.rawValue, nil)
+        case "monthly":
+            return (RoutineCadenceType.monthly.rawValue, nil)
+        case "quarterly":
+            return (RoutineCadenceType.quarterly.rawValue, nil)
+        case "semi-annually":
+            return (RoutineCadenceType.semiannual.rawValue, nil)
+        case "annually":
+            return (RoutineCadenceType.annual.rawValue, nil)
+        case "seasonal":
+            return (RoutineCadenceType.customDays.rawValue, 90)
+        default:
+            return (RoutineCadenceType.monthly.rawValue, nil)
         }
     }
 }

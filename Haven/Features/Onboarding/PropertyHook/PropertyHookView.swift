@@ -117,7 +117,7 @@ struct PropertyHookView: View {
                         // mid-funnel.
                         Text(valuation.formattedMidpoint)
                             .font(HavenTypography.fraunces(size: 38, weight: 700))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
 
@@ -154,7 +154,7 @@ struct PropertyHookView: View {
                 // Phase 20 polish: Four preview cards, with Home systems &
                 // maintenance leading the stack. System management is the
                 // primary value driver behind the equity card above, so it
-                // anchors the "what Haven manages" section. Vendor coordination,
+                // anchors the "what Chez manages" section. Vendor coordination,
                 // documents, and Alfred follow as supporting capabilities.
                 VStack(spacing: HavenTheme.spacing12) {
                     previewCard(
@@ -251,7 +251,7 @@ struct PropertyHookView: View {
             HStack(alignment: .top, spacing: HavenTheme.spacing12) {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(width: 36, height: 36)
                     .background(HavenColors.navy.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
@@ -592,7 +592,7 @@ struct PropertyHookView: View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 32, height: 32)
                 .background(HavenColors.navy.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))

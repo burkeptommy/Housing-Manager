@@ -40,10 +40,10 @@ struct OnboardingCombinedInfoStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("About You")
                         .font(HavenTypography.title2)
-                    Text("Tell us a bit about yourself so Haven can personalize your experience.")
+                    Text("Tell us a bit about yourself so Chez can personalize your experience.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -126,7 +126,7 @@ struct OnboardingSpouseStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.2.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Spouse or Partner")
                         .font(HavenTypography.title2)
                     Text("Add them now, or skip and add later.")
@@ -145,7 +145,7 @@ struct OnboardingSpouseStep: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
                                 .background(HavenColors.navy.opacity(0.08))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
@@ -184,7 +184,7 @@ struct OnboardingSpouseStep: View {
                                 Image(systemName: "person.badge.checkmark")
                                     .foregroundStyle(HavenColors.success)
                                     .font(.caption)
-                                Text("This person already has a Haven account. They'll be invited to join your household.")
+                                Text("This person already has a Chez account. They'll be invited to join your household.")
                                     .font(HavenTypography.caption)
                                     .foregroundStyle(HavenColors.success)
                             }
@@ -237,10 +237,10 @@ struct OnboardingFamilyStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.3.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Family Members")
                         .font(HavenTypography.title2)
-                    Text("Add people named in your estate documents — children, parents, guardians, or trustees. Haven will match them when you upload documents.")
+                    Text("Add people named in your estate documents — children, parents, guardians, or trustees. Chez will match them when you upload documents.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -301,21 +301,10 @@ struct OnboardingFeaturesStep: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Text("H")
-                .font(HavenTypography.fraunces(size: 88, weight: 400))
-                .foregroundStyle(HavenColors.navy800)
-                .frame(width: 100, height: 100)
-                .background(
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(HavenColors.creamLight)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22)
-                                .stroke(HavenColors.beige300, lineWidth: 1)
-                        )
-                )
+            ChezBrandView(width: 144)
 
             VStack(spacing: 12) {
-                Text("Welcome to Haven")
+                Text("Welcome to Chez")
                     .font(HavenTypography.title)
 
                 Text("The smart way to manage your home and protect what matters most.")
@@ -342,7 +331,7 @@ struct OnboardingFeaturesStep: View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 36, height: 36)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
@@ -362,7 +351,7 @@ struct OnboardingModulesStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("You're All Set!")
                         .font(HavenTypography.title2)
                     Text("Here's what you can start doing right away.")
@@ -398,7 +387,7 @@ struct OnboardingModulesStep: View {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: icon)
                     .font(.title3)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text(title)
                     .font(HavenTypography.headline)
             }

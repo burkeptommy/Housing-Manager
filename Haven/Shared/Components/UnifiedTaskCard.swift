@@ -475,7 +475,7 @@ struct UnifiedTaskCard: View {
                         if let cadence = standingAppointment?.cadenceLabel {
                             Text(cadence)
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(HavenColors.navy.opacity(0.08))
@@ -529,7 +529,7 @@ struct UnifiedTaskCard: View {
                             Text("Resume")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(HavenColors.navy.opacity(0.08))
@@ -552,7 +552,7 @@ struct UnifiedTaskCard: View {
                             Text("Confirm")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(HavenColors.navy.opacity(0.08))
@@ -593,7 +593,7 @@ struct UnifiedTaskCard: View {
                             Text("Mark Done")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(HavenColors.navy.opacity(0.08))
@@ -711,7 +711,7 @@ struct UnifiedTaskCard: View {
                     Text("Schedule")
                         .font(.system(size: 14, weight: .medium))
                 }
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(HavenColors.navy.opacity(0.08))

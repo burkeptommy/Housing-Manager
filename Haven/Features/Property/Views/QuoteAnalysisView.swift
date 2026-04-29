@@ -71,7 +71,7 @@ struct QuoteAnalysisView: View {
                 Text("Upload a Contractor Quote")
                     .font(HavenTypography.title2)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Take a photo or upload a quote and Haven will extract every line item, compare to fair market pricing, and tell you if you're getting a good deal.")
+                Text("Take a photo or upload a quote and Chez will extract every line item, compare to fair market pricing, and tell you if you're getting a good deal.")
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -162,7 +162,7 @@ struct QuoteAnalysisView: View {
             HStack {
                 Image(systemName: "building.2.fill")
                     .font(.title3)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(vendor.name ?? "Unknown Vendor")
                         .font(HavenTypography.headline)
@@ -299,7 +299,7 @@ struct QuoteAnalysisView: View {
         HavenCard {
             HStack(spacing: 8) {
                 Image(systemName: "hammer.fill")
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("DIY Alternative")
                         .font(HavenTypography.headline)

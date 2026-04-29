@@ -7,6 +7,8 @@ final class AppState: ObservableObject {
     @Published var needsOnboarding = false
     @Published var primaryProperty: PropertyRow?
     @Published var hasCheckedPrimaryProperty = false
+    @Published var activeExperience: AppExperience = .homeowner
+    @Published var fieldDashboard: HavenFieldDashboard?
 
     /// Phase 20b — when a brand-new user finishes the address-hook flow
     /// and AccountCreationStep auth, OnboardingViewModel.complete() stamps
@@ -34,6 +36,10 @@ final class AppState: ObservableObject {
     let authService = AuthService()
     let sessionManager = SessionManager()
 
+    private var isRunningFieldApp: Bool {
+        (Bundle.main.bundleIdentifier ?? "").lowercased() == "com.havenhome.field"
+    }
+
     /// Refresh the cached primary property. Called on auth resolution and
     /// after property mutations so the AddressConfirmationIntercept knows
     /// whether to show.
@@ -45,6 +51,52 @@ final class AppState: ObservableObject {
             primaryProperty = nil
         }
         hasCheckedPrimaryProperty = true
+    }
+
+    private func resolveExperienceContext() async {
+        if !isAuthenticated {
+            activeExperience = .homeowner
+            fieldDashboard = nil
+            primaryProperty = nil
+            hasCheckedPrimaryProperty = false
+            return
+        }
+
+        let currentUser = try? await DatabaseService.shared.fetchCurrentUser()
+        let hasHousehold = currentUser?.householdId != nil
+        let shouldPrioritizeFieldWorkspace = isRunningFieldApp
+
+        do {
+            let dashboard = try await HavenFieldService.shared.fetchDashboard()
+            fieldDashboard = dashboard
+            if !dashboard.needsWorkspace && (shouldPrioritizeFieldWorkspace || !hasHousehold) {
+                HavenFieldCache.saveDashboard(dashboard)
+                activeExperience = .field
+                needsOnboarding = false
+                primaryProperty = nil
+                hasCheckedPrimaryProperty = true
+                return
+            }
+
+            if shouldPrioritizeFieldWorkspace && dashboard.needsWorkspace {
+                needsOnboarding = false
+                primaryProperty = nil
+                hasCheckedPrimaryProperty = true
+                return
+            }
+        } catch {
+            if let cached = HavenFieldCache.loadDashboard(), shouldPrioritizeFieldWorkspace || !hasHousehold {
+                fieldDashboard = cached
+                activeExperience = .field
+                needsOnboarding = false
+                primaryProperty = nil
+                hasCheckedPrimaryProperty = true
+                return
+            }
+        }
+
+        activeExperience = .homeowner
+        fieldDashboard = nil
     }
 
     /// Asks `app_config` whether the running build is at or above the
@@ -71,6 +123,7 @@ final class AppState: ObservableObject {
         // Force-update gate runs in parallel with auth resolution. The DB
         // table is publicly readable so it doesn't depend on a session.
         Task { await checkAppVersion() }
+        Task { await AdminCatalogService.shared.refreshPublishedCatalog() }
 
         Task {
             // Wait for the initial session to be fully resolved before showing any UI.
@@ -82,70 +135,97 @@ final class AppState: ObservableObject {
             // Now we definitively know the auth state
             isAuthenticated = authService.isAuthenticated
             needsOnboarding = authService.needsOnboarding
-            isLoading = false
 
             if isAuthenticated {
                 PushNotificationService.shared.ensureTokenStored()
                 RealtimeService.shared.subscribe()
-                Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
-                Task { await MaintenanceTemplates.migrateTaskTitlesToActionFirst() }
-                Task { await MaintenanceTemplates.cleanupTaskTitlesP54A() }
-                Task { await Self.migrateVehicleMaintenanceTasks() }
-                Task { await Self.reconcileAllPropertiesOnce() }
-                Task { await Self.backfillUtilityAccountSnapshotsOnce() }
-                Task { await Self.refreshPropertyValuesOnce() }
-                Task { await Self.purgeDroppedTemplatesOnce() }
-                Task { await Self.migratePoolTasksToVendorOnce() }
-                Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
-                Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
-                Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
-                Task {
-                    // Phase 54A: order matters — reseed first so bundle backfill
-                    // lands on seasonally-distributed anchor dates; missing-system
-                    // backfill last so the reconciler has somewhere to hang templates.
-                    await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
-                    await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
-                    await Self.backfillMissingSystemsOnceIfNeeded()
-                    // Phase 54E.3: mirror existing waste haulers +
-                    // service utilities to the contractors table.
-                    await Self.backfillUtilityContractorMirrorOnceIfNeeded()
-                    // Phase 60.6: canonicalize `contractors.category`
-                    // strings so vendor-coverage matching resolves
-                    // legacy rows (e.g. "Plumbing & Heating", "Fire
-                    // Protection" from the old chimney_sweep chip).
-                    await Self.canonicalizeContractorCategoriesOnceIfNeeded()
-                    // Phase 55.2: repair air-filter tasks that
-                    // drifted to vendor under the 54A assignment
-                    // leak. Runs AFTER the other backfills so any
-                    // reconciler-created row lands first.
-                    await MaintenanceTaskReconciler.fixAirFilterAssignmentP55()
-                    // Phase 58: archive tasks whose templates were
-                    // killed or demoted during the task library purge.
-                    // Runs LAST so earlier backfills have landed before
-                    // the orphan pass evaluates what to prune.
-                    await Self.archivePhase58OrphanedTasksOnceIfNeeded()
-                    // Phase 67: materialize bundle child rows for
-                    // existing Handyman:spring / Handyman:fall parents.
-                    // Runs AFTER the orphan pass so new children land
-                    // on a clean library. Idempotent.
-                    await MaintenanceTaskReconciler.materializeHandymanBundleChildrenOnceIfNeeded()
-                    // Phase 66: Day1TaskCurator backfill for existing
-                    // TestFlight users. Runs the four-way router (vendor
-                    // / pending-vendor / handyman / This Season) for
-                    // every property whose curator flag is unset, so
-                    // existing installs get the new five-section layout
-                    // populated on first launch without re-running the
-                    // quiz. Idempotent per-property via the standard
-                    // curator UserDefaults gate.
-                    await Self.runDay1CuratorForExistingPropertiesOnceIfNeeded()
+                Task { await AdminCatalogService.shared.refreshPublishedCatalog() }
+                await resolveExperienceContext()
+                if activeExperience == .homeowner && !(isRunningFieldApp && fieldDashboard?.needsWorkspace == true) {
+                    Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
+                    Task { await MaintenanceTemplates.migrateTaskTitlesToActionFirst() }
+                    Task { await MaintenanceTemplates.cleanupTaskTitlesP54A() }
+                    Task { await Self.migrateVehicleMaintenanceTasks() }
+                    Task { await Self.reconcileAllPropertiesOnce() }
+                    Task { await Self.backfillUtilityAccountSnapshotsOnce() }
+                    Task { await Self.refreshPropertyValuesOnce() }
+                    Task { await Self.purgeDroppedTemplatesOnce() }
+                    Task { await Self.migratePoolTasksToVendorOnce() }
+                    Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
+                    Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
+                    Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
+                    Task {
+                        // Phase 54A: order matters — reseed first so bundle backfill
+                        // lands on seasonally-distributed anchor dates; missing-system
+                        // backfill last so the reconciler has somewhere to hang templates.
+                        await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
+                        await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                        await Self.backfillMissingSystemsOnceIfNeeded()
+                        // Phase 54E.3: mirror existing waste haulers +
+                        // service utilities to the contractors table.
+                        await Self.backfillUtilityContractorMirrorOnceIfNeeded()
+                        // Phase 60.6: canonicalize `contractors.category`
+                        // strings so vendor-coverage matching resolves
+                        // legacy rows (e.g. "Plumbing & Heating", "Fire
+                        // Protection" from the old chimney_sweep chip).
+                        await Self.canonicalizeContractorCategoriesOnceIfNeeded()
+                        // Phase 55.2: repair air-filter tasks that
+                        // drifted to vendor under the 54A assignment
+                        // leak. Runs AFTER the other backfills so any
+                        // reconciler-created row lands first.
+                        await MaintenanceTaskReconciler.fixAirFilterAssignmentP55()
+                        // Phase 58: archive tasks whose templates were
+                        // killed or demoted during the task library purge.
+                        // Runs LAST so earlier backfills have landed before
+                        // the orphan pass evaluates what to prune.
+                        await Self.archivePhase58OrphanedTasksOnceIfNeeded()
+                        // Phase 67: materialize bundle child rows for
+                        // existing Handyman:spring / Handyman:fall parents.
+                        // Runs AFTER the orphan pass so new children land
+                        // on a clean library. Idempotent.
+                        await MaintenanceTaskReconciler.materializeHandymanBundleChildrenOnceIfNeeded()
+                        // Phase 66: Day1TaskCurator backfill for existing
+                        // TestFlight users. Runs the four-way router (vendor
+                        // / pending-vendor / handyman / This Season) for
+                        // every property whose curator flag is unset, so
+                        // existing installs get the new five-section layout
+                        // populated on first launch without re-running the
+                        // quiz. Idempotent per-property via the standard
+                        // curator UserDefaults gate.
+                        await Self.runDay1CuratorForExistingPropertiesOnceIfNeeded()
+
+                        // Chez v1: legacy service-row backfill. Archives
+                        // any home_systems row whose category is a
+                        // service (Pet Waste, Cleaning, Trash, Snow
+                        // Removal, Mosquito & Tick, Handyman) and
+                        // ensures matching routines exist. Must run
+                        // BEFORE the install-date pre-fill so we don't
+                        // waste cycles stamping dates onto rows that
+                        // are about to be archived.
+                        await Self.runServiceSystemArchiveOnceIfNeeded()
+
+                        // Chez v1: pre-fill install_date for systems
+                        // whose category correlates with year_built
+                        // (roof, foundation, structural shells). The
+                        // gamified coverage flow then asks the user to
+                        // confirm or correct these. Idempotent via
+                        // `installDateAttomPrefilled` flag on the row +
+                        // a UserDefaults gate inside the helper.
+                        await Self.runInstallDatePrefillOnceIfNeeded()
+                    }
+                    Task { await Self.archivePreQuizChoreTasksOnce() }
+                    Task { await Self.backfillUniversalSystemsOnce() }
+                    Task { await Self.ensurePropertyValuesAreFresh() }
+                    await refreshPrimaryProperty()
+                } else {
+                    hasCheckedPrimaryProperty = true
                 }
-                Task { await Self.archivePreQuizChoreTasksOnce() }
-                Task { await Self.backfillUniversalSystemsOnce() }
-                Task { await Self.ensurePropertyValuesAreFresh() }
-                Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
+                activeExperience = .homeowner
+                fieldDashboard = nil
             }
+            isLoading = false
 
             // Continue listening for future auth state changes (sign out, sign in, etc.)
             // Phase 60.1 trust fix (2026-04-20): read `needsOnboarding`
@@ -163,44 +243,76 @@ final class AppState: ObservableObject {
                 isAuthenticated = isAuth
                 needsOnboarding = authService.needsOnboarding
                 if isAuth {
+                    isLoading = true
                     PushNotificationService.shared.ensureTokenStored()
                     RealtimeService.shared.subscribe()
-                    Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
-                    Task { await MaintenanceTemplates.cleanupTaskTitlesP54A() }
-                    Task { await Self.migrateVehicleMaintenanceTasks() }
-                    Task { await Self.reconcileAllPropertiesOnce() }
-                    Task { await Self.backfillUtilityAccountSnapshotsOnce() }
-                    Task { await Self.refreshPropertyValuesOnce() }
-                    Task { await Self.purgeDroppedTemplatesOnce() }
-                    Task { await Self.migratePoolTasksToVendorOnce() }
-                    Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
-                    Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
-                    Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
-                    Task {
-                        await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
-                        await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
-                        await Self.backfillMissingSystemsOnceIfNeeded()
-                        // Phase 58 orphan archive pass.
-                        await Self.archivePhase58OrphanedTasksOnceIfNeeded()
+                    Task { await AdminCatalogService.shared.refreshPublishedCatalog() }
+                    await resolveExperienceContext()
+                    if activeExperience == .homeowner && !(isRunningFieldApp && fieldDashboard?.needsWorkspace == true) {
+                        Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
+                        Task { await MaintenanceTemplates.cleanupTaskTitlesP54A() }
+                        Task { await Self.migrateVehicleMaintenanceTasks() }
+                        Task { await Self.reconcileAllPropertiesOnce() }
+                        Task { await Self.backfillUtilityAccountSnapshotsOnce() }
+                        Task { await Self.refreshPropertyValuesOnce() }
+                        Task { await Self.purgeDroppedTemplatesOnce() }
+                        Task { await Self.migratePoolTasksToVendorOnce() }
+                        Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
+                        Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
+                        Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
+                        Task {
+                            await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
+                            await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                            await Self.backfillMissingSystemsOnceIfNeeded()
+                            // Phase 58 orphan archive pass.
+                            await Self.archivePhase58OrphanedTasksOnceIfNeeded()
+                        }
+                        Task { await Self.archivePreQuizChoreTasksOnce() }
+                        Task { await Self.backfillUniversalSystemsOnce() }
+                        Task { await Self.ensurePropertyValuesAreFresh() }
+                        await refreshPrimaryProperty()
+                    } else {
+                        primaryProperty = nil
+                        hasCheckedPrimaryProperty = true
                     }
-                    Task { await Self.archivePreQuizChoreTasksOnce() }
-                    Task { await Self.backfillUniversalSystemsOnce() }
-                    Task { await Self.ensurePropertyValuesAreFresh() }
-                    Task { await refreshPrimaryProperty() }
+                    isLoading = false
                 } else {
                     RealtimeService.shared.unsubscribe()
                     primaryProperty = nil
                     hasCheckedPrimaryProperty = false
+                    activeExperience = .homeowner
+                    fieldDashboard = nil
+                    HavenFieldCache.clearDashboard()
+                    isLoading = false
                 }
             }
         }
 
         Task {
             for await onboarding in authService.$needsOnboarding.values {
-                needsOnboarding = onboarding
+                if activeExperience != .field {
+                    needsOnboarding = onboarding
             }
         }
     }
+
+    func applyFieldDashboard(_ dashboard: HavenFieldDashboard) {
+        fieldDashboard = dashboard
+        if dashboard.needsWorkspace {
+            activeExperience = .homeowner
+            needsOnboarding = false
+            primaryProperty = nil
+            hasCheckedPrimaryProperty = true
+            return
+        }
+
+        HavenFieldCache.saveDashboard(dashboard)
+        activeExperience = .field
+        needsOnboarding = false
+        primaryProperty = nil
+        hasCheckedPrimaryProperty = true
+    }
+}
 
     /// Phase 54A: One-time backfill that walks every property and creates
     /// the `home_systems` rows the Vendor Coverage registry knows about
@@ -293,6 +405,132 @@ final class AppState: ObservableObject {
 
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         NotificationCenter.default.post(name: .routineChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Chez v1: legacy backfill that retires service-shaped
+    /// `home_systems` rows (Pet Waste, Cleaning Service, Trash &
+    /// Recycling, Snow Removal, Mosquito & Tick, Handyman) so those
+    /// categories live ONLY as routines going forward. Walks every
+    /// existing system, archives any row whose lowercased category
+    /// is in `SystemGroup.serviceCategories`, and ensures matching
+    /// routines exist via `RoutineSeeder.ensureSystemlessRoutines`.
+    ///
+    /// Idempotent: gated on `UserDefaults` AND the helper itself
+    /// skips rows whose category check fails. Once flipped, never
+    /// re-runs.
+    static func runServiceSystemArchiveOnceIfNeeded() async {
+        let key = "hasArchivedServiceSystemsP1_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            print("[AppState] runServiceSystemArchive: fetchProperties failed: \(error)")
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var archivedCount = 0
+        for property in properties {
+            // fetchHomeSystems already filters archived rows via the
+            // server-side filter we added — but at first-run all the
+            // legacy service rows are still active, so they'll show.
+            let systems = (try? await db.fetchHomeSystems(propertyId: property.id)) ?? []
+            for system in systems
+                where SystemGroup.isServiceCategory(system.category) {
+                try? await db.archiveHomeSystem(id: system.id)
+                archivedCount += 1
+            }
+
+            // Ensure routines exist for the now-archived service
+            // categories. The seeder is idempotent so households that
+            // already have these routines (e.g. via Day1Curator or
+            // contractor seeding) get no-ops.
+            // FlexibleValue.bool(true) renders as "Yes" via
+            // stringValue while quiz writes commonly persist as
+            // "true" — accept both so the snow/pet gate stays robust.
+            let petsRaw = property.attributes?["has_pets"]?.stringValue.lowercased() ?? ""
+            let hasPets = (petsRaw == "true" || petsRaw == "yes")
+            let isSnow = isSnowState(property.state)
+            await RoutineSeeder.shared.ensureSystemlessRoutines(
+                propertyId: property.id,
+                householdId: property.householdId,
+                hasPets: hasPets,
+                isSnowState: isSnow
+            )
+        }
+
+        if archivedCount > 0 {
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        }
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+        print("[AppState] runServiceSystemArchive: archived=\(archivedCount)")
+    }
+
+    /// Snow-state lookup for backfill — matches the snow-state set used
+    /// in `HouseQuizAnswerMapper.ensureAutoCreatedSystems`. Kept inline
+    /// here because the mapper's helper is fileprivate and we don't
+    /// want to widen its visibility for a single backfill use.
+    private static func isSnowState(_ state: String?) -> Bool {
+        guard let s = state?.uppercased(), !s.isEmpty else { return false }
+        return [
+            "MA", "CT", "RI", "NY", "NH", "VT", "ME", "NJ", "PA",
+            "OH", "MI", "WI", "MN", "IA", "IL", "IN",
+            "CO", "UT", "WY", "ID", "MT", "ND", "SD", "NE", "AK",
+        ].contains(s)
+    }
+
+    /// Chez v1: walks every existing property and pre-fills install
+    /// dates on systems whose category correlates with the home's age
+    /// (roof, foundation, structural shells, original windows, etc.)
+    /// using the property's ATTOM-sourced `year_built`. Stamps source
+    /// = 'estimated' and a `attom_prefilled = true` flag so the
+    /// gamified coverage flow surfaces them as "estimated from public
+    /// records — confirm or correct".
+    ///
+    /// Idempotent two ways: (1) global `UserDefaults` gate so the
+    /// fetchProperties pass only fires once per install; (2) the row
+    /// helper skips systems where `installDate` is already set OR
+    /// `installDateAttomPrefilled` is already true, so even if the
+    /// gate were bypassed we never double-stamp.
+    static func runInstallDatePrefillOnceIfNeeded() async {
+        let key = "hasRunInstallDatePrefill_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            print("[AppState] InstallDatePrefill backfill: fetchProperties failed: \(error)")
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var totalUpdated = 0
+        for property in properties {
+            guard let yearBuilt = property.yearBuilt, yearBuilt > 0 else { continue }
+            let count = await InstallDatePrefiller.prefill(
+                propertyId: property.id,
+                yearBuilt: yearBuilt,
+                db: db
+            )
+            totalUpdated += count
+        }
+
+        if totalUpdated > 0 {
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        }
         UserDefaults.standard.set(true, forKey: key)
     }
 

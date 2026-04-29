@@ -13,6 +13,29 @@ import Foundation
 /// with 3 tiers (diy / mixed / hire_out) replacing the 1-10 slider.
 /// Tom can edit copy here without touching view code.
 enum HouseQuizQuestionLibrary {
+    private static let monthSelectionOptions: [AnswerOption] = [
+        AnswerOption(id: "jan", label: "January"),
+        AnswerOption(id: "feb", label: "February"),
+        AnswerOption(id: "mar", label: "March"),
+        AnswerOption(id: "apr", label: "April"),
+        AnswerOption(id: "may", label: "May"),
+        AnswerOption(id: "jun", label: "June"),
+        AnswerOption(id: "jul", label: "July"),
+        AnswerOption(id: "aug", label: "August"),
+        AnswerOption(id: "sep", label: "September"),
+        AnswerOption(id: "oct", label: "October"),
+        AnswerOption(id: "nov", label: "November"),
+        AnswerOption(id: "dec", label: "December"),
+    ]
+
+    private static func hasProviderContext(_ answer: HouseQuizAnswer?) -> Bool {
+        guard let answer else { return false }
+        if answer.selectedProviderId != nil {
+            return true
+        }
+        let trimmed = answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !trimmed.isEmpty
+    }
 
     /// Phase 60.3: quiz now renders in chapter order rather than section
     /// order. The chapter grouping was introduced in Phase 60.3 as a
@@ -335,6 +358,19 @@ enum HouseQuizQuestionLibrary {
             }
         ),
         HouseQuizQuestion(
+            id: "q11c_landscaping_months",
+            section: .outside,
+            title: "Which months does your landscaping crew usually come?",
+            subtitle: "Select all that apply. Use Select all if they run year-round.",
+            kind: .multiSelect,
+            answerOptions: monthSelectionOptions,
+            dynamicSkip: { state in
+                guard state.answers["q11_lawn"]?.answerId == "pro" else { return true }
+                return !hasProviderContext(state.answers["q11_lawn"])
+            },
+            supportsSelectAll: true
+        ),
+        HouseQuizQuestion(
             id: "q12_pool",
             section: .outside,
             title: "Pool or hot tub?",
@@ -380,6 +416,22 @@ enum HouseQuizQuestionLibrary {
                     && q12 != "above_ground"
                     && q12 != "both"
             }
+        ),
+        HouseQuizQuestion(
+            id: "q12c_pool_months",
+            section: .outside,
+            title: "Which months does your pool company cover?",
+            subtitle: "Select the months they handle opening, weekly care, or closing.",
+            kind: .multiSelect,
+            answerOptions: monthSelectionOptions,
+            dynamicSkip: { state in
+                guard let q12 = state.answers["q12_pool"]?.answerId,
+                      ["in_ground", "above_ground", "both"].contains(q12) else {
+                    return true
+                }
+                return !hasProviderContext(state.answers["q12_pool"])
+            },
+            supportsSelectAll: true
         ),
         HouseQuizQuestion(
             id: "q13_pest",
@@ -433,6 +485,22 @@ enum HouseQuizQuestionLibrary {
                 return false
             },
             providerSearchPlaceholder: "Your sprinkler company..."
+        ),
+        HouseQuizQuestion(
+            id: "q14b_irrigation_months",
+            section: .outside,
+            title: "Which months does the irrigation system usually run?",
+            subtitle: "We'll use this to save the active season for startup, checks, and winterization.",
+            kind: .multiSelect,
+            answerOptions: monthSelectionOptions,
+            dynamicSkip: { state in
+                guard let q14 = state.answers["q14_irrigation"]?.answerId,
+                      ["full", "drip"].contains(q14) else {
+                    return true
+                }
+                return !hasProviderContext(state.answers["q14_irrigation"])
+            },
+            supportsSelectAll: true
         ),
         HouseQuizQuestion(
             id: "q15_security",
@@ -527,6 +595,26 @@ enum HouseQuizQuestionLibrary {
             ],
             providerFollowUpAnswerIds: ["private"],
             providerTypes: ["trash"]
+        ),
+        HouseQuizQuestion(
+            id: "q18b_trash_day",
+            section: .energyServices,
+            title: "Which days should Chez remind you about pickup?",
+            subtitle: "Pick every day bins go out if trash and recycling happen separately.",
+            kind: .multiSelect,
+            answerOptions: [
+                AnswerOption(id: "sun", label: "Sunday"),
+                AnswerOption(id: "mon", label: "Monday"),
+                AnswerOption(id: "tue", label: "Tuesday"),
+                AnswerOption(id: "wed", label: "Wednesday"),
+                AnswerOption(id: "thu", label: "Thursday"),
+                AnswerOption(id: "fri", label: "Friday"),
+                AnswerOption(id: "sat", label: "Saturday"),
+            ],
+            dynamicSkip: { state in
+                guard let q18 = state.answers["q18_trash"]?.answerId else { return true }
+                return q18 == "not_sure"
+            }
         ),
         HouseQuizQuestion(
             id: "q19_heating_provider",

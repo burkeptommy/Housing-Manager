@@ -67,7 +67,7 @@ struct QuizKidsInlineForm: View {
                         Text(kids.isEmpty ? "Add a kid" : "Add another kid")
                     }
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 }
                 .buttonStyle(.plain)
 
@@ -83,7 +83,7 @@ struct QuizKidsInlineForm: View {
                             Text("Expecting?")
                         }
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     }
                     .buttonStyle(.plain)
                 }

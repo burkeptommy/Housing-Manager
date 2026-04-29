@@ -113,7 +113,7 @@ struct FrequencyPickerSheet: View {
                                 if selectedPreset == preset {
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                             }
                             .contentShape(Rectangle())
@@ -192,7 +192,7 @@ struct FrequencyPickerSheet: View {
                     Button("Save") {
                         save()
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                     .disabled(resolvedDays <= 0)
                 }

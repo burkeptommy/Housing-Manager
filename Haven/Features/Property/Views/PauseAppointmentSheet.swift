@@ -47,7 +47,7 @@ struct PauseAppointmentSheet: View {
                                 Spacer()
                                 if selectedReason == reason {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(HavenColors.navy800)
+                                        .foregroundColor(HavenColors.textPrimary)
                                 }
                             }
                         }
@@ -68,7 +68,7 @@ struct PauseAppointmentSheet: View {
                                 Spacer()
                                 if resumeOption == .auto {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(HavenColors.navy800)
+                                        .foregroundColor(HavenColors.textPrimary)
                                 }
                             }
                         }
@@ -81,7 +81,7 @@ struct PauseAppointmentSheet: View {
                             Spacer()
                             if resumeOption == .manual {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(HavenColors.navy800)
+                                    .foregroundColor(HavenColors.textPrimary)
                             }
                         }
                     }
@@ -93,7 +93,7 @@ struct PauseAppointmentSheet: View {
                             Spacer()
                             if resumeOption == .custom {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(HavenColors.navy800)
+                                    .foregroundColor(HavenColors.textPrimary)
                             }
                         }
                     }
@@ -132,7 +132,7 @@ struct PauseAppointmentSheet: View {
                         onPause(reason, resumeDate)
                         dismiss()
                     }
-                    .foregroundColor(HavenColors.navy800)
+                    .foregroundColor(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                 }
             }

@@ -26,7 +26,13 @@ targets:
         excludes:
           - "Config/Info.plist"
           - "Config/Haven.entitlements"
+          - "Config/HavenField-Info.plist"
           - "Resources/SplashScreen.storyboard"
+          # Chez v1: HavenFieldApp.swift declares its own @main and is intended
+          # for a separate Field-app target. Excluded here so the homeowner
+          # Haven target builds cleanly. HavenFieldView.swift (model types
+          # consumed by AppState/ContentView) stays in the target.
+          - "App/HavenFieldApp.swift"
     resources:
       - path: Haven/Resources/Assets.xcassets
       - path: Haven/Resources/Fonts
@@ -39,8 +45,9 @@ targets:
         INFOPLIST_FILE: Haven/Config/Info.plist
         CODE_SIGN_ENTITLEMENTS: Haven/Config/Haven.entitlements
         MARKETING_VERSION: "1.0.2"
-        CURRENT_PROJECT_VERSION: "86"
+        CURRENT_PROJECT_VERSION: "95"
         CODE_SIGN_STYLE: Automatic
+        PRODUCT_NAME: Chez
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: false
@@ -67,6 +74,39 @@ targets:
           - applinks:havenhome.dev
           - applinks:api.havenhome.dev
 
+  HavenField:
+    type: application
+    platform: iOS
+    sources:
+      - path: Haven
+        excludes:
+          - "Config/Info.plist"
+          - "Config/Haven.entitlements"
+          - "Config/HavenField-Info.plist"
+          - "Resources/SplashScreen.storyboard"
+          # Separate field app target: include HavenFieldApp.swift and exclude
+          # the homeowner @main so the standalone technician app owns launch.
+          - "App/HavenApp.swift"
+    resources:
+      - path: Haven/Resources/Assets.xcassets
+      - path: Haven/Resources/Fonts
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.havenhome.field
+        INFOPLIST_FILE: Haven/Config/HavenField-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Haven/Config/Haven.entitlements
+        MARKETING_VERSION: "1.0.2"
+        CURRENT_PROJECT_VERSION: "86"
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_NAME: ChezField
+        ASSETCATALOG_COMPILER_APPICON_NAME: HavenFieldAppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: false
+        TARGETED_DEVICE_FAMILY: "1,2"
+
   HavenTests:
     type: bundle.unit-test
     platform: iOS
@@ -77,5 +117,31 @@ targets:
     settings:
       base:
         BUNDLE_LOADER: "$(TEST_HOST)"
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Haven.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Haven"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Chez.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Chez"
         GENERATE_INFOPLIST_FILE: true
+
+schemes:
+  Chez:
+    build:
+      targets:
+        Haven: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+  Chez Field:
+    build:
+      targets:
+        HavenField: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+    profile:
+      config: Release
+    analyze:
+      config: Debug

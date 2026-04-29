@@ -27,7 +27,7 @@ struct EquipmentIdentifySheet: View {
                         .foregroundStyle(HavenColors.navy700)
                     Text("Identify Your Equipment")
                         .font(HavenTypography.fraunces(size: 20, weight: 700))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Find your exact model for manuals, maintenance tips, and specs")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
@@ -80,7 +80,7 @@ struct EquipmentIdentifySheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Search by Name")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Type a brand, model, or product type")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -112,7 +112,7 @@ struct EquipmentIdentifySheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Take a Photo")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Snap the model/serial plate on your equipment")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -141,7 +141,7 @@ struct EquipmentIdentifySheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Choose from Photos")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Use an existing photo of the label")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -190,7 +190,7 @@ struct EquipmentIdentifySheet: View {
                 .scaleEffect(1.5)
             Text("Analyzing photo...")
                 .font(HavenTypography.headline)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("Reading the model and serial plate")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
@@ -211,12 +211,12 @@ struct EquipmentIdentifySheet: View {
                         .foregroundStyle(.green)
                     Text("Equipment Identified!")
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(match.displayName)
                             .font(HavenTypography.title3)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(match.subtitle)
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -227,7 +227,7 @@ struct EquipmentIdentifySheet: View {
                                     .foregroundStyle(HavenColors.textTertiary)
                                 Text(serial)
                                     .font(HavenTypography.uiLabel)
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                         }
                     }
@@ -261,7 +261,7 @@ struct EquipmentIdentifySheet: View {
                         .foregroundStyle(HavenColors.warning)
                     Text("Partially Identified")
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                     VStack(alignment: .leading, spacing: 6) {
                         if let mfg = result.manufacturer {
@@ -321,7 +321,7 @@ struct EquipmentIdentifySheet: View {
                 .frame(width: 50, alignment: .trailing)
             Text(value)
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
 

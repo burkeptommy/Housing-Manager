@@ -55,7 +55,7 @@ struct WhatsNewPhase57Card: View {
         let regional = regionalPack == .northeast
             ? " including Northeast-specific routines like radon testing and humidifier service"
             : ""
-        return "Haven now tracks 10+ additional vendor routines\(regional). Review your home to add what applies — we'll only schedule what you confirm."
+        return "Chez now tracks 10+ additional vendor routines\(regional). Review your home to add what applies — we'll only schedule what you confirm."
     }
 
     var body: some View {
@@ -64,7 +64,7 @@ struct WhatsNewPhase57Card: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("NEW ROUTINES AVAILABLE")
                             .font(HavenTypography.uiSectionHeader)
                             .tracking(1.5)

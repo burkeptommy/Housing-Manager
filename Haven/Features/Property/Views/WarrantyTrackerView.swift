@@ -30,7 +30,7 @@ struct WarrantyTrackerView: View {
                 ContentUnavailableView {
                     Label("Warranty Tracker", systemImage: "shield")
                 } description: {
-                    Text("Add warranties to your home systems and Haven will remind you before they expire.")
+                    Text("Add warranties to your home systems and Chez will remind you before they expire.")
                 }
             } else {
                 warrantyList

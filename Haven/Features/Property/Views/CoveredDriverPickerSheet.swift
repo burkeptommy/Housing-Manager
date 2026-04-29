@@ -101,10 +101,10 @@ struct CoveredDriverPickerSheet: View {
                     HStack(spacing: 12) {
                         Image(systemName: "plus.circle")
                             .font(.system(size: 20))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Add new driver")
                             .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
                     }
                 }

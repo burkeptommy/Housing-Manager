@@ -34,7 +34,7 @@ struct PropertyListView: View {
                         Text("Your Home Awaits")
                             .font(HavenTypography.title2)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Add your property and Haven will help you track systems, maintenance, and more.")
+                        Text("Add your property and Chez will help you track systems, maintenance, and more.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                             .multilineTextAlignment(.center)
@@ -70,8 +70,7 @@ struct PropertyListView: View {
                     .padding(.top, HavenTheme.spacing8)
                 }
 
-                // Your Garage section
-                garageSection
+                vehiclesSection
             }
             .background(HavenColors.background)
             .navigationTitle("Properties")
@@ -83,7 +82,7 @@ struct PropertyListView: View {
                 ToolbarItem(placement: .principal) {
                     Text("Properties")
                         .font(HavenTypography.fraunces(size: 18, weight: 700))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -93,7 +92,7 @@ struct PropertyListView: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     .accessibilityLabel("Add new property")
                 }
@@ -146,14 +145,14 @@ struct PropertyListView: View {
         }
     }
 
-    // MARK: - Garage Section
+    // MARK: - Vehicles Section
 
-    private var garageSection: some View {
+    private var vehiclesSection: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             HStack {
-                Text("Your Garage")
+                Text("Vehicles")
                     .font(HavenTypography.title3)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
                 Button {
                     Haptics.light()
@@ -171,10 +170,6 @@ struct PropertyListView: View {
             .padding(.horizontal, HavenTheme.spacing16)
 
             if viewModel.vehicles.isEmpty {
-                // Phase 56.2: value-forward empty state. HNW voice
-                // connects the vehicle to the home-care premise; the
-                // primary CTA lives inside the card so users don't
-                // have to hunt for the "+" in the section header.
                 Button {
                     Haptics.light()
                     showAddVehicle = true
@@ -190,10 +185,10 @@ struct PropertyListView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Your daily driver deserves care too")
+                                    Text("Keep vehicle records alongside the home")
                                         .font(HavenTypography.headline)
                                         .foregroundStyle(HavenColors.textPrimary)
-                                    Text("Maintenance schedules, recall alerts, and service history in one place.")
+                                    Text("Maintenance schedules, recall alerts, and service history live here too.")
                                         .font(HavenTypography.caption)
                                         .foregroundStyle(HavenColors.textSecondary)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -241,6 +236,21 @@ struct VehicleCardRow: View {
     let vehicle: VehicleRow
     @State private var brandLogoURL: URL?
 
+    private var serviceItemCount: Int {
+        vehicle.maintenanceSchedule?.count ?? 0
+    }
+
+    private var actionSummary: String {
+        if serviceItemCount > 0 {
+            return "\(serviceItemCount) service item\(serviceItemCount == 1 ? "" : "s") tracked"
+        }
+        return "No service plan yet"
+    }
+
+    private var ownershipSummary: String {
+        vehicle.preferredMechanicId == nil ? "No shop assigned" : "Shop assigned"
+    }
+
     var body: some View {
         HavenCard {
             HStack(spacing: 14) {
@@ -264,7 +274,7 @@ struct VehicleCardRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(vehicle.name)
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     if !vehicle.displayName.isEmpty && vehicle.displayName != vehicle.name {
                         Text(vehicle.displayName)
                             .font(HavenTypography.bodySmall)
@@ -275,6 +285,10 @@ struct VehicleCardRow: View {
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textTertiary)
                     }
+                    Text("\(actionSummary) · \(ownershipSummary)")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(2)
                 }
 
                 Spacer()
@@ -308,7 +322,7 @@ struct VehicleCardRow: View {
     private var vehicleIconFallback: some View {
         Image(systemName: "car.fill")
             .font(.system(size: 24))
-            .foregroundStyle(HavenColors.navy)
+            .foregroundStyle(HavenColors.textPrimary)
             .frame(width: 44, height: 44)
             .background(HavenColors.navy.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -324,6 +338,7 @@ struct PropertyCardRow: View {
     @State private var totalSystemCount: Int = 0
     @State private var nextVendorName: String?
     @State private var nextVendorDate: String?
+    @State private var nextTaskTitle: String?
 
     /// Addendum Fix 2: ±5% centered band, en dash, compact enough for
     /// one line. Manual overrides show a point value. Real ATTOM bands
@@ -379,7 +394,7 @@ struct PropertyCardRow: View {
                 HStack(spacing: HavenTheme.spacing16) {
                     Image(systemName: propertyIcon)
                         .font(.title2)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .frame(width: 48, height: 48)
                         .background(HavenColors.navy.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
@@ -389,6 +404,9 @@ struct PropertyCardRow: View {
                         Text(property.name)
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
+                        Text(property.propertyType)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
                         // Only show address details when the property
                         // name doesn't already contain the street — the
                         // default name IS the address, so repeating it
@@ -411,14 +429,12 @@ struct PropertyCardRow: View {
 
                     if !compactValue.isEmpty {
                         VStack(alignment: .trailing, spacing: 2) {
-                            // Addendum Fix 2: reduced to 14pt + lineLimit + scale
-                            // so the range fits one line on smaller devices.
                             Text(compactValue)
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                                 .foregroundStyle(HavenColors.textPrimary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
-                            Text("Est. Value")
+                            Text("Est. value")
                                 .font(.system(size: 9))
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
@@ -429,13 +445,11 @@ struct PropertyCardRow: View {
                         .accessibilityHidden(true)
                 }
 
-                // Addendum Fix 10: divider separates identity (above)
-                // from status (below) for a clear visual break.
                 if totalSystemCount > 0 {
                     Divider()
                         .background(HavenColors.beige200)
 
-                    HStack(spacing: HavenTheme.spacing16) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 4) {
                             Image(systemName: coveredCount == totalSystemCount
                                   ? "checkmark.circle.fill"
@@ -444,26 +458,33 @@ struct PropertyCardRow: View {
                                 .foregroundStyle(coveredCount == totalSystemCount
                                                  ? HavenColors.success
                                                  : HavenColors.warning)
-                            Text("\(coveredCount)/\(totalSystemCount) covered")
+                            Text("\(coveredCount) of \(totalSystemCount) systems covered")
                                 .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textSecondary)
                         }
 
-                        Spacer(minLength: 0)
+                        let uncoveredCount = max(totalSystemCount - coveredCount, 0)
+                        if uncoveredCount > 0 {
+                            Text("\(uncoveredCount) system\(uncoveredCount == 1 ? "" : "s") need vendors")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.warning)
+                        }
 
-                        if let vendor = nextVendorName, let date = nextVendorDate {
-                            HStack(spacing: 4) {
-                                Image(systemName: "calendar")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(HavenColors.textTertiary)
-                                Text("Next: \(vendor)")
+                        if let title = nextTaskTitle, let date = nextVendorDate {
+                            Text("Next visit: \(title) · \(date)")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textPrimary)
+                                .lineLimit(2)
+                            if let vendor = nextVendorName {
+                                Text(vendor)
                                     .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textSecondary)
+                                    .foregroundStyle(HavenColors.textTertiary)
                                     .lineLimit(1)
-                                Text(date)
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
                             }
+                        } else {
+                            Text("No upcoming visits scheduled")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
                         }
                     }
                     .padding(.top, 2)
@@ -503,17 +524,18 @@ struct PropertyCardRow: View {
         coveredCount = coverage.covered.count
         totalSystemCount = coverage.covered.count + filteredUncovered.count
 
-        // Next vendor visit
         let contractorsById = Dictionary(uniqueKeysWithValues: contractors.map { ($0.id, $0) })
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let now = Date()
+        let meaningfulWindow = Calendar.current.date(byAdding: .day, value: 120, to: now) ?? now
         let upcoming = tasks
             .compactMap { task -> (task: MaintenanceTaskDBRow, date: Date)? in
                 guard task.vehicleId == nil,
                       task.assignedContractorId != nil,
                       let date = formatter.date(from: task.nextDueDate),
-                      date >= Calendar.current.startOfDay(for: now) else { return nil }
+                      date >= Calendar.current.startOfDay(for: now),
+                      date <= meaningfulWindow else { return nil }
                 return (task, date)
             }
             .sorted { $0.date < $1.date }
@@ -522,7 +544,6 @@ struct PropertyCardRow: View {
         if let upcoming,
            let contractorId = upcoming.task.assignedContractorId,
            let contractor = contractorsById[contractorId] {
-            // Fix 3: short-form for long comma-separated names
             let name = contractor.companyName
             if name.count > 24, let comma = name.firstIndex(of: ",") {
                 nextVendorName = String(name[..<comma])
@@ -531,9 +552,11 @@ struct PropertyCardRow: View {
                 nextVendorName = name
             }
             nextVendorDate = upcoming.task.nextDueDate.havenDateShort
+            nextTaskTitle = upcoming.task.title
         } else {
             nextVendorName = nil
             nextVendorDate = nil
+            nextTaskTitle = nil
         }
     }
 }

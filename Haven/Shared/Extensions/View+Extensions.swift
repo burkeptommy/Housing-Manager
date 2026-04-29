@@ -9,7 +9,7 @@ func screenTitle(_ title: String) -> some View {
     HStack {
         Text(title)
             .font(HavenTypography.fraunces(size: 28, weight: 700))
-            .foregroundStyle(HavenColors.navy)
+            .foregroundStyle(HavenColors.textPrimary)
         Spacer()
     }
 }

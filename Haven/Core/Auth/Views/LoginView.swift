@@ -21,17 +21,7 @@ struct LoginView: View {
 
                     // Logo & branding
                     VStack(spacing: 8) {
-                        Text("H")
-                            .font(HavenTypography.fraunces(size: 88, weight: 400))
-                            .foregroundStyle(HavenColors.creamLight)
-                            .frame(width: 100, height: 100)
-                            .background(
-                                RoundedRectangle(cornerRadius: 22)
-                                    .fill(HavenColors.navy800)
-                            )
-                        Text("Haven")
-                            .font(HavenTypography.fraunces(size: 36, weight: 400))
-                            .foregroundStyle(HavenColors.navy800)
+                        ChezBrandView(width: 144)
                         Text("Your home and everything that protects it.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -113,7 +103,7 @@ struct LoginView: View {
                                 Label("Sign in with \(AuthService.biometricName)", systemImage: AuthService.biometricIcon)
                                     .font(HavenTypography.uiLabel)
                             }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
 
@@ -123,7 +113,7 @@ struct LoginView: View {
                             viewModel.showForgotPassword = true
                         }
                         .font(HavenTypography.bodySmall)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                         HStack(spacing: 4) {
                             Text("Don't have an account?")
@@ -132,7 +122,7 @@ struct LoginView: View {
                                 viewModel.showSignUp = true
                             }
                             .fontWeight(.semibold)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                         .font(HavenTypography.bodySmall)
                     }
@@ -158,7 +148,7 @@ struct LoginView: View {
                         VStack(spacing: 8) {
                             Image(systemName: "key.fill")
                                 .font(.system(size: 48))
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text("Reset Password")
                                 .font(HavenTypography.title2)
                             Text("Enter your email and we'll send you a reset link.")
@@ -205,7 +195,7 @@ struct LoginView: View {
                                 Text("Back")
                                     .font(HavenTypography.bodySmall)
                             }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                 }

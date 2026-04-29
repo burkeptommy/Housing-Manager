@@ -25,7 +25,7 @@ struct DocumentCard: View {
             ZStack(alignment: .bottomTrailing) {
                 Image(systemName: categoryIcon)
                     .font(.title3)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(width: 40, height: 40)
                     .background(HavenColors.navy.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))

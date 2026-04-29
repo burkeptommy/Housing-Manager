@@ -185,7 +185,7 @@ struct VendorCoverageSheet: View {
                 .font(HavenTypography.title3)
                 .foregroundStyle(HavenColors.textPrimary)
                 .multilineTextAlignment(.center)
-            Text("You're set. Haven will let you know if anything changes.")
+            Text("You're set. Chez will let you know if anything changes.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)

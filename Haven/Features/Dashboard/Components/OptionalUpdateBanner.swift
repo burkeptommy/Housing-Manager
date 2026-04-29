@@ -21,11 +21,11 @@ struct OptionalUpdateBanner: View {
                     .frame(width: 36, height: 36)
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
 
             VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
-                Text("Haven \(latestVersion) is available")
+                Text("Chez \(latestVersion) is available")
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textPrimary)
 
@@ -55,7 +55,7 @@ struct OptionalUpdateBanner: View {
                     } label: {
                         Text("Later")
                             .font(HavenTypography.uiButton)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .padding(.horizontal, HavenTheme.spacing16)
                             .padding(.vertical, HavenTheme.spacing8)
                     }
@@ -80,7 +80,7 @@ struct OptionalUpdateBanner: View {
 #Preview {
     OptionalUpdateBanner(
         latestVersion: "1.0.4",
-        message: "A new version of Haven is available. Update anytime to get the latest features.",
+        message: "A new version of Chez is available. Update anytime to get the latest features.",
         appStoreURL: URL(string: "https://apps.apple.com/app/id6757167606")!,
         onDismiss: {}
     )

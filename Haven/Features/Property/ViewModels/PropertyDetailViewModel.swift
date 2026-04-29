@@ -24,6 +24,13 @@ final class PropertyDetailViewModel: ObservableObject {
     /// `loadProperty` alongside the other fetches.
     @Published private(set) var routineVendorIds: Set<UUID> = []
 
+    /// Chez v1: every active (non-archived) routine on this household.
+    /// Drives the new "SERVICES" section on the Systems sub-tab —
+    /// recurring vendor visits live here as routines, not as
+    /// `home_systems` rows that require brand/model/serial. Same
+    /// underlying data the Tasks tab Maintenance segment uses.
+    @Published var routines: [RoutineRow] = []
+
     /// Guards auto-refresh so it only fires once per VM lifecycle.
     private var hasAttemptedAutoRefresh = false
     private let db = DatabaseService.shared
@@ -78,13 +85,18 @@ final class PropertyDetailViewModel: ObservableObject {
     /// Phase 50: Tasks shown in the Maintenance tab's "Your tasks"
     /// section. Filters by template routing so even hire-out users still
     /// see the small set of `.diyDefault` chores (filter swap, mini-split
-    /// rinse, generator dipstick, weatherstripping check). Custom tasks
-    /// (no templateId) fall back to assignment_type — anything not
-    /// `vendor` is treated as personal.
+    /// rinse, generator dipstick, weatherstripping check). Explicit
+    /// routing overrides the template default: once a task is moved to
+    /// the handyman or a vendor, it should leave the personal bucket.
+    /// Custom tasks (no templateId) fall back to assignment_type —
+    /// anything not `vendor` is treated as personal.
     var diyTasksForMaintenanceTab: [MaintenanceTaskDBRow] {
         maintenanceTasks.filter { task in
             // Vehicle tasks live on the vehicle detail screen.
             if task.vehicleId != nil { return false }
+            if task.assignedRoute == "handyman" || task.assignedRoute == "vendor" {
+                return false
+            }
             guard let templateKey = task.templateId,
                   let template = MaintenanceTemplates.template(forKey: templateKey) else {
                 // Custom tasks: include if assignment is anything but vendor.
@@ -508,9 +520,11 @@ final class PropertyDetailViewModel: ObservableObject {
             // Powers the Contacts sub-tab "Routines" filter and the
             // per-row "Routine" badge.
             if let householdId = property?.householdId {
-                let routines = (try? await db.fetchRoutines(householdId: householdId)) ?? []
-                routineVendorIds = Set(routines.compactMap { $0.vendorId })
+                let fetched = (try? await db.fetchRoutines(householdId: householdId)) ?? []
+                routines = fetched
+                routineVendorIds = Set(fetched.compactMap { $0.vendorId })
             } else {
+                routines = []
                 routineVendorIds = []
             }
         } catch {
@@ -594,7 +608,11 @@ final class PropertyDetailViewModel: ObservableObject {
                 serviceDate: formatter.string(from: .now),
                 serviceType: "maintenance",
                 description: task.title,
-                systemId: task.systemId
+                systemId: task.systemId,
+                contractorId: MaintenanceTaskRoutingSupport.resolvedContractorId(
+                    for: task,
+                    systems: systems
+                )
             ))
 
             // Reschedule notifications

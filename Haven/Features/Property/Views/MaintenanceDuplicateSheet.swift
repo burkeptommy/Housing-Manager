@@ -136,7 +136,7 @@ struct MaintenanceDuplicateSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { onCancel() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
             .disabled(isResolving)

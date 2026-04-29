@@ -160,7 +160,7 @@ struct InvoiceReviewSheet: View {
             HStack(spacing: 12) {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 24))
-                    .foregroundColor(HavenColors.navy800)
+                    .foregroundColor(HavenColors.textPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Invoice Intelligence")
                         .font(HavenTypography.title2)
@@ -258,7 +258,7 @@ struct InvoiceReviewSheet: View {
                     Spacer()
                 }
                 .padding(12)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .background(HavenColors.beige200.opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
             }
@@ -615,7 +615,7 @@ struct InvoiceReviewSheet: View {
             HStack(spacing: 4) {
                 Image(systemName: "bell")
                     .font(.system(size: 10))
-                Text("Haven will create reminders for these")
+                Text("Chez will create reminders for these")
                     .font(HavenTypography.uiLabelSmall)
             }
             .foregroundColor(HavenColors.textTertiary)

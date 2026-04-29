@@ -77,7 +77,7 @@ struct TrustedContactsView: View {
         HStack(spacing: 12) {
             Image(systemName: "person.badge.key.fill")
                 .font(.title3)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 40, height: 40)
                 .background(HavenColors.navy.opacity(0.1))
                 .clipShape(Circle())

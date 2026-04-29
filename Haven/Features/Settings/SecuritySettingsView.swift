@@ -53,7 +53,7 @@ struct SecuritySettingsView: View {
                         .tracking(1.5)
                         .foregroundStyle(HavenColors.textTertiary)
                 } footer: {
-                    Text("Haven will require \(AuthService.biometricName) after being in the background for this duration.")
+                    Text("Chez will require \(AuthService.biometricName) after being in the background for this duration.")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textTertiary)
                 }
@@ -65,7 +65,7 @@ struct SecuritySettingsView: View {
                     showChangePassword = true
                 }
                 .font(HavenTypography.body)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             } header: {
                 Text("PASSWORD")
                     .font(HavenTypography.uiSectionHeader)
@@ -104,7 +104,7 @@ struct ChangePasswordSheet: View {
                 VStack(spacing: 12) {
                     Image(systemName: "envelope.badge.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Reset Link Sent")
                         .font(HavenTypography.title2)
                     Text("Check your email for a password reset link.")
@@ -117,7 +117,7 @@ struct ChangePasswordSheet: View {
                 VStack(spacing: 8) {
                     Image(systemName: "key.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Change Password")
                         .font(HavenTypography.title2)
                     Text("We'll send a password reset link to your email.")

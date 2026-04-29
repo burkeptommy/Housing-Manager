@@ -27,18 +27,7 @@ struct AddressConfirmationIntercept: View {
 
                     // Branding
                     VStack(spacing: HavenTheme.spacing8) {
-                        Text("H")
-                            .font(HavenTypography.fraunces(size: 48, weight: 700))
-                            .foregroundStyle(HavenColors.navy800)
-                            .frame(width: 80, height: 80)
-                            .background(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .fill(HavenColors.cream)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 20)
-                                            .stroke(HavenColors.beige300, lineWidth: 1.5)
-                                    )
-                            )
+                        ChezBrandView(width: 104)
                         Text("Welcome back")
                             .font(HavenTypography.title)
                     }

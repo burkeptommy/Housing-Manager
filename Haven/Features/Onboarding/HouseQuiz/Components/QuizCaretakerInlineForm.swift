@@ -74,7 +74,7 @@ struct QuizCaretakerInlineForm: View {
             }
 
             if didConfirm {
-                Text("Haven will remember them as part of your household.")
+                Text("Chez will remember them as part of your household.")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
             }
@@ -215,7 +215,7 @@ struct QuizCaretakerInlineForm: View {
                     Text("Add another \(role.label.lowercased())")
                 }
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             }
             .buttonStyle(.plain)
         }

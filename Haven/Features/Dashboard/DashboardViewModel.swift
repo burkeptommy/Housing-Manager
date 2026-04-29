@@ -251,7 +251,7 @@ final class DashboardViewModel: ObservableObject {
     /// `LegacyTasksNotificationCard` visibility on the dashboard. Archived rows
     /// originate from any reconciler pass (subtype mismatch, bundle backfill,
     /// Phase 58 orphan prune, future retirement cycles) — the user's mental
-    /// model is "Haven tidied my list," so one count covers every source.
+    /// model is "Chez tidied my list," so one count covers every source.
     @Published var legacyTaskCount: Int = 0
 
     // Family members
@@ -299,17 +299,11 @@ final class DashboardViewModel: ObservableObject {
     /// dashboard reloads.
     @Published var dismissedCoverageCategories: Set<String> = []
 
-    var shouldShowEstateDripCard: Bool {
-        // Don't show during onboarding -- wait until all house quizzes are done
-        let allQuizzesDone = !properties.isEmpty && properties.allSatisfy { $0.houseQuizState?.completedAt != nil }
-        guard allQuizzesDone else { return false }
-        return EstateIntakeDripCard.shouldShow(estateState: estateState)
-    }
-
-    func dismissEstateDrip(tier: EstateIntakeDripCard.DismissTier) {
-        EstateIntakeDripCard.dismiss(tier: tier)
-        objectWillChange.send()
-    }
+    // Chez v1: shouldShowEstateDripCard + dismissEstateDrip removed —
+    // estate management is out of v1 scope. estateState property kept
+    // as @Published var for now since RecommendationEngine + edge
+    // function context still reference it; SmartRecommendations cleanup
+    // and estateState removal land in the same Phase 3 sweep.
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -350,7 +344,6 @@ final class DashboardViewModel: ObservableObject {
             hasRunGapAnalysis: hasRunGapAnalysis,
             hasRunScenario: hasRunScenario,
             expiringCount: upcomingExpirations.count,
-            estateReadiness: overallReadiness,
             hasRemindersEnabled: hasRemindersEnabled,
             overBudgetProjectCount: overBudgetProjectCount,
             approachingDeadlineProjectCount: approachingDeadlineProjectCount,
@@ -359,7 +352,6 @@ final class DashboardViewModel: ObservableObject {
             currentSeasonName: currentSeasonName,
             systemsNeedingServiceCount: systemsNeedingServiceCount,
             hasIncompleteProperty: hasIncompleteProperty,
-            estateState: estateState,
             dismissedIds: dismissedRecommendationIds
         )
     }
@@ -738,11 +730,11 @@ final class DashboardViewModel: ObservableObject {
 
     /// Phase 56.4: Whether to surface the proactive "Schedule handyman
     /// visit" suggestion. Triggered when:
-    /// - Punch list has ≥3 pending items
+    /// - Punch list has ≥1 pending item
     /// - AND no Handyman task is scheduled in the next 30 days
     /// - AND no Handyman task completed in the last 90 days
     var shouldShowHandymanSuggestion: Bool {
-        guard handymanPunchItemCount >= 3 else { return false }
+        guard handymanPunchItemCount >= 1 else { return false }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let now = Date()
@@ -1141,14 +1133,11 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func loadEstateState() async {
-        guard let householdId = primaryHouseholdId else {
-            // Try to get it from properties
-            let props = (try? await DatabaseService.shared.fetchProperties()) ?? []
-            guard let hid = props.first?.householdId else { return }
-            estateState = try? await EstateStateService.shared.fetch(householdId: hid)
-            return
-        }
-        estateState = try? await EstateStateService.shared.fetch(householdId: householdId)
+        // Chez v1: estate state fetch is a no-op. The property is kept on
+        // the view model so RecommendationEngine + activity feed can still
+        // pass it through, but it always reads as nil and nothing in the
+        // UI depends on it any more.
+        estateState = nil
     }
 
     func loadInboxItems() async {
@@ -1540,43 +1529,14 @@ final class DashboardViewModel: ObservableObject {
         await refresh()
     }
 
-    /// Compute Foundation card state from estate data.
+    /// Chez v1: estate-driven foundation card removed from the Dashboard.
+    /// The function is now a no-op so existing call sites keep compiling
+    /// while the published flags stay false. The properties themselves
+    /// (`shouldShowFoundation`, `foundationMessage`, `foundationIcon`)
+    /// stay declared so anything observing them doesn't crash; they
+    /// can be removed alongside the SmartRecommendations estate sweep.
     func computeFoundationState() {
-        guard hasCompletedAnyQuiz else {
-            shouldShowFoundation = false
-            return
-        }
-
-        if let estate = estateState {
-            let intakeStarted = estate.intakeState?.startedAt != nil
-            let intakeCompleted = estate.intakeState?.completedAt != nil
-            let staleness = estate.stalenessTier
-
-            if staleness == "critical" || staleness == "amber" {
-                shouldShowFoundation = true
-                foundationMessage = "Your estate plan needs a review"
-                foundationIcon = "exclamationmark.triangle.fill"
-            } else if intakeStarted && !intakeCompleted {
-                let answeredCount = estate.intakeState?.answers?.count ?? 0
-                shouldShowFoundation = true
-                foundationMessage = answeredCount > 0
-                    ? "Continue estate setup (\(answeredCount) questions answered)"
-                    : "Continue estate setup"
-                foundationIcon = "arrow.right.circle.fill"
-            } else if !intakeStarted {
-                shouldShowFoundation = EstateIntakeDripCard.shouldShow(estateState: estateState)
-                foundationMessage = "Start organizing your estate"
-                foundationIcon = "doc.text.fill"
-            } else {
-                // Intake complete, no staleness -- healthy, hide it
-                shouldShowFoundation = false
-            }
-        } else {
-            // No estate state at all -- prompt to start
-            shouldShowFoundation = EstateIntakeDripCard.shouldShow(estateState: nil)
-            foundationMessage = "Start organizing your estate"
-            foundationIcon = "doc.text.fill"
-        }
+        shouldShowFoundation = false
     }
 
     // MARK: - Phase 50: Recent Activity

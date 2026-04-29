@@ -41,7 +41,7 @@ struct TrustedContactFormView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "person.crop.circle.badge.plus")
                                 .font(.title3)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Import from Contacts")
                                     .font(HavenTypography.subheadline)

@@ -38,7 +38,7 @@ struct RecommendationEngine {
         hasRunGapAnalysis: Bool,
         hasRunScenario: Bool,
         expiringCount: Int,
-        estateReadiness: Double,
+        estateReadiness: Double = 0,
         hasRemindersEnabled: Bool,
         overBudgetProjectCount: Int = 0,
         approachingDeadlineProjectCount: Int = 0,
@@ -47,7 +47,6 @@ struct RecommendationEngine {
         currentSeasonName: String = "",
         systemsNeedingServiceCount: Int = 0,
         hasIncompleteProperty: Bool = false,
-        estateState: EstateStateRow? = nil,
         dismissedIds: Set<String>
     ) -> [Recommendation] {
         var recs: [Recommendation] = []
@@ -100,7 +99,7 @@ struct RecommendationEngine {
             recs.append(Recommendation(
                 id: "add_systems",
                 title: "Add home systems",
-                subtitle: "HVAC, plumbing, electrical -- Haven tracks maintenance for you",
+                subtitle: "HVAC, plumbing, electrical -- Chez tracks maintenance for you",
                 icon: "gearshape.2.fill",
                 iconColor: HavenColors.navy700,
                 priority: 15,
@@ -185,82 +184,14 @@ struct RecommendationEngine {
             ))
         }
 
-        // ============================================================
-        // ESTATE (lower priority -- shown after home management is handled)
-        // ============================================================
+        // Chez v1: estate-readiness, gap-analysis-prompt, scenario-prompt,
+        // and estate-staleness recommendations removed. Estate management
+        // is out of v1 scope; the parameters stay for ABI compatibility.
 
-        if documentCount > 0 && estateReadiness < 30 {
-            recs.append(Recommendation(
-                id: "low_readiness",
-                title: "Improve your estate readiness",
-                subtitle: "You're at \(Int(estateReadiness))% -- upload key documents to protect your family",
-                icon: "shield.lefthalf.filled",
-                iconColor: HavenColors.info,
-                priority: 70,
-                action: .navigate(tab: 2)
-            ))
-        }
-
-        if documentCount >= 5 && !hasRunGapAnalysis {
-            recs.append(Recommendation(
-                id: "run_gap_analysis",
-                title: "Run AI Gap Analysis",
-                subtitle: "Let Alfred find blind spots in your estate plan",
-                icon: "chart.bar.doc.horizontal.fill",
-                iconColor: HavenColors.info,
-                priority: 75,
-                action: .runGapAnalysis
-            ))
-        }
-
-        if documentCount >= 3 && !hasRunScenario {
-            recs.append(Recommendation(
-                id: "try_scenarios",
-                title: "Try Scenario Planning",
-                subtitle: "Ask \"What if?\" questions with your real data",
-                icon: "sparkles",
-                iconColor: HavenColors.navy700,
-                priority: 80,
-                action: .runScenario
-            ))
-        }
-
-        if documentCount >= 10 && estateReadiness >= 50 && estateReadiness < 80 {
-            recs.append(Recommendation(
-                id: "push_readiness",
-                title: "You're halfway there",
-                subtitle: "Upload a few more key documents to reach 80% readiness",
-                icon: "arrow.up.circle.fill",
-                iconColor: HavenColors.success,
-                priority: 85,
-                action: .navigate(tab: 2)
-            ))
-        }
-
-        // Phase 48: Estate staleness from estate_state
-        if let estate = estateState {
-            if estate.stalenessTier == "critical" {
-                recs.append(Recommendation(
-                    id: "estate_staleness_critical",
-                    title: "Your estate plan needs urgent review",
-                    subtitle: estate.stalenessReasons?.first ?? "Key documents are outdated or major life changes detected",
-                    icon: "exclamationmark.shield.fill",
-                    iconColor: HavenColors.critical,
-                    priority: 5,
-                    action: .navigate(tab: 2)
-                ))
-            } else if estate.stalenessTier == "amber" {
-                recs.append(Recommendation(
-                    id: "estate_staleness_amber",
-                    title: "Time to review your estate plan",
-                    subtitle: estate.stalenessReasons?.first ?? "Some documents are getting older",
-                    icon: "exclamationmark.shield",
-                    iconColor: HavenColors.warning,
-                    priority: 65,
-                    action: .navigate(tab: 2)
-                ))
-            }
-        }
+        // Suppress unused-parameter warnings for the deferred fields.
+        _ = estateReadiness
+        _ = hasRunGapAnalysis
+        _ = hasRunScenario
 
         // Filter out dismissed recommendations, sort by priority, take top 2
         return recs

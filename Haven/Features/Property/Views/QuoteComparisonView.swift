@@ -60,7 +60,7 @@ struct QuoteComparisonView: View {
 
                 Text("Itemized Quotes Needed")
                     .font(HavenTypography.title3)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 Text("To compare quotes line-by-line, both vendors need to provide itemized breakdowns. Ask your contractors for a detailed quote showing each item with its price.")
                     .font(HavenTypography.bodySmall)
@@ -125,7 +125,7 @@ struct QuoteComparisonView: View {
                         if let total = quote.quoteTotal {
                             Text("$\(Int(total).formatted())")
                                 .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                         if let fair = quote.estimatedFairTotal {
                             Text("Fair: $\(Int(fair).formatted())")
@@ -146,7 +146,7 @@ struct QuoteComparisonView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "shield.checkered")
                             .foregroundStyle(HavenColors.navy700)
-                        Text("Haven's Fair Estimate")
+                        Text("Chez's Fair Estimate")
                             .font(HavenTypography.body)
                             .foregroundStyle(HavenColors.navy700)
                     }
@@ -208,14 +208,14 @@ struct QuoteComparisonView: View {
                     HStack(spacing: 0) {
                         Text("TOTAL")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .frame(width: 140, alignment: .leading)
 
                         ForEach(quotes) { quote in
                             let total = quote.quoteTotal ?? 0
                             Text("$\(Int(total).formatted())")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .frame(width: 90)
                         }
 

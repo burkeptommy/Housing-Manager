@@ -19,7 +19,7 @@ struct CategoryProgress: View {
                     Text("\(documentCount)")
                         .font(HavenTypography.caption)
                         .fontWeight(.semibold)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 Text("\(Int(progress * 100))%")
                     .font(HavenTypography.caption)

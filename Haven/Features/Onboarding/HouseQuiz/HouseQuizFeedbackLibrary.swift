@@ -148,7 +148,7 @@ enum HouseQuizFeedbackLibrary {
             "diy": AnswerFeedback(
                 badge: "Good to know",
                 title: "You'll stay on top of the lawn yourself.",
-                subhead: "Haven will handle the stuff you delegate: tree work, irrigation blowouts, and the seasonal pros you already use.",
+                subhead: "Chez will handle the stuff you delegate: tree work, irrigation blowouts, and the seasonal pros you already use.",
                 citationName: nil
             ),
         ],
@@ -177,7 +177,7 @@ enum HouseQuizFeedbackLibrary {
                 badge: "Tip",
                 title: "Not sure? Walk out and tug a blade. Natural grass roots, turf doesn't.",
                 subhead: "You can always update this later from Property → Landscaping.",
-                citationName: "Haven Field Guide"
+                citationName: "Chez Field Guide"
             ),
         ],
 

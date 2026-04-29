@@ -322,7 +322,7 @@ final class AuthService: ObservableObject {
         do {
             return try await context.evaluatePolicy(
                 .deviceOwnerAuthentication,
-                localizedReason: "Unlock Haven"
+                localizedReason: "Unlock Chez"
             )
         } catch {
             return false

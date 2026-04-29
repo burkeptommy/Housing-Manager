@@ -49,7 +49,7 @@ struct QuoteDetailView: View {
             if let name = analysis.vendor?.name {
                 Text(name)
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
 
             let details = [analysis.vendor?.phone, analysis.vendor?.email, analysis.vendor?.address].compactMap { $0 }
@@ -268,7 +268,7 @@ struct QuoteDetailView: View {
                     .foregroundStyle(HavenColors.navy700)
                 Text("DIY Alternative")
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
 
             if let cost = diy.estimatedDiyCost {

@@ -250,6 +250,47 @@ function mapLineItemForClient(item: Record<string, unknown>) {
     quantity,
     unitPrice,
     total: numberValue(item.total ?? quantity * unitPrice),
+    // Phase 78: optional cross-link to a structured punch item. The
+    // homeowner reviewing a quote can see "this line covers [punch item]";
+    // the handyman building a quote can drag a punch item into the line.
+    punchItemId: compactString(item.punch_item_id ?? item.punchItemId) || undefined,
+  };
+}
+
+/// Phase 78: client-facing shape for `handyman_punch_items` rows. Camel-
+/// cases column names + drops noisy server-only fields. Both the field
+/// app and the desktop Operations Desk decode this shape.
+function mapPunchItemForClient(item: Record<string, unknown>) {
+  return {
+    id: compactString(item.id),
+    householdId: compactString(item.household_id),
+    propertyId: compactString(item.property_id) || null,
+    assignedVisitTaskId: compactString(item.assigned_visit_task_id) || null,
+    systemId: compactString(item.system_id) || null,
+    systemLabelSnapshot: compactString(item.system_label_snapshot) || null,
+    templateId: compactString(item.template_id) || null,
+    title: compactString(item.title),
+    description: compactString(item.description) || null,
+    source: compactString(item.source),
+    status: compactString(item.status) || "pending",
+    priority: compactString(item.priority) || "medium",
+    estimatedMinutes: item.estimated_minutes != null ? numberValue(item.estimated_minutes) : null,
+    estimatedCostRange: compactString(item.estimated_cost_range) || null,
+    materialRequired: Boolean(item.material_required),
+    costBasis: compactString(item.cost_basis) || "time_and_materials",
+    attachments: Array.isArray(item.attachments) ? item.attachments : [],
+    addedAfterLock: Boolean(item.added_after_lock),
+    proposedByRole: compactString(item.proposed_by_role) || null,
+    proposedAt: item.proposed_at ?? null,
+    proposalMessage: compactString(item.proposal_message) || null,
+    proposalStatus: compactString(item.proposal_status) || "none",
+    proposalExpiresAt: item.proposal_expires_at ?? null,
+    acceptedAt: item.accepted_at ?? null,
+    declinedAt: item.declined_at ?? null,
+    declinedReason: compactString(item.declined_reason) || null,
+    completedAt: item.completed_at ?? null,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
   };
 }
 
@@ -477,18 +518,87 @@ async function currentHouseholdIdForUser(service: ServiceClient, userId: string)
   return compactString(data?.household_id);
 }
 
-async function getWorkspaceMembership(service: ServiceClient, userId: string) {
-  const { data, error } = await service
+const MEMBER_SELECT =
+  "id, workspace_id, role, full_name, email, phone, title, status, invite_token, user_id, provider_workspaces(*)";
+
+async function getWorkspaceMembership(
+  service: ServiceClient,
+  userId: string,
+  authEmail?: string,
+) {
+  // Primary: active row already pinned to this auth.users.id.
+  const direct = await service
     .from("provider_workspace_members")
-    .select("id, workspace_id, role, full_name, email, phone, title, status, invite_token, provider_workspaces(*)")
+    .select(MEMBER_SELECT)
     .eq("user_id", userId)
     .eq("status", "active")
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
+  if (direct.error) throw direct.error;
+  if (direct.data) return direct.data as Record<string, unknown>;
 
-  if (error) throw error;
-  return data as Record<string, unknown> | null;
+  const trimmedEmail = authEmail?.trim().toLowerCase();
+  if (!trimmedEmail) return null;
+
+  // Fallback 1: an active row whose email matches the verified auth email
+  // but whose user_id points at a different auth.users row. Happens when
+  // the same person signs in via different providers (email/password on web,
+  // Apple Sign-In on iOS, etc.) — Supabase keeps separate auth.users rows
+  // per identity but the verified email is the same. Claim the row by
+  // repointing user_id to the current session so the fast path hits next time.
+  const activeByEmail = await service
+    .from("provider_workspace_members")
+    .select(MEMBER_SELECT)
+    .ilike("email", trimmedEmail)
+    .eq("status", "active")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (activeByEmail.error) throw activeByEmail.error;
+  if (activeByEmail.data) {
+    const row = activeByEmail.data as Record<string, unknown>;
+    const memberId = compactString(row.id);
+    if (memberId && compactString(row.user_id) !== userId) {
+      await service
+        .from("provider_workspace_members")
+        .update({ user_id: userId, last_seen_at: isoNow(), updated_at: isoNow() })
+        .eq("id", memberId);
+    }
+    return { ...row, user_id: userId };
+  }
+
+  // Fallback 2: an invited row addressed to the verified auth email (no
+  // explicit invite token in the request). Auto-claim it on first sign-in
+  // so a sole proprietor / single-seat invitee doesn't dead-end.
+  const invitedByEmail = await service
+    .from("provider_workspace_members")
+    .select(MEMBER_SELECT)
+    .ilike("email", trimmedEmail)
+    .eq("status", "invited")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (invitedByEmail.error) throw invitedByEmail.error;
+  if (invitedByEmail.data) {
+    const row = invitedByEmail.data as Record<string, unknown>;
+    const memberId = compactString(row.id);
+    if (memberId) {
+      await service
+        .from("provider_workspace_members")
+        .update({
+          user_id: userId,
+          status: "active",
+          invite_token: null,
+          last_seen_at: isoNow(),
+          updated_at: isoNow(),
+        })
+        .eq("id", memberId);
+    }
+    return { ...row, user_id: userId, status: "active", invite_token: null };
+  }
+
+  return null;
 }
 
 async function fetchTeamInvitePreview(service: ServiceClient, token: string) {
@@ -1265,7 +1375,7 @@ async function ensureWorkspaceForUser(
   const userId = compactString(user.id);
   if (!userId) throw new Error("Missing user id");
 
-  const existing = await getWorkspaceMembership(service, userId);
+  const existing = await getWorkspaceMembership(service, userId, normalizedEmail(user.email));
   const fullName =
     compactString(body.fullName) ||
     compactString((user.user_metadata as Record<string, unknown> | undefined)?.full_name) ||
@@ -1659,8 +1769,13 @@ async function claimInviteForWorkspace(
 
 async function loadDashboard(service: ServiceClient, user: Record<string, unknown>) {
   const userId = compactString(user.id);
-  const membership = await getWorkspaceMembership(service, userId);
+  const userEmail = normalizedEmail(user.email);
+  const membership = await getWorkspaceMembership(service, userId, userEmail);
   if (!membership) {
+    console.log("[handyman-provider] needsWorkspace=true", {
+      userId,
+      email: userEmail,
+    });
     return {
       needsWorkspace: true,
       currentUser: {
@@ -1796,7 +1911,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
 
   const quoteIds = quotes.map((row) => compactString(row.id)).filter(Boolean);
 
-  const [messagesResult, reportsResult, propertiesResult, systemsResult, visitTasksResult, quoteMessagesResult, openTasksResult, documentsResult] = await Promise.all([
+  const [messagesResult, reportsResult, propertiesResult, systemsResult, visitTasksResult, quoteMessagesResult, openTasksResult, documentsResult, punchItemsResult] = await Promise.all([
     requestIds.length
       ? service
           .from("handyman_request_messages")
@@ -1852,6 +1967,17 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
           .order("uploaded_at", { ascending: false })
           .limit(300)
       : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+    // Phase 78: structured punch list rows. Pulled by the visit_task_id
+    // FK so each visit row can carry its own punchItems[] alongside the
+    // legacy notes blob (which the backfill should have trimmed).
+    visitIds.length
+      ? service
+          .from("handyman_punch_items")
+          .select("id, household_id, property_id, assigned_visit_task_id, system_id, system_label_snapshot, template_id, title, description, source, status, priority, estimated_minutes, estimated_cost_range, material_required, cost_basis, attachments, added_after_lock, proposed_by_user_id, proposed_by_role, proposed_at, proposal_message, proposal_status, proposal_expires_at, accepted_by_user_id, accepted_at, declined_by_user_id, declined_at, declined_reason, completed_at, completed_visit_task_id, archived_at, created_at, updated_at")
+          .in("assigned_visit_task_id", visitIds)
+          .is("archived_at", null)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
   ]);
 
   if (messagesResult.error) throw messagesResult.error;
@@ -1862,6 +1988,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   if (quoteMessagesResult.error) throw quoteMessagesResult.error;
   if (openTasksResult.error) throw openTasksResult.error;
   if (documentsResult.error) throw documentsResult.error;
+  if (punchItemsResult.error) throw punchItemsResult.error;
 
   const messages = (messagesResult.data ?? []) as Record<string, unknown>[];
   const reports = (reportsResult.data ?? []) as Record<string, unknown>[];
@@ -1871,6 +1998,21 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   const quoteMessages = (quoteMessagesResult.data ?? []) as Record<string, unknown>[];
   const openTasks = (openTasksResult.data ?? []) as Record<string, unknown>[];
   const propertyDocuments = (documentsResult.data ?? []) as Record<string, unknown>[];
+  const punchItems = (punchItemsResult.data ?? []) as Record<string, unknown>[];
+
+  // Phase 78: bucket punch items by their assigned visit so each visit
+  // row can carry its own punchItems[] without an N+1 query.
+  const punchItemsByVisitTaskId = new Map<string, Record<string, unknown>[]>();
+  for (const item of punchItems) {
+    const key = compactString(item.assigned_visit_task_id);
+    if (!key) continue;
+    const existing = punchItemsByVisitTaskId.get(key);
+    if (existing) {
+      existing.push(item);
+    } else {
+      punchItemsByVisitTaskId.set(key, [item]);
+    }
+  }
 
   const propertyById = new Map(properties.map((row) => [compactString(row.id), row]));
   const reportBySessionId = new Map(reports.map((row) => [compactString(row.portal_session_id), row]));
@@ -2072,6 +2214,10 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
             publicShareUrl: publicQuoteUrl(compactString(quote.public_share_token)),
           }
         : null,
+      // Phase 78: structured punch list. Replaces the legacy notes-bullet
+      // text the field app used to regex-parse. Items already filtered to
+      // archived_at IS NULL on the server side.
+      punchItems: (punchItemsByVisitTaskId.get(visitId) ?? []).map(mapPunchItemForClient),
     };
   }).sort((lhs, rhs) => {
     const leftDate = lhs.routeDate || "9999-12-31";
@@ -4714,7 +4860,10 @@ serve(async (req) => {
 
       const user = await getAuthenticatedUser(service, req);
       if (!user) return json({ error: "Unauthorized" }, 401);
-      const dashboard = await loadDashboard(service, user as unknown as Record<string, unknown>);
+      const dashboard = await loadDashboard(
+        service,
+        user as unknown as Record<string, unknown>,
+      );
       return json(dashboard);
     }
 
@@ -4791,7 +4940,7 @@ serve(async (req) => {
       }
 
       if (action === "link_invite") {
-        const membership = await getWorkspaceMembership(service, compactString(user.id));
+        const membership = await getWorkspaceMembership(service, compactString(user.id), normalizedEmail(user.email));
         const workspaceId = compactString((membership?.provider_workspaces as Record<string, unknown> | undefined)?.id);
         if (!workspaceId) return json({ error: "No provider workspace found" }, 400);
         const inviteToken = compactString(body.inviteToken);
@@ -5039,6 +5188,780 @@ serve(async (req) => {
         }
 
         return json({ ok: true, reply: inserted });
+      }
+
+      // =====================================================================
+      // Phase 78 — Homeowner ↔ Handyman coordination actions
+      // =====================================================================
+
+      // Homeowner-callable. Converts an existing maintenance_task into a
+      // handyman punch list item. Sets delegated_to_punch_item_id on the
+      // source task so the homeowner UI can hide it from the primary list
+      // while preserving service history. If no upcoming handyman visit
+      // exists, the punch item lands as a wishlist item
+      // (assigned_visit_task_id = null).
+      if (action === "delegate_task_to_punch_list") {
+        const callerUserId = compactString(user.id);
+        const taskId = compactString(body.taskId);
+        if (!taskId) return json({ error: "taskId is required" }, 400);
+
+        const { data: task, error: taskErr } = await service
+          .from("maintenance_tasks")
+          .select("id, household_id, property_id, system_id, title, priority, estimated_cost, delegated_to_punch_item_id")
+          .eq("id", taskId)
+          .maybeSingle();
+        if (taskErr) throw taskErr;
+        if (!task) return json({ error: "Task not found" }, 404);
+
+        // Caller must own the household.
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        if (compactString(callerRow?.household_id) !== compactString(task.household_id)) {
+          return json({ error: "Not your household" }, 403);
+        }
+
+        if (compactString(task.delegated_to_punch_item_id)) {
+          return json({ error: "Task is already delegated" }, 409);
+        }
+
+        // Resolve target visit (caller-supplied OR next unlocked handyman
+        // visit on this property).
+        let targetVisitTaskId = compactString(body.targetVisitTaskId) || null;
+        if (!targetVisitTaskId && task.property_id) {
+          const { data: nextVisit } = await service
+            .from("maintenance_tasks")
+            .select("id")
+            .eq("property_id", task.property_id)
+            .eq("household_id", task.household_id)
+            .like("template_id", "Handyman:%")
+            .is("archived_at", null)
+            .is("delegated_to_punch_item_id", null)
+            .gte("next_due_date", new Date().toISOString().slice(0, 10))
+            .order("next_due_date", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          targetVisitTaskId = compactString(nextVisit?.id) || null;
+        }
+
+        // Snapshot the system label so an archived/renamed system later
+        // still renders a sensible label.
+        let systemLabelSnapshot: string | null = null;
+        if (task.system_id) {
+          const { data: sys } = await service
+            .from("home_systems")
+            .select("name")
+            .eq("id", task.system_id)
+            .maybeSingle();
+          systemLabelSnapshot = compactString(sys?.name) || null;
+        }
+
+        const now = new Date().toISOString();
+        const { data: punchInsert, error: punchErr } = await service
+          .from("handyman_punch_items")
+          .insert({
+            household_id: task.household_id,
+            property_id: task.property_id,
+            title: compactString(task.title),
+            source: "maintenance_task",
+            source_task_id: taskId,
+            delegated_from_task_id: taskId,
+            assigned_visit_task_id: targetVisitTaskId,
+            system_id: task.system_id,
+            system_label_snapshot: systemLabelSnapshot,
+            status: targetVisitTaskId ? "assigned" : "pending",
+            priority: compactString(task.priority) || "medium",
+            added_by_user_id: callerUserId,
+            proposed_by_user_id: callerUserId,
+            proposed_by_role: "homeowner",
+            proposed_at: now,
+            proposal_status: "accepted",
+            accepted_by_user_id: callerUserId,
+            accepted_at: now,
+          })
+          .select("id, assigned_visit_task_id")
+          .single();
+        if (punchErr) throw punchErr;
+
+        await service
+          .from("maintenance_tasks")
+          .update({
+            delegated_to_punch_item_id: compactString(punchInsert.id),
+            updated_at: now,
+          })
+          .eq("id", taskId);
+
+        // Fan-out: tell the linked handyman a new item appeared.
+        if (targetVisitTaskId) {
+          const { data: visitReq } = await service
+            .from("handyman_requests")
+            .select("id, contractor_id, visit_locked_at, household_id")
+            .eq("visit_task_id", targetVisitTaskId)
+            .limit(1)
+            .maybeSingle();
+          if (visitReq?.contractor_id) {
+            await notifyProviderForRequest(service, compactString(visitReq.contractor_id), {
+              title: "New punch item from homeowner",
+              body: `"${compactString(task.title)}" added to the upcoming visit.`,
+              requestId: compactString(visitReq.id),
+              eventType: "handyman_punch_item_added",
+            });
+            // Mark added_after_lock if visit is already locked.
+            if (compactString(visitReq.visit_locked_at)) {
+              await service
+                .from("handyman_punch_items")
+                .update({ added_after_lock: true, updated_at: now })
+                .eq("id", compactString(punchInsert.id));
+            }
+          }
+        }
+
+        return json({
+          ok: true,
+          punchItemId: compactString(punchInsert.id),
+          assignedVisitTaskId: compactString(punchInsert.assigned_visit_task_id) || null,
+        });
+      }
+
+      // Handyman-callable. Flags a maintenance task for the homeowner to
+      // accept ("you need a roofer"). Creates a maintenance_tasks row with
+      // proposal_status='pending' that lands in the homeowner's proposals
+      // inbox. Requires workspace access on the visit's contractor.
+      if (action === "propose_homeowner_task") {
+        const workspaceId = compactString(body.workspaceId);
+        const userId = compactString(user.id);
+        await assertWorkspaceAccess(service, userId, workspaceId);
+
+        const originVisitTaskId = compactString(body.originVisitTaskId);
+        const title = compactString(body.title);
+        const message = compactString(body.message);
+        const suggestedCategory = compactString(body.suggestedCategory) || null;
+        const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+        const requiresApproval = Boolean(body.requiresHomeownerApproval);
+
+        if (!originVisitTaskId) return json({ error: "originVisitTaskId is required" }, 400);
+        if (!title) return json({ error: "title is required" }, 400);
+
+        // Resolve household + property from the originating visit.
+        const { data: visit } = await service
+          .from("maintenance_tasks")
+          .select("id, household_id, property_id")
+          .eq("id", originVisitTaskId)
+          .maybeSingle();
+        if (!visit) return json({ error: "Originating visit not found" }, 404);
+
+        const now = new Date().toISOString();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Suggested vendor search payload pre-filters FindLocalVendorSheet.
+        let suggestedVendorSearch: Record<string, unknown> | null = null;
+        if (suggestedCategory && visit.property_id) {
+          const { data: prop } = await service
+            .from("properties").select("city, state").eq("id", visit.property_id).maybeSingle();
+          suggestedVendorSearch = {
+            category: suggestedCategory,
+            town: compactString(prop?.city) || null,
+            state: compactString(prop?.state) || null,
+          };
+        }
+
+        const { data: inserted, error: insertErr } = await service
+          .from("maintenance_tasks")
+          .insert({
+            household_id: visit.household_id,
+            property_id: visit.property_id,
+            title,
+            description: message,
+            frequency: "Once",
+            next_due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+            priority: "medium",
+            assignment_type: "vendor",
+            needs_vendor: true,
+            suggested_category: suggestedCategory,
+            suggested_vendor_search: suggestedVendorSearch,
+            proposed_by_user_id: userId,
+            proposed_by_role: "handyman",
+            proposed_at: now,
+            proposal_message: message || null,
+            proposal_status: "pending",
+            proposal_expires_at: expiresAt,
+            proposal_attachments: attachments,
+            proposal_origin_visit_task_id: originVisitTaskId,
+            requires_homeowner_approval: requiresApproval,
+          })
+          .select("id")
+          .single();
+        if (insertErr) throw insertErr;
+
+        await notifyHomeownersForRequest(service, compactString(visit.household_id), {
+          title: "Your handyman flagged something",
+          body: title.length > 80 ? title.slice(0, 77) + "…" : title,
+          requestId: compactString(inserted.id),
+          eventType: "handyman_proposal_pending",
+          extra: { task_id: compactString(inserted.id), kind: "task" },
+        });
+
+        return json({ ok: true, taskId: compactString(inserted.id) });
+      }
+
+      // Handyman-callable. Suggests a follow-up visit, optionally bringing
+      // along punch items from the originating visit. Creates a new
+      // handyman_requests row with proposal_status='pending'. Optional
+      // proposed_visit_at uses the existing propose_visit_time RPC for
+      // homeowner-side accept/counter ergonomics.
+      if (action === "propose_followup_visit") {
+        const workspaceId = compactString(body.workspaceId);
+        const userId = compactString(user.id);
+        await assertWorkspaceAccess(service, userId, workspaceId);
+
+        const parentRequestId = compactString(body.parentRequestId);
+        const title = compactString(body.title) || "Follow-up visit";
+        const details = compactString(body.details);
+        const proposedAt = compactString(body.proposedAt);
+        const punchItemIds = Array.isArray(body.punchItemIds)
+          ? (body.punchItemIds as unknown[]).map((v) => compactString(v)).filter(Boolean)
+          : [];
+        const costEstimateLow = body.costEstimateLow != null ? numberValue(body.costEstimateLow) : null;
+        const costEstimateHigh = body.costEstimateHigh != null ? numberValue(body.costEstimateHigh) : null;
+        const costEstimateKind = compactString(body.costEstimateKind) || (costEstimateLow != null || costEstimateHigh != null ? "ballpark" : "none");
+
+        if (!parentRequestId) return json({ error: "parentRequestId is required" }, 400);
+
+        const { data: parent } = await service
+          .from("handyman_requests")
+          .select("id, household_id, property_id, contractor_id")
+          .eq("id", parentRequestId)
+          .maybeSingle();
+        if (!parent) return json({ error: "Parent request not found" }, 404);
+
+        const now = new Date().toISOString();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: newRequest, error: reqErr } = await service
+          .from("handyman_requests")
+          .insert({
+            household_id: parent.household_id,
+            property_id: parent.property_id,
+            contractor_id: parent.contractor_id,
+            request_type: "standard_visit",
+            source: "vendor",
+            title,
+            details: details || null,
+            status: "submitted",
+            parent_request_id: parentRequestId,
+            proposal_status: "pending",
+            proposal_expires_at: expiresAt,
+            proposal_message: details || null,
+            cost_estimate_low: costEstimateLow,
+            cost_estimate_high: costEstimateHigh,
+            cost_estimate_kind: costEstimateKind,
+          })
+          .select("id, visit_task_id")
+          .single();
+        if (reqErr) throw reqErr;
+
+        // If a proposed time was supplied, run propose_visit_time so the
+        // existing accept_visit_time machinery covers homeowner accept.
+        if (proposedAt) {
+          await service.rpc("propose_visit_time", {
+            p_request_id: compactString(newRequest.id),
+            p_proposed_at: proposedAt,
+            p_proposed_by_role: "handyman",
+            p_note: details || null,
+          });
+        }
+
+        // Pre-attach punch items by setting their assigned_visit_task_id
+        // to the new request's visit_task_id (created by propose_visit_time
+        // or by a follow-up trigger; may be null at this point — server
+        // gracefully handles that and the punch items remain on the parent
+        // visit until the new visit's task row materializes).
+        if (punchItemIds.length && newRequest.visit_task_id) {
+          await service
+            .from("handyman_punch_items")
+            .update({
+              assigned_visit_task_id: compactString(newRequest.visit_task_id),
+              status: "assigned",
+              updated_at: now,
+            })
+            .in("id", punchItemIds);
+        }
+
+        await notifyHomeownersForRequest(service, compactString(parent.household_id), {
+          title: "Follow-up visit suggested",
+          body: title,
+          requestId: compactString(newRequest.id),
+          eventType: "handyman_proposal_pending",
+          extra: { request_id: compactString(newRequest.id), kind: "request" },
+        });
+
+        return json({ ok: true, requestId: compactString(newRequest.id) });
+      }
+
+      // Generic accept/decline/cancel for any of the three proposal-bearing
+      // rows (task, punch_item, request). Either party may call. The DB
+      // unique partial index prevents double-accept races.
+      if (action === "respond_to_proposal") {
+        const callerUserId = compactString(user.id);
+        const kind = compactString(body.kind);
+        const targetId = compactString(body.id);
+        // body.action is "respond_to_proposal" (already consumed by the
+        // outer router). The actual decision rides on body.decision.
+        const decision = compactString(body.decision);
+        const reason = compactString(body.reason);
+        if (!["task", "punch_item", "request"].includes(kind)) {
+          return json({ error: "kind must be task | punch_item | request" }, 400);
+        }
+        if (!["accept", "decline", "cancel"].includes(decision)) {
+          return json({ error: "action must be accept | decline | cancel" }, 400);
+        }
+        if (!targetId) return json({ error: "id is required" }, 400);
+
+        const tableMap: Record<string, string> = {
+          task: "maintenance_tasks",
+          punch_item: "handyman_punch_items",
+          request: "handyman_requests",
+        };
+        const tableName = tableMap[kind];
+
+        const { data: existing } = await service
+          .from(tableName)
+          .select(
+            tableName === "handyman_requests"
+              ? "id, household_id, contractor_id, proposal_status, requires_homeowner_approval"
+              : "id, household_id, proposal_status, requires_homeowner_approval, proposed_by_role"
+          )
+          .eq("id", targetId)
+          .maybeSingle();
+        if (!existing) return json({ error: "Proposal not found" }, 404);
+
+        if (compactString(existing.proposal_status) !== "pending") {
+          return json({ error: `Proposal is ${compactString(existing.proposal_status)}; cannot respond` }, 409);
+        }
+
+        // Caller authorization. Homeowner-side: caller must be in the
+        // household. Handyman-side: caller must be a workspace member of
+        // the contractor on the request.
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const callerHouseholdId = compactString(callerRow?.household_id);
+        const isHomeowner = callerHouseholdId === compactString(existing.household_id);
+
+        let isHandyman = false;
+        if (!isHomeowner && tableName === "handyman_requests" && existing.contractor_id) {
+          const { data: workspaceLink } = await service
+            .from("provider_contractor_links")
+            .select("workspace_id")
+            .eq("contractor_id", compactString(existing.contractor_id))
+            .limit(1)
+            .maybeSingle();
+          if (workspaceLink?.workspace_id) {
+            try {
+              await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+              isHandyman = true;
+            } catch (_) { /* not a member */ }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        // Home manager guardrail: above-threshold proposals can't be
+        // accepted by managers/staff — only the homeowner.
+        if (decision === "accept" && existing.requires_homeowner_approval) {
+          const { data: caller } = await service
+            .from("family_members")
+            .select("member_type")
+            .eq("linked_user_id", callerUserId)
+            .maybeSingle();
+          const memberType = compactString(caller?.member_type);
+          if (memberType === "home_manager" || memberType === "staff") {
+            return json({ error: "This proposal needs homeowner approval" }, 403);
+          }
+        }
+
+        const now = new Date().toISOString();
+        const updatePayload: Record<string, unknown> =
+          decision === "accept"
+            ? { proposal_status: "accepted", accepted_by_user_id: callerUserId, accepted_at: now, updated_at: now }
+            : decision === "decline"
+            ? { proposal_status: "declined", declined_by_user_id: callerUserId, declined_at: now, declined_reason: reason || null, updated_at: now }
+            : { proposal_status: "cancelled", updated_at: now };
+
+        const { error: updErr } = await service
+          .from(tableName)
+          .update(updatePayload)
+          .eq("id", targetId)
+          .eq("proposal_status", "pending");          // optimistic guard
+        if (updErr) {
+          if (String(updErr.code) === "23505") {
+            return json({ error: "Already responded by another user" }, 409);
+          }
+          throw updErr;
+        }
+
+        // Side-effects per kind on accept:
+        if (decision === "accept" && kind === "request") {
+          // Walk request status to scheduled so the visit shows up on
+          // the calendar. The existing propose_visit_time / accept_visit_time
+          // machinery handles the time-side; this only flips proposal_status.
+          await service.from("handyman_requests")
+            .update({ status: "scheduled", updated_at: now })
+            .eq("id", targetId);
+        }
+
+        // Notify the OTHER side.
+        const eventType = decision === "accept"
+          ? "handyman_proposal_accepted"
+          : decision === "decline"
+          ? "handyman_proposal_declined"
+          : "handyman_proposal_cancelled";
+
+        if (isHomeowner && tableName === "handyman_requests" && existing.contractor_id) {
+          await notifyProviderForRequest(service, compactString(existing.contractor_id), {
+            title: decision === "accept" ? "Homeowner accepted" : decision === "decline" ? "Homeowner declined" : "Homeowner cancelled",
+            body: `Proposal ${decision}ed.`,
+            requestId: targetId,
+            eventType,
+          });
+        } else if (isHandyman) {
+          await notifyHomeownersForRequest(service, compactString(existing.household_id), {
+            title: decision === "accept" ? "Your handyman accepted" : "Your handyman cancelled",
+            body: `Proposal ${decision}ed.`,
+            requestId: targetId,
+            eventType,
+          });
+        }
+
+        return json({ ok: true });
+      }
+
+      // Either party. Adds one or more punch items to a specific visit.
+      // For new items, supports template_id (auto-fills minutes/category)
+      // OR free-text title. If the visit is locked and the caller is the
+      // homeowner, items get added_after_lock=true so the handyman sees a
+      // "needs your confirmation" badge.
+      if (action === "add_punch_items_to_visit") {
+        const callerUserId = compactString(user.id);
+        const visitTaskId = compactString(body.visitTaskId);
+        const items = Array.isArray(body.items) ? body.items : [];
+        if (!visitTaskId) return json({ error: "visitTaskId is required" }, 400);
+        if (!items.length) return json({ error: "items[] is required" }, 400);
+
+        const { data: visit } = await service
+          .from("maintenance_tasks")
+          .select("id, household_id, property_id")
+          .eq("id", visitTaskId)
+          .maybeSingle();
+        if (!visit) return json({ error: "Visit not found" }, 404);
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const callerHouseholdId = compactString(callerRow?.household_id);
+        const isHomeowner = callerHouseholdId === compactString(visit.household_id);
+
+        // Workspace access check for handyman caller path. Reuses the
+        // visit's linked request to discover the contractor.
+        let isHandyman = false;
+        let visitLockedAt: string | null = null;
+        const { data: linkedReq } = await service
+          .from("handyman_requests")
+          .select("id, contractor_id, visit_locked_at")
+          .eq("visit_task_id", visitTaskId)
+          .limit(1)
+          .maybeSingle();
+        if (linkedReq) {
+          visitLockedAt = compactString(linkedReq.visit_locked_at) || null;
+          if (!isHomeowner && linkedReq.contractor_id) {
+            const { data: workspaceLink } = await service
+              .from("provider_contractor_links")
+              .select("workspace_id")
+              .eq("contractor_id", compactString(linkedReq.contractor_id))
+              .limit(1)
+              .maybeSingle();
+            if (workspaceLink?.workspace_id) {
+              try {
+                await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+                isHandyman = true;
+              } catch (_) { /* not a member */ }
+            }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const callerRole = isHomeowner ? "homeowner" : "handyman";
+        const now = new Date().toISOString();
+        const inserts: Record<string, unknown>[] = [];
+
+        for (const raw of items) {
+          const item = raw as Record<string, unknown>;
+          const templateId = compactString(item.templateId) || null;
+          let title = compactString(item.title);
+          let minutes = item.estimatedMinutes != null ? numberValue(item.estimatedMinutes) : null;
+          let categorySnapshot: string | null = null;
+
+          if (templateId) {
+            const { data: tpl } = await service
+              .from("punch_list_templates")
+              .select("title, default_minutes, system_category")
+              .eq("id", templateId)
+              .maybeSingle();
+            if (tpl) {
+              if (!title) title = compactString(tpl.title);
+              if (minutes == null && tpl.default_minutes != null) minutes = numberValue(tpl.default_minutes);
+              categorySnapshot = compactString(tpl.system_category) || null;
+            }
+          }
+
+          if (!title) continue;
+
+          // Resolve system_id by category match on the property.
+          let systemId: string | null = compactString(item.systemId) || null;
+          let systemLabel: string | null = null;
+          if (!systemId && categorySnapshot && visit.property_id) {
+            const { data: sys } = await service
+              .from("home_systems")
+              .select("id, name")
+              .eq("property_id", visit.property_id)
+              .ilike("category", categorySnapshot)
+              .limit(1)
+              .maybeSingle();
+            if (sys) {
+              systemId = compactString(sys.id);
+              systemLabel = compactString(sys.name);
+            }
+          } else if (systemId) {
+            const { data: sys } = await service
+              .from("home_systems").select("name").eq("id", systemId).maybeSingle();
+            systemLabel = compactString(sys?.name) || null;
+          }
+
+          inserts.push({
+            household_id: visit.household_id,
+            property_id: visit.property_id,
+            assigned_visit_task_id: visitTaskId,
+            template_id: templateId,
+            title,
+            source: templateId ? "template" : "manual",
+            system_id: systemId,
+            system_label_snapshot: systemLabel,
+            estimated_minutes: minutes,
+            priority: compactString(item.priority) || "medium",
+            material_required: Boolean(item.materialRequired),
+            status: "assigned",
+            added_by_user_id: callerUserId,
+            added_after_lock: Boolean(visitLockedAt) && isHomeowner,
+            proposed_by_user_id: callerUserId,
+            proposed_by_role: callerRole,
+            proposed_at: now,
+            proposal_status: "accepted",
+            accepted_by_user_id: callerUserId,
+            accepted_at: now,
+          });
+        }
+
+        if (!inserts.length) return json({ error: "No valid items to add" }, 400);
+
+        const { data: insertedRows, error: insertErr } = await service
+          .from("handyman_punch_items")
+          .insert(inserts)
+          .select("id");
+        if (insertErr) throw insertErr;
+
+        // Notify the OTHER side.
+        if (isHomeowner && linkedReq?.contractor_id && visitLockedAt) {
+          await notifyProviderForRequest(service, compactString(linkedReq.contractor_id), {
+            title: "Punch items added after lock",
+            body: `${inserts.length} new ${inserts.length === 1 ? "item" : "items"} need your confirmation.`,
+            requestId: compactString(linkedReq.id),
+            eventType: "handyman_punch_item_added",
+          });
+        } else if (isHandyman) {
+          await notifyHomeownersForRequest(service, compactString(visit.household_id), {
+            title: "Punch items added to your visit",
+            body: `${inserts.length} new ${inserts.length === 1 ? "item" : "items"}.`,
+            requestId: linkedReq ? compactString(linkedReq.id) : visitTaskId,
+            eventType: "handyman_punch_item_added",
+          });
+        }
+
+        return json({ ok: true, count: insertedRows.length, ids: insertedRows.map((r) => compactString(r.id)) });
+      }
+
+      // Either party. Marks a punch item status (assigned → in_progress
+      // → done) without going through accept/decline. Used by handyman
+      // during a live visit to check items off, and by homeowner to
+      // cancel an item ("nevermind").
+      if (action === "update_punch_item_status") {
+        const callerUserId = compactString(user.id);
+        const itemId = compactString(body.itemId);
+        const newStatus = compactString(body.status);
+        if (!itemId) return json({ error: "itemId is required" }, 400);
+        if (!["pending", "assigned", "in_progress", "done", "cancelled"].includes(newStatus)) {
+          return json({ error: "Invalid status" }, 400);
+        }
+
+        const { data: item } = await service
+          .from("handyman_punch_items")
+          .select("id, household_id, assigned_visit_task_id")
+          .eq("id", itemId)
+          .maybeSingle();
+        if (!item) return json({ error: "Punch item not found" }, 404);
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const isHomeowner = compactString(callerRow?.household_id) === compactString(item.household_id);
+
+        // Workspace check for handyman path.
+        let isHandyman = false;
+        if (!isHomeowner && item.assigned_visit_task_id) {
+          const { data: linkedReq } = await service
+            .from("handyman_requests")
+            .select("contractor_id")
+            .eq("visit_task_id", compactString(item.assigned_visit_task_id))
+            .limit(1)
+            .maybeSingle();
+          if (linkedReq?.contractor_id) {
+            const { data: workspaceLink } = await service
+              .from("provider_contractor_links")
+              .select("workspace_id")
+              .eq("contractor_id", compactString(linkedReq.contractor_id))
+              .limit(1)
+              .maybeSingle();
+            if (workspaceLink?.workspace_id) {
+              try {
+                await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+                isHandyman = true;
+              } catch (_) { /* not a member */ }
+            }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const now = new Date().toISOString();
+        const updatePayload: Record<string, unknown> = {
+          status: newStatus,
+          updated_at: now,
+        };
+        if (newStatus === "done") {
+          updatePayload.completed_at = now;
+          // The trg_punch_item_completion trigger will bump
+          // home_systems.last_service_date if the item is system-linked.
+        }
+
+        const { error: updErr } = await service
+          .from("handyman_punch_items")
+          .update(updatePayload)
+          .eq("id", itemId);
+        if (updErr) throw updErr;
+
+        return json({ ok: true });
+      }
+
+      // Either party. Soft-cancels a handyman_request and reverts any
+      // attached punch items back to wishlist (assigned_visit_task_id=null).
+      if (action === "cancel_handyman_request") {
+        const callerUserId = compactString(user.id);
+        const requestId = compactString(body.requestId);
+        const reason = compactString(body.reason);
+        if (!requestId) return json({ error: "requestId is required" }, 400);
+
+        const { data: request } = await service
+          .from("handyman_requests")
+          .select("id, household_id, contractor_id, visit_task_id, status")
+          .eq("id", requestId)
+          .maybeSingle();
+        if (!request) return json({ error: "Request not found" }, 404);
+        if (compactString(request.status) === "cancelled") {
+          return json({ error: "Already cancelled" }, 409);
+        }
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const isHomeowner = compactString(callerRow?.household_id) === compactString(request.household_id);
+
+        let isHandyman = false;
+        if (!isHomeowner && request.contractor_id) {
+          const { data: workspaceLink } = await service
+            .from("provider_contractor_links")
+            .select("workspace_id")
+            .eq("contractor_id", compactString(request.contractor_id))
+            .limit(1)
+            .maybeSingle();
+          if (workspaceLink?.workspace_id) {
+            try {
+              await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+              isHandyman = true;
+            } catch (_) {}
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const callerRole = isHomeowner ? "homeowner" : "handyman";
+        const now = new Date().toISOString();
+
+        await service
+          .from("handyman_requests")
+          .update({
+            status: "cancelled",
+            cancelled_at: now,
+            cancelled_by_user_id: callerUserId,
+            cancelled_by_role: callerRole,
+            proposal_status: compactString(request.proposal_status) === "pending" ? "cancelled" : compactString(request.proposal_status),
+            proposal_message: reason || null,
+            updated_at: now,
+          })
+          .eq("id", requestId);
+
+        // Revert linked punch items to wishlist state.
+        if (request.visit_task_id) {
+          await service
+            .from("handyman_punch_items")
+            .update({
+              assigned_visit_task_id: null,
+              status: "pending",
+              updated_at: now,
+            })
+            .eq("assigned_visit_task_id", compactString(request.visit_task_id))
+            .neq("status", "done");
+        }
+
+        const eventType = "handyman_request_cancelled";
+        if (isHomeowner && request.contractor_id) {
+          await notifyProviderForRequest(service, compactString(request.contractor_id), {
+            title: "Visit cancelled by homeowner",
+            body: reason || "The homeowner cancelled this visit.",
+            requestId,
+            eventType,
+          });
+        } else if (isHandyman) {
+          await notifyHomeownersForRequest(service, compactString(request.household_id), {
+            title: "Visit cancelled by your handyman",
+            body: reason || "Your handyman cancelled this visit.",
+            requestId,
+            eventType,
+          });
+        }
+
+        return json({ ok: true });
+      }
+
+      // Cron-callable. Flips proposal_status='expired' on all rows past
+      // proposal_expires_at. Service-role only — guarded by the function's
+      // caller (scheduled tasks pass a special header) OR a workspace owner
+      // sweep.
+      if (action === "expire_stale_proposals") {
+        const now = new Date().toISOString();
+        const tables = ["maintenance_tasks", "handyman_punch_items", "handyman_requests"];
+        const counts: Record<string, number> = {};
+        for (const tbl of tables) {
+          const { data, error: expErr } = await service
+            .from(tbl)
+            .update({ proposal_status: "expired", updated_at: now })
+            .lt("proposal_expires_at", now)
+            .eq("proposal_status", "pending")
+            .select("id");
+          if (expErr) throw expErr;
+          counts[tbl] = (data ?? []).length;
+        }
+        return json({ ok: true, expired: counts });
       }
 
       return json({ error: "Unknown action" }, 400);

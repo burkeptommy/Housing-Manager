@@ -46,9 +46,7 @@ enum RoutineGroupingEngine {
             // (linkVehicleTasksToRoutine below).
             return 0
         }
-        guard let kind = routine.typedKind else { return 0 }
-
-        let matchingCategories = systemCategoriesFor(routineKind: kind)
+        let matchingCategories = systemCategoriesFor(routine: routine)
         guard !matchingCategories.isEmpty else { return 0 }
 
         let db = DatabaseService.shared
@@ -159,6 +157,42 @@ enum RoutineGroupingEngine {
     }
 
     // MARK: - Category mapping
+
+    static func systemCategoriesFor(routine: RoutineRow) -> [String] {
+        if let serviceKey = routine.resolvedServiceKey {
+            switch serviceKey {
+            case "hvac_program":
+                return ["HVAC"]
+            case "security_and_smart_home_program":
+                return ["Security System"]
+            case "irrigation_program":
+                return ["Irrigation"]
+            case "landscaping_program":
+                return ["Landscaping"]
+            case "pool_program":
+                return ["Pool/Spa", "Hot Tub"]
+            case "pest_and_termite_program":
+                return ["Pest Control"]
+            case "mosquito_and_tick_program":
+                return ["Mosquito & Tick"]
+            case "snow_and_ice_management_program":
+                return ["Snow Removal"]
+            case "housekeeping_program":
+                return ["Cleaning Service"]
+            case "waste_program":
+                return ["Trash & Recycling"]
+            case "generator_program":
+                return ["Generator"]
+            case "handyman_program":
+                return ["Handyman"]
+            default:
+                break
+            }
+        }
+
+        guard let kind = routine.typedKind else { return [] }
+        return systemCategoriesFor(routineKind: kind)
+    }
 
     /// Phase 66: Map a RoutineKind to the `home_systems.category` strings
     /// whose tasks should hide under an active routine of that kind.

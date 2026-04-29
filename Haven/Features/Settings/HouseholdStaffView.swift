@@ -45,7 +45,7 @@ struct HouseholdStaffView: View {
                     showAddSheet = true
                 } label: {
                     Image(systemName: "plus")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
@@ -108,7 +108,7 @@ struct HouseholdStaffView: View {
                             Image(systemName: "link.circle.fill")
                                 .font(.system(size: 14))
                                 .foregroundStyle(HavenColors.success)
-                                .accessibilityLabel("Connected Haven user")
+                                .accessibilityLabel("Connected Chez user")
                         }
                     }
                     Text(roleLabel(for: member))

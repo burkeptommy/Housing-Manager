@@ -36,22 +36,10 @@ enum DocumentAccessDefaults {
     /// are space-separated lowercased keys; the lookup normalizes input to
     /// match this format. Anything NOT in this set is visible by default.
     static let privateFromHomeManagers: Set<String> = [
-        // Estate Planning — DocumentCategory raw values + common Claude
-        // classification variants
-        "will",
-        "trust",
-        "power of attorney",
-        "healthcare directive",
-        "guardianship designation",
-        "letter of intent",
-        "living will",
-        "hipaa authorization",
-        "pre-nuptial agreement",
-        "post-nuptial agreement",
-        "disposition of remains",
-        "deed in trust",
-        "estate plan",
-        "beneficiary designation",
+        // Chez v1: estate-planning category keys removed from the
+        // home-manager visibility gate. Estate management is out of v1
+        // scope; the corresponding rows no longer flow through the app.
+        // Financial / medical / legal / government-ID keys below stay.
 
         // Financial Accounts — DocumentCategory raw values + plain variants
         "brokerage account",

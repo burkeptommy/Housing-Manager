@@ -193,7 +193,7 @@ struct InboxView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "envelope.fill")
-                    Text("View Your Haven Email")
+                    Text("View Your Chez Email")
                 }
                 .font(HavenTypography.uiButton)
                 .foregroundStyle(.white)

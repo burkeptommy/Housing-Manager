@@ -1,9 +1,17 @@
 import SwiftUI
 
+/// Chez button — salmon CTA + indigo-tinted secondary + text-only tertiary.
+///
+/// Primary buttons get a salmon glow shadow that intensifies-then-tightens
+/// on press (matches the JSX prototype: `0 6px 16px rgba(237,105,85,.32)`
+/// at rest, `0 2px 8px rgba(237,105,85,.32)` pressed). Secondary uses the
+/// neutral 300 outline. Tertiary is text-only with an indigo 500 link
+/// color, used inline in cards for "View all" / "Manage" affordances.
 struct HavenButton: View {
     let title: String
     let action: () -> Void
     var style: Style = .primary
+    var size: Size = .standard
     var icon: String? = nil
     var isLoading: Bool = false
     var isFullWidth: Bool = true
@@ -12,7 +20,12 @@ struct HavenButton: View {
     @State private var isPressed = false
 
     enum Style {
-        case primary, secondary, destructive
+        case primary, secondary, tertiary, destructive
+    }
+
+    enum Size {
+        case standard
+        case compact
     }
 
     var body: some View {
@@ -30,20 +43,20 @@ struct HavenButton: View {
                 }
                 Text(title)
             }
-            .font(HavenTypography.uiButton)
+            .font(font)
             .frame(maxWidth: isFullWidth ? .infinity : nil)
-            .frame(height: HavenTheme.buttonHeight)
+            .frame(height: height)
             .padding(.horizontal, isFullWidth ? 0 : HavenTheme.spacing24)
             .background(backgroundColor)
             .foregroundStyle(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay {
                 if style == .secondary {
-                    RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                    RoundedRectangle(cornerRadius: cornerRadius)
                         .strokeBorder(HavenColors.beige300, lineWidth: 1)
                 }
             }
-            .havenShadow(HavenTheme.shadowButton)
+            .modifier(HavenButtonShadow(style: style))
         }
         .buttonStyle(HavenButtonPressStyle())
         .disabled(isLoading || isDisabled)
@@ -53,10 +66,25 @@ struct HavenButton: View {
         .accessibilityHint(isLoading ? "Loading" : "")
     }
 
+    private var height: CGFloat {
+        size == .compact ? HavenTheme.buttonHeightCompact : HavenTheme.buttonHeight
+    }
+
+    private var cornerRadius: CGFloat {
+        size == .compact ? HavenTheme.radiusMedium : HavenTheme.radiusButton
+    }
+
+    private var font: Font {
+        size == .compact
+            ? Font.system(size: 14, weight: .semibold)
+            : HavenTypography.uiButton
+    }
+
     private var backgroundColor: Color {
         switch style {
         case .primary: return HavenColors.action
         case .secondary: return HavenColors.creamLight
+        case .tertiary: return Color.clear
         case .destructive: return HavenColors.critical.opacity(0.1)
         }
     }
@@ -64,8 +92,39 @@ struct HavenButton: View {
     private var foregroundColor: Color {
         switch style {
         case .primary: return HavenColors.textOnAction
-        case .secondary: return HavenColors.action
+        case .secondary: return HavenColors.navy
+        case .tertiary: return HavenColors.navy500
         case .destructive: return HavenColors.critical
+        }
+    }
+}
+
+/// Shadow modifier per style — primary gets the salmon glow, secondary
+/// gets the soft card shadow, tertiary is shadow-free.
+private struct HavenButtonShadow: ViewModifier {
+    let style: HavenButton.Style
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        switch style {
+        case .primary:
+            // Salmon glow — `shadow-button` from chez-tokens.css.
+            // Disabled in dark mode to match `havenShadow` discipline.
+            if colorScheme == .dark {
+                content
+            } else {
+                content.shadow(
+                    color: HavenColors.action.opacity(0.32),
+                    radius: 8,
+                    y: 4
+                )
+            }
+        case .secondary:
+            content.havenShadow(HavenTheme.shadowButton)
+        case .tertiary:
+            content
+        case .destructive:
+            content
         }
     }
 }
@@ -81,10 +140,12 @@ struct HavenButtonPressStyle: ButtonStyle {
 
 #Preview {
     VStack(spacing: 16) {
-        HavenButton(title: "Upload Document", action: {}, icon: "doc.badge.plus")
+        HavenButton(title: "Schedule visit", action: {}, icon: "calendar.badge.plus")
         HavenButton(title: "Add Property", action: {}, style: .secondary, icon: "building.2")
+        HavenButton(title: "View all", action: {}, style: .tertiary, isFullWidth: false)
+        HavenButton(title: "Compact CTA", action: {}, size: .compact, isFullWidth: false)
         HavenButton(title: "Delete Account", action: {}, style: .destructive, icon: "trash")
-        HavenButton(title: "Uploading...", action: {}, isLoading: true)
+        HavenButton(title: "Uploading…", action: {}, isLoading: true)
         HavenButton(title: "Disabled", action: {}, isDisabled: true)
     }
     .padding()

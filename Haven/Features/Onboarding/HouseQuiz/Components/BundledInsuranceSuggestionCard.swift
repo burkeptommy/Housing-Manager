@@ -27,7 +27,7 @@ struct BundledInsuranceSuggestionCard: View {
                         .foregroundStyle(HavenColors.textTertiary)
                     Text("Is \(provider.name) your \(partnerLineLabel) too?")
                         .font(HavenTypography.title3)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -78,7 +78,7 @@ struct BundledInsuranceSuggestionCard: View {
                 default:
                     Image(systemName: "shield.lefthalf.filled")
                         .font(.system(size: 22))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
             .frame(width: 56, height: 56)
@@ -87,7 +87,7 @@ struct BundledInsuranceSuggestionCard: View {
         } else {
             Image(systemName: "shield.lefthalf.filled")
                 .font(.system(size: 22))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 56, height: 56)
                 .background(HavenColors.surface)
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))

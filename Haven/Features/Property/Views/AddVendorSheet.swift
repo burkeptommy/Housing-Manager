@@ -69,7 +69,7 @@ struct AddVendorSheet: View {
                     VStack(spacing: 8) {
                         Image(systemName: "person.crop.rectangle.badge.plus")
                             .font(.system(size: 44))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Add a Vendor")
                             .font(HavenTypography.title2)
                             .foregroundStyle(HavenColors.textPrimary)

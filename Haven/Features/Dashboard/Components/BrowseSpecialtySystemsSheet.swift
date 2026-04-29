@@ -96,7 +96,7 @@ struct BrowseSpecialtySystemsSheet: View {
         HStack(spacing: HavenTheme.spacing12) {
             Image(systemName: meta.icon)
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 36, height: 36)
                 .background(HavenColors.navy.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 8))

@@ -13,16 +13,16 @@ struct HouseQuizAnswerFeedbackCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text(feedback.badge.uppercased())
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(1.2)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
 
             Text(feedback.renderedTitle(city: city, state: state))
                 .font(HavenTypography.title3)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let subhead = feedback.renderedSubhead(city: city, state: state) {

@@ -69,7 +69,7 @@ struct PurchasePriceInputSheet: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     Text(title)
                         .font(HavenTypography.title2)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text(subtitle)
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)

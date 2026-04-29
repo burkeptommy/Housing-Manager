@@ -33,7 +33,7 @@ actor VersionCheckService {
                     minimumVersion: config.minimumRequiredVersion,
                     minimumBuild: config.minimumRequiredBuild,
                     message: config.forceUpdateMessage
-                        ?? "Please update Haven to continue.",
+                        ?? "Please update Chez to continue.",
                     appStoreURL: appStoreURL
                 )
             }
@@ -48,7 +48,7 @@ actor VersionCheckService {
                     latestVersion: config.latestVersion,
                     latestBuild: config.latestBuild,
                     message: config.optionalUpdateMessage
-                        ?? "A new version of Haven is available."
+                        ?? "A new version of Chez is available."
                 )
             }
 

@@ -59,7 +59,7 @@ struct VendorCoveragePickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
             .task { await loadContractors() }
@@ -127,7 +127,7 @@ struct VendorCoveragePickerSheet: View {
                     HStack(spacing: HavenTheme.spacing12) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Add a new vendor")
                                 .font(HavenTypography.uiLabel.weight(.semibold))

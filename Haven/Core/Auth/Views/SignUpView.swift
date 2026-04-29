@@ -29,8 +29,8 @@ struct SignUpView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Create Account")
                     .font(HavenTypography.title)
-                    .foregroundStyle(HavenColors.navy800)
-                Text("Set up your Haven account to get started.")
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("Set up your Chez account to get started.")
                     .font(HavenTypography.subheadline)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -118,7 +118,7 @@ struct SignUpView: View {
                     .foregroundStyle(HavenColors.textSecondary)
                 Button("Sign In") { dismiss() }
                     .fontWeight(.semibold)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             .font(HavenTypography.subheadline)
         }
@@ -132,7 +132,7 @@ struct SignUpView: View {
 
             Image(systemName: "envelope.badge.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Check Your Email")

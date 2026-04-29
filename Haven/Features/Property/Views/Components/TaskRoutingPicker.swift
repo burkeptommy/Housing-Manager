@@ -85,7 +85,7 @@ struct TaskRoutingPicker: View {
         routeButton(
             label: "Find a vendor",
             icon: "person.fill.checkmark",
-            subtitle: "Haven will help you book the right pro",
+            subtitle: "Chez will help you book the right pro",
             isPrimary: isPrimary,
             action: onSelectVendor
         )

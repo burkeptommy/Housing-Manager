@@ -29,7 +29,7 @@ struct DuplicateResolutionSheet: View {
                     HStack(spacing: 10) {
                         Image(systemName: "doc.fill")
                             .font(.title3)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(resolution.existingDocument.title)
                                 .font(HavenTypography.body)

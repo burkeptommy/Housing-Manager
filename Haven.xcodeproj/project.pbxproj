@@ -206,6 +206,7 @@
 		41A1E7046EBC3410D18C1A43 /* EncryptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4CEAEAAB9A80F3874FB94C /* EncryptionService.swift */; };
 		41BB2823B0FF59DD0B2B1080 /* RoutineSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6C3D46692851751F6A5572 /* RoutineSeeder.swift */; };
 		41BBCB98E7DAB82B051B8C1D /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 92FA1BB2ACAD067BEEE1857A /* CLAUDE.md */; };
+		41F4D65411C35406E81820C8 /* AdminCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A089E995B8C1F11C65BFCB /* AdminCatalogService.swift */; };
 		42ED97592B585181011E0D87 /* HomeCoverageHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFFBCDCDA9F773F07AC5C25 /* HomeCoverageHero.swift */; };
 		42F87AAB644BC5C4E20611FD /* DESIGN_RULES.md in Resources */ = {isa = PBXBuildFile; fileRef = D10346B1798B972FA9CA0219 /* DESIGN_RULES.md */; };
 		4303838C0B43C2F4CC2405AB /* EditDocumentDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A0A0D08A5DF798B9BBADB8 /* EditDocumentDetailsView.swift */; };
@@ -246,6 +247,7 @@
 		4E4773F655E522928563E75D /* RoutineGroupingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7DA5A4040EA8102CE628ED /* RoutineGroupingEngine.swift */; };
 		4EE0F545691A2FDAFD7FCEC2 /* AddVendorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF285398DF308A59B99CB085 /* AddVendorSheet.swift */; };
 		4EE3114C02815A56D1077AC2 /* AvatarPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715AA20065124665D9D16D60 /* AvatarPhotoService.swift */; };
+		4F18AB1214BA431402655665 /* AlfredMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DC7665829C027EA8937D17 /* AlfredMark.swift */; };
 		4F635BA08AD5878571AA4CF8 /* InvestmentSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CC363C4F7144C666BF14C2 /* InvestmentSummaryCard.swift */; };
 		4F92664E9E3BED84774FCF65 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B1CBF7F1BC549E214B0BEF /* SignUpView.swift */; };
 		510229707C6AD12008FECF8B /* FindLocalVendorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DA5F5AB2791F09EBCA125F /* FindLocalVendorSheet.swift */; };
@@ -359,6 +361,7 @@
 		7649D78F8A31651BE64D555C /* HandymanUpsellScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F859B342CCEB810261DA5D /* HandymanUpsellScannerTests.swift */; };
 		76DA3EE6CDDB3DA7B536EC58 /* PropertyListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E445A5A77BF6DC331BFB3B07 /* PropertyListView.swift */; };
 		775ED6CA00790B9A2799293D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8FC4B4D10494E8767E9A0642 /* Assets.xcassets */; };
+		78022848C865EF2C21DD8903 /* AlfredMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DC7665829C027EA8937D17 /* AlfredMark.swift */; };
 		780273DB8E374241F09C2B63 /* HouseQuizTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E305136BBADF35A4473FE8 /* HouseQuizTransition.swift */; };
 		7802919D253F53C4BB862550 /* VendorReviewForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A1E64945F0A863947B24B9 /* VendorReviewForm.swift */; };
 		7821054DBA37A7EC0AE98E53 /* MessageComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1FA359763C96ED224CADD3 /* MessageComposeView.swift */; };
@@ -374,6 +377,7 @@
 		7ABECB7847B769DA380C004E /* TaskRoutingPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5239A1D6C6A2839467DD32 /* TaskRoutingPicker.swift */; };
 		7B45A6304E471551A5BD3BD9 /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD6C14FAF58D10B27759559 /* CategoryPickerSheet.swift */; };
 		7B6C4BF8B3567D49B262FB92 /* AddressCompletionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F676C1BCF5799F544342A088 /* AddressCompletionSheet.swift */; };
+		7BACE6B65B5D6388FF66E313 /* AdminCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A089E995B8C1F11C65BFCB /* AdminCatalogService.swift */; };
 		7C36017D8225844EB0016483 /* RoutingPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD4E4211AA57C9D18E978A /* RoutingPreference.swift */; };
 		7C7A69EF7465DB1B8250C8EF /* QuoteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00F7EDA80AB205933D1E68E /* QuoteDetailView.swift */; };
 		7D66ECAFD4708FD25D8BFA4B /* MaintenanceTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */; };
@@ -825,6 +829,7 @@
 		14626DD382FED3D16FDE7151 /* DocumentUploadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUploadView.swift; sourceTree = "<group>"; };
 		1474AED18F96520DAA30E1B4 /* EnrichmentActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentActions.swift; sourceTree = "<group>"; };
 		14F48385E70645CE6220AE67 /* FamilyMembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMembersView.swift; sourceTree = "<group>"; };
+		15DC7665829C027EA8937D17 /* AlfredMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredMark.swift; sourceTree = "<group>"; };
 		164BF6C3C64C2E76B6836067 /* TokenManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenManager.swift; sourceTree = "<group>"; };
 		1651D3CEF3409A68FA7202EE /* RecommendedServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedServicesView.swift; sourceTree = "<group>"; };
 		168915F51136FFCD45ECA6E8 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
@@ -1101,6 +1106,7 @@
 		D09C463CADD4EC1A7F9BB9B3 /* HavenTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenTextField.swift; sourceTree = "<group>"; };
 		D0D84533D1A420378319EF60 /* HandymanChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanChatSheet.swift; sourceTree = "<group>"; };
 		D10346B1798B972FA9CA0219 /* DESIGN_RULES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DESIGN_RULES.md; sourceTree = "<group>"; };
+		D1A089E995B8C1F11C65BFCB /* AdminCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminCatalogService.swift; sourceTree = "<group>"; };
 		D253512E9703A545575048F1 /* PropertyHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyHookView.swift; sourceTree = "<group>"; };
 		D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyRecapEditors.swift; sourceTree = "<group>"; };
 		D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizQuestionLibrary.swift; sourceTree = "<group>"; };
@@ -1361,6 +1367,7 @@
 		51966FB4DF11A95F4E171443 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D1A089E995B8C1F11C65BFCB /* AdminCatalogService.swift */,
 				DB35F3710C0269686BE2C4E4 /* AnalyticsService.swift */,
 				715AA20065124665D9D16D60 /* AvatarPhotoService.swift */,
 				DB2C3C183F8B5FB668ADBCC4 /* DocumentUploadManager.swift */,
@@ -1960,6 +1967,7 @@
 			children = (
 				6D454019B1D9DF0E175C34AB /* AddressAutocompleteField.swift */,
 				68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */,
+				15DC7665829C027EA8937D17 /* AlfredMark.swift */,
 				7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */,
 				CD3497A46F82CCF175F158A2 /* CostTierView.swift */,
 				C4B5DD5BFCD50724A3EF7556 /* DocumentCategoryPicker.swift */,
@@ -2176,7 +2184,9 @@
 				91AE516BAE40BA3EED92B9B6 /* AddressCompletionSheet.swift in Sources */,
 				ECA9178D259E8FFFFAA28806 /* AddressConfirmationIntercept.swift in Sources */,
 				AD005EAEACB25EDD6C4CFCD8 /* AddressHookView.swift in Sources */,
+				7BACE6B65B5D6388FF66E313 /* AdminCatalogService.swift in Sources */,
 				C5ADDE464B4578DE81C202FF /* AlfredLogoView.swift in Sources */,
+				4F18AB1214BA431402655665 /* AlfredMark.swift in Sources */,
 				C73500039ED9E2161F154F7C /* AnalyticsService.swift in Sources */,
 				30A31977F96A68E07024A093 /* AppConfig.swift in Sources */,
 				85EDC669E036389F6A00F5B6 /* AppState.swift in Sources */,
@@ -2571,7 +2581,9 @@
 				7B6C4BF8B3567D49B262FB92 /* AddressCompletionSheet.swift in Sources */,
 				2989F8C1948C09628BDCF237 /* AddressConfirmationIntercept.swift in Sources */,
 				C78D1A9FDEDFCFFF91F3E8F9 /* AddressHookView.swift in Sources */,
+				41F4D65411C35406E81820C8 /* AdminCatalogService.swift in Sources */,
 				E844B3B782B687101D043825 /* AlfredLogoView.swift in Sources */,
+				78022848C865EF2C21DD8903 /* AlfredMark.swift in Sources */,
 				5C267D2A1A6145757F6E2D92 /* AnalyticsService.swift in Sources */,
 				48A03C21573D6CED2282E056 /* AppConfig.swift in Sources */,
 				0A95D6BDDAE77304A341001C /* AppState.swift in Sources */,

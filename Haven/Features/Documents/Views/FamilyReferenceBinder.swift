@@ -34,7 +34,7 @@ struct FamilyReferenceBinder: View {
 
             Image(systemName: "book.closed.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: 8) {
                 Text("Family Reference Binder")
@@ -89,7 +89,7 @@ struct FamilyReferenceBinder: View {
     private func binderSection(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 20)
             Text(text)
                 .font(HavenTypography.bodySmall)
@@ -226,7 +226,7 @@ final class BinderViewModel: ObservableObject {
 
     func generatePDF() -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Haven_Family_Binder.pdf")
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Chez_Family_Binder.pdf")
 
         do {
             // Apply NSFileProtectionComplete to the temp directory for this file
@@ -292,7 +292,7 @@ final class BinderViewModel: ObservableObject {
         let attrs: [NSAttributedString.Key: Any] = [.font: HavenTypography.frauncesUIFont(size: 32, weight: 700)]
         title.draw(at: CGPoint(x: margin, y: 280), withAttributes: attrs)
 
-        let subtitle = "Prepared by Haven"
+        let subtitle = "Prepared by Chez"
         let subAttrs: [NSAttributedString.Key: Any] = [.font: UIFont(name: "Inter", size: 16) ?? UIFont.systemFont(ofSize: 16), .foregroundColor: UIColor.secondaryLabel]
         subtitle.draw(at: CGPoint(x: margin, y: 330), withAttributes: subAttrs)
 

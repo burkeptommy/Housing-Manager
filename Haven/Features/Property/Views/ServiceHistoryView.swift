@@ -4,6 +4,7 @@ struct ServiceHistoryView: View {
     var systemId: UUID?
     var propertyId: UUID?
     @State private var records: [ServiceRecordRow] = []
+    @State private var contractorsById: [UUID: ContractorRow] = [:]
     @State private var isLoading = true
 
     var body: some View {
@@ -49,6 +50,10 @@ struct ServiceHistoryView: View {
 
                             HStack(spacing: 12) {
                                 Label(record.serviceDate, systemImage: "calendar")
+                                if let contractorId = record.contractorId,
+                                   let contractor = contractorsById[contractorId] {
+                                    Label(contractor.companyName, systemImage: "person.crop.circle")
+                                }
                                 Label(record.serviceType.capitalized, systemImage: "wrench")
                             }
                             .font(HavenTypography.uiLabelSmall)
@@ -92,10 +97,15 @@ struct ServiceHistoryView: View {
     private func loadRecords() async {
         isLoading = true
         do {
-            records = try await DatabaseService.shared.fetchServiceRecords(
+            async let loadedRecords = DatabaseService.shared.fetchServiceRecords(
                 systemId: systemId,
                 propertyId: propertyId
             )
+            async let loadedContractors = DatabaseService.shared.fetchContractors()
+
+            let (recordsResult, contractorRows) = try await (loadedRecords, loadedContractors)
+            records = recordsResult
+            contractorsById = Dictionary(uniqueKeysWithValues: contractorRows.map { ($0.id, $0) })
         } catch {
             // silently handle
         }

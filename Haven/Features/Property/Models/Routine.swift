@@ -101,10 +101,22 @@ enum RoutineKind: String, Codable, CaseIterable, Identifiable {
             return false
         }
     }
+
+    /// Some cadence-based routines are still useful to tie to a known
+    /// provider even though they do not require one to be considered
+    /// "set up" (for example, linking the local hauler to trash day).
+    var supportsVendorLink: Bool {
+        switch self {
+        case .trash, .recycling, .compost, .yardWaste:
+            return true
+        default:
+            return isVendorBased
+        }
+    }
 }
 
 /// Phase 66: Service lifecycle on a routine. Distinguishes "I have this
-/// service running with a vendor" (`active`) from "I want Haven to find
+/// service running with a vendor" (`active`) from "I want Chez to find
 /// me a pro" (`pendingVendor`) from "I haven't finished setting up yet"
 /// (`draft`). `paused` + `archived` complement Phase 55's `is_paused` +
 /// `archived_at` for UI grouping (a paused service still renders in Your
@@ -128,7 +140,7 @@ enum RoutineSetupState: String, Codable, CaseIterable {
     var displayLabel: String {
         switch self {
         case .draft: return "Draft"
-        case .pendingVendor: return "Haven helping"
+        case .pendingVendor: return "Chez helping"
         case .active: return "Active"
         case .paused: return "Paused"
         case .archived: return "Archived"
@@ -208,6 +220,8 @@ struct RoutineRow: Codable, Identifiable {
     let householdId: UUID
     let propertyId: UUID?
     let label: String
+    let serviceKey: String?
+    let sourceUtilityAccountId: UUID?
     let routineKind: String
     let icon: String?
     let notes: String?
@@ -255,6 +269,8 @@ struct RoutineRow: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, label, icon, notes, scope
+        case serviceKey = "service_key"
+        case sourceUtilityAccountId = "source_utility_account_id"
         case householdId = "household_id"
         case propertyId = "property_id"
         case routineKind = "routine_kind"
@@ -296,6 +312,8 @@ struct RoutineRow: Codable, Identifiable {
         self.householdId = try c.decode(UUID.self, forKey: .householdId)
         self.propertyId = try c.decodeIfPresent(UUID.self, forKey: .propertyId)
         self.label = try c.decode(String.self, forKey: .label)
+        self.serviceKey = try? c.decodeIfPresent(String.self, forKey: .serviceKey)
+        self.sourceUtilityAccountId = try? c.decodeIfPresent(UUID.self, forKey: .sourceUtilityAccountId)
         self.routineKind = try c.decode(String.self, forKey: .routineKind)
         self.icon = try? c.decodeIfPresent(String.self, forKey: .icon)
         self.notes = try? c.decodeIfPresent(String.self, forKey: .notes)
@@ -356,6 +374,23 @@ struct RoutineRow: Codable, Identifiable {
     var hidesChildTasks: Bool { typedSetupState.hidesChildTasks && !isPaused }
 
     var resolvedIcon: String { icon ?? typedKind?.icon ?? "calendar" }
+    /// Some routines are born with temporary setup copy like
+    /// "Pick a pro for mosquito and tick spraying". Once a vendor is
+    /// attached, homeowners should see the canonical program title
+    /// instead of that transitional prompt.
+    var shouldUseCanonicalServiceTitle: Bool {
+        guard resolvedServiceKey != "custom_routine_program" else { return false }
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        return trimmed.range(
+            of: #"^pick a pro for\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
+    var presentationLabel: String {
+        shouldUseCanonicalServiceTitle ? ServiceLibrary.homeownerTitle(for: self) : label
+    }
 
     /// Is this routine active in the given month (1=January..12=December)?
     func isActiveInMonth(_ month: Int) -> Bool {
@@ -471,12 +506,349 @@ struct RoutineRow: Codable, Identifiable {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+
+    var proactiveForecastVisitTypeKeys: Set<String> {
+        switch resolvedServiceKey {
+        case "landscaping_program":
+            return ["spring_cleanup", "fall_cleanup"]
+        case "pool_program":
+            return ["opening", "closing"]
+        case "irrigation_program":
+            return ["startup_backflow", "winterization"]
+        case "hvac_program":
+            return ["cooling_service", "heating_service"]
+        case "housekeeping_program":
+            return ["deep_clean"]
+        case "snow_and_ice_management_program":
+            return ["season_setup"]
+        case "generator_program":
+            return ["generator_service"]
+        case "pest_and_termite_program":
+            return ["termite_review"]
+        default:
+            return []
+        }
+    }
+
+    func upcomingVisitPreviews(
+        existingVisits: [RoutineVisitRow],
+        limit: Int = 3,
+        from referenceDate: Date = Date()
+    ) -> [RoutineUpcomingVisitPreview] {
+        guard limit > 0 else { return [] }
+
+        let today = RoutineForecastDates.startOfDay(referenceDate)
+        var previews = existingVisits
+            .filter { visit in
+                visit.typedVisitState.isActive
+                    && (RoutineForecastDates.date(from: visit.scheduledDate) ?? .distantPast) >= today
+            }
+            .sorted { $0.scheduledDate < $1.scheduledDate }
+            .map { visit in
+                RoutineUpcomingVisitPreview(
+                    routineId: id,
+                    title: visitTitle(for: visit.visitTypeKey),
+                    scheduledDate: visit.scheduledDate,
+                    targetWindowEnd: visit.targetWindowEnd,
+                    visitTypeKey: visit.visitTypeKey,
+                    visitState: visit.typedVisitState,
+                    isProjected: false
+                )
+            }
+
+        guard previews.count < limit else {
+            return Array(previews.prefix(limit))
+        }
+
+        let existingKeys = Set(previews.map { projectionKey(for: $0.visitTypeKey, scheduledDate: $0.scheduledDate) })
+        let projected = projectedVisitPreviews(
+            from: today,
+            excluding: existingKeys,
+            limit: limit - previews.count
+        )
+        previews.append(contentsOf: projected)
+        return Array(previews.prefix(limit))
+    }
+
+    private func projectedVisitPreviews(
+        from referenceDate: Date,
+        excluding existingKeys: Set<String>,
+        limit: Int
+    ) -> [RoutineUpcomingVisitPreview] {
+        guard limit > 0 else { return [] }
+
+        var previews: [RoutineUpcomingVisitPreview] = []
+
+        func appendProjectedVisit(
+            visitTypeKey: String?,
+            on date: Date,
+            targetWindowEnd: String? = nil
+        ) {
+            let scheduledDate = RoutineForecastDates.string(from: date)
+            let key = projectionKey(for: visitTypeKey, scheduledDate: scheduledDate)
+            guard !existingKeys.contains(key) else { return }
+
+            previews.append(
+                RoutineUpcomingVisitPreview(
+                    routineId: id,
+                    title: visitTitle(for: visitTypeKey),
+                    scheduledDate: scheduledDate,
+                    targetWindowEnd: targetWindowEnd,
+                    visitTypeKey: visitTypeKey,
+                    visitState: .planned,
+                    isProjected: true
+                )
+            )
+        }
+
+        for milestone in seasonalMilestoneDates(from: referenceDate) {
+            appendProjectedVisit(
+                visitTypeKey: milestone.visitTypeKey,
+                on: milestone.date,
+                targetWindowEnd: milestone.targetWindowEnd
+            )
+        }
+
+        if let recurringVisitTypeKey = recurringForecastVisitTypeKey {
+            for date in nextRecurringDates(limit: max(limit * 2, 4), from: referenceDate) {
+                appendProjectedVisit(visitTypeKey: recurringVisitTypeKey, on: date)
+            }
+        }
+
+        return previews
+            .sorted { lhs, rhs in
+                if lhs.scheduledDate != rhs.scheduledDate {
+                    return lhs.scheduledDate < rhs.scheduledDate
+                }
+                return lhs.title < rhs.title
+            }
+            .reduce(into: [RoutineUpcomingVisitPreview]()) { result, preview in
+                guard result.count < limit else { return }
+                if result.contains(where: { $0.id == preview.id }) { return }
+                result.append(preview)
+            }
+    }
+
+    private func nextRecurringDates(limit: Int, from referenceDate: Date) -> [Date] {
+        guard limit > 0 else { return [] }
+
+        let start = RoutineForecastDates.startOfDay(referenceDate)
+        let maxScanDays = max(
+            400,
+            typedCadence == .annual || typedCadence == .semiannual ? 760 : 220
+        )
+        var results: [Date] = []
+
+        for offset in 0...maxScanDays {
+            guard let candidate = RoutineForecastDates.calendar.date(byAdding: .day, value: offset, to: start) else {
+                continue
+            }
+            if isActive(on: candidate, calendar: RoutineForecastDates.calendar) {
+                results.append(candidate)
+            }
+            if results.count >= limit { break }
+        }
+        return results
+    }
+
+    private func seasonalMilestoneDates(
+        from referenceDate: Date
+    ) -> [(visitTypeKey: String, date: Date, targetWindowEnd: String?)] {
+        func nextDate(months: [Int], day: Int) -> Date? {
+            RoutineForecastDates.nextAnnualDate(
+                months: months,
+                preferredDay: day,
+                from: referenceDate
+            )
+        }
+
+        switch resolvedServiceKey {
+        case "landscaping_program":
+            let springMonths = activeMonths.filter { [3, 4, 5, 6].contains($0) }
+            let fallMonths = activeMonths.filter { [9, 10, 11].contains($0) }
+            return [
+                nextDate(months: springMonths.isEmpty ? [4] : springMonths, day: 10)
+                    .map { ("spring_cleanup", $0, nil) },
+                nextDate(months: fallMonths.isEmpty ? [10] : fallMonths, day: 10)
+                    .map { ("fall_cleanup", $0, nil) },
+            ].compactMap { $0 }
+
+        case "pool_program":
+            let startMonth = activeMonths.min()
+            let endMonth = activeMonths.max()
+            return [
+                startMonth.flatMap { nextDate(months: [$0], day: 1) }
+                    .map { ("opening", $0, nil) },
+                endMonth.flatMap { nextDate(months: [$0], day: 15) }
+                    .map { ("closing", $0, nil) },
+            ].compactMap { $0 }
+
+        case "irrigation_program":
+            let startMonth = activeMonths.min()
+            let endMonth = activeMonths.max()
+            return [
+                startMonth.flatMap { nextDate(months: [$0], day: 1) }
+                    .map { ("startup_backflow", $0, nil) },
+                endMonth.flatMap { nextDate(months: [$0], day: 15) }
+                    .map { ("winterization", $0, nil) },
+            ].compactMap { $0 }
+
+        case "hvac_program":
+            return [
+                nextDate(months: [4, 5], day: 1).map { ("cooling_service", $0, nil) },
+                nextDate(months: [9, 10], day: 15).map { ("heating_service", $0, nil) },
+            ].compactMap { $0 }
+
+        case "housekeeping_program":
+            return [
+                nextDate(months: [3, 4], day: 1).map { ("deep_clean", $0, nil) },
+                nextDate(months: [9, 10], day: 1).map { ("deep_clean", $0, nil) },
+            ].compactMap { $0 }
+
+        case "snow_and_ice_management_program":
+            return [
+                nextDate(months: [10, 11], day: 1).map { ("season_setup", $0, nil) }
+            ].compactMap { $0 }
+
+        case "generator_program":
+            return [
+                nextDate(months: [4, 5, 10], day: 15).map { ("generator_service", $0, nil) }
+            ].compactMap { $0 }
+
+        case "pest_and_termite_program":
+            return [
+                nextDate(months: [4, 5], day: 15).map { ("termite_review", $0, nil) }
+            ].compactMap { $0 }
+
+        default:
+            return []
+        }
+    }
+
+    private var recurringForecastVisitTypeKey: String? {
+        switch resolvedServiceKey {
+        case "waste_program":
+            switch typedKind {
+            case .recycling:
+                return "recycling_pickup"
+            case .compost, .yardWaste:
+                return "organics_pickup"
+            default:
+                return "trash_pickup"
+            }
+        case "landscaping_program":
+            return "routine_grounds"
+        case "pool_program":
+            return "weekly_care"
+        case "housekeeping_program":
+            return "routine_cleaning"
+        case "pest_and_termite_program":
+            return "routine_pest_service"
+        case "mosquito_and_tick_program":
+            return "mosquito_tick_service"
+        case "hot_tub_program":
+            return "water_care"
+        case "hvac_program", "irrigation_program", "snow_and_ice_management_program", "generator_program":
+            return nil
+        default:
+            return ServiceLibrary.serviceDefinition(for: self)?.visitTypes.first?.key
+        }
+    }
+
+    private func visitTitle(for visitTypeKey: String?) -> String {
+        guard let visitTypeKey else {
+            return ServiceLibrary.homeownerTitle(for: self)
+        }
+        return ServiceLibrary.serviceDefinition(for: self)?
+            .visitTypes
+            .first(where: { $0.key == visitTypeKey })?
+            .label
+            ?? ServiceLibrary.homeownerTitle(for: self)
+    }
+
+    private func projectionKey(for visitTypeKey: String?, scheduledDate: String) -> String {
+        "\(visitTypeKey ?? "generic")|\(scheduledDate)"
+    }
+}
+
+struct RoutineUpcomingVisitPreview: Identifiable, Hashable {
+    let routineId: UUID
+    let title: String
+    let scheduledDate: String
+    let targetWindowEnd: String?
+    let visitTypeKey: String?
+    let visitState: RoutineVisitState
+    let isProjected: Bool
+
+    var id: String {
+        "\(routineId.uuidString)|\(visitTypeKey ?? "generic")|\(scheduledDate)|\(isProjected ? "projected" : "saved")"
+    }
+
+    var badgeText: String {
+        isProjected ? "Projected" : visitState.displayLabel
+    }
+}
+
+private enum RoutineForecastDates {
+    static let calendar: Calendar = {
+        var calendar = Calendar.current
+        calendar.timeZone = .current
+        return calendar
+    }()
+
+    static let isoFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    static func startOfDay(_ date: Date) -> Date {
+        calendar.startOfDay(for: date)
+    }
+
+    static func date(from isoDate: String) -> Date? {
+        isoFormatter.date(from: isoDate)
+    }
+
+    static func string(from date: Date) -> String {
+        isoFormatter.string(from: date)
+    }
+
+    static func nextAnnualDate(
+        months: [Int],
+        preferredDay: Int,
+        from referenceDate: Date
+    ) -> Date? {
+        let today = startOfDay(referenceDate)
+        let currentYear = calendar.component(.year, from: today)
+        var candidates: [Date] = []
+
+        for month in months {
+            for year in [currentYear, currentYear + 1] {
+                var components = DateComponents()
+                components.year = year
+                components.month = month
+                let dayRange = calendar.range(of: .day, in: .month, for: calendar.date(from: components) ?? today)
+                components.day = min(preferredDay, dayRange?.count ?? preferredDay)
+                if let date = calendar.date(from: components), date >= today {
+                    candidates.append(date)
+                }
+            }
+        }
+
+        return candidates.min()
+    }
 }
 
 struct RoutineInsert: Codable {
     let householdId: UUID
     let propertyId: UUID?
     let label: String
+    var serviceKey: String? = nil
+    var sourceUtilityAccountId: UUID? = nil
     let routineKind: String
     var icon: String? = nil
     var notes: String? = nil
@@ -515,6 +887,8 @@ struct RoutineInsert: Codable {
 
     enum CodingKeys: String, CodingKey {
         case label, icon, notes, scope
+        case serviceKey = "service_key"
+        case sourceUtilityAccountId = "source_utility_account_id"
         case householdId = "household_id"
         case propertyId = "property_id"
         case routineKind = "routine_kind"
@@ -548,6 +922,8 @@ struct RoutineInsert: Codable {
 
 struct RoutineUpdate: Codable {
     var label: String?
+    var serviceKey: String?
+    var sourceUtilityAccountId: UUID?
     var icon: String?
     var notes: String?
     var vendorId: UUID?
@@ -579,6 +955,8 @@ struct RoutineUpdate: Codable {
 
     enum CodingKeys: String, CodingKey {
         case label, icon, notes, scope
+        case serviceKey = "service_key"
+        case sourceUtilityAccountId = "source_utility_account_id"
         case vendorId = "vendor_id"
         case systemId = "system_id"
         case cadenceType = "cadence_type"
@@ -649,6 +1027,7 @@ struct RoutineVisitRow: Codable, Identifiable {
     let id: UUID
     let routineId: UUID
     let scheduledDate: String
+    let visitTypeKey: String?
     let status: String
     let confirmedAt: Date?
     let confirmedBy: String?
@@ -664,6 +1043,7 @@ struct RoutineVisitRow: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, status, notes
+        case visitTypeKey = "visit_type_key"
         case routineId = "routine_id"
         case scheduledDate = "scheduled_date"
         case confirmedAt = "confirmed_at"
@@ -680,6 +1060,7 @@ struct RoutineVisitRow: Codable, Identifiable {
         self.id = try c.decode(UUID.self, forKey: .id)
         self.routineId = try c.decode(UUID.self, forKey: .routineId)
         self.scheduledDate = try c.decode(String.self, forKey: .scheduledDate)
+        self.visitTypeKey = try? c.decodeIfPresent(String.self, forKey: .visitTypeKey)
         self.status = try c.decode(String.self, forKey: .status)
         self.confirmedAt = try? c.decodeIfPresent(Date.self, forKey: .confirmedAt)
         self.confirmedBy = try? c.decodeIfPresent(String.self, forKey: .confirmedBy)
@@ -702,6 +1083,7 @@ struct RoutineVisitRow: Codable, Identifiable {
 struct RoutineVisitInsert: Codable {
     let routineId: UUID
     let scheduledDate: String
+    var visitTypeKey: String? = nil
     var status: String = "planned"
     var visitState: String = "planned"
     var targetWindowStart: String? = nil
@@ -711,6 +1093,7 @@ struct RoutineVisitInsert: Codable {
 
     enum CodingKeys: String, CodingKey {
         case status, notes
+        case visitTypeKey = "visit_type_key"
         case routineId = "routine_id"
         case scheduledDate = "scheduled_date"
         case visitState = "visit_state"
@@ -724,6 +1107,7 @@ struct RoutineVisitInsert: Codable {
 /// confirms a date (`visitState: "scheduled"`), marks complete, or cancels.
 struct RoutineVisitUpdate: Codable {
     var scheduledDate: String?
+    var visitTypeKey: String?
     var status: String?
     var visitState: String?
     var targetWindowStart: String?
@@ -734,6 +1118,7 @@ struct RoutineVisitUpdate: Codable {
 
     enum CodingKeys: String, CodingKey {
         case status, notes
+        case visitTypeKey = "visit_type_key"
         case scheduledDate = "scheduled_date"
         case visitState = "visit_state"
         case targetWindowStart = "target_window_start"

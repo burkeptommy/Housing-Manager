@@ -86,7 +86,7 @@ struct MergeResolutionView: View {
         VStack(spacing: 12) {
             Image(systemName: "arrow.triangle.merge")
                 .font(.system(size: 40))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             Text("Merging \"\(sourceHouseholdName)\" into \"\(targetHouseholdName)\"")
                 .font(HavenTypography.headline)
@@ -167,7 +167,7 @@ struct MergeResolutionView: View {
                         Text(isIndividual ? "Use bulk choice" : "Review individually")
                             .font(HavenTypography.caption)
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 }
 
                 // Individual items (expanded mode)

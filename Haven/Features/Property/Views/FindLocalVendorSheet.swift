@@ -29,14 +29,36 @@ struct FindLocalVendorSheet: View {
     let systemCategory: String
     let categoryDisplayName: String
     var onComplete: (() -> Void)?
+    var onAdoptedVendor: ((ContractorRow) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
     @State private var vendors: [HavenSupabase.LocalVendorResult] = []
+    @State private var chezFieldProviders: [HavenSupabase.ChezFieldProvider] = []
     @State private var isLoading: Bool = true
     @State private var loadError: String? = nil
+    /// Inline directory-search query for the ON CHEZ section. Empty
+    /// string falls back to the auto-match (near-me) results — that's
+    /// the default discovery surface. Typing kicks the same search
+    /// path the full-screen `ChezDirectorySearchView` uses, with a
+    /// 400ms debounce so we don't fire the edge function on every
+    /// keystroke. Only ever non-nil when category is handyman.
+    @State private var chezSearchQuery: String = ""
+    @State private var chezSearchDebounced: String = ""
+    @State private var isSearchingChez: Bool = false
     @State private var pendingAdoption: HavenSupabase.LocalVendorResult? = nil
+    @State private var pendingChezFieldAdoption: HavenSupabase.ChezFieldProvider? = nil
     @State private var isAdding: Bool = false
+    /// Drives the full-screen browse / search view. Only ever set when
+    /// `systemCategory == "handyman"` because the Chez Field directory
+    /// is handyman-only today.
+    @State private var showDirectorySearch: Bool = false
+    /// Inline error shown above the action area when an adopt call
+    /// fails. Without this the sheet just sits there silently when
+    /// the network call or RLS blocks the contractor insert, which
+    /// looks identical to "the button didn't fire" from a user's
+    /// perspective.
+    @State private var adoptError: String? = nil
 
     /// Guard against `.onAppear` firing twice (which SwiftUI can do during
     /// sheet presentation animations) from triggering two network calls.
@@ -56,10 +78,34 @@ struct FindLocalVendorSheet: View {
                             loadingState
                         } else if let error = loadError {
                             errorState(error)
-                        } else if vendors.isEmpty {
-                            emptyState
-                        } else {
+                        } else if shouldRenderVendorList {
+                            // The ON CHEZ section has its own empty-state
+                            // card with the Browse CTA, so we route through
+                            // `vendorList` for handyman even when both
+                            // result sets came back empty. For non-handyman
+                            // categories with no results, fall back to the
+                            // generic empty state.
                             vendorList
+                        } else {
+                            emptyState
+                        }
+
+                        if let adoptError {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(HavenColors.critical)
+                                    .font(.system(size: 14))
+                                    .padding(.top, 1)
+                                Text(adoptError)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(HavenTheme.spacing12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(HavenColors.critical.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                            .padding(.top, HavenTheme.spacing12)
                         }
 
                         addMyOwnButton
@@ -77,7 +123,7 @@ struct FindLocalVendorSheet: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -86,17 +132,50 @@ struct FindLocalVendorSheet: View {
                 isPresented: Binding(
                     get: { pendingAdoption != nil },
                     set: { if !$0 { pendingAdoption = nil } }
-                )
-            ) {
+                ),
+                presenting: pendingAdoption
+            ) { vendor in
                 Button("Cancel", role: .cancel) { pendingAdoption = nil }
                 Button("Add") {
-                    if let vendor = pendingAdoption {
-                        Task { await adoptVendor(vendor) }
-                    }
+                    Task { await adoptVendor(vendor) }
                 }
-            } message: {
-                if let vendor = pendingAdoption {
-                    Text("Add \(vendor.name) as your \(categoryDisplayName) contractor? We'll move your matching tasks over.")
+            } message: { vendor in
+                Text("Add \(vendor.name) as your \(categoryDisplayName) contractor? We'll move your matching tasks over.")
+            }
+            .alert(
+                "Add this Chez Field provider?",
+                isPresented: Binding(
+                    get: { pendingChezFieldAdoption != nil },
+                    set: { if !$0 { pendingChezFieldAdoption = nil } }
+                ),
+                presenting: pendingChezFieldAdoption
+            ) { provider in
+                // `presenting:` hands the unwrapped provider to both
+                // closures so we don't read `pendingChezFieldAdoption`
+                // again at action time. That avoids a SwiftUI race
+                // where the binding setter clears the state before the
+                // Button action's `if let` evaluates, which on some iOS
+                // versions made "Add" a silent no-op.
+                Button("Cancel", role: .cancel) { pendingChezFieldAdoption = nil }
+                Button("Add") {
+                    Task { await adoptChezFieldProvider(provider) }
+                }
+            } message: { provider in
+                Text("Add \(provider.name) as your \(categoryDisplayName) contractor? They use Chez Field, so they'll get your punch list and home details when you schedule a visit.")
+            }
+            .fullScreenCover(isPresented: $showDirectorySearch) {
+                ChezDirectorySearchView(
+                    householdId: householdId,
+                    systemCategory: systemCategory,
+                    categoryDisplayName: categoryDisplayName,
+                    defaultState: state
+                ) { contractor in
+                    // Bubble the same outputs the auto-match adoption path
+                    // would deliver, then dismiss this sheet too. The
+                    // directory view dismisses itself first.
+                    onAdoptedVendor?(contractor)
+                    onComplete?()
+                    dismiss()
                 }
             }
         }
@@ -126,7 +205,7 @@ struct FindLocalVendorSheet: View {
 
             Text("Top \(categoryDisplayName) pros in \(town), \(state).")
                 .font(HavenTypography.fraunces(size: 24, weight: 600))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("We screen for high ratings, real reviews, and local independents. Tap a card to add them as your contractor.")
@@ -167,7 +246,7 @@ struct FindLocalVendorSheet: View {
             } label: {
                 Text("Try again")
                     .font(HavenTypography.uiLabel.weight(.semibold))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             .padding(.top, HavenTheme.spacing4)
         }
@@ -183,7 +262,7 @@ struct FindLocalVendorSheet: View {
             Text("No vendors found yet")
                 .font(HavenTypography.headline)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("We couldn't surface a strong local match. Add your own vendor below and Haven will use it for future tasks.")
+            Text("We couldn't surface a strong local match. Add your own vendor below and Chez will use it for future tasks.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -194,16 +273,72 @@ struct FindLocalVendorSheet: View {
 
     // MARK: - Vendor List
 
+    /// True when there's any content for `vendorList` to render. For the
+    /// handyman category we render even when both Google Places and Chez
+    /// Field returned zero, because the ON CHEZ section's empty-state
+    /// card hosts the "Browse all Chez handymen" CTA.
+    private var shouldRenderVendorList: Bool {
+        if !vendors.isEmpty || !chezFieldProviders.isEmpty {
+            return true
+        }
+        return systemCategory.lowercased() == "handyman"
+    }
+
     private var vendorList: some View {
         let havenCertified = vendors.filter { $0.isHavenCertified }
         let suggested = vendors.filter { !$0.isHavenCertified }
+        let isHandyman = systemCategory.lowercased() == "handyman"
+        let chezSectionVisible = isHandyman || !chezFieldProviders.isEmpty
 
         return VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+            // Chez Field providers — registered via the desktop command
+            // center, opted into the homeowner directory. Render at the
+            // top because they're already in the network and have
+            // verified workspace identity. For handyman category we
+            // always render the section so the user can discover the
+            // directory and browse it actively, even when no providers
+            // auto-match in their area.
+            if chezSectionVisible {
+                Text("ON CHEZ")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.2)
+                    .foregroundStyle(HavenColors.action)
+
+                if isHandyman {
+                    chezSearchField
+                }
+
+                if isSearchingChez {
+                    chezSearchLoadingRow
+                } else if chezFieldProviders.isEmpty {
+                    if chezSearchDebounced.isEmpty {
+                        chezDirectoryEmptyCard
+                    } else {
+                        chezSearchEmptyResultsCard
+                    }
+                } else {
+                    VStack(spacing: HavenTheme.spacing12) {
+                        ForEach(chezFieldProviders) { provider in
+                            ChezFieldProviderCard(
+                                provider: provider,
+                                isDisabled: isAdding
+                            ) {
+                                pendingChezFieldAdoption = provider
+                            }
+                        }
+                    }
+                    if isHandyman {
+                        browseDirectoryFooterLink
+                    }
+                }
+            }
+
             if !havenCertified.isEmpty {
-                Text("HAVEN CERTIFIED")
+                Text("CHEZ CERTIFIED")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.success)
+                    .padding(.top, chezSectionVisible ? HavenTheme.spacing8 : 0)
                 VStack(spacing: HavenTheme.spacing12) {
                     ForEach(havenCertified) { vendor in
                         vendorCard(vendor)
@@ -224,6 +359,218 @@ struct FindLocalVendorSheet: View {
                 }
             }
         }
+    }
+
+    /// Phase 73 follow-up: inline search field for the ON CHEZ section.
+    /// Live-filters the directory by company name + display blurb so
+    /// homeowners can narrow a growing handyman list without leaving
+    /// the sheet. When empty, the list falls back to the auto-match
+    /// (near-me) result set so social-proof remains the default.
+    private var chezSearchField: some View {
+        HStack(spacing: HavenTheme.spacing8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13))
+                .foregroundStyle(HavenColors.textTertiary)
+
+            TextField(
+                "Search Chez handymen by name or specialty",
+                text: $chezSearchQuery
+            )
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.textPrimary)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+
+            if !chezSearchQuery.isEmpty {
+                Button {
+                    Haptics.light()
+                    chezSearchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, HavenTheme.spacing12)
+        .padding(.vertical, HavenTheme.spacing8)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                .strokeBorder(HavenColors.beige200, lineWidth: 1)
+        )
+        .onChange(of: chezSearchQuery) { _, newValue in
+            Task { await debounceChezSearch(newValue) }
+        }
+    }
+
+    private var chezSearchLoadingRow: some View {
+        HStack(spacing: HavenTheme.spacing8) {
+            ProgressView().controlSize(.small)
+            Text("Searching the Chez directory…")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    private var chezSearchEmptyResultsCard: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("No matches for \"\(chezSearchDebounced)\"")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("Try a different search term, clear the search to see who's nearby, or browse the full directory.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                Haptics.light()
+                showDirectorySearch = true
+            } label: {
+                Text("Browse all Chez handymen")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, HavenTheme.spacing12)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+            .buttonStyle(.plain)
+            .disabled(isAdding)
+            .padding(.top, HavenTheme.spacing4)
+        }
+        .padding(HavenTheme.spacing16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                .strokeBorder(HavenColors.beige200, lineWidth: 1)
+        )
+    }
+
+    /// 400ms debounce so we don't fire the edge function on every
+    /// keystroke. Snapshot the value, sleep, then verify the query
+    /// hasn't been overtaken by a later keystroke before kicking
+    /// the search.
+    private func debounceChezSearch(_ value: String) async {
+        let snapshot = value
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        guard snapshot == chezSearchQuery else { return }
+        chezSearchDebounced = snapshot
+        await searchChezDirectory(query: snapshot)
+    }
+
+    /// Hits the network-handymen edge function in directory-search
+    /// mode (presence of `searchQuery` triggers it). For an empty
+    /// query, falls back to the original auto-match (near_me) call so
+    /// the section reverts to the social-proof default.
+    private func searchChezDirectory(query: String) async {
+        guard systemCategory.lowercased() == "handyman" else { return }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        await MainActor.run { isSearchingChez = true }
+        defer {
+            Task { @MainActor in isSearchingChez = false }
+        }
+
+        do {
+            if trimmed.isEmpty {
+                let response = try await HavenSupabase.findNetworkHandymen(
+                    town: town,
+                    state: state,
+                    category: "handyman"
+                )
+                await MainActor.run {
+                    chezFieldProviders = response.providers
+                }
+            } else {
+                let response = try await HavenSupabase.findNetworkHandymen(
+                    state: state,
+                    category: "handyman",
+                    searchQuery: trimmed,
+                    nationwide: false
+                )
+                await MainActor.run {
+                    chezFieldProviders = response.providers
+                }
+            }
+        } catch {
+            // Cancellation or transient errors: leave the existing
+            // results in place so the user keeps a working list.
+            print("[FindLocalVendor] chez directory search error: \(error)")
+        }
+    }
+
+    /// Inline card rendered inside the ON CHEZ section when the auto-match
+    /// query returned zero providers near the homeowner. Promotes the
+    /// browse path so the user understands the Chez directory exists and
+    /// is searchable.
+    private var chezDirectoryEmptyCard: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            Text("No Chez pros in your area yet")
+                .font(HavenTypography.title3)
+                .foregroundStyle(HavenColors.textPrimary)
+
+            Text("Browse the full Chez \(categoryDisplayName.lowercased()) directory or expand to nationwide.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                Haptics.light()
+                showDirectorySearch = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Browse all Chez \(categoryDisplayName.lowercased())s")
+                        .font(HavenTypography.uiButton)
+                }
+                .foregroundStyle(HavenColors.textOnAction)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, HavenTheme.spacing12)
+                .background(HavenColors.action)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+            .buttonStyle(.plain)
+            .disabled(isAdding)
+            .padding(.top, HavenTheme.spacing4)
+        }
+        .padding(HavenTheme.spacing16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .overlay {
+            RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                .strokeBorder(HavenColors.action.opacity(0.4), lineWidth: 1.5)
+        }
+    }
+
+    /// Footer "Browse all" link rendered below the auto-matched Chez
+    /// providers. Lets the user reach the full directory without giving
+    /// up the cards already in front of them.
+    private var browseDirectoryFooterLink: some View {
+        Button {
+            Haptics.light()
+            showDirectorySearch = true
+        } label: {
+            HStack(spacing: 6) {
+                Text("Browse all in \(state)")
+                    .font(HavenTypography.uiLabel.weight(.semibold))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(HavenColors.action)
+            .padding(.top, HavenTheme.spacing4)
+        }
+        .buttonStyle(.plain)
+        .disabled(isAdding)
     }
 
     private func vendorCard(_ vendor: HavenSupabase.LocalVendorResult) -> some View {
@@ -367,13 +714,34 @@ struct FindLocalVendorSheet: View {
             loadError = nil
         }
         do {
-            let response = try await HavenSupabase.findLocalVendors(
+            // Chez v1: query both directories in parallel. The Chez Field
+            // call is fast (Supabase index lookup) and the Google Places
+            // call is the long pole. We don't gate one on the other —
+            // either result lighting up is enough to render the list.
+            async let googlePlaces = HavenSupabase.findLocalVendors(
                 town: town,
                 state: state,
                 category: systemCategory
             )
+            async let chezField: HavenSupabase.ChezFieldProviderResponse? = {
+                // Chez Field directory only knows about handyman today.
+                // Skip the call entirely for other categories so we don't
+                // burn round-trips on guaranteed-empty results.
+                let normalized = systemCategory.lowercased()
+                guard normalized == "handyman" else { return nil }
+                return try? await HavenSupabase.findNetworkHandymen(
+                    town: town,
+                    state: state,
+                    category: "handyman"
+                )
+            }()
+
+            let response = try await googlePlaces
+            let chezFieldResponse = await chezField
+
             await MainActor.run {
                 vendors = response.vendors
+                chezFieldProviders = chezFieldResponse?.providers ?? []
                 isLoading = false
             }
         } catch {
@@ -398,7 +766,37 @@ struct FindLocalVendorSheet: View {
         }
     }
 
-    // MARK: - Adopt
+    // MARK: - Adopt — Chez Field provider
+
+    /// Adopts a Chez Field directory provider as a household contractor.
+    /// Delegates the contractor insert + matching-task sweep to
+    /// `ChezDirectoryService` so the same logic powers both the auto-match
+    /// path and the directory-search path. The view stays responsible for
+    /// presentation: the `isAdding` flag, the `onAdoptedVendor` /
+    /// `onComplete` callbacks, and dismiss.
+    private func adoptChezFieldProvider(_ provider: HavenSupabase.ChezFieldProvider) async {
+        isAdding = true
+        adoptError = nil
+        defer { isAdding = false }
+
+        let result = await ChezDirectoryService.shared.adopt(
+            provider,
+            householdId: householdId,
+            systemCategory: systemCategory,
+            triggeringTaskId: task?.id
+        )
+
+        switch result {
+        case .success(let createdContractor):
+            onAdoptedVendor?(createdContractor)
+            onComplete?()
+            dismiss()
+        case .failure(let message):
+            adoptError = message
+        }
+    }
+
+    // MARK: - Adopt — Google Places vendor
 
     private func adoptVendor(_ vendor: HavenSupabase.LocalVendorResult) async {
         isAdding = true
@@ -472,6 +870,7 @@ struct FindLocalVendorSheet: View {
         )
         Haptics.success()
 
+        onAdoptedVendor?(createdContractor)
         onComplete?()
         dismiss()
     }

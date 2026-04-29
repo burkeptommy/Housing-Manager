@@ -127,14 +127,7 @@ struct AccountCreationStep: View {
             // Logo monogram (smaller than LoginView's so the hero title
             // sits closer to the top of the screen and the form has room
             // to breathe).
-            Text("H")
-                .font(HavenTypography.statNumber)
-                .foregroundStyle(HavenColors.creamLight)
-                .frame(width: 64, height: 64)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(HavenColors.navy800)
-                )
+            ChezBrandView(width: 96)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text(heroTitle)
@@ -264,7 +257,7 @@ struct AccountCreationStep: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(HavenColors.creamLight)
-            .foregroundStyle(HavenColors.navy)
+            .foregroundStyle(HavenColors.textPrimary)
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
             .overlay {
                 RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
@@ -327,7 +320,7 @@ struct AccountCreationStep: View {
                     showSignIn = true
                 }
                 .fontWeight(.semibold)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             }
             .font(HavenTypography.bodySmall)
 

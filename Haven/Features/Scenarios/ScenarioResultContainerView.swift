@@ -32,7 +32,7 @@ struct ScenarioResultContainerView: View {
 
                     Text("Something went wrong")
                         .font(HavenTypography.title2)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                     Text(error)
                         .font(HavenTypography.bodySmall)

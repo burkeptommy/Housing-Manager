@@ -7,8 +7,8 @@ import SwiftUI
 /// caller passes one).
 ///
 /// Used by:
-///   - FamilyMembersView context menu "Invite to Haven" on existing members
-///   - FamilyMemberFormView "Invite to Haven" footer button
+///   - FamilyMembersView context menu "Invite to Chez" on existing members
+///   - FamilyMemberFormView "Invite to Chez" footer button
 ///
 /// New entry points should call `HouseholdInviteCoordinator` directly. This
 /// sheet exists only to keep the legacy "tap a member, hit invite" path
@@ -46,7 +46,7 @@ struct InviteToHavenSheet: View {
                 .padding(HavenTheme.spacing20)
             }
             .background(HavenColors.background)
-            .navigationTitle("Invite to Haven")
+            .navigationTitle("Invite to Chez")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -70,9 +70,9 @@ struct InviteToHavenSheet: View {
         VStack(spacing: HavenTheme.spacing16) {
             Image(systemName: "person.badge.plus")
                 .font(.system(size: 48))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
-            Text("Invite \(familyMember?.firstName ?? "this person") to Haven")
+            Text("Invite \(familyMember?.firstName ?? "this person") to Chez")
                 .font(HavenTypography.title2)
                 .multilineTextAlignment(.center)
 
@@ -134,7 +134,7 @@ struct InviteToHavenSheet: View {
         guard case .inviteSent(_, _, let code) = trustMoment else { return }
         let formatted = formatCode(code)
         let firstName = familyMember?.firstName ?? "there"
-        let text = "Hey \(firstName), here's your Haven invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(code)"
+        let text = "Hey \(firstName), here's your Chez invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(code)"
         let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }

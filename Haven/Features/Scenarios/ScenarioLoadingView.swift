@@ -53,7 +53,7 @@ struct ScenarioLoadingView: View {
             VStack(spacing: 12) {
                 Text("\(loadingMessages[currentMessageIndex])\(String(repeating: ".", count: dotCount))")
                     .font(Font.system(size: 16))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .animation(.easeInOut(duration: 0.3), value: currentMessageIndex)
 
                 // Progress dots

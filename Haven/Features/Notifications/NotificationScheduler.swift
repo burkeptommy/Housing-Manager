@@ -258,7 +258,7 @@ final class NotificationScheduler {
         components.minute = 0
 
         let content = UNMutableNotificationContent()
-        content.title = "Haven Daily Summary"
+        content.title = "Chez Daily Summary"
         content.body = "Check what needs your attention today."
         content.sound = .default
         content.categoryIdentifier = "morning_digest"

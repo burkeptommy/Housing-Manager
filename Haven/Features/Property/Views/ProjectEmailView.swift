@@ -27,14 +27,14 @@ struct ProjectEmailView: View {
                 // Icon
                 Image(systemName: "envelope.open.fill")
                     .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .padding(.top, HavenTheme.spacing32)
 
                 // Title
                 VStack(spacing: HavenTheme.spacing8) {
                     Text("Your Household Email")
                         .font(HavenTypography.title2)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .multilineTextAlignment(.center)
 
                     Text("Forward anything related to your home, estate, or family to this address. Alfred will automatically extract vendors, analyze quotes, categorize documents, and create projects for you.")
@@ -90,7 +90,7 @@ struct ProjectEmailView: View {
 
                         howItWorksStep(number: "1", text: "You receive an email with a quote, document, or vendor info")
                         howItWorksStep(number: "2", text: "Forward it to your household email above")
-                        howItWorksStep(number: "3", text: "Alfred reads it, extracts everything useful, and organizes it in Haven")
+                        howItWorksStep(number: "3", text: "Alfred reads it, extracts everything useful, and organizes it in Chez")
                         howItWorksStep(number: "4", text: "Check your dashboard for a summary of what was created")
                     }
                 }
@@ -122,7 +122,7 @@ struct ProjectEmailView: View {
 
                 Text(email)
                     .font(Font.system(size: 16))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .textSelection(.enabled)
                     .padding(.vertical, HavenTheme.spacing4)
 
@@ -181,7 +181,7 @@ struct ProjectEmailView: View {
                             Text("Share")
                         }
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(HavenColors.navy.opacity(0.08))
@@ -333,13 +333,13 @@ struct ProjectEmailView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showAddSender = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         Task { await addSender() }
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                     .disabled(newSenderEmail.trimmingCharacters(in: .whitespaces).isEmpty || isAddingSender)
                 }
@@ -359,9 +359,9 @@ struct ProjectEmailView: View {
 
                 Text("No forwarding email yet")
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
 
-                Text("Generate a unique email address for your household. Anyone in your household can use it to forward documents and quotes to Haven.")
+                Text("Generate a unique email address for your household. Anyone in your household can use it to forward documents and quotes to Chez.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -388,7 +388,7 @@ struct ProjectEmailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text(detail)
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textSecondary)
@@ -488,9 +488,9 @@ struct ProjectEmailView: View {
 
     private func saveAsContact(email: String) {
         let contact = CNMutableContact()
-        contact.givenName = "Haven"
+        contact.givenName = "Chez"
         contact.familyName = "Alfred"
-        contact.organizationName = "Haven Home"
+        contact.organizationName = "Chez Home"
         contact.emailAddresses = [
             CNLabeledValue(label: CNLabelWork, value: email as NSString)
         ]

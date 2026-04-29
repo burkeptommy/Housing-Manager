@@ -44,7 +44,7 @@ struct PropertyDocumentsView: View {
                     showUpload = true
                 } label: {
                     Image(systemName: "plus")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
@@ -87,7 +87,7 @@ struct PropertyDocumentsView: View {
                         Text("Tap to upload")
                             .font(HavenTypography.uiLabel)
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .padding(.top, 4)
                 }
                 .padding(.horizontal, 32)
@@ -151,7 +151,7 @@ struct PropertyDocumentsView: View {
                     VStack(spacing: 2) {
                         Text("\(documents.count)")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Documents")
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textSecondary)

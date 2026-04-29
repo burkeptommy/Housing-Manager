@@ -40,7 +40,7 @@ enum PersonalQuizQuestionLibrary {
         ),
         PersonalQuizQuestion(
             id: "pq5_notifications",
-            title: "Want Haven notifications on your phone?",
+            title: "Want Chez notifications on your phone?",
             subtitle: "Reminders, recall alerts, and household updates. You can change this later in Settings.",
             kind: .singleChoice,
             answerOptions: [

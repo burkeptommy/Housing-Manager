@@ -338,6 +338,264 @@ struct VisitHistoryEmptyCard: View {
     }
 }
 
+// MARK: - HandymanVisitCard
+
+/// Phase 78 — Homeowner-side visit card. Replaces the generic
+/// `UnifiedTaskCard` rendering of `service_key='handyman'` rows so the
+/// homeowner stops seeing "two tasks with super long notes" and starts
+/// seeing the underlying handyman visit as a first-class entity:
+/// vendor + date + status + structured punch list as checkable subitems.
+///
+/// Counts and items come from the structured `handyman_punch_items`
+/// rows the Phase 78 backfill created — same source of truth the
+/// handyman field app reads.
+struct HandymanVisitCard: View {
+    let title: String                    // "Spring Handyman Visit"
+    let vendorName: String?              // "Burke Handymen LLC"
+    let scheduledDate: Date?             // nextDueDate / route_date
+    let statusLabel: String              // "Confirmed" / "Awaiting your accept"
+    let isStatusActive: Bool             // green when confirmed, amber otherwise
+    let totalItems: Int
+    let doneItems: Int
+    let punchItems: [HandymanVisitPunchItem]
+    var hasNeedsAttentionItem: Bool = false  // any added_after_lock=true
+
+    var onTap: () -> Void = {}
+    var onToggleItem: (String) -> Void = { _ in }
+    var onMessage: (() -> Void)? = nil
+    var onAddItem: (() -> Void)? = nil
+
+    @State private var isExpanded: Bool = false
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d"
+        return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if isExpanded { expandedItems }
+            footer
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(HavenColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(hasNeedsAttentionItem ? HavenColors.action.opacity(0.4) : HavenColors.beige200, lineWidth: 1)
+        )
+        .shadow(
+            color: TasksV5.cardShadowColor,
+            radius: TasksV5.cardShadowRadius,
+            x: 0,
+            y: TasksV5.cardShadowY
+        )
+    }
+
+    private var header: some View {
+        Button(action: {
+            Haptics.selection()
+            withAnimation(.easeInOut(duration: 0.18)) { isExpanded.toggle() }
+            onTap()
+        }) {
+            HStack(spacing: 12) {
+                IconTile(symbol: "wrench.and.screwdriver.fill", tone: .indigo, size: .large)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("HANDYMAN VISIT")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.66)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        if hasNeedsAttentionItem {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(HavenColors.action)
+                        }
+                    }
+                    Text(title)
+                        .font(HavenTypography.fraunces(size: 17, weight: 600))
+                        .tracking(-0.2)
+                        .foregroundStyle(HavenColors.navy900)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 8) {
+                        if let vendorName, !vendorName.isEmpty {
+                            Text(vendorName)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .lineLimit(1)
+                        }
+                        if let scheduledDate {
+                            if vendorName?.isEmpty == false {
+                                Text("·")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            Text(Self.dateFormatter.string(from: scheduledDate))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    statusPill
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            .padding(14)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var statusPill: some View {
+        Text(statusLabel)
+            .font(.system(size: 10.5, weight: .semibold))
+            .tracking(0.4)
+            .foregroundStyle(isStatusActive ? HavenColors.success : HavenColors.action)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill((isStatusActive ? HavenColors.success : HavenColors.action).opacity(0.10))
+            )
+    }
+
+    @ViewBuilder
+    private var expandedItems: some View {
+        if punchItems.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("No items on this visit yet.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(HavenColors.textSecondary)
+                if let onAddItem {
+                    Button(action: onAddItem) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Add a punch item")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(HavenColors.action)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 12)
+        } else {
+            VStack(spacing: 6) {
+                Divider().background(HavenColors.beige200)
+                VStack(spacing: 6) {
+                    ForEach(punchItems) { item in
+                        Button(action: { onToggleItem(item.id) }) {
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundStyle(item.isDone ? HavenColors.success : HavenColors.textTertiary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(item.isDone ? HavenColors.textSecondary : HavenColors.navy900)
+                                        .strikethrough(item.isDone, color: HavenColors.textSecondary)
+                                        .multilineTextAlignment(.leading)
+                                    if let badge = item.metaBadge {
+                                        Text(badge)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(item.addedAfterLock ? HavenColors.action : HavenColors.textTertiary)
+                                    }
+                                }
+                                Spacer(minLength: 6)
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 14)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            // Progress text
+            Text(progressLabel)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(HavenColors.textSecondary)
+            Spacer()
+            if let onAddItem {
+                Button(action: onAddItem) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(HavenColors.navy800)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10).fill(HavenColors.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10).stroke(HavenColors.beige300, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add punch item")
+            }
+            if let onMessage {
+                Button(action: onMessage) {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy800)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10).fill(HavenColors.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10).stroke(HavenColors.beige300, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Message handyman")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 12)
+        .padding(.top, isExpanded ? 6 : 0)
+    }
+
+    private var progressLabel: String {
+        if totalItems == 0 { return "Open visit" }
+        return "\(doneItems) of \(totalItems) items done"
+    }
+}
+
+/// Lightweight value type for `HandymanVisitCard.punchItems`. Caller
+/// converts a `HandymanPunchItemRow` into one of these so the card
+/// stays UI-only and doesn't import the DB model.
+struct HandymanVisitPunchItem: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let isDone: Bool
+    let estimatedMinutes: Int?
+    let systemLabel: String?
+    let addedAfterLock: Bool
+
+    /// One-line meta badge under the title — minutes, system link, or
+    /// "Added after Burke confirmed". First non-nil wins.
+    var metaBadge: String? {
+        if addedAfterLock { return "Added after handyman confirmed" }
+        if let systemLabel { return "Linked: \(systemLabel)" }
+        if let m = estimatedMinutes { return "~\(m) min" }
+        return nil
+    }
+}
+
 #Preview {
     @Previewable @State var items: [PunchListItem] = [
         .init(id: "p1", title: "Clean dryer vent duct", duration: nil, isChecked: false),
@@ -350,6 +608,21 @@ struct VisitHistoryEmptyCard: View {
         VStack(spacing: 16) {
             VendorCard(state: .linked(name: "Burke Handymen LLC", phoneURL: nil))
             VendorCard(state: .empty)
+            HandymanVisitCard(
+                title: "Spring Handyman Visit",
+                vendorName: "Burke Handymen LLC",
+                scheduledDate: Date(),
+                statusLabel: "Confirmed",
+                isStatusActive: true,
+                totalItems: 18,
+                doneItems: 0,
+                punchItems: [
+                    .init(id: "1", title: "Clean dryer vent duct", isDone: false, estimatedMinutes: 45, systemLabel: nil, addedAfterLock: false),
+                    .init(id: "2", title: "Fire extinguisher annual check", isDone: true, estimatedMinutes: 15, systemLabel: nil, addedAfterLock: false),
+                    .init(id: "3", title: "Top up joint sand in pavers", isDone: false, estimatedMinutes: 30, systemLabel: nil, addedAfterLock: true),
+                ],
+                hasNeedsAttentionItem: true
+            )
             PunchListCard(items: $items, extraCount: 19)
             RecommendedRow(title: "Treat weeds between pavers", due: "in 3 months")
             VisitHistoryEmptyCard()

@@ -41,7 +41,7 @@ struct LinkDocumentToProjectSheet: View {
                         HStack(spacing: 10) {
                             Image(systemName: "doc.fill")
                                 .font(.system(size: 14))
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .frame(width: 24)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(doc.title)
@@ -55,7 +55,7 @@ struct LinkDocumentToProjectSheet: View {
                             Spacer()
                             Image(systemName: "link.badge.plus")
                                 .font(.caption)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                 }

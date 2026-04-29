@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// Build 90: Compact "UP NEXT" section showing max 5 smart-filtered
-/// items. Replaces both RECOMMENDED and NEEDS YOUR ATTENTION with a
-/// focused, vendor-oriented list.
+/// Dashboard action queue focused on what still needs the homeowner.
 struct ThisWeekSection: View {
     let items: [ThisWeekItem]
     let totalTaskCount: Int
@@ -12,13 +10,8 @@ struct ThisWeekSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            // Header
             HStack(alignment: .firstTextBaseline) {
-                // Phase 56.2: "YOUR TO-DOS" disambiguates this action
-                // queue from the hero's "Next visit" vendor schedule —
-                // one is what's on your plate, the other is what's
-                // happening to your home.
-                Text("YOUR TO-DOS")
+                Text("NEEDS YOUR ATTENTION")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.5)
                     .foregroundStyle(HavenColors.textTertiary)
@@ -29,7 +22,7 @@ struct ThisWeekSection: View {
                     Button(action: onSeeAll) {
                         Text("See all (\(totalTaskCount))")
                             .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -67,9 +60,14 @@ struct ThisWeekSection: View {
                 .font(.system(size: 24))
                 .foregroundStyle(Color.green)
 
-            Text("Nothing to schedule in the next 60 days.")
-                .font(HavenTypography.body)
-                .foregroundStyle(HavenColors.textSecondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Nothing needs your attention right now.")
+                    .font(HavenTypography.body.weight(.semibold))
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("Chez is handling the rest for now.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
 
             Spacer()
         }
@@ -102,7 +100,7 @@ struct ThisWeekSection: View {
                     Text(subtitle)
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
 

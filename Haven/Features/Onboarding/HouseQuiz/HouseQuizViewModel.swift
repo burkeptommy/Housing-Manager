@@ -7,7 +7,7 @@ final class HouseQuizViewModel: ObservableObject {
     /// every downstream reader (Q4 prefill, ATTOM-source caption, etc.)
     /// sees the corrected value immediately without a view rebuild.
     @Published var property: PropertyRow
-    let allQuestions: [HouseQuizQuestion]
+    @Published private(set) var allQuestions: [HouseQuizQuestion]
 
     /// Phase 60.1: Home systems detected at property-creation time. Powers
     /// the "What we detected at your home" list inside the new
@@ -163,14 +163,14 @@ final class HouseQuizViewModel: ObservableObject {
     /// chapter progress pill shows worst-case count so the N/M ratio
     /// doesn't rearrange mid-chapter).
     func questionsInChapter(_ chapter: HouseQuizChapter) -> Int {
-        HouseQuizQuestionLibrary.questions(in: chapter).count
+        allQuestions.filter { $0.chapter == chapter }.count
     }
 
     /// Phase 60.3: 1-indexed position of the current question within its
     /// chapter. Returns 0 when `currentQuestion` is nil.
     func positionInCurrentChapter() -> Int {
         guard let current = currentQuestion else { return 0 }
-        let qs = HouseQuizQuestionLibrary.questions(in: current.chapter)
+        let qs = allQuestions.filter { $0.chapter == current.chapter }
         return (qs.firstIndex(where: { $0.id == current.id }) ?? 0) + 1
     }
 
@@ -362,6 +362,10 @@ final class HouseQuizViewModel: ObservableObject {
         // DB has more answers than our in-memory state, adopt the DB state
         // and re-resolve our cursor.
         Task { @MainActor [weak self] in
+            await self?.refreshAdminCatalog()
+        }
+
+        Task { @MainActor [weak self] in
             await self?.refreshPropertyStateFromDB()
         }
 
@@ -390,6 +394,42 @@ final class HouseQuizViewModel: ObservableObject {
             from: state,
             property: property
         )
+    }
+
+    private func refreshAdminCatalog() async {
+        let items = await AdminCatalogService.shared.refreshPublishedCatalog()
+        let nextQuestions = AdminCatalogService.shared.quizQuestions(
+            applying: items,
+            to: HouseQuizQuestionLibrary.allQuestions
+        )
+        guard quizFingerprint(nextQuestions) != quizFingerprint(allQuestions) else { return }
+
+        let currentQuestionId = currentQuestion?.id
+        allQuestions = nextQuestions
+
+        if let currentQuestionId,
+           let retainedIndex = allQuestions.firstIndex(where: { $0.id == currentQuestionId }) {
+            currentIndex = retainedIndex
+        } else {
+            currentIndex = firstUnresolvedIndex()
+        }
+
+        skipDynamicallyUnreachableQuestion()
+        skipDynamicallyHiddenQuestion()
+    }
+
+    private func quizFingerprint(_ questions: [HouseQuizQuestion]) -> String {
+        questions.map { question in
+            [
+                question.id,
+                question.title,
+                question.subtitle ?? "",
+                question.kind.rawValue,
+                question.chapter.rawValue,
+                question.section.rawValue,
+                question.answerOptions.map { "\($0.id):\($0.label)" }.joined(separator: "|"),
+            ].joined(separator: "§")
+        }.joined(separator: "¶")
     }
 
     /// Phase 60.3: Sum the `HouseQuizValueMeter.delta` for every answer in

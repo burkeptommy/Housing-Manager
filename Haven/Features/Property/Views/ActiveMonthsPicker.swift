@@ -46,7 +46,7 @@ struct ActiveMonthsPicker: View {
             // to "ear-round").
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    presetButton("Year-round", months: Set(1...12))
+                    presetButton("All", months: Set(1...12))
                     presetButton("Apr-Nov", months: Set(4...11))
                     presetButton("May-Sep", months: Set(5...9))
                     presetButton("Dec-Mar", months: Set([12, 1, 2, 3]))

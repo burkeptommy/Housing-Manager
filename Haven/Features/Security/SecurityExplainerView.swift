@@ -17,8 +17,8 @@ struct SecurityExplainerView: View {
             icon: "eye.slash.fill",
             iconAnimation: .crossedEye,
             headline: "No One Can Snoop",
-            body: "Haven Staff Cannot Access Your Documents. This isn't a policy \u{2014} it's how the system is built. Your documents are encrypted with keys stored in an isolated vault that no person can access directly. There is no 'View All Documents' button on our end. There is no back door.",
-            secondaryText: "Haven employees can see your account status and document category counts to provide you service, but they cannot open, read, or download your actual files."
+            body: "Chez Staff Cannot Access Your Documents. This isn't a policy \u{2014} it's how the system is built. Your documents are encrypted with keys stored in an isolated vault that no person can access directly. There is no 'View All Documents' button on our end. There is no back door.",
+            secondaryText: "Chez employees can see your account status and document category counts to provide you service, but they cannot open, read, or download your actual files."
         ),
         SecurityExplainerPage(
             icon: "brain.head.profile",
@@ -38,7 +38,7 @@ struct SecurityExplainerView: View {
             icon: "lock.doc.fill",
             iconAnimation: .vaultLock,
             headline: "The Nuclear Option",
-            body: "For any document you consider ultra-sensitive, you can enable Vault Lock. This adds a second layer of encryption using a key that exists only on your device. Not even Haven's servers can decrypt a Vault Locked document. The tradeoff: the AI can't analyze Vault Locked files. But they're there, they're counted in your estate inventory, and they are untouchable by anyone but you.",
+            body: "For any document you consider ultra-sensitive, you can enable Vault Lock. This adds a second layer of encryption using a key that exists only on your device. Not even Chez's servers can decrypt a Vault Locked document. The tradeoff: the AI can't analyze Vault Locked files. But they're there, they're counted in your estate inventory, and they are untouchable by anyone but you.",
             secondaryText: "Most clients don't need Vault Lock for everything \u{2014} the standard encryption is extremely strong. But it's there if you want it."
         ),
     ]
@@ -104,7 +104,7 @@ private struct SecurityExplainerPageView: View {
 
                     Image(systemName: page.icon)
                         .font(.system(size: 48, weight: .medium))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .scaleEffect(iconAppeared ? 1 : 0.3)
                         .rotationEffect(.degrees(iconAppeared ? 0 : -15))
                 }
@@ -113,7 +113,7 @@ private struct SecurityExplainerPageView: View {
                 // Headline — Georgia Bold 24pt centered
                 Text(page.headline)
                     .font(HavenTypography.fraunces(size: 24, weight: 700))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
                     .opacity(iconAppeared ? 1 : 0)
                     .offset(y: iconAppeared ? 0 : 10)

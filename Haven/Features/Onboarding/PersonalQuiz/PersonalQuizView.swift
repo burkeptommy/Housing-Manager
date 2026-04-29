@@ -55,7 +55,7 @@ struct PersonalQuizView: View {
 
                 Text(q.title)
                     .font(HavenTypography.fraunces(size: 24, weight: 600))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 if let subtitle = q.subtitle {
                     Text(subtitle)
@@ -101,7 +101,7 @@ struct PersonalQuizView: View {
                     HStack {
                         Text(option.label)
                             .font(HavenTypography.body)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
@@ -166,10 +166,10 @@ struct PersonalQuizView: View {
             Spacer()
             Image(systemName: "sparkles")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("You're all set")
                 .font(HavenTypography.largeTitle)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("Welcome to the household. Alfred will keep an eye on things and let you know what needs your attention.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)

@@ -105,7 +105,7 @@ struct DocumentExtractionConflictSheet: View {
             HStack(spacing: HavenTheme.spacing8) {
                 Image(systemName: "doc.text.fill")
                     .font(.system(size: 14))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text(documentTitle)
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textPrimary)
@@ -204,7 +204,7 @@ struct DocumentExtractionConflictSheet: View {
                     if let confidenceText {
                         Text(confidenceText)
                             .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(HavenColors.navy.opacity(0.12))

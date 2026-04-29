@@ -421,7 +421,8 @@ class InvoiceProcessingViewModel: ObservableObject {
                     insert.assignmentType = "vendor"
                     insert.assignedContractorId = followUpContractorId
                     insert.needsVendor = followUpContractorId == nil
-                    _ = try await db.createMaintenanceTask(insert)
+                    insert.serviceKey = ServiceLibrary.serviceKey(for: insert) ?? "custom_seasonal_service"
+                    _ = try await ServiceOrchestrator.createCustomService(insert)
                 }
             }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 /// V5 Handyman screen — focused punch-list-and-vendor surface that lives
 /// behind the title-switcher in `TasksHubView`.
@@ -30,6 +31,25 @@ struct HandymanTabView: View {
     @State private var presentedVisit: MaintenanceTaskDBRow? = nil
     @State private var presentChat = false
     @State private var presentQuote = false
+
+    // Phase 78: proposals inbox state. Pending tasks (handyman flagged
+    // a "you need a roofer" item) + pending requests (handyman suggested
+    // a follow-up visit) + pending punch items (homeowner added after
+    // visit lock). Loaded on appear + refreshed on every relevant
+    // notification. `respondingProposalId` tracks the inflight call so
+    // the row dims while a decision is being recorded.
+    @State private var proposalTasks: [MaintenanceTaskDBRow] = []
+    @State private var proposalPunchItems: [HandymanPunchItemRow] = []
+    @State private var respondingProposalId: String? = nil
+    @State private var proposalErrorMessage: String? = nil
+
+    // Phase 78: structured punch items for the upcoming visit. Replaces
+    // the regex-parsed-from-notes path so the canonical handyman surface
+    // reads from `handyman_punch_items` (the same table the field app
+    // writes to). Falls back to `VisitNotesParser` for legacy visits the
+    // backfill missed (notes intact, no structured rows yet).
+    @State private var structuredVisitItems: [HandymanPunchItemRow] = []
+    @State private var togglingItemIds: Set<UUID> = []
 
     let onSwitchMode: () -> Void
 
@@ -109,12 +129,31 @@ struct HandymanTabView: View {
         Array(upcomingVisits.dropFirst())
     }
 
-    /// Punch list items parsed from the visit's notes block. Each `-` /
-    /// `•` / `*` bullet becomes a child item. Strips the parent header
-    /// line ("What's included", "Punch list", etc).
+    /// Punch list items for the upcoming visit. Phase 78: prefers
+    /// structured rows from `handyman_punch_items` (the canonical
+    /// source — same table the field app writes to). Falls back to
+    /// regex-parsing the visit's notes for legacy visits the Phase 1
+    /// backfill missed.
     private var visitChildren: [VisitChildItem] {
+        if !structuredVisitItems.isEmpty {
+            return structuredVisitItems.map { row in
+                VisitChildItem(
+                    id: row.id.uuidString,
+                    title: row.title,
+                    estimatedMinutes: row.estimatedMinutes
+                )
+            }
+        }
         guard let notes = nextScheduledVisit?.notes, !notes.isEmpty else { return [] }
         return VisitNotesParser.parsePunchList(from: notes)
+    }
+
+    /// True when the upcoming visit's punch list is backed by
+    /// structured rows (vs. the legacy regex-parsed fallback). Drives
+    /// whether the punch list section renders interactive checkboxes
+    /// or read-only display rows.
+    private var hasStructuredVisitItems: Bool {
+        !structuredVisitItems.isEmpty
     }
 
     private var totalPunchCount: Int { punchListVM.entries.count }
@@ -196,6 +235,12 @@ struct HandymanTabView: View {
                 vendorCardSection
                 quotesSection
 
+                // Phase 78: pending proposals (handyman-flagged tasks,
+                // suggested follow-up visits, after-lock punch items)
+                // need explicit homeowner accept/decline. Pin above the
+                // punch list so they're impossible to miss.
+                proposalsInboxSection
+
                 if hasFirstVisitOpportunity {
                     firstVisitPromptSection
                 }
@@ -219,6 +264,8 @@ struct HandymanTabView: View {
             }
             await maintenanceVM.loadTasks()
             await reloadCoordination()
+            await loadProposals()
+            await loadStructuredVisitItems()
         }
         .refreshable {
             if let householdId {
@@ -226,6 +273,8 @@ struct HandymanTabView: View {
             }
             await maintenanceVM.loadTasks()
             await reloadCoordination()
+            await loadProposals()
+            await loadStructuredVisitItems()
         }
         .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
             Task {
@@ -234,6 +283,8 @@ struct HandymanTabView: View {
                 }
                 await maintenanceVM.loadTasks()
                 await reloadCoordination()
+                await loadProposals()
+                await loadStructuredVisitItems()
             }
         }
         // Push notification deep-link arrived. Present the right sheet
@@ -557,7 +608,276 @@ struct HandymanTabView: View {
         }
     }
 
+    // MARK: - Proposals Inbox (Phase 78)
+    //
+    // Renders pending proposals from the handyman side that need a
+    // homeowner accept/decline. Two row types:
+    //   1. Tasks where the handyman flagged something for the homeowner
+    //      (e.g. "you need a roofer"). proposed_by_role='handyman' AND
+    //      proposal_status='pending'.
+    //   2. Punch items the homeowner added AFTER the visit was confirmed
+    //      ("added_after_lock"). The visit is locked, so the handyman
+    //      needs to confirm scope creep before doing the work.
+    // Plus follow-up visit proposals (handyman_requests rows) — not
+    // wired in v1; will land in a later sub-phase once the request
+    // shape stabilizes.
+    @ViewBuilder
+    private var proposalsInboxSection: some View {
+        let pendingTasks = proposalTasks
+        let pendingItems = proposalPunchItems.filter { $0.addedAfterLock == true && $0.archivedAt == nil && ($0.completedAt == nil) }
+        let total = pendingTasks.count + pendingItems.count
+
+        if total > 0 {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    Text("NEEDS YOUR DECISION")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.32)
+                        .foregroundStyle(HavenColors.action)
+                    Text("·")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                    Text("\(total)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                }
+                .padding(.horizontal, 4)
+
+                VStack(spacing: 8) {
+                    ForEach(pendingTasks, id: \.id) { task in
+                        proposalTaskRow(task)
+                    }
+                    ForEach(pendingItems, id: \.id) { item in
+                        proposalPunchItemRow(item)
+                    }
+                }
+
+                if let msg = proposalErrorMessage {
+                    Text(msg)
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.critical)
+                        .padding(.horizontal, 4)
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, 20)
+        }
+    }
+
+    private func proposalTaskRow(_ task: MaintenanceTaskDBRow) -> some View {
+        let proposalId = task.id.uuidString
+        let isResponding = respondingProposalId == proposalId
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.bubble.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy900)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Suggested by your handyman")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textSecondary)
+                    if let desc = task.description, !desc.isEmpty {
+                        Text(desc)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            proposalActionRow(
+                proposalId: proposalId,
+                isResponding: isResponding,
+                onAccept: { Task { await respondToProposal(kind: "task", id: proposalId, decision: "accept") } },
+                onDecline: { Task { await respondToProposal(kind: "task", id: proposalId, decision: "decline") } }
+            )
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(TasksV5.decisionRowBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(TasksV5.decisionRowBorder, lineWidth: 1)
+        )
+        .opacity(isResponding ? 0.5 : 1.0)
+    }
+
+    private func proposalPunchItemRow(_ item: HandymanPunchItemRow) -> some View {
+        let proposalId = item.id.uuidString
+        let isResponding = respondingProposalId == proposalId
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.open.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy900)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Added after the visit was locked — handyman needs to confirm")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let desc = item.description, !desc.isEmpty {
+                        Text(desc)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            proposalActionRow(
+                proposalId: proposalId,
+                isResponding: isResponding,
+                onAccept: { Task { await respondToProposal(kind: "punch_item", id: proposalId, decision: "accept") } },
+                onDecline: { Task { await respondToProposal(kind: "punch_item", id: proposalId, decision: "decline") } }
+            )
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(TasksV5.decisionRowBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(TasksV5.decisionRowBorder, lineWidth: 1)
+        )
+        .opacity(isResponding ? 0.5 : 1.0)
+    }
+
+    private func proposalActionRow(
+        proposalId: String,
+        isResponding: Bool,
+        onAccept: @escaping () -> Void,
+        onDecline: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 8) {
+            Button(action: onAccept) {
+                Text("Accept")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(HavenColors.action)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(isResponding)
+
+            Button(action: onDecline) {
+                Text("Decline")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy900)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(HavenColors.beige300, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(isResponding)
+        }
+    }
+
+    @ViewBuilder
     private func visitChildrenPunchList(visit: MaintenanceTaskDBRow) -> some View {
+        if hasStructuredVisitItems {
+            structuredVisitChildrenPunchList(visit: visit)
+        } else {
+            legacyVisitChildrenPunchList(visit: visit)
+        }
+    }
+
+    /// Phase 78: structured children path. Each row is a real
+    /// `handyman_punch_items` row — tap the checkbox to mark done,
+    /// which fires `update_punch_item_status` and bumps the linked
+    /// system's last-serviced date via the DB trigger.
+    private func structuredVisitChildrenPunchList(visit: MaintenanceTaskDBRow) -> some View {
+        let items = structuredVisitItems
+        let visibleItems = Array(items.prefix(4))
+        return VStack(alignment: .leading, spacing: 0) {
+            SectionLabel(
+                eyebrow: "Punch list for this visit",
+                sub: "\(items.count) item\(items.count == 1 ? "" : "s")",
+                action: .init(title: "View all", tone: .indigo, perform: {
+                    presentedVisit = visit
+                })
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            if items.isEmpty {
+                emptyVisitChildrenCard
+                    .padding(.horizontal, TasksV5.pageMargin)
+                    .padding(.bottom, TasksV5.sectionGap)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                        VisitStructuredChildRow(
+                            item: item,
+                            isLast: index >= min(items.count, 4) - 1 && items.count <= 4,
+                            isToggling: togglingItemIds.contains(item.id),
+                            onToggle: { Task { await togglePunchItem(item) } }
+                        )
+                    }
+                    if items.count > 4 {
+                        Button {
+                            presentedVisit = visit
+                        } label: {
+                            HStack {
+                                Text("+ \(items.count - 4) more")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .padding(.top, 10)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 14)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(HavenColors.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+                .padding(.horizontal, TasksV5.pageMargin)
+                .padding(.bottom, TasksV5.sectionGap)
+            }
+        }
+    }
+
+    /// Legacy fallback path used only when there are no structured
+    /// punch items for the visit (pre-Phase-78 visits the backfill
+    /// missed). Read-only — the only way to "complete" these is to
+    /// migrate the visit through the Phase 1 backfill or have the
+    /// handyman re-add items via the field app.
+    private func legacyVisitChildrenPunchList(visit: MaintenanceTaskDBRow) -> some View {
         let children = visitChildren
         return VStack(alignment: .leading, spacing: 0) {
             SectionLabel(
@@ -785,7 +1105,7 @@ struct HandymanTabView: View {
         let task = Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             await punchListVM.archive(entry: entry)
-            await MainActor.run { pendingChecked.remove(id) }
+            _ = await MainActor.run { pendingChecked.remove(id) }
         }
         _ = task
     }
@@ -809,7 +1129,7 @@ struct HandymanTabView: View {
             } catch {
                 print("[HandymanTabView] addToPunchList failed: \(error)")
             }
-            await MainActor.run { addingRecommendedIds.remove(task.id) }
+            _ = await MainActor.run { addingRecommendedIds.remove(task.id) }
         }
         _ = work
     }
@@ -820,6 +1140,109 @@ struct HandymanTabView: View {
             return
         }
         await coordinator.load(visit: visit, vendor: linkedHandyman)
+    }
+
+    /// Phase 78: load structured punch items for the upcoming visit.
+    /// Reads from `handyman_punch_items WHERE assigned_visit_task_id =
+    /// visit.id` — the same table the field app writes to. Empty
+    /// result means we should fall back to the legacy notes parser
+    /// (pre-Phase-78 visits that the backfill missed).
+    private func loadStructuredVisitItems() async {
+        guard let visit = nextScheduledVisit else {
+            await MainActor.run { self.structuredVisitItems = [] }
+            return
+        }
+        let items = (try? await DatabaseService.shared.fetchHandymanPunchItemsForVisit(visitTaskId: visit.id)) ?? []
+        let active = items.filter { $0.archivedAt == nil }
+            .sorted { lhs, rhs in
+                // Pending items first (so unchecked work is at the top),
+                // then chronological.
+                if lhs.isDone != rhs.isDone {
+                    return !lhs.isDone
+                }
+                return lhs.createdAt < rhs.createdAt
+            }
+        await MainActor.run {
+            self.structuredVisitItems = active
+        }
+    }
+
+    /// Phase 78: toggle a structured punch item between pending and
+    /// done. Routes through `update_punch_item_status` so the DB
+    /// trigger bumps the linked system's last-serviced date when an
+    /// item flips to done. Optimistic UI: dim the row while the call
+    /// is in flight so two rapid taps don't double-fire.
+    private func togglePunchItem(_ item: HandymanPunchItemRow) async {
+        guard !togglingItemIds.contains(item.id) else { return }
+        let nextStatus = item.isDone ? "pending" : "done"
+        await MainActor.run { _ = togglingItemIds.insert(item.id) }
+        do {
+            _ = try await HavenSupabase.updatePunchItemStatus(
+                itemId: item.id.uuidString,
+                status: nextStatus
+            )
+            Haptics.success()
+            await loadStructuredVisitItems()
+            // Bumping a system's last-serviced date may surface in the
+            // homeowner's system detail / dashboard, so refresh the
+            // wider task list too.
+            await maintenanceVM.loadTasks()
+        } catch {
+            Haptics.error()
+        }
+        await MainActor.run { togglingItemIds.remove(item.id) }
+    }
+
+    /// Phase 78: refresh the proposals inbox. Pulls handyman-flagged
+    /// pending tasks (proposed_by_role='handyman' AND
+    /// proposal_status='pending') and the household's punch items so we
+    /// can pick out the after-lock additions. Both queries are RLS-
+    /// scoped to the caller's household so this is safe to call
+    /// liberally on any data-change notification.
+    private func loadProposals() async {
+        guard let householdId else { return }
+        let db = DatabaseService.shared
+        async let tasksTask: [MaintenanceTaskDBRow] = (try? db.fetchHandymanProposalTasks(householdId: householdId)) ?? []
+        async let itemsTask: [HandymanPunchItemRow] = (try? db.fetchAllHandymanPunchItems(householdId: householdId)) ?? []
+        let (tasks, items) = await (tasksTask, itemsTask)
+        await MainActor.run {
+            self.proposalTasks = tasks
+            self.proposalPunchItems = items
+        }
+    }
+
+    /// Phase 78: accept or decline a proposal. Server enforces
+    /// no-double-accept via DB unique partial index — if a spouse beats
+    /// us to it, the call returns a 409 and we surface the conflict
+    /// inline. Refreshes both the inbox and the underlying task list
+    /// so accepted handyman-flagged tasks immediately graduate into
+    /// the homeowner's regular maintenance list.
+    private func respondToProposal(kind: String, id: String, decision: String) async {
+        await MainActor.run {
+            self.respondingProposalId = id
+            self.proposalErrorMessage = nil
+        }
+        do {
+            _ = try await HavenSupabase.respondToProposal(kind: kind, id: id, decision: decision)
+            Haptics.success()
+            await loadProposals()
+            await maintenanceVM.loadTasks()
+            if let householdId {
+                await punchListVM.load(householdId: householdId, propertyId: propertyId)
+            }
+            Analytics.track(.handymanProposalResponded, [
+                "kind": kind,
+                "decision": decision
+            ])
+        } catch {
+            Haptics.error()
+            await MainActor.run {
+                self.proposalErrorMessage = "Couldn't record your decision. Try again in a moment."
+            }
+        }
+        await MainActor.run {
+            self.respondingProposalId = nil
+        }
     }
 
     // MARK: - Navigation
@@ -1249,6 +1672,71 @@ private struct VisitChildRow: View {
     }
 }
 
+/// Phase 78: structured punch item row. Tap the checkbox to flip
+/// between pending and done — server fires `update_punch_item_status`
+/// and the DB trigger bumps the linked system's last-serviced date
+/// when status='done' takes effect.
+private struct VisitStructuredChildRow: View {
+    let item: HandymanPunchItemRow
+    let isLast: Bool
+    let isToggling: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 12) {
+                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: item.isDone ? .semibold : .regular))
+                    .foregroundStyle(item.isDone ? HavenColors.success : HavenColors.beige400)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(item.isDone ? HavenColors.textTertiary : HavenColors.navy900)
+                        .strikethrough(item.isDone, color: HavenColors.textTertiary)
+                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 6) {
+                        if let mins = item.estimatedMinutes {
+                            Text("~\(mins) min")
+                                .font(.system(size: 11.5, weight: .medium))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        if let label = item.systemLabelSnapshot, !label.isEmpty {
+                            Text("·")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text("Linked: \(label)")
+                                .font(.system(size: 11.5, weight: .medium))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        if item.addedAfterLock == true && !item.isDone {
+                            Text("·")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text("Awaiting handyman confirmation")
+                                .font(.system(size: 11.5, weight: .medium))
+                                .foregroundStyle(HavenColors.action)
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .opacity(isToggling ? 0.5 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .disabled(isToggling)
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Rectangle()
+                    .fill(TasksV5.punchListDivider)
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+            }
+        }
+    }
+}
+
 // MARK: - Quote row (top-level Quotes section)
 
 /// Compact tappable row used in the Handyman tab's Quotes section.
@@ -1343,8 +1831,6 @@ private struct HandymanQuoteRow: View {
 }
 
 // MARK: - Coordinator (shared state for visit + chat)
-
-import Supabase
 
 @MainActor
 final class HandymanRequestCoordinator: ObservableObject {

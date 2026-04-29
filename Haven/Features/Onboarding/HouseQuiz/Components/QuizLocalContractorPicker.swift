@@ -48,7 +48,7 @@ struct QuizLocalContractorPicker: View {
     /// Build 87: When `true`, the picker shows a prominent search bar and
     /// hides results until the user types 2+ characters. Results are loaded
     /// from Google Places on appear (same as the default mode) but filtered
-    /// locally and rendered as a flat list without "Haven Certified" /
+    /// locally and rendered as a flat list without "Chez Certified" /
     /// "Suggested" section headers. Used by Q15b ("Got any pros on speed
     /// dial?") where the intent is for the user to search for THEIR
     /// existing contractor, not see our recommendations. Other callers
@@ -168,7 +168,7 @@ struct QuizLocalContractorPicker: View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text("CURRENTLY SELECTED")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
@@ -193,7 +193,7 @@ struct QuizLocalContractorPicker: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(pinned.name)
                             .font(HavenTypography.body.weight(.semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .multilineTextAlignment(.leading)
                             .lineLimit(2)
 
@@ -211,7 +211,7 @@ struct QuizLocalContractorPicker: View {
                                         .foregroundStyle(HavenColors.textTertiary)
                                 }
                                 if pinned.isHavenCertified {
-                                    Text("\u{00B7} Haven Certified")
+                                    Text("\u{00B7} Chez Certified")
                                         .font(HavenTypography.uiCaption.weight(.semibold))
                                         .foregroundStyle(HavenColors.success)
                                 }
@@ -226,7 +226,7 @@ struct QuizLocalContractorPicker: View {
                     Spacer(minLength: 0)
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 .padding(HavenTheme.spacing12)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -458,7 +458,7 @@ struct QuizLocalContractorPicker: View {
 
         return VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             if !havenCertified.isEmpty {
-                Text("HAVEN CERTIFIED")
+                Text("CHEZ CERTIFIED")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.success)
@@ -529,7 +529,7 @@ struct QuizLocalContractorPicker: View {
                                     .foregroundStyle(HavenColors.textSecondary)
                             }
                             if certified {
-                                Text("\u{00B7} Haven Certified")
+                                Text("\u{00B7} Chez Certified")
                                     .font(HavenTypography.uiCaption.weight(.semibold))
                                     .foregroundStyle(HavenColors.success)
                             }
@@ -599,7 +599,7 @@ struct QuizLocalContractorPicker: View {
                     HStack(spacing: HavenTheme.spacing8) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Didn't find yours? Add it")
                             .font(HavenTypography.uiLabel.weight(.semibold))
                             .foregroundStyle(HavenColors.navy700)

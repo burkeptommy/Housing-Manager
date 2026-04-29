@@ -89,14 +89,7 @@ struct OnboardingView: View {
             Spacer()
 
             // Logo monogram
-            Text("H")
-                .font(HavenTypography.fraunces(size: 56, weight: 700))
-                .foregroundStyle(HavenColors.creamLight)
-                .frame(width: 96, height: 96)
-                .background(
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(HavenColors.navy800)
-                )
+            ChezBrandView(width: 136)
                 .scaleEffect(animatePulse ? 1.04 : 1.0)
                 .animation(
                     .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
@@ -106,7 +99,7 @@ struct OnboardingView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text(progressTitle)
                     .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
                     .id(progressTitle) // forces fade between label changes
@@ -143,7 +136,7 @@ struct OnboardingView: View {
 
     private var progressSubtitle: String {
         if viewModel.setupProgress.contains("All done") {
-            return "Welcome to Haven."
+            return "Welcome to Chez."
         }
         return "This only takes a few seconds."
     }
@@ -161,7 +154,7 @@ struct OnboardingView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text("We hit a snag")
                     .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 if let error = viewModel.errorMessage {
                     Text(error)
                         .font(HavenTypography.bodySmall)
@@ -193,10 +186,10 @@ struct OnboardingView: View {
                     VStack(spacing: HavenTheme.spacing8) {
                         Image(systemName: "person.crop.circle.badge.plus")
                             .font(.system(size: 48))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("One last detail")
                             .font(HavenTypography.title2)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Add your name to finish setting up your household.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -240,12 +233,12 @@ struct OnboardingView: View {
 
             Image(systemName: "house.and.flag.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             Text("You've Been Invited!")
                 .font(HavenTypography.title)
 
-            Text("Join your family's Haven household to share documents, properties, and estate planning.")
+            Text("Join your family's Chez household to share documents, properties, and estate planning.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)

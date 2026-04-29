@@ -190,7 +190,7 @@ struct InvestmentSummaryCard: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { showAIReasoning = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
@@ -288,7 +288,7 @@ struct InvestmentSummaryCard: View {
                             Text("Add estimated value")
                                 .font(HavenTypography.uiButton)
                         }
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .padding(.horizontal, HavenTheme.spacing16)
                         .padding(.vertical, HavenTheme.spacing8)
                         .background(HavenColors.navy.opacity(0.08))
@@ -646,7 +646,7 @@ struct InvestmentSummaryCard: View {
                 .foregroundStyle(HavenColors.creamLight)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("At your estimated value, that's about \(formattedEquity) in equity Haven helps you protect.")
+            Text("At your estimated value, that's about \(formattedEquity) in equity Chez helps you protect.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.creamLight.opacity(0.92))
                 .fixedSize(horizontal: false, vertical: true)

@@ -28,7 +28,7 @@ struct ChapterIntroCard: View {
 
             Image(systemName: chapter.icon)
                 .font(.system(size: 48, weight: .regular))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 88, height: 88)
                 .background(
                     Circle()
@@ -38,7 +38,7 @@ struct ChapterIntroCard: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text(chapter.title)
                     .font(HavenTypography.title)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 Text(chapter.subtitle)
                     .font(HavenTypography.body)

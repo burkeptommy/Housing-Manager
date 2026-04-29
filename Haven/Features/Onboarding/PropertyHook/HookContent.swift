@@ -19,10 +19,10 @@ enum HookContent {
         // Equity-protected anchor
         static let equityHeadline = "Homes maintained well sell for ~7.4% more."
         static let equityCitation = "Source: NAR Remodeling Impact Report"
-        static let equityTemplate = "That's roughly {equityProtected} in equity Haven helps you protect."
+        static let equityTemplate = "That's roughly {equityProtected} in equity Chez helps you protect."
 
         // Three preview cards
-        static let previewSectionLabel = "WHAT HAVEN MANAGES"
+        static let previewSectionLabel = "WHAT CHEZ MANAGES"
 
         // Phase 20 polish: Home systems leads the preview cards on Page 1
         // because system management + maintenance is what protects the
@@ -66,7 +66,7 @@ enum HookContent {
         static let findingsRoofTemplate = "{roofType} roof, typically inspected every 1 to 2 years."
         static let findingsPoolTemplate = "In-ground pool detected, which adds about $200 to $400 per month in season."
         static let findingsMoreLine = "We'll surface more once you finish setup."
-        static let findingsEmptyLine = "We couldn't pull public records for this address yet. Haven will keep trying."
+        static let findingsEmptyLine = "We couldn't pull public records for this address yet. Chez will keep trying."
 
         // Bridge to home management frame
         static let bridgeText = "And here's why all of it matters."
@@ -79,14 +79,14 @@ enum HookContent {
         // of running a home and positions Haven as the source of truth.
         // Variable names retained for backward compat with the view code.
         static let equityReminderHeadline = "A typical home has 14+ vendors and 200+ documents tied to it."
-        static let equityReminderBody = "Most homeowners can't find half of them when they need to. Haven keeps every name, visit, and invoice in one place, instantly searchable."
+        static let equityReminderBody = "Most homeowners can't find half of them when they need to. Chez keeps every name, visit, and invoice in one place, instantly searchable."
         static let equityReminderCitation = "Source: Houzz Home Services Industry Report"
 
         // Home management frame (bottom half) — reframed from estate-only
         // to home-system + asset-protection language. The card stack below
         // emphasizes day-to-day home operations, not just inheritance docs.
         static let estateHeadline = "Your home is your largest asset."
-        static let estateBody = "Haven tracks every system, vendor, and dollar so you can protect what it's worth."
+        static let estateBody = "Chez tracks every system, vendor, and dollar so you can protect what it's worth."
 
         // Phase 20 polish: 4-card 2×2 grid for visual uniformity. Removed
         // the "Value & equity" card because the optimistic valuation +

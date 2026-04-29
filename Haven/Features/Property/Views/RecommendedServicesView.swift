@@ -97,7 +97,7 @@ struct RecommendedServicesView: View {
         ContentUnavailableView {
             Label("You're all set", systemImage: "sparkles")
         } description: {
-            Text("Everything Haven would suggest for your home is either on your schedule or dismissed. Check back after a season change.")
+            Text("Everything Chez would suggest for your home is either on your schedule or dismissed. Check back after a season change.")
         } actions: {
             if viewModel.hasDismissals {
                 Button {
@@ -114,7 +114,7 @@ struct RecommendedServicesView: View {
     private var mainList: some View {
         List {
             Section {
-                Text("Browse services Haven thinks your home could benefit from. Schedule any that fit, or drop them on your handyman's punch list.")
+                Text("Browse services Chez thinks your home could benefit from. Schedule any that fit, or drop them on your handyman's punch list.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .listRowSeparator(.hidden)
@@ -197,7 +197,7 @@ struct RecommendedServicesView: View {
                             Text("Update what's in your home")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.textPrimary)
-                            Text("Toggle systems you have so Haven can recommend the right services.")
+                            Text("Toggle systems you have so Chez can recommend the right services.")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.textSecondary)
                                 .multilineTextAlignment(.leading)
@@ -271,7 +271,7 @@ struct RecommendedServicesView: View {
                         } label: {
                             Text("Add to handyman")
                                 .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .padding(.horizontal, 12)
                                 .frame(height: 36)
                                 .frame(maxWidth: .infinity)

@@ -349,11 +349,11 @@ actor HouseholdInviteCoordinator {
         let inviterName: String
         if let currentUser = try? await db.fetchCurrentUser() {
             inviterUserId = currentUser.id
-            inviterName = currentUser.fullName ?? "Someone on Haven"
+            inviterName = currentUser.fullName ?? "Someone on Chez"
         } else if let session = await HavenSupabase.safeSession(timeout: 3.0) {
             inviterUserId = session.user.id
             inviterName = (session.user.userMetadata["full_name"]?.value as? String)
-                ?? "Someone on Haven"
+                ?? "Someone on Chez"
         } else {
             return AddPersonResult(
                 familyMember: familyMember,
@@ -461,7 +461,7 @@ actor HouseholdInviteCoordinator {
     }
 
     /// Invite a family member that already has a row in the database. Used
-    /// by the legacy "Invite to Haven" sheet on FamilyMembersView, which is
+    /// by the legacy "Invite to Chez" sheet on FamilyMembersView, which is
     /// only reached when an existing family_member is selected. We skip step
     /// 1 of `addPersonToHousehold` (createFamilyMember) and reuse the rest
     /// of the flow: existing-user check, code generation, invitation row,
@@ -514,11 +514,11 @@ actor HouseholdInviteCoordinator {
         let inviterName2: String
         if let currentUser = try? await db.fetchCurrentUser() {
             inviterUserId2 = currentUser.id
-            inviterName2 = currentUser.fullName ?? "Someone on Haven"
+            inviterName2 = currentUser.fullName ?? "Someone on Chez"
         } else if let session = await HavenSupabase.safeSession(timeout: 3.0) {
             inviterUserId2 = session.user.id
             inviterName2 = (session.user.userMetadata["full_name"]?.value as? String)
-                ?? "Someone on Haven"
+                ?? "Someone on Chez"
         } else {
             return AddPersonResult(
                 familyMember: member,

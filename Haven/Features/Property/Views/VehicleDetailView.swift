@@ -1391,7 +1391,7 @@ struct VehicleDetailView: View {
                 HStack {
                     Label("Service History", systemImage: "wrench.and.screwdriver")
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Spacer()
                     Button {
                         Haptics.light()
@@ -1498,7 +1498,7 @@ struct VehicleDetailView: View {
                 HStack {
                     Label("Vehicle Documents", systemImage: "doc.fill")
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Spacer()
                     Button {
                         Haptics.light()
@@ -1532,7 +1532,7 @@ struct VehicleDetailView: View {
                             HStack {
                                 Image(systemName: "doc.fill")
                                     .font(.caption)
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                 Text(doc.title)
                                     .font(HavenTypography.bodySmall)
                                     .foregroundStyle(HavenColors.textPrimary)
@@ -2181,10 +2181,10 @@ struct MechanicPickerSheet: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text("Add New Mechanic")
                                 .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                 }
@@ -2411,7 +2411,7 @@ private struct PurchaseDatePickerSheet: View {
                     Task { await save() }
                 }
                 .font(HavenTypography.uiButton)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .disabled(isSaving)
             }
 

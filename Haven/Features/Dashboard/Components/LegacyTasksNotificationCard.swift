@@ -25,7 +25,7 @@ struct LegacyTasksNotificationCard: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("WE TIDIED YOUR LIST")
                             .font(HavenTypography.uiSectionHeader)
                             .tracking(1.5)
@@ -43,7 +43,7 @@ struct LegacyTasksNotificationCard: View {
                         .accessibilityLabel("Dismiss")
                     }
 
-                    Text("\(legacyCount) low-value recurring task\(legacyCount == 1 ? "" : "s") \(legacyCount == 1 ? "has" : "have") been archived as Haven refined the task library. You can still see them from the Maintenance tab.")
+                    Text("\(legacyCount) low-value recurring task\(legacyCount == 1 ? "" : "s") \(legacyCount == 1 ? "has" : "have") been archived as Chez refined the task library. You can still see them from the Maintenance tab.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textPrimary)
 

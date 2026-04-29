@@ -56,7 +56,7 @@ struct MissingDocumentsView: View {
                                         onUpload?(cat)
                                     } label: {
                                         Image(systemName: "plus.circle.fill")
-                                            .foregroundStyle(HavenColors.navy)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                     }
                                 }
                             }

@@ -5,6 +5,7 @@ import SwiftUI
 /// list with a single hero card that shows how many of the home's
 /// systems have vendor coverage.
 struct HomeCoverageHero: View {
+    let propertyName: String?
     let coveredCount: Int
     let totalCount: Int
     let activeVendorCount: Int
@@ -19,26 +20,42 @@ struct HomeCoverageHero: View {
         return Double(coveredCount) / Double(totalCount)
     }
 
+    private var uncoveredCount: Int {
+        max(totalCount - coveredCount, 0)
+    }
+
+    private var seasonLabel: String {
+        let month = Calendar.current.component(.month, from: Date())
+        switch month {
+        case 3, 4, 5: return "Spring readiness"
+        case 6, 7, 8: return "Summer readiness"
+        case 9, 10, 11: return "Fall readiness"
+        default: return "Winter readiness"
+        }
+    }
+
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
-                // Phase 56.2: demoted from a dominant tracked label to
-                // a subtle inline affordance — the card's content
-                // already communicates "this is about your home."
                 HStack {
-                    Spacer()
-                    HStack(spacing: 4) {
-                        Text("Maintenance")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(seasonLabel)
                             .font(HavenTypography.uiCaption)
-                            .foregroundStyle(Color.white.opacity(0.5))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.4))
+                            .foregroundStyle(Color.white.opacity(0.64))
+                        if let propertyName, !propertyName.isEmpty {
+                            Text(propertyName)
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textOnNavy.opacity(0.9))
+                                .lineLimit(1)
+                        }
                     }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.4))
                 }
 
                 if totalCount == 0 {
-                    // No systems yet
                     emptyState
                 } else if isFullyCovered {
                     fullyCoveredState
@@ -69,7 +86,6 @@ struct HomeCoverageHero: View {
     private var fullyCoveredState: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             HStack(spacing: HavenTheme.spacing12) {
-                // Green checkmark ring
                 ZStack {
                     Circle()
                         .stroke(Color.green.opacity(0.3), lineWidth: 4)
@@ -85,10 +101,10 @@ struct HomeCoverageHero: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("All systems covered")
+                    Text("Your home is covered")
                         .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(HavenColors.textOnNavy)
-                    Text("\(activeVendorCount) vendor\(activeVendorCount == 1 ? "" : "s") managing your home")
+                    Text("\(coveredCount) of \(totalCount) systems are covered")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
                 }
@@ -97,13 +113,16 @@ struct HomeCoverageHero: View {
             if let next = nextVisit {
                 nextServiceRow(next)
             }
+
+            Text("Covered means Chez knows who services the system, when the work happens, and how to track it.")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.62))
         }
     }
 
     private var coverageState: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             HStack(spacing: HavenTheme.spacing12) {
-                // Progress ring
                 ZStack {
                     Circle()
                         .stroke(HavenColors.textOnNavy.opacity(0.15), lineWidth: 4)
@@ -127,14 +146,12 @@ struct HomeCoverageHero: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(coveredCount) of \(totalCount) systems covered")
+                    Text("\(coveredCount) of \(totalCount) systems are covered")
                         .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(HavenColors.textOnNavy)
-                    if activeVendorCount > 0 {
-                        Text("\(activeVendorCount) active vendor\(activeVendorCount == 1 ? "" : "s")")
-                            .font(HavenTypography.bodySmall)
-                            .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
-                    }
+                    Text("\(uncoveredCount) need a vendor before Chez can manage them")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
                 }
             }
 
@@ -142,13 +159,12 @@ struct HomeCoverageHero: View {
                 nextServiceRow(next)
             }
 
-            // Uncovered systems CTA
             if !uncoveredSystemNames.isEmpty {
                 Button(action: onFindVendor) {
                     HStack(spacing: 8) {
                         Image(systemName: "person.badge.plus")
                             .font(.system(size: 13, weight: .semibold))
-                        Text("\(uncoveredSystemNames.count) system\(uncoveredSystemNames.count == 1 ? "" : "s") need\(uncoveredSystemNames.count == 1 ? "s" : "") a vendor")
+                        Text("Assign vendors to \(uncoveredSystemNames.count) system\(uncoveredSystemNames.count == 1 ? "" : "s")")
                             .font(HavenTypography.uiLabel)
                         Spacer()
                         Image(systemName: "arrow.right")
@@ -161,27 +177,44 @@ struct HomeCoverageHero: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                if activeVendorCount > 0 {
+                    heroMetaPill("\(activeVendorCount) active vendor\(activeVendorCount == 1 ? "" : "s")")
+                }
+                Text("Covered means vendor chosen, schedule known, and tracking is ready.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textOnNavy.opacity(0.62))
+            }
         }
     }
 
-    // MARK: - Shared
-
     private func nextServiceRow(_ visit: (vendorName: String, date: String, taskTitle: String)) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "calendar")
-                .font(.system(size: 12))
-                .foregroundStyle(HavenColors.textOnNavy.opacity(0.5))
-            // Phase 56.2: "Next visit:" (not "Next:") disambiguates
-            // from the "Up next" task strip below. The hero is the
-            // home's vendor schedule; the strip is your personal to-do.
-            Text("Next visit: \(visit.vendorName)")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.textOnNavy.opacity(0.5))
+                Text("Next scheduled visit")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textOnNavy.opacity(0.62))
+            }
+
+            Text("\(visit.taskTitle) · \(formatHeroDate(visit.date)) · \(visit.vendorName)")
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.textOnNavy.opacity(0.8))
-            Spacer()
-            Text(formatHeroDate(visit.date))
-                .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.textOnNavy.opacity(0.5))
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.88))
+                .lineLimit(2)
         }
+    }
+
+    private func heroMetaPill(_ text: String) -> some View {
+        Text(text)
+            .font(HavenTypography.uiCaption)
+            .foregroundStyle(HavenColors.textOnNavy.opacity(0.72))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.08))
+            .clipShape(Capsule())
     }
 
     private func formatHeroDate(_ dateStr: String) -> String {

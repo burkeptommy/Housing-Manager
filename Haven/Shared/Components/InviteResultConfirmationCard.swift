@@ -85,7 +85,7 @@ struct InviteResultConfirmationCard: View {
             Text(formattedCode(code))
                 .font(.system(size: 28, weight: .bold, design: .monospaced))
                 .tracking(2)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, HavenTheme.spacing16)
                 .background(HavenColors.creamLight)
@@ -123,7 +123,7 @@ struct InviteResultConfirmationCard: View {
                 Spacer(minLength: 0)
             }
 
-            Text("\(name) already uses Haven. We've asked them to merge their household with yours. When they accept, your data will be combined.")
+            Text("\(name) already uses Chez. We've asked them to merge their household with yours. When they accept, your data will be combined.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 

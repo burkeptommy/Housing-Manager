@@ -4,13 +4,9 @@ import Foundation
 /// Matches the VALID_CATEGORIES array in analyze-document Edge Function.
 enum DocumentCategoryGroups {
     static let all: [(section: String, categories: [String])] = [
-        ("Estate Planning", [
-            "Will", "Trust", "Power of Attorney", "Healthcare Directive",
-            "Guardianship Designation", "Letter of Intent",
-            "Living Will", "HIPAA Authorization",
-            "Pre-Nuptial Agreement", "Post-Nuptial Agreement",
-            "Disposition of Remains", "Deed in Trust",
-        ]),
+        // Chez v1: "Estate Planning" group removed from the picker. Estate
+        // categories still exist as raw values so legacy uploads decode,
+        // but they're no longer offered to users.
         ("Entity Documents", [
             "LLC Operating Agreement", "LP Agreement", "S-Corp Documents",
             "EIN Documentation", "Annual Filings", "Bylaws",

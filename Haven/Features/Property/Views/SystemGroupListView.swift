@@ -36,21 +36,22 @@ struct SystemGroupListView: View {
                             let topLevel = topLevelSystems
                             Text("\(topLevel.count) System\(topLevel.count == 1 ? "" : "s")")
                                 .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
 
-                            let needsAttention = systems.filter {
-                                let s = $0.status?.lowercased() ?? ""
-                                return s.contains("maintenance") || s.contains("repair") || s.contains("replacement")
-                            }
-                            if needsAttention.isEmpty {
-                                Text("All systems in good condition")
+                            let prioritySetup = topLevel.filter { !isIdentified($0) }
+                            if prioritySetup.isEmpty {
+                                Text(profileCompleteCount > 0 ? "\(profileCompleteCount) profiles complete" : "Record ready")
                                     .font(HavenTypography.caption)
-                                    .foregroundStyle(HavenColors.success)
+                                    .foregroundStyle(profileCompleteCount > 0 ? HavenColors.success : HavenColors.textSecondary)
                             } else {
-                                Text("\(needsAttention.count) need attention")
+                                Text("\(prioritySetup.count) profile\(prioritySetup.count == 1 ? "" : "s") to finish")
                                     .font(HavenTypography.caption)
                                     .foregroundStyle(HavenColors.warning)
                             }
+
+                            Text("\(profileCompleteCount) profiles complete · \(maintenanceLinkedCount) linked to maintenance")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
 
                         Spacer()
@@ -86,7 +87,7 @@ struct SystemGroupListView: View {
                         Text("Add System")
                             .font(HavenTypography.uiLabel)
                     }
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(HavenColors.navy.opacity(0.08))
@@ -156,7 +157,7 @@ struct SystemGroupListView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(system.displayName)
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(2)
 
                     if system.manufacturer != nil || system.modelNumber != nil {
@@ -191,17 +192,21 @@ struct SystemGroupListView: View {
                         }
                     }
 
-                    // Details: model, serial, lifespan
-                    HStack(spacing: 12) {
-                        if let model = system.modelNumber, !model.isEmpty {
-                            detailChip(label: "Model", value: model)
-                        }
-                        if let serial = system.serialNumber, !serial.isEmpty {
-                            detailChip(label: "Serial", value: serial)
-                        }
-                        if let lifespan = system.expectedLifespanYears {
-                            detailChip(label: "Lifespan", value: "\(lifespan) yrs")
-                        }
+                    Text(primarySystemStatus(system))
+                        .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                        .foregroundStyle(primarySystemStatusColor(system))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(primarySystemStatusColor(system).opacity(0.12))
+                        .clipShape(Capsule())
+
+                    let facts = secondaryFacts(for: system)
+                    if !facts.isEmpty {
+                        Text(facts.joined(separator: " · "))
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -229,7 +234,7 @@ struct SystemGroupListView: View {
                         .foregroundStyle(i < fullStars || (i == fullStars && hasHalf) ? HavenColors.warning : HavenColors.navy.opacity(0.15))
                 }
             }
-            Text("Reliability")
+            Text("Model reliability")
                 .font(.system(size: 8, weight: .medium))
                 .foregroundStyle(HavenColors.textTertiary)
         }
@@ -238,6 +243,121 @@ struct SystemGroupListView: View {
     /// Top-level systems (no parent) — children are shown inside their parent's detail view
     private var topLevelSystems: [HomeSystemRow] {
         systems.filter { $0.parentSystemId == nil }
+    }
+
+    private func isIdentified(_ system: HomeSystemRow) -> Bool {
+        system.catalogEntryId != nil
+            || !(system.manufacturer?.isEmpty ?? true)
+            || !(system.modelNumber?.isEmpty ?? true)
+            || !(system.serialNumber?.isEmpty ?? true)
+    }
+
+    private func systemNeedsAttention(_ system: HomeSystemRow) -> Bool {
+        if !isIdentified(system) { return true }
+        if system.preferredContractorId == nil && requiresVendor(system) { return true }
+        if isNearEndOfLife(system) { return true }
+        let status = system.status?.lowercased() ?? ""
+        return status.contains("maintenance") || status.contains("repair") || status.contains("replacement")
+    }
+
+    private var profileCompleteCount: Int {
+        topLevelSystems.filter(isProfileComplete).count
+    }
+
+    private var maintenanceLinkedCount: Int {
+        topLevelSystems.filter(isMaintenanceLinked).count
+    }
+
+    private func primarySystemStatus(_ system: HomeSystemRow) -> String {
+        if !isIdentified(system) {
+            return "Needs details"
+        }
+        if system.preferredContractorId == nil && requiresVendor(system) && !(system.nextServiceDue?.isEmpty ?? true) {
+            return "Coverage needed"
+        }
+        if isNearEndOfLife(system) {
+            return "Near expected lifespan"
+        }
+        if isProfileComplete(system) {
+            return "Profile complete"
+        }
+        if isMaintenanceLinked(system) {
+            return "Linked to maintenance"
+        }
+        let status = system.status?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !status.isEmpty, status.lowercased() != "good" {
+            return status.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+        return "Tracked"
+    }
+
+    private func primarySystemStatusColor(_ system: HomeSystemRow) -> Color {
+        let label = primarySystemStatus(system).lowercased()
+        if label.contains("profile complete") { return HavenColors.success }
+        if label.contains("linked to maintenance") { return HavenColors.navy700 }
+        if label.contains("near") { return HavenColors.warning }
+        if label.contains("coverage needed") { return HavenColors.action }
+        if label.contains("needs") { return HavenColors.warning }
+        if label.contains("repair") || label.contains("replacement") { return HavenColors.critical }
+        return HavenColors.info
+    }
+
+    private func secondaryFacts(for system: HomeSystemRow) -> [String] {
+        var facts: [String] = []
+        if !(system.serialNumber?.isEmpty ?? true) {
+            facts.append("Serial on file")
+        }
+        if system.cachedManualLinks?.isEmpty == false {
+            facts.append("Manual found")
+        }
+        if let installDate = system.installDate, !installDate.isEmpty {
+            facts.append("Installed \(installDate.prefix(4))")
+        } else {
+            facts.append("Missing install date")
+        }
+        if let due = system.nextServiceDue, !due.isEmpty {
+            facts.append("Next service \(due.havenDateShort)")
+        }
+        return Array(facts.prefix(2))
+    }
+
+    private func requiresVendor(_ system: HomeSystemRow) -> Bool {
+        let category = system.category.lowercased()
+        return !["appliance", "security system", "smart home"].contains(category)
+    }
+
+    private func isMaintenanceLinked(_ system: HomeSystemRow) -> Bool {
+        system.serviceIntervalDays != nil
+            || !(system.lastServiceDate?.isEmpty ?? true)
+            || !(system.nextServiceDue?.isEmpty ?? true)
+    }
+
+    private func isProfileComplete(_ system: HomeSystemRow) -> Bool {
+        let hasIdentity = isIdentified(system)
+        let hasInstallContext = !(system.installDate?.isEmpty ?? true) || system.expectedLifespanYears != nil
+        let hasSupportMaterial = !(system.serialNumber?.isEmpty ?? true)
+            || !(system.cachedManualLinks?.isEmpty ?? true)
+            || system.catalogEntryId != nil
+        let hasConnectedHistory = isMaintenanceLinked(system)
+            || system.preferredContractorId != nil
+
+        return [hasIdentity, hasInstallContext, hasSupportMaterial, hasConnectedHistory]
+            .filter { $0 }
+            .count >= 3
+    }
+
+    private func isNearEndOfLife(_ system: HomeSystemRow) -> Bool {
+        guard let lifespan = system.expectedLifespanYears,
+              let installDate = system.installDate,
+              let install = isoFormatter.date(from: installDate) else { return false }
+        let years = Calendar.current.dateComponents([.year], from: install, to: Date()).year ?? 0
+        return years >= max(lifespan - 2, 1)
+    }
+
+    private var isoFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
     }
 
     /// Count of child systems for a given parent

@@ -29,7 +29,7 @@ struct PendingInvitationsSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "envelope.badge")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("PENDING INVITATIONS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -117,7 +117,7 @@ struct PendingInvitationsSection: View {
                 Text(formattedCode(invitation.inviteCode))
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
                     .tracking(1.5)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, HavenTheme.spacing12)
@@ -236,7 +236,7 @@ struct PendingInvitationsSection: View {
     private func presentShareSheet(for invitation: HouseholdInvitationRow) {
         let formatted = formattedCode(invitation.inviteCode)
         let name = displayName(forInvitationRow: invitation)
-        let text = "Hey \(name), here's your Haven invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(invitation.inviteCode)"
+        let text = "Hey \(name), here's your Chez invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(invitation.inviteCode)"
         let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }

@@ -635,6 +635,11 @@ enum MaintenanceTaskReconciler {
             aggregate = aggregate.merging(result)
         }
 
+        await ServiceOrchestrator.backfillServiceMetadata(
+            propertyId: propertyId,
+            householdId: householdId
+        )
+
         return aggregate
     }
 

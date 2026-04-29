@@ -18,6 +18,10 @@ struct HavenColors {
     /// #FFFFFF — Sheets, modals, popovers
     static let creamWhite = Color.havenCreamWhite
 
+    /// #FAF7F1 — Warmer cream for editorial / long-form moments.
+    /// Use sparingly: cinematic reveals, reading-style surfaces.
+    static let creamWarm = Color.havenCreamWarm
+
     // MARK: - Neutral — Structure
 
     /// #EDEEF0 — Subtle borders, input field backgrounds
@@ -29,10 +33,18 @@ struct HavenColors {
     /// #BFC2C8 — Progress bar fills (neutral), placeholder-weight
     static let beige400 = Color.havenBeige400
 
+    /// #9C98AD — text-soft tier; also drives section-header eyebrows.
+    static let neutral500 = Color.havenNeutral500
+
     // MARK: - Cosmic Indigo — The Ink
 
-    /// #332860 — Deepest indigo, pressed states
+    /// #2A2252 — Body text, footer, deepest pressed states.
+    /// Chez design refresh: was #332860 in the previous palette.
     static let navy900 = Color.havenNavy900
+
+    /// #332860 — Slightly lighter than 900; pressed states where 900
+    /// would feel too heavy. The previous `navy900` value.
+    static let indigo800 = Color.havenIndigo800
 
     /// #453A70 — PRIMARY: text, icons, inactive borders, hero card
     static let navy800 = Color.havenNavy
@@ -43,19 +55,37 @@ struct HavenColors {
     /// #524580 — Pressed states, active tab icons
     static let navy700 = Color.havenNavy700
 
-    /// #60558E — Secondary interactive elements
+    /// #5D4C8F — Secondary interactive elements (refreshed hex)
     static let navy600 = Color.havenNavy600
 
-    /// #70669D — Links, tertiary interactive
+    /// #6B5AA0 — Links, tertiary interactive (refreshed hex)
     static let navy500 = Color.havenNavy500
+
+    /// #8B7DBA — Tertiary accents on dark surfaces
+    static let indigo400 = Color.havenIndigo400
+
+    /// #E8E4F2 — Faint indigo wash; subtle backgrounds for indigo-tinted cards
+    static let indigo100 = Color.havenIndigo100
+
+    /// #F2EFF8 — Pill / icon-bg tint behind indigo glyphs
+    static let indigo50 = Color.havenIndigo50
 
     // MARK: - Deepened Salmon — Action / CTA
 
     /// #ED6955 — Primary CTA: buttons, FAB, progress bars, active nav
     static let action = Color.havenSalmon
 
-    /// Pressed state for salmon action elements
+    /// #D14E3E — Pressed state for salmon action elements
     static let actionPressed = Color.havenSalmonPressed
+
+    /// #F4877B — Eyebrows on indigo backgrounds; hover-tint variant
+    static let actionLight = Color.havenSalmonLight
+
+    /// #FFE8E2 — Salmon-tinted pill / chip background
+    static let actionPale = Color.havenSalmonPale
+
+    /// #FFF5F2 — "Decision needed" wash for cards prompting action
+    static let action50 = Color.havenSalmon50
 
     /// White text on salmon action surfaces
     static let textOnAction = Color.white
@@ -117,6 +147,11 @@ struct HavenColors {
     static let warmOffWhite = creamLight
     static let warmCream = cream
     static let textInverse = textOnNavy
+
+    /// Alias for `textTertiary` — matches the design-system `text-soft` token name.
+    static let textSoft = textTertiary
+    /// Alias for `textSecondary` — matches the design-system `text-muted` token name.
+    static let textMuted = textSecondary
 
     // MARK: - Utility
 

@@ -35,7 +35,7 @@ struct InvoiceChoiceSheet: View {
                             VStack(spacing: HavenTheme.spacing8) {
                                 Image(systemName: mode == .vehicle ? "car.fill" : "doc.text.magnifyingglass")
                                     .font(.system(size: 36))
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .padding(.top, HavenTheme.spacing16)
 
                                 Text(mode == .vehicle ? "Vehicle service invoice detected" : "This looks like a home service invoice")
@@ -44,8 +44,8 @@ struct InvoiceChoiceSheet: View {
                                     .multilineTextAlignment(.center)
 
                                 Text(mode == .vehicle
-                                     ? "Haven can scan this to update your vehicle's maintenance, mileage, and service records."
-                                     : "Haven can scan this for completed maintenance tasks and new systems to track.")
+                                     ? "Chez can scan this to update your vehicle's maintenance, mileage, and service records."
+                                     : "Chez can scan this for completed maintenance tasks and new systems to track.")
                                     .font(HavenTypography.bodySmall)
                                     .foregroundStyle(HavenColors.textSecondary)
                                     .multilineTextAlignment(.center)
@@ -158,7 +158,7 @@ struct InvoiceChoiceSheet: View {
                             } label: {
                                 Text("Save as Personal Document")
                                     .font(HavenTypography.uiButton)
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 50)
                                     .background(HavenColors.surface)

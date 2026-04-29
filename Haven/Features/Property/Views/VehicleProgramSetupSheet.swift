@@ -32,7 +32,7 @@ struct VehicleProgramSetupSheet: View {
                         Text(vehicleTitle)
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Set up how Haven tracks service for this vehicle.")
+                        Text("Set up how Chez tracks service for this vehicle.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     }

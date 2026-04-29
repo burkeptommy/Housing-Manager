@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Alfred">
+  <path d="M 8 24 L 44 38 L 44 62 L 8 76 Z" fill="currentColor"/>
+  <path d="M 92 24 L 56 38 L 56 62 L 92 76 Z" fill="currentColor"/>
+  <rect x="42" y="34" width="16" height="32" rx="2.5" fill="#ED6955"/>
+  <line x1="50" y1="38" x2="50" y2="62" stroke="#FFFFFF" stroke-width="1.2" opacity="0.4"/>
+</svg>

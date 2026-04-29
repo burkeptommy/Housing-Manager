@@ -2,7 +2,7 @@ import Foundation
 
 enum AppConfig {
     // MARK: - App Identity
-    static let appName = "Haven"
+    static let appName = "Chez"
     static let bundleID = "com.havenhome.app"
     /// Pulled live from `CFBundleShortVersionString` instead of being
     /// hardcoded so the value never drifts from project.yml.

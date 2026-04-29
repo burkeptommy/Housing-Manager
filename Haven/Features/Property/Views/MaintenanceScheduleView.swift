@@ -87,7 +87,6 @@ struct MaintenanceScheduleView: View {
     }
 
     @StateObject private var viewModel = MaintenanceViewModel.shared
-    @State private var viewMode: MaintenanceViewMode = .timeline
     @State private var taskToDelete: MaintenanceTaskDBRow?
     @State private var selectedTask: MaintenanceTaskDBRow?
     @State private var showDeleteConfirm = false
@@ -96,6 +95,13 @@ struct MaintenanceScheduleView: View {
     @State private var snoozeDate = Date()
     @State private var showAddTask = false
     @State private var showAddRecurringService = false
+
+    /// Phase 78: structured punch items keyed by `assigned_visit_task_id`.
+    /// Loaded once when the schedule view appears + on `.maintenanceTaskChanged`
+    /// notifications. Lets `HandymanVisitCard` render its sub-checklist
+    /// without N+1 fetches per visit row.
+    @State private var punchItemsByVisitTaskId: [UUID: [HandymanPunchItemRow]] = [:]
+    @State private var isPerformingHandymanAction = false
 
     /// Phase 54E: Add cadence sheet state — opens the same CadenceEditSheet
     /// the Property tab uses, so users can create trash day / recycling
@@ -239,7 +245,7 @@ struct MaintenanceScheduleView: View {
                     Label("Your Maintenance Schedule", systemImage: "wrench.and.screwdriver")
                 } description: {
                     VStack(spacing: 8) {
-                        Text("Add systems to your property and Haven will create a maintenance schedule for you.")
+                        Text("Add systems to your property and Chez will create a maintenance schedule for you.")
                         // Phase 55.2: surface routines for users who
                         // land here with zero tasks but could still
                         // configure trash / recycling / school pickup.
@@ -363,6 +369,10 @@ struct MaintenanceScheduleView: View {
             // Phase 56.5: run duplicate detection after routines +
             // tasks are loaded so the banner surfaces on first view.
             await loadDuplicates()
+            // Phase 78: load structured punch items so handyman visit
+            // rows can render their checklist as subitems instead of a
+            // notes blob. One round-trip; bucketed by visit task id.
+            await loadHandymanPunchItems()
         }
         .onReceive(NotificationCenter.default.publisher(for: .standingAppointmentChanged)) { _ in
             Task {
@@ -393,6 +403,9 @@ struct MaintenanceScheduleView: View {
             Task {
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 await loadDuplicates()
+                // Phase 78: refresh structured punch items so handyman
+                // visit cards reflect newly delegated / completed items.
+                await loadHandymanPunchItems()
             }
         }
         // Phase 56.5: dropped the per-property bucket-state reload.
@@ -566,7 +579,7 @@ struct MaintenanceScheduleView: View {
                 Haptics.light()
                 showAddRoutine = true
             } label: {
-                Label("Add routine", systemImage: "calendar.badge.clock")
+                Label("Add custom program", systemImage: "calendar.badge.clock")
             }
             // Phase 56.4: separate "create a thing" actions
             // from the "navigate to a flow" action.
@@ -590,7 +603,7 @@ struct MaintenanceScheduleView: View {
             }
         } label: {
             Image(systemName: "plus")
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
 
@@ -686,7 +699,7 @@ struct MaintenanceScheduleView: View {
             savePersistedLayout()
         } label: {
             Image(systemName: layout == .list ? "calendar" : "list.bullet")
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         }
         .accessibilityLabel(layout == .list ? "Switch to calendar view" : "Switch to list view")
     }
@@ -716,7 +729,7 @@ struct MaintenanceScheduleView: View {
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
 
@@ -750,35 +763,10 @@ struct MaintenanceScheduleView: View {
                     }
                 }
 
-                // Phase 56.4: HandymanSuggestionCard sits above the
-                // summary bar so users see the batchable work prompt
-                // before they scan the pills. Session-dismissible;
-                // resurfaces next launch.
-                if shouldShowHandymanSuggestion, !handymanSuggestionDismissedThisSession {
-                    HandymanSuggestionCard(
-                        punchItemCount: handymanPunchItemCount,
-                        onSchedule: {
-                            NotificationCenter.default.post(
-                                name: .switchToTab,
-                                object: nil,
-                                userInfo: ["tab": 1]
-                            )
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(
-                                    name: .navigateToPropertySection,
-                                    object: nil,
-                                    userInfo: ["section": "handyman_punch_list"]
-                                )
-                            }
-                        },
-                        onDismiss: {
-                            handymanSuggestionDismissedThisSession = true
-                        }
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
-                }
+                // Chez v1: HandymanSuggestionCard removed — Tasks → Handyman
+                // is now the canonical destination for the punch list, so
+                // surfacing the prompt here too just creates two front doors
+                // for the same flow.
 
                 // Phase 56.5: Duplicate review banner. Surfaces when
                 // detection found one or more high-confidence matches
@@ -910,7 +898,7 @@ struct MaintenanceScheduleView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("Cancel") { showSnooze = false }
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Save") {
@@ -927,7 +915,7 @@ struct MaintenanceScheduleView: View {
                                     await viewModel.loadTasks()
                                 }
                             }
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .fontWeight(.semibold)
                         }
                     }
@@ -985,32 +973,26 @@ struct MaintenanceScheduleView: View {
                     ContentUnavailableView {
                         Label("No household yet", systemImage: "house")
                     } description: {
-                        Text("Add a property first to set up routines.")
+                        Text("Add a property first to set up active programs.")
                     }
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Done") { showAddRoutine = false }
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                 }
             }
         }
-        // Phase 55.3: Edit-routine sheet. Tapping an expanded-child
-        // occurrence or (later) a single-occurrence routine row
-        // opens the full RoutineEditSheet with the underlying row
-        // hydrated. Collapsed rows continue to toggle expansion
-        // rather than open the sheet.
+        // Phase 55.3+: routine detail sheet. Tapping a routine should
+        // show the program itself first; edit now lives inside the
+        // detail screen so every surface behaves consistently.
         .sheet(item: $editingRoutine) { routine in
             if let householdId = resolveRoutineHouseholdId() {
                 NavigationStack {
-                    RoutineEditSheet(
-                        householdId: householdId,
-                        propertyId: routine.propertyId ?? viewModel.filterPropertyId,
-                        existing: routine,
-                        onSaved: {
-                            Task { await loadRoutines() }
-                        }
+                    RoutineDetailView(
+                        routine: routine,
+                        householdId: householdId
                     )
                 }
             }
@@ -1281,23 +1263,68 @@ struct MaintenanceScheduleView: View {
     }
 
     /// Phase 56.6: Whether a task is eligible for the inline handyman
-    /// quick-add link on its card. Same criteria as the detail sheet's
-    /// "Add to handyman list" button:
-    /// - Not a vehicle task (handyman is a home contractor)
-    /// - No contractor already assigned (delegating to handyman would
-    ///   contradict an existing vendor link)
-    /// - Matched template exists AND has `diyEffortMinutes ≤ 60`
-    ///   (handyman-appropriate small work, not specialist jobs like a
-    ///   crawl space inspection or generator service)
+    /// quick-add link on its card. Uses the shared routing helper so
+    /// maintenance cards, task detail, and system detail all surface
+    /// the same handyman-appropriate work.
     private func isHandymanEligible(_ task: MaintenanceTaskDBRow) -> Bool {
-        guard task.vehicleId == nil else { return false }
-        guard task.assignedContractorId == nil else { return false }
-        guard let templateKey = task.templateId,
-              let template = MaintenanceTemplates.template(forKey: templateKey),
-              let minutes = template.diyEffortMinutes else {
-            return false
+        MaintenanceTaskRoutingSupport.isInlineHandymanEligible(task, systems: viewModel.systems)
+    }
+
+    /// Phase 78: a task renders as a `HandymanVisitCard` (instead of
+    /// the generic `UnifiedTaskCard`) when its `serviceKey == "handyman"`
+    /// OR when its `templateId` starts with "Handyman:" (covers ad-hoc
+    /// visits created via `create_ad_hoc_visit` on the field side, which
+    /// don't carry a template_id but DO surface a punch list).
+    private func isHandymanVisit(_ task: MaintenanceTaskDBRow) -> Bool {
+        if task.serviceKey == "handyman" { return true }
+        if (task.templateId ?? "").hasPrefix("Handyman:") { return true }
+        // Backfill heuristic — Phase 78 backfill seeded
+        // `assigned_visit_task_id` on items pulled from notes blocks; if
+        // any structured punch items reference this task, treat it as a
+        // visit.
+        return punchItemsByVisitTaskId[task.id]?.isEmpty == false
+    }
+
+    /// Phase 78: load all of the household's handyman punch items once
+    /// and bucket them by `assigned_visit_task_id`. Called from `.task`
+    /// + on `.maintenanceTaskChanged`. One round-trip per refresh.
+    /// Resolves the household id from any task in the schedule view —
+    /// the maintenance view model doesn't track a single canonical
+    /// household, so this avoids threading a new prop through.
+    private func loadHandymanPunchItems() async {
+        guard let householdId = viewModel.tasks.first?.householdId else { return }
+        do {
+            let items = try await DatabaseService.shared.fetchAllHandymanPunchItems(householdId: householdId)
+            var bucket: [UUID: [HandymanPunchItemRow]] = [:]
+            for item in items {
+                guard let visitId = item.assignedVisitTaskId else { continue }
+                bucket[visitId, default: []].append(item)
+            }
+            await MainActor.run { punchItemsByVisitTaskId = bucket }
+        } catch {
+            print("[MaintenanceScheduleView] loadHandymanPunchItems failed: \(error)")
         }
-        return minutes <= 60
+    }
+
+    /// Phase 78: toggles a punch item between pending and done. Hits
+    /// the `update_punch_item_status` edge action; on success the
+    /// server-side trigger bumps `home_systems.last_service_date` if
+    /// the item is system-linked. Optimistically updates the local
+    /// bucket so the visit card re-renders immediately.
+    private func toggleHandymanPunchItem(_ item: HandymanPunchItemRow) async {
+        guard !isPerformingHandymanAction else { return }
+        let newStatus = item.isDone ? "pending" : "done"
+        await MainActor.run { isPerformingHandymanAction = true }
+        defer { Task { await MainActor.run { isPerformingHandymanAction = false } } }
+        do {
+            _ = try await HavenSupabase.updatePunchItemStatus(itemId: item.id.uuidString, status: newStatus)
+            Haptics.light()
+            await loadHandymanPunchItems()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            print("[MaintenanceScheduleView] toggleHandymanPunchItem failed: \(error)")
+            Haptics.error()
+        }
     }
 
     /// Phase 56.6: Quick-add a task to the handyman punch list from
@@ -1324,18 +1351,7 @@ struct MaintenanceScheduleView: View {
             return
         }
 
-        var insert = HandymanPunchItemInsert(
-            householdId: task.householdId,
-            propertyId: task.propertyId,
-            title: task.title
-        )
-        insert.description = task.description
-        insert.source = "maintenance_task"
-        insert.sourceTaskId = task.id
-        if let templateKey = task.templateId,
-           let template = MaintenanceTemplates.template(forKey: templateKey) {
-            insert.estimatedMinutes = template.diyEffortMinutes
-        }
+        let insert = MaintenanceTaskRoutingSupport.buildPunchItemInsert(for: task)
 
         do {
             _ = try await db.createHandymanPunchItem(insert)
@@ -1474,12 +1490,12 @@ struct MaintenanceScheduleView: View {
     }
 
     /// Phase 56.4: Whether to show the proactive "Schedule handyman
-    /// visit" suggestion. Gates on ≥3 pending punch items, no Handyman
+    /// visit" suggestion. Gates on ≥1 pending punch item, no Handyman
     /// task scheduled in the next 30 days, and no Handyman task
     /// completed in the last 90 days. Mirrors the same logic on
     /// DashboardViewModel so both surfaces stay in sync.
     private var shouldShowHandymanSuggestion: Bool {
-        guard handymanPunchItemCount >= 3 else { return false }
+        guard handymanPunchItemCount >= 1 else { return false }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let now = Date()
@@ -1929,7 +1945,7 @@ struct MaintenanceScheduleView: View {
                 // with no indication the label was truncated. Also caps
                 // the pill's width so long routine labels don't push
                 // subsequent pills off-screen.
-                Text(routine.label)
+                Text(routine.presentationLabel)
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textPrimary)
                     .lineLimit(1)
@@ -2196,7 +2212,7 @@ struct MaintenanceScheduleView: View {
     }
 
     /// Phase 60: surfaces the coordinated scope at the top of the tab
-    /// so the Maintenance surface reads as "Haven is running 220+
+    /// so the Maintenance surface reads as "Chez is running 220+
     /// interactions/year for you" instead of a sparse to-do list.
     /// Hidden when the user has nothing tracked yet.
     private var yearAtAGlanceCard: some View {
@@ -2397,7 +2413,7 @@ struct MaintenanceScheduleView: View {
                             .background(HavenColors.beige200)
                             .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
-                    Text(routine.label)
+                    Text(routine.presentationLabel)
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(1)
@@ -2888,7 +2904,78 @@ struct MaintenanceScheduleView: View {
 
     // MARK: - Task Row
 
+    @ViewBuilder
     private func maintenanceRow(_ task: MaintenanceTaskDBRow) -> some View {
+        // Phase 78: handyman visits render via the dedicated visit card
+        // (vendor + date + status + checkable punch list as subitems).
+        // Bypasses the generic UnifiedTaskCard so the homeowner stops
+        // seeing "two tasks with super long notes" and starts seeing
+        // the underlying visit as a first-class entity.
+        if isHandymanVisit(task) {
+            handymanVisitRow(task)
+        } else {
+            standardMaintenanceRow(task)
+        }
+    }
+
+    /// Phase 78: visit-shaped row for handyman bundles. Reads the
+    /// structured punch items from `punchItemsByVisitTaskId` (loaded
+    /// once on appear). Tap a subitem to mark it done — the server
+    /// trigger bumps the linked system's last-serviced date.
+    @ViewBuilder
+    private func handymanVisitRow(_ task: MaintenanceTaskDBRow) -> some View {
+        let items = punchItemsByVisitTaskId[task.id] ?? []
+        let cardItems: [HandymanVisitPunchItem] = items.map { row in
+            HandymanVisitPunchItem(
+                id: row.id.uuidString,
+                title: row.title,
+                isDone: row.isDone,
+                estimatedMinutes: row.estimatedMinutes,
+                systemLabel: row.systemLabelSnapshot,
+                addedAfterLock: row.addedAfterLock ?? false
+            )
+        }
+        let doneCount = cardItems.filter(\.isDone).count
+        let scheduledDate: Date? = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f.date(from: task.nextDueDate)
+        }()
+        let vendorName = viewModel.contractors.first(where: { $0.id == task.assignedContractorId })?.companyName
+
+        let hasVendor = task.assignedContractorId != nil
+        let statusLabel: String = hasVendor ? "Confirmed" : "Pending vendor"
+        let isStatusActive: Bool = hasVendor
+
+        HandymanVisitCard(
+            title: task.title,
+            vendorName: vendorName,
+            scheduledDate: scheduledDate,
+            statusLabel: statusLabel,
+            isStatusActive: isStatusActive,
+            totalItems: cardItems.count,
+            doneItems: doneCount,
+            punchItems: cardItems,
+            hasNeedsAttentionItem: cardItems.contains(where: \.addedAfterLock),
+            onTap: {
+                Analytics.track(.maintenanceTaskViewed, [
+                    "task_id": task.id.uuidString,
+                    "task_title": task.title,
+                    "render": "handyman_visit_card"
+                ])
+                selectedTask = task
+            },
+            onToggleItem: { itemId in
+                guard let item = items.first(where: { $0.id.uuidString == itemId }) else { return }
+                Task { await toggleHandymanPunchItem(item) }
+            },
+            onMessage: nil,
+            onAddItem: nil
+        )
+    }
+
+    @ViewBuilder
+    private func standardMaintenanceRow(_ task: MaintenanceTaskDBRow) -> some View {
         // Phase 19l: resolve the contractor row when one is linked, so the
         // vendor-managed card variant can render the brand logo and color.
         let linkedContractor: ContractorRow? = {
@@ -2898,7 +2985,7 @@ struct MaintenanceScheduleView: View {
         let assignment = task.assignmentType?.lowercased()
         let isPersonal = assignment != "vendor"
 
-        return Button {
+        Button {
             Analytics.track(.maintenanceTaskViewed, ["task_id": task.id.uuidString, "task_title": task.title])
             selectedTask = task
         } label: {

@@ -177,7 +177,7 @@ struct MaintenancePreferencesView: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 18)
             Text(text)
                 .font(HavenTypography.bodySmall)

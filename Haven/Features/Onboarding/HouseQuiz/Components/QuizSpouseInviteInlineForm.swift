@@ -126,7 +126,7 @@ struct QuizSpouseInviteInlineForm: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(HavenColors.info)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(name) already has Haven")
+                Text("\(name) already has Chez")
                     .font(HavenTypography.bodySmall.weight(.semibold))
                     .foregroundStyle(HavenColors.textPrimary)
                 Text("We'll send them a merge request so you can share this household.")
@@ -213,7 +213,7 @@ struct QuizSpouseInviteInlineForm: View {
     private func presentShareSheet() {
         guard case .inviteSent(_, _, let code) = trustMoment else { return }
         let formatted = formatCode(code)
-        let text = "Hey \(firstName), here's your Haven invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(code)"
+        let text = "Hey \(firstName), here's your Chez invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(code)"
         let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
 
         // Find the topmost UIWindowScene to present from. iPad needs a popover.

@@ -360,7 +360,7 @@ final class AddPropertyFlowViewModel: ObservableObject {
         let systems = result.systemsCreated
         let tasks = result.tasksCreated
         if systems == 0 && tasks == 0 {
-            return "We saved your property. Take the House Quiz so Haven knows what to track."
+            return "We saved your property. Take the House Quiz so Chez knows what to track."
         }
         let systemsPhrase: String
         if systems == 0 {

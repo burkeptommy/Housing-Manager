@@ -45,6 +45,9 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var snoozeDate = Date()
     @State private var showScheduleChat = false
     @State private var showContractorDirectory = false
+    @State private var showHandymanPunchList = false
+    @State private var showFindLocalVendor = false
+    @State private var showManualAddFromFindVendor = false
     @State private var showEditDueDate = false
     @State private var editedDueDate = Date()
     @State private var showLastServicedPicker = false
@@ -81,6 +84,8 @@ struct MaintenanceTaskDetailSheet: View {
     // so the picker re-renders after a tap without waiting for a DB round-trip.
     @State private var currentRoute: String?
     @State private var preferredHandyman: ContractorRow?
+    @State private var propertyTown = ""
+    @State private var propertyState = ""
     // Phase 65: toast shown after the first pick per category ("We'll remember
     // this for future Plumbing tasks").
     @State private var showRoutingRememberedToast = false
@@ -108,6 +113,10 @@ struct MaintenanceTaskDetailSheet: View {
     /// for a handyman punch list.
     @State private var showAddedToPunchListToast = false
     @State private var isAddingToPunchList = false
+    /// Phase 78: separate spinner for the new "Have my handyman do
+    /// this →" delegate action. Distinct from `isAddingToPunchList`
+    /// so the two CTAs can co-exist without one disabling the other.
+    @State private var isDelegatingToHandyman = false
 
     /// Phase 56.4: Confirmation dialog for "Add to handyman list" when
     /// the task is already vendor-assigned. Offers Just this time /
@@ -145,6 +154,76 @@ struct MaintenanceTaskDetailSheet: View {
         if daysUntilDue <= 7 { return HavenColors.critical }
         if daysUntilDue <= 30 { return HavenColors.warning }
         return HavenColors.success
+    }
+
+    /// Bundled maintenance tasks often store their generated checklist in
+    /// `notes`, and some legacy rows also duplicated that same checklist in
+    /// `description`. We split that block out so it renders once as
+    /// "What's included" instead of showing up again under Notes.
+    private var bundledChecklistBlock: String? {
+        if let notes = task.notes,
+           let block = extractBundledChecklist(from: notes) {
+            return block
+        }
+        if let description = task.description,
+           let block = extractBundledChecklist(from: description) {
+            return block
+        }
+        return nil
+    }
+
+    private var bundledChecklistItems: [String] {
+        guard let bundledChecklistBlock else { return [] }
+        return bundledChecklistBlock
+            .components(separatedBy: .newlines)
+            .dropFirst()
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.hasPrefix("- ") }
+            .map { String($0.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var visibleDescription: String? {
+        cleanedTaskCopy(task.description)
+    }
+
+    private var visibleNotes: String? {
+        guard let cleaned = cleanedTaskCopy(task.notes) else { return nil }
+        if let visibleDescription,
+           cleaned.caseInsensitiveCompare(visibleDescription) == .orderedSame {
+            return nil
+        }
+        return cleaned
+    }
+
+    private func cleanedTaskCopy(_ raw: String?) -> String? {
+        guard var text = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return nil }
+
+        if let bundledChecklistBlock {
+            text = text.replacingOccurrences(of: bundledChecklistBlock, with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return text.isEmpty ? nil : text
+    }
+
+    private func extractBundledChecklist(from text: String) -> String? {
+        guard let range = text.range(of: "What's included:") else { return nil }
+
+        let trailing = String(text[range.lowerBound...])
+        let firstParagraph = trailing
+            .components(separatedBy: "\n\n")
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        let bulletCount = firstParagraph
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.hasPrefix("- ") }
+            .count
+
+        return bulletCount > 0 ? firstParagraph : nil
     }
 
     var body: some View {
@@ -295,17 +374,21 @@ struct MaintenanceTaskDetailSheet: View {
                     NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                     dismiss()
                 }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .trackScreen("MaintenanceTaskDetailSheet", properties: ["task_id": task.id.uuidString, "task_title": task.title])
         .sheet(isPresented: $showCompleteForm) {
             NavigationStack {
-                MarkCompleteForm(task: task, onComplete: {
-                    Analytics.track(.maintenanceTaskCompleted, ["task_id": task.id.uuidString, "task_title": task.title])
-                    onTaskCompleted?()
-                    dismiss()
-                })
+                MarkCompleteForm(
+                    task: task,
+                    contractorId: assignedContractor?.id,
+                    onComplete: {
+                        Analytics.track(.maintenanceTaskCompleted, ["task_id": task.id.uuidString, "task_title": task.title])
+                        onTaskCompleted?()
+                        dismiss()
+                    }
+                )
             }
             .presentationDetents([.medium, .large])
         }
@@ -320,17 +403,53 @@ struct MaintenanceTaskDetailSheet: View {
         }
         .sheet(isPresented: $showContractorDirectory) {
             NavigationStack {
-                ContractorDirectoryView(onSelect: { contractor in
-                    showContractorDirectory = false
-                    Task { await assignContractorToTask(contractor) }
-                })
+                ContractorDirectoryView(
+                    delegationContext: DelegationContext(
+                        task: task,
+                        systemCategory: vendorSearchCategory,
+                        onVendorSelected: { contractor in
+                            showContractorDirectory = false
+                            Task { await assignContractorToTask(contractor) }
+                        },
+                        onFindLocalVendors: {
+                            showContractorDirectory = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                showFindLocalVendor = true
+                            }
+                        }
+                    )
+                )
             }
+        }
+        .sheet(isPresented: $showHandymanPunchList) {
+            NavigationStack {
+                HandymanPunchListView(
+                    householdId: task.householdId,
+                    propertyId: task.propertyId
+                )
+            }
+        }
+        .sheet(isPresented: $showFindLocalVendor) {
+            vendorSearchSheet
         }
         .task {
             await loadVendorInfo()
+            await loadRoutingContext()
             await loadExistingReminders()
             await loadHouseholdUsers()
             await loadUpcomingVisits()
+            await loadPropertyContext()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openManualContractorAdd)) { _ in
+            showManualAddFromFindVendor = true
+        }
+        .sheet(isPresented: $showManualAddFromFindVendor) {
+            NavigationStack {
+                ContractorDirectoryView(onSelect: { contractor in
+                    showManualAddFromFindVendor = false
+                    Task { await assignContractorToTask(contractor) }
+                })
+            }
         }
         .sheet(isPresented: $showPauseFromDetail) {
             if let appointment = appointmentToPauseFromDetail {
@@ -354,22 +473,25 @@ struct MaintenanceTaskDetailSheet: View {
 
     // MARK: - Phase 54B.3 / 56.4: Add-to-handyman helpers
 
-    /// Phase 54B.3 / 56.4: Visible when the matched template has
-    /// `diyEffortMinutes` set and it's under an hour. Phase 56.4 dropped
-    /// the hard `assignmentType != "vendor"` gate — vendor-assigned
-    /// small jobs CAN go to the handyman, we just need to ask the user
-    /// what to do with the recurring series (see the confirmation
-    /// dialog in Step 56.4.13). Anything bigger than an hour stays on
-    /// the schedule — handing a multi-hour project to a handyman isn't
-    /// a handyman job.
+    /// Task detail should always let the homeowner try the handyman path
+    /// unless the task is already on the handyman list or belongs to a
+    /// vehicle workflow. Coverage can still be recommended, but it should
+    /// never block the "ask my handyman first" path.
     private var showAddToHandymanButton: Bool {
         guard task.vehicleId == nil else { return false }
-        guard let templateKey = task.templateId,
-              let template = MaintenanceTemplates.template(forKey: templateKey),
-              let minutes = template.diyEffortMinutes else {
-            return false
-        }
-        return minutes <= 60
+        return !isOnHandymanList
+    }
+
+    private var activeRoute: String? {
+        currentRoute ?? task.assignedRoute
+    }
+
+    private var isOnHandymanList: Bool {
+        activeRoute?.lowercased() == "handyman"
+    }
+
+    private var prefersVendorCoverage: Bool {
+        MaintenanceTaskRoutingSupport.prefersVendorCoverage(task)
     }
 
     /// Phase 56.4: Entry point for the handyman add flow. Vendor-assigned
@@ -381,6 +503,36 @@ struct MaintenanceTaskDetailSheet: View {
             showHandymanReassignConfirm = true
         } else {
             Task { await addToPunchListJustThisTime() }
+        }
+    }
+
+    /// Phase 78: stronger commitment than "Add to handyman list".
+    /// Atomically:
+    ///   1. inserts a `handyman_punch_items` row delegated to the next
+    ///      upcoming handyman visit (or wishlist if none exists),
+    ///   2. stamps `delegated_to_punch_item_id` on this task so it
+    ///      stops appearing in primary task lists.
+    /// The visit card now represents this work; the source task lives
+    /// on for service-history purposes but isn't user-facing anymore.
+    private func handleDelegateToHandyman() async {
+        guard !isDelegatingToHandyman else { return }
+        await MainActor.run { isDelegatingToHandyman = true }
+        defer { Task { await MainActor.run { isDelegatingToHandyman = false } } }
+        do {
+            _ = try await HavenSupabase.delegateTaskToPunchList(taskId: task.id.uuidString)
+            Analytics.track(.handymanPunchItemAdded, [
+                "source": "delegate_to_handyman",
+                "task_id": task.id.uuidString,
+                "entry_point": "task_detail_sheet",
+            ])
+            Haptics.success()
+            // Refresh the schedule + handyman tab so the visit card
+            // picks up the new item and the source task disappears.
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            await MainActor.run { dismiss() }
+        } catch {
+            print("[MaintenanceTaskDetailSheet] handleDelegateToHandyman failed: \(error)")
+            Haptics.error()
         }
     }
 
@@ -402,6 +554,7 @@ struct MaintenanceTaskDetailSheet: View {
         let existing = (try? await db.fetchPendingHandymanPunchItems(householdId: task.householdId)) ?? []
         if existing.contains(where: { $0.sourceTaskId == task.id }) {
             Haptics.light()
+            await MainActor.run { currentRoute = "handyman" }
             withAnimation { showAddedToPunchListToast = true }
             Task {
                 try? await Task.sleep(for: .seconds(2))
@@ -427,6 +580,10 @@ struct MaintenanceTaskDetailSheet: View {
             // Scheduled/To-Schedule buckets in MaintenanceScheduleView.
             // Errors swallowed — the punch item is the canonical action.
             _ = try? await db.assignTaskToHandymanRoutine(task: task)
+            await MainActor.run { currentRoute = "handyman" }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "routed", "id": task.id.uuidString, "route": "handyman"])
+            NotificationCenter.default.post(name: .routineChanged, object: nil)
             Analytics.track(.handymanPunchItemAdded, [
                 "source": "maintenance_task",
                 "task_id": task.id.uuidString,
@@ -492,12 +649,18 @@ struct MaintenanceTaskDetailSheet: View {
             // 4. Reflect the change in local UI state so the vendor
             // section disappears immediately instead of waiting for
             // the next sheet presentation.
-            await MainActor.run { assignedContractor = nil }
+            await MainActor.run {
+                assignedContractor = nil
+                currentRoute = "handyman"
+            }
 
             // Phase 66: Link the task to the handyman routine via
             // `parent_routine_id` so it surfaces under "Next Handyman
             // Visit" on the new Maintenance hub.
             _ = try? await db.assignTaskToHandymanRoutine(task: task)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "routed", "id": task.id.uuidString, "route": "handyman"])
+            NotificationCenter.default.post(name: .routineChanged, object: nil)
 
             Analytics.track(.handymanPunchItemAdded, [
                 "source": "maintenance_task",
@@ -523,19 +686,7 @@ struct MaintenanceTaskDetailSheet: View {
     /// Shared builder — same insert body whether the user chose Just
     /// this time or From now on.
     private func buildPunchItemInsert() -> HandymanPunchItemInsert {
-        var insert = HandymanPunchItemInsert(
-            householdId: task.householdId,
-            propertyId: task.propertyId,
-            title: task.title
-        )
-        insert.description = task.description
-        insert.source = "maintenance_task"
-        insert.sourceTaskId = task.id
-        if let templateKey = task.templateId,
-           let template = MaintenanceTemplates.template(forKey: templateKey) {
-            insert.estimatedMinutes = template.diyEffortMinutes
-        }
-        return insert
+        MaintenanceTaskRoutingSupport.buildPunchItemInsert(for: task)
     }
 
     // MARK: - Vendor Loading
@@ -570,6 +721,14 @@ struct MaintenanceTaskDetailSheet: View {
         vendorLoaded = true
     }
 
+    private func loadPropertyContext() async {
+        guard let propertyId = task.propertyId else { return }
+        let properties = (try? await db.fetchProperties()) ?? []
+        guard let property = properties.first(where: { $0.id == propertyId }) else { return }
+        propertyTown = property.city ?? ""
+        propertyState = property.state ?? ""
+    }
+
     private func loadUpcomingVisits() async {
         guard let appointmentId = task.standingAppointmentId else { return }
         let visits = (try? await db.fetchVisits(appointmentId: appointmentId, limit: 10)) ?? []
@@ -586,8 +745,10 @@ struct MaintenanceTaskDetailSheet: View {
                     needsVendor: false
                 )
             )
+            _ = try? await db.setTaskRoute(taskId: task.id, route: "vendor", task: task)
             await MainActor.run {
                 assignedContractor = contractor
+                currentRoute = "vendor"
                 withAnimation { showVendorAssignedToast = true }
             }
             Haptics.success()
@@ -626,6 +787,57 @@ struct MaintenanceTaskDetailSheet: View {
         } catch {
             print("[TaskDetail] Failed to unassign contractor: \(error)")
             Haptics.error()
+        }
+    }
+
+    private var vendorSearchCategory: String {
+        if let serviceVendor = ServiceLibrary.serviceDefinition(for: task)?.vendorCategory,
+           !serviceVendor.isEmpty {
+            return serviceVendor
+        }
+        if let systemCategory, !systemCategory.isEmpty {
+            return systemCategory
+        }
+        return resolvedCategory ?? "home service"
+    }
+
+    @ViewBuilder
+    private var vendorSearchSheet: some View {
+        if propertyTown.isEmpty || propertyState.isEmpty {
+            NavigationStack {
+                VStack(spacing: HavenTheme.spacing16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(HavenColors.warning)
+                    Text("Add a city and state to this property before searching local pros.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                    HavenButton(title: "Choose from my contacts") {
+                        showFindLocalVendor = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            showManualAddFromFindVendor = true
+                        }
+                    }
+                }
+                .padding(HavenTheme.spacing24)
+            }
+            .presentationDetents([.medium])
+        } else {
+            FindLocalVendorSheet(
+                task: task,
+                householdId: task.householdId,
+                town: propertyTown,
+                state: propertyState,
+                systemCategory: vendorSearchCategory,
+                categoryDisplayName: vendorSearchCategory.lowercased(),
+                onComplete: {
+                    Task { await loadVendorInfo() }
+                },
+                onAdoptedVendor: { contractor in
+                    Task { await assignContractorToTask(contractor) }
+                }
+            )
         }
     }
 
@@ -953,14 +1165,36 @@ struct MaintenanceTaskDetailSheet: View {
                     }
                 }
 
-                if let desc = task.description, !desc.isEmpty {
+                if let desc = visibleDescription {
                     Divider().overlay(HavenColors.beige200)
                     Text(desc)
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
 
-                if let notes = task.notes, !notes.isEmpty {
+                if !bundledChecklistItems.isEmpty {
+                    Divider().overlay(HavenColors.beige200)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("WHAT'S INCLUDED")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+
+                        ForEach(Array(bundledChecklistItems.enumerated()), id: \.offset) { _, item in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("-")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text(item)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+
+                if let notes = visibleNotes {
                     Divider().overlay(HavenColors.beige200)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("NOTES")
@@ -1028,7 +1262,7 @@ struct MaintenanceTaskDetailSheet: View {
                             }
                         }
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                 }
             }
@@ -1045,7 +1279,7 @@ struct MaintenanceTaskDetailSheet: View {
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textSecondary)
 
-                Text("Haven will recalculate the next due date based on the task frequency (\(task.frequency)).")
+                Text("Chez will recalculate the next due date based on the task frequency (\(task.frequency)).")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textTertiary)
                     .multilineTextAlignment(.center)
@@ -1066,13 +1300,13 @@ struct MaintenanceTaskDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showLastServicedPicker = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         Task { await saveLastServiced() }
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                 }
             }
@@ -1140,7 +1374,7 @@ struct MaintenanceTaskDetailSheet: View {
                             Spacer()
                             if editedFrequency == option {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .fontWeight(.semibold)
                             }
                         }
@@ -1153,13 +1387,13 @@ struct MaintenanceTaskDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showEditFrequency = false }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         Task { await saveFrequency() }
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                     .disabled(editedFrequency == task.frequency)
                 }
@@ -1423,7 +1657,63 @@ struct MaintenanceTaskDetailSheet: View {
                     .tracking(1.5)
                     .foregroundStyle(HavenColors.textTertiary)
 
-                if let contractor = assignedContractor {
+                if isOnHandymanList {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hammer.fill")
+                                .foregroundStyle(HavenColors.navy600)
+                            Text("On the handyman list")
+                                .font(HavenTypography.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(HavenColors.textPrimary)
+
+                            if prefersVendorCoverage {
+                                Text("Coverage recommended")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.warning)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(HavenColors.warning.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+
+                        Text(
+                            prefersVendorCoverage
+                            ? "Your handyman can review this first. Add service coverage if you want Chez to schedule it automatically in the future."
+                            : "We’ll keep this with your handyman bundle so it still gets serviced without getting lost inside the system record."
+                        )
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                        HStack(spacing: HavenTheme.spacing12) {
+                            Button {
+                                Haptics.light()
+                                showHandymanPunchList = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "hammer.fill")
+                                    Text("View handyman list")
+                                }
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            }
+                            .buttonStyle(.plain)
+
+                            if prefersVendorCoverage {
+                                Button {
+                                    Haptics.light()
+                                    showContractorDirectory = true
+                                } label: {
+                                    Text("Set service coverage")
+                                        .font(HavenTypography.uiLabelSmall)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                } else if let contractor = assignedContractor {
                     // Vendor is assigned — show info + Call button
                     HStack(spacing: HavenTheme.spacing12) {
                         Image(systemName: "person.crop.circle.fill")
@@ -1532,9 +1822,28 @@ struct MaintenanceTaskDetailSheet: View {
                                 Text("Add a Vendor")
                             }
                             .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         }
                         .padding(.top, 4)
+
+                        if showAddToHandymanButton {
+                            Button {
+                                Haptics.light()
+                                handleAddToHandymanList()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "hammer.fill")
+                                    Text("Or batch this with your handyman")
+                                }
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy700)
+                            }
+                            .buttonStyle(.plain)
+
+                            Text("Good for smaller tune-ups, lubrication, batteries, touch-ups, and other quick upkeep items.")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
                     }
                 }
             }
@@ -1792,7 +2101,7 @@ struct MaintenanceTaskDetailSheet: View {
                                     Text("Resume Service")
                                 }
                                 .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             }
                             .buttonStyle(.plain)
                         } else {
@@ -2000,7 +2309,7 @@ struct MaintenanceTaskDetailSheet: View {
                             if assignedUserId == user.id {
                                 Text("Assigned")
                                     .font(HavenTypography.badgeLabel)
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
                                     .background(HavenColors.navy.opacity(0.1))
@@ -2080,27 +2389,49 @@ struct MaintenanceTaskDetailSheet: View {
             // equivalent and handles the common case (user did it
             // off-app) more naturally.
 
-            Button {
-                Haptics.light()
-                if let scheduled = task.scheduledDate, let date = dateFormatter.date(from: scheduled) {
-                    scheduledPickerDate = date
+            if isOnHandymanList {
+                Button {
+                    Haptics.light()
+                    showHandymanPunchList = true
+                } label: {
+                    HStack {
+                        Image(systemName: "hammer.fill")
+                        Text("Open handyman list")
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: HavenTheme.buttonHeight)
+                    .background(HavenColors.creamLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .stroke(HavenColors.beige300, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
-                showScheduledPicker = true
-            } label: {
-                HStack {
-                    Image(systemName: "calendar.badge.checkmark")
-                    Text(task.scheduledDate != nil ? "Reschedule" : "Scheduled")
+            } else {
+                Button {
+                    Haptics.light()
+                    if let scheduled = task.scheduledDate, let date = dateFormatter.date(from: scheduled) {
+                        scheduledPickerDate = date
+                    }
+                    showScheduledPicker = true
+                } label: {
+                    HStack {
+                        Image(systemName: "calendar.badge.checkmark")
+                        Text(task.scheduledDate != nil ? "Reschedule" : "Scheduled")
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: HavenTheme.buttonHeight)
+                    .background(HavenColors.creamLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .stroke(HavenColors.beige300, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
-                .font(HavenTypography.uiButton)
-                .foregroundStyle(HavenColors.navy800)
-                .frame(maxWidth: .infinity)
-                .frame(height: HavenTheme.buttonHeight)
-                .background(HavenColors.creamLight)
-                .overlay(
-                    RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
-                        .stroke(HavenColors.beige300, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
             }
 
             Button {
@@ -2113,7 +2444,7 @@ struct MaintenanceTaskDetailSheet: View {
                     Text("Snooze")
                 }
                 .font(HavenTypography.uiButton)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .frame(height: HavenTheme.buttonHeight)
                 .background(HavenColors.creamLight)
@@ -2144,7 +2475,7 @@ struct MaintenanceTaskDetailSheet: View {
                         Text("Add to handyman list")
                     }
                     .font(HavenTypography.uiButton)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(maxWidth: .infinity)
                     .frame(height: HavenTheme.buttonHeight)
                     .background(HavenColors.creamLight)
@@ -2155,6 +2486,37 @@ struct MaintenanceTaskDetailSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
                 .disabled(isAddingToPunchList)
+
+                // Phase 78: "Have my handyman do this →" — stronger
+                // commitment than "Add to handyman list". Atomically
+                // inserts a punch item linked to the next handyman visit
+                // AND stamps `delegated_to_punch_item_id` on this task
+                // so the homeowner stops seeing it in their primary
+                // task list (the visit card represents it now). Calls
+                // the `delegate_task_to_punch_list` edge function so
+                // both writes happen in one transaction.
+                Button {
+                    Haptics.light()
+                    Task { await handleDelegateToHandyman() }
+                } label: {
+                    HStack {
+                        if isDelegatingToHandyman {
+                            ProgressView()
+                                .tint(HavenColors.textOnAction)
+                                .scaleEffect(0.85)
+                        } else {
+                            Image(systemName: "arrow.right.circle.fill")
+                        }
+                        Text("Have my handyman do this")
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: HavenTheme.buttonHeight)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .disabled(isDelegatingToHandyman)
             }
 
             Button {
@@ -2183,7 +2545,7 @@ struct MaintenanceTaskDetailSheet: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button("Cancel") { showSnooze = false }
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Save") {
@@ -2207,7 +2569,7 @@ struct MaintenanceTaskDetailSheet: View {
                                         }
                                     }
                                 }
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .fontWeight(.semibold)
                             }
                         }
@@ -2225,7 +2587,7 @@ struct MaintenanceTaskDetailSheet: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button("Cancel") { showScheduledPicker = false }
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Save") {
@@ -2248,7 +2610,7 @@ struct MaintenanceTaskDetailSheet: View {
                                         }
                                     }
                                 }
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .fontWeight(.semibold)
                             }
                         }
@@ -2263,6 +2625,7 @@ struct MaintenanceTaskDetailSheet: View {
 
 struct MarkCompleteForm: View {
     let task: MaintenanceTaskDBRow
+    let contractorId: UUID?
     let onComplete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -2319,14 +2682,14 @@ struct MarkCompleteForm: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") {
                     Task { await saveCompletion() }
                 }
                 .disabled(isSaving)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fontWeight(.semibold)
             }
         }
@@ -2361,6 +2724,7 @@ struct MarkCompleteForm: View {
                     serviceType: "maintenance",
                     description: task.title,
                     systemId: task.systemId,
+                    contractorId: contractorId,
                     cost: Double(cost),
                     notes: notes.isEmpty ? nil : notes
                 ))
@@ -2379,6 +2743,9 @@ struct MarkCompleteForm: View {
 
             // 4. Reschedule notifications
             Task { await NotificationScheduler.shared.rescheduleAll() }
+
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "completed", "id": task.id.uuidString])
 
             // 5. Push notification to all household members
             Task {

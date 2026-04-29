@@ -148,7 +148,7 @@ struct IntroExplainerView: View {
                 // Headline
                 Text(headline)
                     .font(HavenTypography.largeTitle)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 12)
 

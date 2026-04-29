@@ -18,11 +18,11 @@ struct ForceUpdateView: View {
                     .frame(width: 120, height: 120)
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 72, weight: .regular))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
 
             VStack(spacing: HavenTheme.spacing12) {
-                Text("Please update Haven")
+                Text("Please update Chez")
                     .font(HavenTypography.title)
                     .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
@@ -56,7 +56,7 @@ struct ForceUpdateView: View {
 
 #Preview {
     ForceUpdateView(
-        message: "We made important updates to keep your household data safe and your experience smooth. Please update Haven to continue.",
+        message: "We made important updates to keep your household data safe and your experience smooth. Please update Chez to continue.",
         appStoreURL: URL(string: "https://apps.apple.com/app/id6757167606")!
     )
 }

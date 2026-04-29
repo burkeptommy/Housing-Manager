@@ -24,6 +24,9 @@ struct ContentView: View {
             } else if appState.isAuthenticated && appState.sessionManager.isLocked {
                 BiometricAuthView()
                     .environmentObject(appState)
+            } else if appState.isAuthenticated && appState.activeExperience == .field {
+                HavenFieldRootView()
+                    .environmentObject(appState)
             } else if appState.isAuthenticated && appState.needsOnboarding {
                 OnboardingView()
                     .environmentObject(appState)
@@ -56,11 +59,31 @@ struct ContentView: View {
                 )
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: appState.requiresUpdate)
-        .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
-        .animation(.easeInOut(duration: 0.3), value: appState.sessionManager.isLocked)
-        .animation(.easeInOut(duration: 0.3), value: appState.needsOnboarding)
-        .animation(.easeInOut(duration: 0.3), value: showAuth)
+        .animation(.easeInOut(duration: 0.3), value: routeIdentifier)
+    }
+
+    /// Stable identifier for the current routing branch. Driving the
+    /// root `.animation(value:)` off this single value collapses what
+    /// used to be six stacked animation modifiers into ONE crossfade,
+    /// no matter how many `@Published` values settled in sequence.
+    private var routeIdentifier: String {
+        if appState.requiresUpdate,
+           appState.forceUpdateMessage != nil,
+           appState.forceUpdateAppStoreURL != nil {
+            return "forceUpdate"
+        }
+        if appState.isLoading { return "loading" }
+        if appState.isAuthenticated && appState.sessionManager.isLocked { return "biometric" }
+        if appState.isAuthenticated && appState.activeExperience == .field { return "field" }
+        if appState.isAuthenticated && appState.needsOnboarding { return "onboarding" }
+        if appState.isAuthenticated
+            && appState.hasCheckedPrimaryProperty
+            && appState.primaryProperty == nil {
+            return "addressIntercept"
+        }
+        if appState.isAuthenticated { return "main" }
+        if showAuth { return "auth" }
+        return "addressHook"
     }
 }
 

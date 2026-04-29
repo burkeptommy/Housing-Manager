@@ -48,17 +48,17 @@ struct HouseQuizInsightOverlay: View {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(feedback.badge.uppercased())
                             .font(.system(size: 11, weight: .bold))
                             .tracking(1.4)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
 
                     // Bold one-line takeaway
                     Text(feedback.renderedTitle(city: city, state: state))
                         .font(HavenTypography.fraunces(size: 22, weight: 600))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
 

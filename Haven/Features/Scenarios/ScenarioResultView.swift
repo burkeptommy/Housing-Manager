@@ -138,13 +138,13 @@ struct ScenarioResultView: View {
             ToolbarItem(placement: .principal) {
                 Text("Scenario Results")
                     .font(HavenTypography.fraunces(size: 18, weight: 700))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             ToolbarItem(placement: .topBarLeading) {
                 ShareLink(item: shareText) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     Analytics.track(.scenarioShared, ["title": String(result.title.prefix(100))])
@@ -159,7 +159,7 @@ struct ScenarioResultView: View {
                     }
                 }
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
             }
         }
     }
@@ -172,7 +172,7 @@ struct ScenarioResultView: View {
 
         Key Takeaway: \(result.actionItems.first?.title ?? "Review your plan")
 
-        — Analyzed by Haven
+        — Analyzed by Chez
         """
     }
 
@@ -234,7 +234,7 @@ struct ScenarioResultView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(result.title)
                 .font(HavenTypography.fraunces(size: 20, weight: 700))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
 
             severityBadge
 
@@ -280,7 +280,7 @@ struct ScenarioResultView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(step.title)
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(step.description)
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -398,7 +398,7 @@ struct ScenarioResultView: View {
                 statusDot(item.status)
                 Text(item.item)
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
                 Text(item.amount)
                     .font(HavenTypography.uiLabel)
@@ -564,7 +564,7 @@ struct ScenarioResultView: View {
                             .foregroundStyle(index == 0 ? HavenColors.navy700 : HavenColors.textTertiary)
                         Text(guardian.name)
                             .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .multilineTextAlignment(.center)
                         Text(guardian.relationship)
                             .font(HavenTypography.uiCaption)
@@ -609,7 +609,7 @@ struct ScenarioResultView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(item.description)
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -766,7 +766,7 @@ struct ScenarioResultView: View {
                     .foregroundStyle(HavenColors.warning)
                 Text("Generalized Projection")
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
 
             Text("This analysis uses national averages because key documents are missing from your vault. Upload them to see your family's actual exposure.")
@@ -788,7 +788,7 @@ struct ScenarioResultView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .semibold))
                             }
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .padding(12)
                             .background(HavenColors.navy.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -934,7 +934,7 @@ struct ScenarioResultView: View {
 
             Text(summaryLine)
                 .font(HavenTypography.title3)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .padding(.bottom, 4)
 
             if !result.financialDetails.isEmpty {

@@ -58,7 +58,7 @@ struct EquipmentSearchSheet: View {
                             .foregroundStyle(HavenColors.textTertiary)
                         Text("No matches found")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Try a different brand, model, or product type")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -168,7 +168,7 @@ struct EquipmentSearchSheet: View {
             HStack {
                 Text(result.displayName)
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .lineLimit(1)
                 Spacer()
                 if let score = result.scores?.reliability {
@@ -237,7 +237,7 @@ struct EquipmentSearchSheet: View {
             HStack(spacing: 10) {
                 Image(systemName: "envelope.badge.shield.half.filled")
                     .font(.system(size: 16))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Don't see your system?")

@@ -426,7 +426,11 @@ final class MaintenanceViewModel: ObservableObject {
                     serviceDate: formatter.string(from: .now),
                     serviceType: "maintenance",
                     description: task.title,
-                    systemId: task.systemId
+                    systemId: task.systemId,
+                    contractorId: MaintenanceTaskRoutingSupport.resolvedContractorId(
+                        for: task,
+                        systems: systems
+                    )
                 ))
             }
 

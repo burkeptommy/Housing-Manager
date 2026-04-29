@@ -92,7 +92,7 @@ struct RoutineOccurrenceRow: View {
     @ViewBuilder
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(routine.label)
+            Text(routine.presentationLabel)
                 .font(HavenTypography.uiLabel)
                 .foregroundStyle(HavenColors.textPrimary)
                 .lineLimit(1)

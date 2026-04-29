@@ -42,7 +42,7 @@ struct InlineInsightPill: View {
             }
             Text(feedback.renderedTitle(city: city, state: state))
                 .font(HavenTypography.bodySmall.weight(.semibold))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
             if let subhead = feedback.renderedSubhead(city: city, state: state) {

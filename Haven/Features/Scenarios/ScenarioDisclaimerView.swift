@@ -10,7 +10,7 @@ struct ScenarioDisclaimerView: View {
 
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: HavenTheme.spacing12) {
                 Text("Before You Begin")

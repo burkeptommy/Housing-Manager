@@ -31,7 +31,7 @@ struct DocumentCategoryPicker: View {
                                     if selectedCategory == cat {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(HavenColors.navy)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                     }
                                 }
                                 .contentShape(Rectangle())

@@ -120,7 +120,7 @@ struct AppliancePictogramGrid: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -141,7 +141,7 @@ struct AppliancePictogramGrid: View {
                         HStack(spacing: 4) {
                             Text(entry)
                                 .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Button {
                                 Haptics.light()
                                 customEntries.removeAll { $0 == entry }

@@ -246,7 +246,7 @@ struct UtilityProviderSearchPicker: View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text("CURRENTLY SELECTED")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
@@ -267,7 +267,7 @@ struct UtilityProviderSearchPicker: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(provider.name)
                             .font(HavenTypography.body.weight(.semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text("Tap to change")
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textTertiary)
@@ -275,7 +275,7 @@ struct UtilityProviderSearchPicker: View {
                     Spacer(minLength: 0)
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 .padding(HavenTheme.spacing12)
                 .background(HavenColors.navy.opacity(0.08))
@@ -417,7 +417,7 @@ struct UtilityProviderSearchPicker: View {
     private func fallbackIcon(for providerType: String) -> some View {
         Image(systemName: Self.fallbackIconName(for: providerType))
             .font(.system(size: 18))
-            .foregroundStyle(HavenColors.navy)
+            .foregroundStyle(HavenColors.textPrimary)
     }
 
     private static func fallbackIconName(for providerType: String) -> String {
@@ -465,14 +465,14 @@ struct UtilityProviderSearchPicker: View {
         HStack(spacing: HavenTheme.spacing12) {
             Image(systemName: "sparkles")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("Can't find yours? Add it")
                 .font(HavenTypography.uiButton)
                 .foregroundStyle(HavenColors.textPrimary)
             Spacer(minLength: 0)
             Image(systemName: "plus.circle.fill")
                 .font(.system(size: 18))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
 
@@ -528,7 +528,7 @@ struct UtilityProviderSearchPicker: View {
                     Text("Add your own")
                         .font(HavenTypography.uiButton)
                 }
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
                 .background(HavenColors.creamLight)

@@ -2,6 +2,12 @@ import SwiftUI
 
 /// Detail view for a HomeSystemRow from the database.
 struct SystemDetailRowView: View {
+    private struct ProfileChecklistItem: Identifiable {
+        let id: String
+        let title: String
+        let detail: String
+    }
+
     let initialSystem: HomeSystemRow
     @State private var system: HomeSystemRow
     @State private var warranties: [WarrantyRow] = []
@@ -27,9 +33,13 @@ struct SystemDetailRowView: View {
     @State private var showEditSystem = false
     @State private var showDeleteConfirm = false
     @State private var showManageTasks = false
+    @State private var showHandymanPunchList = false
     @State private var showResetTemplatesConfirm = false
     @State private var manualLinks: [ManualLink] = []
     @State private var childSystems: [HomeSystemRow] = []
+    @State private var contractorsById: [UUID: ContractorRow] = [:]
+    @State private var systemStatusToast: String?
+    @State private var isAddingTaskToHandyman = false
     @State private var equipmentScore: EquipmentDetailScore?
     @State private var catalogDetails: CatalogDetails?
     /// Phase 50: Toggles the FrequencyPickerSheet.
@@ -43,37 +53,80 @@ struct SystemDetailRowView: View {
         return f
     }()
 
+    private var hasBasicSystemIdentity: Bool {
+        !(system.manufacturer?.isEmpty ?? true)
+            || !(system.modelNumber?.isEmpty ?? true)
+            || !(system.serialNumber?.isEmpty ?? true)
+    }
+
+    private var shouldShowIdentifyPrompt: Bool {
+        !catalogLinked || (system.serialNumber?.isEmpty ?? true) || (system.installDate?.isEmpty ?? true)
+    }
+
+    private var hasProfileSetupNeeds: Bool {
+        !missingProfileChecklist.isEmpty
+    }
+
+    /// Service-typed rows (pet waste, snow removal, pest control, etc.)
+    /// are recurring vendor visits, not equipment. They have no brand,
+    /// model, serial, install date, manuals, or label photo. The detail
+    /// page suppresses every equipment-shaped card and surfaces only
+    /// the vendor + tasks + history. New service rows are created as
+    /// routines in the Services section; legacy `home_systems` rows
+    /// from earlier builds may still resolve here via deep links, so
+    /// the gate below is defensive.
+    private var isServiceCategory: Bool {
+        SystemGroup.isServiceCategory(system.category)
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: HavenTheme.spacing16) {
-                // Equipment catalog identification prompt
-                if !catalogLinked {
+                if !isServiceCategory && hasProfileSetupNeeds {
+                    profileSetupCard
+                }
+                if !isServiceCategory {
+                    if system.manufacturer != nil {
+                        brandCard
+                            .onTapGesture {
+                                Haptics.light()
+                                showEditSystem = true
+                            }
+                    } else {
+                        systemInfoCard
+                    }
+                }
+                if !isServiceCategory && equipmentScore != nil && system.manufacturer == nil { reliabilityCard }
+                if !isServiceCategory && !hasProfileSetupNeeds && shouldShowIdentifyPrompt {
                     identifyEquipmentCard
                 }
-
-                if system.manufacturer != nil {
-                    brandCard
-                        .onTapGesture {
-                            Haptics.light()
-                            showEditSystem = true
-                        }
-                } else {
-                    systemInfoCard
-                }
-                if equipmentScore != nil && system.manufacturer == nil { reliabilityCard }
-                if !manualLinks.isEmpty { manualsCard }
-                componentsCard
+                if !isServiceCategory && !manualLinks.isEmpty { manualsCard }
+                if !isServiceCategory { componentsCard }
                 preferredVendorCard
                 askAlfredCard
                 maintenanceCard
-                warrantiesCard
                 serviceRecordsCard
+                warrantiesCard
                 documentsCard
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             .padding(.vertical, HavenTheme.spacing16)
         }
         .background(HavenColors.background)
+        .overlay(alignment: .top) {
+            if let systemStatusToast {
+                Text(systemStatusToast)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .background(HavenColors.navy800)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.16), radius: 14, y: 8)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .navigationTitle(system.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -140,15 +193,33 @@ struct SystemDetailRowView: View {
         .task {
             await loadDetails()
         }
-        .sheet(item: $selectedTask) { task in
+        .sheet(item: $selectedTask, onDismiss: {
+            Task { await loadDetails() }
+        }) { task in
             NavigationStack {
-                MaintenanceTaskDetailSheet(task: task)
+                MaintenanceTaskDetailSheet(
+                    task: task,
+                    onTaskCompleted: {
+                        Task { await loadDetails() }
+                    },
+                    onDeleteTask: {
+                        Task { await loadDetails() }
+                    }
+                )
             }
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showContractorPicker) {
             ContractorPickerSheet(systemCategory: system.category) { contractor in
                 Task { await assignContractor(contractor) }
+            }
+        }
+        .sheet(isPresented: $showHandymanPunchList) {
+            NavigationStack {
+                HandymanPunchListView(
+                    householdId: system.householdId,
+                    propertyId: system.propertyId
+                )
             }
         }
         .sheet(isPresented: $showAlfredChat) {
@@ -212,6 +283,111 @@ struct SystemDetailRowView: View {
 
     // MARK: - Identify Equipment Card
 
+    private var profileSetupCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "checklist.checked")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.warning)
+                        .frame(width: 36, height: 36)
+                        .background(HavenColors.warning.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Profile to finish")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(profileSetupHeadline)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    Text("Setup in progress")
+                        .font(HavenTypography.uiCaption.weight(.semibold))
+                        .foregroundStyle(HavenColors.warning)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(HavenColors.warning.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(missingProfileChecklist.prefix(4)) { item in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 6))
+                                .foregroundStyle(HavenColors.warning)
+                                .padding(.top, 7)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(HavenTypography.uiLabel.weight(.semibold))
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text(item.detail)
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    if missingProfileChecklist.count > 4 {
+                        Text("+ \(missingProfileChecklist.count - 4) more detail\(missingProfileChecklist.count - 4 == 1 ? "" : "s") to add")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+
+                Text(profileSetupHelperText)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Button {
+                        Haptics.light()
+                        if shouldLeadWithPhotoCapture {
+                            showEquipmentIdentify = true
+                        } else {
+                            showEditSystem = true
+                        }
+                    } label: {
+                        Text(primaryProfileActionTitle)
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                            .foregroundStyle(HavenColors.textOnNavy)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(HavenColors.navy800)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        Haptics.light()
+                        if shouldLeadWithPhotoCapture {
+                            showEditSystem = true
+                        } else {
+                            showEquipmentIdentify = true
+                        }
+                    } label: {
+                        Text(secondaryProfileActionTitle)
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(HavenColors.navy.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
     private var identifyEquipmentCard: some View {
         Button {
             Haptics.light()
@@ -226,10 +402,10 @@ struct SystemDetailRowView: View {
                         .background(HavenColors.navy.opacity(0.08))
                         .clipShape(Circle())
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Identify Your Equipment")
+                        Text(identifyEquipmentTitle)
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
-                        Text("Search or take a photo for manuals, specs & maintenance tips")
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(identifyEquipmentSubtitle)
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textSecondary)
                             .lineLimit(2)
@@ -242,6 +418,70 @@ struct SystemDetailRowView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var identifyEquipmentTitle: String {
+        if !hasBasicSystemIdentity {
+            return "Identify this equipment"
+        }
+        if (system.serialNumber?.isEmpty ?? true) || (system.installDate?.isEmpty ?? true) {
+            return "Finish identifying this system"
+        }
+        return "Update system info"
+    }
+
+    private var identifyEquipmentSubtitle: String {
+        if !hasBasicSystemIdentity {
+            return "Take a label photo to find manuals, specs, lifespan, and maintenance tips."
+        }
+        if (system.serialNumber?.isEmpty ?? true) || (system.installDate?.isEmpty ?? true) {
+            return "We still need details like the serial number or install date."
+        }
+        return "Retake the label photo or edit details if anything changed."
+    }
+
+    private var primaryProfileActionTitle: String {
+        shouldLeadWithPhotoCapture ? "Take label photo" : "Enter details"
+    }
+
+    private var secondaryProfileActionTitle: String {
+        shouldLeadWithPhotoCapture ? "Enter details" : "Take label photo"
+    }
+
+    private var profileSetupHeadline: String {
+        "Chez still needs \(missingProfileChecklist.count) detail\(missingProfileChecklist.count == 1 ? "" : "s") before this system record is complete."
+    }
+
+    private var profileSetupHelperText: String {
+        if shouldLeadWithPhotoCapture {
+            return "Fastest path: take a label photo. Chez can usually fill in brand, model, manuals, parts, and other key specs automatically."
+        }
+        return "Manual entry is the fastest path for this system. Add the missing details and Chez will keep maintenance, manuals, and service history connected."
+    }
+
+    private var shouldLeadWithPhotoCapture: Bool {
+        missingProfileChecklist.contains { item in
+            ["brand", "model", "serial", "fuel-type", "catalog-match", "panel-brand"].contains(item.id)
+        }
+    }
+
+    /// Delegates to `SystemProfileAudit.missingItems` so the SAME
+    /// per-category logic drives both the in-page "Profile to finish"
+    /// checklist and the Overview "Systems missing profile" sheet.
+    /// One source of truth — adding a new category means editing
+    /// `SystemProfileAudit` once.
+    private var missingProfileChecklist: [ProfileChecklistItem] {
+        SystemProfileAudit.missingItems(
+            for: system,
+            warranties: warranties,
+            serviceRecords: records,
+            catalogLinked: catalogLinked,
+            manualLinkCount: manualLinks.count
+        ).map { ProfileChecklistItem(id: $0.id, title: $0.title, detail: $0.detail) }
+    }
+
+    private func containsAny(_ source: String, _ keywords: [String]) -> Bool {
+        keywords.contains { source.contains($0) }
     }
 
     // MARK: - Link Equipment to Catalog
@@ -312,7 +552,7 @@ struct SystemDetailRowView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(brand)
                                 .font(HavenTypography.title2)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             HStack(spacing: 6) {
                                 // Build 94: Surface the appliance type
                                 // ("Refrigerator" / "Dishwasher" / "Wall
@@ -640,7 +880,7 @@ struct SystemDetailRowView: View {
                     Image(systemName: "shield.checkered")
                         .font(.system(size: 16))
                         .foregroundStyle(scoreColor(equipmentScore?.reliability ?? 0))
-                    Text("Reliability Score")
+                    Text("Model reliability")
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.textPrimary)
                     Spacer()
@@ -655,6 +895,9 @@ struct SystemDetailRowView: View {
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
+                Text("This reflects known repair frequency and expected performance for this model. It is not an inspection of this specific unit.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
             }
         }
     }
@@ -682,7 +925,7 @@ struct SystemDetailRowView: View {
                             HStack {
                                 Image(systemName: manual.cached ? "doc.fill" : "link")
                                     .font(.system(size: 14))
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .frame(width: 24)
                                 Text(manual.displayName)
                                     .font(HavenTypography.uiLabel)
@@ -852,7 +1095,7 @@ struct SystemDetailRowView: View {
                     HStack {
                         Label("Components", systemImage: "square.stack.3d.up")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
                         Text("\(childSystems.count)")
                             .font(HavenTypography.uiLabel)
@@ -1117,7 +1360,7 @@ struct SystemDetailRowView: View {
                                     } label: {
                                         Text(template.title)
                                             .font(HavenTypography.uiLabelSmall)
-                                            .foregroundStyle(HavenColors.navy800)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 7)
                                             .background(HavenColors.navy.opacity(0.08))
@@ -1128,7 +1371,7 @@ struct SystemDetailRowView: View {
                                 }
                             }
                         } else {
-                            Text("Set up your maintenance schedule and Haven will make sure nothing falls through the cracks.")
+                            Text("Set up your maintenance schedule and Chez will make sure nothing falls through the cracks.")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
@@ -1136,60 +1379,203 @@ struct SystemDetailRowView: View {
                     .padding(.vertical, HavenTheme.spacing4)
                 } else {
                     ForEach(tasks) { task in
-                        Button {
-                            Haptics.light()
-                            selectedTask = task
-                        } label: {
-                            HStack(spacing: HavenTheme.spacing12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(task.title)
-                                        .font(HavenTypography.headline)
-                                        .foregroundStyle(HavenColors.textPrimary)
-
-                                    HStack(spacing: HavenTheme.spacing8) {
-                                        Text(task.frequency)
-                                            .font(HavenTypography.uiCaption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(HavenColors.beige300.opacity(0.5))
-                                            .clipShape(Capsule())
-                                            .foregroundStyle(HavenColors.textSecondary)
-
-                                        dueDateBadge(task.nextDueDate)
-                                    }
-
-                                    if let cost = task.estimatedCost {
-                                        Text("Est. $\(cost, specifier: "%.0f")")
-                                            .font(HavenTypography.uiLabelSmall)
-                                            .foregroundStyle(HavenColors.textSecondary)
-                                    }
-                                }
-
-                                Spacer()
-
-                                if let priority = task.priority {
-                                    Text(priority)
-                                        .font(HavenTypography.uiCaption)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(HavenColors.priorityColor(priority).opacity(0.12))
-                                        .foregroundStyle(HavenColors.priorityColor(priority))
-                                        .clipShape(Capsule())
-                                }
-
-                                Image(systemName: "chevron.right")
-                                    .font(.caption2)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
-                            .padding(HavenTheme.spacing12)
-                            .background(HavenColors.background)
-                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-                        }
-                        .buttonStyle(.plain)
+                        systemTaskRow(task)
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func systemTaskRow(_ task: MaintenanceTaskDBRow) -> some View {
+        let contractorId = MaintenanceTaskRoutingSupport.resolvedContractorId(for: task, systems: [system])
+        let prefersVendorCoverage = MaintenanceTaskRoutingSupport.prefersVendorCoverage(task)
+        let handymanEligible = MaintenanceTaskRoutingSupport.isInlineHandymanEligible(task, systems: [system])
+        let activeRoute = task.assignedRoute?.lowercased()
+
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Button {
+                Haptics.light()
+                selectedTask = task
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.title)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+
+                        HStack(spacing: HavenTheme.spacing8) {
+                            Text(task.frequency)
+                                .font(HavenTypography.uiCaption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(HavenColors.beige300.opacity(0.5))
+                                .clipShape(Capsule())
+                                .foregroundStyle(HavenColors.textSecondary)
+
+                            dueDateBadge(task.nextDueDate)
+                        }
+
+                        if let cost = task.estimatedCost {
+                            Text("Est. $\(cost, specifier: "%.0f")")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if let priority = task.priority {
+                        Text(priority)
+                            .font(HavenTypography.uiCaption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(HavenColors.priorityColor(priority).opacity(0.12))
+                            .foregroundStyle(HavenColors.priorityColor(priority))
+                            .clipShape(Capsule())
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(alignment: .center, spacing: HavenTheme.spacing12) {
+                let status = serviceStatus(for: task)
+                Label(status.text, systemImage: status.icon)
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(status.color)
+                    .lineLimit(2)
+
+                Spacer(minLength: HavenTheme.spacing8)
+
+                if activeRoute == "handyman" {
+                    Button {
+                        Haptics.light()
+                        showHandymanPunchList = true
+                    } label: {
+                        Text("View list")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(HavenColors.creamLight)
+                            .overlay(
+                                Capsule()
+                                    .stroke(HavenColors.beige300, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                } else if prefersVendorCoverage && contractorId == nil {
+                    Button {
+                        Haptics.light()
+                        Task { await addTaskToHandymanPunchList(task) }
+                    } label: {
+                        Text("Try handyman")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(HavenColors.creamLight)
+                            .overlay(
+                                Capsule()
+                                    .stroke(HavenColors.beige300, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                } else if handymanEligible {
+                    Button {
+                        Haptics.light()
+                        Task { await addTaskToHandymanPunchList(task) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isAddingTaskToHandyman {
+                                ProgressView()
+                                    .scaleEffect(0.75)
+                                    .tint(HavenColors.navy700)
+                            } else {
+                                Image(systemName: "hammer.fill")
+                            }
+                            Text("Add to handyman")
+                        }
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.navy700)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(HavenColors.creamLight)
+                        .overlay(
+                            Capsule()
+                                .stroke(HavenColors.beige300, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isAddingTaskToHandyman)
+                }
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.background)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    private func serviceStatus(for task: MaintenanceTaskDBRow) -> (text: String, icon: String, color: Color) {
+        if let contractorId = MaintenanceTaskRoutingSupport.resolvedContractorId(for: task, systems: [system]),
+           let contractor = contractorsById[contractorId] {
+            return ("Handled by \(contractor.companyName)", "person.crop.circle", HavenColors.textSecondary)
+        }
+
+        if task.assignedRoute == "handyman" {
+            return ("On the handyman list", "hammer.fill", HavenColors.navy700)
+        }
+
+        if MaintenanceTaskRoutingSupport.prefersVendorCoverage(task) {
+            return ("Coverage recommended", "wrench.and.screwdriver", HavenColors.warning)
+        }
+
+        if MaintenanceTaskRoutingSupport.isInlineHandymanEligible(task, systems: [system]) {
+            return ("Good for a handyman visit", "hammer.fill", HavenColors.warning)
+        }
+
+        return ("Open task", "calendar", HavenColors.textSecondary)
+    }
+
+    @MainActor
+    private func addTaskToHandymanPunchList(_ task: MaintenanceTaskDBRow) async {
+        guard !isAddingTaskToHandyman else { return }
+        isAddingTaskToHandyman = true
+        defer { isAddingTaskToHandyman = false }
+
+        let existing = (try? await db.fetchPendingHandymanPunchItems(householdId: task.householdId)) ?? []
+        if existing.contains(where: { $0.sourceTaskId == task.id }) {
+            Haptics.light()
+            await presentSystemToast("Already on the handyman list")
+            return
+        }
+
+        do {
+            let insert = MaintenanceTaskRoutingSupport.buildPunchItemInsert(for: task)
+            _ = try await db.createHandymanPunchItem(insert)
+            _ = try? await db.assignTaskToHandymanRoutine(task: task)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "routed", "id": task.id.uuidString, "route": "handyman"])
+            NotificationCenter.default.post(name: .routineChanged, object: nil)
+            Haptics.success()
+            await loadDetails()
+            await presentSystemToast("Added to the handyman list")
+        } catch {
+            print("[SystemDetail] Failed to add task to handyman list: \(error)")
+            Haptics.error()
+            await presentSystemToast("Couldn't add this task right now")
+        }
+    }
+
+    @MainActor
+    private func presentSystemToast(_ message: String) async {
+        withAnimation { systemStatusToast = message }
+        try? await Task.sleep(for: .seconds(2))
+        withAnimation { systemStatusToast = nil }
     }
 
     private func dueDateBadge(_ dateStr: String) -> some View {
@@ -1211,10 +1597,16 @@ struct SystemDetailRowView: View {
             .foregroundStyle(color)
     }
 
-    // MARK: - Service History
+    // MARK: - Recent Services
 
     private var serviceRecordsCard: some View {
-        Group {
+        let latestRecord = records.first
+        let latestVendorName: String? = {
+            guard let contractorId = latestRecord?.contractorId else { return nil }
+            return contractorsById[contractorId]?.companyName
+        }()
+
+        return Group {
             if records.isEmpty {
                 HavenCard {
                     HStack(spacing: HavenTheme.spacing12) {
@@ -1222,10 +1614,11 @@ struct SystemDetailRowView: View {
                             .font(.title3)
                             .foregroundStyle(HavenColors.textTertiary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Service History")
+                            Text("Recent Services")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.textPrimary)
-                            Text("Service records will appear as work is completed")
+                            Text(system.lastServiceDate.map { "Last recorded service \($0.havenDateShort). Future visits will show up here." }
+                                 ?? "Completed vendor visits and logged work for this system will show up here.")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
@@ -1238,9 +1631,21 @@ struct SystemDetailRowView: View {
                         HStack {
                             Image(systemName: "clock.fill")
                                 .foregroundStyle(HavenColors.textSecondary)
-                            Text("Service History")
-                                .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.textPrimary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Recent Services")
+                                    .font(HavenTypography.headline)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text(
+                                    latestRecord.map {
+                                        if let latestVendorName {
+                                            return "Last visit \($0.serviceDate.havenDateShort) by \(latestVendorName)"
+                                        }
+                                        return "Last visit \($0.serviceDate.havenDateShort)"
+                                    } ?? "Latest work and vendor visits for this system"
+                                )
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
                             Spacer()
                             if totalSpentAmount > 0 {
                                 Text("$\(totalSpentAmount, specifier: "%.0f") total")
@@ -1249,14 +1654,14 @@ struct SystemDetailRowView: View {
                             }
                         }
 
-                        ForEach(records) { record in
+                        ForEach(Array(records.prefix(3))) { record in
                             HStack(alignment: .top, spacing: HavenTheme.spacing12) {
                                 // Timeline dot
                                 VStack(spacing: 0) {
                                     Circle()
                                         .fill(HavenColors.navy)
                                         .frame(width: 8, height: 8)
-                                    if record.id != records.last?.id {
+                                    if record.id != Array(records.prefix(3)).last?.id {
                                         Rectangle()
                                             .fill(HavenColors.beige300)
                                             .frame(width: 1)
@@ -1282,6 +1687,16 @@ struct SystemDetailRowView: View {
                                         Text(record.serviceDate.havenDateShort)
                                             .font(HavenTypography.uiLabelSmall)
                                             .foregroundStyle(HavenColors.textSecondary)
+                                        if let contractorId = record.contractorId,
+                                           let contractor = contractorsById[contractorId] {
+                                            Text(contractor.companyName)
+                                                .font(HavenTypography.uiCaption)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(HavenColors.navy.opacity(0.08))
+                                                .clipShape(Capsule())
+                                                .foregroundStyle(HavenColors.navy700)
+                                        }
                                         Text(record.serviceType.capitalized)
                                             .font(HavenTypography.uiCaption)
                                             .padding(.horizontal, 6)
@@ -1293,6 +1708,21 @@ struct SystemDetailRowView: View {
                                 }
                             }
                             .padding(.vertical, 4)
+                        }
+
+                        if records.count > 3 {
+                            NavigationLink {
+                                ServiceHistoryView(systemId: system.id)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text("View full service history")
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy700)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -1627,6 +2057,9 @@ struct SystemDetailRowView: View {
 
     private func loadDetails() async {
         isLoading = true
+        await MainActor.run {
+            catalogLinked = system.catalogEntryId != nil
+        }
 
         // Start equipment intelligence in parallel with main data
         let modelNum = system.modelNumber
@@ -1638,8 +2071,7 @@ struct SystemDetailRowView: View {
             async let t = db.fetchMaintenanceTasks(propertyId: system.propertyId)
             async let r = db.fetchServiceRecords(systemId: system.id)
             async let docs = db.fetchDocuments()
-            async let contractors: [ContractorRow] = system.preferredContractorId != nil
-                ? db.fetchContractors() : []
+            async let contractors = db.fetchContractors()
 
             async let children = db.fetchChildSystems(parentId: system.id)
             let (wResult, tResult, rResult, allDocs, contractorList, childResult) = try await (w, t, r, docs, contractors, children)
@@ -1648,8 +2080,11 @@ struct SystemDetailRowView: View {
                 tasks = tResult.filter { $0.systemId == system.id }
                 records = rResult
                 childSystems = childResult
+                contractorsById = Dictionary(uniqueKeysWithValues: contractorList.map { ($0.id, $0) })
                 if let contractorId = system.preferredContractorId {
                     preferredContractor = contractorList.first { $0.id == contractorId }
+                } else {
+                    preferredContractor = nil
                 }
                 linkedDocuments = allDocs.filter { doc in
                     guard doc.propertyId == system.propertyId else { return false }

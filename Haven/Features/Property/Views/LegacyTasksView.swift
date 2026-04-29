@@ -37,7 +37,7 @@ struct LegacyTasksView: View {
                 ContentUnavailableView {
                     Label("Nothing archived", systemImage: "archivebox")
                 } description: {
-                    Text("Haven hasn't tidied any tasks in your household yet.")
+                    Text("Chez hasn't tidied any tasks in your household yet.")
                 }
             } else {
                 List {
@@ -124,7 +124,7 @@ struct LegacyTasksView: View {
         switch category {
         case "subtype_mismatch": return "Doesn't apply to your home"
         case "bundle_consolidation": return "Rolled into a service visit"
-        case "library_retirement": return "Retired from Haven's library"
+        case "library_retirement": return "Retired from Chez's library"
         default: return "Tidied up"
         }
     }
@@ -244,7 +244,7 @@ private struct LegacyTaskDetailView: View {
     /// copy a premium HNW audience expects. Never expose raw keys.
     static func humanReason(for raw: String?) -> String {
         guard let raw = raw, !raw.isEmpty else {
-            return "Haven tidied this task during a recent library refresh."
+            return "Chez tidied this task during a recent library refresh."
         }
 
         let lower = raw.lowercased()
@@ -268,7 +268,7 @@ private struct LegacyTaskDetailView: View {
         }
 
         if lower.hasPrefix("template_retired") || lower.contains("retired") {
-            return "Removed when Haven refined its task library. Nothing you need to do."
+            return "Removed when Chez refined its task library. Nothing you need to do."
         }
 
         if lower.contains("consolidated") || lower.contains("phase 52") {
@@ -276,6 +276,6 @@ private struct LegacyTaskDetailView: View {
         }
 
         // Fallback: show a friendly generic message rather than the raw code.
-        return "Haven tidied this task during a recent library refresh."
+        return "Chez tidied this task during a recent library refresh."
     }
 }

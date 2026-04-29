@@ -60,7 +60,7 @@ struct HouseholdAccessView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "person.2.fill")
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text("LINKED ACCOUNTS")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.5)
@@ -88,7 +88,7 @@ struct HouseholdAccessView: View {
             let unlinkedAdults = familyMembers.filter { !$0.isLinkedUser && $0.isMinor != true && $0.isExpecting != true }
             if !unlinkedAdults.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Not yet on Haven")
+                    Text("Not yet on Chez")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textTertiary)
 
@@ -143,7 +143,7 @@ struct HouseholdAccessView: View {
                     if isMe {
                         Text("You")
                             .font(HavenTypography.badgeLabel)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(HavenColors.navy.opacity(0.1))
@@ -217,7 +217,7 @@ struct HouseholdAccessView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "person.badge.key")
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text("TRUSTED ACCESS")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.5)
@@ -287,7 +287,7 @@ struct HouseholdAccessView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text("HOW SHARING WORKS")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.5)

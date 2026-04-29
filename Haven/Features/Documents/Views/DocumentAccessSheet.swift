@@ -50,7 +50,7 @@ struct DocumentAccessSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -66,7 +66,7 @@ struct DocumentAccessSheet: View {
                         } else {
                             Text("Save")
                                 .fontWeight(.semibold)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                     .disabled(isSaving || visibleToHomeManagers == document.isVisibleToHomeManagers)
@@ -82,7 +82,7 @@ struct DocumentAccessSheet: View {
             HStack(spacing: HavenTheme.spacing16) {
                 Image(systemName: "person.2.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(document.title)
                         .font(HavenTypography.headline)

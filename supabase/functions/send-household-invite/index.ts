@@ -38,7 +38,7 @@ interface SendInviteRequest {
 }
 
 const FROM_EMAIL = "hello@havenhome.dev";
-const FROM_NAME = "Haven";
+const FROM_NAME = "Chez";
 const REPLY_TO_EMAIL = "tom@havenhome.dev";
 
 function escapeHtml(input: string): string {
@@ -87,7 +87,7 @@ function buildHtml(payload: SendInviteRequest): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>You're invited to Haven</title>
+    <title>You're invited to Chez</title>
   </head>
   <body style="margin:0;padding:0;background:#F2EEE5;font-family:Georgia,serif;color:#1B2A4A;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EEE5;">
@@ -96,7 +96,7 @@ function buildHtml(payload: SendInviteRequest): string {
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F8F6F1;border-radius:16px;border:1px solid #F0EBE1;">
             <tr>
               <td style="padding:32px 32px 8px 32px;text-align:center;">
-                <div style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#1B2A4A;letter-spacing:0.5px;">Haven</div>
+                <div style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#1B2A4A;letter-spacing:0.5px;">Chez</div>
               </td>
             </tr>
             <tr>
@@ -106,7 +106,7 @@ function buildHtml(payload: SendInviteRequest): string {
             </tr>
             <tr>
               <td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#1B2A4A;">
-                ${escapeHtml(inviterName)} invited you to join ${householdName ? `<strong>${escapeHtml(householdName)}</strong>` : "their household"} on Haven, the app that helps families protect their home and everything in it.
+                ${escapeHtml(inviterName)} invited you to join ${householdName ? `<strong>${escapeHtml(householdName)}</strong>` : "their household"} on Chez, the app that helps families protect their home and everything in it.
               </td>
             </tr>
             ${address ? `<tr><td style="padding:24px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;border:1px solid #E3D9C6;border-radius:12px;"><tr><td style="padding:16px 20px;font-family:Georgia,serif;font-size:14px;color:#1B2A4A;">${escapeHtml(address)}</td></tr></table></td></tr>` : ""}
@@ -114,7 +114,7 @@ function buildHtml(payload: SendInviteRequest): string {
             ${personalBlock ? `<tr><td style="padding:0 32px;">${personalBlock}</td></tr>` : ""}
             <tr>
               <td style="padding:32px 32px 0 32px;text-align:center;">
-                <a href="${escapeHtml(payload.invite_url)}" style="display:inline-block;padding:14px 28px;background:#1B2A4A;color:#F8F6F1;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Haven</a>
+                <a href="${escapeHtml(payload.invite_url)}" style="display:inline-block;padding:14px 28px;background:#1B2A4A;color:#F8F6F1;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Chez</a>
               </td>
             </tr>
             <tr>
@@ -135,7 +135,7 @@ function buildHtml(payload: SendInviteRequest): string {
             </tr>
             <tr>
               <td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">
-                Haven Home, havenhome.dev
+                Chez, havenhome.dev
               </td>
             </tr>
           </table>
@@ -157,7 +157,7 @@ function buildText(payload: SendInviteRequest): string {
   const lines: string[] = [];
   lines.push(`Hi ${inviteeName},`);
   lines.push("");
-  lines.push(`${inviterName} invited you to join ${householdName} on Haven, the app that helps families protect their home and everything in it.`);
+  lines.push(`${inviterName} invited you to join ${householdName} on Chez, the app that helps families protect their home and everything in it.`);
   if (address) {
     lines.push("");
     lines.push(address);
@@ -167,13 +167,13 @@ function buildText(payload: SendInviteRequest): string {
     lines.push(`"${personalMessage}"`);
   }
   lines.push("");
-  lines.push(`Open in Haven: ${payload.invite_url}`);
+  lines.push(`Open in Chez: ${payload.invite_url}`);
   lines.push("");
   lines.push(`Or enter code: ${code}`);
   lines.push("");
   lines.push("This invite expires in 30 days. If you don't want to join, just ignore this email.");
   lines.push("");
-  lines.push("Haven Home, havenhome.dev");
+  lines.push("Chez, havenhome.dev");
   return lines.join("\n");
 }
 
@@ -199,7 +199,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const subject = `${payload.inviter_name.split(/\s+/)[0]} invited you to Haven`;
+    const subject = `${payload.inviter_name.split(/\s+/)[0]} invited you to Chez`;
     const previewText = payload.household_name
       ? `Join ${payload.household_name} to keep your home protected together.`
       : "Join their household to keep your home protected together.";

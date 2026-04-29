@@ -93,7 +93,7 @@ struct ProfileView: View {
                             isEditing = true
                         }
                     }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .disabled(isSaving)
                 }
             }

@@ -166,7 +166,7 @@ struct ChatView: View {
                 HStack(spacing: 8) {
                     Image(systemName: contextType == "document" ? "doc.fill" : "house.fill")
                         .font(.caption)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Chatting about: \(contextName)")
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.textPrimary)
@@ -429,7 +429,7 @@ struct ChatView: View {
                 } label: {
                     Image(systemName: "paperclip.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 .disabled(viewModel.isUploadingDocument)
                 .accessibilityLabel("Attach document")

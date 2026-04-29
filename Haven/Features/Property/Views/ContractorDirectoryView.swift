@@ -25,6 +25,7 @@ struct ContractorDirectoryView: View {
     var delegationContext: DelegationContext? = nil
     @StateObject private var viewModel = ContractorViewModel()
     @State private var showAddContractor = false
+    @State private var contractorIdsBeforeAdd: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -33,11 +34,11 @@ struct ContractorDirectoryView: View {
                 ProgressView("Loading contractors...")
             } else if viewModel.contractors.isEmpty && delegationContext == nil {
                 ContentUnavailableView {
-                    Label("Your Contact Network", systemImage: "person.crop.rectangle.badge.plus")
+                    Label("Your vendor network", systemImage: "person.crop.rectangle.badge.plus")
                 } description: {
-                    Text("Add contractors, attorneys, financial advisors, insurance agents, and other contacts.")
+                    Text("Add contractors, attorneys, financial advisors, insurance agents, and other trusted pros.")
                 } actions: {
-                    Button("Add a Contact") {
+                    Button("Add a vendor or advisor") {
                         showAddContractor = true
                     }
                     .buttonStyle(.borderedProminent)
@@ -51,9 +52,9 @@ struct ContractorDirectoryView: View {
                 contractorList
             }
         }
-        .navigationTitle("Home & Estate Contacts")
+        .navigationTitle("Vendors & Advisors")
         .trackScreen("ContractorDirectoryView")
-        .searchable(text: $viewModel.searchText, prompt: "Search contractors...")
+        .searchable(text: $viewModel.searchText, prompt: "Search vendors and advisors...")
         .onChange(of: viewModel.searchText) { _, newValue in
             if !newValue.isEmpty {
                 Analytics.track(.contractorSearched, ["query": newValue])
@@ -80,14 +81,15 @@ struct ContractorDirectoryView: View {
                         }
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
 
                     Button {
+                        contractorIdsBeforeAdd = Set(viewModel.contractors.map(\.id))
                         showAddContractor = true
                     } label: {
                         Image(systemName: "plus")
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -102,8 +104,31 @@ struct ContractorDirectoryView: View {
         }
         .sheet(isPresented: $showAddContractor) {
             AddVendorSheet(onComplete: {
-                Task { await viewModel.loadContractors() }
+                Task { await autoSelectNewlyAddedContractor() }
             })
+        }
+    }
+
+    private func autoSelectNewlyAddedContractor() async {
+        await viewModel.loadContractors()
+
+        guard onSelect != nil || delegationContext != nil else { return }
+
+        let currentIds = Set(viewModel.contractors.map(\.id))
+        let newIds = currentIds.subtracting(contractorIdsBeforeAdd)
+        guard let newId = newIds.first,
+              let contractor = viewModel.contractors.first(where: { $0.id == newId })
+        else {
+            return
+        }
+
+        await MainActor.run {
+            Haptics.success()
+            if let delegationContext {
+                delegationContext.onVendorSelected(contractor)
+            }
+            onSelect?(contractor)
+            dismiss()
         }
     }
 
@@ -206,7 +231,7 @@ struct ContractorDirectoryView: View {
                                 .font(HavenTypography.uiLabel)
                             Spacer()
                         }
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .padding(.horizontal, HavenTheme.spacing16)
                         .padding(.vertical, HavenTheme.spacing12)
                         .frame(maxWidth: .infinity)
@@ -286,7 +311,7 @@ struct ContractorDirectoryView: View {
                         .frame(width: 44, height: 44)
                     Image(systemName: icon)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -320,7 +345,7 @@ struct ContractorDirectoryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "person.crop.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(contractor.companyName)
@@ -438,6 +463,7 @@ struct ContractorDetailView: View {
     @State private var vendorDocuments: [DocumentRow] = []
     @State private var taskCompletions: [MaintenanceTaskDBRow] = []
     @State private var assignedSystems: [HomeSystemRow] = []
+    @State private var linkedRoutines: [RoutineRow] = []
     @State private var forwardingEmail: String?
     @State private var showDocumentUpload = false
     @State private var showForwardingSheet = false
@@ -579,6 +605,7 @@ struct ContractorDetailView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
                 heroCard
                 quickActionsRow
+                if !linkedRoutines.isEmpty { routinesSection }
                 if !upcomingTasks.isEmpty { upcomingSection }
                 contractsSection
                 if hasAnyActivity { recentActivitySection }
@@ -595,7 +622,7 @@ struct ContractorDetailView: View {
 
                             HStack(spacing: 4) {
                                 Image(systemName: "repeat")
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                 Text(appointment.cadenceLabel)
                                     .font(HavenTypography.body)
                                     .foregroundStyle(HavenColors.textPrimary)
@@ -656,7 +683,7 @@ struct ContractorDetailView: View {
                                         Task { try? await StandingAppointmentViewModel.shared.resumeAppointment(id: appointment.id) }
                                     }
                                     .font(HavenTypography.uiLabel.weight(.medium))
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                 } else {
                                     Button("Pause") { showPauseSheet = true }
                                         .font(HavenTypography.uiLabel)
@@ -675,8 +702,8 @@ struct ContractorDetailView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack(spacing: 8) {
                                 Image(systemName: "lightbulb.fill")
-                                    .foregroundStyle(HavenColors.navy800)
-                                Text("Haven noticed \(contractor.companyName) visits \(proposal.cadenceType.replacingOccurrences(of: "_", with: " ")).")
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text("Chez noticed \(contractor.companyName) visits \(proposal.cadenceType.replacingOccurrences(of: "_", with: " ")).")
                                     .font(HavenTypography.body)
                                     .foregroundStyle(HavenColors.textPrimary)
                             }
@@ -688,7 +715,7 @@ struct ContractorDetailView: View {
                                     Task { await acceptCadenceProposal(proposal) }
                                 }
                                 .font(HavenTypography.uiLabel.weight(.medium))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
                                 .background(HavenColors.navy800.opacity(0.12))
@@ -762,6 +789,9 @@ struct ContractorDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .documentChanged)) { _ in
             Task { await loadDocuments() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .routineChanged)) { _ in
+            Task { await loadDetail() }
         }
         .sheet(isPresented: $showDocumentUpload) {
             DocumentUploadView(preselectedCategory: nil,
@@ -1008,6 +1038,50 @@ struct ContractorDetailView: View {
         }
     }
 
+    private var routinesSection: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("ROUTINES")
+                    .font(HavenTypography.uiSectionHeader)
+                    .foregroundStyle(HavenColors.textSecondary)
+
+                ForEach(linkedRoutines) { routine in
+                    NavigationLink {
+                        RoutineDetailView(
+                            routine: routine,
+                            householdId: contractor.householdId
+                        )
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: routine.resolvedIcon)
+                                .foregroundStyle(HavenColors.navy700)
+                                .frame(width: 20)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(routine.presentationLabel)
+                                    .font(HavenTypography.body)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text(routine.typedCadence?.displayLabel ?? "Recurring")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                Text(routine.activeMonthsSummary)
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
     private func quickActionButton(symbol: String, label: String, url: URL?) -> some View {
         Group {
             if let url {
@@ -1241,7 +1315,7 @@ struct ContractorDetailView: View {
             VStack(spacing: 8) {
                 Image(systemName: symbol)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text(label)
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textPrimary)
@@ -1263,7 +1337,7 @@ struct ContractorDetailView: View {
                     Text("Forward any bill to Alfred")
                         .font(HavenTypography.title3)
                         .foregroundStyle(HavenColors.textPrimary)
-                    Text("Forward a bill or invoice from \(contractor.companyName) to the address below. Haven will auto-link it to this vendor.")
+                    Text("Forward a bill or invoice from \(contractor.companyName) to the address below. Chez will auto-link it to this vendor.")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
@@ -1271,7 +1345,7 @@ struct ContractorDetailView: View {
                     HStack {
                         Text(email)
                             .font(HavenTypography.body.monospaced())
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .textSelection(.enabled)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -1372,6 +1446,7 @@ struct ContractorDetailView: View {
         async let email = DatabaseService.shared.fetchHouseholdEmailAddress()
         async let systems = DatabaseService.shared.fetchHomeSystems()
         async let contracts = DatabaseService.shared.fetchServiceContracts(contractorId: contractor.id)
+        async let routines = DatabaseService.shared.fetchRoutines(householdId: contractor.householdId)
 
         let allRecords = (try? await records) ?? []
         serviceRecords = allRecords.filter { $0.contractorId == contractor.id }
@@ -1387,6 +1462,11 @@ struct ContractorDetailView: View {
         let allSystems = (try? await systems) ?? []
         assignedSystems = allSystems.filter { $0.preferredContractorId == contractor.id }
         serviceContracts = (try? await contracts) ?? []
+        linkedRoutines = ((try? await routines) ?? [])
+            .filter { $0.vendorId == contractor.id && $0.archivedAt == nil }
+            .sorted {
+                $0.presentationLabel.localizedCaseInsensitiveCompare($1.presentationLabel) == .orderedAscending
+            }
 
         if standingAppointments.isEmpty {
             cadenceProposal = await InvoiceCadenceCoordinator.shared.analyzeVendorCadence(
@@ -1580,7 +1660,7 @@ struct AddContractorView: View {
                                     Spacer()
                                     if selectedSpecialties.contains(cat) {
                                         Image(systemName: "checkmark")
-                                            .foregroundStyle(HavenColors.navy)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                     }
                                 }
                             }
@@ -1784,7 +1864,7 @@ struct EditContractorSheet: View {
                                     Spacer()
                                     if selectedSpecialties.contains(cat) {
                                         Image(systemName: "checkmark")
-                                            .foregroundStyle(HavenColors.navy)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                     }
                                 }
                             }

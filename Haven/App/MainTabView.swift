@@ -47,6 +47,24 @@ extension Notification.Name {
     /// The Dashboard listens for this and renders a confirmation card so
     /// the user can accept the new interval and update the system row.
     static let invoiceCadenceDetected = Notification.Name("invoiceCadenceDetected")
+
+    /// Chez v1: Posted by the new Property → Projects empty-state starter
+    /// rows so PropertyProjectsView can open its "Add Project" dialog
+    /// without requiring a custom binding handoff. `userInfo["mode"]` is
+    /// "plan" (open NewProjectView), "log" (open LogHistoricalProjectView),
+    /// or "import" (defer to inbox import flow).
+    static let propertyProjectsRequestAdd = Notification.Name("propertyProjectsRequestAdd")
+
+    /// Phase 67: Sent by the push handler when a `handyman_*` notification fires.
+    /// `TasksHubView` listens and flips its title-switcher to Handyman mode so the
+    /// user lands where the notification expects.
+    static let handymanModeRequested = Notification.Name("handymanModeRequested")
+
+    /// Phase 67: Sent by the push handler with `userInfo: ["request_id": String,
+    /// "presentation": "visit" | "quote"]`. `HandymanTabView` listens and presents
+    /// the visit detail sheet (or jumps straight to the quote review when the event
+    /// was quote-related).
+    static let openHandymanVisit = Notification.Name("openHandymanVisit")
 }
 
 struct MainTabView: View {
@@ -78,7 +96,8 @@ struct MainTabView: View {
                 PropertyListView()
                     .tag(1)
 
-                DocumentVaultView()
+                TasksHubView()
+                    .environmentObject(appState)
                     .tag(2)
 
                 ChatView()
@@ -98,7 +117,7 @@ struct MainTabView: View {
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) { _, newTab in
             Haptics.selection()
-            let tabNames = ["Dashboard", "Property", "Life", "Alfred"]
+            let tabNames = ["Dashboard", "Property", "Tasks", "Alfred"]
             let name = newTab < tabNames.count ? tabNames[newTab] : "Unknown"
             Analytics.track(.tabSelected, ["tab": name, "tab_index": newTab])
         }
@@ -156,7 +175,7 @@ struct MainTabView: View {
         HStack(spacing: 0) {
             tabButton(icon: "square.grid.2x2.fill", label: "Dashboard", tag: 0)
             tabButton(icon: "building.columns.fill", label: "Property", tag: 1)
-            tabButton(icon: "heart.text.square.fill", label: "Life", tag: 2)
+            tabButton(icon: "checklist", label: "Tasks", tag: 2)
             alfredTabButton
         }
         .padding(.top, 8)
@@ -223,9 +242,8 @@ struct MainTabView: View {
             Circle()
                 .fill(selectedTab == 3 ? HavenColors.action : HavenColors.tabInactive)
                 .frame(width: 22, height: 22)
-            Text("A")
-                .font(HavenTypography.fraunces(size: 13, weight: 700))
-                .foregroundStyle(HavenColors.creamLight)
+            AlfredMark(tint: HavenColors.creamLight, knotOverride: HavenColors.creamLight)
+                .frame(width: 18, height: 18)
         }
     }
 }

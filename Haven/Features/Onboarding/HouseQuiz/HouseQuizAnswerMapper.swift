@@ -247,12 +247,20 @@ final class HouseQuizAnswerMapper {
                     // Build 87 (search picker): use the catalog-aware path when
                     // the user picked from the search picker so the full brand
                     // identity (logo, brand color, website) lands on the row.
+                    var landscapingRoutine: RoutineRow?
                     if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
+                        let utilityAccount: UtilityAccountRow?
                         if answer.selectedProviderId != nil {
-                            try await createUtilityAccount(from: answer, fallbackType: "landscaping")
+                            utilityAccount = try await createUtilityAccount(from: answer, fallbackType: "landscaping")
                         } else {
-                            try await createUtilityAccount(name: provider, type: "landscaping")
+                            utilityAccount = try await createUtilityAccount(name: provider, type: "landscaping")
                         }
+                        let contractor = await matchedContractor(for: utilityAccount)
+                        landscapingRoutine = await ensureLinkedRoutineForProviderContext(
+                            providerType: "landscaping",
+                            utilityAccount: utilityAccount,
+                            contractor: contractor
+                        )
                     }
                     let lawnResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -271,6 +279,13 @@ final class HouseQuizAnswerMapper {
                         await flipCategoryTasksToVendor(
                             systemCategory: "Landscaping",
                             providerName: provider
+                        )
+                    }
+                    if let landscapingRoutine {
+                        _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                            landscapingRoutine,
+                            in: householdId,
+                            propertyId: propertyId
                         )
                     }
                 }
@@ -388,6 +403,29 @@ final class HouseQuizAnswerMapper {
                     }
                 }
 
+            case "q11c_landscaping_months":
+                let selectedIds = answer.selectedIds ?? []
+                guard !selectedIds.isEmpty else { break }
+
+                let activeMonths = monthsForRoutineSeasonAnswer(selectedIds)
+                guard !activeMonths.isEmpty else { break }
+
+                try await persistAttribute(
+                    "landscaping_active_months",
+                    value: activeMonths.map(String.init).joined(separator: ",")
+                )
+                let utilityAccounts = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+                let landscapingAccount = utilityAccounts.first(where: {
+                    $0.providerType.lowercased() == "landscaping"
+                })
+                let contractor = await matchedContractor(for: landscapingAccount)
+                _ = await ensureLinkedRoutineForProviderContext(
+                    providerType: "landscaping",
+                    utilityAccount: landscapingAccount,
+                    contractor: contractor,
+                    activeMonthsOverride: activeMonths
+                )
+
             case "q12_pool":
                 // Build 87 (Edit 2): Pool vs Hot Tub split. The previous
                 // build collapsed every Q12 answer into a single "Pool/Spa"
@@ -417,8 +455,22 @@ final class HouseQuizAnswerMapper {
 
                 let hasPool = id == "in_ground" || id == "above_ground" || id == "both"
                 let hasHotTub = id == "hot_tub" || id == "both"
+                let providerName = answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let hasProvider = providerName?.isEmpty == false
+                let poolUtilityAccount: UtilityAccountRow?
+                if hasProvider {
+                    if answer.selectedProviderId != nil {
+                        poolUtilityAccount = try await createUtilityAccount(from: answer, fallbackType: "pool_service")
+                    } else {
+                        poolUtilityAccount = try await createUtilityAccount(name: providerName ?? "", type: "pool_service")
+                    }
+                } else {
+                    poolUtilityAccount = nil
+                }
+                let poolContractor = await matchedContractor(for: poolUtilityAccount)
 
                 if hasPool {
+                    var poolRoutine: RoutineRow?
                     let poolSubtype: String
                     switch id {
                     case "in_ground": poolSubtype = "pool_inground"
@@ -445,12 +497,12 @@ final class HouseQuizAnswerMapper {
                     // contractor for: ..." placeholders.
                     // Build 87 (search picker): catalog-aware path when
                     // the user picked from the search picker.
-                    if let provider = answer.customText, !provider.isEmpty {
-                        if answer.selectedProviderId != nil {
-                            try await createUtilityAccount(from: answer, fallbackType: "pool_service")
-                        } else {
-                            try await createUtilityAccount(name: provider, type: "pool_service")
-                        }
+                    if hasProvider {
+                        poolRoutine = await ensureLinkedRoutineForProviderContext(
+                            providerType: "pool_service",
+                            utilityAccount: poolUtilityAccount,
+                            contractor: poolContractor
+                        )
                     }
                     let poolResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -460,10 +512,17 @@ final class HouseQuizAnswerMapper {
                         confirmedSubtype: poolSubtype
                     )
                     reconciliationResult = reconciliationResult.merging(poolResult)
-                    if let provider = answer.customText, !provider.isEmpty {
+                    if let provider = providerName, !provider.isEmpty {
                         await flipCategoryTasksToVendor(
                             systemCategory: "Pool/Spa",
                             providerName: provider
+                        )
+                    }
+                    if let poolRoutine {
+                        _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                            poolRoutine,
+                            in: householdId,
+                            propertyId: propertyId
                         )
                     }
                 }
@@ -595,6 +654,29 @@ final class HouseQuizAnswerMapper {
                     }
                 }
 
+            case "q12c_pool_months":
+                let selectedIds = answer.selectedIds ?? []
+                guard !selectedIds.isEmpty else { break }
+
+                let activeMonths = monthsForRoutineSeasonAnswer(selectedIds)
+                guard !activeMonths.isEmpty else { break }
+
+                try await persistAttribute(
+                    "pool_active_months",
+                    value: activeMonths.map(String.init).joined(separator: ",")
+                )
+                let utilityAccounts = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+                let poolAccount = utilityAccounts.first(where: {
+                    $0.providerType.lowercased() == "pool_service"
+                })
+                let contractor = await matchedContractor(for: poolAccount)
+                _ = await ensureLinkedRoutineForProviderContext(
+                    providerType: "pool_service",
+                    utilityAccount: poolAccount,
+                    contractor: contractor,
+                    activeMonthsOverride: activeMonths
+                )
+
             case "q13_pest":
                 try await persistAttribute("pest_control", value: answer.answerId)
                 if answer.answerId == "quarterly_pro" || answer.answerId == "termite_bond" {
@@ -609,12 +691,20 @@ final class HouseQuizAnswerMapper {
                     // templates to the matching contractor in one shot.
                     // Build 87 (search picker): catalog-aware path when
                     // the user picked from the search picker.
+                    var pestRoutine: RoutineRow?
                     if let provider = answer.customText, !provider.isEmpty {
+                        let utilityAccount: UtilityAccountRow?
                         if answer.selectedProviderId != nil {
-                            try await createUtilityAccount(from: answer, fallbackType: "pest_control")
+                            utilityAccount = try await createUtilityAccount(from: answer, fallbackType: "pest_control")
                         } else {
-                            try await createUtilityAccount(name: provider, type: "pest_control")
+                            utilityAccount = try await createUtilityAccount(name: provider, type: "pest_control")
                         }
+                        let contractor = await matchedContractor(for: utilityAccount)
+                        pestRoutine = await ensureLinkedRoutineForProviderContext(
+                            providerType: "pest_control",
+                            utilityAccount: utilityAccount,
+                            contractor: contractor
+                        )
                     }
                     // Run the reconciler so Pest Control templates become
                     // real tasks. With the contractor mirrored above, the
@@ -644,6 +734,13 @@ final class HouseQuizAnswerMapper {
                             providerName: provider
                         )
                     }
+                    if let pestRoutine {
+                        _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                            pestRoutine,
+                            in: householdId,
+                            propertyId: propertyId
+                        )
+                    }
                 }
 
             case "q14_irrigation":
@@ -662,12 +759,20 @@ final class HouseQuizAnswerMapper {
                     // doesn't change whether a pro is handling it.
                     // Build 87 (search picker): catalog-aware path when
                     // the user picked from the search picker.
+                    var irrigationRoutine: RoutineRow?
                     if let provider = answer.customText, !provider.isEmpty {
+                        let utilityAccount: UtilityAccountRow?
                         if answer.selectedProviderId != nil {
-                            try await createUtilityAccount(from: answer, fallbackType: "irrigation")
+                            utilityAccount = try await createUtilityAccount(from: answer, fallbackType: "irrigation")
                         } else {
-                            try await createUtilityAccount(name: provider, type: "irrigation")
+                            utilityAccount = try await createUtilityAccount(name: provider, type: "irrigation")
                         }
+                        let contractor = await matchedContractor(for: utilityAccount)
+                        irrigationRoutine = await ensureLinkedRoutineForProviderContext(
+                            providerType: "irrigation",
+                            utilityAccount: utilityAccount,
+                            contractor: contractor
+                        )
                     }
                     let irrigationResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -686,7 +791,37 @@ final class HouseQuizAnswerMapper {
                             providerName: provider
                         )
                     }
+                    if let irrigationRoutine {
+                        _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                            irrigationRoutine,
+                            in: householdId,
+                            propertyId: propertyId
+                        )
+                    }
                 }
+
+            case "q14b_irrigation_months":
+                let selectedIds = answer.selectedIds ?? []
+                guard !selectedIds.isEmpty else { break }
+
+                let activeMonths = monthsForRoutineSeasonAnswer(selectedIds)
+                guard !activeMonths.isEmpty else { break }
+
+                try await persistAttribute(
+                    "irrigation_active_months",
+                    value: activeMonths.map(String.init).joined(separator: ",")
+                )
+                let utilityAccounts = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+                let irrigationAccount = utilityAccounts.first(where: {
+                    $0.providerType.lowercased() == "irrigation"
+                })
+                let contractor = await matchedContractor(for: irrigationAccount)
+                _ = await ensureLinkedRoutineForProviderContext(
+                    providerType: "irrigation",
+                    utilityAccount: irrigationAccount,
+                    contractor: contractor,
+                    activeMonthsOverride: activeMonths
+                )
 
             case "q15_security":
                 try await persistAttribute("security_system", value: answer.answerId)
@@ -703,16 +838,24 @@ final class HouseQuizAnswerMapper {
                     // monitored / cameras-only households don't have an
                     // alarm company to delegate tasks to, so their DIY
                     // tasks stay DIY.
+                    var securityRoutine: RoutineRow?
                     let hasMonitoredProvider = id == "monitored"
                         && (answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
                     // Build 87 (search picker): catalog-aware path when
                     // the user picked from the search picker.
                     if hasMonitoredProvider, let provider = answer.customText {
+                        let utilityAccount: UtilityAccountRow?
                         if answer.selectedProviderId != nil {
-                            try await createUtilityAccount(from: answer, fallbackType: "security")
+                            utilityAccount = try await createUtilityAccount(from: answer, fallbackType: "security")
                         } else {
-                            try await createUtilityAccount(name: provider, type: "security")
+                            utilityAccount = try await createUtilityAccount(name: provider, type: "security")
                         }
+                        let contractor = await matchedContractor(for: utilityAccount)
+                        securityRoutine = await ensureLinkedRoutineForProviderContext(
+                            providerType: "security",
+                            utilityAccount: utilityAccount,
+                            contractor: contractor
+                        )
                     }
                     let securityResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -730,6 +873,13 @@ final class HouseQuizAnswerMapper {
                         await flipCategoryTasksToVendor(
                             systemCategory: "Security System",
                             providerName: provider
+                        )
+                    }
+                    if let securityRoutine {
+                        _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                            securityRoutine,
+                            in: householdId,
+                            propertyId: propertyId
                         )
                     }
                 }
@@ -901,10 +1051,10 @@ final class HouseQuizAnswerMapper {
             case "q16_electric":
                 // Phase 18e: picker selection threads selectedProviderId on the
                 // answer; the helper looks it up and snapshots logo + brand.
-                try await createUtilityAccount(from: answer, fallbackType: "electric")
+                _ = try await createUtilityAccount(from: answer, fallbackType: "electric")
 
             case "q17_internet":
-                try await createUtilityAccount(from: answer, fallbackType: "internet_cable")
+                _ = try await createUtilityAccount(from: answer, fallbackType: "internet_cable")
 
             case "q18_trash":
                 try await persistAttribute("trash_service", value: answer.answerId)
@@ -912,11 +1062,29 @@ final class HouseQuizAnswerMapper {
                     // Build 87 (search picker): catalog-aware path when
                     // the user picked from the search picker.
                     if answer.selectedProviderId != nil {
-                        try await createUtilityAccount(from: answer, fallbackType: "trash")
+                        _ = try await createUtilityAccount(from: answer, fallbackType: "trash")
                     } else {
-                        try await createUtilityAccount(name: provider, type: "trash")
+                        _ = try await createUtilityAccount(name: provider, type: "trash")
                     }
                 }
+
+            case "q18b_trash_day":
+                let selectedIds = answer.selectedIds ?? []
+                guard !selectedIds.isEmpty else { break }
+
+                try await persistAttribute("trash_pickup_days", value: selectedIds.joined(separator: ","))
+                let weekdays = weekdaysForTrashAnswer(selectedIds)
+                let utilityAccounts = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+                let wasteAccount = utilityAccounts.first(where: {
+                    ["trash", "recycling", "compost", "yard_waste", "yardwaste"].contains($0.providerType.lowercased())
+                })
+                let contractor = await matchedContractor(for: wasteAccount)
+                _ = await ensureLinkedRoutineForProviderContext(
+                    providerType: "trash",
+                    utilityAccount: wasteAccount,
+                    contractor: contractor,
+                    weekdayOverride: weekdays
+                )
 
             case "q19_heating_provider":
                 // Use the heating fuel attribute (q3) as a hint when known so
@@ -932,7 +1100,7 @@ final class HouseQuizAnswerMapper {
                     default: break
                     }
                 }
-                try await createUtilityAccount(from: answer, fallbackType: fallbackType)
+                _ = try await createUtilityAccount(from: answer, fallbackType: fallbackType)
 
             case "q20_other_fuels":
                 // Phase 19i: Q20 now covers fireplace + stove + wood + pellets
@@ -992,7 +1160,7 @@ final class HouseQuizAnswerMapper {
                                 selectedProviderId: propaneId,
                                 answeredAt: answer.answeredAt
                             )
-                            try await createUtilityAccount(from: propaneAnswer, fallbackType: "propane")
+                            _ = try await createUtilityAccount(from: propaneAnswer, fallbackType: "propane")
                         }
                     }
                 }
@@ -1052,7 +1220,7 @@ final class HouseQuizAnswerMapper {
                         selectedProviderId: providerId,
                         answeredAt: answer.answeredAt
                     )
-                    try await createUtilityAccount(from: synthetic, fallbackType: fuel)
+                    _ = try await createUtilityAccount(from: synthetic, fallbackType: fuel)
                 }
 
             case "q23_vehicle_count":
@@ -1106,14 +1274,14 @@ final class HouseQuizAnswerMapper {
             case "q26_auto_insurance":
                 // Phase 18e: snapshot the carrier's logo + brand color from
                 // the catalog when the user picked from the search picker.
-                try await createUtilityAccount(from: answer, fallbackType: "auto_insurance")
+                _ = try await createUtilityAccount(from: answer, fallbackType: "auto_insurance")
 
             case "q27_homeowners_insurance":
                 // Phase 16b: keep the utility_account row aligned with the
                 // seeded "home_insurance" provider_type from Phase 16a so
                 // search and write paths use the same vocabulary.
                 // Phase 18e: snapshot the picker selection.
-                try await createUtilityAccount(from: answer, fallbackType: "home_insurance")
+                _ = try await createUtilityAccount(from: answer, fallbackType: "home_insurance")
 
             case "q28_household":
                 if let id = answer.answerId {
@@ -1357,6 +1525,160 @@ final class HouseQuizAnswerMapper {
         _ = try await db.createHomeSystem(insert)
     }
 
+    private func matchedContractor(for utilityAccount: UtilityAccountRow?) async -> ContractorRow? {
+        guard let utilityAccount else { return nil }
+        let contractors = (try? await db.fetchContractors()) ?? []
+
+        if let providerId = utilityAccount.providerId,
+           let exactProviderMatch = contractors.first(where: { $0.utilityProviderId == providerId }) {
+            return exactProviderMatch
+        }
+
+        let normalizedName = utilityAccount.providerName.lowercased()
+        let expectedCategory = UtilityContractorMirror.serviceCategory(forProviderType: utilityAccount.providerType)
+
+        return contractors.first { contractor in
+            guard contractor.companyName.lowercased() == normalizedName else { return false }
+            guard let expectedCategory else { return true }
+
+            let categoryMatches = contractor.category?.caseInsensitiveCompare(expectedCategory) == .orderedSame
+            let specialtyMatches = contractor.specialties?.contains {
+                $0.caseInsensitiveCompare(expectedCategory) == .orderedSame
+            } == true
+            return categoryMatches || specialtyMatches
+        }
+    }
+
+    @discardableResult
+    private func ensureLinkedRoutineForProviderContext(
+        providerType: String,
+        utilityAccount: UtilityAccountRow?,
+        contractor: ContractorRow?,
+        weekdayOverride: [Int]? = nil,
+        activeMonthsOverride: [Int]? = nil
+    ) async -> RoutineRow? {
+        guard let defaults = RoutineSeeder.shared.defaults(forProviderType: providerType) else {
+            return nil
+        }
+
+        let routineTitle = ServiceLibrary.serviceDefinition(forKey: defaults.serviceKey)?.homeownerTitle
+            ?? defaults.label.replacingOccurrences(of: "_", with: " ").capitalized
+        let shouldBeActive = utilityAccount != nil || contractor != nil || !defaults.kind.isVendorBased
+        let icon = defaults.kind == .otherService
+            ? MaintenanceHubIcon.icon(for: defaults.serviceKey)
+            : defaults.kind.icon
+
+        let routines = (try? await db.fetchRoutines(householdId: householdId)) ?? []
+        let existing = routines.first { routine in
+            guard routine.archivedAt == nil else { return false }
+            guard routine.typedScope == .property else { return false }
+            guard routine.propertyId == propertyId || routine.propertyId == nil else { return false }
+            if defaults.kind == .otherService {
+                return routine.resolvedServiceKey == defaults.serviceKey
+            }
+            return routine.resolvedServiceKey == defaults.serviceKey || routine.typedKind == defaults.kind
+        }
+
+        let resolvedWeekdays = weekdayOverride ?? defaults.daysOfWeek
+        let resolvedActiveMonths = {
+            guard let activeMonthsOverride, !activeMonthsOverride.isEmpty else {
+                return defaults.activeMonths
+            }
+            return activeMonthsOverride.sorted()
+        }()
+
+        do {
+            let routine: RoutineRow
+            if let existing {
+                var update = RoutineUpdate()
+                update.label = routineTitle
+                update.serviceKey = defaults.serviceKey
+                update.sourceUtilityAccountId = utilityAccount?.id ?? existing.sourceUtilityAccountId
+                if let contractor {
+                    update.vendorId = contractor.id
+                }
+                update.icon = icon
+                update.cadenceType = defaults.cadenceType.rawValue
+                update.cadenceIntervalDays = defaults.cadenceIntervalDays
+                update.daysOfWeek = resolvedWeekdays
+                update.timeOfDay = defaults.timeOfDay
+                update.activeMonths = resolvedActiveMonths
+                update.eveningBeforeReminder = defaults.eveningBeforeReminder
+                update.morningOfReminder = defaults.morningOfReminder
+                update.setupState = shouldBeActive
+                    ? RoutineSetupState.active.rawValue
+                    : RoutineSetupState.pendingVendor.rawValue
+                routine = try await db.updateRoutine(id: existing.id, update)
+            } else {
+                var insert = RoutineInsert(
+                    householdId: householdId,
+                    propertyId: propertyId,
+                    label: routineTitle,
+                    routineKind: defaults.kind.rawValue,
+                    cadenceType: defaults.cadenceType.rawValue
+                )
+                insert.serviceKey = defaults.serviceKey
+                insert.sourceUtilityAccountId = utilityAccount?.id
+                insert.vendorId = contractor?.id
+                insert.icon = icon
+                insert.cadenceIntervalDays = defaults.cadenceIntervalDays
+                insert.daysOfWeek = resolvedWeekdays
+                insert.timeOfDay = defaults.timeOfDay
+                insert.activeMonths = resolvedActiveMonths
+                insert.eveningBeforeReminder = defaults.eveningBeforeReminder
+                insert.morningOfReminder = defaults.morningOfReminder
+                insert.cadenceSource = "quiz"
+                insert.setupState = shouldBeActive
+                    ? RoutineSetupState.active.rawValue
+                    : RoutineSetupState.pendingVendor.rawValue
+                routine = try await db.createRoutine(insert)
+            }
+
+            if shouldBeActive {
+                _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                    routine,
+                    in: householdId,
+                    propertyId: propertyId
+                )
+            }
+            return routine
+        } catch {
+            print("[HouseQuizAnswerMapper] Failed to ensure linked routine for \(providerType): \(error)")
+            return nil
+        }
+    }
+
+    private func weekdaysForTrashAnswer(_ selectedIds: [String]) -> [Int] {
+        let mapping: [String: Int] = [
+            "sun": 1,
+            "mon": 2,
+            "tue": 3,
+            "wed": 4,
+            "thu": 5,
+            "fri": 6,
+            "sat": 7,
+        ]
+        return selectedIds.compactMap { mapping[$0] }.sorted()
+    }
+
+    private func monthsForRoutineSeasonAnswer(_ selectedIds: [String]) -> [Int] {
+        let mapping: [String: Int] = [
+            "jan": 1,
+            "feb": 2,
+            "mar": 3,
+            "apr": 4,
+            "may": 5,
+            "jun": 6,
+            "jul": 7,
+            "aug": 8,
+            "sep": 9,
+            "oct": 10,
+            "nov": 11,
+            "dec": 12,
+        ]
+        return selectedIds.compactMap { mapping[$0] }.sorted()
+    }
+
     /// Phase 18e: When the answer carries a `selectedProviderId` (set by the
     /// quiz picker via `recordProviderAnswer`), look up the catalog row and
     /// snapshot its logo, brand color, slug, website, and phone onto the new
@@ -1373,7 +1695,7 @@ final class HouseQuizAnswerMapper {
     /// pest, irrigation, security, etc.), ALSO mirror the vendor into the
     /// `contractors` table so the maintenance task reconciler can find them
     /// at task-creation time and auto-assign vendor-managed tasks.
-    private func createUtilityAccount(from answer: HouseQuizAnswer, fallbackType: String) async throws {
+    private func createUtilityAccount(from answer: HouseQuizAnswer, fallbackType: String) async throws -> UtilityAccountRow? {
         // Resolve the catalog provider record (if any) so we can snapshot it.
         var catalogProvider: UtilityProviderRow?
         if let providerId = answer.selectedProviderId {
@@ -1386,18 +1708,18 @@ final class HouseQuizAnswerMapper {
         } else if let typed = answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines), !typed.isEmpty {
             resolvedName = typed
         } else {
-            return
+            return nil
         }
 
         let resolvedType = catalogProvider?.providerType ?? fallbackType
 
         // Avoid duplicates: skip if an account with this provider name already exists.
         let existing = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
-        if existing.contains(where: { $0.providerName.lowercased() == resolvedName.lowercased() }) {
+        if let match = existing.first(where: { $0.providerName.lowercased() == resolvedName.lowercased() }) {
             // Even if the utility_account already exists, ensure the contractor
             // mirror is up to date for service categories.
             try? await mirrorContractorIfNeeded(name: resolvedName, providerType: resolvedType, catalogProvider: catalogProvider)
-            return
+            return match
         }
 
         var insert = UtilityAccountInsert(
@@ -1414,12 +1736,13 @@ final class HouseQuizAnswerMapper {
             insert.website = catalog.website
             insert.phone = catalog.phone
         }
-        _ = try await db.createUtilityAccount(insert)
+        let created = try await db.createUtilityAccount(insert)
 
         // Phase 19k: Mirror the vendor into the contractors table when this
         // is a service category. The reconciler picks up the row by category
         // match at task-creation time and auto-assigns vendor-managed tasks.
         try? await mirrorContractorIfNeeded(name: resolvedName, providerType: resolvedType, catalogProvider: catalogProvider)
+        return created
     }
 
     /// Phase 18e: Name-only convenience wrapper for the legacy follow-up path
@@ -1428,13 +1751,13 @@ final class HouseQuizAnswerMapper {
     /// the user types a free-form name with no catalog ID.
     ///
     /// Phase 19k: Same contractor mirror as the picker-driven helper.
-    private func createUtilityAccount(name: String, type: String) async throws {
+    private func createUtilityAccount(name: String, type: String) async throws -> UtilityAccountRow? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
         let existing = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
-        if existing.contains(where: { $0.providerName.lowercased() == trimmed.lowercased() }) {
+        if let match = existing.first(where: { $0.providerName.lowercased() == trimmed.lowercased() }) {
             try? await mirrorContractorIfNeeded(name: trimmed, providerType: type, catalogProvider: nil)
-            return
+            return match
         }
         let insert = UtilityAccountInsert(
             propertyId: propertyId,
@@ -1442,9 +1765,10 @@ final class HouseQuizAnswerMapper {
             providerType: type,
             providerName: trimmed
         )
-        _ = try await db.createUtilityAccount(insert)
+        let created = try await db.createUtilityAccount(insert)
 
         try? await mirrorContractorIfNeeded(name: trimmed, providerType: type, catalogProvider: nil)
+        return created
     }
 
     /// Build 83 (Apr 7, 2026): Q15b customEntries are pipe-delimited strings.
@@ -1476,13 +1800,13 @@ final class HouseQuizAnswerMapper {
         let source: String
 
         /// Render a human caption for the contractor `notes` column so we can
-        /// surface "Haven Certified \u{2022} 4.7 \u{2022} 120 reviews" without
+        /// surface "Chez Certified \u{2022} 4.7 \u{2022} 120 reviews" without
         /// adding new columns. Returns nil when there's nothing to attribute
         /// (e.g. a manual-add row with no rating).
         func attributionNotes() -> String? {
             var parts: [String] = []
             if isHavenCertified {
-                parts.append("Haven Certified")
+                parts.append("Chez Certified")
             }
             if let rating {
                 parts.append(String(format: "%.1f stars", rating))
@@ -1924,38 +2248,23 @@ final class HouseQuizAnswerMapper {
 
         let isSnow = isSnowState(property?.state)
 
-        // Phase 57: Air Quality is gated on the Northeast regional pack —
-        // radon risk tracks granite-belt geology, so non-NE households
-        // don't see the category auto-created (they can still add it from
-        // the Browse Specialty sheet).
-        let isNortheast = RegionalPack(state: property?.state) == .northeast
-
         struct Rule {
             let category: String
             let subtype: String?
             let shouldCreate: Bool
         }
 
+        // Chez v1: service-shaped categories (Handyman, Mosquito &
+        // Tick, Trash & Recycling, Pet Waste, Snow Removal) are no
+        // longer auto-created as `home_systems` rows — they're
+        // recurring vendor visits, not equipment with brand/model/
+        // serial. Instead they become pending-vendor routines via
+        // `RoutineSeeder.ensureSystemlessRoutines` below. Chimney
+        // STAYS in this loop because a chimney is a real structural
+        // system with install date / type / sweep history.
         let rules: [Rule] = [
-            .init(category: "Handyman", subtype: nil, shouldCreate: true),
-            .init(category: "Mosquito & Tick", subtype: nil, shouldCreate: true),
-            // Phase 54E.3: Trash & Recycling is universal so every
-            // household sees the category in Vendor Coverage + the
-            // contractor directory's Assign Systems picker.
-            .init(category: "Trash & Recycling", subtype: nil, shouldCreate: true),
-            .init(category: "Pet Waste", subtype: nil, shouldCreate: hasPets),
             .init(category: "Chimney", subtype: chimneySubtype, shouldCreate: hasChimney),
-            .init(category: "Snow Removal", subtype: nil, shouldCreate: isSnow),
-            // Phase 67 fix: Air Quality is NOT a primary system that needs
-            // its own dedicated vendor. The annual radon test can be
-            // handled by the household's handyman (it's a 2-7 day DIY kit
-            // + placement). Radon mitigation fan verification already
-            // lives as a Handyman:fall bundle child. We keep the Air
-            // Quality category + template available via "Recommended for
-            // your home" browse, but we no longer auto-create it as a
-            // primary system that triggers "you need an Air Quality
-            // vendor" coverage gaps.
-            // .init(category: "Air Quality", subtype: nil, shouldCreate: isNortheast), // REMOVED
+            // Phase 67 fix: Air Quality removed — see prior comment.
         ]
 
         for rule in rules {
@@ -1970,10 +2279,21 @@ final class HouseQuizAnswerMapper {
                 householdId: householdId,
                 name: displayName,
                 category: rule.category,
-                notes: "Auto-created by Haven so vendor coverage stays complete."
+                notes: "Auto-created by Chez so vendor coverage stays complete."
             )
             insert.subtype = rule.subtype
             _ = try? await db.createHomeSystem(insert)
         }
+
+        // Chez v1: seed pending-vendor routines for the service-shaped
+        // categories that used to live as home_systems rows. Idempotent
+        // — `RoutineSeeder.ensureSystemlessRoutines` skips any kind for
+        // which a routine already exists.
+        await RoutineSeeder.shared.ensureSystemlessRoutines(
+            propertyId: propertyId,
+            householdId: householdId,
+            hasPets: hasPets,
+            isSnowState: isSnow
+        )
     }
 }

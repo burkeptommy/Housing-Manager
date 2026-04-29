@@ -71,7 +71,7 @@ struct TrustedContactDetailView: View {
                 HStack {
                     Image(systemName: "person.badge.key.fill")
                         .font(.title2)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("CONTACT INFO")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -177,7 +177,7 @@ struct TrustedContactDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "doc.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("SHARED DOCUMENTS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -188,7 +188,7 @@ struct TrustedContactDetailView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(HavenColors.navy.opacity(0.12))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .clipShape(Capsule())
                 }
 

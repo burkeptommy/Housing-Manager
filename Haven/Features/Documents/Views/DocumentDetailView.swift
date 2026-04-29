@@ -133,7 +133,7 @@ struct DocumentDetailView: View {
             if viewModel.document?.vaultLocked == true {
                 Text("This will remove device-only encryption. The document will be accessible to Alfred for analysis and chat.")
             } else {
-                Text("Vault Lock adds device-only encryption that even Haven's servers can't break. The AI will no longer be able to analyze, summarize, or reference this document. If you lose access to this device, Vault Locked documents cannot be recovered.")
+                Text("Vault Lock adds device-only encryption that even Chez's servers can't break. The AI will no longer be able to analyze, summarize, or reference this document. If you lose access to this device, Vault Locked documents cannot be recovered.")
             }
         }
         .sheet(isPresented: $showEditDetails) {
@@ -243,7 +243,7 @@ struct DocumentDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(HavenColors.creamLight)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .overlay(
                             RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                                 .stroke(HavenColors.beige300, lineWidth: 1)
@@ -256,11 +256,8 @@ struct DocumentDetailView: View {
                 // Status and dates
                 metadataCard(doc)
 
-                // Estate attorney (Phase 48) -- only for estate planning docs
-                if let docCategory = DocumentCategory(rawValue: doc.category),
-                   docCategory.sectionGroup == "Estate Planning" {
-                    estateAttorneyCard(doc)
-                }
+                // Chez v1: estate attorney card removed; estate management
+                // is out of v1 scope.
 
                 // Vault Lock indicator
                 if doc.vaultLocked == true {
@@ -357,7 +354,7 @@ struct DocumentDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(HavenColors.navy.opacity(0.12))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 }
                 .quickLookPreview($quickLookURL, in: [viewModel.previewURL].compactMap { $0 })
@@ -529,43 +526,6 @@ struct DocumentDetailView: View {
         }
     }
 
-    // MARK: - Estate Attorney Card (Phase 48)
-
-    /// Separate card for linking an estate attorney to estate planning
-    /// documents. Shows below the metadata card when the document's
-    /// category is in the "Estate Planning" section group.
-    private func estateAttorneyCard(_ doc: DocumentRow) -> some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
-                        .foregroundStyle(HavenColors.textSecondary)
-                    Text("ESTATE ATTORNEY")
-                        .font(HavenTypography.uiSectionHeader)
-                        .tracking(1.5)
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
-
-                LinkedAttorneyField(
-                    document: doc,
-                    allTrustedContacts: viewModel.allTrustedContacts,
-                    onUpdate: { contactId in
-                        Task {
-                            var update = DocumentUpdate()
-                            update.linkedAttorneyContactId = contactId
-                            if let updated = try? await DatabaseService.shared.updateDocument(id: doc.id, update) {
-                                viewModel.document = updated
-                            }
-                        }
-                    },
-                    onAddNewAttorney: {
-                        showAddTrustedContact = true
-                    }
-                )
-            }
-        }
-    }
-
     /// Build 87 (Home Manager expansion): tappable row that opens
     /// `DocumentAccessSheet`. Only rendered when the household has at
     /// least one home manager.
@@ -613,7 +573,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "sparkles")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .font(.title3)
                     Text("AI SUMMARY")
                         .font(HavenTypography.uiSectionHeader)
@@ -644,7 +604,7 @@ struct DocumentDetailView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(HavenColors.navy.opacity(0.1))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .clipShape(Capsule())
                     }
                     Spacer()
@@ -658,7 +618,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "sparkles")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("AI ANALYSIS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -686,7 +646,7 @@ struct DocumentDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .background(HavenColors.navy.opacity(0.12))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 }
                 .disabled(viewModel.isAnalyzing)
@@ -722,7 +682,7 @@ struct DocumentDetailView: View {
                             .foregroundStyle(matchedIds.isEmpty ? HavenColors.warning : HavenColors.navy700)
                         Text("Vehicles Detected")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
 
                     // Matched vehicles
@@ -857,7 +817,7 @@ struct DocumentDetailView: View {
                             .font(.caption)
                             .foregroundColor(HavenColors.textTertiary)
                     }
-                    .foregroundColor(HavenColors.navy800)
+                    .foregroundColor(HavenColors.textPrimary)
                     .padding(HavenTheme.spacing16)
                     .background(HavenColors.navy800.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
@@ -919,7 +879,7 @@ struct DocumentDetailView: View {
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "building.columns.fill")
-                                    .foregroundColor(HavenColors.navy800)
+                                    .foregroundColor(HavenColors.textPrimary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(property.name)
                                         .font(HavenTypography.headline)
@@ -1182,7 +1142,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "person.2.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("FAMILY MEMBERS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -1193,7 +1153,7 @@ struct DocumentDetailView: View {
                         showManageAccess = true
                     }
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 }
 
                 if viewModel.familyMembers.isEmpty {
@@ -1263,7 +1223,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "person.text.rectangle.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("IDENTIFIED PEOPLE")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -1286,7 +1246,7 @@ struct DocumentDetailView: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 2)
                                     .background(HavenColors.navy.opacity(0.12))
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                     .clipShape(Capsule())
 
                                 if party.familyMemberId != nil {
@@ -1342,7 +1302,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "person.badge.key.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("SHARING")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -1353,7 +1313,7 @@ struct DocumentDetailView: View {
                         showShareSheet = true
                     }
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 }
 
                 if viewModel.trustedContactsWithAccess.isEmpty {
@@ -1370,7 +1330,7 @@ struct DocumentDetailView: View {
                                     Text("Add Trusted Contact")
                                 }
                                 .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                             }
                         }
                     } else {
@@ -1468,7 +1428,7 @@ struct DocumentDetailView: View {
         HavenCard {
             HStack(spacing: 12) {
                 Image(systemName: "house.fill")
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .font(.title3)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("LINKED PROPERTY")
@@ -1509,7 +1469,7 @@ struct DocumentDetailView: View {
                         editingNotes.toggle()
                     }
                     .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                 }
 
                 if editingNotes {
@@ -1530,7 +1490,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "tag.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("TAGS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
@@ -1544,7 +1504,7 @@ struct DocumentDetailView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(HavenColors.navy.opacity(0.12))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .clipShape(Capsule())
                     }
                 }
@@ -1578,7 +1538,7 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: "link")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("RELATED DOCUMENTS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)

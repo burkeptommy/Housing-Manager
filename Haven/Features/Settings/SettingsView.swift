@@ -315,7 +315,7 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .trackScreen("SettingsView")

@@ -33,7 +33,7 @@ struct GapAnalysisView: View {
 
             Image(systemName: "chart.bar.doc.horizontal")
                 .font(.system(size: 56))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .accessibilityHidden(true)
 
             VStack(spacing: HavenTheme.spacing8) {
@@ -73,7 +73,7 @@ struct GapAnalysisView: View {
     private func gapFeatureRow(icon: String, text: String) -> some View {
         HStack(spacing: HavenTheme.spacing12) {
             Image(systemName: icon)
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .frame(width: 24)
             Text(text)
                 .font(HavenTypography.subheadline)
@@ -107,7 +107,7 @@ struct GapAnalysisView: View {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                         HStack {
                             Image(systemName: "sparkles")
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text("Analysis Complete")
                                 .font(HavenTypography.headline)
                         }

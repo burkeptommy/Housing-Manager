@@ -186,7 +186,7 @@ struct DocumentUploadView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "doc.badge.plus")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Upload a Document")
                         .font(HavenTypography.title)
                     Text("Just pick your file. Alfred will automatically categorize it, extract dates, identify people, and fill everything in for you.")
@@ -341,7 +341,7 @@ struct DocumentUploadView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Summary", systemImage: "sparkles")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
 
                         resultRow("Title", value: viewModel.title)
 
@@ -361,7 +361,7 @@ struct DocumentUploadView: View {
                                         .lineLimit(1)
                                     Text("Change")
                                         .font(HavenTypography.caption)
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                             }
                         }
@@ -384,7 +384,7 @@ struct DocumentUploadView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("Details", systemImage: "doc.text.magnifyingglass")
                                 .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
 
                             if !analysis.keyDates.isEmpty {
                                 ForEach(analysis.keyDates) { date in
@@ -416,10 +416,10 @@ struct DocumentUploadView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "link")
                                         .font(.caption)
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                     Text("Auto-linked: \(viewModel.autoLinkedMemberNames.joined(separator: ", "))")
                                         .font(HavenTypography.caption)
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                             }
 
@@ -427,10 +427,10 @@ struct DocumentUploadView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "house.fill")
                                         .font(.caption)
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                     Text("Linked to: \(propName)")
                                         .font(HavenTypography.caption)
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                             }
                         }
@@ -485,7 +485,7 @@ struct DocumentUploadView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(HavenColors.creamLight)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                             .overlay(
                                 RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
@@ -508,7 +508,7 @@ struct DocumentUploadView: View {
 
             Image(systemName: "doc.on.doc")
                 .font(.system(size: 48))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: 12) {
                 ProgressView(value: viewModel.batchProgress)
@@ -583,7 +583,7 @@ struct DocumentUploadView: View {
                 } else {
                     Image(systemName: "doc.fill")
                         .font(.title3)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .frame(width: 44, height: 44)
                 }
 
@@ -672,7 +672,7 @@ struct DocumentUploadView: View {
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 2)
                                         .background(HavenColors.navy.opacity(0.12))
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                         .clipShape(Capsule())
                                 }
 

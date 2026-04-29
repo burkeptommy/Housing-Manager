@@ -94,10 +94,32 @@ struct AddSystemView: View {
                 }
 
                 Section("Installation") {
-                    Toggle("Has Install Date", isOn: $hasInstallDate)
-                        .tint(HavenColors.navy800)
+                    // See EditSystemSheet for the rationale — the legacy
+                    // "Has Install Date" toggle was easy to miss. The
+                    // value sits next to the toggle so the user can read
+                    // current state at a glance, and the picker is
+                    // graphical (always visible when on).
+                    Toggle(isOn: $hasInstallDate.animation()) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Install date")
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text(hasInstallDate
+                                ? addSystemDisplayDateFormatter.string(from: installDate)
+                                : "Add the install date")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(hasInstallDate
+                                    ? HavenColors.textSecondary
+                                    : HavenColors.textTertiary)
+                        }
+                    }
+                    .tint(HavenColors.navy800)
                     if hasInstallDate {
-                        DatePicker("Install Date", selection: $installDate, displayedComponents: .date)
+                        DatePicker(
+                            "Pick a date",
+                            selection: $installDate,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
                     }
                     TextField("Expected Lifespan (years)", text: $expectedLifespan)
                         .keyboardType(.numberPad)
@@ -247,11 +269,29 @@ struct AddSystemView: View {
         }
     }
 
+    /// Stable formatter for the persisted ISO date string (`yyyy-MM-dd`).
+    /// Locked to `en_US_POSIX` + UTC so the persisted value never shifts
+    /// based on the user's locale or time zone — Postgres expects ISO.
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    /// Locale-aware display formatter — used for the row label so the
+    /// chosen date reads naturally to the user.
+    fileprivate var addSystemDisplayDateFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f
+    }
+
     private func save() async {
         isSaving = true
         error = nil
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = Self.isoDateFormatter
         do {
             let user = try await DatabaseService.shared.fetchCurrentUser()
             guard let householdId = user.householdId else {

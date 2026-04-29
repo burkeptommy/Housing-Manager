@@ -5,23 +5,20 @@ import SwiftUI
 /// Renders to look IDENTICAL to the iOS UILaunchScreen so the handoff
 /// from system splash → SwiftUI loader is seamless — no logo jump.
 ///
-/// Match contract (iOS UILaunchScreen with UIImageName centers the
-/// image at its intrinsic point size; no scaling. The ChezLaunch
-/// asset is 260pt square at @1x):
-///   - Image: `ChezLaunch` (same asset the launch screen renders)
-///   - Frame: 180×180pt, perfectly centered (intentionally tighter
-///     than the asset's 260pt square so the rendered glyph reads as
-///     a centered brand mark, not a wallpaper)
-///   - Background: `HavenColors.navy800` — same `ChezLaunchBackground`
-///     color the launch screen uses
-///   - Spinner: small + faded, anchored ~96pt below the bottom so it
-///     doesn't disturb the logo's vertical center
+/// Match contract: iOS `UILaunchScreen` with `UIImageName` renders the
+/// named image at its intrinsic point size (the @1x pixel dimensions),
+/// centered. `ChezLaunch.png` is 260px @1x, so the system splash shows
+/// the glyph at 260pt centered on `ChezLaunchBackground` (navy).
 ///
-/// Tom's bug: previous version used `.scaledToFit()` with no frame,
-/// which filled the entire screen. iOS launch screen rendered at
-/// intrinsic 260pt. Result: the C "jumped" between sizes during the
-/// handoff. The 180pt fixed frame here is what the launch screen
-/// effectively shows on a 6.1" device, so they match visually.
+/// To match exactly, this view renders the same `Image("ChezLaunch")`
+/// with NO `.resizable()` / `.frame(...)` — letting SwiftUI fall back
+/// to the asset's intrinsic 260pt size. The spinner sits ~96pt below
+/// the bottom so it doesn't disturb the logo's vertical center.
+///
+/// Earlier versions constrained the image to 180×180 thinking iOS
+/// "effectively" rendered at 180pt on a 6.1" device — that was wrong.
+/// The system splash shows it at 260pt; constraining to 180 caused a
+/// visible logo shrink during the system→SwiftUI handoff.
 struct LoadingView: View {
     var message: String = "Loading..."
 
@@ -31,9 +28,7 @@ struct LoadingView: View {
                 .ignoresSafeArea()
 
             Image("ChezLaunch")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 180, height: 180)
+                .accessibilityHidden(true)
 
             VStack(spacing: HavenTheme.spacing12) {
                 Spacer()

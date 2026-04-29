@@ -132,7 +132,7 @@ struct UpdateHomeDetailsSheet: View {
     /// Top-of-screen intro, styled like the subtitle paragraph at the top
     /// of `RecommendedServicesView.mainList`.
     private var introHeader: some View {
-        Text("Toggle anything you have. Haven will add the right vendor tasks to your schedule. Nothing changes until you save.")
+        Text("Toggle anything you have. Chez will add the right vendor tasks to your schedule. Nothing changes until you save.")
             .font(HavenTypography.bodySmall)
             .foregroundStyle(HavenColors.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -250,7 +250,7 @@ struct UpdateHomeDetailsSheet: View {
                             Text("Recommended for your home")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.textPrimary)
-                            Text("Browse services Haven thinks your home could benefit from.")
+                            Text("Browse services Chez thinks your home could benefit from.")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.textSecondary)
                                 .multilineTextAlignment(.leading)
@@ -585,7 +585,7 @@ struct SubtypeReviewDiffSheet: View {
                         Text(Self.labelByKey[key] ?? key)
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text(Self.previewByKey[key] ?? "Haven will schedule the relevant tasks.")
+                        Text(Self.previewByKey[key] ?? "Chez will schedule the relevant tasks.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     }

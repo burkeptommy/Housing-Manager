@@ -101,7 +101,7 @@ struct EditProjectSheet: View {
                         } else {
                             Text("Save")
                                 .fontWeight(.semibold)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)

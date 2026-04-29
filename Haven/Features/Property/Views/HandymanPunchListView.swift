@@ -20,10 +20,10 @@ struct HandymanPunchListView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading && viewModel.items.isEmpty {
+            if viewModel.isLoading && viewModel.entries.isEmpty {
                 ProgressView("Loading punch list...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.items.isEmpty {
+            } else if viewModel.entries.isEmpty {
                 emptyState
             } else {
                 itemList
@@ -39,12 +39,12 @@ struct HandymanPunchListView: View {
                     showAddSheet = true
                 } label: {
                     Image(systemName: "plus")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !viewModel.items.isEmpty {
+            if !viewModel.entries.isEmpty {
                 bottomActionBar
             }
         }
@@ -70,7 +70,7 @@ struct HandymanPunchListView: View {
         // but ad-hoc visits are first-class.
         .sheet(isPresented: $showScheduleSheet) {
             ScheduleHandymanVisitSheet(
-                itemCount: viewModel.items.count,
+                itemCount: viewModel.entries.count,
                 householdId: householdId,
                 propertyId: propertyId,
                 onSchedule: { scheduledDate, contractor in
@@ -116,7 +116,7 @@ struct HandymanPunchListView: View {
         }
         .animation(.easeInOut, value: viewModel.toast != nil)
         .task {
-            await viewModel.load(householdId: householdId)
+            await viewModel.load(householdId: householdId, propertyId: propertyId)
         }
         .trackScreen("HandymanPunchListView")
     }
@@ -151,8 +151,8 @@ struct HandymanPunchListView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
             }
 
-            ForEach(viewModel.items) { item in
-                punchItemCard(item)
+            ForEach(viewModel.entries) { entry in
+                punchItemCard(entry)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -162,11 +162,11 @@ struct HandymanPunchListView: View {
         .scrollContentBackground(.hidden)
         .background(HavenColors.background)
         .refreshable {
-            await viewModel.load(householdId: householdId)
+            await viewModel.load(householdId: householdId, propertyId: propertyId)
         }
     }
 
-    private func punchItemCard(_ item: HandymanPunchItemRow) -> some View {
+    private func punchItemCard(_ entry: HandymanPunchEntry) -> some View {
         HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                 HStack(alignment: .top, spacing: HavenTheme.spacing12) {
@@ -178,10 +178,10 @@ struct HandymanPunchListView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
+                        Text(entry.title)
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        if let description = item.description, !description.isEmpty {
+                        if let description = entry.description, !description.isEmpty {
                             Text(description)
                                 .font(HavenTypography.bodySmall)
                                 .foregroundStyle(HavenColors.textSecondary)
@@ -194,7 +194,7 @@ struct HandymanPunchListView: View {
                     Button {
                         Haptics.light()
                         Task {
-                            await viewModel.archive(item: item)
+                            await viewModel.archive(entry: entry)
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -202,12 +202,12 @@ struct HandymanPunchListView: View {
                             .foregroundStyle(HavenColors.textTertiary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Remove \(item.title) from punch list")
+                    .accessibilityLabel("Remove \(entry.title) from punch list")
                 }
 
-                if !item.metadataChips.isEmpty {
+                if !entry.metadataChips.isEmpty {
                     HStack(spacing: 6) {
-                        ForEach(item.metadataChips, id: \.self) { chip in
+                        ForEach(entry.metadataChips, id: \.self) { chip in
                             Text(chip)
                                 .font(HavenTypography.uiLabelSmall)
                                 .foregroundStyle(HavenColors.textSecondary)
@@ -253,7 +253,9 @@ struct HandymanPunchListView: View {
 
 // MARK: - Add sheet
 
-private struct AddHandymanPunchItemSheet: View {
+/// Used directly by `HandymanHubView` from the Tasks tab in addition to
+/// the legacy `HandymanPunchListView` route.
+struct AddHandymanPunchItemSheet: View {
     let householdId: UUID
     let propertyId: UUID?
     let onAdded: () -> Void
@@ -333,7 +335,7 @@ private struct AddHandymanPunchItemSheet: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -346,7 +348,7 @@ private struct AddHandymanPunchItemSheet: View {
                             .fontWeight(.semibold)
                     }
                 }
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
             }
         }
@@ -392,10 +394,110 @@ private struct AddHandymanPunchItemSheet: View {
     }
 }
 
+// MARK: - Unified punch list entry (Chez v1)
+
+/// Wraps the two data sources that compose the handyman punch list:
+///
+///   1. `manual` — explicit `handyman_punch_items` rows the user added
+///      (or that came from "Add to handyman" on a task / a recommended
+///      service). These have effort estimates, descriptions, and the
+///      legacy archive path.
+///   2. `task` — routine-parented `maintenance_tasks` rows that
+///      Day1TaskCurator routed onto the handyman routine. Day1Curator
+///      sets `parent_routine_id` so they're hidden from the regular
+///      maintenance buckets and surface here as work to bundle into
+///      the next visit.
+///
+/// Both render through the same card. The display layer doesn't care
+/// which side a row came from — only the source pill differs.
+enum HandymanPunchEntry: Identifiable {
+    case manual(HandymanPunchItemRow)
+    case task(MaintenanceTaskDBRow)
+
+    /// Stable, namespaced id so SwiftUI's diff doesn't collide a
+    /// punch_item with a maintenance_task that happen to share a
+    /// UUID (defensive — they're separate tables, but better safe).
+    var id: String {
+        switch self {
+        case .manual(let row): return "punch_" + row.id.uuidString
+        case .task(let row): return "task_" + row.id.uuidString
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .manual(let row): return row.title
+        case .task(let row): return row.title
+        }
+    }
+
+    var description: String? {
+        switch self {
+        case .manual(let row): return row.description
+        case .task(let row): return row.description
+        }
+    }
+
+    var estimatedMinutes: Int? {
+        switch self {
+        case .manual(let row): return row.estimatedMinutes
+        case .task: return nil
+        }
+    }
+
+    /// Used by HandymanHubView to dedup recommended-task suggestions
+    /// against punch list entries. Manual rows expose `sourceTaskId`;
+    /// task rows ARE their own source — return their `id`.
+    var sourceTaskId: UUID? {
+        switch self {
+        case .manual(let row): return row.sourceTaskId
+        case .task(let row): return row.id
+        }
+    }
+
+    /// Legacy callsites compare against `.manual(...).id` (UUID).
+    /// Keeps the existing archive route working without leaking the
+    /// enum shape into call sites that only care about the punch_item.
+    var manualPunchItem: HandymanPunchItemRow? {
+        if case .manual(let row) = self { return row }
+        return nil
+    }
+
+    var taskRow: MaintenanceTaskDBRow? {
+        if case .task(let row) = self { return row }
+        return nil
+    }
+
+    /// Compact metadata chips rendered at the bottom of each card.
+    var metadataChips: [String] {
+        var chips: [String] = []
+        if let mins = estimatedMinutes {
+            chips.append("~\(mins) min")
+        }
+        switch self {
+        case .manual(let row):
+            switch row.source {
+            case "maintenance_task": chips.append("From task")
+            case "recommended": chips.append("From recommendations")
+            default: break
+            }
+        case .task:
+            chips.append("From maintenance")
+        }
+        return chips
+    }
+}
+
 // MARK: - View model
 
 @MainActor
 final class HandymanPunchListViewModel: ObservableObject {
+    /// Combined unified list of every entry — manual punch_items + Day1-
+    /// curator-routed maintenance tasks. Display-layer source of truth.
+    @Published private(set) var entries: [HandymanPunchEntry] = []
+    /// Manual-punch-items-only — preserved for back-compat with code
+    /// paths that need the punch_item-specific shape (e.g. dedup against
+    /// recommended tasks via `sourceTaskId`).
     @Published private(set) var items: [HandymanPunchItemRow] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isScheduling = false
@@ -425,16 +527,134 @@ final class HandymanPunchListViewModel: ObservableObject {
         "\(nextVisitSeasonLabel) Handyman Visit"
     }
 
-    func load(householdId: UUID) async {
+    func load(householdId: UUID, propertyId: UUID? = nil) async {
         isLoading = true
         defer { isLoading = false }
+
+        // Chez v1 unified load — fetch BOTH manual punch_items AND any
+        // maintenance_tasks that should belong on the handyman list.
+        // "Should belong" is broader than just "parent_routine_id ==
+        // handyman_recurring" because the user has handyman tasks
+        // pre-Day1Curator that don't carry that linkage. The full
+        // eligibility set:
+        //   1. parent_routine_id matches the household's handyman_recurring routine
+        //   2. category resolves to "Handyman" via VendorTaskGrouping
+        //   3. templateId starts with "Handyman:" (catches handyman
+        //      bundle children even when their parent_routine_id is
+        //      null — pre-Phase-66 data)
+        // Excludes:
+        //   - The bundle PARENT tasks themselves (Spring/Fall Handyman
+        //     Visit). Those represent the visit slot, not punch items.
+        //   - Completed / archived tasks
+        //   - Tasks already assigned to a vendor with a scheduled date
+        //     (the user has acted on them via Maintenance)
+        async let punchItemsTask = db.fetchPendingHandymanPunchItems(householdId: householdId)
+        async let allTasksTask = db.fetchMaintenanceTasks(propertyId: propertyId)
+        async let systemsTask: [HomeSystemRow] = {
+            guard let propertyId else { return [] }
+            return try await db.fetchHomeSystems(propertyId: propertyId)
+        }()
+        async let handymanRoutineTask: RoutineRow? = {
+            let routines = try await db.fetchRoutines(householdId: householdId)
+            return routines.first(where: {
+                $0.routineKind == "handyman_recurring" && $0.archivedAt == nil
+            })
+        }()
+
+        let punchItemsRaw: [HandymanPunchItemRow]
         do {
-            let raw = try await db.fetchPendingHandymanPunchItems(householdId: householdId)
-            items = Self.deduplicated(raw)
+            punchItemsRaw = try await punchItemsTask
         } catch {
-            print("[HandymanPunchListViewModel] load failed: \(error)")
-            items = []
+            if Self.isCancellation(error) { return }
+            print("[HandymanPunchListViewModel] punch items load failed: \(error)")
+            punchItemsRaw = []
         }
+
+        let allTasks: [MaintenanceTaskDBRow]
+        do {
+            allTasks = try await allTasksTask
+        } catch {
+            if Self.isCancellation(error) { return }
+            print("[HandymanPunchListViewModel] tasks load failed: \(error)")
+            allTasks = []
+        }
+
+        let systems: [HomeSystemRow]
+        do {
+            systems = try await systemsTask
+        } catch {
+            if Self.isCancellation(error) { return }
+            systems = []
+        }
+
+        let handymanRoutine: RoutineRow?
+        do {
+            handymanRoutine = try await handymanRoutineTask
+        } catch {
+            if Self.isCancellation(error) { return }
+            handymanRoutine = nil
+        }
+
+        guard !Task.isCancelled else { return }
+
+        let systemsLookup = Dictionary(uniqueKeysWithValues: systems.map { ($0.id, $0) })
+        let bundleParentTemplateIds: Set<String> = ["Handyman:spring", "Handyman:fall"]
+
+        // Eligibility filter — see top-of-function comment for rules.
+        let eligibleTasks = allTasks.filter { task in
+            guard task.lastCompletedDate == nil else { return false }
+            guard task.isArchived != true else { return false }
+            // Skip the bundle parent visit slots themselves.
+            if let templateId = task.templateId,
+               bundleParentTemplateIds.contains(templateId) { return false }
+            // Skip tasks that have already been vendor-assigned AND
+            // scheduled (the user has acted on them via Maintenance).
+            if task.assignedContractorId != nil,
+               let scheduled = task.scheduledDate, !scheduled.isEmpty {
+                return false
+            }
+            // Now check eligibility — any of these qualifies.
+            if let routineId = handymanRoutine?.id, task.parentRoutineId == routineId {
+                return true
+            }
+            if let templateId = task.templateId, templateId.hasPrefix("Handyman:") {
+                return true
+            }
+            let canonical = VendorTaskGrouping.resolveCanonicalCategory(
+                for: task,
+                systemsLookup: systemsLookup
+            )
+            return canonical == "Handyman"
+        }
+
+        let dedupPunchItems = Self.deduplicated(punchItemsRaw)
+        // Dedup: if a punch_item already references a maintenance task
+        // (`sourceTaskId`), drop the task entry — the manual row is the
+        // authoritative version.
+        let punchSourceTaskIds = Set(dedupPunchItems.compactMap { $0.sourceTaskId })
+        let filteredTasks = eligibleTasks.filter { !punchSourceTaskIds.contains($0.id) }
+
+        guard !Task.isCancelled else { return }
+        items = dedupPunchItems
+        var combined: [HandymanPunchEntry] = dedupPunchItems.map(HandymanPunchEntry.manual)
+        let sortedTasks = filteredTasks.sorted { lhs, rhs in
+            let l = MaintenanceDateFormatting.date(from: lhs.scheduledDate ?? lhs.nextDueDate) ?? .distantFuture
+            let r = MaintenanceDateFormatting.date(from: rhs.scheduledDate ?? rhs.nextDueDate) ?? .distantFuture
+            return l < r
+        }
+        combined.append(contentsOf: sortedTasks.map(HandymanPunchEntry.task))
+        entries = combined
+
+        print("[HandymanPunchListViewModel] load complete — manual=\(dedupPunchItems.count) tasks=\(filteredTasks.count) total=\(combined.count)")
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return true
+        }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 
     /// Phase 56.6: Dedup pending punch items that share the same
@@ -476,9 +696,40 @@ final class HandymanPunchListViewModel: ObservableObject {
         do {
             try await db.archiveHandymanPunchItem(id: item.id)
             items.removeAll { $0.id == item.id }
+            entries.removeAll {
+                if case .manual(let row) = $0 { return row.id == item.id }
+                return false
+            }
             Analytics.track(.handymanPunchItemRemoved, ["source": item.source])
         } catch {
             print("[HandymanPunchListViewModel] archive failed: \(error)")
+        }
+    }
+
+    /// Chez v1: dispatches on entry type. Manual items archive via the
+    /// existing punch_items soft-delete; task entries get unrouted from
+    /// the handyman routine (their `parent_routine_id` clears) so they
+    /// fall back into the regular maintenance flow — the user is saying
+    /// "this isn't handyman work" rather than "delete this task."
+    func archive(entry: HandymanPunchEntry) async {
+        switch entry {
+        case .manual(let row):
+            await archive(item: row)
+        case .task(let task):
+            do {
+                var update = MaintenanceTaskUpdate()
+                update.parentRoutineId = nil
+                update.assignedRoute = nil
+                _ = try await db.updateMaintenanceTask(id: task.id, update)
+                entries.removeAll {
+                    if case .task(let t) = $0 { return t.id == task.id }
+                    return false
+                }
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                Analytics.track(.handymanPunchItemRemoved, ["source": "task_unrouted"])
+            } catch {
+                print("[HandymanPunchListViewModel] task unroute failed: \(error)")
+            }
         }
     }
 
@@ -498,7 +749,11 @@ final class HandymanPunchListViewModel: ObservableObject {
         scheduledDate: Date,
         contractor: ContractorRow?
     ) async {
-        guard !items.isEmpty else { return }
+        // Chez v1: schedule when EITHER manual items or routed tasks
+        // are present. Pre-Chez-v1 this short-circuited on `items`
+        // empty, but with the unified list a user can have 0 manual
+        // items and 18 routed tasks.
+        guard !entries.isEmpty else { return }
         guard let propertyId else {
             showToast("Select a property to schedule a handyman visit.")
             return
@@ -511,10 +766,12 @@ final class HandymanPunchListViewModel: ObservableObject {
         let dateStr = formatter.string(from: scheduledDate)
 
         // Build the bundled notes so the handyman task reads like a
-        // work order: what's included + who requested when.
-        let bullets = items.map { item -> String in
-            var line = "- " + item.title
-            if let mins = item.estimatedMinutes {
+        // work order: what's included + who requested when. Includes
+        // both manual punch items AND routed tasks so the handyman
+        // gets the full picture in one place.
+        let bullets = entries.map { entry -> String in
+            var line = "- " + entry.title
+            if let mins = entry.estimatedMinutes {
                 line += " (~\(mins) min)"
             }
             return line
@@ -546,14 +803,62 @@ final class HandymanPunchListViewModel: ObservableObject {
             let ids = items.map { $0.id }
             try await db.completePunchItems(ids: ids, visitTaskId: created.id)
 
+            // Chez v1: also stamp scheduled_date + contractor on every
+            // task entry that was on the unified list. The user's
+            // mental model is "this whole list is part of this visit"
+            // — the routed maintenance tasks need the same scheduling
+            // metadata so they appear in the Scheduled bucket and the
+            // Maintenance / Dashboard surfaces show them as covered.
+            let routedTasks = entries.compactMap { $0.taskRow }
+            for task in routedTasks {
+                var update = MaintenanceTaskUpdate()
+                update.scheduledDate = dateStr
+                if let contractor {
+                    update.assignedContractorId = contractor.id
+                    update.assignmentType = "vendor"
+                    update.needsVendor = false
+                }
+                _ = try? await db.updateMaintenanceTask(id: task.id, update)
+            }
+
+            // Phase 73 follow-up: every visit on the Handyman tab needs
+            // a `handyman_request` row so the provider's dispatch board
+            // (handyman.html) and the iOS coordination surfaces (chat,
+            // scheduling round-trip, quote review) all have something
+            // to hang off. Without this the visit lives only as a
+            // maintenance_task and the provider never sees it.
+            //
+            // Best-effort — a request-create failure shouldn't block
+            // the visit itself. The homeowner can still see the
+            // scheduled task; the provider just won't surface it
+            // until we backfill on next sync.
+            await Self.bridgeVisitToHandymanRequest(
+                visitTask: created,
+                householdId: householdId,
+                propertyId: propertyId,
+                contractor: contractor,
+                scheduledDateStr: dateStr,
+                bullets: bullets
+            )
+
             Analytics.track(.handymanPunchListScheduled, [
-                "item_count": items.count,
+                "item_count": items.count + routedTasks.count,
+                "manual_count": items.count,
+                "task_count": routedTasks.count,
                 "mode": "ad_hoc",
                 "vendor_assigned": contractor != nil
             ])
 
             items.removeAll()
+            entries.removeAll()
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            // Force the global maintenance cache to pick up the new
+            // task immediately so HandymanHubView's `nextScheduledVisit`
+            // resolves on the very next render. Without this the user
+            // saw a stale punch-list-empty state with no visit card,
+            // because the notification-driven reload was racing the
+            // view's re-render and arriving too late.
+            await MaintenanceViewModel.shared.loadTasks()
             try? await Task.sleep(nanoseconds: 150_000_000)
             justScheduledTask = created
         } catch {
@@ -731,6 +1036,57 @@ final class HandymanPunchListViewModel: ObservableObject {
             await MainActor.run { self.toast = nil }
         }
     }
+
+    /// Phase 73 follow-up: every Handyman-tab visit also creates a
+    /// `handyman_request` so the provider's dispatch board picks it
+    /// up and the iOS coordination surfaces (chat, scheduling round
+    /// trip, quote review) have something to hang off. Idempotent —
+    /// if a request already exists for this visit_task_id we skip.
+    static func bridgeVisitToHandymanRequest(
+        visitTask: MaintenanceTaskDBRow,
+        householdId: UUID,
+        propertyId: UUID,
+        contractor: ContractorRow?,
+        scheduledDateStr: String,
+        bullets: String
+    ) async {
+        let db = DatabaseService.shared
+        if let existing = try? await db.fetchLatestHandymanRequest(visitTaskId: visitTask.id),
+           existing.id != UUID(uuidString: "00000000-0000-0000-0000-000000000000") {
+            // A request already covers this visit — leave it alone.
+            // Future scheduling edits can update it via the existing
+            // handyman_provider/handyman-portal coordination paths.
+            _ = existing
+            return
+        }
+
+        var insert = HandymanRequestInsert(
+            householdId: householdId,
+            requestType: "standard_visit",
+            title: "Handyman visit"
+        )
+        insert.propertyId = propertyId
+        insert.contractorId = contractor?.id
+        insert.visitTaskId = visitTask.id
+        insert.source = "homeowner"
+        insert.preferredTiming = scheduledDateStr
+        insert.urgency = "routine"
+        // Status branches on whether a contractor is locked in. With a
+        // contractor we can mark the visit `scheduled`; without one we
+        // start at `submitted` so the homeowner sees "find a handyman"
+        // affordances on the coordination card.
+        insert.status = contractor == nil ? "submitted" : "scheduled"
+        insert.firstVisitSetupRequested = false
+        insert.details = bullets.isEmpty
+            ? "Punch list visit scheduled from the Handyman tab."
+            : "What's included:\n\(bullets)"
+
+        do {
+            _ = try await db.createHandymanRequest(insert)
+        } catch {
+            print("[HandymanPunchListViewModel] Couldn't bridge visit \(visitTask.id) → handyman_request: \(error)")
+        }
+    }
 }
 
 // MARK: - Schedule Handyman Visit Sheet (Phase 60)
@@ -766,7 +1122,7 @@ struct ScheduleHandymanVisitSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Haven will create a scheduled visit for \(itemCount) item\(itemCount == 1 ? "" : "s"). Your handyman gets the full punch list in the task notes.")
+                    Text(scheduleSummary)
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
@@ -819,6 +1175,13 @@ struct ScheduleHandymanVisitSheet: View {
                 }
             }
         }
+    }
+
+    private var scheduleSummary: String {
+        if itemCount > 0 {
+            return "Chez will create a scheduled visit for \(itemCount) item\(itemCount == 1 ? "" : "s"). Your handyman gets the full punch list in the task notes."
+        }
+        return "Schedule the next handyman walkthrough now. Chez will keep the default spring and fall checklist in view, and you can keep adding odd jobs before the visit."
     }
 }
 

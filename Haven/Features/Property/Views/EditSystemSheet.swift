@@ -34,9 +34,23 @@ struct EditSystemSheet: View {
     private let statuses = ["Good", "Needs Maintenance", "Needs Repair", "Replace Soon"]
 
     private let db = DatabaseService.shared
+    /// Locale-stable ISO-style formatter so the persisted string is
+    /// always `yyyy-MM-dd` regardless of the user's system locale.
+    /// Without `en_US_POSIX` this can produce locale-shifted strings
+    /// that fail Postgres date parsing on certain region/calendar
+    /// combos.
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+    /// Display formatter for showing the chosen date back to the user
+    /// in the row label. Uses the user's locale so it reads naturally.
+    private let displayDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
         return f
     }()
 
@@ -81,7 +95,7 @@ struct EditSystemSheet: View {
                                 .foregroundStyle(HavenColors.navy700)
                             Text("Find in Equipment Catalog")
                                 .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 12))
@@ -115,9 +129,33 @@ struct EditSystemSheet: View {
                 }
 
                 Section("Installation") {
-                    Toggle("Has Install Date", isOn: $hasInstallDate)
+                    // The legacy "Has Install Date" toggle was confusing —
+                    // users would read it as a question and skip past it,
+                    // never realizing they had to flip it ON for the
+                    // DatePicker to appear. New pattern: a single row that
+                    // shows the current value (or "Add date") with a
+                    // toggle for clear "off" intent. When on, the picker
+                    // is always visible right below.
+                    Toggle(isOn: $hasInstallDate.animation()) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Install date")
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text(hasInstallDate
+                                ? displayDateFormatter.string(from: installDate)
+                                : "Add the install date")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(hasInstallDate
+                                    ? HavenColors.textSecondary
+                                    : HavenColors.textTertiary)
+                        }
+                    }
                     if hasInstallDate {
-                        DatePicker("Install Date", selection: $installDate, displayedComponents: .date)
+                        DatePicker(
+                            "Pick a date",
+                            selection: $installDate,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
                     }
                     TextField("Expected Lifespan (years)", text: $expectedLifespan)
                         .keyboardType(.numberPad)
@@ -196,7 +234,7 @@ struct EditSystemSheet: View {
                             ? "Added 1 new maintenance task"
                             : "Added \(addedTaskCount) new maintenance tasks")
                             .font(HavenTypography.uiLabel.weight(.semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                     .padding(.horizontal, HavenTheme.spacing16)
                     .padding(.vertical, HavenTheme.spacing12)
@@ -266,7 +304,20 @@ struct EditSystemSheet: View {
                 updates.customCategoryName = nil
             }
 
+            // Diagnostic: surface what we're sending so future "didn't
+            // save" reports can be verified against the actual request
+            // body. Logged as a single line for easy console grep.
+            print("[EditSystemSheet] commitSave id=\(system.id.uuidString) installDate=\(updates.installDate ?? "nil") subtype=\(updates.subtype ?? "nil")")
+
             let updated = try await db.updateHomeSystem(id: system.id, updates)
+
+            // Verify the round-trip — if the persisted install_date
+            // doesn't match what we sent, something silently dropped
+            // the field (RLS column block, schema mismatch, etc.) and
+            // we should surface it instead of fooling the user.
+            if hasInstallDate, updated.installDate != updates.installDate {
+                print("[EditSystemSheet] WARNING install_date round-trip mismatch sent=\(updates.installDate ?? "nil") got=\(updated.installDate ?? "nil")")
+            }
 
             if !deleteOrphanIds.isEmpty {
                 try? await db.deleteMaintenanceTasks(ids: deleteOrphanIds)

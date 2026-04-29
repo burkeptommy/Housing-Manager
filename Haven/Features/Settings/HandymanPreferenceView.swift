@@ -24,7 +24,7 @@ enum HandymanPreference: String, CaseIterable, Identifiable {
         switch self {
         case .hasOne: return "We'll route small tasks to them"
         case .doesDiy: return "We'll keep small tasks on your list"
-        case .needsHelp: return "Haven will help you vet options"
+        case .needsHelp: return "Chez will help you vet options"
         }
     }
 
@@ -56,7 +56,7 @@ struct HandymanPreferenceView: View {
                     .foregroundStyle(HavenColors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("This helps Haven decide whether to route routine small-fix tasks to your handyman, keep them on your personal list, or offer to help you find someone.")
+                Text("This helps Chez decide whether to route routine small-fix tasks to your handyman, keep them on your personal list, or offer to help you find someone.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

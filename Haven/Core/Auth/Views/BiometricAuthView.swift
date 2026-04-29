@@ -11,10 +11,10 @@ struct BiometricAuthView: View {
 
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: 8) {
-                Text("Haven is Locked")
+                Text("Chez is Locked")
                     .font(HavenTypography.title2)
                 Text("Authenticate to continue")
                     .font(HavenTypography.bodySmall)

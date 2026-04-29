@@ -32,18 +32,17 @@ struct AppliancesListView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(appliances.count) Appliance\(appliances.count == 1 ? "" : "s")")
                                 .font(HavenTypography.headline)
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
 
                             let needsAttention = appliances.filter {
-                                let s = $0.status?.lowercased() ?? ""
-                                return s.contains("maintenance") || s.contains("repair") || s.contains("replacement")
+                                applianceNeedsAttention($0)
                             }
                             if needsAttention.isEmpty {
-                                Text("All appliances in good condition")
+                                Text("\(identifiedCount) identified · No open issues")
                                     .font(HavenTypography.caption)
                                     .foregroundStyle(HavenColors.success)
                             } else {
-                                Text("\(needsAttention.count) need attention")
+                                Text("\(needsAttention.count) need attention · \(identifiedCount) identified")
                                     .font(HavenTypography.caption)
                                     .foregroundStyle(HavenColors.warning)
                             }
@@ -74,7 +73,7 @@ struct AppliancesListView: View {
                         Text("Add Appliance")
                             .font(HavenTypography.uiLabel)
                     }
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(HavenColors.navy.opacity(0.08))
@@ -127,7 +126,7 @@ struct AppliancesListView: View {
 
                     Text(appliance.name)
                         .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
 
                     Spacer()
 
@@ -142,19 +141,20 @@ struct AppliancesListView: View {
                     }
                 }
 
-                // Details row: Brand | Series | Model — evenly spaced
-                HStack(spacing: 0) {
-                    if let mfr = appliance.manufacturer {
-                        detailChip(label: "Brand", value: mfr)
-                        Spacer()
-                    }
-                    if let seriesName = catalogSeries[appliance.id] ?? deriveSeries(appliance) {
-                        detailChip(label: "Series", value: seriesName)
-                        Spacer()
-                    }
-                    if let model = appliance.modelNumber {
-                        detailChip(label: "Model", value: model)
-                    }
+                Text(applianceProfileLine(for: appliance))
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(2)
+
+                Text(primaryStatusText(for: appliance))
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(primaryStatusColor(for: appliance))
+
+                if !secondaryFacts(for: appliance).isEmpty {
+                    Text(secondaryFacts(for: appliance).joined(separator: " · "))
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .lineLimit(2)
                 }
             }
         }
@@ -316,16 +316,108 @@ struct AppliancesListView: View {
         return nil
     }
 
-    private func detailChip(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(HavenTypography.uiCaption)
-                .foregroundStyle(HavenColors.textTertiary)
-            Text(value)
-                .font(HavenTypography.uiLabelSmall)
-                .foregroundStyle(HavenColors.textSecondary)
-                .lineLimit(1)
+    private var identifiedCount: Int {
+        appliances.filter(isIdentified).count
+    }
+
+    private func isIdentified(_ appliance: HomeSystemRow) -> Bool {
+        appliance.catalogEntryId != nil
+            || appliance.manufacturer != nil
+            || appliance.modelNumber != nil
+            || appliance.serialNumber != nil
+    }
+
+    private func applianceNeedsAttention(_ appliance: HomeSystemRow) -> Bool {
+        if appliance.preferredContractorId == nil { return true }
+        if appliance.status?.localizedCaseInsensitiveContains("repair") == true { return true }
+        if appliance.status?.localizedCaseInsensitiveContains("replace") == true { return true }
+        if appliance.status?.localizedCaseInsensitiveContains("maintenance") == true { return true }
+
+        if let lifespan = appliance.expectedLifespanYears,
+           let installDate = parsedInstallDate(for: appliance) {
+            let age = Calendar.current.dateComponents([.year], from: installDate, to: Date()).year ?? 0
+            if age >= max(lifespan - 1, 1) {
+                return true
+            }
         }
+
+        return !isIdentified(appliance)
+    }
+
+    private func primaryStatusText(for appliance: HomeSystemRow) -> String {
+        if appliance.preferredContractorId == nil {
+            return "Needs vendor"
+        }
+        if let status = appliance.status?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !status.isEmpty {
+            return status.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+        if !isIdentified(appliance) {
+            return "Needs information"
+        }
+        if let lifespan = appliance.expectedLifespanYears,
+           let installDate = parsedInstallDate(for: appliance) {
+            let age = Calendar.current.dateComponents([.year], from: installDate, to: Date()).year ?? 0
+            if age >= max(lifespan - 1, 1) {
+                return "Nearing expected lifespan"
+            }
+        }
+        return "No open issues"
+    }
+
+    private func primaryStatusColor(for appliance: HomeSystemRow) -> Color {
+        let status = primaryStatusText(for: appliance).lowercased()
+        if status.contains("needs") || status.contains("repair") || status.contains("replace") {
+            return HavenColors.warning
+        }
+        return HavenColors.success
+    }
+
+    private func applianceProfileLine(for appliance: HomeSystemRow) -> String {
+        let pieces = [appliance.manufacturer, catalogSeries[appliance.id] ?? deriveSeries(appliance), appliance.modelNumber]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return pieces.isEmpty ? "Appliance profile in progress" : pieces.joined(separator: " · ")
+    }
+
+    private func secondaryFacts(for appliance: HomeSystemRow) -> [String] {
+        var facts: [String] = []
+        if let manuals = appliance.cachedManualLinks, !manuals.isEmpty {
+            facts.append("Manual found")
+        }
+        if appliance.serialNumber != nil {
+            facts.append("Serial on file")
+        } else if !isIdentified(appliance) {
+            facts.append("Missing model info")
+        }
+        if appliance.installDate != nil {
+            facts.append("Install date on file")
+        }
+        if let score = appliance.manufacturer.flatMap({ brandScores[$0] }) {
+            let label: String
+            switch score {
+            case 85...: label = "High model reliability"
+            case 70...: label = "Above-average model reliability"
+            case 55...: label = "Average model reliability"
+            default: label = "Lower model reliability"
+            }
+            facts.append(label)
+        }
+        if let lifespan = appliance.expectedLifespanYears {
+            facts.append("Lifespan \(lifespan) yrs")
+        }
+        return Array(facts.prefix(3))
+    }
+
+    private func parsedInstallDate(for appliance: HomeSystemRow) -> Date? {
+        guard let installDate = appliance.installDate, !installDate.isEmpty else { return nil }
+        if let date = ISO8601DateFormatter().date(from: installDate) {
+            return date
+        }
+        let fallback = DateFormatter()
+        fallback.locale = Locale(identifier: "en_US_POSIX")
+        fallback.dateFormat = "yyyy-MM-dd"
+        return fallback.date(from: installDate)
     }
 
     // MARK: - Load Scores

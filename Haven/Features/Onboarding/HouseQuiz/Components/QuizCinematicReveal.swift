@@ -73,7 +73,7 @@ struct QuizCinematicReveal: View {
         if let value = protectionValue, value > 0 {
             Text(formattedValue)
                 .font(HavenTypography.fraunces(size: 56, weight: 700))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .contentTransition(.numericText(value: displayValue))
                 .animation(.easeOut(duration: 2.5), value: displayValue)
                 .minimumScaleFactor(0.6)
@@ -86,7 +86,7 @@ struct QuizCinematicReveal: View {
             // did the work; they should feel the win.
             Text("Set up.")
                 .font(HavenTypography.fraunces(size: 56, weight: 700))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .padding(.horizontal, HavenTheme.pageMargin)
                 .accessibilityLabel("Your home is set up.")
         }

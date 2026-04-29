@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Phase 60.3: Small toast pill shown at the top of the next visible
 /// question when the quiz auto-skips one or more questions. Makes the
-/// jump feel like "Haven respected my time" rather than "the quiz
+/// jump feel like "Chez respected my time" rather than "the quiz
 /// glitched." Auto-dismissed by the view after ~3 seconds.
 ///
 /// Reference: Noom's "we're not wasting your time" skip acknowledgments.

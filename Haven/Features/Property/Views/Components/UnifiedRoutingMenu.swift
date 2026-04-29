@@ -28,10 +28,9 @@ struct UnifiedRoutingMenu: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            Text("WHO SHOULD HANDLE THIS?")
-                .font(HavenTypography.uiSectionHeader)
-                .tracking(1.5)
-                .foregroundStyle(HavenColors.textTertiary)
+            Text("Choose who handles this")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: HavenTheme.spacing8) {
                 if handymanVendor != nil {
@@ -61,7 +60,7 @@ struct UnifiedRoutingMenu: View {
                 routingButton(
                     icon: "magnifyingglass",
                     title: "Find a different vendor",
-                    subtitle: "Haven searches local pros for this task",
+                    subtitle: "Chez searches local pros for this task",
                     action: {
                         trackChoice("find_vendor")
                         onFindDifferentVendor()
@@ -93,11 +92,11 @@ struct UnifiedRoutingMenu: View {
 
     private var handymanLabel: String {
         guard let handyman = handymanVendor else { return "Add to handyman list" }
-        if !handyman.companyName.isEmpty { return "Add to \(handyman.companyName)'s list" }
+        if !handyman.companyName.isEmpty { return "Add to \(handyman.companyName)'s bundle" }
         if let contact = handyman.contactName, !contact.isEmpty {
-            return "Add to \(contact)'s list"
+            return "Add to \(contact)'s bundle"
         }
-        return "Add to handyman list"
+        return "Add to handyman bundle"
     }
 
     @ViewBuilder
@@ -158,16 +157,19 @@ enum UnifiedRoutingActions {
         task: MaintenanceTaskDBRow,
         category: String?
     ) async throws {
-        let db = DatabaseService.shared
-        _ = try await db.assignTaskToHandymanRoutine(task: task)
-        try await saveStickyPreference(
+        try await ServiceOrchestrator.routeService(
             task: task,
-            category: category,
             route: "handyman",
-            vendorId: nil
+            category: category,
+            persistPreference: true
         )
-        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
-        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        Analytics.track(.stickyRoutingPreferenceSaved, [
+            "task_id": task.id.uuidString,
+            "category": category ?? task.templateId?.split(separator: ":").first.map(String.init) ?? "General",
+            "route": "handyman",
+            "scope": task.templateId != nil ? "template" : "category",
+            "has_vendor": false
+        ])
     }
 
     /// Route the task to the user's existing vendor routine in this
@@ -178,19 +180,20 @@ enum UnifiedRoutingActions {
         routine: RoutineRow,
         category: String?
     ) async throws {
-        let db = DatabaseService.shared
-        var update = MaintenanceTaskUpdate()
-        update.parentRoutineId = routine.id
-        update.assignedRoute = "vendor"
-        update.assignedContractorId = routine.vendorId
-        _ = try await db.updateMaintenanceTask(id: task.id, update)
-        try await saveStickyPreference(
+        try await ServiceOrchestrator.routeService(
             task: task,
-            category: category,
             route: "vendor",
-            vendorId: routine.vendorId
+            category: category,
+            routine: routine,
+            persistPreference: true
         )
-        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        Analytics.track(.stickyRoutingPreferenceSaved, [
+            "task_id": task.id.uuidString,
+            "category": category ?? task.templateId?.split(separator: ":").first.map(String.init) ?? "General",
+            "route": "vendor",
+            "scope": task.templateId != nil ? "template" : "category",
+            "has_vendor": routine.vendorId != nil
+        ])
     }
 
     /// Mark this task as user-handled. Clears any parent_routine_id so
@@ -200,49 +203,18 @@ enum UnifiedRoutingActions {
         task: MaintenanceTaskDBRow,
         category: String?
     ) async throws {
-        let db = DatabaseService.shared
-        var update = MaintenanceTaskUpdate()
-        update.parentRoutineId = nil
-        update.assignedRoute = "diy"
-        _ = try await db.updateMaintenanceTask(id: task.id, update)
-        try await saveStickyPreference(
+        try await ServiceOrchestrator.routeService(
             task: task,
-            category: category,
             route: "diy",
-            vendorId: nil
+            category: category,
+            persistPreference: true
         )
-        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
-    }
-
-    /// Phase 65: Writes a `routing_preferences` row at template scope so
-    /// future reconciles honor the choice. Falls back to category scope
-    /// if we don't have a template id. Errors are swallowed — the primary
-    /// action (routing the task) already succeeded.
-    private static func saveStickyPreference(
-        task: MaintenanceTaskDBRow,
-        category: String?,
-        route: String,
-        vendorId: UUID?
-    ) async throws {
-        guard let propertyId = task.propertyId else { return }
-        let db = DatabaseService.shared
-        let taskCategory = category ?? task.templateId?.split(separator: ":").first.map(String.init) ?? "General"
-
-        let insert = RoutingPreferenceInsert(
-            householdId: task.householdId,
-            propertyId: propertyId,
-            taskCategory: taskCategory,
-            scopeType: task.templateId != nil ? "template" : "category",
-            preferredRoute: route,
-            preferredVendorId: vendorId
-        )
-        _ = try? await db.upsertRoutingPreference(insert)
         Analytics.track(.stickyRoutingPreferenceSaved, [
             "task_id": task.id.uuidString,
-            "category": taskCategory,
-            "route": route,
-            "scope": insert.scopeType,
-            "has_vendor": vendorId != nil
+            "category": category ?? task.templateId?.split(separator: ":").first.map(String.init) ?? "General",
+            "route": "diy",
+            "scope": task.templateId != nil ? "template" : "category",
+            "has_vendor": false
         ])
     }
 }

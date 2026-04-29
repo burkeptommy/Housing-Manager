@@ -30,10 +30,10 @@ struct MaintenanceTaskRow: View {
                             .foregroundStyle(HavenColors.textTertiary)
                         Image(systemName: "person.fill")
                             .font(.system(size: 9))
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(name)
                             .font(HavenTypography.uiLabelSmall)
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }

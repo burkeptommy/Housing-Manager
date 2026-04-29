@@ -78,22 +78,42 @@ struct YearAtAGlanceCard: View {
     struct SeasonSummary: Identifiable {
         let season: Season
         let count: Int
+        let actionCount: Int
+        let coveredCount: Int
         let previewTitles: [String]
 
         var id: String { season.rawValue }
+
+        var statusLine: String {
+            if count == 0 {
+                return "Not started"
+            }
+            if actionCount > 0 {
+                return "\(actionCount) need action"
+            }
+            if coveredCount >= count {
+                return "All covered"
+            }
+            return "\(coveredCount) covered"
+        }
+
+        var itemsLine: String {
+            "\(count) item\(count == 1 ? "" : "s")"
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             HStack {
-                Text("YEAR AT A GLANCE")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
+                Text("Year at a glance")
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
-                Text("\(totalCount) across the year")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.textTertiary)
+                if seasonsWithOpenWork > 0 {
+                    Text("\(seasonsWithOpenWork) need review")
+                        .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                        .foregroundStyle(HavenColors.action)
+                }
             }
 
             HStack(spacing: HavenTheme.spacing8) {
@@ -108,64 +128,61 @@ struct YearAtAGlanceCard: View {
         seasons.reduce(0) { $0 + $1.count }
     }
 
+    private var seasonsWithOpenWork: Int {
+        seasons.filter { $0.actionCount > 0 }.count
+    }
+
     @ViewBuilder
     private func seasonTile(_ summary: SeasonSummary) -> some View {
-        // BUG-001/002/003 fix: redesigned tile.
-        // - Icon+label in vertical stack (label gets full tile width — no
-        //   more "SPRIN G" wrap).
-        // - Mixed case "Spring" not SHOUTING UPPERCASE — reads cleaner.
-        // - Dropped the cryptic 12-char task previews ("Renew s...",
-        //   "Termite i...") in favor of a "Today" badge on the current
-        //   tile + an inviting "Tap to see" caption. The full task list
-        //   lives inside SeasonTasksSheet where it has room to breathe.
-        // - Current-season highlight bumped from opacity 0.06→0.14 +
-        //   stroke 0.3→0.6 so the coral tint actually reads as "active"
-        //   instead of a barely-there tint.
         let isCurrent = summary.season == Season.current
         Button {
             onTapSeason(summary.season)
         } label: {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                Image(systemName: summary.season.icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(summary.season.iconColor)
-                    .frame(width: 24, height: 20, alignment: .leading)
+                HStack(alignment: .center) {
+                    Image(systemName: summary.season.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(summary.season.iconColor)
+                    Spacer(minLength: 6)
+                    if isCurrent {
+                        Text("Now")
+                            .font(HavenTypography.uiCaption.weight(.semibold))
+                            .foregroundStyle(HavenColors.action)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(HavenColors.action.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                }
 
-                Text(summary.season.displayLabel)
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(isCurrent ? HavenColors.navy800 : HavenColors.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Text("\(summary.count)")
-                    .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.textPrimary)
-                    .contentTransition(.numericText(value: Double(summary.count)))
-
-                // Short caption that fits in ~8 chars of the tile's
-                // content width. Longer alternatives like "Tap to view"
-                // or "You're here" still truncated after the BUG-001
-                // label redesign. Keeping captions short is the
-                // compromise for tile-width math on iPhone 17 Pro.
-                if summary.count == 0 {
-                    Text("Empty")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(summary.season.displayLabel)
+                        .font(HavenTypography.uiLabel.weight(.semibold))
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(1)
+                    Text(summary.itemsLine)
                         .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+
+                Text(summary.statusLine)
+                    .font(HavenTypography.bodySmall.weight(.semibold))
+                    .foregroundStyle(summary.actionCount > 0 ? HavenColors.action : HavenColors.textPrimary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !summary.previewTitles.isEmpty {
+                    Text(summary.previewTitles.prefix(2).joined(separator: " · "))
+                        .font(HavenTypography.caption2)
                         .foregroundStyle(HavenColors.textTertiary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                } else if isCurrent {
-                    Text("Now")
-                        .font(HavenTypography.caption.weight(.semibold))
-                        .foregroundStyle(HavenColors.action)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Text("View")
-                        .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.textTertiary)
-                        .lineLimit(1)
+                    Spacer(minLength: 0)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 148, alignment: .leading)
             .padding(HavenTheme.spacing12)
             .background(
                 isCurrent
@@ -244,6 +261,8 @@ enum YearAtAGlanceAggregator {
             return YearAtAGlanceCard.SeasonSummary(
                 season: season,
                 count: titles.count,
+                actionCount: 0,
+                coveredCount: titles.count,
                 previewTitles: titles
             )
         }

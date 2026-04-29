@@ -85,6 +85,9 @@ enum AnalyticsEvent: String {
     case handymanPunchItemAdded = "handyman_punch_item_added"
     case handymanPunchItemRemoved = "handyman_punch_item_removed"
     case handymanPunchListScheduled = "handyman_punch_list_scheduled"
+    /// Phase 78 — homeowner accepted/declined a proposal from the handyman
+    /// (flagged task, after-lock punch addition, follow-up visit).
+    case handymanProposalResponded = "handyman_proposal_responded"
     /// Phase 54B — Wave view (seasonal orchestration) analytics.
     case maintenanceWaveScheduleAllTapped = "maintenance_wave_schedule_all_tapped"
     case maintenanceWaveDetailsTapped = "maintenance_wave_details_tapped"
@@ -119,6 +122,12 @@ enum AnalyticsEvent: String {
     case handymanVisitScheduled = "handyman_visit_scheduled"
     case handymanVisitCompleted = "handyman_visit_completed"
     case handymanVisitSkipped = "handyman_visit_skipped"
+    /// Phase 73 sub-phase A — bidirectional visit-time scheduling.
+    case handymanVisitTimeProposed = "handyman_visit_time_proposed"
+    case handymanVisitTimeAccepted = "handyman_visit_time_accepted"
+    /// Phase 73 sub-phase B — quote negotiation + signed agreement.
+    case handymanQuoteSigned = "handyman_quote_signed"
+    case handymanQuoteCountered = "handyman_quote_countered"
     /// Phase 54D — Household cadences (trash day, recycling, etc.).
     case householdCadenceSaved = "household_cadence_saved"
     case householdCadenceDeleted = "household_cadence_deleted"

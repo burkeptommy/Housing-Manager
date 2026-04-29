@@ -3,8 +3,9 @@ import SwiftUI
 /// Phase 55.3: Unified routines list. Replaces the Phase 54D
 /// `HouseholdCadencesView`. Shows every active routine for the
 /// household — trash, cleaning with Renata, lawn care with Blue Fox,
-/// the full set — in one place. Tap a row to edit via
-/// `RoutineEditSheet`; swipe to archive.
+/// the full set — in one place. Tap a row to open the routine itself;
+/// edit lives one level deeper inside `RoutineDetailView`. Swipe still
+/// archives from the list.
 ///
 /// Routines that used to live as `standing_appointments` now render
 /// here too, so the user has a single surface for "everything that
@@ -16,13 +17,12 @@ struct RoutinesListView: View {
     let propertyId: UUID?
 
     @StateObject private var viewModel = RoutinesListViewModel()
-    @State private var editing: RoutineRow?
     @State private var showAddSheet = false
 
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.routines.isEmpty {
-                ProgressView("Loading routines...")
+                ProgressView("Loading active programs...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.routines.isEmpty {
                 emptyState
@@ -31,7 +31,7 @@ struct RoutinesListView: View {
             }
         }
         .background(HavenColors.background)
-        .navigationTitle("Routines")
+        .navigationTitle("Active Programs")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -39,7 +39,7 @@ struct RoutinesListView: View {
                     Haptics.light()
                     showAddSheet = true
                 } label: {
-                    Image(systemName: "plus").foregroundStyle(HavenColors.navy)
+                    Image(systemName: "plus").foregroundStyle(HavenColors.textPrimary)
                 }
             }
         }
@@ -57,27 +57,17 @@ struct RoutinesListView: View {
                 )
             }
         }
-        .sheet(item: $editing) { routine in
-            NavigationStack {
-                RoutineEditSheet(
-                    householdId: householdId,
-                    propertyId: propertyId,
-                    existing: routine,
-                    onSaved: { Task { await viewModel.load(householdId: householdId) } }
-                )
-            }
-        }
         .trackScreen("RoutinesListView")
     }
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("No routines yet", systemImage: "calendar.badge.clock")
+            Label("No active programs yet", systemImage: "calendar.badge.clock")
         } description: {
-            Text("Set up your recurring rhythms. Trash day, biweekly cleaning, lawn care, pool service. Anything that just happens on a schedule lives here.")
+            Text("Set up recurring services and household rhythms. Trash day, cleaning, lawn care, pool service, and pickup schedules live here.")
         } actions: {
             HavenButton(
-                title: "Add routine",
+                title: "Add program",
                 action: { showAddSheet = true },
                 icon: "plus",
                 isFullWidth: false
@@ -88,7 +78,7 @@ struct RoutinesListView: View {
     private var routineList: some View {
         List {
             Section {
-                Text("Recurring rhythms: services and cadences that just happen on their schedule. Different from one-time visits like an annual roof inspection (those live on the Maintenance schedule).")
+                Text("Active programs are the recurring services and schedules Chez keeps humming along for you. One-time visits still live on the Maintenance schedule.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .listRowSeparator(.hidden)
@@ -97,15 +87,15 @@ struct RoutinesListView: View {
             }
 
             ForEach(viewModel.routines) { routine in
-                // Phase 55.3: use .contentShape + .onTapGesture so
-                // the full row area triggers edit, and so SwiftUI
-                // treats the row as a List row (not a Button) for
-                // swipe-gesture purposes. A Button wrapper here
-                // caused the trailing swipe to fail to register on
-                // some rows — swipe now works reliably.
-                routineCard(routine)
-                    .contentShape(Rectangle())
-                    .onTapGesture { editing = routine }
+                NavigationLink {
+                    RoutineDetailView(
+                        routine: routine,
+                        householdId: householdId
+                    )
+                } label: {
+                    routineCard(routine)
+                }
+                .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -142,7 +132,7 @@ struct RoutinesListView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(routine.label)
+                    Text(routine.presentationLabel)
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.textPrimary)
                     if let vendor = linkedVendor {
@@ -184,7 +174,10 @@ final class RoutinesListViewModel: ObservableObject {
         async let routinesTask = db.fetchRoutines(householdId: householdId)
         async let contractorsTask = db.fetchContractors()
         do {
-            routines = try await routinesTask
+            let loaded = try await routinesTask
+            routines = loaded.sorted {
+                $0.presentationLabel.localizedCaseInsensitiveCompare($1.presentationLabel) == .orderedAscending
+            }
         } catch {
             print("[RoutinesListVM] load routines failed: \(error)")
             routines = []

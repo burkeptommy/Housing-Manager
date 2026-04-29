@@ -356,6 +356,95 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "gap-analysis", body: body)
     }
 
+    // MARK: - Phase 78 — Handyman coordination edge actions
+
+    /// Convert a homeowner's `maintenance_tasks` row into a
+    /// `handyman_punch_items` row delegated to the next upcoming
+    /// handyman visit (or to the wishlist if none).
+    struct DelegateTaskRequest: Encodable {
+        let action = "delegate_task_to_punch_list"
+        let taskId: String
+        let targetVisitTaskId: String?
+    }
+
+    static func delegateTaskToPunchList(taskId: String, targetVisitTaskId: String? = nil) async throws -> Data {
+        let body = DelegateTaskRequest(taskId: taskId, targetVisitTaskId: targetVisitTaskId)
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Generic accept / decline / cancel for a proposal-bearing row.
+    /// `kind` is "task" | "punch_item" | "request". Server enforces
+    /// no-double-accept via DB unique partial index.
+    struct RespondToProposalRequest: Encodable {
+        let action = "respond_to_proposal"
+        let kind: String
+        let id: String
+        let decision: String
+        let reason: String?
+    }
+
+    static func respondToProposal(kind: String, id: String, decision: String, reason: String? = nil) async throws -> Data {
+        let body = RespondToProposalRequest(
+            kind: kind,
+            id: id,
+            decision: decision,
+            reason: (reason?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+        )
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Add ad-hoc punch items to a visit. Each item can carry a
+    /// `templateId` (server auto-fills minutes/category) or be a
+    /// free-text title. Visit-lock semantics applied server-side.
+    struct AddPunchItemDraft: Encodable {
+        let templateId: String?
+        let title: String?
+        let estimatedMinutes: Int?
+        let priority: String?
+        let materialRequired: Bool
+        let systemId: String?
+    }
+
+    struct AddPunchItemsRequest: Encodable {
+        let action = "add_punch_items_to_visit"
+        let visitTaskId: String
+        let items: [AddPunchItemDraft]
+    }
+
+    static func addPunchItemsToVisit(visitTaskId: String, items: [AddPunchItemDraft]) async throws -> Data {
+        let body = AddPunchItemsRequest(visitTaskId: visitTaskId, items: items)
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 25)
+    }
+
+    /// Toggle status on a single punch item. Mirrors field-side method
+    /// (homeowner can also mark items done if they handled it themselves).
+    struct UpdatePunchItemStatusRequest: Encodable {
+        let action = "update_punch_item_status"
+        let itemId: String
+        let status: String
+    }
+
+    static func updatePunchItemStatus(itemId: String, status: String) async throws -> Data {
+        let body = UpdatePunchItemStatusRequest(itemId: itemId, status: status)
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 15)
+    }
+
+    /// Soft-cancel a `handyman_requests` row. Reverts attached punch
+    /// items to wishlist (assigned_visit_task_id=null) server-side.
+    struct CancelRequestRequest: Encodable {
+        let action = "cancel_handyman_request"
+        let requestId: String
+        let reason: String?
+    }
+
+    static func cancelHandymanRequest(requestId: String, reason: String? = nil) async throws -> Data {
+        let body = CancelRequestRequest(
+            requestId: requestId,
+            reason: (reason?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+        )
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
     // MARK: - Extract Vendor from Website
 
     struct ExtractVendorRequest: Encodable {

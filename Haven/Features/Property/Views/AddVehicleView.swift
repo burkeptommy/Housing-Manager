@@ -86,7 +86,7 @@ struct AddVehicleView: View {
                 VStack(spacing: HavenTheme.spacing8) {
                     Image(systemName: "car.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Add a Vehicle")
                         .font(HavenTypography.title)
                     Text("Scan or enter your VIN to auto-fill vehicle details, check for recalls, and generate a maintenance schedule.")
@@ -105,7 +105,7 @@ struct AddVehicleView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "camera.fill")
                                 .font(.title2)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .frame(width: 48, height: 48)
                                 .background(HavenColors.navy.opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))

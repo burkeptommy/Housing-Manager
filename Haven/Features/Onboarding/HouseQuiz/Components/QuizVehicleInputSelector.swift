@@ -129,7 +129,7 @@ struct QuizVehicleInputSelector: View {
             HStack(spacing: HavenTheme.spacing12) {
                 Image(systemName: icon)
                     .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .frame(width: 44, height: 44)
                     .background(HavenColors.creamLight)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))

@@ -64,12 +64,12 @@ struct VendorLogoView: View {
             // Tier 2: Category icon
             Image(systemName: symbolName)
                 .font(.system(size: size * 0.4, weight: .medium))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         } else if let name = vendorName, !name.isEmpty {
             // Tier 3: Initials
             Text(Self.initials(from: name))
                 .font(.system(size: size * 0.36, weight: .semibold))
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
         } else {
             // Tier 3 fallback: generic icon
             Image(systemName: "wrench.and.screwdriver")

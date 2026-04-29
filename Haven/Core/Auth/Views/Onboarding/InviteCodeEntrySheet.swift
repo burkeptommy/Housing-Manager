@@ -78,7 +78,7 @@ struct InviteCodeEntrySheet: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Image(systemName: "envelope.open.fill")
                     .font(.system(size: 40, weight: .medium))
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .padding(.top, HavenTheme.spacing16)
 
                 Text("Join a household")
@@ -141,7 +141,7 @@ struct InviteCodeEntrySheet: View {
                 HStack(alignment: .top, spacing: HavenTheme.spacing12) {
                     Image(systemName: "house.fill")
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .frame(width: 40, height: 40)
                         .background(HavenColors.creamLight)
                         .clipShape(Circle())

@@ -232,7 +232,7 @@ final class DocumentUploadViewModel: ObservableObject {
             "to whom it may concern"
         ]
         if resumePatterns.contains(where: { t.contains($0) }) {
-            return "This looks like a resume or cover letter. Haven is designed for home, estate, and financial documents."
+            return "This looks like a resume or cover letter. Chez is designed for home, estate, and financial documents."
         }
 
         // Recipe patterns
@@ -242,7 +242,7 @@ final class DocumentUploadViewModel: ObservableObject {
             "prep time:", "cook time:", "servings:"
         ]
         if recipePatterns.filter({ t.contains($0) }).count >= 2 {
-            return "This looks like a recipe. Haven is designed for home, estate, and financial documents."
+            return "This looks like a recipe. Chez is designed for home, estate, and financial documents."
         }
 
         // School/homework patterns
@@ -253,14 +253,14 @@ final class DocumentUploadViewModel: ObservableObject {
             "grade report", "report card"
         ]
         if schoolPatterns.filter({ t.contains($0) }).count >= 2 {
-            return "This looks like a school document. Haven is designed for home, estate, and financial documents."
+            return "This looks like a school document. Chez is designed for home, estate, and financial documents."
         }
 
         // Filename-only checks
         let filenameLower = selectedFileName.lowercased()
         let resumeFilePatterns = ["resume", "cv_", "coverletter", "cover_letter", "curriculum"]
         if resumeFilePatterns.contains(where: { filenameLower.contains($0) }) {
-            return "The filename suggests this is a resume or CV. Haven is designed for home, estate, and financial documents."
+            return "The filename suggests this is a resume or CV. Chez is designed for home, estate, and financial documents."
         }
 
         return nil
@@ -821,10 +821,10 @@ final class DocumentUploadViewModel: ObservableObject {
         let message = String(describing: error)
 
         if message.contains("ANTHROPIC_API_KEY") || message.contains("not configured") {
-            return "The AI service hasn't been configured yet. Please contact Haven support."
+            return "The AI service hasn't been configured yet. Please contact Chez support."
         }
         if message.contains("authentication failed") || message.contains("401") {
-            return "There's an issue with the AI service configuration. Please contact Haven support."
+            return "There's an issue with the AI service configuration. Please contact Chez support."
         }
         if message.contains("rate limit") || message.contains("429") {
             return "We're processing too many documents right now. Please wait a moment and try again."

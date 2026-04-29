@@ -575,21 +575,36 @@ enum SystemCategoryRegistry {
             }
         }
 
-        // Step 2: Add Tier 1 gaps (categories that SHOULD exist but don't have a DB row)
+        // Step 2: Add Tier 1 gaps (categories that SHOULD exist but don't have a DB row).
+        //
+        // Build 90 fix: previously hardcoded `isCovered: false` for every
+        // synthesized row. That caused the Groton-Plumbing bug — contractor
+        // had `category = "Plumbing"` but no Plumbing home_system existed,
+        // so the synthesized Plumbing gap always rendered uncovered. Fix:
+        // reuse `expandedContractorCategories` + `canonicalContractorCategories`
+        // (already built above) to detect a matching contractor and stamp
+        // the row covered with their name/logo/brand color.
         let existingCategories = Set(existingSystems.map(\.category))
         for meta in universal {
             if !existingCategories.contains(meta.categoryKey) && categoryCoverage[meta.categoryKey] == nil {
+                let (isCovered, vendorName, vendorLogoURL, vendorBrandColor) = Self.resolveSynthesizedCoverage(
+                    categoryKey: meta.categoryKey,
+                    canonicalContractorCategories: canonicalContractorCategories,
+                    expandedContractorCategories: expandedContractorCategories,
+                    relatedCategories: relatedCategories,
+                    contractorById: contractorById
+                )
                 categoryCoverage[meta.categoryKey] = VendorCoverageItem(
                     id: meta.categoryKey,
                     systemName: meta.displayName,
                     tier: .universal,
                     displayPriority: meta.displayPriority,
                     icon: meta.icon,
-                    vendorName: nil,
-                    vendorLogoURL: nil,
-                    vendorBrandColor: nil,
+                    vendorName: vendorName,
+                    vendorLogoURL: vendorLogoURL,
+                    vendorBrandColor: vendorBrandColor,
                     cadence: meta.defaultCadence,
-                    isCovered: false,
+                    isCovered: isCovered,
                     systemId: nil
                 )
             }
@@ -638,6 +653,26 @@ enum SystemCategoryRegistry {
     }
 
     // MARK: - Helpers
+
+    private static func resolveSynthesizedCoverage(
+        categoryKey: String,
+        canonicalContractorCategories: [UUID: String],
+        expandedContractorCategories: Set<String>,
+        relatedCategories: [String: Set<String>],
+        contractorById: [UUID: ContractorRow]
+    ) -> (Bool, String?, String?, String?) {
+        guard let canonicalCategory = SystemCategoryRegistry.canonical(category: categoryKey),
+              expandedContractorCategories.contains(canonicalCategory),
+              let match = canonicalContractorCategories.first(where: { entry in
+                  entry.value == canonicalCategory
+                      || (relatedCategories[entry.value]?.contains(canonicalCategory) ?? false)
+              }),
+              let contractor = contractorById[match.key] else {
+            return (false, nil, nil, nil)
+        }
+
+        return (true, contractor.companyName, contractor.logoUrl, contractor.brandColor)
+    }
 
     static func humanCadence(days: Int) -> String {
         switch days {

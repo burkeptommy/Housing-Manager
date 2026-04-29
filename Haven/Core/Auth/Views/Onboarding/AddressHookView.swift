@@ -92,23 +92,13 @@ struct AddressHookView: View {
 
                 // Branding
                 VStack(spacing: 8) {
-                    Text("H")
-                        .font(HavenTypography.fraunces(size: 56, weight: 400))
-                        .foregroundStyle(HavenColors.creamLight)
-                        .frame(width: 80, height: 80)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(HavenColors.navy800)
-                        )
-                    Text("Haven")
-                        .font(HavenTypography.fraunces(size: 36, weight: 400))
-                        .foregroundStyle(HavenColors.navy800)
+                    ChezBrandView(width: 144)
                 }
 
                 VStack(spacing: HavenTheme.spacing8) {
                     Text("Where's your home?")
                         .font(HavenTypography.title2)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text("Enter your address and we'll build a personalized home maintenance plan, free, in seconds.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
@@ -311,6 +301,7 @@ final class AddressHookViewModel: ObservableObject {
             propertyLookupResult = nil
         }
 
+        await AdminCatalogService.shared.refreshPublishedCatalog()
         schedulePreview = OnboardingScheduleGenerator.generate(
             from: propertyLookupResult,
             state: state

@@ -147,7 +147,7 @@ struct FamilyMemberFormView: View {
 
                     // Warm, helpful context
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Haven will create a preparation checklist", systemImage: "checklist")
+                        Label("Chez will create a preparation checklist", systemImage: "checklist")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                         Label("Track documents like birth certificate, 529, updated will", systemImage: "doc.text.fill")
@@ -262,7 +262,7 @@ struct FamilyMemberFormView: View {
                                     .font(.system(size: 16))
                                     .foregroundStyle(HavenColors.info)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(name) already has a Haven account")
+                                    Text("\(name) already has a Chez account")
                                         .font(HavenTypography.uiLabel)
                                         .foregroundStyle(HavenColors.textPrimary)
                                     Text("Would you like to invite them to your household? They'll be able to access all your shared data.")
@@ -327,8 +327,8 @@ struct FamilyMemberFormView: View {
                     Button {
                         showInviteSheet = true
                     } label: {
-                        Label("Invite to Haven", systemImage: "person.badge.plus")
-                            .foregroundStyle(HavenColors.navy)
+                        Label("Invite to Chez", systemImage: "person.badge.plus")
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -381,7 +381,7 @@ struct FamilyMemberFormView: View {
             Button("Cancel", role: .cancel) { }
             Button("Remove \(firstName)", role: .destructive) { Task { await deleteMember() } }
         } message: {
-            Text("\(firstName) has an active Haven account linked to this household. Removing them will:\n\n• Revoke their access to all shared documents, properties, and tasks\n• They will no longer see household activity\n• Their personal account will remain but they'll need to create or join a new household\n\nThis cannot be undone.")
+            Text("\(firstName) has an active Chez account linked to this household. Removing them will:\n\n• Revoke their access to all shared documents, properties, and tasks\n• They will no longer see household activity\n• Their personal account will remain but they'll need to create or join a new household\n\nThis cannot be undone.")
         }
         .onAppear {
             if let m = existingMember {

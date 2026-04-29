@@ -69,7 +69,7 @@ struct InboxItemCard: View {
                 HStack(spacing: 6) {
                     Text(item.title)
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(1)
 
                     if item.isProcessing {
@@ -149,7 +149,7 @@ struct InboxItemCard: View {
                     Text("This file type couldn't be analyzed automatically. Please review and categorize.")
                         .font(HavenTypography.uiCaption)
                 }
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .padding(HavenTheme.spacing8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(HavenColors.navy.opacity(0.06))
@@ -631,7 +631,7 @@ struct InboxItemCard: View {
                                     Text("Add to Project")
                                 }
                                 .font(HavenTypography.uiButton)
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                                 .background(HavenColors.navy.opacity(0.08))
@@ -727,7 +727,7 @@ struct InboxItemCard: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "folder.fill")
-                                .foregroundStyle(HavenColors.navy)
+                                .foregroundStyle(HavenColors.textPrimary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(project.name)
                                     .font(HavenTypography.uiLabel)

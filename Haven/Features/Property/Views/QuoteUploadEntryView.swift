@@ -88,12 +88,12 @@ struct QuoteUploadEntryView: View {
 
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 44, weight: .light))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Upload a contractor quote")
                     .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
 
                 if let project = attachToProject {
@@ -143,7 +143,7 @@ struct QuoteUploadEntryView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Analyzing your quote...")
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Text("Extracting vendor details, researching fair market pricing for every line item, and comparing to your area.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
@@ -161,12 +161,12 @@ struct QuoteUploadEntryView: View {
 
             Image(systemName: "doc.on.doc.fill")
                 .font(.system(size: 44, weight: .light))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Existing project found")
                     .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 if let matched = matchedProject {
                     Text("This looks like a quote for **\(matched.name)**. Add it to that project, or create a new one?")
@@ -187,7 +187,7 @@ struct QuoteUploadEntryView: View {
                     if let total = analysisResult?.quoteTotal {
                         Text("$\(Int(total).formatted())")
                             .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
                 .padding(HavenTheme.spacing12)
@@ -227,7 +227,7 @@ struct QuoteUploadEntryView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Quote Saved")
                     .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 if let project = targetProject {
                     Text("Added to \(project.name)")

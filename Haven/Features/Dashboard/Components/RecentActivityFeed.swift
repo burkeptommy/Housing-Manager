@@ -52,7 +52,7 @@ struct RecentActivityFeed: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                 // Addendum Fix 12: header with count pill + View all
                 HStack {
-                    Text("RECENT")
+                    Text("RECENT ACTIVITY")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
                         .foregroundStyle(HavenColors.textTertiary)
@@ -138,7 +138,7 @@ struct RecentActivityFeed: View {
                     .font(HavenTypography.bodySmall)
                     .fontWeight(.medium)
                     .foregroundStyle(HavenColors.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 // Addendum Fix 8: when the date is shown as a group
                 // header, skip the per-row "Today" subtitle to avoid
                 // repeating it 7 times.
@@ -304,10 +304,15 @@ extension RecentActivityFeed {
         // 3. Vendor additions
         for contractor in contractors {
             guard let createdAt = contractor.createdAt else { continue }
+            let category = contractor.category?.replacingOccurrences(of: "_", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalizedCategory = category?.isEmpty == false ? category : nil
             events.append(RecentActivityEvent(
                 id: "vendor_\(contractor.id.uuidString)",
                 eventType: .vendorLinked,
-                title: "\(contractor.companyName) added",
+                title: normalizedCategory.map {
+                    "\(contractor.companyName) added for \($0.lowercased())"
+                } ?? "\(contractor.companyName) added as a vendor",
                 occurredAt: createdAt,
                 icon: ActivityEventType.vendorLinked.icon,
                 iconColor: ActivityEventType.vendorLinked.iconColor,

@@ -1,5 +1,19 @@
 import SwiftUI
 
+struct RoutineDraftPreset {
+    let routineKind: RoutineKind
+    let label: String
+    let cadenceType: RoutineCadenceType
+    let customIntervalDays: Int?
+    let selectedWeekdays: Set<Int>
+    let hasTimeOfDay: Bool
+    let timeOfDay: Date
+    let activeMonths: Set<Int>
+    let startDate: Date
+    let selectedVendor: ContractorRow?
+    let notes: String
+}
+
 /// Phase 55.3: Unified Routine config sheet. Replaces both the Phase
 /// 54D `CadenceEditSheet` and the standing-appointment edit flow.
 /// Same form handles both service-based routines (Renata's biweekly
@@ -15,17 +29,20 @@ struct RoutineEditSheet: View {
     let householdId: UUID
     let propertyId: UUID?
     let existing: RoutineRow?
+    let preset: RoutineDraftPreset?
     let onSaved: () -> Void
 
     init(
         householdId: UUID,
         propertyId: UUID?,
         existing: RoutineRow? = nil,
+        preset: RoutineDraftPreset? = nil,
         onSaved: @escaping () -> Void
     ) {
         self.householdId = householdId
         self.propertyId = propertyId
         self.existing = existing
+        self.preset = preset
         self.onSaved = onSaved
     }
 
@@ -86,7 +103,7 @@ struct RoutineEditSheet: View {
             // Vendor link — only for service-based kinds. Cadence
             // kinds (trash, recycling, school pickup) don't normally
             // have a linked contractor.
-            if routineKind.isVendorBased {
+            if routineKind.supportsVendorLink {
                 Section {
                     vendorRow
                     if selectedVendor != nil {
@@ -101,7 +118,7 @@ struct RoutineEditSheet: View {
                     Text("Service provider (optional)")
                 } footer: {
                     if selectedVendor == nil {
-                        Text("Link your \(routineKind.displayLabel.lowercased()) provider to see their logo on the schedule.")
+                        Text("Link your \(routineKind.displayLabel.lowercased()) provider to see their logo and visit rhythm on the schedule.")
                             .font(HavenTypography.caption)
                     }
                 }
@@ -251,12 +268,12 @@ struct RoutineEditSheet: View {
         } message: {
             Text("Removes the routine from every schedule. Visit history is preserved.")
         }
-        .navigationTitle(existing == nil ? "Add routine" : "Edit routine")
+        .navigationTitle(existing == nil ? "Add program" : "Edit program")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -264,7 +281,7 @@ struct RoutineEditSheet: View {
                 } label: {
                     if isSaving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
                 }
-                .foregroundStyle(HavenColors.navy)
+                .foregroundStyle(HavenColors.textPrimary)
                 .disabled(isDisabled || isSaving)
             }
         }
@@ -382,6 +399,7 @@ struct RoutineEditSheet: View {
         case .windowCleaning: return "window_cleaning"
         case .treeService: return "tree_service"
         case .handymanRecurring: return "handyman"
+        case .trash, .recycling, .compost, .yardWaste: return "trash"
         default: return "routine_\(kind.rawValue)"
         }
     }
@@ -391,7 +409,7 @@ struct RoutineEditSheet: View {
     private func loadExisting() {
         if let existing {
             routineKind = existing.typedKind ?? .otherCadence
-            label = existing.label
+            label = existing.presentationLabel
             cadenceType = existing.typedCadence ?? .weekly
             customIntervalDays = existing.cadenceIntervalDays ?? 7
             selectedWeekdays = Set(existing.daysOfWeek ?? [])
@@ -424,6 +442,18 @@ struct RoutineEditSheet: View {
             if let vendorId = existing.vendorId {
                 Task { await hydrateVendor(id: vendorId) }
             }
+        } else if let preset {
+            routineKind = preset.routineKind
+            label = preset.label
+            cadenceType = preset.cadenceType
+            customIntervalDays = preset.customIntervalDays ?? 7
+            selectedWeekdays = preset.selectedWeekdays
+            hasTimeOfDay = preset.hasTimeOfDay
+            timeOfDay = preset.timeOfDay
+            activeMonths = preset.activeMonths
+            startDate = preset.startDate
+            selectedVendor = preset.selectedVendor
+            notes = preset.notes
         } else {
             label = routineKind.displayLabel
             selectedWeekdays = [4]  // Wednesday — default trash day
@@ -549,13 +579,13 @@ struct RoutineEditSheet: View {
             : nil
         let intervalDaysOut: Int? = cadenceType == .customDays ? customIntervalDays : nil
         let activeMonthsOut = Array(activeMonths).sorted()
-        let vendorIdOut = routineKind.isVendorBased ? selectedVendor?.id : nil
+        let vendorIdOut = routineKind.supportsVendorLink ? selectedVendor?.id : nil
 
         do {
             // Phase 66: If a vendor is now attached, the routine should
             // be `active` (so it hides child tasks). If no vendor and
             // the routine is service-based, leave it in `pending_vendor`
-            // so the "Haven helping" card surfaces in Your Services.
+            // so the "Chez helping" card surfaces in Your Services.
             // Non-vendor routines (trash, recycling) stay `active` —
             // they don't need a vendor.
             let derivedSetupState: String = {

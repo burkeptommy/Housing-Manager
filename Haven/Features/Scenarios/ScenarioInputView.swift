@@ -29,7 +29,7 @@ struct ScenarioInputView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(scenario.title)
                             .font(HavenTypography.title3)
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(scenario.teaser)
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -78,7 +78,7 @@ struct ScenarioInputView: View {
                 .alert("Please fill in all fields", isPresented: $showEmptyFieldAlert) {
                     Button("OK", role: .cancel) {}
                 } message: {
-                    Text("One of the scenario parameters is empty. Fill it in so Haven can give you an accurate analysis.")
+                    Text("One of the scenario parameters is empty. Fill it in so Chez can give you an accurate analysis.")
                 }
             }
             .padding(.horizontal, HavenTheme.pageMargin)
@@ -91,7 +91,7 @@ struct ScenarioInputView: View {
             ToolbarItem(placement: .principal) {
                 Text("Scenario Details")
                     .font(HavenTypography.fraunces(size: 18, weight: 700))
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .trackScreen("ScenarioInputView")
@@ -119,7 +119,7 @@ struct ScenarioInputView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(field.label)
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
 
             switch field.type {
             case .picker:
@@ -178,7 +178,7 @@ struct ScenarioInputView: View {
                 .foregroundStyle(HavenColors.textSecondary)
             TextField("Amount", text: binding)
                 .font(HavenTypography.headline)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .keyboardType(.numberPad)
         }
         .padding(12)
@@ -198,7 +198,7 @@ struct ScenarioInputView: View {
 
         return TextField(field.label, text: binding)
             .font(HavenTypography.body)
-            .foregroundStyle(HavenColors.navy800)
+            .foregroundStyle(HavenColors.textPrimary)
             .padding(12)
             .background(HavenColors.creamLight)
             .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -216,7 +216,7 @@ struct ScenarioInputView: View {
                 Spacer()
                 Text("$\(formatNumber(value))")
                     .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.navy800)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             Slider(value: Binding(
                 get: { value },

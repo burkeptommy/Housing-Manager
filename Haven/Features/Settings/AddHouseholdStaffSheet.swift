@@ -42,7 +42,7 @@ struct AddHouseholdStaffSheet: View {
                             } else {
                                 Image(systemName: "person.crop.circle.badge.checkmark")
                                     .font(.system(size: 28))
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                         }
                         VStack(alignment: .leading, spacing: 4) {
@@ -96,11 +96,11 @@ struct AddHouseholdStaffSheet: View {
                 }
 
                 Section {
-                    Toggle("Send invite to join Haven", isOn: $sendInvite)
+                    Toggle("Send invite to join Chez", isOn: $sendInvite)
                         .tint(HavenColors.navy)
                         .disabled(email.isEmpty)
                 } footer: {
-                    Text("When enabled, your home manager gets a Haven invite by email so they can see and manage your household tasks. You can also leave this off and just track them locally.")
+                    Text("When enabled, your home manager gets a Chez invite by email so they can see and manage your household tasks. You can also leave this off and just track them locally.")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textTertiary)
                 }

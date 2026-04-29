@@ -40,7 +40,7 @@ struct FamilyMemberProfileView: View {
                     Haptics.light()
                     showEditForm = true
                 }
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
             }
         }
         .sheet(isPresented: $showEditForm) {

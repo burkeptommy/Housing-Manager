@@ -27,7 +27,7 @@ const corsHeaders = {
 };
 
 const FROM_EMAIL = "hello@havenhome.dev";
-const FROM_NAME = "Haven";
+const FROM_NAME = "Chez";
 const REPLY_TO_EMAIL = "tom@havenhome.dev";
 
 // Reminder thresholds: 24h, 3 days, 7 days (in milliseconds).
@@ -69,17 +69,17 @@ function reminderCopy(index: number): { subjectSuffix: string; intro: string } {
   switch (index) {
     case 0:
       return {
-        subjectSuffix: "is still waiting on Haven",
+        subjectSuffix: "is still waiting on Chez",
         intro: "A quick reminder: your invitation is still active.",
       };
     case 1:
       return {
-        subjectSuffix: "your Haven invite is still open",
+        subjectSuffix: "your Chez invite is still open",
         intro: "Just a friendly nudge — your invitation is still waiting.",
       };
     default:
       return {
-        subjectSuffix: "last chance to join Haven",
+        subjectSuffix: "last chance to join Chez",
         intro: "This is the last reminder we'll send. Your invitation is still open.",
       };
   }
@@ -100,16 +100,16 @@ function buildHtml(ctx: ReminderContext, intro: string): string {
       <tr>
         <td align="center" style="padding:48px 16px;">
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F8F6F1;border-radius:16px;border:1px solid #F0EBE1;">
-            <tr><td style="padding:32px 32px 8px 32px;text-align:center;"><div style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#1B2A4A;letter-spacing:0.5px;">Haven</div></td></tr>
+            <tr><td style="padding:32px 32px 8px 32px;text-align:center;"><div style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#1B2A4A;letter-spacing:0.5px;">Chez</div></td></tr>
             <tr><td style="padding:24px 32px 0 32px;font-family:Georgia,serif;font-size:18px;color:#1B2A4A;">Hi ${escapeHtml(inviteeName)},</td></tr>
-            <tr><td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#1B2A4A;">${escapeHtml(intro)} ${escapeHtml(ctx.inviterName)} invited you to join <strong>${escapeHtml(householdName)}</strong> on Haven.</td></tr>
+            <tr><td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#1B2A4A;">${escapeHtml(intro)} ${escapeHtml(ctx.inviterName)} invited you to join <strong>${escapeHtml(householdName)}</strong> on Chez.</td></tr>
             ${ctx.householdAddress ? `<tr><td style="padding:24px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;border:1px solid #E3D9C6;border-radius:12px;"><tr><td style="padding:16px 20px;font-family:Georgia,serif;font-size:14px;color:#1B2A4A;">${escapeHtml(ctx.householdAddress)}</td></tr></table></td></tr>` : ""}
             ${personalBlock ? `<tr><td style="padding:0 32px;">${personalBlock}</td></tr>` : ""}
-            <tr><td style="padding:32px 32px 0 32px;text-align:center;"><a href="${escapeHtml(ctx.inviteUrl)}" style="display:inline-block;padding:14px 28px;background:#1B2A4A;color:#F8F6F1;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Haven</a></td></tr>
+            <tr><td style="padding:32px 32px 0 32px;text-align:center;"><a href="${escapeHtml(ctx.inviteUrl)}" style="display:inline-block;padding:14px 28px;background:#1B2A4A;color:#F8F6F1;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Chez</a></td></tr>
             <tr><td style="padding:24px 32px 0 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:#1B2A4A;opacity:0.7;">Or enter this code in the app:</td></tr>
             <tr><td style="padding:8px 32px 0 32px;text-align:center;font-family:'SF Mono',Menlo,Monaco,monospace;font-size:24px;font-weight:bold;letter-spacing:4px;color:#1B2A4A;">${escapeHtml(code)}</td></tr>
             <tr><td style="padding:32px 32px 0 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#1B2A4A;opacity:0.6;text-align:center;">If you don't want to join, just ignore this email.</td></tr>
-            <tr><td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">Haven Home, havenhome.dev</td></tr>
+            <tr><td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">Chez, havenhome.dev</td></tr>
           </table>
         </td>
       </tr>
@@ -125,7 +125,7 @@ function buildText(ctx: ReminderContext, intro: string): string {
   const lines = [
     `Hi ${inviteeName},`,
     "",
-    `${intro} ${ctx.inviterName} invited you to join ${householdName} on Haven.`,
+    `${intro} ${ctx.inviterName} invited you to join ${householdName} on Chez.`,
   ];
   if (ctx.householdAddress) {
     lines.push("");
@@ -136,11 +136,11 @@ function buildText(ctx: ReminderContext, intro: string): string {
     lines.push(`"${ctx.personalMessage}"`);
   }
   lines.push("");
-  lines.push(`Open in Haven: ${ctx.inviteUrl}`);
+  lines.push(`Open in Chez: ${ctx.inviteUrl}`);
   lines.push("");
   lines.push(`Or enter code: ${code}`);
   lines.push("");
-  lines.push("Haven Home, havenhome.dev");
+  lines.push("Chez, havenhome.dev");
   return lines.join("\n");
 }
 
@@ -274,7 +274,7 @@ serve(async (req: Request) => {
         to: row.invited_email,
         inviteCode: row.invite_code,
         inviteUrl: `https://havenhome.dev/join/${row.invite_code}`,
-        inviterName: inviter?.full_name ?? "Someone on Haven",
+        inviterName: inviter?.full_name ?? "Someone on Chez",
         householdName: household?.name ?? null,
         householdAddress,
         personalMessage: row.personal_message ?? null,

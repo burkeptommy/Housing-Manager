@@ -17,7 +17,7 @@ struct AddressCompletionSheet: View {
     var body: some View {
         Form {
             Section {
-                Text("Help Haven give you better property data, home values, and maintenance recommendations by adding your address.")
+                Text("Help Chez give you better property data, home values, and maintenance recommendations by adding your address.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .listRowBackground(Color.clear)

@@ -9,7 +9,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Haven</string>
+    <string>Chez</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -47,23 +47,25 @@
       <true/>
     </dict>
     <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>Haven needs calendar access to show your events and help manage your schedule.</string>
+    <string>Chez needs calendar access to show your events and help manage your schedule.</string>
     <key>NSCalendarsUsageDescription</key>
-    <string>Haven needs calendar access to show your events and help manage your schedule.</string>
+    <string>Chez needs calendar access to show your events and help manage your schedule.</string>
     <key>NSCameraUsageDescription</key>
-    <string>Haven needs camera access to scan documents.</string>
+    <string>Chez needs camera access to scan documents.</string>
     <key>NSContactsUsageDescription</key>
-    <string>Haven uses contacts access to save your household forwarding email as a contact for easy access.</string>
+    <string>Chez uses contacts access to save your household forwarding email as a contact for easy access.</string>
     <key>NSFaceIDUsageDescription</key>
-    <string>Allow Haven to use Face ID for quick login.</string>
+    <string>Allow Chez to use Face ID for quick login.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Haven uses your location to find local service providers.</string>
+    <string>Chez uses your location to find local service providers.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Haven needs photo access to upload documents.</string>
+    <string>Chez needs photo access to upload documents.</string>
     <key>UILaunchScreen</key>
     <dict>
-      <key>UIColorName</key>
-      <string>SplashScreenBackground</string>
+        <key>UIColorName</key>
+        <string>ChezLaunchBackground</string>
+        <key>UIImageName</key>
+        <string>ChezLaunch</string>
     </dict>
     <key>UIRequiredDeviceCapabilities</key>
     <array>

@@ -52,7 +52,7 @@ struct ManageSystemTasksSheet: View {
                                 Text("Add a custom task")
                                     .font(HavenTypography.uiButton)
                             }
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.textPrimary)
                             .padding(.vertical, HavenTheme.spacing12)
                             .padding(.horizontal, HavenTheme.spacing16)
                             .background(HavenColors.beige200)

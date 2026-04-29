@@ -37,7 +37,7 @@ struct QuizCompletionSummary: View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             Text("Here's what we set up")
                 .font(HavenTypography.title2)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("Every item below is ready for you. Tap into your dashboard to dive deeper.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
@@ -62,7 +62,7 @@ struct QuizCompletionSummary: View {
             count: totals.vendorsOnFile,
             countLabel: totals.vendorsOnFile == 1 ? "vendor on file" : "vendors on file",
             examples: totals.vendorExamples,
-            subtitle: "Call, text, or email any of them from your dashboard. Haven will draft the message."
+            subtitle: "Call, text, or email any of them from your dashboard. Chez will draft the message."
         )
     }
 
@@ -106,7 +106,7 @@ struct QuizCompletionSummary: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(count)")
                         .font(HavenTypography.fraunces(size: 32, weight: 700))
-                        .foregroundStyle(HavenColors.navy800)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text(countLabel)
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textSecondary)

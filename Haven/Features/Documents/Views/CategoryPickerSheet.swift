@@ -35,7 +35,7 @@ struct CategoryPickerSheet: View {
                                     Spacer()
                                     if cat == selectedCategory {
                                         Image(systemName: "checkmark")
-                                            .foregroundStyle(HavenColors.navy)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                             .fontWeight(.semibold)
                                     }
                                 }

@@ -135,7 +135,7 @@ struct InboxItemDetailView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "folder.fill")
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(project.name)
                                         .font(HavenTypography.uiLabel)
@@ -179,7 +179,7 @@ struct InboxItemDetailView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "folder.fill")
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(project.name)
                                         .font(HavenTypography.body)
@@ -366,7 +366,7 @@ struct InboxItemDetailView: View {
 
             Text(item.title)
                 .font(HavenTypography.title3)
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HavenTheme.spacing16)
@@ -1032,14 +1032,14 @@ struct InboxItemDetailView: View {
                                 image.resizable().aspectRatio(contentMode: .fit)
                             } placeholder: {
                                 Image(systemName: "bolt.fill")
-                                    .foregroundStyle(HavenColors.navy800)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                             .frame(width: 32, height: 32)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                         } else {
                             Image(systemName: "bolt.fill")
                                 .font(.system(size: 18))
-                                .foregroundStyle(HavenColors.navy800)
+                                .foregroundStyle(HavenColors.textPrimary)
                                 .frame(width: 32, height: 32)
                         }
 

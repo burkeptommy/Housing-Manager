@@ -62,7 +62,7 @@ struct PostQuizVendorDelegationSheet: View {
                         skipAndDismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .foregroundStyle(HavenColors.navy)
+                            .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
             }
@@ -84,10 +84,10 @@ struct PostQuizVendorDelegationSheet: View {
 
             Text("Your vendors could handle these too.")
                 .font(HavenTypography.fraunces(size: 26, weight: 600))
-                .foregroundStyle(HavenColors.navy800)
+                .foregroundStyle(HavenColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("We'll move these tasks off your to-do list and onto Haven's. You just confirm the appointment when it's time.")
+            Text("We'll move these tasks off your to-do list and onto Chez's. You just confirm the appointment when it's time.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

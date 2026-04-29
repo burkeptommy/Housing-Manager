@@ -408,7 +408,7 @@ struct SystemAssignmentSheet: View {
                             Spacer()
                             if selectedIds.contains(system.id) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(HavenColors.navy)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             } else {
                                 Image(systemName: "circle")
                                     .foregroundStyle(HavenColors.textTertiary)

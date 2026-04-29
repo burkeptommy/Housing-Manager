@@ -10,7 +10,7 @@ struct ChatDocumentCard: View {
                 // Header
                 HStack(spacing: HavenTheme.spacing8) {
                     Image(systemName: "doc.text.fill")
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                         .font(.title3)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(result.title)
@@ -65,7 +65,7 @@ struct ChatDocumentCard: View {
                 } label: {
                     Text("View in Vault")
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy)
+                        .foregroundStyle(HavenColors.textPrimary)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     Analytics.track(.chatDocumentCardTapped, ["document_id": result.documentId.uuidString, "category": result.category])

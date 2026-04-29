@@ -265,15 +265,3 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
 }
 
-extension Notification.Name {
-    /// Sent by the push handler when a handyman_* notification fires.
-    /// `TasksHubView` listens and flips its title-switcher to Handyman
-    /// mode so the user lands where the notification expects.
-    static let handymanModeRequested = Notification.Name("handymanModeRequested")
-
-    /// Sent by the push handler with `userInfo: ["request_id": String, "presentation": "visit" | "quote"]`.
-    /// `HandymanTabView` listens and presents the visit detail sheet
-    /// (or jumps straight to the quote review when the event was
-    /// quote-related).
-    static let openHandymanVisit = Notification.Name("openHandymanVisit")
-}
