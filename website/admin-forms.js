@@ -161,26 +161,42 @@ export const SCHEMAS = {
       { id: "impact", label: "Cross-entity impact" },
     ],
     fields: [
-      { key: "id", label: "Question ID (Swift-baked)", group: "identity", type: "text", readonly: true },
+      { key: "id", label: "Question ID (Swift-baked)", group: "identity", type: "text", readonly: true,
+        usage: "Stable identifier used everywhere downstream — house_quiz_state JSONB key on properties, scope_id on every admin_codex_note about this Q, dispatch key in HouseQuizAnswerMapper's switch statement, and the lookup key for HouseQuizFeedbackLibrary entries. Do not rename without renaming all references." },
       { key: "title", label: "Title", group: "copy", type: "text",
-        help: "Supports {yearBuilt}, {street}, {state}, {city}, {squareFootage}, {roofType} tokens." },
-      { key: "subtitle", label: "Subtitle", group: "copy", type: "textarea", rows: 2 },
+        help: "Supports {yearBuilt}, {street}, {state}, {city}, {squareFootage}, {roofType} tokens.",
+        usage: "Rendered as the question's primary headline in HouseQuizView. PropertyFactBundle interpolates the {tokens} at render time; if any token is unresolvable, fallbackTitle wins. Action-first phrasing reads better in the iOS card layout." },
+      { key: "subtitle", label: "Subtitle", group: "copy", type: "textarea", rows: 2,
+        usage: "Smaller body text under the title in HouseQuizView. Use it to explain WHY we're asking — what we'll do with the answer." },
       { key: "fallbackTitle", label: "Fallback title (when tokens unresolved)", group: "copy", type: "text",
-        help: "Used as the literal title if a {token} can't resolve. Leave blank if title has no tokens." },
-      { key: "section", label: "Section (legacy grouping)", group: "structure", type: "select", enumKey: "quizSection" },
-      { key: "chapter", label: "Chapter", group: "structure", type: "select", enumKey: "quizChapter" },
-      { key: "kind", label: "Question kind", group: "behavior", type: "select", enumKey: "quizKind" },
-      { key: "supportsSelectAll", label: "Show 'Select all' pill (multi-select only)", group: "behavior", type: "boolean" },
-      { key: "documentUploadCategory", label: "Document upload category (optional)", group: "behavior", type: "text" },
-      { key: "answerOptions", label: "Answer options", group: "answers", type: "answer-options" },
-      { key: "providerTypes", label: "Provider types (for providerSearch kind)", group: "extras", type: "enum-list", enumKey: "providerTypes" },
+        help: "Used as the literal title if a {token} can't resolve. Leave blank if title has no tokens.",
+        usage: "HouseQuizQuestion.personalizedTitle(using:) returns this when any token in the main title can't resolve against PropertyFactBundle. Required for every title that contains tokens — without it, users can see literal '{state}' on screen." },
+      { key: "section", label: "Section (legacy grouping)", group: "structure", type: "select", enumKey: "quizSection",
+        usage: "Pre-Phase-60.3 organizing concept (homeBasics / inside / outside / etc). Some legacy UI still groups by section; new flows group by chapter instead." },
+      { key: "chapter", label: "Chapter", group: "structure", type: "select", enumKey: "quizChapter",
+        usage: "Phase 60.3 grouping that drives the chapter intro card, the chapter progress pill, and Q36's repositioning. yourPros chapter intentionally fires Q36 BEFORE Q11/Q13/Q14/Q15 so the preference tier is set before vendor branches persist .either tasks." },
+      { key: "kind", label: "Question kind", group: "behavior", type: "select", enumKey: "quizKind",
+        usage: "Drives which renderer HouseQuizView uses (singleChoiceBody / multiSelectBody / currencyBody / providerCaptureInline / etc) and which save shape HouseQuizAnswer takes (answerId / selectedIds / generatorFuelType / kids / etc). Changing kind on an existing Q is a breaking change for persisted answers." },
+      { key: "supportsSelectAll", label: "Show 'Select all' pill (multi-select only)", group: "behavior", type: "boolean",
+        usage: "Build 86 opt-in flag, currently only Q10 (appliances) uses it. Renders a 'Select all / Deselect all' pill above the chip grid. Skips 'Other' (custom input) and 'None of these' (mutual-exclusion) options when toggling." },
+      { key: "documentUploadCategory", label: "Document upload category (optional)", group: "behavior", type: "text",
+        usage: "When set, the quiz card shows an 'Upload instead' button that lets the user attach a doc (mortgage statement, utility bill, etc) directly. The upload bypasses the answer flow and lands as a documents row with this category. Currently used by Q5 (mortgage) and Q19 (utility bill)." },
+      { key: "answerOptions", label: "Answer options", group: "answers", type: "answer-options",
+        usage: "Rendered as the chip grid (singleChoice/multiSelect) or as label-only metadata (kinds with custom forms). Each AnswerOption has id, label, optional icon (SF Symbol), and acceptsCustomInput flag. Reordering changes user-visible order; renaming an id orphans persisted answers." },
+      { key: "providerTypes", label: "Provider types (for providerSearch kind)", group: "extras", type: "enum-list", enumKey: "providerTypes",
+        usage: "Static list of provider_type tokens that the picker filters on (matches utility_providers.provider_type column). Used by all kind=providerSearch questions plus inline pickers triggered by providerFollowUpAnswerIds. Q19 uses dynamicProviderTypes instead." },
       { key: "providerFollowUpAnswerIds", label: "Provider follow-up answer IDs", group: "extras", type: "chip-list",
-        help: "Comma-separated answer option IDs that trigger an inline provider picker." },
-      { key: "providerSearchPlaceholder", label: "Provider picker placeholder", group: "extras", type: "text" },
+        help: "Comma-separated answer option IDs that trigger an inline provider picker.",
+        usage: "When the user picks any of these answer ids, HouseQuizView reveals an inline UtilityProviderSearchPicker scoped to providerTypes. Used by Q11 (lawn=pro), Q13 (pest=quarterly_pro), Q14 (irrigation=full/drip), Q15 (security=monitored)." },
+      { key: "providerSearchPlaceholder", label: "Provider picker placeholder", group: "extras", type: "text",
+        usage: "Build 87 per-question placeholder for the inline provider picker (e.g. 'TruGreen, BrightView…'). Nil falls back to the picker's built-in default." },
       { key: "dynamicSkip", label: "Dynamic skip rule (Swift closure)", group: "extras", type: "code", readonly: true,
-        help: "Conditional skip logic captured raw from Swift. Editing requires a code change." },
-      { key: "dynamicProviderTypes", label: "Dynamic provider-types rule (Swift closure)", group: "extras", type: "code", readonly: true },
-      { key: "_impact.creates_systems", label: "Creates these systems (heuristic)", group: "impact", type: "chip-list", readonly: true },
+        help: "Conditional skip logic captured raw from Swift. Editing requires a code change.",
+        usage: "Closure called at advance time with HouseQuizState. Returning true causes the view model to mark this question skipped and move to the next. Used by Q11b (skip when no_lawn), Q12b/Q12c (skip when not pool), Q14 (skip when no_lawn), Q19 (skip when electric/geothermal heating), Q25b (skip when no garage)." },
+      { key: "dynamicProviderTypes", label: "Dynamic provider-types rule (Swift closure)", group: "extras", type: "code", readonly: true,
+        usage: "Phase 18b runtime narrowing of providerTypes based on prior answers. Q19 reads Q3's heating fuel and returns ['oil'] / ['propane'] / [] (empty = skip). When this resolves to empty the view auto-skips the Q." },
+      { key: "_impact.creates_systems", label: "Creates these systems (heuristic)", group: "impact", type: "chip-list", readonly: true,
+        usage: "Heuristic backreference baked at JSON-export time — best-guess of which home_systems.category rows the answer mapper will create when this Q is answered. Used by the Decisions queue + Impact tab to show downstream effects." },
     ],
   },
 
@@ -196,38 +212,64 @@ export const SCHEMAS = {
       { id: "extras", label: "Advanced" },
     ],
     fields: [
-      { key: "templateKey", label: "Template key (Swift-derived)", group: "identity", type: "text", readonly: true },
+      { key: "templateKey", label: "Template key (Swift-derived)", group: "identity", type: "text", readonly: true,
+        usage: "Reconciler dedup key + the value that lands on every maintenance_tasks.template_id column. Derived as stableId ?? '{systemCategory}:{title}'. The admin_template_stats RPC counts rows by this key." },
       { key: "stableId", label: "Stable ID override (rename safety)", group: "identity", type: "text",
-        help: "Use only when renaming a template whose previous title is referenced by existing task rows." },
-      { key: "systemCategory", label: "System category", group: "identity", type: "system-picker" },
+        help: "Use only when renaming a template whose previous title is referenced by existing task rows.",
+        usage: "When set, overrides the derived templateKey. Use ONLY when renaming a template whose old title is referenced by existing maintenance_tasks rows — set to the EXACT previous templateKey ('{oldCategory}:{oldTitle}') so the reconciler keeps deduping correctly and existing completion history stays attached." },
+      { key: "systemCategory", label: "System category", group: "identity", type: "system-picker",
+        usage: "Maps to home_systems.category. Determines which system row this template seeds tasks under, and via SystemCategoryRegistry, which tier (universal/conditional/specialty) the system is gated to." },
       { key: "title", label: "Title", group: "copy", type: "text",
-        help: "Action-first: 'Schedule …', 'Check …', 'Inspect …'. No 'Professional X' titles." },
-      { key: "description", label: "Description", group: "copy", type: "textarea", rows: 4 },
-      { key: "notes", label: "Pro tips / notes", group: "copy", type: "textarea", rows: 3 },
-      { key: "frequency", label: "Frequency", group: "schedule", type: "select", enumKey: "taskFrequency", allowCustom: true },
-      { key: "seasonalTiming", label: "Seasonal anchor", group: "schedule", type: "select", enumKey: "taskSeasonalTiming" },
-      { key: "estimatedCostRange", label: "Estimated cost range", group: "schedule", type: "text" },
-      { key: "priority", label: "Priority", group: "schedule", type: "select", enumKey: "taskPriority" },
+        help: "Action-first: 'Schedule …', 'Check …', 'Inspect …'. No 'Professional X' titles.",
+        usage: "Rendered on UnifiedTaskCard. When linked to a vendor, the card reframes to 'Schedule {Vendor}: {title.lowercased}' (Phase 19l). Voice rules: action-first verbs, no em dashes, no 'Professional X' prefixes." },
+      { key: "description", label: "Description", group: "copy", type: "textarea", rows: 4,
+        usage: "Body text on the task detail sheet. For vendor-managed tasks, MaintenanceTaskReconciler prepends 'Your job: book the appointment and be home for it. {Vendor} will handle the work.' before this string." },
+      { key: "notes", label: "Pro tips / notes", group: "copy", type: "textarea", rows: 3,
+        usage: "Optional notes shown in the task detail sheet's 'Pro tips' callout. Often interpolated with {city}/{state} via MaintenanceTemplate.interpolated(city:state:)." },
+      { key: "frequency", label: "Frequency", group: "schedule", type: "select", enumKey: "taskFrequency", allowCustom: true,
+        usage: "Parsed by MaintenanceTemplate.interval into DateComponents that drive the next-due-date math. Phase 50 added biweekly/triweekly/every-N-weeks support." },
+      { key: "seasonalTiming", label: "Seasonal anchor", group: "schedule", type: "select", enumKey: "taskSeasonalTiming",
+        usage: "Phase 54A: tells MaintenanceTaskReconciler.initialDueDate to walk to the next Spring/Summer/Fall/Winter anchor instead of today+interval, with a 14-day lookahead buffer. Sub-annual cadences ignore this; annual+ cadences honor it." },
+      { key: "estimatedCostRange", label: "Estimated cost range", group: "schedule", type: "text",
+        usage: "Shown in vendor-managed task subtitles ('$200-$400'). Future: aggregated into the InvestmentSummaryCard's projected-spend rollup." },
+      { key: "priority", label: "Priority", group: "schedule", type: "select", enumKey: "taskPriority",
+        usage: "High/Medium/Low. UnifiedTaskCard renders a priority pill ONLY for high-priority overdue tasks or critical/urgent — Phase 56.6 stopped rendering for plain 'High' since it was the default and appearing on ~70% of cards." },
       { key: "maxIntervalDays", label: "Max interval (days, optional)", group: "schedule", type: "number",
-        help: "Warns user when extending frequency past this cap." },
-      { key: "warrantyLinked", label: "Warranty-linked (warns on cadence change)", group: "schedule", type: "boolean" },
-      { key: "assignmentType", label: "Assignment type", group: "routing", type: "select", enumKey: "taskAssignmentType" },
-      { key: "routingOverride", label: "Routing override", group: "routing", type: "select", enumKey: "taskRoutingOverride" },
-      { key: "safetyFloor", label: "Safety floor (always vendor regardless of preference)", group: "routing", type: "boolean" },
-      { key: "diyEffortMinutes", label: "DIY effort (minutes)", group: "routing", type: "number" },
+        help: "Warns user when extending frequency past this cap.",
+        usage: "FrequencyPickerSheet warns when the user tries to extend a task's next-due past this cap. Used for safety-sensitive items (smoke detectors capped 365, septic pumping capped 1825)." },
+      { key: "warrantyLinked", label: "Warranty-linked (warns on cadence change)", group: "schedule", type: "boolean",
+        usage: "When true, FrequencyPickerSheet shows a 'this may void your warranty' warning. Used for HVAC tune-ups, annual boiler service, generator service — manufacturer warranty terms tie to documented service intervals." },
+      { key: "assignmentType", label: "Assignment type", group: "routing", type: "select", enumKey: "taskAssignmentType",
+        usage: "Personal (always DIY) / Vendor (always pro) / Either (defaults personal, flippable by Q36 + per-task toggle). Drives which UnifiedTaskCard variant renders + whether the reconciler tries to link a contractor at task-creation time." },
+      { key: "routingOverride", label: "Routing override", group: "routing", type: "select", enumKey: "taskRoutingOverride",
+        usage: "Phase 50 routing hint independent of assignmentType. .vendorOnly = single-option picker; .vendorDefault = 3-option (vendor/handyman/DIY); .diyDefault = handyman+DIY 2-option, hard floor against Q36 flip; .diyCapable = 3-option but defaults DIY; .bundledIntoParent = template never renders standalone, only via its bundle parent." },
+      { key: "safetyFloor", label: "Safety floor (always vendor regardless of preference)", group: "routing", type: "boolean",
+        usage: "Reconciler.resolveAssignment short-circuits and forces .vendor lane regardless of preference tier. Used for gas, panel, roof, septic, well, chimney — flat-out unsafe to hand a homeowner." },
+      { key: "diyEffortMinutes", label: "DIY effort (minutes)", group: "routing", type: "number",
+        usage: "Time estimate shown on personal task cards as 'X min' / 'X hr Y min'. Used by Day1TaskCurator to decide if a task is small enough to delegate to handyman ('mixed' tier: tasks > 30 min go to vendor lane; 'hire-out': all to vendor)." },
       { key: "diyEffortLabel", label: "DIY effort label", group: "routing", type: "text",
-        help: "e.g. 'Anyone can do this', 'Need a stepladder', 'Skip if you don't like heights'" },
-      { key: "isEssential", label: "Essential (auto-seeded at quiz time)", group: "gating", type: "boolean" },
-      { key: "isDIY", label: "isDIY (deprecated — use assignmentType + diyEffortMinutes)", group: "gating", type: "boolean" },
-      { key: "professionalRequired", label: "professionalRequired (deprecated — use safetyFloor)", group: "gating", type: "boolean" },
-      { key: "regionalPack", label: "Regional pack", group: "gating", type: "select", enumKey: "regionalPack" },
+        help: "e.g. 'Anyone can do this', 'Need a stepladder', 'Skip if you don't like heights'",
+        usage: "Difficulty descriptor shown alongside diyEffortMinutes on UnifiedTaskCard. Helps users self-assess before tapping in." },
+      { key: "isEssential", label: "Essential (auto-seeded at quiz time)", group: "gating", type: "boolean",
+        usage: "When true, MaintenanceTaskReconciler seeds this template at quiz completion. When false, the template only surfaces in the 'Recommended for your home' (Phase 54C) sheet — opt-in, not auto-seeded." },
+      { key: "isDIY", label: "isDIY (deprecated — use assignmentType + diyEffortMinutes)", group: "gating", type: "boolean",
+        usage: "Pre-Phase 19k field. Use assignmentType + diyEffortMinutes instead. Kept on existing templates for backward compatibility." },
+      { key: "professionalRequired", label: "professionalRequired (deprecated — use safetyFloor)", group: "gating", type: "boolean",
+        usage: "Pre-Phase 50 field. Use safetyFloor + routingOverride instead." },
+      { key: "regionalPack", label: "Regional pack", group: "gating", type: "select", enumKey: "regionalPack",
+        usage: "Phase 57 regional gate. When set, template only surfaces on properties whose properties.regional_pack matches (auto-derived from state). Nil = universal — no regional gating." },
       { key: "requiredSubtypes", label: "Required subtypes", group: "gating", type: "chip-list",
-        help: "Tags that gate this template on the home_systems row's subtype set." },
-      { key: "equipmentKeywords", label: "Equipment keywords (child-system migration)", group: "gating", type: "chip-list" },
+        help: "Tags that gate this template on the home_systems row's subtype set.",
+        usage: "MaintenanceTemplates.activeSubtypes(category, flags) builds an active set per property; this template only seeds if ALL its required subtypes are in that set. Common values: ['tank'] for tank water heaters, ['pool', 'pool_chlorine'] for chlorine-pool-only templates, ['has_pets'] for pet-related items." },
+      { key: "equipmentKeywords", label: "Equipment keywords (child-system migration)", group: "gating", type: "chip-list",
+        usage: "Phase 19h-: when a child home_system row matching these keywords is added (e.g. a Filter under HVAC), the reconciler migrates matching tasks from the parent system to the child. Used to move 'replace HVAC filter' tasks to a specific equipment record once it's added." },
       { key: "bundleId", label: "Bundle ID", group: "bundle", type: "text",
-        help: "e.g. 'Roofing:spring', 'Handyman:fall'. Bundled templates roll up into one task." },
-      { key: "bundleTitle", label: "Bundle title (first child only)", group: "bundle", type: "text" },
-      { key: "_impact.in_bundle.siblings", label: "Sibling templates in this bundle", group: "extras", type: "chip-list", readonly: true },
+        help: "e.g. 'Roofing:spring', 'Handyman:fall'. Bundled templates roll up into one task.",
+        usage: "Phase 50 bundle marker. All templates sharing the same bundleId roll up into ONE maintenance_tasks row at reconcile time, with a 'What's included:' checklist in notes. The bundle's templateKey is the bundleId itself." },
+      { key: "bundleTitle", label: "Bundle title (first child only)", group: "bundle", type: "text",
+        usage: "Display title for the bundle parent task. Read from the FIRST child template; siblings inherit it. Reframed at render time when a vendor is linked: 'Schedule {Vendor}: {bundleTitle.lowercased}'." },
+      { key: "_impact.in_bundle.siblings", label: "Sibling templates in this bundle", group: "extras", type: "chip-list", readonly: true,
+        usage: "Backreference baked at JSON-export time — the other templates that share this template's bundleId. Helps audit bundle composition without grepping Swift." },
     ],
   },
 
@@ -239,16 +281,25 @@ export const SCHEMAS = {
       { id: "defaults", label: "Seeder defaults" },
     ],
     fields: [
-      { key: "rawValue", label: "Raw value (DB)", group: "identity", type: "text", readonly: true },
-      { key: "swiftCase", label: "Swift case", group: "identity", type: "text", readonly: true },
-      { key: "displayLabel", label: "Display label", group: "display", type: "text" },
+      { key: "rawValue", label: "Raw value (DB)", group: "identity", type: "text", readonly: true,
+        usage: "Stored on routines.routine_kind in Postgres. Stable string identifier — do not rename. iOS RoutineKind enum case rawValue maps to this." },
+      { key: "swiftCase", label: "Swift case", group: "identity", type: "text", readonly: true,
+        usage: "iOS-side enum case name (camelCase). Used by the routine kind switch statements (displayLabel, icon, isVendorBased, supportsVendorLink)." },
+      { key: "displayLabel", label: "Display label", group: "display", type: "text",
+        usage: "User-visible text on RoutineRow, RoutineDetailView, and Apple Calendar-style chips. Shown when no vendor is linked; vendor-linked routines render the vendor name instead." },
       { key: "icon", label: "SF Symbol icon", group: "display", type: "text",
-        help: "e.g. 'sparkles', 'leaf.fill', 'snowflake'. Must exist in Apple's SF Symbols catalog." },
-      { key: "isVendorBased", label: "Vendor-based (defaults to having a contractor link)", group: "display", type: "boolean" },
-      { key: "seederDefault.cadenceType", label: "Default cadence", group: "defaults", type: "select", enumKey: "cadenceType" },
-      { key: "seederDefault.activeMonths", label: "Default active months (1=Jan…12=Dec)", group: "defaults", type: "month-picker" },
-      { key: "seederDefault.defaultEveningBeforeReminder", label: "Default evening-before reminder", group: "defaults", type: "boolean" },
-      { key: "seederDefault.defaultMorningOfReminder", label: "Default morning-of reminder", group: "defaults", type: "boolean" },
+        help: "e.g. 'sparkles', 'leaf.fill', 'snowflake'. Must exist in Apple's SF Symbols catalog.",
+        usage: "Falls through VendorLogoView's hierarchy: vendor logo → category SF Symbol → routine kind icon → generic. Tested in Apple's SF Symbols app before shipping." },
+      { key: "isVendorBased", label: "Vendor-based (defaults to having a contractor link)", group: "display", type: "boolean",
+        usage: "Drives form defaults in RoutineEditSheet (vendor section visible/required) + per-banner copy in PickupDayBanner (cadence-based routines say 'pickup tomorrow', vendor-based routines say 'visit tomorrow')." },
+      { key: "seederDefault.cadenceType", label: "Default cadence", group: "defaults", type: "select", enumKey: "cadenceType",
+        usage: "Pre-fills RoutineEditSheet when adding a routine of this kind. Maps to routines.cadence_type column on insert." },
+      { key: "seederDefault.activeMonths", label: "Default active months (1=Jan…12=Dec)", group: "defaults", type: "month-picker",
+        usage: "Pre-fills routines.active_months. Snow removal defaults to {12,1,2,3,4}, lawn care to {4..11}, year-round routines like trash leave this empty (= all 12 months)." },
+      { key: "seederDefault.defaultEveningBeforeReminder", label: "Default evening-before reminder", group: "defaults", type: "boolean",
+        usage: "Pre-fills the routine row's evening_before_reminder flag. The PickupDayBanner surfaces these between 6pm and midnight on the day before the routine fires." },
+      { key: "seederDefault.defaultMorningOfReminder", label: "Default morning-of reminder", group: "defaults", type: "boolean",
+        usage: "Pre-fills the routine row's morning_of_reminder flag. PickupDayBanner surfaces these before 10am on the day-of." },
     ],
   },
 
@@ -261,20 +312,34 @@ export const SCHEMAS = {
       { id: "routing", label: "Routing" },
     ],
     fields: [
-      { key: "templateKey", label: "Template key", group: "identity", type: "text", readonly: true },
-      { key: "systemCategory", label: "System category", group: "identity", type: "system-picker" },
-      { key: "bundleId", label: "Bundle (Handyman:spring / Handyman:fall)", group: "identity", type: "text" },
-      { key: "title", label: "Title", group: "copy", type: "text" },
-      { key: "description", label: "Description", group: "copy", type: "textarea", rows: 3 },
-      { key: "notes", label: "Notes", group: "copy", type: "textarea", rows: 2 },
-      { key: "frequency", label: "Frequency", group: "schedule", type: "select", enumKey: "taskFrequency", allowCustom: true },
-      { key: "seasonalTiming", label: "Seasonal anchor", group: "schedule", type: "select", enumKey: "taskSeasonalTiming" },
-      { key: "diyEffortMinutes", label: "Effort (minutes)", group: "schedule", type: "number" },
-      { key: "diyEffortLabel", label: "Effort label", group: "schedule", type: "text" },
-      { key: "estimatedCostRange", label: "Cost range", group: "schedule", type: "text" },
-      { key: "routingOverride", label: "Routing override", group: "routing", type: "select", enumKey: "taskRoutingOverride" },
-      { key: "assignmentType", label: "Assignment type", group: "routing", type: "select", enumKey: "taskAssignmentType" },
-      { key: "safetyFloor", label: "Safety floor", group: "routing", type: "boolean" },
+      { key: "templateKey", label: "Template key", group: "identity", type: "text", readonly: true,
+        usage: "Same dedup key shared with Tasks. Filtered subset (routingOverride .diyDefault / .diyCapable + Handyman:* bundles) flow into the punch-list path." },
+      { key: "systemCategory", label: "System category", group: "identity", type: "system-picker",
+        usage: "Most handyman templates land under 'Handyman' but some live under their primary category (e.g. HVAC filter swap stays under HVAC)." },
+      { key: "bundleId", label: "Bundle (Handyman:spring / Handyman:fall)", group: "identity", type: "text",
+        usage: "Phase 54B bundles. 'Handyman:spring' rolls up the spring punch list; 'Handyman:fall' rolls up the fall list. Children share this id and inherit bundleTitle from the first child." },
+      { key: "title", label: "Title", group: "copy", type: "text",
+        usage: "Rendered on the punch list as a single line. Punch items added at runtime via 'Add to handyman list' bypass templates entirely." },
+      { key: "description", label: "Description", group: "copy", type: "textarea", rows: 3,
+        usage: "Body text on the task detail sheet." },
+      { key: "notes", label: "Notes", group: "copy", type: "textarea", rows: 2,
+        usage: "Optional pro tips. For Handyman:spring/fall bundle parents, this often lists what's typically covered in a spring/fall visit." },
+      { key: "frequency", label: "Frequency", group: "schedule", type: "select", enumKey: "taskFrequency", allowCustom: true,
+        usage: "Most handyman templates are semi-annual (Spring + Fall) or annual." },
+      { key: "seasonalTiming", label: "Seasonal anchor", group: "schedule", type: "select", enumKey: "taskSeasonalTiming",
+        usage: "Drives next-due via Phase 54A's initialDueDate seasonal anchor walk." },
+      { key: "diyEffortMinutes", label: "Effort (minutes)", group: "schedule", type: "number",
+        usage: "Day1TaskCurator's handyman-eligibility check requires diyEffortMinutes ≤ 60. Items larger than that need a real vendor visit, not a punch list bundle." },
+      { key: "diyEffortLabel", label: "Effort label", group: "schedule", type: "text",
+        usage: "Difficulty descriptor — same field as the parent Tasks schema." },
+      { key: "estimatedCostRange", label: "Cost range", group: "schedule", type: "text",
+        usage: "Per-item cost. Aggregated for the whole spring/fall visit when bundled." },
+      { key: "routingOverride", label: "Routing override", group: "routing", type: "select", enumKey: "taskRoutingOverride",
+        usage: "Handyman path requires .diyDefault or .diyCapable. .vendorOnly templates can't end up here." },
+      { key: "assignmentType", label: "Assignment type", group: "routing", type: "select", enumKey: "taskAssignmentType",
+        usage: "Same semantics as Tasks. Most handyman templates are .either with low diyEffortMinutes." },
+      { key: "safetyFloor", label: "Safety floor", group: "routing", type: "boolean",
+        usage: "If true, never lands on a punch list — handyman path is bypassed and the template forces vendor lane." },
     ],
   },
 
@@ -286,14 +351,22 @@ export const SCHEMAS = {
       { id: "behavior", label: "Behavior" },
     ],
     fields: [
-      { key: "categoryKey", label: "Category key (matches home_systems.category)", group: "identity", type: "text", readonly: true },
-      { key: "displayName", label: "Display name", group: "display", type: "text" },
-      { key: "icon", label: "SF Symbol icon", group: "display", type: "text" },
-      { key: "tier", label: "Tier", group: "behavior", type: "select", enumKey: "systemTier" },
-      { key: "displayPriority", label: "Display priority (sort within tier)", group: "behavior", type: "number" },
-      { key: "defaultCadence", label: "Default cadence", group: "behavior", type: "select", enumKey: "taskFrequency", allowCustom: true },
-      { key: "showInVendorCoverage", label: "Show in vendor coverage", group: "behavior", type: "boolean" },
-      { key: "specialtyGroup", label: "Specialty group (for Browse sheet)", group: "behavior", type: "text" },
+      { key: "categoryKey", label: "Category key (matches home_systems.category)", group: "identity", type: "text", readonly: true,
+        usage: "Stored as home_systems.category text. The reconciler matches templates' systemCategory against this. Renaming breaks every existing system row + every template gated to it." },
+      { key: "displayName", label: "Display name", group: "display", type: "text",
+        usage: "User-facing name on PropertyDetailView's systems list, in vendor coverage chips, and in the Browse Specialty Systems sheet." },
+      { key: "icon", label: "SF Symbol icon", group: "display", type: "text",
+        usage: "Default icon for this category when no vendor logo is available. VendorLogoView falls through: brand logo → category icon → initials." },
+      { key: "tier", label: "Tier", group: "behavior", type: "select", enumKey: "systemTier",
+        usage: "Universal (auto-backfilled to every property), Conditional (gated by quiz answers), Specialty (Browse sheet only), SubSystem (hidden from Vendor Coverage; lives under a parent)." },
+      { key: "displayPriority", label: "Display priority (sort within tier)", group: "behavior", type: "number",
+        usage: "Sort order within tier — lower numbers come first. Used by VendorCoverageSheet's gap-list ordering." },
+      { key: "defaultCadence", label: "Default cadence", group: "behavior", type: "select", enumKey: "taskFrequency", allowCustom: true,
+        usage: "Shown in vendor-coverage UI to set expectation ('Cleaning Service · biweekly'). Doesn't auto-create routines — those need an explicit user action." },
+      { key: "showInVendorCoverage", label: "Show in vendor coverage", group: "behavior", type: "boolean",
+        usage: "When false, hides this category from VendorCoverageSheet (used for SubSystem-tier rows that live under a parent)." },
+      { key: "specialtyGroup", label: "Specialty group (for Browse sheet)", group: "behavior", type: "text",
+        usage: "Header label in BrowseSpecialtySystemsSheet (e.g. 'Outdoor Amenities', 'Smart Home & Energy'). Tier-3 specialty categories grouped by this." },
     ],
   },
 
@@ -305,11 +378,15 @@ export const SCHEMAS = {
       { id: "samples", label: "Sample outputs" },
     ],
     fields: [
-      { key: "sourceFile", label: "Source file", group: "source", type: "text", readonly: true },
-      { key: "sourceExists", label: "Source exists in repo", group: "source", type: "boolean", readonly: true },
+      { key: "sourceFile", label: "Source file", group: "source", type: "text", readonly: true,
+        usage: "Path to the edge function in repo (supabase/functions/vehicle-lookup/index.ts)." },
+      { key: "sourceExists", label: "Source exists in repo", group: "source", type: "boolean", readonly: true,
+        usage: "Set to false when the exporter couldn't find the file. Indicates a stale snapshot or a moved/deleted edge function." },
       { key: "systemPrompt", label: "System prompt", group: "prompt", type: "textarea", rows: 14,
-        help: "Sent to Claude with role: 'system'. Drives per-vehicle maintenance schedule generation." },
-      { key: "cachedSamples", label: "Cached sample outputs (4 representative vehicles)", group: "samples", type: "json-readonly" },
+        help: "Sent to Claude with role: 'system'. Drives per-vehicle maintenance schedule generation.",
+        usage: "Sent to Claude with role: 'system'. Drives the AI-generated per-vehicle maintenance schedule that lands as maintenance_tasks rows after VIN decode. Cached samples on the right show what the prompt produces for representative vehicles." },
+      { key: "cachedSamples", label: "Cached sample outputs (4 representative vehicles)", group: "samples", type: "json-readonly",
+        usage: "Cached responses from running the live edge function with synthetic inputs (BMW X5, Honda CR-V, Tesla Model 3, Ford F-150). Refreshed when --refresh-samples flag passed to exporter." },
     ],
   },
 
@@ -321,11 +398,15 @@ export const SCHEMAS = {
       { id: "prompt", label: "System prompt" },
     ],
     fields: [
-      { key: "functionName", label: "Function name", group: "identity", type: "text", readonly: true },
-      { key: "sourceFile", label: "Source file", group: "identity", type: "text", readonly: true },
-      { key: "model", label: "Model", group: "behavior", type: "select", enumKey: "claudeModel", allowCustom: true },
+      { key: "functionName", label: "Function name", group: "identity", type: "text", readonly: true,
+        usage: "Folder name under supabase/functions/. Deploy with `supabase functions deploy {name} --no-verify-jwt`." },
+      { key: "sourceFile", label: "Source file", group: "identity", type: "text", readonly: true,
+        usage: "Path to index.ts. Click 'Open in admin detail' to jump back to the listed prompt panel." },
+      { key: "model", label: "Model", group: "behavior", type: "select", enumKey: "claudeModel", allowCustom: true,
+        usage: "Claude model passed to the @anthropic-ai/sdk client. Use claude-sonnet-4-6 for most production prompts; haiku for cheap classification; opus for hard reasoning. Update this when migrating model versions." },
       { key: "systemPrompt", label: "System prompt (first detected)", group: "prompt", type: "textarea", rows: 16,
-        help: "Heuristic extraction. v2 will surface every message role + structured response shape." },
+        help: "Heuristic extraction. v2 will surface every message role + structured response shape.",
+        usage: "First role:'system' content extracted by the Swift→JSON exporter. Where 90% of the app's intelligence lives. Changing the prompt requires `supabase functions deploy {function_name} --no-verify-jwt` to ship." },
     ],
   },
 };
@@ -371,11 +452,17 @@ function renderField(field, entity, original) {
   const changedTag = changed
     ? `<span class="admin-form__changed">changed</span>`
     : "";
+  // Phase 4b — every field gets a (?) info button surfacing the `usage`
+  // string from the schema. Click toggles a popover with the explainer.
+  const infoBtn = field.usage
+    ? `<button type="button" class="admin-form__info" data-info-text="${escapeHtml(field.usage)}" data-info-label="${escapeHtml(field.label)}" aria-label="What is ${escapeHtml(field.label)} used for?">?</button>`
+    : "";
   const control = renderControl(field, value);
   return `
     <label class="admin-form__field ${changed ? "is-changed" : ""}" data-field-key="${escapeHtml(field.key)}">
       <span class="admin-form__label">
         ${escapeHtml(field.label)}
+        ${infoBtn}
         ${changedTag}
       </span>
       ${control}
@@ -580,6 +667,67 @@ export function attachFormHandlers(container, viewId, original, current, onChang
       onChange?.(current);
     });
   });
+
+  // Info buttons — click toggles a popover anchored to the button.
+  root.querySelectorAll(".admin-form__info").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showInfoPopover(btn);
+    });
+  });
+}
+
+// Phase 4b — info popover. Lazy-built singleton anchored next to the
+// clicked (?) button. Click anywhere to dismiss.
+let infoPopoverEl = null;
+function showInfoPopover(anchorBtn) {
+  hideInfoPopover();
+  const text = anchorBtn.dataset.infoText || "";
+  const label = anchorBtn.dataset.infoLabel || "";
+  const pop = document.createElement("div");
+  pop.className = "admin-info-popover";
+  pop.innerHTML = `
+    <header>
+      <strong>${escapeHtml(label)}</strong>
+      <button type="button" class="admin-info-popover__close" aria-label="Close">×</button>
+    </header>
+    <p>${escapeHtml(text)}</p>
+  `;
+  document.body.appendChild(pop);
+  const rect = anchorBtn.getBoundingClientRect();
+  // Position below the button by default; flip up if too low.
+  const popHeight = 200;
+  const wantedTop = rect.bottom + 8;
+  const flipUp = wantedTop + popHeight > window.innerHeight - 16;
+  pop.style.top = (flipUp ? Math.max(16, rect.top - popHeight - 8) : wantedTop) + "px";
+  pop.style.left = Math.min(window.innerWidth - 360 - 16, Math.max(16, rect.left - 16)) + "px";
+  infoPopoverEl = pop;
+  pop.querySelector(".admin-info-popover__close")?.addEventListener("click", hideInfoPopover);
+  // Click outside closes
+  setTimeout(() => {
+    document.addEventListener("click", outsideClickHandler);
+    document.addEventListener("keydown", escHandler);
+  }, 0);
+}
+
+function hideInfoPopover() {
+  if (infoPopoverEl) {
+    infoPopoverEl.remove();
+    infoPopoverEl = null;
+  }
+  document.removeEventListener("click", outsideClickHandler);
+  document.removeEventListener("keydown", escHandler);
+}
+
+function outsideClickHandler(event) {
+  if (!infoPopoverEl) return;
+  if (infoPopoverEl.contains(event.target)) return;
+  hideInfoPopover();
+}
+
+function escHandler(event) {
+  if (event.key === "Escape") hideInfoPopover();
 }
 
 export function computeProposedDiff(viewId, original, current) {

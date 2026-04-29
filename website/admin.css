@@ -1371,6 +1371,392 @@
 }
 
 /* =============================================================================
+   Phase 4b — Info buttons + popover, walkthrough nav, live notes in preview
+   ============================================================================= */
+
+.admin-form__info {
+  align-items: center;
+  background: rgba(69, 58, 112, 0.08);
+  border: 0;
+  border-radius: 999px;
+  color: var(--indigo-700);
+  cursor: help;
+  display: inline-flex;
+  font: 700 10px var(--sans);
+  height: 16px;
+  justify-content: center;
+  margin-left: 6px;
+  width: 16px;
+}
+
+.admin-form__info:hover {
+  background: var(--indigo-700);
+  color: #fff;
+}
+
+.admin-info-popover {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(20, 12, 40, 0.22);
+  max-width: 360px;
+  padding: 14px 16px 12px;
+  position: fixed;
+  width: 360px;
+  z-index: 900;
+}
+
+.admin-info-popover header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.admin-info-popover header strong {
+  color: var(--indigo-800, #453a70);
+  font: 700 13px var(--sans);
+}
+
+.admin-info-popover__close {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 700 18px var(--sans);
+  line-height: 1;
+}
+
+.admin-info-popover p {
+  color: var(--text);
+  font: 500 12.5px var(--sans);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* -- Walkthrough nav strip --------------------------------------------- */
+
+.qp-nav {
+  align-items: center;
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: max-content 1fr max-content;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+}
+
+.qp-nav__btn {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font: 700 13px var(--sans);
+  padding: 8px 14px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.qp-nav__btn:hover {
+  background: rgba(69, 58, 112, 0.08);
+}
+
+.qp-nav__btn--primary {
+  background: var(--salmon, #ed6955);
+  border-color: var(--salmon, #ed6955);
+  color: #fff;
+}
+
+.qp-nav__btn--primary:hover {
+  background: var(--salmon-dark, #c25a4a);
+}
+
+.qp-nav__btn--ghost {
+  background: transparent;
+  border-color: rgba(69, 58, 112, 0.2);
+  color: var(--indigo-700);
+}
+
+.qp-nav__btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.qp-nav__progress {
+  display: grid;
+  gap: 4px;
+}
+
+.qp-nav__progress-bar {
+  background: var(--neutral-200);
+  border-radius: 999px;
+  height: 4px;
+  overflow: hidden;
+}
+
+.qp-nav__progress-bar > div {
+  background: var(--salmon, #ed6955);
+  border-radius: 999px;
+  height: 100%;
+  transition: width 240ms ease;
+  width: 0%;
+}
+
+.qp-nav__counter {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+}
+
+.qp-nav__counter strong {
+  color: var(--indigo-800);
+}
+
+.qp-nav__counter code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 5px;
+  color: var(--indigo-700);
+  font: 600 10px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+
+/* -- Explainer sections (right rail of preview) ------------------------ */
+
+.qp__exp-section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+}
+
+.qp__exp-section h3 {
+  color: var(--indigo-700);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.qp__exp-section--lint {
+  background: rgba(237, 105, 85, 0.06);
+  border-color: rgba(237, 105, 85, 0.32);
+}
+
+.qp__exp-section--lint h3 {
+  color: var(--salmon-dark, #c25a4a);
+}
+
+.qp__effect-list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.qp__effect-list li {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 6px;
+  color: var(--text);
+  font: 500 12px var(--sans);
+  padding: 4px 8px;
+}
+
+.qp__effect-list code {
+  background: rgba(69, 58, 112, 0.12);
+  border-radius: 4px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+
+.qp__exp-details {
+  margin-top: 8px;
+}
+
+.qp__exp-details summary {
+  color: var(--indigo-700);
+  cursor: pointer;
+  font: 600 12px var(--sans);
+}
+
+.qp__exp-details pre {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 6px;
+  font: 500 11px ui-monospace, monospace;
+  margin: 6px 0 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
+
+.qp__answers-table {
+  border-collapse: collapse;
+  font: 500 12px var(--sans);
+  width: 100%;
+}
+
+.qp__answers-table th,
+.qp__answers-table td {
+  border-bottom: 1px solid var(--neutral-200);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.qp__answers-table th {
+  color: var(--text-muted);
+  font: 800 10.5px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.qp__answers-table code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 4px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+
+.qp__jump {
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* -- Live notes panel inside preview ----------------------------------- */
+
+.qp__notes {
+  background: linear-gradient(135deg, rgba(237, 105, 85, 0.06), rgba(237, 105, 85, 0.02));
+  border: 1px solid rgba(237, 105, 85, 0.25);
+  border-radius: 14px;
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 14px 16px;
+}
+
+.qp__notes h3 {
+  color: var(--salmon-dark, #c25a4a);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.qp__notes-help {
+  font: 500 12px var(--sans);
+  margin: 0;
+}
+
+.qp__notes-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.qp__notes-row label {
+  display: grid;
+  gap: 3px;
+}
+
+.qp__notes-row span {
+  color: var(--text-muted);
+  font: 800 10px var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.qp__notes-row select {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  font: 500 12px var(--sans);
+  padding: 6px 8px;
+}
+
+.qp__notes textarea {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  color: var(--text);
+  font: 500 13px var(--sans);
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.qp__notes textarea:focus {
+  border-color: var(--salmon, #ed6955);
+  outline: none;
+}
+
+.qp__notes-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.qp__notes-feedback {
+  font: 600 11px var(--sans);
+}
+
+.qp__notes-feedback[data-tone="ok"] {
+  color: #4a7c59;
+}
+
+.qp__notes-feedback[data-tone="warn"] {
+  color: var(--salmon-dark, #c25a4a);
+}
+
+.qp__notes-recent {
+  border-top: 1px dashed rgba(237, 105, 85, 0.32);
+  margin-top: 6px;
+  padding-top: 8px;
+}
+
+.qp__notes-recent h4 {
+  color: var(--text-muted);
+  font: 800 10px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.qp__notes-recent-item {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+}
+
+.qp__notes-recent-item header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.qp__notes-recent-item small {
+  color: var(--text-muted);
+  font: 500 11px var(--sans);
+}
+
+.qp__notes-recent-item pre {
+  background: transparent;
+  color: var(--text);
+  font: 500 12px var(--sans);
+  line-height: 1.4;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* =============================================================================
    Phase 7 — Reconciler simulator
    ============================================================================= */
 

@@ -375,10 +375,8 @@ function wireEvents() {
 
   el.previewQuestion?.addEventListener("click", () => {
     if (!state.selected || state.selected.itemType !== "question") return;
-    openQuestionPreview(structuredCloneSafe(editingState.current ?? state.selected.payload), {
-      index: indexOfSelectedQuestion(),
-      total: state.liveData["quiz-questions"]?.entries?.length || 41,
-    });
+    const q = structuredCloneSafe(editingState.current ?? state.selected.payload);
+    openQuestionPreview(q, buildPreviewOptions());
   });
   el.previewQuiz?.addEventListener("click", () => {
     const entries = state.liveData["quiz-questions"]?.entries || [];
@@ -386,26 +384,48 @@ function wireEvents() {
       alert("Quiz JSON not loaded yet. Run scripts/export_swift_admin_data.mjs and refresh.");
       return;
     }
-    // Annotate each Q with note count for the flow listing.
+    // Annotate each Q with note count so the walkthrough's notes panel
+    // shows the historical thread.
     const annotated = entries.map((q) => ({
       ...q,
       _noteCount: state.notes.filter((n) => n.scopeType === "question" && (n.scopeId === q.id || n.scopeTitle === q.title))
         .length,
     }));
-    openQuizFlowPreview(annotated);
-    // Wire flow item clicks to open single-question preview.
-    setTimeout(() => {
-      document.querySelectorAll("[data-preview-question-id]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = btn.dataset.previewQuestionId;
-          const q = entries.find((entry) => entry.id === id);
-          if (!q) return;
-          closePreview();
-          openQuestionPreview(q, { index: entries.findIndex((entry) => entry.id === id) + 1, total: entries.length });
-        });
-      });
-    }, 60);
+    openQuizFlowPreview(annotated, buildPreviewOptions());
   });
+}
+
+// Phase 7+ — Build the options bag passed into preview overlays. Wires
+// mapper-effects digest, per-question note lookups, and the live note
+// save handler so the preview's notes panel round-trips into
+// admin_codex_notes (and thus into CLAUDE_ADMIN_NOTES.md after sync).
+function buildPreviewOptions() {
+  return {
+    mapperEffects: state.liveData["quiz-mapper-effects"]?.effectsByQuestion || {},
+    notesForQuestion: (qId) =>
+      state.notes
+        .filter((n) => n.scopeType === "question" && (n.scopeId === qId || n.scopeTitle === qId))
+        .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    onSaveNote: async ({ scopeId, scopeTitle, body, intent, target, snapshot }) => {
+      await writeNote({
+        scopeType: "question",
+        scopeId,
+        scopeTitle,
+        body,
+        intent: intent || "feedback",
+        target: target || "claude",
+        snapshot: snapshot || {},
+      });
+    },
+    onJumpToDetail: (qId) => {
+      // Jump back to the Quiz surface and select the matching item.
+      state.view = "quiz";
+      const items = liveItemsForView("quiz") || [];
+      const match = items.find((i) => i.payload?.id === qId);
+      if (match) state.selected = match;
+      render();
+    },
+  };
 }
 
 function showShortcutHelp() {

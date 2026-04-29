@@ -1,13 +1,21 @@
 // =============================================================================
-// admin-preview.js — render quiz questions and the full quiz flow
+// admin-preview.js — render quiz questions and the full quiz walkthrough
 // =============================================================================
-// HTML/CSS-based mock of the iOS quiz UI. Cosmic Indigo + Pearl White +
-// Salmon Action palette per CLAUDE.md. Used for "Preview this question"
-// (single Q overlay) and "Preview entire quiz" (step-through).
+// HTML/CSS-based mock of the iOS quiz UI in a phone-frame on the left,
+// with a structured explainer + live notes panel on the right.
 //
-// Rendering favors clarity over pixel-perfect SwiftUI parity — the goal
-// is "does the copy + flow read right" not "does it look exactly like
-// the iOS app".
+// Two entry points:
+//   openQuestionPreview(question, options)  — single Q
+//   openQuizFlowPreview(questions, options) — interactive prev/next walkthrough
+//
+// `options` extension surface (passed in by admin.js):
+//   factBundle           — initial property facts for token resolution
+//   mapperEffects        — { [questionId]: { effects: [...], rawSnippet: "" } }
+//   notesForQuestion     — (questionId) => Note[]   for the recent-notes list
+//   onSaveNote           — async ({ scopeId, scopeTitle, body, intent, target,
+//                                    snapshot }) => void   live note save
+//   onJumpToDetail       — (questionId) => void  (closes preview, opens admin
+//                                                  detail for that Q)
 
 const COLORS = {
   cream: "#F8F9FA",
@@ -21,29 +29,66 @@ const COLORS = {
   textMuted: "rgba(69,58,112,0.62)",
 };
 
-// -----------------------------------------------------------------------------
-// Public API
-// -----------------------------------------------------------------------------
+// ---- Default fact bundle for token resolution ----------------------------
+
+const DEFAULT_FACT_BUNDLE = {
+  yearBuilt: "1962",
+  street: "Park Avenue",
+  city: "Greenwich",
+  state: "CT",
+  squareFootage: "4,200 sqft",
+  roofType: "asphalt shingle",
+};
+
+// ---- Public API ----------------------------------------------------------
 
 export function openQuestionPreview(question, options = {}) {
-  const html = renderQuestionPreviewHtml(question, options);
-  showModal({
+  const ctx = makeContext([question], 0, options);
+  const overlay = showModal({
     title: "Preview question",
     subtitle: question.id,
-    body: html,
+    body: renderPanel(question, ctx),
     accent: "salmon",
+    wide: true,
   });
+  wirePanel(overlay, ctx, () => {});
 }
 
 export function openQuizFlowPreview(questions, options = {}) {
-  const html = renderQuizFlowHtml(questions, options);
-  showModal({
+  if (!questions?.length) return;
+  const ctx = makeContext(questions, 0, options);
+  const overlay = showModal({
     title: "Preview entire quiz",
     subtitle: `${questions.length} questions in render order`,
-    body: html,
+    body: renderPanel(questions[0], ctx),
     accent: "indigo",
     wide: true,
   });
+
+  function reRender() {
+    const panel = overlay.querySelector(".qp-modal__body");
+    if (!panel) return;
+    panel.innerHTML = renderPanel(ctx.questions[ctx.index], ctx);
+    wirePanel(overlay, ctx, reRender);
+  }
+
+  wirePanel(overlay, ctx, reRender);
+  // Keyboard arrow nav (escape is handled in showModal already)
+  const arrowHandler = (event) => {
+    if (!document.body.contains(overlay)) {
+      document.removeEventListener("keydown", arrowHandler);
+      return;
+    }
+    if (event.target?.tagName === "INPUT" || event.target?.tagName === "TEXTAREA" || event.target?.tagName === "SELECT") return;
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      goNext(ctx, reRender);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      goPrev(ctx, reRender);
+    }
+  };
+  document.addEventListener("keydown", arrowHandler);
 }
 
 export function closePreview() {
@@ -51,76 +96,102 @@ export function closePreview() {
   if (modal) modal.remove();
 }
 
-// -----------------------------------------------------------------------------
-// Single-question render
-// -----------------------------------------------------------------------------
+// ---- Context bag ----------------------------------------------------------
 
-function renderQuestionPreviewHtml(q, opts = {}) {
-  const factBundle = opts.factBundle || DEFAULT_FACT_BUNDLE;
-  const interpolatedTitle = resolveTokens(q.title, factBundle, q.fallbackTitle);
-  const tokenCount = countTokens(q.title);
-  const skipNote = q.dynamicSkip
-    ? `<p class="qp__skip-note">⚠️ Has a dynamic skip rule. The quiz may auto-skip this question for some answers.</p>`
-    : "";
-  const providerNote = q.dynamicProviderTypes
-    ? `<p class="qp__skip-note">↪ Provider list is computed at render time from prior answers.</p>`
-    : "";
+function makeContext(questions, index, options) {
+  return {
+    questions,
+    index,
+    isWalkthrough: questions.length > 1,
+    factBundle: { ...DEFAULT_FACT_BUNDLE, ...(options.factBundle || {}) },
+    mapperEffects: options.mapperEffects || {},
+    notesForQuestion: options.notesForQuestion || (() => []),
+    onSaveNote: options.onSaveNote || null,
+    onJumpToDetail: options.onJumpToDetail || null,
+  };
+}
 
+function goNext(ctx, reRender) {
+  if (ctx.index < ctx.questions.length - 1) {
+    ctx.index += 1;
+    reRender();
+  }
+}
+
+function goPrev(ctx, reRender) {
+  if (ctx.index > 0) {
+    ctx.index -= 1;
+    reRender();
+  }
+}
+
+// ---- Panel rendering ------------------------------------------------------
+
+function renderPanel(question, ctx) {
+  const navHtml = ctx.isWalkthrough ? renderNavStrip(ctx) : "";
   return `
+    ${navHtml}
     <div class="qp">
       <div class="qp__chrome">
-        <div class="qp__phone">
-          <div class="qp__statusbar">9:41</div>
-          <div class="qp__nav">
-            <span class="qp__nav-back">‹ Back</span>
-            <span class="qp__chapter-pill">${escapeHtml(chapterTitle(q.chapter))} · ${escapeHtml(q.section || "")}</span>
-          </div>
-          <div class="qp__progress"><div class="qp__progress-bar" style="width:${Math.min(100, ((opts.index || 1) / (opts.total || 41)) * 100)}%"></div></div>
-          <div class="qp__body">
-            <h1 class="qp__title">${escapeHtml(interpolatedTitle || q.fallbackTitle || "(no title)")}</h1>
-            ${q.subtitle ? `<p class="qp__subtitle">${escapeHtml(q.subtitle)}</p>` : ""}
-            <div class="qp__answers">
-              ${renderAnswerControls(q)}
-            </div>
-          </div>
-          <div class="qp__cta">
-            <button class="qp__cta-btn">Continue</button>
-          </div>
+        ${renderPhoneFrame(question, ctx)}
+      </div>
+      <aside class="qp__meta">
+        ${renderExplainer(question, ctx)}
+        ${renderNotesPanel(question, ctx)}
+        ${renderTokenControls(question, ctx)}
+      </aside>
+    </div>
+  `;
+}
+
+function renderNavStrip(ctx) {
+  const { index, questions } = ctx;
+  const q = questions[index];
+  const prevDisabled = index === 0;
+  const nextDisabled = index === questions.length - 1;
+  return `
+    <div class="qp-nav">
+      <button type="button" class="qp-nav__btn" data-prev ${prevDisabled ? "disabled" : ""}>
+        ← Previous
+      </button>
+      <div class="qp-nav__progress">
+        <div class="qp-nav__progress-bar"><div style="width:${((index + 1) / questions.length) * 100}%"></div></div>
+        <div class="qp-nav__counter">
+          <strong>${index + 1}</strong> of ${questions.length} ·
+          <code>${escapeHtml(q.id)}</code>
         </div>
       </div>
+      <button type="button" class="qp-nav__btn qp-nav__btn--primary" data-next ${nextDisabled ? "disabled" : ""}>
+        Next →
+      </button>
+    </div>
+  `;
+}
 
-      <aside class="qp__meta">
-        <h3>What this question does</h3>
-        <dl class="qp__dl">
-          <dt>Kind</dt><dd>${escapeHtml(q.kind || "?")}</dd>
-          <dt>Section</dt><dd>${escapeHtml(q.section || "?")}</dd>
-          <dt>Chapter</dt><dd>${escapeHtml(chapterTitle(q.chapter))}</dd>
-          ${tokenCount > 0 ? `<dt>Tokens</dt><dd>${tokenCount} in title (${escapeHtml(extractTokens(q.title).join(", "))})</dd>` : ""}
-          ${q.fallbackTitle ? `<dt>Fallback</dt><dd>${escapeHtml(q.fallbackTitle)}</dd>` : ""}
-          ${(q.providerTypes && q.providerTypes.length) ? `<dt>Provider types</dt><dd>${q.providerTypes.map(escapeHtml).join(", ")}</dd>` : ""}
-          ${(q.providerFollowUpAnswerIds && q.providerFollowUpAnswerIds.length) ? `<dt>Follow-up answers</dt><dd>${q.providerFollowUpAnswerIds.map(escapeHtml).join(", ")}</dd>` : ""}
-          ${q.documentUploadCategory ? `<dt>Document upload</dt><dd>${escapeHtml(q.documentUploadCategory)}</dd>` : ""}
-          ${q.supportsSelectAll ? `<dt>Select all</dt><dd>Pill enabled</dd>` : ""}
-        </dl>
-        ${skipNote}
-        ${providerNote}
-        ${(q._impact?.creates_systems?.length) ? `
-          <div class="qp__impact">
-            <strong>Creates systems:</strong> ${q._impact.creates_systems.map(escapeHtml).join(", ")}
-          </div>
-        ` : ""}
-        ${q._lint?.length ? `
-          <div class="qp__lint">
-            <strong>Lint warnings (${q._lint.length}):</strong>
-            <ul>${q._lint.map(l => `<li><code>${escapeHtml(l.ruleId)}</code> on ${escapeHtml(l.field)} — ${escapeHtml(l.message)}</li>`).join("")}</ul>
-          </div>
-        ` : ""}
+// ---- Phone frame ----------------------------------------------------------
 
-        <div class="qp__token-controls">
-          <h4>Try different property facts</h4>
-          ${renderFactInputs(factBundle)}
+function renderPhoneFrame(q, ctx) {
+  const interpolatedTitle = resolveTokens(q.title, ctx.factBundle, q.fallbackTitle);
+  return `
+    <div class="qp__phone">
+      <div class="qp__statusbar">9:41</div>
+      <div class="qp__nav">
+        <span class="qp__nav-back">‹ Back</span>
+        <span class="qp__chapter-pill">${escapeHtml(chapterTitle(q.chapter))} · ${escapeHtml(q.section || "")}</span>
+      </div>
+      <div class="qp__progress">
+        <div class="qp__progress-bar" style="width:${Math.min(100, ((ctx.index + 1) / ctx.questions.length) * 100)}%"></div>
+      </div>
+      <div class="qp__body">
+        <h1 class="qp__title">${escapeHtml(interpolatedTitle || q.fallbackTitle || "(no title)")}</h1>
+        ${q.subtitle ? `<p class="qp__subtitle">${escapeHtml(q.subtitle)}</p>` : ""}
+        <div class="qp__answers">
+          ${renderAnswerControls(q)}
         </div>
-      </aside>
+      </div>
+      <div class="qp__cta">
+        <button class="qp__cta-btn">Continue</button>
+      </div>
     </div>
   `;
 }
@@ -135,9 +206,7 @@ function renderAnswerControls(q) {
         <span class="qp__currency-prefix">$</span>
         <input type="text" placeholder="0" class="qp__currency-input" disabled />
       </div>
-      <div class="qp__answer-row">
-        ${opts.map((o) => optionChip(o, "single")).join("")}
-      </div>
+      ${opts.length ? `<div class="qp__answer-row">${opts.map((o) => optionChip(o, "single")).join("")}</div>` : ""}
     `;
   }
 
@@ -172,7 +241,7 @@ function renderAnswerControls(q) {
     return `
       <div class="qp__provider">
         <input type="text" class="qp__provider-input" placeholder="${escapeHtml(q.providerSearchPlaceholder || "Search providers…")}" disabled />
-        <p class="qp__provider-hint">Filters by ${(q.providerTypes || []).map(escapeHtml).join(" / ") || "(any)"} in ${q._impact?.region || "your region"}.</p>
+        <p class="qp__provider-hint">Filters by ${(q.providerTypes || []).map(escapeHtml).join(" / ") || "(any)"}</p>
       </div>
     `;
   }
@@ -181,17 +250,12 @@ function renderAnswerControls(q) {
     return `
       <div class="qp__custom-form">
         <div class="qp__custom-form-pill">${escapeHtml(kindLabel(kind))} · custom inline form</div>
-        <p class="qp__custom-form-note">This kind shows a structured form embedded in the question. ${
-          kind === "caretakers" ? "Walks spouse → kids → caretakers → home manager sub-steps." :
-          kind === "generatorAdd" ? "Captures generator type, fuel, and optional provider." :
-          "Multi-select chips with inline provider picker per chip."
-        }</p>
+        <p class="qp__custom-form-note">${customFormNoteFor(kind)}</p>
         ${opts.length ? `<div class="qp__answer-row">${opts.map((o) => optionChip(o, "single")).join("")}</div>` : ""}
       </div>
     `;
   }
 
-  // singleChoice / multiSelect / slider fallthrough
   if (kind === "multiSelect") {
     return `
       <div class="qp__answer-grid">
@@ -220,89 +284,328 @@ function optionChip(opt, mode) {
   `;
 }
 
-// -----------------------------------------------------------------------------
-// Quiz flow render
-// -----------------------------------------------------------------------------
+function customFormNoteFor(kind) {
+  if (kind === "caretakers")
+    return "Walks spouse → kids → caretakers → home manager sub-steps. Each sub-step can create family_member rows via HouseholdInviteCoordinator at apply time.";
+  if (kind === "generatorAdd")
+    return "Captures generator type (whole-home / portable / none), fuel type, and an optional provider. Creates a separate utility_account when fuel differs from Q3's heating fuel.";
+  return "Multi-select chip grid with inline provider picker per chip. Saved chips become contractor rows + auto-created vendor routines per category.";
+}
 
-function renderQuizFlowHtml(questions, opts = {}) {
-  const grouped = groupByChapter(questions);
-  const chapters = Object.keys(grouped);
-  const totalCount = questions.length;
-  let qIndex = 0;
-  return `
-    <div class="qf">
-      <div class="qf__legend">
-        <span class="qf__legend-item"><span class="qf__legend-dot qf__legend-dot--ok"></span> ${totalCount} questions across ${chapters.length} chapter${chapters.length === 1 ? "" : "s"}</span>
-        <span class="qf__legend-item"><span class="qf__legend-dot qf__legend-dot--skip"></span> dynamicSkip rule</span>
-        <span class="qf__legend-item"><span class="qf__legend-dot qf__legend-dot--lint"></span> lint warnings</span>
-        <span class="qf__legend-item"><span class="qf__legend-dot qf__legend-dot--token"></span> uses tokens</span>
+// ---- Explainer panel ------------------------------------------------------
+// Pulls together everything we know about a question so Tom can see the
+// behavior without flipping back to the admin form.
+
+function renderExplainer(q, ctx) {
+  const tokens = extractTokens(q.title);
+  const lints = q._lint || [];
+  const mapperEntry = ctx.mapperEffects?.[q.id];
+  const downstream = downstreamEffects(q);
+
+  const sections = [];
+
+  // Identity + metadata
+  sections.push(`
+    <section class="qp__exp-section">
+      <h3>What this question does</h3>
+      <dl class="qp__dl">
+        <dt>Question ID</dt><dd><code>${escapeHtml(q.id)}</code></dd>
+        <dt>Kind</dt><dd>${escapeHtml(kindLabel(q.kind))}</dd>
+        <dt>Section</dt><dd>${escapeHtml(q.section || "?")}</dd>
+        <dt>Chapter</dt><dd>${escapeHtml(chapterTitle(q.chapter))}</dd>
+        ${q.fallbackTitle ? `<dt>Fallback title</dt><dd>${escapeHtml(q.fallbackTitle)}</dd>` : ""}
+        ${tokens.length ? `<dt>Tokens used</dt><dd>${tokens.map((t) => `<code>{${escapeHtml(t)}}</code>`).join(" ")}</dd>` : ""}
+        ${q.documentUploadCategory ? `<dt>Doc upload</dt><dd>${escapeHtml(q.documentUploadCategory)} (user can upload instead of answering)</dd>` : ""}
+        ${q.supportsSelectAll ? `<dt>Select-all pill</dt><dd>Enabled</dd>` : ""}
+      </dl>
+    </section>
+  `);
+
+  // Per-answer breakdown
+  if (q.answerOptions?.length) {
+    sections.push(renderAnswersTable(q));
+  }
+
+  // Mapper side-effects digest
+  if (mapperEntry) {
+    sections.push(`
+      <section class="qp__exp-section">
+        <h3>Side effects when answered</h3>
+        <ul class="qp__effect-list">
+          ${(mapperEntry.effects || []).map((e) => `<li>${escapeHtml(e)}</li>`).join("")}
+        </ul>
+        ${mapperEntry.rawSnippet ? `<details class="qp__exp-details"><summary>Raw HouseQuizAnswerMapper snippet</summary><pre>${escapeHtml(mapperEntry.rawSnippet)}</pre></details>` : ""}
+      </section>
+    `);
+  }
+
+  // Provider routing
+  if (q.kind === "providerSearch" || q.providerTypes?.length || q.providerFollowUpAnswerIds?.length) {
+    sections.push(`
+      <section class="qp__exp-section">
+        <h3>Provider routing</h3>
+        ${q.providerTypes?.length ? `<p>Static provider types: ${q.providerTypes.map((t) => `<code>${escapeHtml(t)}</code>`).join(", ")}</p>` : ""}
+        ${q.dynamicProviderTypes ? `<p>Has a <strong>dynamic</strong> provider-types closure — narrows the picker based on prior answers (e.g. Q19 reads Q3's heating fuel).</p>` : ""}
+        ${q.providerFollowUpAnswerIds?.length ? `<p>These answer IDs trigger an <strong>inline provider picker</strong>: ${q.providerFollowUpAnswerIds.map((a) => `<code>${escapeHtml(a)}</code>`).join(", ")}</p>` : ""}
+        ${q.providerSearchPlaceholder ? `<p>Picker placeholder: "${escapeHtml(q.providerSearchPlaceholder)}"</p>` : ""}
+      </section>
+    `);
+  }
+
+  // Skip + downstream gating
+  if (q.dynamicSkip || downstream.gates.length || downstream.creates.length) {
+    sections.push(`
+      <section class="qp__exp-section">
+        <h3>Flow + downstream</h3>
+        ${q.dynamicSkip ? `
+          <div class="qp__skip-note">
+            ⚠️ Has a <strong>dynamicSkip</strong> rule — the quiz auto-skips this question when prior answers make it irrelevant.
+            <details><summary>Closure source</summary><pre>${escapeHtml(typeof q.dynamicSkip === "string" ? q.dynamicSkip : JSON.stringify(q.dynamicSkip))}</pre></details>
+          </div>
+        ` : ""}
+        ${downstream.creates.length ? `<p><strong>Creates these systems:</strong> ${downstream.creates.map((s) => `<code>${escapeHtml(s)}</code>`).join(", ")}</p>` : ""}
+        ${downstream.gates.length ? `<p><strong>Likely gates downstream Q's:</strong> ${downstream.gates.map((s) => `<code>${escapeHtml(s)}</code>`).join(", ")}</p>` : ""}
+      </section>
+    `);
+  }
+
+  // Lint warnings
+  if (lints.length) {
+    sections.push(`
+      <section class="qp__exp-section qp__exp-section--lint">
+        <h3>Voice lint warnings (${lints.length})</h3>
+        <ul class="qp__effect-list">
+          ${lints.map((l) => `<li><code>${escapeHtml(l.ruleId)}</code> on ${escapeHtml(l.field)} — ${escapeHtml(l.message)}<br/><small>${escapeHtml(l.snippet || "")}</small></li>`).join("")}
+        </ul>
+      </section>
+    `);
+  }
+
+  // Jump to detail panel link
+  if (ctx.onJumpToDetail) {
+    sections.push(`
+      <div class="qp__jump">
+        <button type="button" class="qp-nav__btn qp-nav__btn--ghost" data-jump-to-detail="${escapeHtml(q.id)}">
+          Open in admin detail →
+        </button>
       </div>
-      ${chapters
-        .map((chapterKey) => {
-          const chapter = chapterTitle(chapterKey);
-          const list = grouped[chapterKey];
-          return `
-            <section class="qf__chapter">
-              <header class="qf__chapter-header">
-                <h2>${escapeHtml(chapter)}</h2>
-                <span class="qf__chapter-count">${list.length} questions</span>
-              </header>
-              <ol class="qf__list">
-                ${list.map((q) => {
-                  qIndex += 1;
-                  return renderQuizFlowItem(q, qIndex);
-                }).join("")}
-              </ol>
-            </section>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
+    `);
+  }
+
+  return sections.join("");
 }
 
-function renderQuizFlowItem(q, n) {
-  const flags = [];
-  if (q.dynamicSkip) flags.push(`<span class="qf__flag qf__flag--skip" title="Has dynamicSkip">↷</span>`);
-  if (countTokens(q.title) > 0) flags.push(`<span class="qf__flag qf__flag--token" title="Uses tokens">{x}</span>`);
-  if ((q._lint || []).length) flags.push(`<span class="qf__flag qf__flag--lint" title="${q._lint.length} lint hits">⚠</span>`);
-  const note = (q._noteCount || 0) > 0 ? `<span class="qf__notes">${q._noteCount} note${q._noteCount === 1 ? "" : "s"}</span>` : "";
-  const opts = (q.answerOptions || []).slice(0, 6).map((o) => o.label || o.id).filter(Boolean).join(" · ");
-  const moreOpts = (q.answerOptions || []).length > 6 ? ` +${q.answerOptions.length - 6} more` : "";
+function renderAnswersTable(q) {
   return `
-    <li class="qf__item" data-question-id="${escapeHtml(q.id)}">
-      <button class="qf__item-btn" data-preview-question-id="${escapeHtml(q.id)}">
-        <span class="qf__item-num">${n}</span>
-        <span class="qf__item-body">
-          <span class="qf__item-title">${escapeHtml(resolveTokens(q.title, DEFAULT_FACT_BUNDLE, q.fallbackTitle))}</span>
-          ${q.subtitle ? `<span class="qf__item-subtitle">${escapeHtml(q.subtitle)}</span>` : ""}
-          <span class="qf__item-meta">
-            <code>${escapeHtml(q.id)}</code>
-            <span>${escapeHtml(kindLabel(q.kind))}</span>
-            ${opts ? `<span class="qf__item-opts">${escapeHtml(opts + moreOpts)}</span>` : ""}
-          </span>
-        </span>
-        <span class="qf__item-flags">
-          ${flags.join("")}
-          ${note}
-        </span>
-      </button>
-    </li>
+    <section class="qp__exp-section">
+      <h3>Answer breakdown (${q.answerOptions.length})</h3>
+      <table class="qp__answers-table">
+        <thead><tr><th>id</th><th>label</th><th>icon</th><th>signal</th></tr></thead>
+        <tbody>
+          ${q.answerOptions.map((o) => `
+            <tr>
+              <td><code>${escapeHtml(o.id || "")}</code></td>
+              <td>${escapeHtml(o.label || "")}</td>
+              <td>${o.icon ? `<code>${escapeHtml(o.icon)}</code>` : "—"}</td>
+              <td>${signalForAnswer(q, o)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </section>
   `;
 }
 
-// -----------------------------------------------------------------------------
-// Token resolution + helpers
-// -----------------------------------------------------------------------------
+function signalForAnswer(q, opt) {
+  const tags = [];
+  if (q.providerFollowUpAnswerIds?.includes(opt.id)) tags.push("opens provider picker");
+  if (opt.acceptsCustomInput) tags.push("accepts custom input");
+  if (opt.id === "not_sure" || opt.id === "skip") tags.push("non-answer");
+  return tags.length ? tags.join(", ") : "—";
+}
 
-const DEFAULT_FACT_BUNDLE = {
-  yearBuilt: "1962",
-  street: "Park Avenue",
-  city: "Greenwich",
-  state: "CT",
-  squareFootage: "4,200 sqft",
-  roofType: "asphalt shingle",
-};
+function downstreamEffects(q) {
+  const out = { creates: [], gates: [] };
+  // creates_systems comes from _impact heuristic baked at export time
+  if (q._impact?.creates_systems?.length) out.creates = q._impact.creates_systems;
+  if (q._impact?.gates_questions?.length) out.gates = q._impact.gates_questions;
+  // dynamicSkip closure scan — pluck quoted question ids out of the raw source
+  if (typeof q.dynamicSkip === "string") {
+    const matches = q.dynamicSkip.match(/"q\w+"/g) || [];
+    for (const m of matches) {
+      const id = m.replace(/"/g, "");
+      if (id !== q.id && !out.gates.includes(id)) out.gates.push(id);
+    }
+  }
+  return out;
+}
+
+// ---- Notes panel ----------------------------------------------------------
+
+function renderNotesPanel(q, ctx) {
+  const notes = ctx.notesForQuestion(q.id) || [];
+  return `
+    <section class="qp__notes" data-note-scope-id="${escapeHtml(q.id)}" data-note-scope-title="${escapeHtml(q.title || q.id)}">
+      <h3>Live note for Claude</h3>
+      <p class="qp__notes-help admin-muted">Captures the question + your comment so I can act on it next session without re-exploring.</p>
+      <div class="qp__notes-row">
+        <label>
+          <span>Intent</span>
+          <select data-note-intent>
+            <option value="feedback">Feedback</option>
+            <option value="change_request">Change request</option>
+            <option value="proposal_add">Add new option</option>
+            <option value="proposal_delete">Cut this question</option>
+            <option value="bug">Bug</option>
+            <option value="idea">Idea</option>
+            <option value="question_for_claude">Question for Claude</option>
+          </select>
+        </label>
+        <label>
+          <span>Target</span>
+          <select data-note-target>
+            <option value="claude" selected>CLAUDE_ADMIN_NOTES.md</option>
+            <option value="codex">CODEX_ADMIN_NOTES.md</option>
+            <option value="both">Both</option>
+          </select>
+        </label>
+      </div>
+      <textarea data-note-body rows="4" placeholder="e.g. 'Cut the Not Sure option — it's covering 30% of answers and we get no signal.' or 'Reorder so {state} appears in the title only when we have it.'"></textarea>
+      <div class="qp__notes-actions">
+        <button type="button" class="qp-nav__btn qp-nav__btn--primary" data-note-save>Save note</button>
+        <span class="qp__notes-feedback admin-muted" data-note-feedback></span>
+      </div>
+      ${notes.length ? `
+        <div class="qp__notes-recent">
+          <h4>Recent notes on this question (${notes.length})</h4>
+          ${notes.slice(0, 5).map((n) => `
+            <article class="qp__notes-recent-item">
+              <header>
+                <span class="admin-pill admin-pill--note">${escapeHtml(n.intent || "feedback")}</span>
+                <small>${escapeHtml(formatNoteDate(n.createdAt))}${n.appliedAt ? ` · applied ${escapeHtml(formatNoteDate(n.appliedAt))}` : ""}</small>
+              </header>
+              <pre>${escapeHtml(n.body || "")}</pre>
+            </article>
+          `).join("")}
+          ${notes.length > 5 ? `<p class="admin-muted">…and ${notes.length - 5} more.</p>` : ""}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function formatNoteDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+// ---- Token controls -------------------------------------------------------
+
+function renderTokenControls(q, ctx) {
+  return `
+    <section class="qp__token-controls">
+      <h4>Try different property facts</h4>
+      <p class="admin-muted qp__notes-help">Edits update the title above live so you can see token resolution.</p>
+      ${Object.keys(ctx.factBundle).map((k) => `
+        <label class="qp__token-row">
+          <span>${escapeHtml(k)}</span>
+          <input type="text" data-fact-key="${escapeHtml(k)}" value="${escapeHtml(ctx.factBundle[k])}" />
+        </label>
+      `).join("")}
+    </section>
+  `;
+}
+
+// ---- Wire interactions ----------------------------------------------------
+
+function wirePanel(overlay, ctx, reRender) {
+  // Nav buttons
+  overlay.querySelector("[data-prev]")?.addEventListener("click", () => goPrev(ctx, reRender));
+  overlay.querySelector("[data-next]")?.addEventListener("click", () => goNext(ctx, reRender));
+
+  // Jump-to-detail
+  overlay.querySelector("[data-jump-to-detail]")?.addEventListener("click", (event) => {
+    const qId = event.currentTarget.dataset.jumpToDetail;
+    closePreview();
+    ctx.onJumpToDetail?.(qId);
+  });
+
+  // Token-fact updates — re-render on change so the title interpolates live
+  overlay.querySelectorAll("[data-fact-key]").forEach((input) => {
+    input.addEventListener("input", () => {
+      ctx.factBundle[input.dataset.factKey] = input.value;
+      // Just update the title in place to avoid full re-render (preserves
+      // notes textarea state).
+      const phoneTitle = overlay.querySelector(".qp__title");
+      if (phoneTitle) {
+        const q = ctx.questions[ctx.index];
+        phoneTitle.textContent = resolveTokens(q.title, ctx.factBundle, q.fallbackTitle) || q.fallbackTitle || "(no title)";
+      }
+    });
+  });
+
+  // Save note
+  overlay.querySelector("[data-note-save]")?.addEventListener("click", () => saveNoteFromPanel(overlay, ctx, reRender));
+  // Cmd/Ctrl-Enter inside note body also saves
+  overlay.querySelector("[data-note-body]")?.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      saveNoteFromPanel(overlay, ctx, reRender);
+    }
+  });
+}
+
+async function saveNoteFromPanel(overlay, ctx, reRender) {
+  const scopeNode = overlay.querySelector("[data-note-scope-id]");
+  if (!scopeNode || !ctx.onSaveNote) return;
+  const body = overlay.querySelector("[data-note-body]")?.value?.trim();
+  if (!body) {
+    setNoteFeedback(overlay, "Write something first.", "warn");
+    return;
+  }
+  const scopeId = scopeNode.dataset.noteScopeId;
+  const scopeTitle = scopeNode.dataset.noteScopeTitle;
+  const intent = overlay.querySelector("[data-note-intent]")?.value || "feedback";
+  const target = overlay.querySelector("[data-note-target]")?.value || "claude";
+  const q = ctx.questions[ctx.index];
+
+  setNoteFeedback(overlay, "Saving…", "");
+  try {
+    await ctx.onSaveNote({
+      scopeId,
+      scopeTitle,
+      body,
+      intent,
+      target,
+      snapshot: {
+        itemType: "question",
+        category: `${q.chapter || "?"} · ${q.section || "?"}`,
+        payload: q,
+        capturedAt: new Date().toISOString(),
+        capturedFrom: "preview-panel",
+      },
+    });
+    overlay.querySelector("[data-note-body]").value = "";
+    setNoteFeedback(overlay, "Saved ✓", "ok");
+    // Refresh recent-notes list — full re-render is the simplest path, but
+    // only re-render this question's panel section to preserve nav state.
+    reRender();
+  } catch (err) {
+    setNoteFeedback(overlay, `Save failed: ${err.message || err}`, "warn");
+  }
+}
+
+function setNoteFeedback(overlay, text, tone) {
+  const node = overlay.querySelector("[data-note-feedback]");
+  if (!node) return;
+  node.textContent = text;
+  node.dataset.tone = tone || "";
+  if (tone === "ok") setTimeout(() => { node.textContent = ""; node.dataset.tone = ""; }, 2200);
+}
+
+// ---- Token resolution + helpers -------------------------------------------
 
 function resolveTokens(rawTitle, facts, fallback) {
   if (!rawTitle) return fallback || "";
@@ -320,10 +623,6 @@ function resolveTokens(rawTitle, facts, fallback) {
   }
   if (unresolved && fallback) return fallback;
   return resolved;
-}
-
-function countTokens(s) {
-  return extractTokens(s).length;
 }
 
 function extractTokens(s) {
@@ -365,32 +664,7 @@ function kindLabel(kind) {
   );
 }
 
-function groupByChapter(questions) {
-  const groups = {};
-  for (const q of questions) {
-    const key = q.chapter || "ungrouped";
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(q);
-  }
-  return groups;
-}
-
-function renderFactInputs(facts) {
-  return Object.keys(facts)
-    .map(
-      (k) => `
-        <label class="qp__token-row">
-          <span>${escapeHtml(k)}</span>
-          <input type="text" data-fact-key="${escapeHtml(k)}" value="${escapeHtml(facts[k])}" />
-        </label>
-      `
-    )
-    .join("");
-}
-
-// -----------------------------------------------------------------------------
-// Modal show / hide
-// -----------------------------------------------------------------------------
+// ---- Modal show / hide ----------------------------------------------------
 
 function showModal({ title, subtitle, body, accent = "indigo", wide = false }) {
   closePreview();
