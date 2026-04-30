@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-29T20:38:35.052Z",
+  "generatedAt": "2026-04-30T15:23:35.024Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift",
-  "sourceCommit": "274713d0",
+  "sourceCommit": "290eb1ac",
   "count": 221,
   "entries": [
     {
@@ -155,14 +155,14 @@
       "stableId": null,
       "systemCategory": "Roofing",
       "title": "Treat moss and algae",
-      "description": "Apply moss/algae treatment to prevent shingle damage and discoloration.",
+      "description": "Roofer applies a zinc-strip or oxygen-bleach moss/algae treatment to prevent the dark streaks and shingle damage that biological growth causes. The streaks aren't just cosmetic — moss lifts the granular surface of asphalt shingles and shortens the roof's life by 5–10 years if left untreated.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$50–$200",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Wood shake roofs are fragile and require pro safety gear",
+      "notes": "Wood shake roofs are fragile and slippery — always pro-only with safety gear. For asphalt, fall application means the rains carry the treatment evenly across the shingles before winter. North-facing slopes show moss first; check those when deciding if you're due.",
       "requiredSubtypes": [
         "roof_wood"
       ],
@@ -191,7 +191,22 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Roofer applies a zinc-strip or oxygen-bleach moss/algae treatment to prevent ..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Wood shake roofs are fragile and slippery — always pro-only with safety gear...."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -437,14 +452,14 @@
       "stableId": null,
       "systemCategory": "Siding/Exterior",
       "title": "Exterior paint touch-up walkaround",
-      "description": "Walk the exterior with the painter or your handyman to identify peeling, chipping, or weathered paint that needs touch-up. Full repaint is every 7-10 years; annual touch-up extends the interval significantly.",
+      "description": "Walk the exterior with the painter or your handyman to identify peeling, chipping, or weathered paint that needs touch-up. Full repaint is every 7-10 years; annual touch-up catches the spots that fail first (south-facing walls, trim around windows, lower clapboards near grade) and extends the full repaint interval significantly.",
       "frequency": "Annually",
       "priority": "Low",
       "estimatedCostRange": "$200-800",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Best done in late spring after the wood has dried out from winter and before summer heat. Match the existing finish carefully — eggshell on a satin wall reads as a patch even after a few weeks of weathering. Most painters keep your color formulation on file once you've used them.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -471,7 +486,15 @@
           "displayPriority": 85
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Best done in late spring after the wood has dried out from winter and before ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -703,14 +726,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Inspect ductwork for leaks",
-      "description": "HVAC tech inspects ductwork for air leaks that reduce efficiency.",
+      "description": "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization test or a manual smoke-pencil walkthrough) to find air loss in the supply and return ducts. Most homes lose 20–30% of conditioned air to duct leaks — sealing them recovers that money on every energy bill for the rest of the system's life.",
       "frequency": "Every 2-3 years",
       "priority": "Medium",
       "estimatedCostRange": "$200–$400",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Older homes (pre-2000) and homes with ductwork running through unconditioned spaces (attic, crawl) benefit most. If your second floor is always 5–10°F off the first floor, leaky ducts are the #1 suspect.",
       "requiredSubtypes": [
         "ducted"
       ],
@@ -739,7 +762,15 @@
           "displayPriority": 20
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization t..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1601,14 +1632,14 @@
       "stableId": null,
       "systemCategory": "Electrical",
       "title": "Replace smoke detectors",
-      "description": "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back.",
+      "description": "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply — this is one of the few maintenance items where the timing isn't optional.",
       "frequency": "Every 10 years",
       "priority": "High",
       "estimatedCostRange": "$100–$250",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "If you have hardwired/interconnected detectors, replace them all at once with the same model — mixing brands or sensor types in an interconnected system can cause false alarms. Check the manufacture date on every detector while up there; some homes have a mix of newer and older units.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -1635,7 +1666,22 @@
           "displayPriority": 40
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Electrician or handyman replaces smoke detectors that have passed their 10-ye..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "If you have hardwired/interconnected detectors, replace them all at once with..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1643,14 +1689,14 @@
       "stableId": null,
       "systemCategory": "Electrical",
       "title": "Inspect electrical panel",
-      "description": "Electrician inspects the main breaker panel for wear or overheating.",
+      "description": "Electrician opens the main breaker panel to check for signs of wear: burned or discolored bus bars, loose terminations, corrosion, water staining, and breakers that feel warm to the touch under load. Catches the early warning signs of a panel that's nearing end-of-life or has a high-current connection slowly arcing.",
       "frequency": "Every 3 years",
       "priority": "Medium",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks — if you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -1677,7 +1723,15 @@
           "displayPriority": 40
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1685,14 +1739,14 @@
       "stableId": null,
       "systemCategory": "Electrical",
       "title": "EV charger inspection",
-      "description": "Electrician inspects the EV charging station, the dedicated circuit, the connections, and the charging cable for wear or heat signatures. Higher-amperage L2 installs benefit the most from an annual check.",
+      "description": "Electrician inspects the EV charging station hardware, dedicated circuit and breaker, terminations at the charger and the panel, and the charging cable for wear or heat signatures. Higher-amperage L2 installs (40A / 50A circuits) draw more current for longer durations than typical residential loads — a slowly-loosening connection runs hot for months before it fails.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$100-200",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "If your charger is in an unconditioned garage or outdoors, check the housing for rodent damage and water intrusion at the same time. Some manufacturer warranties require documented annual inspection — ask before you buy if you're shopping a new install.",
       "requiredSubtypes": [
         "has_ev_charger"
       ],
@@ -1721,7 +1775,22 @@
           "displayPriority": 40
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Electrician inspects the EV charging station hardware, dedicated circuit and ..."
+        },
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "If your charger is in an unconditioned garage or outdoors, check the housing ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -2050,14 +2119,14 @@
       "stableId": null,
       "systemCategory": "Windows",
       "title": "Schedule exterior window re-caulking",
-      "description": "Painter or handyman removes failed exterior caulk and applies fresh exterior-grade sealant around windows.",
+      "description": "Painter or handyman scrapes out cracked or pulling-away exterior caulk around every window and door, applies fresh exterior-grade urethane or polyurethane sealant, and tools the bead clean. Failed exterior caulk is the #1 entry point for water damage to wall framing — catching it early prevents wood rot and the $5K+ repair that follows.",
       "frequency": "Every 2-3 years",
       "priority": "Medium",
       "estimatedCostRange": "$200–$500",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Look for caulk that's pulled away from the trim, has hairline cracks, or has yellowed (older silicone). Schedule before fall rains so the new bead has dry weather to skin over before winter freeze-thaw cycles stress it. Often paired with a touch-up paint visit in the same trip.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -2080,7 +2149,15 @@
         "in_bundle": null,
         "system_category_meta": null
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Painter or handyman scrapes out cracked or pulling-away exterior caulk around..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -2596,14 +2673,14 @@
       "stableId": null,
       "systemCategory": "Landscaping",
       "title": "Soil pH test and lime application",
-      "description": "Landscaper tests soil pH and applies lime as needed to bring pH back to 6.0-7.0 where grass thrives.",
+      "description": "Landscaper pulls soil core samples from a few representative spots, runs a pH test, and applies dolomitic or calcitic lime in measured amounts to bring acidic soil back to 6.0–7.0 where cool-season grasses thrive. Acidic soil locks out nutrients even when you're fertilizing — without correcting pH first, the fertilizer is wasted money.",
       "frequency": "Every 2 years",
       "priority": "Low",
       "estimatedCostRange": "$80–$200",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Lime needs 3–6 months to fully react with soil, so fall application gives it the winter to do its work before spring growth. Northeast soils are naturally acidic from rainfall; if you've never tested, you're almost certainly low.",
       "requiredSubtypes": [
         "natural_lawn"
       ],
@@ -2632,7 +2709,15 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Landscaper pulls soil core samples from a few representative spots, runs a pH..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -2780,14 +2865,14 @@
       "stableId": null,
       "systemCategory": "Landscaping",
       "title": "Deep clean synthetic turf",
-      "description": "Turf cleaning service extracts embedded debris, pollen, and pet residue from the infill layer. Extends turf life by years.",
+      "description": "Turf cleaning service uses a power groomer + extraction vacuum to pull embedded debris, pollen, dust, and pet residue out of the infill layer. Goes deeper than the annual top-up + grooming visit. Extends usable turf life by 3–5 years and resets the look to near-new for HNW homeowners who notice surface fade.",
       "frequency": "Every 2 years",
       "priority": "Low",
       "estimatedCostRange": "$300–$800",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Schedule for early spring before the heaviest pollen weeks — that way the infill is clean before the year's accumulation starts. If you have dogs or kids using the turf heavily, consider every year rather than every two.",
       "requiredSubtypes": [
         "synthetic_turf"
       ],
@@ -2816,7 +2901,15 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Schedule for early spring before the heaviest pollen weeks — that way the inf..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -3430,14 +3523,14 @@
       "stableId": null,
       "systemCategory": "Pool/Spa",
       "title": "Test and sanitize hot tub water",
-      "description": "Test bromine/chlorine, pH, and alkalinity. Add sanitizer as needed.",
+      "description": "Use test strips or a digital tester to check bromine/chlorine, pH, and total alkalinity weekly. Add sanitizer to maintain levels and re-balance pH/alkalinity. Without weekly sanitizer additions, hot tub water gets cloudy + biofilm starts forming inside the plumbing — a much harder problem to recover from than just topping up sanitizer.",
       "frequency": "Weekly",
       "priority": "High",
       "estimatedCostRange": "$10–$20/month",
       "isDIY": true,
       "seasonalTiming": null,
       "professionalRequired": false,
-      "notes": "Target: pH 7.2-7.8, sanitizer 3-5 ppm.",
+      "notes": "Target ranges: pH 7.2-7.8, alkalinity 80-120 ppm, bromine 3-5 ppm or chlorine 1-3 ppm. Hot tubs sanitize harder than pools because the small water volume + heat speeds chemical breakdown. After a heavy-use night with multiple soakers, dose extra sanitizer and let it circulate before next use.",
       "requiredSubtypes": [
         "hot_tub"
       ],
@@ -3466,7 +3559,15 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Use test strips or a digital tester to check bromine/chlorine, pH, and total ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -10017,14 +10118,14 @@
       "stableId": null,
       "systemCategory": "Window Cleaning",
       "title": "Exterior window washing",
-      "description": "Professional cleaning of all exterior windows, screens, and tracks.",
+      "description": "Professional washing of all exterior windows, screens, frame tracks, and sills using purified water systems that leave a streak-free finish without chemical residue. Includes a wipe-down of the frames and removal of any caked pollen, spider webs, and bird debris that builds up in upper corners.",
       "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "$200-600",
       "isDIY": false,
       "seasonalTiming": "Spring/Fall",
       "professionalRequired": true,
-      "notes": "Spring after pollen settles and fall before storm windows go on. Quarterly for homes that need to stay immaculate.",
+      "notes": "Spring after pollen settles and fall before storm windows go on. Quarterly for homes that need to stay immaculate (waterfront, heavy shade with sap, or homes with frequent entertaining). Most premium services include sill and screen cleaning at no extra charge.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -10059,14 +10160,14 @@
       "stableId": null,
       "systemCategory": "Pressure Washing",
       "title": "Annual exterior power washing",
-      "description": "Soft-wash siding, deck, walkways, and patio. Removes mildew, pollen, and dirt buildup and restores curb appeal in one visit.",
+      "description": "Soft-wash crew applies a low-pressure cleaning solution and rinses the siding, deck, walkways, and patio. Removes mildew, pollen, and dirt buildup that accumulates over the year and restores curb appeal in one visit. The 'soft-wash' approach (chemistry-driven, low pressure) avoids the wood damage and oxidation streaking that high-pressure washing can cause on siding and decks.",
       "frequency": "Annually",
       "priority": "Low",
       "estimatedCostRange": "$300-700",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Schedule for late spring after the heaviest pollen settles — that way the cleaning lasts the longest into summer. Hardscape (concrete, stone, pavers) is more forgiving and can take higher pressure if needed. Always confirm with the vendor that they're using soft-wash on siding before they start.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -10093,7 +10194,15 @@
           "displayPriority": 30
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Schedule for late spring after the heaviest pollen settles — that way the cle..."
+        }
+      ],
       "_recommendation": null
     },
     {
