@@ -1695,29 +1695,46 @@ function renderRecommendationsPanel(allItems) {
       </details>
     `;
   }
+  // Phase 5z+1 — Each row carries an explicit "What this is" + "Why
+  // this matters" + ONE primary action, instead of two generic buttons.
   const voiceHtml = findings.voice.length
     ? `<div class="admin-recs__section">
         <h4>🔠 Voice violations <span class="admin-recs__badge">${findings.voice.length}</span></h4>
-        <p class="admin-muted">Em-dashes and other brand-voice issues flagged by website/admin-data/voice-rules.json.</p>
-        ${findings.voice.slice(0, 8).map((v) => recRow({
-          kind: "voice",
-          title: v.item.title,
-          tone: "salmon",
-          detail: v.hits.map((h) => `<code>${escapeHtml(h.field)}</code>: "${escapeHtml((h.snippet || "").slice(0, 70))}…"`).join(" · "),
-          itemId: v.item.id,
-        })).join("")}
+        <p class="admin-recs__what">
+          <strong>What this is:</strong> Templates flagged by <code>website/admin-data/voice-rules.json</code> for breaking the brand voice (most commonly em-dashes in description / notes).<br/>
+          <strong>Why it matters:</strong> Em-dashes read as AI-generated to HNW audience. Tom's design rule. Fix is mechanical — replace with periods or sentence breaks.<br/>
+          <strong>Primary action:</strong> Click <em>Apply fix</em> to compute the cleaned text and save a proposal note Claude will apply next session.
+        </p>
+        ${findings.voice.slice(0, 8).map((v) => {
+          const hit = v.hits[0];
+          const snippet = (hit.snippet || "").slice(0, 90);
+          return recRow({
+            kind: "voice",
+            title: v.item.title,
+            tone: "salmon",
+            description: `<strong>${escapeHtml(hit.ruleId)}</strong> in field <code>${escapeHtml(hit.field)}</code> — "${escapeHtml(snippet)}…"`,
+            primaryLabel: "Apply fix",
+            itemId: v.item.id,
+            extraData: { fieldName: hit.field, ruleId: hit.ruleId },
+          });
+        }).join("")}
         ${findings.voice.length > 8 ? `<p class="admin-muted">… and ${findings.voice.length - 8} more</p>` : ""}
       </div>`
     : "";
   const dupesHtml = findings.duplicates.length
     ? `<div class="admin-recs__section">
         <h4>🔁 Likely duplicates <span class="admin-recs__badge">${findings.duplicates.length}</span></h4>
-        <p class="admin-muted">Same systemCategory + ≥55% title overlap (intentional spring/fall pairs auto-excluded).</p>
+        <p class="admin-recs__what">
+          <strong>What this is:</strong> Two templates in the same systemCategory with ≥55% title-token overlap. Intentional spring/fall bundle pairs (smoke detector batteries appearing in both seasons) auto-excluded.<br/>
+          <strong>Why it matters:</strong> Real duplicates cost the homeowner extra task rows for the same work. False positives are worth confirming so we can suppress future audits.<br/>
+          <strong>Primary action:</strong> Click <em>Draft merge proposal</em> to ask Claude to evaluate merge / rename / confirm intentional in the next session.
+        </p>
         ${findings.duplicates.map((d) => recRow({
           kind: "duplicate",
-          title: `${d.a.title} ↔ ${d.b.title}`,
+          title: `${d.a.title} <span class="admin-muted">↔</span> ${d.b.title}`,
           tone: "indigo",
-          detail: `${d.cat} · ${d.sim}% overlap. Consider: merge, rename one, or confirm intentional.`,
+          description: `<strong>${d.sim}%</strong> title overlap in <code>${escapeHtml(d.cat)}</code>. If they're meant as a semi-annual pair, no action needed — confirm and suppress. If one supersedes the other, propose a merge with the better description.`,
+          primaryLabel: "Draft merge proposal",
           itemId: d.a.id,
           extraData: { otherId: d.b.id, otherTitle: d.b.title, similarity: d.sim },
         })).join("")}
@@ -1726,15 +1743,24 @@ function renderRecommendationsPanel(allItems) {
   const candidatesHtml = findings.bundleCandidates.length
     ? `<div class="admin-recs__section">
         <h4>📦 Bundle-merge candidates <span class="admin-recs__badge">${findings.bundleCandidates.length}</span></h4>
-        <p class="admin-muted">3+ standalone templates in the same category + season + assignment that could fold into ONE seasonal visit (like the existing Generator:annual or Roofing:spring bundles).</p>
-        ${findings.bundleCandidates.map((c) => recRow({
-          kind: "bundle_candidate",
-          title: `${c.cat} · ${c.season} · ${c.assignmentType} (${c.items.length} items)`,
-          tone: "purple",
-          detail: c.items.map((t) => `<code>${escapeHtml(t.title)}</code>`).join(", "),
-          itemId: c.items[0].id,
-          extraData: { groupKey: c.groupKey, items: c.items.map((t) => ({ title: t.title, templateKey: t.payload?.templateKey })) },
-        })).join("")}
+        <p class="admin-recs__what">
+          <strong>What this is:</strong> 3+ standalone templates in the same systemCategory + season + assignment that match the existing bundle pattern (Generator:annual, Roofing:spring, Pool/Spa:opening, etc.).<br/>
+          <strong>Why it matters:</strong> When a vendor visits, they handle multiple items in ONE trip. Bundling these means the homeowner sees ONE scheduled task ("Schedule Fall HVAC Service") instead of 4 separate to-dos for the same visit. Saves ~3 rows per bundle on the homeowner's list.<br/>
+          <strong>Primary action:</strong> Click <em>Draft bundle proposal</em> to write a structured proposal Claude will apply next session — sets bundleId/bundleTitle on each template, runs the migration to re-parent existing tasks.
+        </p>
+        ${findings.bundleCandidates.map((c) => {
+          const suggestedBundleId = `${c.cat}:${c.season.toLowerCase()}`;
+          const suggestedTitle = `${c.season} ${c.cat} Service`;
+          return recRow({
+            kind: "bundle_candidate",
+            title: `${escapeHtml(c.cat)} · ${escapeHtml(c.season)} · ${escapeHtml(c.assignmentType)}`,
+            tone: "purple",
+            description: `<strong>${c.items.length} templates</strong> could fold into <code>${escapeHtml(suggestedBundleId)}</code> as "<em>${escapeHtml(suggestedTitle)}</em>": ${c.items.map((t) => escapeHtml(t.title)).join(", ")}. Same pattern the existing seasonal bundles already use.`,
+            primaryLabel: "Draft bundle proposal",
+            itemId: c.items[0].id,
+            extraData: { groupKey: c.groupKey, items: c.items.map((t) => ({ title: t.title, templateKey: t.payload?.templateKey })) },
+          });
+        }).join("")}
       </div>`
     : "";
   return `
@@ -1754,15 +1780,21 @@ function renderRecommendationsPanel(allItems) {
 
 function recRow(opts) {
   const dataAttrs = Object.entries(opts.extraData || {}).map(([k, v]) => `data-rec-${k}="${escapeHtml(JSON.stringify(v))}"`).join(" ");
+  // Phase 5z+1 — title may contain pre-escaped HTML (e.g. duplicate
+  // pairs with "↔"). Detect by looking for the marker; otherwise
+  // escape the raw string.
+  const titleHtml = opts.title.includes("<span") ? opts.title : escapeHtml(opts.title);
+  // Plain-text fallback for the data-rec-title attribute used by note drafting.
+  const titlePlain = opts.title.replace(/<[^>]+>/g, "");
   return `
-    <div class="admin-rec admin-rec--${opts.tone}" data-rec-kind="${escapeHtml(opts.kind)}" data-rec-item-id="${escapeHtml(opts.itemId || "")}" data-rec-title="${escapeHtml(opts.title)}" ${dataAttrs}>
+    <div class="admin-rec admin-rec--${opts.tone}" data-rec-kind="${escapeHtml(opts.kind)}" data-rec-item-id="${escapeHtml(opts.itemId || "")}" data-rec-title="${escapeHtml(titlePlain)}" ${dataAttrs}>
       <div class="admin-rec__main">
-        <strong>${opts.title.includes("↔") ? opts.title : escapeHtml(opts.title)}</strong>
-        <span class="admin-muted">${opts.detail}</span>
+        <strong>${titleHtml}</strong>
+        <p class="admin-rec__description">${opts.description}</p>
       </div>
       <div class="admin-rec__actions">
-        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-jump>Open</button>
-        <button type="button" class="admin-button admin-button--small" data-rec-draft>Draft note</button>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-jump title="Jump to this template's detail panel">Open</button>
+        <button type="button" class="admin-button admin-button--primary admin-button--small" data-rec-draft title="Pre-write a structured proposal note Claude will pick up next session">${escapeHtml(opts.primaryLabel || "Draft note")}</button>
       </div>
     </div>
   `;
@@ -1863,52 +1895,93 @@ function attachRecommendationsHandlers(host) {
 async function draftRecommendationNote(data) {
   const kind = data.recKind;
   const title = data.recTitle;
-  let body, intent, scopeType, scopeId, scopeTitle;
+  let body, intent, scopeType, scopeId, scopeTitle, proposedDiff, snapshot;
 
   if (kind === "voice") {
     intent = "change_request";
     scopeType = "task";
     scopeId = data.recItemId;
     scopeTitle = title;
+    const fieldName = data.recFieldName ? JSON.parse(data.recFieldName) : null;
+    const ruleId = data.recRuleId ? JSON.parse(data.recRuleId) : null;
+    // Phase 5z+1 — compute the actual fix inline so Claude doesn't have
+    // to re-read the source. For em-dashes: replace with sentence breaks.
+    const item = itemsForCurrentView().find((i) => i.id === scopeId);
+    const original = item?.payload?.[fieldName] || "";
+    const fixed = applyVoiceFix(original, ruleId);
+    proposedDiff = fieldName ? { [fieldName]: { from: original, to: fixed } } : null;
+    snapshot = item?.payload || null;
     body =
-      `**Voice fix proposal.**\n\n` +
-      `Template "${title}" has a brand-voice violation flagged by website/admin-data/voice-rules.json. ` +
-      `Most common: em-dashes in description / notes, which read as AI-generated to HNW audience.\n\n` +
-      `Action: replace em-dashes with periods or em-spaces, regenerate the affected fields, re-run the voice lint.`;
+      `**Voice fix — pre-computed.**\n\n` +
+      `Template "${title}" has a \`${ruleId}\` violation in field \`${fieldName}\`.\n\n` +
+      `**BEFORE:**\n> ${original}\n\n` +
+      `**AFTER (proposed):**\n> ${fixed}\n\n` +
+      `**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.\n\n` +
+      `**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.`;
   } else if (kind === "duplicate") {
     const otherTitle = JSON.parse(data.recOtherTitle || '""');
     const sim = JSON.parse(data.recSimilarity || "0");
+    const otherId = JSON.parse(data.recOtherId || '""');
     intent = "change_request";
     scopeType = "task";
     scopeId = data.recItemId;
-    scopeTitle = title;
+    scopeTitle = title.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+    // Pull both templates' full data so the merge analysis is concrete.
+    const items = itemsForCurrentView();
+    const a = items.find((i) => i.id === scopeId);
+    const b = items.find((i) => i.id === otherId);
+    snapshot = { a: a?.payload, b: b?.payload };
     body =
-      `**Duplicate review.**\n\n` +
-      `Detected ${sim}% title overlap between two templates in the same systemCategory:\n` +
-      `1. ${title.split("↔")[0].trim()}\n` +
-      `2. ${otherTitle}\n\n` +
-      `Decide whether to:\n` +
-      `- **Merge** into one template (use the better description; archive the other with stableId override).\n` +
-      `- **Rename** one to make the distinction clear (e.g., add "winter" / "summer" / "exterior" / "interior").\n` +
-      `- **Confirm intentional** — close this note with reason.\n\n` +
-      `If merging, also update any references in HouseQuizAnswerMapper.swift, system seeders, or dashboard cards.`;
+      `**Duplicate review — concrete merge analysis.**\n\n` +
+      `Detected ${sim}% title overlap, same systemCategory:\n\n` +
+      `**Template A:** ${a?.title || "?"}\n` +
+      `- Description: "${(a?.payload?.description || "").slice(0, 200)}…"\n` +
+      `- Frequency: ${a?.payload?.frequency || "?"} · Cost: ${a?.payload?.estimatedCostRange || "?"}\n` +
+      `- Seasonal: ${a?.payload?.seasonalTiming || "year-round"}\n` +
+      `- Assignment: ${a?.payload?.assignmentType || "either"}\n` +
+      `- Subtypes: ${JSON.stringify(a?.payload?.requiredSubtypes || [])}\n\n` +
+      `**Template B:** ${b?.title || "?"}\n` +
+      `- Description: "${(b?.payload?.description || "").slice(0, 200)}…"\n` +
+      `- Frequency: ${b?.payload?.frequency || "?"} · Cost: ${b?.payload?.estimatedCostRange || "?"}\n` +
+      `- Seasonal: ${b?.payload?.seasonalTiming || "year-round"}\n` +
+      `- Assignment: ${b?.payload?.assignmentType || "either"}\n` +
+      `- Subtypes: ${JSON.stringify(b?.payload?.requiredSubtypes || [])}\n\n` +
+      `**Action for Claude next session:** Decide one of:\n` +
+      `1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.\n` +
+      `2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).\n` +
+      `3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.`;
   } else if (kind === "bundle_candidate") {
     const items = JSON.parse(data.recItems || "[]");
     const groupKey = data.recGroupKey || "";
     const [cat, season, at] = groupKey.split("|");
     const suggestedBundleId = `${cat}:${season.toLowerCase()}`;
+    const suggestedTitle = `${season} ${cat} Service`;
     intent = "proposal_add";
     scopeType = "task";
     scopeId = data.recItemId;
-    scopeTitle = `Bundle candidate: ${cat} ${season}`;
+    scopeTitle = `Bundle: ${cat} ${season}`;
+    proposedDiff = {
+      bundleId: suggestedBundleId,
+      bundleTitle: suggestedTitle,
+      members: items,
+      parentTemplateKey: items[0]?.templateKey || null,
+    };
+    snapshot = { groupKey, cat, season, assignmentType: at, items };
     body =
-      `**Bundle-merge proposal.**\n\n` +
-      `${items.length} standalone templates share the same systemCategory + season + assignmentType — same pattern as the existing Generator:annual or Roofing:spring bundles. Consider folding them into one seasonal visit so the homeowner sees ONE scheduled task instead of ${items.length} separate ones.\n\n` +
-      `**Proposed bundle:** \`${suggestedBundleId}\`\n` +
-      `**Bundle title suggestion:** "${season} ${cat} Service"\n` +
-      `**Templates to fold in:**\n` +
-      items.map((i, idx) => `${idx + 1}. ${i.title} (${i.templateKey || "—"})`).join("\n") +
-      `\n\nAction: in MaintenanceTemplates.swift, add bundleId="${suggestedBundleId}" to all ${items.length}, set bundleTitle="${season} ${cat} Service" on the first one (the parent), and verify the iOS reconciler creates one task instead of ${items.length}. Watch out for: existing standalone tasks in real households (the migration backfillBundlesOnceIfNeeded handles re-parenting, but check the migration runs once per install).\n\nAlternative: if the homeowner-friction case is weak, leave them standalone.`;
+      `**Bundle-merge proposal — pre-structured.**\n\n` +
+      `Pattern match: ${items.length} standalone templates share systemCategory=\`${cat}\` + seasonalTiming=\`${season}\` + assignmentType=\`${at}\`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see ${items.length} separate task rows.\n\n` +
+      `**Proposed:**\n` +
+      `- bundleId: \`${suggestedBundleId}\`\n` +
+      `- bundleTitle: "${suggestedTitle}" (set on the FIRST template only — that becomes the parent)\n` +
+      `- Templates to fold in:\n` +
+      items.map((i, idx) => `  ${idx + 1}. ${i.title} (templateKey: ${i.templateKey || "—"})`).join("\n") +
+      `\n\n**Action for Claude next session:**\n` +
+      `1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add \`bundleId: "${suggestedBundleId}"\` to all ${items.length} templates listed.\n` +
+      `2. Set \`bundleTitle: "${suggestedTitle}"\` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).\n` +
+      `3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.\n` +
+      `4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_${suggestedBundleId.replace(":", "_")}) so existing households' standalone tasks fold into the new bundle parent.\n` +
+      `5. xcodebuild -scheme Chez to confirm clean compile.\n\n` +
+      `**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.`;
   } else {
     return;
   }
@@ -1922,6 +1995,8 @@ async function draftRecommendationNote(data) {
         body,
         intent,
         target: el.fieldTarget?.value || "claude",
+        proposedDiff,
+        snapshot,
       });
       flashSavePill();
       alert("Draft note saved. Open the Notes tab to review + edit before sync.");
@@ -1931,6 +2006,23 @@ async function draftRecommendationNote(data) {
   } catch (err) {
     alert(`Failed to draft note: ${err.message}`);
   }
+}
+
+// Phase 5z+1 — Apply the corresponding voice rule's fix to a string.
+// Currently only handles "no-em-dash"; expand as voice-rules.json grows.
+function applyVoiceFix(text, ruleId) {
+  if (!text) return text;
+  if (ruleId === "no-em-dash") {
+    // Replace " — " (em-dash with surrounding spaces) with ". " — gives
+    // a natural sentence break. Bare "—" (no spaces) → ".". Then
+    // collapse any double-spaces. Capitalize the first character after
+    // the period for readability.
+    let out = text.replace(/\s+—\s+/g, ". ").replace(/—/g, ". ");
+    out = out.replace(/\.\s+([a-z])/g, (m, c) => `. ${c.toUpperCase()}`);
+    out = out.replace(/\s\s+/g, " ").trim();
+    return out;
+  }
+  return text;
 }
 
 function attachFacetPillHandlers(host) {

@@ -1048,6 +1048,66 @@
   font: 500 11px var(--sans);
   margin: 0 0 8px;
 }
+
+/* Phase 5z+1 — "What this is / Why it matters / Primary action" header
+   above each section's row list. Three short lines, tight spacing. */
+.admin-recs__what {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  color: var(--text);
+  font: 500 11px var(--sans) !important;
+  line-height: 1.55;
+  margin: 4px 0 10px !important;
+  padding: 8px 12px;
+}
+.admin-recs__what strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.admin-recs__what code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  font: 600 10px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+.admin-recs__what em {
+  color: var(--salmon-dark);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* Per-row description (replaces the old .admin-muted span) */
+.admin-rec__description {
+  color: var(--text);
+  font: 500 12px var(--sans);
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+.admin-rec__description code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 4px;
+  color: var(--indigo-700);
+  font: 600 11px ui-monospace, monospace;
+  padding: 1px 5px;
+}
+.admin-rec__description strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.admin-rec__description em {
+  color: var(--salmon-dark);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.admin-button--primary {
+  background: var(--indigo-700);
+  border-color: var(--indigo-700);
+  color: #fff;
+}
+.admin-button--primary:hover {
+  background: var(--indigo-600, #3d3265);
+}
 .admin-rec {
   align-items: flex-start;
   background: #fff;
