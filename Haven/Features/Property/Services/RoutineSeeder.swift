@@ -268,18 +268,38 @@ final class RoutineSeeder {
         // household, vendor-linked or not. We'd rather let the user
         // manually tie the contractor to an existing routine than create
         // a duplicate.
+        var existingRoutines: [RoutineRow] = []
+        var dedupHit = false
         do {
-            let existing = try await db.fetchRoutines(householdId: contractor.householdId)
-            let match = existing.first {
+            existingRoutines = try await db.fetchRoutines(householdId: contractor.householdId)
+            let match = existingRoutines.first {
                 $0.resolvedServiceKey == defaults.serviceKey
                     || ($0.routineKind == defaults.kind.rawValue && defaults.kind != .otherService)
             }
-            if match != nil { return }
+            dedupHit = (match != nil)
         } catch {
             // Fetch failure isn't fatal — still try to insert, and the
             // DB can surface any genuine constraint violations.
             Secure.warn("[RoutineSeeder] fetchRoutines failed: \(error.localizedDescription)")
         }
+
+        // Phase 67E/F (admin feedback 378778e2): Pest Control + Mosquito
+        // & Tick are nearly always handled by the same vendor (Orkin,
+        // Terminix, etc.) — quarterly pest control + monthly mosquito
+        // spraying during active months. When seeding one of these
+        // kinds, opportunistically link this contractor to a pending
+        // sibling routine without a vendor so the user doesn't have to
+        // capture the same contractor twice. The user can swap later in
+        // routine settings if it's actually a different vendor for that
+        // service.
+        await linkPendingSiblingRoutineIfApplicable(
+            for: contractor,
+            seedKind: defaults.kind,
+            existing: existingRoutines,
+            db: db
+        )
+
+        if dedupHit { return }
 
         let label = "\(contractor.companyName) \(defaults.label)"
 
@@ -310,6 +330,54 @@ final class RoutineSeeder {
             NotificationCenter.default.post(name: .routineChanged, object: nil)
         } catch {
             Secure.warn("[RoutineSeeder] createRoutine failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Phase 67E/F: when seeding a pest_control / mosquito_tick routine,
+    /// opportunistically link this contractor to the OTHER kind's pending
+    /// routine if one exists without a vendor. Real-world pattern from
+    /// admin feedback 378778e2: same vendor (Orkin, Terminix, etc.)
+    /// almost always handles both — quarterly pest spray + monthly
+    /// mosquito treatment during active months. Saves the user from
+    /// double-capturing the same contractor.
+    ///
+    /// No-op for any other routine kind. The user can swap the linked
+    /// vendor later in routine settings if it's actually a different
+    /// company for the sibling service.
+    private func linkPendingSiblingRoutineIfApplicable(
+        for contractor: ContractorRow,
+        seedKind: RoutineKind,
+        existing: [RoutineRow],
+        db: DatabaseService
+    ) async {
+        let siblingKind: RoutineKind
+        switch seedKind {
+        case .pestControl: siblingKind = .mosquitoTick
+        case .mosquitoTick: siblingKind = .pestControl
+        default: return
+        }
+
+        // Find a pending sibling without a vendor. Skip if it's archived,
+        // vendor-linked, or in a non-pending setupState.
+        guard let pending = existing.first(where: {
+            $0.routineKind == siblingKind.rawValue
+                && $0.archivedAt == nil
+                && $0.vendorId == nil
+                && ($0.setupState == "pending_vendor" || $0.setupState == "draft")
+        }) else { return }
+
+        var update = RoutineUpdate()
+        update.vendorId = contractor.id
+        update.setupState = "active"
+        do {
+            _ = try await db.updateRoutine(id: pending.id, update)
+            Analytics.track(.routineSeededFromContractor, [
+                "kind": siblingKind.rawValue,
+                "vendor_id": contractor.id.uuidString,
+                "source": "sibling_inheritance"
+            ])
+        } catch {
+            Secure.warn("[RoutineSeeder] sibling link failed: \(error.localizedDescription)")
         }
     }
 

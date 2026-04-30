@@ -1192,7 +1192,16 @@ enum MaintenanceTemplates {
             // remain for spring and fall cleanup visits. Inspection /
             // walkaround templates folded into Handyman defaults.
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Mulch garden beds", description: "Landscaper adds 2-3 inches of fresh mulch to garden beds to retain moisture and suppress weeds.", frequency: "Annually", priority: "Low", estimatedCostRange: "$200–$500", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, isEssential: false, assignmentType: .vendor, bundleId: "Landscaping:spring"),
-            MaintenanceTemplate(systemCategory: "Landscaping", title: "Prune shrubs and hedges", description: "Landscaper trims overgrown shrubs and hedges for health and appearance. Spring and fall.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Landscaping:ongoing", bundleTitle: "Ongoing Lawn Care"),
+            // Phase 67E/F (admin feedback a85bba2a): "Prune shrubs and
+            // hedges" was bundled under "Landscaping:ongoing" which
+            // duplicated the bi-weekly landscaping ROUTINE. The routine
+            // already handles ongoing mowing / hedging / trimming. Pruning
+            // is a real semi-annual task done as part of the seasonal
+            // visits — folded into Landscaping:spring so it surfaces
+            // alongside fertilize + mulch + pre-emergent in one task.
+            // Frequency stays semi-annually so it appears in both the
+            // spring and fall bundles via the reconciler's bundle pass.
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Prune shrubs and hedges", description: "Landscaper trims overgrown shrubs and hedges for health and appearance. Spring and fall.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Landscaping:spring"),
 
             // NATURAL LAWN templates — seasonal bundle members
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Fertilize natural lawn", description: "Landscaper applies seasonal fertilizer appropriate for grass type and season. Three rounds per year keeps roots strong and color deep.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, requiredSubtypes: ["natural_lawn"], assignmentType: .vendor, bundleId: "Landscaping:spring", bundleTitle: "Spring Landscaping Service"),
@@ -1450,17 +1459,25 @@ enum MaintenanceTemplates {
             // has_fridge_water_dispenser enrichment flag — not all
             // fridges have a built-in dispenser. Most filters need
             // replacement every 6 months (manufacturer schedule varies).
+            // Phase 67E/F (admin feedback aca6ce51 "Can you please do this
+            // for us?"): handyman-tier (DIY-default + 10 min effort + no
+            // safety floor + no bundle), so the reconciler routes this
+            // straight to handyman_punch_items per Phase 67E/F. Haven
+            // tracks the cadence; the user's handyman handles the swap on
+            // the next visit. Description + notes nudge toward the
+            // manufacturer subscription path for users without a
+            // handyman.
             MaintenanceTemplate(
                 systemCategory: "Appliance",
                 title: "Replace refrigerator water filter",
-                description: "Replace the built-in water/ice filter per the manufacturer's schedule. Most fridge filters are rated for 6 months regardless of throughput.",
+                description: "Haven adds this to your handyman punch list every six months — drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.",
                 frequency: "Semi-annually",
                 priority: "Medium",
                 estimatedCostRange: "$30–$60",
                 isDIY: true,
                 seasonalTiming: nil,
                 professionalRequired: false,
-                notes: "Check your fridge manual for the exact filter part number. Some manufacturers offer subscriptions that auto-ship.",
+                notes: "Filter SKU varies by fridge model. Pull the model number from the inside-door sticker and search the manufacturer site, or tap your refrigerator in the equipment catalog for a direct reorder link.",
                 requiredSubtypes: ["has_fridge_water_dispenser"],
                 equipmentKeywords: ["refrigerator", "fridge"],
                 assignmentType: .either,
