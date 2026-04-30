@@ -65,6 +65,15 @@ extension Notification.Name {
     /// the visit detail sheet (or jumps straight to the quote review when the event
     /// was quote-related).
     static let openHandymanVisit = Notification.Name("openHandymanVisit")
+
+    /// Phase 67E/F: Posted whenever a `handyman_punch_items` row is
+    /// inserted, archived, or completed. Cleaner refresh signal than
+    /// `.maintenanceTaskChanged` because the punch-list rail no longer
+    /// shares state with the task table. Listeners include
+    /// `HandymanPunchListView`, `HandymanTabView`, and the dashboard's
+    /// punch-count reads. Both events post when a single action affects
+    /// both rails (e.g. promote-to-task, demote-to-punch).
+    static let handymanPunchListChanged = Notification.Name("handymanPunchListChanged")
 }
 
 struct MainTabView: View {

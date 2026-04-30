@@ -194,6 +194,19 @@ final class AppState: ObservableObject {
                         // curator UserDefaults gate.
                         await Self.runDay1CuratorForExistingPropertiesOnceIfNeeded()
 
+                        // Phase 67E/F: handyman single-rail migrations.
+                        // These converge existing TestFlight households
+                        // onto the new "punch items only" handyman model
+                        // shipped with Phase 67E/F. Order matters — run
+                        // tier-conversion BEFORE visit-archive so the
+                        // converted children land before the parents
+                        // are gone, and AFTER the Day1Curator pass so
+                        // its handyman re-parenting has already
+                        // executed (we conservatively skip user-touched
+                        // rows in both migrations).
+                        await Self.migrateHandymanTierTasksToPunchItemsOnceIfNeeded()
+                        await Self.migrateHandymanVisitsToRemindersOnceIfNeeded()
+
                         // Chez v1: legacy service-row backfill. Archives
                         // any home_systems row whose category is a
                         // service (Pet Waste, Cleaning, Trash, Snow
@@ -406,6 +419,125 @@ final class AppState: ObservableObject {
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         NotificationCenter.default.post(name: .routineChanged, object: nil)
         UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 67E/F: one-time migration that converts existing handyman-
+    /// tier `maintenance_tasks` rows (DIY-capable, ≤60 min, no
+    /// safetyFloor, no bundleId) into `handyman_punch_items` rows so
+    /// existing TestFlight households converge onto the single-rail
+    /// model the reconciler now seeds against (commit B3).
+    ///
+    /// Conservative: skips any row with `lastCompletedDate` (preserves
+    /// completion history) or `scheduledDate` (user picked a time —
+    /// don't yank it). Source task is soft-archived with reason
+    /// `migrated_to_handyman_punch`; the new punch item carries
+    /// `source = "migrated_from_task"` and `source_task_id` /
+    /// `source_template_key` for traceability.
+    @MainActor
+    static func migrateHandymanTierTasksToPunchItemsOnceIfNeeded() async {
+        let key = "hasMigratedHandymanTierToPunchItems_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let tasks: [MaintenanceTaskDBRow]
+        do {
+            tasks = try await db.fetchMaintenanceTasks()
+        } catch {
+            print("[AppState] HandymanTier migration: fetch failed: \(error)")
+            return
+        }
+
+        var migrated = 0
+        for task in tasks {
+            // Preserve any user touchpoints. lastCompletedDate carries
+            // service history; scheduledDate means the homeowner picked
+            // a date and we shouldn't surprise them.
+            if task.lastCompletedDate != nil { continue }
+            if task.scheduledDate != nil { continue }
+            // Need a templateId to look up the in-app template metadata.
+            guard let templateKey = task.templateId,
+                  let template = MaintenanceTemplates.template(forKey: templateKey)
+            else { continue }
+
+            let isHandymanTier =
+                !template.safetyFloor &&
+                template.bundleId == nil &&
+                (template.routingOverride == .diyDefault || template.routingOverride == .diyCapable) &&
+                (template.diyEffortMinutes ?? 0) <= 60
+            guard isHandymanTier else { continue }
+
+            var insert = HandymanPunchItemInsert(
+                householdId: task.householdId,
+                propertyId: task.propertyId,
+                title: template.title
+            )
+            insert.description = template.description
+            insert.notes = template.notes
+            insert.estimatedMinutes = template.diyEffortMinutes
+            insert.estimatedCostRange = template.estimatedCostRange
+            insert.source = "migrated_from_task"
+            insert.sourceTemplateKey = template.templateKey
+            insert.sourceTaskId = task.id
+
+            if (try? await db.createHandymanPunchItem(insert)) != nil {
+                try? await db.archiveMaintenanceTask(id: task.id, reason: "migrated_to_handyman_punch")
+                migrated += 1
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+        if migrated > 0 {
+            print("[AppState] HandymanTier migration: converted \(migrated) tasks to punch items")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
+        }
+    }
+
+    /// Phase 67E/F: one-time migration that archives the legacy
+    /// "Spring handyman visit" / "Fall handyman visit" parent
+    /// `maintenance_tasks` rows for existing TestFlight households.
+    /// Those parent templates were deleted in commit B1; their seasonal
+    /// coordination role moved to push reminders + the dashboard's
+    /// `HandymanSeasonalReminderCard`.
+    ///
+    /// Conservative: skips rows with `lastCompletedDate` so completion
+    /// history is preserved. Archive reason
+    /// `migrated_to_seasonal_reminder` distinguishes from the tier
+    /// conversion above.
+    @MainActor
+    static func migrateHandymanVisitsToRemindersOnceIfNeeded() async {
+        let key = "hasMigratedHandymanVisitsToReminders_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let tasks: [MaintenanceTaskDBRow]
+        do {
+            tasks = try await db.fetchMaintenanceTasks()
+        } catch {
+            print("[AppState] HandymanVisits migration: fetch failed: \(error)")
+            return
+        }
+
+        // Match what `MaintenanceTemplate.templateKey` emits for the
+        // deleted parents — `"\(systemCategory):\(title)"`.
+        let visitTemplateKeys: Set<String> = [
+            "Handyman:Spring handyman visit",
+            "Handyman:Fall handyman visit",
+        ]
+
+        var archived = 0
+        for task in tasks {
+            guard let tid = task.templateId, visitTemplateKeys.contains(tid) else { continue }
+            if task.lastCompletedDate != nil { continue }
+            try? await db.archiveMaintenanceTask(id: task.id, reason: "migrated_to_seasonal_reminder")
+            archived += 1
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+        if archived > 0 {
+            print("[AppState] HandymanVisits migration: archived \(archived) seasonal visit tasks")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
     }
 
     /// Chez v1: legacy backfill that retires service-shaped
