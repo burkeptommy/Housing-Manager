@@ -194,6 +194,24 @@ final class AppState: ObservableObject {
                         // curator UserDefaults gate.
                         await Self.runDay1CuratorForExistingPropertiesOnceIfNeeded()
 
+                        // Phase 67 reconciler v2: archive legacy "Find a
+                        // contractor for X" tasks and migrate handyman
+                        // bundle tasks (parents + children) into the
+                        // handyman_punch_items table. Runs AFTER the
+                        // Day1Curator so any vendor / handyman routine
+                        // routing has already landed. Idempotent via
+                        // UserDefaults gate inside the helper.
+                        await MaintenanceTaskReconciler.runReconcilerV2BackfillOnceIfNeeded()
+
+                        // Phase 67 (G4): archive legacy routine-tier
+                        // maintenance_tasks rows that pre-date C1. They
+                        // were curator-routed under routines (parent_
+                        // routine_id set) and hidden from UI, but still
+                        // sit in the DB. Reconciler v2 wouldn't create
+                        // them today — converge existing installs to that
+                        // state. Conservative: skips user-touched rows.
+                        await MaintenanceTaskReconciler.runLegacyRoutineTaskArchiveOnceIfNeeded()
+
                         // Chez v1: legacy service-row backfill. Archives
                         // any home_systems row whose category is a
                         // service (Pet Waste, Cleaning, Trash, Snow
