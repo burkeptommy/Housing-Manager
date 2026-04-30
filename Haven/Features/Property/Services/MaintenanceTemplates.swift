@@ -2297,21 +2297,15 @@ enum MaintenanceTemplates {
         // auto-seeded at quiz completion.
         // ──────────────────────────────────────────────
         ("Tree Service", [
-            MaintenanceTemplate(
-                systemCategory: "Tree Service",
-                title: "Annual tree assessment",
-                description: "Certified arborist walks the property identifying dead limbs, structural weakness, disease, and storm risk. A $300 annual visit catches the $30,000 problems.",
-                frequency: "Annually",
-                priority: "Medium",
-                estimatedCostRange: "$200-500",
-                isDIY: false,
-                seasonalTiming: "Spring",
-                professionalRequired: true,
-                notes: "Best done in early spring before leaf-out so the structural picture is clear.",
-                isEssential: false,
-                assignmentType: .vendor,
-                safetyFloor: true
-            ),
+            // Phase 67E/F (admin feedback efb97159): "Annual tree
+            // assessment" template removed. It duplicated
+            // `Landscaping:Arborist tree health inspection`, which
+            // gates on `mature_trees` and is more precise. Households
+            // with a Tree Service vendor on file (Q15b arborist capture)
+            // still pick up the canonical inspection from the
+            // Landscaping category as long as they have mature_trees
+            // flagged. Tree Service category retains Pruning and crown
+            // thinning + other dedicated arborist work.
             MaintenanceTemplate(
                 systemCategory: "Tree Service",
                 title: "Pruning and crown thinning",
