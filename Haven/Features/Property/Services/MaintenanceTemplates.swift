@@ -1584,86 +1584,16 @@ enum MaintenanceTemplates {
         ("Cleaning Service", []),
 
         ("Handyman", [
-            MaintenanceTemplate(systemCategory: "Handyman", title: "Spring handyman visit", description: "Seasonal walkthrough and punch list. Your handyman handles small repairs, caulking touch-ups, filter swaps, and anything that's accumulated since the last visit.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$300-800", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: """
-What's typically covered in a spring handyman visit:
-
-HVAC
-• Air filter swap (buy a case, swap during visit)
-• Mini-split filter rinse (if applicable)
-
-Plumbing
-• Washing machine supply hose visual check
-• Sump pump test (if applicable)
-• Well cap and pressure tank visual (if well home)
-• Water softener brine tank visual (if applicable)
-• Whole-house filter swap (if applicable)
-
-Exterior
-• Caulking touch-up around windows and doors
-• Driveway crack sealcoat spot-fill
-• Deck/fence screw check
-• Foundation grading walkaround
-• Retaining wall condition check
-
-Safety
-• Smoke and CO detector battery swap
-• Fire extinguisher gauge check
-• Camera perimeter walk-past
-• Verify smoke and CO detectors (self-test confirmation)
-• Test GFCI outlets
-
-Appliances
-• Refrigerator coil vacuum (if accessible)
-• Dishwasher spray arm clean (if not covered by housekeeper)
-• Ice maker filter replacement (if due)
-
-Other (conditional)
-• Crawl space visual for moisture (if applicable)
-• Dehumidifier operation test (if applicable)
-• Septic drain field walkaround (if applicable)
-• Smart leak system test (if applicable)
-• Turf drainage spot-check (synthetic turf homes)
-
-Add anything you've been meaning to get to — that's what the handyman is for.
-""", assignmentType: .vendor, bundleId: "Handyman:spring", bundleTitle: "Spring Handyman Visit"),
-            MaintenanceTemplate(systemCategory: "Handyman", title: "Fall handyman visit", description: "Pre-winter walkthrough and punch list. Your handyman handles weatherproofing, hose-bib winterization, storm door prep, attic insulation check, and any accumulated punch-list items.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$300-800", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: """
-What's typically covered in a fall handyman visit:
-
-Weatherization
-• Exterior faucet winterization and hose bib covers
-• Storm door and weatherstripping check (windows + doors)
-• Window AC removal and storage (if applicable)
-• Door hinge and lock lubrication
-
-HVAC
-• Air filter swap (heating season)
-• Attic insulation check before heating season
-
-Generator (if applicable)
-• Oil level check
-• Confirm weekly exercise cycle visually
-
-Safety
-• Smoke and CO detector battery swap
-• Smoke detector age check (replace if 9+ years — bring spares)
-• Fire extinguisher gauge check
-• Camera perimeter walk-past
-• Verify smoke and CO detectors (self-test confirmation)
-
-Plumbing
-• Drain cleaning and sink trap check
-• Hose bib shutoff valve test
-
-Exterior
-• Seal gaps around pipes and utility entries (pest prevention)
-• Firebox and damper check (wood-burning fireplaces)
-
-Other (conditional)
-• Central vacuum service (if applicable)
-• Radon mitigation fan check (if applicable)
-
-Add anything you've been meaning to get to.
-""", assignmentType: .vendor, bundleId: "Handyman:fall", bundleTitle: "Fall Handyman Visit"),
+            // Phase 67E/F: The "Spring handyman visit" and "Fall handyman
+            // visit" parent bundle templates were removed. Handyman work is
+            // now a single rail — `handyman_punch_items`, never
+            // `maintenance_tasks`. Seasonal coordination happens via
+            // HandymanSeasonalReminderCard (dashboard, Apr 1 / Oct 1
+            // ±14-day window) and recurring Mar 1 / Sep 1 push reminders.
+            // Bundle children with `bundleId: "Handyman:spring"` or
+            // `bundleId: "Handyman:fall"` remain in the library so existing
+            // templateKey references survive; the reconciler routes them to
+            // punch items rather than seeding bundle parent tasks.
             // Phase 57: HNW bundle children. Each joins an existing
             // seasonal handyman visit via `bundleId`, surfacing in the
             // "What's included:" checklist on that visit's task notes.
