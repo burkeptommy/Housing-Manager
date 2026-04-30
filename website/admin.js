@@ -3048,14 +3048,44 @@ function countBySeason(items) {
 //                        homeowner explicitly pulls a task to themselves
 //   bundled            — has a bundleId; folds into a parent visit at
 //                        runtime instead of surfacing as its own task
-// Phase 5z+7 — "Handyman context" = systemCategory is Handyman OR
-// bundleId starts with Handyman: (the spring/fall bundle members).
-// Used to exclude these items from non-Handyman surfaces (Tasks /
-// Recommended) so they live ONLY on the Handyman tab.
+// Phase 5z+7/+17 — "Handyman context" classification. Used to keep
+// handyman items off the Tasks tab; they live exclusively on the
+// Handyman tab. Three rules, all OR'd:
+//
+//   1. Explicit Handyman category (the dedicated catalog rows).
+//   2. Member of a Handyman: bundle (spring + fall handyman visits).
+//   3. Phase 67E/F handyman-tier — DIY-capable templates that fire as
+//      handyman_punch_items rows at runtime instead of maintenance_
+//      tasks. The Swift definition (MaintenanceTaskReconciler):
+//
+//        !template.safetyFloor &&
+//        template.bundleId == nil &&
+//        (template.routingOverride == .diyDefault ||
+//         template.routingOverride == .diyCapable) &&
+//        (template.diyEffortMinutes ?? 0) <= 60
+//
+//      Tom's bug report: "Fire Extinguisher Annual Check… its a
+//      handyman task I thought." It is — at runtime it lands on the
+//      handyman punch list. But its systemCategory is "Electrical"
+//      (not "Handyman"), so the old category-only rule missed it
+//      and let it leak onto the Tasks tab. The same pattern caught 4
+//      more templates that were also leaking: condensate drain flush
+//      (HVAC), sump pump battery test (Plumbing), refrigerator water
+//      filter (Appliance), dehumidifier service (Air Quality).
 function isHandymanContextItem(item) {
   const t = item?.payload || {};
   if (t.systemCategory === "Handyman") return true;
   if (typeof t.bundleId === "string" && t.bundleId.startsWith("Handyman:")) return true;
+  if (
+    t.safetyFloor !== true &&
+    !t.bundleId &&
+    (t.routingOverride === "diyDefault" || t.routingOverride === "diyCapable") &&
+    typeof t.diyEffortMinutes === "number" &&
+    t.diyEffortMinutes > 0 &&
+    t.diyEffortMinutes <= 60
+  ) {
+    return true;
+  }
   return false;
 }
 
