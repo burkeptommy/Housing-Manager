@@ -402,6 +402,10 @@ const state = {
   // focus, refresh button, or initial load), stamp this so the
   // "last synced" indicator can render relative time.
   lastDataLoadAt: null,
+  // Phase 5z+14 — currently-focused decision on the Decisions tab.
+  // Cleared on tab navigation; survives renderDecisionsView re-renders
+  // (e.g. after a refresh) so the panel stays open while Tom acts.
+  selectedDecision: null,
 };
 
 function structuredCloneSafePure(value) {
@@ -482,6 +486,8 @@ const el = {
   refreshData: document.querySelector("[data-refresh-data]"),
   refreshTime: document.querySelector("[data-refresh-time]"),
   refreshIndicator: document.querySelector("[data-refresh-indicator]"),
+  // Phase 5z+14 — Focused decision panel container.
+  decisionFocused: document.querySelector("[data-decision-focused]"),
 };
 
 const paletteState = { open: false, results: [], activeIndex: 0 };
@@ -1722,6 +1728,7 @@ function renderNav() {
     button.addEventListener("click", () => {
       state.view = button.dataset.view;
       state.selected = null;
+      state.selectedDecision = null;
       state.search = "";
       state.statusFilter = "all";
       state.lifecycleFilter = "all";
@@ -3139,10 +3146,12 @@ function renderDetail() {
   // Re-show the tabs strip in case the simulator view hid it on the
   // previous render.
   el.detailTabs?.classList.remove("is-hidden");
-  // Phase 5z+9 — Hide the focused-note panel when rendering an entity
-  // detail. Re-show the legacy quick-actions row that focusFor a note
-  // suppresses. Keeps cross-tab navigation clean.
+  // Phase 5z+9 / 5z+14 — Hide the focused note + focused decision
+  // panels when rendering an entity detail. Re-show the legacy quick-
+  // actions row that focused panels suppress. Keeps cross-tab
+  // navigation clean.
   el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
   document.querySelector("[data-detail-quick-actions]")?.classList.remove("is-hidden");
   el.saveItem.disabled = false;
 
@@ -3735,11 +3744,13 @@ function renderDecisionsView() {
   const decisions = computeDecisionQueue();
   el.search.value = state.search || "";
 
+  // Phase 5z+14 — Plain-English summary tiles. Each one is a friendly
+  // count of a single decision kind so Tom knows what's stacking.
   el.stats.innerHTML = `
-    <div class="admin-stat"><strong>${decisions.length}</strong><span>Awaiting your call</span></div>
-    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "lint").length}</strong><span>Lint</span></div>
-    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "question").length}</strong><span>Questions</span></div>
-    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "proposal").length}</strong><span>Proposals</span></div>
+    <div class="admin-stat"><strong>${decisions.length}</strong><span>Decisions waiting</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "question").length}</strong><span>Questions for you</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "proposal").length}</strong><span>Pending proposals</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "lint").length}</strong><span>Voice + style fixes</span></div>
   `;
 
   const filtered = state.search
@@ -3749,8 +3760,8 @@ function renderDecisionsView() {
     : decisions;
 
   el.list.innerHTML = filtered.length
-    ? filtered.map((d) => decisionRowHtml(d)).join("")
-    : `<div class="admin-empty-detail" style="min-height:240px"><h3>No decisions waiting</h3><p>Surfaces are clean. Move to Quiz or Tasks for active curation.</p></div>`;
+    ? filtered.map((d) => decisionRowHtml(d, state.selectedDecision?.id === d.id)).join("")
+    : `<div class="admin-empty-detail" style="min-height:240px"><h3>No decisions waiting</h3><p>Every surface is clean. Move to another tab for active curation.</p></div>`;
 
   el.list.querySelectorAll("[data-decision-action]").forEach((btn) => {
     btn.addEventListener("click", async (event) => {
@@ -3762,20 +3773,44 @@ function renderDecisionsView() {
       await handleDecisionAction(decision, action);
     });
   });
+  // Phase 5z+14 — Click a row → focused decision panel on the right
+  // (no more entity-jump). The panel explains what the decision is,
+  // recommends an action, and gives Tom one-click choices for every
+  // option. Same pattern as the focused note panel.
   el.list.querySelectorAll("[data-decision-id][data-open-detail]").forEach((row) => {
     row.addEventListener("click", () => {
       const decisionId = row.dataset.decisionId;
       const decision = decisions.find((d) => d.id === decisionId);
-      if (!decision?.targetItem) return;
-      // Jump to the entity's home surface.
-      state.view = decision.targetView;
-      state.selected = decision.targetItem;
-      render();
+      if (!decision) return;
+      state.selectedDecision = decision;
+      renderFocusedDecisionDetail(decision);
+      // Re-render the list so the active row gets a highlight.
+      renderDecisionsView();
     });
   });
 
-  el.emptyDetail.classList.add("is-hidden");
-  el.detail.classList.add("is-hidden");
+  // Either show the focused decision panel (if a decision is selected
+  // and still in the queue) or fall back to the empty-detail card.
+  const stillSelected = state.selectedDecision && decisions.some((d) => d.id === state.selectedDecision.id);
+  if (stillSelected) {
+    // Refresh the decision object from the freshly-computed queue (it
+    // may carry updated entity payloads after a refresh).
+    const fresh = decisions.find((d) => d.id === state.selectedDecision.id);
+    state.selectedDecision = fresh;
+    renderFocusedDecisionDetail(fresh);
+  } else {
+    state.selectedDecision = null;
+    el.decisionFocused?.classList.add("is-hidden");
+    el.noteFocused?.classList.add("is-hidden");
+    el.emptyDetail.classList.remove("is-hidden");
+    el.detail.classList.add("is-hidden");
+    el.emptyDetail.querySelector("h3").textContent = decisions.length
+      ? "Pick a decision to see the details"
+      : "No decisions waiting";
+    el.emptyDetail.querySelector("p").textContent = decisions.length
+      ? "Click any card on the left. You'll see what the decision is, why it surfaced, what would happen if you act on it, plus one-click buttons for each option — no jumping to other tabs."
+      : "Every surface is clean right now. Decisions show up here when there's a pending question, an open proposal, a voice/style fix to make, or a high-impact entity that hasn't been reviewed.";
+  }
 }
 
 function computeDecisionQueue() {
@@ -3793,7 +3828,10 @@ function computeDecisionQueue() {
         itemType: note.scopeType,
         targetView: viewIdForType(note.scopeType),
         targetItem: locateLiveItemByScope(note),
-        recommendation: "Answer first — Tom is waiting on you.",
+        // Phase 5z+14 — keep the source note id so the focused panel
+        // can route "Open + reply" / "Mark answered" to the right note.
+        noteId: note.id,
+        recommendation: "Reply first. Don't ship code changes until you and Claude agree on the answer.",
         primaryActions: ["open"],
       });
     }
@@ -3806,15 +3844,26 @@ function computeDecisionQueue() {
       !note.appliedAt &&
       !note.revertedAt
     ) {
+      const intentLabel = {
+        change_request: "Change request",
+        proposal_add: "Suggested addition",
+        proposal_delete: "Suggested removal",
+      }[note.intent] || note.intent;
       queue.push({
         id: `proposal-${note.id}`,
         severity: "proposal",
-        title: `${note.intent}: ${note.scopeTitle || "(unscoped)"}`,
+        title: `${intentLabel}: ${note.scopeTitle || "(unscoped)"}`,
         reason: note.body?.slice(0, 200) || "(no body)",
         itemType: note.scopeType,
         targetView: viewIdForType(note.scopeType),
         targetItem: locateLiveItemByScope(note),
-        recommendation: "Apply or revert this proposal.",
+        noteId: note.id,
+        recommendation:
+          note.intent === "proposal_delete"
+            ? "Open the note for the full impact read. If it's safe, mark applied and Claude will remove it next session."
+            : note.intent === "proposal_add"
+            ? "Open the note for the full read. If it survives review, Claude will add it next session."
+            : "Open the note to see what would change. Mark it applied to ship the edit on the next code session.",
         primaryActions: ["open"],
       });
     }
@@ -3839,6 +3888,9 @@ function computeDecisionQueue() {
           itemType: item.itemType,
           targetView: surfaceId,
           targetItem: item,
+          // Phase 5z+14 — keep the raw lint hit so the focused panel
+          // can compute the suggested fix and render before/after.
+          lintHit: hit,
           recommendation: lintRecommendationFor(hit),
           primaryActions: ["open", "approve", "cut"],
         });
@@ -3868,7 +3920,7 @@ function computeDecisionQueue() {
         itemType: item.itemType,
         targetView: surfaceId,
         targetItem: item,
-        recommendation: "Review + lock if it's right.",
+        recommendation: "Skim the entity. If it's right, approve + lock so it stops surfacing here. If something's off, open to edit or cut it.",
         primaryActions: ["open", "approve", "cut"],
       });
       highImpactCount += 1;
@@ -3950,39 +4002,33 @@ function locateLiveItemByScope(note) {
   );
 }
 
-function decisionRowHtml(decision) {
+function decisionRowHtml(decision, isActive = false) {
+  // Phase 5z+14 — Friendlier severity labels + plain-English type hint.
+  // The detailed action set lives in the focused panel now; the row
+  // is a clean preview that's safe to scan + click.
   const severityLabel =
     {
-      question: "Open question",
+      question: "Question for you",
       proposal: "Pending proposal",
-      lint: "Lint issue",
-      impact: "High-impact entity",
+      lint: "Voice / style fix",
+      impact: "Needs review",
     }[decision.severity] || decision.severity;
   const severityTone =
     {
-      question: "defer",
+      question: "reshape",
       proposal: "active",
-      lint: "cut",
-      impact: "reshape",
+      lint: "draft",
+      impact: "defer",
     }[decision.severity] || "active";
-  const actions = decision.primaryActions
-    .map((a) => {
-      if (a === "open") return `<button type="button" class="admin-button" data-decision-action="open">Open</button>`;
-      if (a === "approve") return `<button type="button" class="admin-button admin-button--primary" data-decision-action="approve">Approve</button>`;
-      if (a === "cut") return `<button type="button" class="admin-button admin-button--danger" data-decision-action="cut">Cut</button>`;
-      return "";
-    })
-    .join("");
+  const itemTypeLabel = friendlyScopeLabel(decision.itemType);
   return `
-    <div class="admin-decision" data-decision-id="${escapeHtml(decision.id)}" data-open-detail>
+    <div class="admin-decision ${isActive ? "is-active" : ""}" data-decision-id="${escapeHtml(decision.id)}" data-open-detail>
       <div class="admin-decision__top">
         <span class="admin-pill" data-tone="${severityTone}">${escapeHtml(severityLabel)}</span>
         <strong>${escapeHtml(decision.title)}</strong>
-        <span class="admin-muted">${escapeHtml(decision.itemType || "")}</span>
+        ${itemTypeLabel ? `<span class="admin-muted">${escapeHtml(itemTypeLabel)}</span>` : ""}
       </div>
       <p class="admin-decision__reason">${escapeHtml(decision.reason)}</p>
-      <p class="admin-decision__rec">${escapeHtml(decision.recommendation)}</p>
-      <div class="admin-decision__actions">${actions}</div>
     </div>
   `;
 }
@@ -3997,6 +4043,7 @@ async function handleDecisionAction(decision, action) {
   if (action === "approve" && decision.targetItem) {
     state.selected = decision.targetItem;
     await toggleLockSelected(); // toggles to approved (or unlocks if already)
+    state.selectedDecision = null; // clear so the empty state shows
     render();
     return;
   }
@@ -4005,8 +4052,334 @@ async function handleDecisionAction(decision, action) {
     const ok = confirm(`Mark "${decision.targetItem.title}" as cut?`);
     if (!ok) return;
     await markCutLive(decision.targetItem);
+    state.selectedDecision = null;
     render();
+    return;
   }
+  if (action === "open_note" && decision.noteId) {
+    // Phase 5z+14 — for question/proposal decisions, jump into the
+    // Notes tab with the source note focused. Tom can reply, mark
+    // applied, or edit from there.
+    const note = state.notes.find((n) => n.id === decision.noteId);
+    if (!note) return;
+    state.view = "notes";
+    state.selected = note;
+    state.selectedDecision = null;
+    render();
+    return;
+  }
+  if (action === "apply_lint_fix" && decision.lintHit) {
+    // Phase 5z+14 — for voice / style lint decisions, save a proposal
+    // note that records the suggested fix. Claude applies it on the
+    // next session via the existing voice-fix scripts.
+    await draftLintFixProposal(decision);
+    return;
+  }
+  if (action === "mark_applied" && decision.noteId) {
+    await markNoteApplied(decision.noteId);
+    state.selectedDecision = null;
+    render();
+    return;
+  }
+}
+
+// =============================================================================
+// Phase 5z+14 — Focused decision panel
+// =============================================================================
+//
+// Tom's ask: "in the 'Decisions' tab when I click on an entity/card it
+// should bring up a decision details information screen to the right
+// on the same page to tell me what I need to make a decision on. give
+// your recommendation on the suggested change, and other options as
+// well that I can just click on."
+//
+// Renders inside the same admin-detail panel slot as the focused note
+// view. Each decision severity has its own body shape:
+//
+//   question  — Tom asked something; Claude needs to reply first.
+//   proposal  — A change request / add / delete is pending.
+//   lint      — Voice or style violation; suggested fix available.
+//   impact    — High-impact entity not yet approved.
+//
+// All four share the same scaffold: header (kind / title / one-line
+// "what is this") → context (why it surfaced + entity preview) → "what
+// would happen" → action buttons. Action buttons are the centerpiece —
+// one click per decision instead of "open then figure out what to do."
+
+function renderFocusedDecisionDetail(decision) {
+  if (!decision) return;
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.remove("is-hidden");
+
+  // Hide every other detail-pane mode.
+  el.detailTabs?.classList.add("is-hidden");
+  el.curatedForm?.classList.add("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.promoteItem.disabled = true;
+  el.duplicateItem.disabled = true;
+  el.deleteItem.disabled = true;
+  el.saveItem.textContent = "Save";
+  el.saveItem.disabled = true;
+
+  // Header: eyebrow + title + plain-English subtitle.
+  const severityLabel = {
+    question: "Question for you",
+    proposal: "Pending proposal",
+    lint: "Voice / style fix",
+    impact: "Needs review",
+  }[decision.severity] || decision.severity;
+  const tone = {
+    question: "reshape",
+    proposal: "active",
+    lint: "draft",
+    impact: "defer",
+  }[decision.severity] || "active";
+  el.detailKind.textContent = severityLabel.toLowerCase();
+  el.detailTitle.textContent = decision.title;
+  el.detailSubtitle.textContent = decisionSubtitle(decision);
+  el.detailStatus.textContent = severityLabel;
+  el.detailStatus.dataset.tone = tone;
+
+  // Render the focused panel body.
+  el.decisionFocused?.classList.remove("is-hidden");
+  if (el.decisionFocused) {
+    el.decisionFocused.innerHTML = renderFocusedDecisionPanelHtml(decision);
+    attachFocusedDecisionHandlers(decision);
+  }
+}
+
+function decisionSubtitle(decision) {
+  return ({
+    question: "Tom is waiting on an answer. Reply first; no code changes until you both agree.",
+    proposal: "A pending change is sitting on this entity. Apply it, defer it, or revert it.",
+    lint: "The text breaks one of Haven's voice rules (em-dashes, 'Professional X', long answer chips, etc.). Suggested fix is below.",
+    impact: "This entity affects a lot of households. Worth a careful review before it ships to TestFlight.",
+  })[decision.severity] || "";
+}
+
+function renderFocusedDecisionPanelHtml(decision) {
+  const note = decision.noteId ? state.notes.find((n) => n.id === decision.noteId) : null;
+  const entity = decision.targetItem || null;
+  const recommendation = decision.recommendation || "";
+
+  // Per-severity content body.
+  let contextHtml = "";
+  let actionsHtml = "";
+  let whatHappensHtml = "";
+
+  if (decision.severity === "question") {
+    contextHtml = `
+      <div class="admin-decision-focused__quote">
+        <p class="admin-muted">Tom wrote on ${escapeHtml(formatDate(note?.createdAt))}:</p>
+        <blockquote>${escapeHtml(note?.body || "(empty)")}</blockquote>
+      </div>
+      ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
+    `;
+    whatHappensHtml = `
+      <ul>
+        <li>Open this question in the Notes tab and write your answer as a reply.</li>
+        <li>Once you're aligned, mark the note as applied so it stops showing here.</li>
+        <li>If the question doesn't need an answer anymore, mark it applied with a quick "won't do" note.</li>
+      </ul>
+    `;
+    actionsHtml = `
+      <button type="button" class="admin-button admin-button--primary" data-decision-fa="open_note">Open + reply</button>
+      <button type="button" class="admin-button admin-button--secondary" data-decision-fa="mark_applied">Mark answered</button>
+    `;
+  } else if (decision.severity === "proposal") {
+    const intent = note?.intent || "change_request";
+    const intentLabel = {
+      change_request: "Change request",
+      proposal_add: "Suggested addition",
+      proposal_delete: "Suggested removal",
+    }[intent] || intent;
+    contextHtml = `
+      <div class="admin-decision-focused__quote">
+        <p class="admin-muted">${escapeHtml(intentLabel)} written on ${escapeHtml(formatDate(note?.createdAt))}:</p>
+        <blockquote>${escapeHtml(note?.body || "(empty)")}</blockquote>
+      </div>
+      ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
+    `;
+    whatHappensHtml = `
+      <ul>
+        <li>Open the note to see Claude's full read on whether the feedback is good and what would change if applied.</li>
+        <li>If you want it applied, mark it as such — Claude picks it up on the next code session.</li>
+        <li>If you've changed your mind, edit or delete the note from the focused note panel.</li>
+      </ul>
+    `;
+    actionsHtml = `
+      <button type="button" class="admin-button admin-button--primary" data-decision-fa="open_note">Open in Notes</button>
+      <button type="button" class="admin-button admin-button--secondary" data-decision-fa="mark_applied">Mark applied</button>
+    `;
+  } else if (decision.severity === "lint") {
+    const hit = decision.lintHit || {};
+    const fixedText = suggestLintFix(hit);
+    contextHtml = `
+      <div class="admin-decision-focused__lint">
+        <p class="admin-muted">Field: <code>${escapeHtml(hit.field || "—")}</code></p>
+        <div class="admin-decision-focused__lint-block">
+          <strong>What's there now</strong>
+          <pre>${escapeHtml(hit.snippet || "—")}</pre>
+        </div>
+        ${fixedText && fixedText !== hit.snippet ? `
+          <div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--suggested">
+            <strong>Suggested fix</strong>
+            <pre>${escapeHtml(fixedText)}</pre>
+          </div>
+        ` : ""}
+      </div>
+      ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
+    `;
+    whatHappensHtml = `
+      <ul>
+        <li><strong>Apply suggested fix</strong> creates a change-request note for Claude. The fix lands on the next code session.</li>
+        <li><strong>Approve as-is</strong> locks the entity so this lint rule stops flagging it. Use this when the wording is intentional.</li>
+        <li><strong>Cut entity</strong> removes it from the catalog entirely. Use sparingly — there's no undo.</li>
+      </ul>
+    `;
+    actionsHtml = `
+      ${fixedText && fixedText !== hit.snippet ? `<button type="button" class="admin-button admin-button--primary" data-decision-fa="apply_lint_fix">Apply suggested fix</button>` : ""}
+      <button type="button" class="admin-button admin-button--secondary" data-decision-fa="approve">Approve as-is</button>
+      <button type="button" class="admin-button admin-button--ghost" data-decision-fa="open">Open to edit</button>
+      <button type="button" class="admin-button admin-button--ghost admin-button--danger" data-decision-fa="cut">Cut entity</button>
+    `;
+  } else if (decision.severity === "impact") {
+    contextHtml = `
+      <div class="admin-decision-focused__impact">
+        <p>${escapeHtml(decision.reason)}</p>
+      </div>
+      ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
+    `;
+    whatHappensHtml = `
+      <ul>
+        <li><strong>Approve + lock</strong> tells Haven this entity is final. Lint won't flag it again.</li>
+        <li><strong>Open to edit</strong> brings up the entity's full detail panel so you can change fields.</li>
+        <li><strong>Cut entity</strong> removes it. Existing households keep what they already have, but new households won't see it.</li>
+      </ul>
+    `;
+    actionsHtml = `
+      <button type="button" class="admin-button admin-button--primary" data-decision-fa="approve">Approve + lock</button>
+      <button type="button" class="admin-button admin-button--secondary" data-decision-fa="open">Open to edit</button>
+      <button type="button" class="admin-button admin-button--ghost admin-button--danger" data-decision-fa="cut">Cut entity</button>
+    `;
+  }
+
+  return `
+    <section class="admin-decision-focused__body">
+      <div class="admin-decision-focused__section admin-decision-focused__section--rec">
+        <div class="admin-decision-focused__section-head">
+          <h4>Claude's recommendation</h4>
+        </div>
+        <p class="admin-decision-focused__rec">${escapeHtml(recommendation)}</p>
+      </div>
+
+      <div class="admin-decision-focused__section">
+        <div class="admin-decision-focused__section-head">
+          <h4>What we're looking at</h4>
+        </div>
+        ${contextHtml}
+      </div>
+
+      <div class="admin-decision-focused__section">
+        <div class="admin-decision-focused__section-head">
+          <h4>What happens if you act</h4>
+        </div>
+        <div class="admin-decision-focused__what">${whatHappensHtml}</div>
+      </div>
+
+      <div class="admin-decision-focused__section admin-decision-focused__section--actions">
+        <div class="admin-decision-focused__section-head">
+          <h4>Choose one</h4>
+          <span class="admin-muted admin-decision-focused__action-hint">One click per option. ${decision.severity === "lint" ? "The recommended action is on the left." : ""}</span>
+        </div>
+        <div class="admin-decision-focused__actions">${actionsHtml}</div>
+      </div>
+    </section>
+  `;
+}
+
+function attachFocusedDecisionHandlers(decision) {
+  el.decisionFocused?.querySelectorAll("[data-decision-fa]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await handleDecisionAction(decision, btn.dataset.decisionFa);
+    });
+  });
+}
+
+// Phase 5z+14 — Compute the suggested fix text for a lint hit so Tom
+// can preview it before clicking "Apply suggested fix." Falls back to
+// a description when no mechanical fix is possible.
+function suggestLintFix(hit) {
+  if (!hit?.snippet) return "";
+  const snippet = hit.snippet;
+  if (hit.ruleId === "no-em-dash") {
+    // Tom's voice rule: em-dashes read as AI-generated to HNW readers.
+    // Replace " — " with ". " (period + space, capitalize next letter)
+    // and bare "—" with ", " (comma + space).
+    let out = snippet.replace(/\s+—\s+/g, ". ").replace(/—/g, ", ");
+    out = out.replace(/\.\s+([a-z])/g, (_, c) => `. ${c.toUpperCase()}`);
+    return out.replace(/\s\s+/g, " ").trim();
+  }
+  if (hit.ruleId === "no-professional-x-titles") {
+    return snippet.replace(/^Professional\s+/i, "Annual ");
+  }
+  if (hit.ruleId === "answer-label-max-words") {
+    // No mechanical trim — Tom needs to rewrite. Return null to skip
+    // the suggestion block.
+    return "";
+  }
+  return "";
+}
+
+// Phase 5z+14 — When Tom clicks "Apply suggested fix" on a lint
+// decision, save a structured change-request note. The voice-fix
+// script picks it up next session and applies the fix to Swift code.
+async function draftLintFixProposal(decision) {
+  const hit = decision.lintHit;
+  if (!hit || !decision.targetItem) return;
+  const fixedText = suggestLintFix(hit);
+  if (!fixedText) {
+    alert("This lint rule needs a manual rewrite — there's no mechanical suggested fix.");
+    return;
+  }
+  const item = decision.targetItem;
+  const body = `Apply voice fix:
+
+Rule: ${hit.ruleId}
+Field: ${hit.field}
+Before: ${hit.snippet}
+After: ${fixedText}
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)`;
+  await writeNote({
+    scopeType: item.itemType,
+    scopeId: liveEntityIdFor(item),
+    scopeTitle: item.title,
+    body,
+    intent: "change_request",
+    target: "claude",
+    proposedDiff: {
+      kind: "voice_fix",
+      rule: hit.ruleId,
+      field: hit.field,
+      from: hit.snippet,
+      to: fixedText,
+    },
+    snapshot: {
+      itemType: item.itemType,
+      payload: item.payload,
+      capturedAt: new Date().toISOString(),
+    },
+  });
+  // Dismiss the focused panel and re-render so the now-resolved
+  // decision drops out of the queue (the proposal note exists, so the
+  // lint hit is being addressed).
+  state.selectedDecision = null;
+  alert(`Voice fix drafted as a note. Claude will apply it on the next session.\n\nBefore: ${hit.snippet}\nAfter:  ${fixedText}`);
+  render();
 }
 
 async function markCutLive(item) {

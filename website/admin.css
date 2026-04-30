@@ -4398,6 +4398,15 @@
   background: rgba(237, 105, 85, 0.04);
 }
 
+/* Phase 5z+14 — Active row when its focused panel is open. Same
+   pattern as Apple Mail / Linear: a stronger left strip + a fill so
+   the user sees which decision the right pane belongs to. */
+.admin-decision.is-active {
+  background: rgba(237, 105, 85, 0.08);
+  border-color: rgba(237, 105, 85, 0.5);
+  border-left-width: 4px;
+}
+
 .admin-decision__top {
   align-items: center;
   display: flex;
@@ -5402,4 +5411,172 @@
 
 .admin-facet-bar__clear:hover {
   color: var(--salmon-dark);
+}
+
+/* =============================================================================
+   Phase 5z+14 — Focused decision panel (Decisions tab → click a row)
+   ============================================================================= */
+
+.admin-decision-focused {
+  display: block;
+}
+
+.admin-decision-focused__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-decision-focused__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Recommendation section — salmon-tinted card. The action card. */
+.admin-decision-focused__section--rec {
+  background: linear-gradient(135deg, rgba(237, 105, 85, 0.1), rgba(237, 105, 85, 0.04));
+  border: 1px solid rgba(237, 105, 85, 0.45);
+  border-left: 4px solid var(--salmon-dark);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.admin-decision-focused__rec {
+  color: var(--text);
+  font: 500 14px/1.5 var(--sans);
+  margin: 0;
+}
+
+/* Section heads — same pattern as the focused note panel. */
+.admin-decision-focused__section-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.admin-decision-focused__section-head h4 {
+  color: var(--text);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.admin-decision-focused__action-hint {
+  font-size: 11px;
+}
+
+/* Quote block — for question / proposal severity (the source note). */
+.admin-decision-focused__quote {
+  background: rgba(69, 58, 112, 0.04);
+  border-left: 3px solid rgba(69, 58, 112, 0.3);
+  border-radius: 0 10px 10px 0;
+  padding: 10px 14px;
+}
+
+.admin-decision-focused__quote p {
+  font: 500 11px var(--sans);
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.admin-decision-focused__quote blockquote {
+  color: var(--text);
+  font: 500 14px/1.55 var(--sans);
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Lint detail — before / after blocks. */
+.admin-decision-focused__lint {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-decision-focused__lint p {
+  font: 500 12px var(--sans);
+  margin: 0;
+}
+
+.admin-decision-focused__lint code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  font: 600 11px var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  padding: 1px 5px;
+}
+
+.admin-decision-focused__lint-block {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.admin-decision-focused__lint-block strong {
+  color: var(--text-muted);
+  display: block;
+  font: 700 10px var(--sans);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.admin-decision-focused__lint-block pre {
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.admin-decision-focused__lint-block--suggested {
+  background: rgba(74, 124, 89, 0.06);
+  border-color: rgba(74, 124, 89, 0.3);
+}
+
+.admin-decision-focused__lint-block--suggested strong {
+  color: rgba(74, 124, 89, 0.9);
+}
+
+/* Impact severity — single explanation paragraph above the entity. */
+.admin-decision-focused__impact p {
+  color: var(--text);
+  font: 500 14px/1.5 var(--sans);
+  margin: 0;
+}
+
+/* "What happens if you act" block — bulleted plain-English. */
+.admin-decision-focused__what ul {
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.admin-decision-focused__what li {
+  margin-bottom: 4px;
+}
+
+.admin-decision-focused__what li:last-child {
+  margin-bottom: 0;
+}
+
+/* Action button row at the bottom. The primary action sits on the
+   left so eye-flow ends on the recommended path. */
+.admin-decision-focused__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-decision-focused__section--actions {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  padding: 12px 14px;
 }
