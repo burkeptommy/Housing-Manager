@@ -4204,7 +4204,26 @@ function renderFocusedDecisionPanelHtml(decision) {
     `;
   } else if (decision.severity === "lint") {
     const hit = decision.lintHit || {};
-    const fixedText = suggestLintFix(hit);
+    const fix = suggestLintFix(hit);
+    // Phase 5z+15 — Always render the Apply button. When we have a
+    // mechanical before→after, show it. When we don't, show what
+    // Claude will do instead. Tom: "make sure every decision has an
+    // apply suggested fix option."
+    const previewBlock = fix?.kind === "mechanical" && fix.text
+      ? `
+        <div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--suggested">
+          <strong>Suggested fix</strong>
+          <pre>${escapeHtml(fix.text)}</pre>
+        </div>
+      `
+      : fix?.kind === "rewrite" && fix.summary
+      ? `
+        <div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--rewrite">
+          <strong>What Claude will do</strong>
+          <p>${escapeHtml(fix.summary)}</p>
+        </div>
+      `
+      : "";
     contextHtml = `
       <div class="admin-decision-focused__lint">
         <p class="admin-muted">Field: <code>${escapeHtml(hit.field || "—")}</code></p>
@@ -4212,24 +4231,23 @@ function renderFocusedDecisionPanelHtml(decision) {
           <strong>What's there now</strong>
           <pre>${escapeHtml(hit.snippet || "—")}</pre>
         </div>
-        ${fixedText && fixedText !== hit.snippet ? `
-          <div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--suggested">
-            <strong>Suggested fix</strong>
-            <pre>${escapeHtml(fixedText)}</pre>
-          </div>
-        ` : ""}
+        ${previewBlock}
       </div>
       ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
     `;
+    const applyLabel = fix?.label || "Apply suggested fix";
+    const applyExplain = fix?.kind === "mechanical"
+      ? "applies the exact swap above on the next code session"
+      : "writes a note asking Claude to rewrite the text on the next code session";
     whatHappensHtml = `
       <ul>
-        <li><strong>Apply suggested fix</strong> creates a change-request note for Claude. The fix lands on the next code session.</li>
+        <li><strong>${escapeHtml(applyLabel)}</strong> ${escapeHtml(applyExplain)}.</li>
         <li><strong>Approve as-is</strong> locks the entity so this lint rule stops flagging it. Use this when the wording is intentional.</li>
         <li><strong>Cut entity</strong> removes it from the catalog entirely. Use sparingly — there's no undo.</li>
       </ul>
     `;
     actionsHtml = `
-      ${fixedText && fixedText !== hit.snippet ? `<button type="button" class="admin-button admin-button--primary" data-decision-fa="apply_lint_fix">Apply suggested fix</button>` : ""}
+      ${fix ? `<button type="button" class="admin-button admin-button--primary" data-decision-fa="apply_lint_fix">${escapeHtml(fix.label)}</button>` : ""}
       <button type="button" class="admin-button admin-button--secondary" data-decision-fa="approve">Approve as-is</button>
       <button type="button" class="admin-button admin-button--ghost" data-decision-fa="open">Open to edit</button>
       <button type="button" class="admin-button admin-button--ghost admin-button--danger" data-decision-fa="cut">Cut entity</button>
@@ -4297,51 +4315,210 @@ function attachFocusedDecisionHandlers(decision) {
   });
 }
 
-// Phase 5z+14 — Compute the suggested fix text for a lint hit so Tom
-// can preview it before clicking "Apply suggested fix." Falls back to
-// a description when no mechanical fix is possible.
+// Phase 5z+14/+15 — Compute the suggested fix for a lint hit. Tom's
+// rule: every lint decision has an "Apply" action. When we can produce
+// a deterministic before→after, the action drafts a structured voice-
+// fix note the script auto-applies. When we can't, the action drafts a
+// regular change-request note describing the rule and what needs
+// rewriting — Claude picks the right wording on the next session.
+//
+// Returns:
+//   {
+//     kind: "mechanical" | "rewrite",
+//     text: string | null,    // the rewrite text (mechanical only)
+//     label: string,          // button label
+//     summary: string | null, // shown when no mechanical preview is
+//                             //   available, describes what Claude
+//                             //   will do
+//   }
+//   or null if there's nothing to fix (snippet missing).
 function suggestLintFix(hit) {
-  if (!hit?.snippet) return "";
+  if (!hit?.snippet) return null;
   const snippet = hit.snippet;
+
+  // 1. Em-dash → period + capitalize, or bare em-dash → comma. Always
+  //    mechanical since Tom's rule is unambiguous.
   if (hit.ruleId === "no-em-dash") {
-    // Tom's voice rule: em-dashes read as AI-generated to HNW readers.
-    // Replace " — " with ". " (period + space, capitalize next letter)
-    // and bare "—" with ", " (comma + space).
     let out = snippet.replace(/\s+—\s+/g, ". ").replace(/—/g, ", ");
     out = out.replace(/\.\s+([a-z])/g, (_, c) => `. ${c.toUpperCase()}`);
-    return out.replace(/\s\s+/g, " ").trim();
+    out = out.replace(/\s\s+/g, " ").trim();
+    if (out && out !== snippet) {
+      return { kind: "mechanical", text: out, label: "Apply suggested fix", summary: null };
+    }
+    return {
+      kind: "rewrite",
+      text: null,
+      label: "Ask Claude to rewrite",
+      summary: "We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session.",
+    };
   }
+
+  // 2. "Professional X" title → "Annual X". Mechanical.
   if (hit.ruleId === "no-professional-x-titles") {
-    return snippet.replace(/^Professional\s+/i, "Annual ");
+    const out = snippet.replace(/^Professional\s+/i, "Annual ");
+    if (out !== snippet) {
+      return { kind: "mechanical", text: out, label: "Apply suggested fix", summary: null };
+    }
   }
+
+  // 3. Long answer label. Try four trim heuristics in order; the first
+  //    one that gets us under 7 words wins. If none do, fall through
+  //    to the rewrite action so Claude picks the right phrasing.
   if (hit.ruleId === "answer-label-max-words") {
-    // No mechanical trim — Tom needs to rewrite. Return null to skip
-    // the suggestion block.
-    return "";
+    const tryTrim = trimLongAnswerLabel(snippet);
+    if (tryTrim) {
+      return {
+        kind: "mechanical",
+        text: tryTrim,
+        label: "Apply suggested fix",
+        summary: null,
+      };
+    }
+    return {
+      kind: "rewrite",
+      text: null,
+      label: "Ask Claude to trim this",
+      summary: `This label is ${snippet.split(/\s+/).length} words. We couldn't auto-shorten it without losing meaning. Claude will pick a clean ≤7-word version on the next session.`,
+    };
   }
-  return "";
+
+  // 4. Generic fallback — any voice rule we don't know how to fix
+  //    deterministically. The action becomes "ask Claude to rewrite";
+  //    the note describes the rule violation so Claude can act.
+  return {
+    kind: "rewrite",
+    text: null,
+    label: "Ask Claude to rewrite",
+    summary: `Voice rule "${hit.ruleId}" was flagged on this field. Claude will rewrite the text to comply on the next session.`,
+  };
 }
 
-// Phase 5z+14 — When Tom clicks "Apply suggested fix" on a lint
-// decision, save a structured change-request note. The voice-fix
-// script picks it up next session and applies the fix to Swift code.
+// Phase 5z+15 — Smart trim for `answer-label-max-words`. Tries four
+// patterns; returns the cleanest cut that fits in 7 words. Returns
+// null when none of the patterns produce a clean result (the focused
+// panel falls back to "Ask Claude to trim this" in that case).
+//
+// Pattern A (em-dash split) wins outright when it produces a valid
+// candidate — the part before " — " is almost always the actual
+// answer, the part after is help text the user shouldn't have to read.
+// The other three patterns compete by longest-clean-fit.
+function trimLongAnswerLabel(snippet) {
+  const wordCount = (s) => s.trim().split(/\s+/).length;
+  const isClean = (s) => {
+    if (!s || s.length === 0) return false;
+    // Reject candidates with unbalanced brackets — Pattern B can
+    // produce "Detached garage (separate building" by splitting at
+    // the first comma inside a parenthetical.
+    const open = (s.match(/[(\[]/g) || []).length;
+    const close = (s.match(/[)\]]/g) || []).length;
+    if (open !== close) return false;
+    // Reject candidates ending with a dangling punctuation mark.
+    if (/[,\-—]\s*$/.test(s)) return false;
+    return true;
+  };
+  const fits = (s) => wordCount(s) <= 7 && wordCount(s) >= 1;
+
+  // Pattern A — em-dash split. Highest priority because the suffix is
+  // usually help text, not the answer itself.
+  // "Not sure — take a photo and we'll tell you" → "Not sure"
+  const emDashSplit = snippet.split(/\s+—\s+|\s+--\s+/);
+  if (emDashSplit.length > 1) {
+    const first = emDashSplit[0].trim();
+    if (first !== snippet && isClean(first) && fits(first)) {
+      return first;
+    }
+  }
+
+  const candidates = [];
+
+  // Pattern B — drop the suffix after the first comma.
+  // "Yes, but only sometimes during winter months" → "Yes"
+  const commaSplit = snippet.split(/,/);
+  if (commaSplit.length > 1) candidates.push(commaSplit[0].trim());
+
+  // Pattern C — drop trailing "and we'll/we will/I'll/I will…" filler.
+  // "Snap a photo and we'll identify it" → "Snap a photo"
+  const fillerStripped = snippet.replace(/\s*(,|—)?\s*and\s+(we['']?ll|we\s+will|i['']?ll|i\s+will)\b.*$/i, "").trim();
+  if (fillerStripped !== snippet) candidates.push(fillerStripped);
+
+  // Pattern D — drop trailing parenthetical.
+  // "Detached garage (separate building, not attached)" → "Detached garage"
+  const parenStripped = snippet.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  if (parenStripped !== snippet) candidates.push(parenStripped);
+
+  // Pick the longest candidate that fits the word budget AND is
+  // structurally clean — preserve as much meaning as possible while
+  // still passing the rule.
+  const fitting = candidates.filter((c) => c && c !== snippet && fits(c) && isClean(c));
+  if (fitting.length === 0) return null;
+  fitting.sort((a, b) => wordCount(b) - wordCount(a));
+  return fitting[0];
+}
+
+// Phase 5z+14/+15 — Apply-fix action handler for lint decisions.
+// Two paths depending on whether we computed a deterministic before→
+// after:
+//
+//   mechanical  — proposed_diff carries from/to. The voice-fix script
+//                 (scripts/apply_voice_fixes.mjs) reads it next session
+//                 and edits the Swift file directly. No human in the
+//                 loop.
+//   rewrite     — proposed_diff carries the rule + field + reason.
+//                 Claude reads the note and rewrites the text by hand
+//                 next session. Slower but handles cases without a
+//                 clean mechanical transform (long answer labels that
+//                 need genuine rewording, etc.).
+//
+// Either way, drafting the note adds it to the Notes tab. On the next
+// recompute, the lint decision drops out of the Decisions queue
+// (Phase 5z+15 dedupes against pending notes) so Tom doesn't see it
+// twice.
 async function draftLintFixProposal(decision) {
   const hit = decision.lintHit;
   if (!hit || !decision.targetItem) return;
-  const fixedText = suggestLintFix(hit);
-  if (!fixedText) {
-    alert("This lint rule needs a manual rewrite — there's no mechanical suggested fix.");
+  const fix = suggestLintFix(hit);
+  if (!fix) {
+    alert("This lint hit doesn't have a snippet — nothing to act on.");
     return;
   }
   const item = decision.targetItem;
-  const body = `Apply voice fix:
+  const isMechanical = fix.kind === "mechanical" && fix.text && fix.text !== hit.snippet;
+
+  const body = isMechanical
+    ? `Apply voice fix:
 
 Rule: ${hit.ruleId}
 Field: ${hit.field}
 Before: ${hit.snippet}
-After: ${fixedText}
+After: ${fix.text}
 
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)`;
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)`
+    : `Rewrite to comply with voice rule:
+
+Rule: ${hit.ruleId}
+Field: ${hit.field}
+Current: ${hit.snippet}
+
+${fix.summary || "Please pick the right phrasing on the next code session."}
+
+(Drafted from the Decisions tab. Claude rewrites the text manually on the next session — there's no mechanical fix Tom can preview.)`;
+
+  const proposedDiff = isMechanical
+    ? {
+        kind: "voice_fix",
+        rule: hit.ruleId,
+        field: hit.field,
+        from: hit.snippet,
+        to: fix.text,
+      }
+    : {
+        kind: "voice_rewrite",
+        rule: hit.ruleId,
+        field: hit.field,
+        from: hit.snippet,
+        reason: fix.summary || null,
+      };
+
   await writeNote({
     scopeType: item.itemType,
     scopeId: liveEntityIdFor(item),
@@ -4349,24 +4526,23 @@ After: ${fixedText}
     body,
     intent: "change_request",
     target: "claude",
-    proposedDiff: {
-      kind: "voice_fix",
-      rule: hit.ruleId,
-      field: hit.field,
-      from: hit.snippet,
-      to: fixedText,
-    },
+    proposedDiff,
     snapshot: {
       itemType: item.itemType,
       payload: item.payload,
       capturedAt: new Date().toISOString(),
     },
   });
+
   // Dismiss the focused panel and re-render so the now-resolved
-  // decision drops out of the queue (the proposal note exists, so the
-  // lint hit is being addressed).
+  // decision drops out of the queue (the change-request note exists,
+  // so Phase 5z+15's dedup hides it).
   state.selectedDecision = null;
-  alert(`Voice fix drafted as a note. Claude will apply it on the next session.\n\nBefore: ${hit.snippet}\nAfter:  ${fixedText}`);
+  if (isMechanical) {
+    alert(`Voice fix drafted as a note. Claude will apply it on the next session.\n\nBefore: ${hit.snippet}\nAfter:  ${fix.text}`);
+  } else {
+    alert(`Rewrite request drafted as a note. Claude will pick the right wording on the next session.\n\nCurrent: ${hit.snippet}`);
+  }
   render();
 }
 

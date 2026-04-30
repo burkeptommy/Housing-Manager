@@ -5544,6 +5544,24 @@
   color: rgba(74, 124, 89, 0.9);
 }
 
+/* Phase 5z+15 — "What Claude will do" block for lint hits without a
+   mechanical fix. Indigo-tinted to distinguish from the green
+   suggested-fix block. */
+.admin-decision-focused__lint-block--rewrite {
+  background: rgba(69, 58, 112, 0.05);
+  border-color: rgba(69, 58, 112, 0.3);
+}
+
+.admin-decision-focused__lint-block--rewrite strong {
+  color: var(--indigo-700);
+}
+
+.admin-decision-focused__lint-block--rewrite p {
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+}
+
 /* Impact severity — single explanation paragraph above the entity. */
 .admin-decision-focused__impact p {
   color: var(--text);
