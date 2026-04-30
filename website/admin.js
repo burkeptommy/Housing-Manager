@@ -858,10 +858,16 @@ const LIVE_SOURCES = [
   "quiz-mapper-effects",
 ];
 
+// Phase 5u — Cache-bust admin-data fetches with a per-session timestamp
+// so a fresh deploy is visible without a hard browser refresh. Tom hit
+// stale JSON multiple times after committing — Vercel's CDN +
+// browser cache combined to hold yesterday's data even after a push.
+const ADMIN_DATA_CACHE_BUST = Date.now();
+
 async function loadLiveData() {
   const results = await Promise.all(
     LIVE_SOURCES.map((name) =>
-      fetch(`/admin-data/${name}.json`)
+      fetch(`/admin-data/${name}.json?v=${ADMIN_DATA_CACHE_BUST}`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null)
     )

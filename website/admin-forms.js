@@ -452,13 +452,42 @@ export function renderEntityForm(viewId, entity, original = entity) {
 function renderGroup(group, schema, entity, original) {
   const fields = schema.fields.filter((f) => f.group === group.id);
   if (!fields.length) return "";
+
+  // Phase 5u — Hide groups where every field is empty AND non-required.
+  // For vendor auto-seeds, the Bundle / Extras groups are entirely
+  // empty (no bundleId, no siblings, no derived impact) and rendering
+  // them as a fieldset with placeholder inputs makes the form feel
+  // bare. Skip the whole group when its fields contribute nothing.
+  // Identity / Copy / Schedule groups always render because they
+  // carry the load-bearing fields.
+  const collapsibleGroups = new Set(["bundle", "extras", "impact"]);
+  if (collapsibleGroups.has(group.id)) {
+    const allEmpty = fields.every((f) => isEmptyValue(readPath(entity, f.key)));
+    if (allEmpty) return "";
+  }
+
   const fieldHtml = fields.map((f) => renderField(f, entity, original)).join("");
+  // Phase 5u — Group description from schema for HVAC tune-up et al.
+  const groupCaption = group.caption
+    ? `<p class="admin-form__group-caption">${escapeHtml(group.caption)}</p>`
+    : "";
   return `
     <fieldset class="admin-form__group">
       <legend>${escapeHtml(group.label)}</legend>
+      ${groupCaption}
       ${fieldHtml}
     </fieldset>
   `;
+}
+
+// Phase 5u — Empty-field detector for the Hide-empty-groups logic.
+// Treats null / undefined / "" / [] / {} as empty.
+function isEmptyValue(v) {
+  if (v == null) return true;
+  if (v === "") return true;
+  if (Array.isArray(v) && v.length === 0) return true;
+  if (typeof v === "object" && Object.keys(v).length === 0) return true;
+  return false;
 }
 
 function renderField(field, entity, original) {
@@ -474,6 +503,7 @@ function renderField(field, entity, original) {
     originalValue = readPath(original, field.key);
   }
   const changed = !equalDeep(value, originalValue);
+  const empty = isEmptyValue(value); // Phase 5u — visual fade for unset fields
   const help = field.help
     ? `<small class="admin-form__help">${escapeHtml(field.help)}</small>`
     : "";
@@ -487,7 +517,7 @@ function renderField(field, entity, original) {
     : "";
   const control = renderControl(field, value);
   return `
-    <label class="admin-form__field ${changed ? "is-changed" : ""}" data-field-key="${escapeHtml(field.key)}">
+    <label class="admin-form__field ${changed ? "is-changed" : ""} ${empty ? "is-empty" : "is-set"}" data-field-key="${escapeHtml(field.key)}">
       <span class="admin-form__label">
         ${escapeHtml(field.label)}
         ${infoBtn}

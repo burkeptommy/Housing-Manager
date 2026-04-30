@@ -983,6 +983,39 @@
   font-size: 14px;
   padding: 4px 14px;
 }
+/* Phase 5u — Empty form fields fade so set fields stand out. Vendor
+   auto-seed templates have many nil fields (no diyEffortMinutes, no
+   bundleId, etc.) — those should fade into the background so the
+   meaningful fields read first. */
+.admin-form__field.is-empty {
+  opacity: 0.55;
+}
+.admin-form__field.is-empty:hover,
+.admin-form__field.is-empty:focus-within {
+  opacity: 1;
+}
+.admin-form__field.is-set {
+  opacity: 1;
+}
+.admin-form__field.is-changed {
+  opacity: 1;
+}
+
+/* Phase 5u — Group caption below legend for context */
+.admin-form__group-caption {
+  color: var(--text-muted);
+  font: 500 12px var(--sans);
+  line-height: 1.45;
+  margin: 0 0 8px;
+}
+
+/* Phase 5u — Summary card visual treatment: heavier, more prominent
+   so it doesn't get scrolled past when reading a task detail. */
+.admin-summary {
+  border-width: 2px;
+  box-shadow: 0 2px 6px rgba(69, 58, 112, 0.06);
+}
+
 /* Phase 5t — Quick-scan stats strip just below the entity title */
 .admin-summary__stats {
   border-bottom: 1px solid var(--neutral-200);
