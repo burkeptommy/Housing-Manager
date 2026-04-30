@@ -1699,14 +1699,18 @@ function renderNav() {
   const counts = countByView();
   el.nav.innerHTML = VIEWS.map((view) => {
     const c = counts[view.id];
-    const total = typeof c === "object" ? c.total : (c ?? 0);
-    const drafts = typeof c === "object" ? c.drafts : 0;
-    // Phase 5t — Show "live + draft" breakdown in the badge when admin
-    // drafts are stacking on top of the Swift-derived count, so totals
-    // are auditable at a glance.
-    const badge = drafts > 0
-      ? `<small title="${total - drafts} live (Swift) + ${drafts} admin drafts">${total - drafts}<span class="admin-nav-badge__delta">+${drafts}</span></small>`
-      : `<small>${total}</small>`;
+    // Phase 5z+13 — Single clean number per tab. No more "+drafts"
+    // notation — drafts are folded into the tab total. 0-count tabs
+    // grey out so the eye skips them. Tool views (Simulator,
+    // Architecture, Claude file) get no badge at all.
+    let badge = "";
+    if (c === null || c === undefined) {
+      badge = "";
+    } else if (c === 0) {
+      badge = `<small class="admin-nav-badge admin-nav-badge--zero">0</small>`;
+    } else {
+      badge = `<small class="admin-nav-badge">${c}</small>`;
+    }
     return `
       <button type="button" class="${state.view === view.id ? "is-active" : ""}" data-view="${escapeHtml(view.id)}">
         <span>${escapeHtml(view.label)}</span>
@@ -7402,13 +7406,66 @@ function replaceAdminItem(item) {
   if (state.storageMode === "local") writeLocal(LOCAL_ITEMS_KEY, state.adminItems);
 }
 
+// Phase 5z+13 — Nav badge counts.
+//
+// Tom's ask: "Lets make sure all these numbers are real too in our tabs
+// on the left… if it says +23 for instance next to tasks…I have no idea
+// what that means and when I click into tasks there is nothing about
+// that '+23' for me to easily see or filter to."
+//
+// Returns a flat number per view (or null for tool views that don't
+// display a count). Each number reflects what the user sees when they
+// click in:
+//   - Tasks tab counts post-handyman-exclusion total (handyman items
+//     live exclusively on the Handyman tab — Phase 5z+7).
+//   - Notes tab counts top-level notes (not replies) so it matches
+//     what's stacked on the screen.
+//   - Decisions counts live items that need a call.
+//   - Activity counts applied/reverted/locked events.
+//   - Tool views (Simulator, Architecture, Claude file) return null —
+//     their badges don't make sense as item counts.
+//
+// Drafts (admin_content_items) get folded into the tab total instead
+// of rendering as the cryptic "+N" — the drafts breakdown is still
+// available inside the tab via the stats area.
 function countByView() {
-  return Object.fromEntries(VIEWS.map((view) => {
-    if (view.id === "notes") return [view.id, state.notes.length];
-    const defaults = defaultItemsForView(view.id).length;
-    const drafts = state.adminItems.filter((item) => item.itemType === view.type).length;
-    return [view.id, { total: defaults + drafts, drafts }];
-  }));
+  return Object.fromEntries(VIEWS.map((view) => [view.id, countForView(view)]));
+}
+
+function countForView(view) {
+  if (view.id === "notes") {
+    // Top-level notes only (replies nest under their parents).
+    return state.notes.filter((n) => !n.parentNoteId).length;
+  }
+  if (view.id === "decisions") {
+    return computeDecisionQueue().length;
+  }
+  if (view.id === "activity") {
+    let events = 0;
+    for (const note of state.notes) {
+      if (note.appliedAt) events++;
+      if (note.revertedAt) events++;
+    }
+    for (const item of state.adminItems) {
+      if (item.lockedAt) events++;
+    }
+    return events;
+  }
+  // Tool/info views don't have an item list — no badge.
+  if (["simulator", "architecture", "claude_file"].includes(view.id)) {
+    return null;
+  }
+  // Item-list views: live + drafts, view-level structural exclusions
+  // applied (so Tasks tab drops handyman items the same way the dropdown
+  // bar does).
+  const defaults = defaultItemsForView(view.id) || [];
+  const drafts = state.adminItems.filter((item) => item.itemType === view.type);
+  return navCountForItems(defaults, view.id) + navCountForItems(drafts, view.id);
+}
+
+function navCountForItems(items, viewId) {
+  if (viewId === "tasks") return items.filter((i) => !isHandymanContextItem(i)).length;
+  return items.length;
 }
 
 function currentView() {
