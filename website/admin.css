@@ -551,6 +551,21 @@
   background: rgba(160, 120, 30, 0.14);
   color: #8a6213;
 }
+/* Phase 5z+16 — Auto-seeds badges. The ✨ Auto-seeds pill marks
+   templates that fire automatically at quiz completion (every
+   household). The conditional variant marks templates that fire
+   only when the household's subtype gates match. Green tones make
+   them feel "this happens automatically, you don't have to do
+   anything" vs. the indigo/yellow tones used for opt-in. */
+.admin-pill--autoseed {
+  background: rgba(74, 124, 89, 0.16);
+  color: rgba(46, 88, 60, 1);
+}
+.admin-pill--autoseed-conditional {
+  background: rgba(74, 124, 89, 0.08);
+  border: 1px dashed rgba(74, 124, 89, 0.5);
+  color: rgba(46, 88, 60, 1);
+}
 .admin-pill--season {
   background: rgba(70, 110, 90, 0.12);
   color: #2f5e3f;
@@ -5562,11 +5577,93 @@
   margin: 0;
 }
 
-/* Impact severity — single explanation paragraph above the entity. */
+/* Impact severity — value verdict row + reasoning + substitutes. */
+.admin-decision-focused__impact {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .admin-decision-focused__impact p {
   color: var(--text);
   font: 500 14px/1.5 var(--sans);
   margin: 0;
+}
+
+/* Phase 5z+16 — Value-tier verdict row: tier pill + reasoning. */
+.admin-decision-focused__value-row {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.admin-decision-focused__value-row .admin-pill {
+  flex-shrink: 0;
+}
+
+.admin-decision-focused__value-summary {
+  color: var(--text);
+  flex: 1;
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+}
+
+.admin-decision-focused__value-why {
+  font: 500 12px/1.5 var(--sans);
+  margin: 0;
+}
+
+/* Phase 5z+16 — Substitutes block. The "if you cut this, here are
+   higher-value HNW services to consider instead" panel. Indigo-tinted
+   to feel like inspiration, not a directive. */
+.admin-decision-focused__substitutes {
+  background: rgba(69, 58, 112, 0.04);
+  border: 1px solid rgba(69, 58, 112, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.admin-decision-focused__substitutes strong {
+  color: var(--text);
+  display: block;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.admin-decision-focused__substitutes p {
+  font: 500 12px/1.5 var(--sans);
+  margin: 0 0 8px;
+}
+
+.admin-decision-focused__substitutes ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-decision-focused__substitutes li {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.admin-decision-focused__substitute-text {
+  color: var(--text);
+  flex: 1;
+  font: 500 13px/1.4 var(--sans);
 }
 
 /* "What happens if you act" block — bulleted plain-English. */

@@ -3900,6 +3900,10 @@ function computeDecisionQueue() {
       // Skip if already in queue from earlier rules.
       const already = queue.some((q) => q.targetItem?.id === item.id);
       if (already) continue;
+      // Phase 5z+16 — attach value analysis so the focused panel can
+      // surface a real recommendation (keep / review / cut + replace)
+      // instead of a canned "skim this" line.
+      const value = valueAnalysisFor(item);
       queue.push({
         id: `impact-${surfaceId}-${item.id}`,
         severity: "impact",
@@ -3908,7 +3912,8 @@ function computeDecisionQueue() {
         itemType: item.itemType,
         targetView: surfaceId,
         targetItem: item,
-        recommendation: "Skim the entity. If it's right, approve + lock so it stops surfacing here. If something's off, open to edit or cut it.",
+        valueAnalysis: value,
+        recommendation: value.summary,
         primaryActions: ["open", "approve", "cut"],
       });
       highImpactCount += 1;
@@ -3959,6 +3964,166 @@ function isHighImpact(item) {
   if (p.requiredSubtypes?.length === 0 && item.itemType === "task") return "Universal template (no gating)";
   return null;
 }
+
+// Phase 5z+16 — Value analysis for "Needs review" decisions. Tom:
+// "some of the tasks are low value like garage door stuff. we should
+// maybe substitute with higher value things, so for all the needs
+// review things in decisions queue give recommendations also for
+// what to replace with low value maintenance tasks."
+//
+// Returns:
+//   {
+//     tier: "high" | "medium" | "low",
+//     verdict: "keep" | "review" | "cut_or_replace",
+//     summary: string,             // one-liner for the recommendation field
+//     reasoning: string,           // longer explanation for the panel
+//     substitutes: string[]|null,  // higher-value HNW alternatives
+//   }
+//
+// Heuristics are intentionally simple and conservative. They flag the
+// obvious low-value items (garage door cosmetics, weather-stripping,
+// doorbell battery checks) and the obvious high-value items (safety
+// floor, expensive vendor visits). Everything else lands as "review."
+function valueAnalysisFor(item) {
+  const t = item.payload || {};
+  const title = (item.title || "").toLowerCase();
+  const desc = (item.description || t.description || "").toLowerCase();
+  const haystack = `${title} ${desc}`;
+
+  // Always-high signals — these never get cut.
+  if (t.safetyFloor === true) {
+    return {
+      tier: "high",
+      verdict: "keep",
+      summary: "Safety-required work — homeowners can't safely DIY this. Approve + lock.",
+      reasoning: "Anything stamped safetyFloor: true (gas, panel, septic, roof, generator) is non-negotiable in the catalog. Cutting it leaves a gap homeowners shouldn't be expected to fill themselves.",
+      substitutes: null,
+    };
+  }
+  if (/\b(gas|panel|chimney sweep|septic pump|smoke detector|carbon monoxide|generator service|water heater)\b/i.test(haystack) || /\bco\s+detector\b/i.test(haystack)) {
+    return {
+      tier: "high",
+      verdict: "keep",
+      summary: "Safety + system-critical work HNW homeowners definitely want tracked. Approve + lock.",
+      reasoning: "Items that touch fire / gas / panel / septic / generator / water-heater systems are the ones HNW homeowners actually pay people for. They're the catalog's load-bearing entries.",
+      substitutes: null,
+    };
+  }
+
+  // High-value trades — HVAC, boiler, plumbing, pool, tree service.
+  // Catches "Spring HVAC tune-up" / "Annual boiler service" / "Pool
+  // opening" / "Roof inspection" even when the cost number is under
+  // our $200 threshold. Verb stems use a leading-only \b so they
+  // match tense variations (inspect / inspection / inspecting).
+  if (
+    /\b(hvac|boiler|furnace|condenser|heat pump|mini[- ]?split|water heater)\b/i.test(haystack) ||
+    /\btune[- ]?up/i.test(haystack) ||
+    /\b(pool|spa)\b.*\b(open|clos|servic|maintenance|chemistry|filter|heater)/i.test(haystack) ||
+    (/\btree\b/i.test(haystack) && /\b(servic|assess|prun|remov|trim|fell|stump|health)/i.test(haystack)) ||
+    /\b(roof|gutter)\b.*\b(inspect|repair|servic|clean|maintenance)/i.test(haystack) ||
+    (/\b(septic|well|irrigation|sprinkler)\b/i.test(haystack) && /\b(servic|test|pump|inspect|maintenance|winteriz|backflow|valve|filter)/i.test(haystack))
+  ) {
+    return {
+      tier: "high",
+      verdict: "keep",
+      summary: "Recurring trade work HNW homeowners genuinely want tracked. Approve + lock.",
+      reasoning: "HVAC tune-ups, boiler service, pool opening/closing, tree work, septic / well / irrigation visits, and roof/gutter maintenance are the high-leverage items that prevent expensive damage when neglected. Always worth keeping.",
+      substitutes: null,
+    };
+  }
+
+  // Vendor-managed visits with real cost = high value.
+  const costMatch = (t.estimatedCostRange || "").match(/\$(\d{2,4})/);
+  const dollars = costMatch ? parseInt(costMatch[1], 10) : 0;
+  if (t.assignmentType === "vendor" && dollars >= 200) {
+    return {
+      tier: "high",
+      verdict: "keep",
+      summary: `${t.estimatedCostRange || "Significant"} vendor visit — high enough cost that homeowners want it on their schedule. Approve + lock.`,
+      reasoning: "Vendor work above ~$200/visit is the kind of thing homeowners forget to schedule and then pay extra for when it becomes urgent. Worth keeping in the auto-seed catalog.",
+      substitutes: null,
+    };
+  }
+
+  // Low-value patterns — garage door cosmetics, doorbell, weather strip.
+  // The "garage door" check looks for the noun in proximity to a soft-
+  // maintenance verb ANYWHERE in the haystack so wording variants
+  // ("Lubricate garage door tracks" vs "Garage door inspection") all
+  // catch. Verb stems use a leading-only \b so they match tense
+  // variations (lubricate / lubricating / lubricates → "lubricat").
+  const lowValueHits = [];
+  if (/\bgarage door\b/i.test(haystack) && /\b(lubricat|greas|tun(?:e|ing|es)|servic|inspect|test|adjust|tighten|seal|track)/i.test(haystack)) {
+    lowValueHits.push("garage-door soft maintenance");
+  }
+  if (/\bdoorbell\b/i.test(haystack)) lowValueHits.push("doorbell maintenance");
+  if (/weather[- ]?strip(ping)?/i.test(haystack)) lowValueHits.push("weather-stripping check");
+  if (/\bcaulk/i.test(haystack) && !/\b(roof|chimney|window)\b/i.test(haystack)) lowValueHits.push("interior caulking");
+  if (/touch[- ]?up\b/i.test(haystack) && /paint/i.test(haystack)) lowValueHits.push("paint touch-up");
+  if (/photo album|family photo|memorabilia/i.test(haystack)) lowValueHits.push("memorabilia care");
+  if (/\bdust/i.test(haystack) && /(blade|fan|baseboard|vent)/i.test(haystack)) lowValueHits.push("light dusting");
+  if (/cabinet hinge|drawer slide/i.test(haystack)) lowValueHits.push("cabinet hardware care");
+  if (lowValueHits.length > 0) {
+    return {
+      tier: "low",
+      verdict: "cut_or_replace",
+      summary: `Low value — ${lowValueHits[0]}. Most HNW homeowners skip this without missing it. Consider cutting or replacing with a higher-value HNW service.`,
+      reasoning: `Tom's read: "some of the tasks are low value like garage door stuff." This entry leans into that bucket. Things HNW households genuinely care about tend to be safety, comfort, or expensive-if-neglected — none of which describes ${lowValueHits[0]}.`,
+      substitutes: HNW_HIGH_VALUE_SUBSTITUTES,
+    };
+  }
+
+  // Bundle parents — already vetted as auto-seed visits, recommend lock.
+  if (t.bundleTitle) {
+    return {
+      tier: "high",
+      verdict: "keep",
+      summary: `Bundle parent (${t.bundleTitle}) — homeowners see this as their seasonal visit. Approve + lock.`,
+      reasoning: "Bundle parent rows are the homeowner-facing scheduled task. Cutting one would orphan its sub-tasks. Almost always a keep.",
+      substitutes: null,
+    };
+  }
+
+  // High-impact universal templates — review carefully, don't auto-recommend cut.
+  if (t.tier === "universal" || (t.requiredSubtypes?.length === 0 && item.itemType === "task")) {
+    return {
+      tier: "medium",
+      verdict: "review",
+      summary: "Universal — applies to every household. Skim it carefully before locking, since it'll show up everywhere.",
+      reasoning: "Universal-tier items don't gate on any property signal — every household gets them. That makes the wording especially important: a generic title pollutes everyone's task list. If the wording is sharp + the task is genuinely useful for HNW, lock it. If it's filler, cut it.",
+      substitutes: null,
+    };
+  }
+
+  // Default — neutral review.
+  return {
+    tier: "medium",
+    verdict: "review",
+    summary: "Skim and decide. Approve + lock if it fits the catalog vision; cut it if not.",
+    reasoning: "Nothing flags this as obviously high or low value. Read the title + description and make the call based on whether HNW homeowners would notice it missing.",
+    substitutes: null,
+  };
+}
+
+// Phase 5z+16 — Curated higher-value substitutes for low-value
+// templates. These are services HNW Westchester families actually
+// pay for or notice when missing. Surfaced as inspiration in the
+// focused decision panel — the user can act on them later by
+// proposing a new template, expanding the catalog, etc.
+const HNW_HIGH_VALUE_SUBSTITUTES = [
+  "Whole-home humidifier service (winter dryness in finished basements + wood floors)",
+  "Wine cellar / cigar room climate check (temp + humidity calibration)",
+  "Smart-home audit (locks, cameras, leak sensors — battery + firmware)",
+  "Built-in fridge + ice-maker filter swap (Sub-Zero, Wolf, Thermador)",
+  "Pool cover service + winterization details beyond basic open/close",
+  "Backflow preventer test (irrigation — required annually in many towns)",
+  "Range hood ducting + filter service (commercial-grade hoods)",
+  "Steam shower / sauna service (heating element + drainage)",
+  "Outdoor lighting transformer + bulb audit (low-voltage landscape)",
+  "EV charger inspection + connection check",
+  "Standby generator transfer-switch test (separate from oil/filter service)",
+  "Whole-house water filter + UV bulb replacement",
+  "Driveway sealcoat + paver re-leveling (HNW curb appeal)",
+];
 
 function viewIdForType(type) {
   return (
@@ -4067,6 +4232,18 @@ async function handleDecisionAction(decision, action) {
     await markNoteApplied(decision.noteId);
     state.selectedDecision = null;
     render();
+    return;
+  }
+  if (action === "propose_substitute" && decision.targetItem) {
+    // Phase 5z+16 — clicking a substitute on the focused panel drafts
+    // a proposal_add note so Tom can ship it next session as a real
+    // template addition. The substitute index rides on the third
+    // positional arg (passed by attachFocusedDecisionHandlers from
+    // the button's data-substitute-idx attribute).
+    const idx = parseInt((typeof arguments[2] !== "undefined" ? arguments[2] : "0") || "0", 10);
+    const substitute = decision.valueAnalysis?.substitutes?.[idx];
+    if (!substitute) return;
+    await draftSubstituteProposal(decision, substitute);
     return;
   }
 }
@@ -4253,24 +4430,70 @@ function renderFocusedDecisionPanelHtml(decision) {
       <button type="button" class="admin-button admin-button--ghost admin-button--danger" data-decision-fa="cut">Cut entity</button>
     `;
   } else if (decision.severity === "impact") {
+    // Phase 5z+16 — Value-driven recommendation. Three buckets:
+    //   high   → keep + lock (vendor work, safety floor, big bundles)
+    //   medium → review + lock if it fits the vision
+    //   low    → consider cut + replace with HNW substitutes
+    const value = decision.valueAnalysis || valueAnalysisFor(entity || {});
+    const tierBadge = {
+      high: { tone: "active", label: "High value" },
+      medium: { tone: "draft", label: "Worth a review" },
+      low: { tone: "cut", label: "Low value" },
+    }[value.tier] || { tone: "draft", label: value.tier };
+    const substitutesBlock = value.substitutes && value.substitutes.length
+      ? `
+        <div class="admin-decision-focused__substitutes">
+          <strong>Higher-value swap ideas</strong>
+          <p class="admin-muted">If this slot opens up, these are the kinds of things HNW Westchester homes actually want tracked. Pick one to draft a "let's add this" note, or come up with your own.</p>
+          <ul>
+            ${value.substitutes.map((s, i) => `
+              <li>
+                <span class="admin-decision-focused__substitute-text">${escapeHtml(s)}</span>
+                <button type="button" class="admin-button admin-button--ghost admin-button--small" data-decision-fa="propose_substitute" data-substitute-idx="${i}">Draft note</button>
+              </li>
+            `).join("")}
+          </ul>
+        </div>
+      `
+      : "";
     contextHtml = `
       <div class="admin-decision-focused__impact">
-        <p>${escapeHtml(decision.reason)}</p>
+        <div class="admin-decision-focused__value-row">
+          <span class="admin-pill" data-tone="${escapeHtml(tierBadge.tone)}">${escapeHtml(tierBadge.label)}</span>
+          <p class="admin-decision-focused__value-summary">${escapeHtml(value.reasoning || decision.reason)}</p>
+        </div>
+        <p class="admin-muted admin-decision-focused__value-why">${escapeHtml(decision.reason)}</p>
       </div>
       ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
+      ${substitutesBlock}
     `;
-    whatHappensHtml = `
-      <ul>
-        <li><strong>Approve + lock</strong> tells Haven this entity is final. Lint won't flag it again.</li>
-        <li><strong>Open to edit</strong> brings up the entity's full detail panel so you can change fields.</li>
-        <li><strong>Cut entity</strong> removes it. Existing households keep what they already have, but new households won't see it.</li>
-      </ul>
-    `;
-    actionsHtml = `
-      <button type="button" class="admin-button admin-button--primary" data-decision-fa="approve">Approve + lock</button>
-      <button type="button" class="admin-button admin-button--secondary" data-decision-fa="open">Open to edit</button>
-      <button type="button" class="admin-button admin-button--ghost admin-button--danger" data-decision-fa="cut">Cut entity</button>
-    `;
+    if (value.tier === "low") {
+      whatHappensHtml = `
+        <ul>
+          <li><strong>Cut entity</strong> removes it. The slot opens up for a higher-value HNW service. The substitute list above is starting inspiration.</li>
+          <li><strong>Approve + lock</strong> keeps it as-is. Use this only if you've thought about it and decided it's pulling its weight.</li>
+          <li><strong>Open to edit</strong> brings up the full detail panel so you can rework the wording / cadence / cost.</li>
+        </ul>
+      `;
+      actionsHtml = `
+        <button type="button" class="admin-button admin-button--primary admin-button--danger" data-decision-fa="cut">Cut entity</button>
+        <button type="button" class="admin-button admin-button--secondary" data-decision-fa="approve">Approve + lock</button>
+        <button type="button" class="admin-button admin-button--ghost" data-decision-fa="open">Open to edit</button>
+      `;
+    } else {
+      whatHappensHtml = `
+        <ul>
+          <li><strong>Approve + lock</strong> tells Haven this entity is final. It stops surfacing here.</li>
+          <li><strong>Open to edit</strong> brings up the entity's full detail panel so you can change fields.</li>
+          <li><strong>Cut entity</strong> removes it. Existing households keep what they already have, but new households won't see it.</li>
+        </ul>
+      `;
+      actionsHtml = `
+        <button type="button" class="admin-button admin-button--primary" data-decision-fa="approve">Approve + lock</button>
+        <button type="button" class="admin-button admin-button--secondary" data-decision-fa="open">Open to edit</button>
+        <button type="button" class="admin-button admin-button--ghost admin-button--danger" data-decision-fa="cut">Cut entity</button>
+      `;
+    }
   }
 
   return `
@@ -4310,7 +4533,10 @@ function renderFocusedDecisionPanelHtml(decision) {
 function attachFocusedDecisionHandlers(decision) {
   el.decisionFocused?.querySelectorAll("[data-decision-fa]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      await handleDecisionAction(decision, btn.dataset.decisionFa);
+      // Phase 5z+16 — propose_substitute carries an index via
+      // data-substitute-idx; pass it through as the third arg so
+      // handleDecisionAction can resolve which substitute was clicked.
+      await handleDecisionAction(decision, btn.dataset.decisionFa, btn.dataset.substituteIdx);
     });
   });
 }
@@ -4391,6 +4617,46 @@ function suggestLintFix(hit) {
     label: "Ask Claude to rewrite",
     summary: `Voice rule "${hit.ruleId}" was flagged on this field. Claude will rewrite the text to comply on the next session.`,
   };
+}
+
+// Phase 5z+16 — Draft a proposal_add note recording that this slot
+// could be replaced by a higher-value HNW service. The note lives in
+// the Notes tab going forward; the original "needs review" decision
+// drops out (Phase 5z+15 dedupes against pending notes).
+async function draftSubstituteProposal(decision, substituteText) {
+  const item = decision.targetItem;
+  if (!item || !substituteText) return;
+  const body = `Replace low-value template with HNW alternative:
+
+Current: ${item.title}
+Why low-value: ${decision.valueAnalysis?.reasoning || "—"}
+
+Suggested replacement: ${substituteText}
+
+Action plan:
+1. Cut the current template (it's the slot opening up).
+2. Add the suggested replacement (or whatever variant fits the catalog).
+3. Wire it into the right system category + bundle if applicable.
+
+(Drafted from the Decisions tab → Needs review → "Higher-value swap ideas" list.)`;
+  await writeNote({
+    scopeType: item.itemType,
+    scopeId: liveEntityIdFor(item),
+    scopeTitle: item.title,
+    body,
+    intent: "proposal_add",
+    target: "claude",
+    snapshot: {
+      itemType: item.itemType,
+      payload: item.payload,
+      currentTier: decision.valueAnalysis?.tier,
+      substituteSuggested: substituteText,
+      capturedAt: new Date().toISOString(),
+    },
+  });
+  state.selectedDecision = null;
+  alert(`Substitute proposal drafted as a note. It'll show up in the Notes tab.\n\nReplacement: ${substituteText}`);
+  render();
 }
 
 // Phase 5z+15 — Smart trim for `answer-label-max-words`. Tries four
@@ -6411,21 +6677,44 @@ function itemRowHtml(item) {
       handymanBadge = `<span class="admin-pill admin-pill--library" title="Library item — opt-in via Recommended Services">🛠️ Library</span>`;
     }
   }
-  // Phase 5q — Lifecycle badge handles when-this-enters semantics
-  // (Opt-in only). Bundle children fall through to the routingBadge
-  // below, which shows the parent visit + sibling count + reason.
+  // Phase 5q/5z+16 — Lifecycle badge: explicit "what happens to this
+  // template when a homeowner finishes the quiz?" pill on every row.
+  // Tom: "we need to see also in the tasks view which ones can
+  // populate automatically after a quiz so we know which tasks show
+  // up and which ones dont."
+  //
+  // Three buckets:
+  //   ✨ Auto-seeds                 — fires for every household
+  //   ✨ Auto-seeds (conditional)   — fires only when subtype gate matches
+  //   📚 Opt-in                     — never auto-seeds; homeowner adds it
+  //
+  // Bundle children fall through to the routingBadge (which shows the
+  // parent visit + sibling count) — no separate lifecycle badge.
   let lifecycleBadge = "";
   let seasonBadge = "";
   if (["task", "recommended", "handyman"].includes(item.itemType)) {
     const t = item.payload || {};
-    if (!t.bundleId && t.isEssential === false) {
-      // Surface HOW the opt-in is offered. Handyman-category opt-ins
-      // land on the punch list "Recommended" section; everything else
-      // lands in the Recommended Services view (Phase 54C).
-      const optInSurface = t.systemCategory === "Handyman"
-        ? "Surfaced in the handyman punch list 'Recommended' section. Homeowner taps + to add it to the next handyman visit."
-        : "Surfaced in PropertyDetailView → Recommended Services. Homeowner taps + on the card to schedule it.";
-      lifecycleBadge = `<span class="admin-pill admin-pill--optin" title="${escapeHtml(optInSurface)}">Opt-in</span>`;
+    const isBundleChild = t.bundleId && !t.bundleTitle;
+    if (!isBundleChild) {
+      if (t.isEssential === false) {
+        // Opt-in — only show on Tasks (Recommended tab is implicitly
+        // all opt-in, so the badge would be noise).
+        if (state.view !== "recommended") {
+          const optInSurface = t.systemCategory === "Handyman"
+            ? "Never auto-seeds. Homeowner adds it via the handyman punch list 'Recommended' section."
+            : "Never auto-seeds. Homeowner adds it via Recommended Services on the property page.";
+          lifecycleBadge = `<span class="admin-pill admin-pill--optin" title="${escapeHtml(optInSurface)}">📚 Opt-in</span>`;
+        }
+      } else if (state.view === "tasks") {
+        // Auto-seeds — show on Tasks tab so Tom sees at a glance which
+        // templates actually fire when a homeowner finishes the quiz.
+        if (t.requiredSubtypes?.length) {
+          const subtypeList = t.requiredSubtypes.map((s) => (typeof humanizeSubtype === "function" ? humanizeSubtype(s) : s)).join(", ");
+          lifecycleBadge = `<span class="admin-pill admin-pill--autoseed-conditional" title="Auto-seeds at quiz completion only for ${escapeHtml(subtypeList)}.">✨ Auto-seeds (conditional)</span>`;
+        } else {
+          lifecycleBadge = `<span class="admin-pill admin-pill--autoseed" title="Auto-seeds at quiz completion for every household.">✨ Auto-seeds</span>`;
+        }
+      }
     }
     if (t.seasonalTiming) {
       const seasonEmoji = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️", "Spring/Fall": "🔁" }[t.seasonalTiming] || "";
