@@ -115,6 +115,15 @@ const VIEWS = [
     liveSource: "system-categories",
   },
   {
+    id: "vendors",
+    label: "Vendors",
+    type: "vendor",
+    title: "Vendor Types",
+    eyebrow: "Who shows up to do the work",
+    subtitle:
+      "Every kind of vendor the app understands — handyman, plumber, HVAC, etc. The quiz captures these in Q15b, the maintenance reconciler routes pro work to them, and the Contacts hub surfaces them as cards on the property page.",
+  },
+  {
     id: "vehicles",
     label: "Vehicles",
     type: "vehicle",
@@ -198,22 +207,116 @@ const DEFAULT_ROUTINES = [
   ["Handyman recurring", "On demand", "No default cadence", "Year-round", "handyman_recurring"],
 ];
 
+// Phase 5z+10 — Vendor type catalog. Each entry: [label, oneLineRole,
+// whatTheyHandle, whenTheyAppear, howTheyConnect]. Surfaces on the
+// Vendors tab so Tom can write notes on each vendor type with the same
+// focused-note panel as everything else.
 const DEFAULT_VENDOR_CATEGORIES = [
-  ["Handyman", "Always visible in Q15b. Stamps preferred handyman and feeds Next Handyman Visit."],
-  ["House cleaner", "Creates cleaning routine when provider is captured."],
-  ["HVAC service", "Creates HVAC service routine/program."],
-  ["Plumber", "Routes plumbing work."],
-  ["Electrician", "Routes electrical work."],
-  ["Roofer", "Routes roofing, gutter, and roof inspection work."],
-  ["Tree service", "Routes tree assessment and pruning work."],
-  ["Mosquito & tick", "Creates seasonal mosquito/tick routine."],
-  ["Snow removal", "Snow-state gated winter contract."],
-  ["Pet waste", "Pet-gated recurring pickup service."],
-  ["Septic pumper", "Visible only for septic homes."],
-  ["Well water service", "Visible only for well homes."],
-  ["Chimney sweep", "Visible when fireplace/chimney signal exists."],
-  ["Hardscape / masonry", "Visible when Q11 says mostly hardscape."],
-  ["Generator service", "Visible when generator exists."],
+  [
+    "Handyman",
+    "The catch-all pro for small home tasks the homeowner doesn't want to DIY.",
+    "Replaces light fixtures, tightens loose handles, cleans gutters, hangs shelves, batches up small repairs into one visit. Tackles a punch list of items the homeowner accumulates between bigger jobs.",
+    "Every household sees this in Q15b — handyman is universal. Spring + fall reminder cards on the dashboard nudge the homeowner to book a seasonal visit.",
+    "Punch-list items live on the Handyman tab. Homeowners add to the punch list from the Recommended Services screen or by tapping 'Add to handyman list' on a small DIY task they don't want to do themselves.",
+  ],
+  [
+    "House cleaner",
+    "Recurring cleaning service that comes weekly or biweekly.",
+    "Vacuums, dusts, kitchens, bathrooms, sometimes laundry. Cleaning is treated as a routine in the app — the homeowner sees it as a recurring rhythm rather than a list of cleaning tasks.",
+    "Captured at Q15b when the homeowner says they have a cleaner. Creates a cleaning routine automatically so the schedule shows the rhythm without per-visit friction.",
+    "Lives on the Routines tab as a 'cleaning' kind. Surfaces on the Pickup Day Banner the day before the cleaner arrives.",
+  ],
+  [
+    "HVAC service",
+    "Heating, cooling, and ventilation pro. Tunes up the system twice a year.",
+    "Spring AC tune-up, fall furnace/boiler tune-up, filter changes the homeowner doesn't want to do, mini-split servicing, ductwork inspections, refrigerant work.",
+    "Captured at Q15b. Once linked, every HVAC-related task gets reframed as 'Schedule X: spring AC tune-up' instead of 'Inspect HVAC system'.",
+    "Routes through the standard maintenance task flow. Spring + fall HVAC tasks are bundle parents — when the vendor visits, multiple sub-tasks happen in one trip.",
+  ],
+  [
+    "Plumber",
+    "Pro for water-system work — leaks, drains, fixtures, water heater service.",
+    "Annual water heater flush, fixing leaks, snaking drains, replacing fixtures, working on the main shutoff valve, addressing low pressure.",
+    "Captured at Q15b. Gas plumbers also handle gas line work in some markets.",
+    "Plumbing tasks always default to vendor (no homeowner DIY). Water heater service is an annual auto-seeded task on every household.",
+  ],
+  [
+    "Electrician",
+    "Pro for everything past the breaker panel.",
+    "Panel upgrades, GFCI/AFCI work, ceiling fan install, EV charger install, troubleshooting circuits, smoke detector hardwiring.",
+    "Captured at Q15b. Required for any task with a safety floor — homeowners are never asked to DIY panel work.",
+    "Electrical work has a hard safety floor in the maintenance reconciler — the preference tier slider can't flip these to DIY.",
+  ],
+  [
+    "Roofer",
+    "Pro for the roof and the gutters.",
+    "Annual roof inspection, replacing missing shingles, gutter cleaning + repair, flashing, ice-dam prevention, post-storm assessments.",
+    "Captured at Q15b. Universal across regions but seasonal patterns vary (Northeast = spring after winter freeze + fall before snow).",
+    "Roof inspection is a bundle parent on the spring + fall sides. Gutter cleaning is bundled into the fall handyman visit if the homeowner doesn't have a roofer on file.",
+  ],
+  [
+    "Tree service",
+    "Pro for tree health, hazard pruning, and removals.",
+    "Annual tree health assessment, pruning dead limbs, removing dangerous trees, treating disease, post-storm cleanup, stump grinding.",
+    "Captured at Q15b. Especially important in tree-heavy Northeast suburbs.",
+    "Tree templates are non-essential by default — the homeowner opts in via Recommended Services unless a problem surfaces.",
+  ],
+  [
+    "Mosquito & tick",
+    "Seasonal spraying service — typically biweekly or triweekly through warm months.",
+    "Backyard fogging or systemic treatments to keep mosquitoes and ticks down. Often paired with pet-protective programs.",
+    "Captured at Q15b. Conditional — only homes with outdoor living areas get the chip.",
+    "Creates a seasonal routine (April–October) when a vendor is captured. Surfaces on the Routines tab and the Pickup Day Banner.",
+  ],
+  [
+    "Snow removal",
+    "Plowing + salting contract for winter snow events.",
+    "Plows the driveway and walkways after each storm, salts when needed, sometimes shovels steps and porch.",
+    "Captured at Q15b. State-gated — only shows for snow-state addresses (NE/MW + cold-belt western states).",
+    "Renewal happens once a year as a fall task ('Renew snow plowing contract'). Per-event work is the vendor's job to track, not the app's.",
+  ],
+  [
+    "Pet waste",
+    "Recurring service that scoops the yard for households with dogs.",
+    "Weekly or biweekly yard cleanups. Sometimes pairs with deodorizing or composting.",
+    "Captured at Q15b. Conditional — only shows when the homeowner answered 'yes' to the pets question.",
+    "Creates a 'pet_waste' routine. Surfaces on the Pickup Day Banner the day of pickup.",
+  ],
+  [
+    "Septic pumper",
+    "Pumps the septic tank every 3 years and inspects the system.",
+    "Pumping the tank, inspecting the drain field, root removal, repairs to baffles and tees, post-flood assessments.",
+    "Captured at Q15b only for septic homes — gated on the Q7 'septic' answer.",
+    "Septic pumping is a 3-year auto-seeded task. The reconciler stamps assignment_type=vendor with safetyFloor — never DIY.",
+  ],
+  [
+    "Well water service",
+    "Pro for private well systems — pump, pressure tank, water testing.",
+    "Annual water test, pump service, pressure tank replacement, sediment filter changes, UV bulb replacement on treatment systems.",
+    "Captured at Q15b only for well homes — gated on the Q6 'well' answer.",
+    "Well templates are auto-seeded annually for any household with a well system. Sub-systems (UV, neutralizer, softener) inherit the same vendor.",
+  ],
+  [
+    "Chimney sweep",
+    "Pro for cleaning + inspecting wood and gas fireplaces.",
+    "Annual chimney sweep, creosote removal, cap inspection, masonry checks, gas log servicing for gas units.",
+    "Captured at Q15b only when fireplace or chimney signal is on the property — comes from Q9 fireplace question or invoice extraction.",
+    "Chimney sweep is a fall-anchored auto-seeded task on every fireplace household. Always vendor — there's a hard safety floor.",
+  ],
+  [
+    "Hardscape / masonry",
+    "Pro for stone, brick, paver, and concrete features.",
+    "Repointing brick, releveling pavers, sealing concrete, repairing retaining walls, post-frost-heave fixes.",
+    "Captured when the homeowner picks 'mostly hardscape' on Q11. Universal across regions; rarely auto-seeds tasks unless the homeowner reports an issue.",
+    "Hardscape work tends to live as opt-in templates in Recommended Services. The homeowner adds it when they notice a problem.",
+  ],
+  [
+    "Generator service",
+    "Pro for whole-home backup generators.",
+    "Annual service, oil + filter changes, transfer switch checks, battery replacement, end-of-season storage prep.",
+    "Captured at Q15b only when the property has a generator — comes from Q22.",
+    "Generator service is a bundle parent (annual visit, multiple sub-tasks). Always vendor with a hard safety floor — the homeowner is never asked to DIY this.",
+  ],
 ];
 
 const DEFAULT_SEARCHES = [
@@ -288,11 +391,17 @@ const state = {
   // Phase 5z+8 — Notes tab filters. `notesIntentFilter` narrows the
   // top-level notes list to a single intent (feedback / change_request /
   // proposal_add / proposal_delete / bug / idea / question_for_claude).
-  // `notesShowApplied` toggles whether applied notes show up in the list
-  // — default true so the audit trail stays visible, click "Hide applied"
-  // to focus on what's still pending. Both reset to defaults on page load.
   notesIntentFilter: "all",
-  notesShowApplied: true,
+  // Phase 5z+10 — Notes tab segmented control. "pending" shows notes
+  // that haven't been applied yet (where Claude's analysis surfaces).
+  // "applied" shows historical resolved notes (audit trail only — no
+  // analysis since the change already happened). Default to pending so
+  // the tab opens on what still needs attention.
+  notesAppliedSegment: "pending",
+  // Phase 5z+10 — When the user pulls in a fresh data refresh (window
+  // focus, refresh button, or initial load), stamp this so the
+  // "last synced" indicator can render relative time.
+  lastDataLoadAt: null,
 };
 
 function structuredCloneSafePure(value) {
@@ -369,6 +478,10 @@ const el = {
   paletteHint: document.querySelector("[data-palette-hint]"),
   // Phase 5z+9 — Focused note panel container.
   noteFocused: document.querySelector("[data-note-focused]"),
+  // Phase 5z+10 — Refresh button + last-sync indicator.
+  refreshData: document.querySelector("[data-refresh-data]"),
+  refreshTime: document.querySelector("[data-refresh-time]"),
+  refreshIndicator: document.querySelector("[data-refresh-indicator]"),
 };
 
 const paletteState = { open: false, results: [], activeIndex: 0 };
@@ -398,7 +511,21 @@ function wireEvents() {
   el.signOut.addEventListener("click", signOut);
   el.search.addEventListener("input", () => {
     state.search = el.search.value;
-    renderList();
+    // Phase 5z+10 — show/hide the clear-X based on input content.
+    const clearBtn = document.querySelector("[data-search-clear]");
+    if (clearBtn) clearBtn.hidden = !state.search;
+    // Notes tab uses renderNotesView; everything else uses renderList.
+    if (state.view === "notes") renderNotesView();
+    else renderList();
+  });
+  // Phase 5z+10 — Search clear button.
+  document.querySelector("[data-search-clear]")?.addEventListener("click", () => {
+    state.search = "";
+    el.search.value = "";
+    document.querySelector("[data-search-clear]").hidden = true;
+    if (state.view === "notes") renderNotesView();
+    else renderList();
+    el.search.focus();
   });
   el.statusFilter.addEventListener("change", () => {
     state.statusFilter = el.statusFilter.value;
@@ -406,6 +533,23 @@ function wireEvents() {
   });
   el.newItem.addEventListener("click", createNewItem);
   el.exportConfig.addEventListener("click", exportConfig);
+  // Phase 5z+10 — Refresh button + window-focus auto-refresh.
+  // Window focus refresh is debounced to once per 30 seconds so
+  // alt-tabbing doesn't hammer the CDN.
+  el.refreshData?.addEventListener("click", () => refreshAdminData("manual"));
+  let lastFocusRefresh = 0;
+  window.addEventListener("focus", () => {
+    const now = Date.now();
+    if (now - lastFocusRefresh < 30_000) return;
+    lastFocusRefresh = now;
+    refreshAdminData("focus");
+  });
+  // Update the "last synced" indicator every 15 seconds so the
+  // relative-time string ("2m ago" / "just now") stays fresh without
+  // requiring a re-render of the whole admin lab.
+  setInterval(() => {
+    if (el.refreshTime) el.refreshTime.textContent = relativeTimeString(state.lastDataLoadAt);
+  }, 15_000);
   el.saveItem.addEventListener("click", saveSelectedItem);
   el.promoteItem.addEventListener("click", promoteSelectedItem);
   el.duplicateItem.addEventListener("click", duplicateSelectedItem);
@@ -874,16 +1018,16 @@ const LIVE_SOURCES = [
   "quiz-mapper-effects",
 ];
 
-// Phase 5u — Cache-bust admin-data fetches with a per-session timestamp
-// so a fresh deploy is visible without a hard browser refresh. Tom hit
-// stale JSON multiple times after committing — Vercel's CDN +
-// browser cache combined to hold yesterday's data even after a push.
-const ADMIN_DATA_CACHE_BUST = Date.now();
-
+// Phase 5u/5z+10 — Cache-bust admin-data fetches with a per-LOAD
+// timestamp so manual refresh + window-focus auto-refresh always hit
+// origin instead of the CDN/browser cache. Tom hit stale JSON multiple
+// times after committing because Vercel's CDN + browser cache held
+// yesterday's data even after a push.
 async function loadLiveData() {
+  const cacheBust = Date.now();
   const results = await Promise.all(
     LIVE_SOURCES.map((name) =>
-      fetch(`/admin-data/${name}.json?v=${ADMIN_DATA_CACHE_BUST}`)
+      fetch(`/admin-data/${name}.json?v=${cacheBust}`, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null)
     )
@@ -891,6 +1035,44 @@ async function loadLiveData() {
   state.liveData = Object.fromEntries(
     LIVE_SOURCES.map((name, i) => [name, results[i] || { entries: [] }])
   );
+  state.lastDataLoadAt = new Date().toISOString();
+}
+
+// Phase 5z+10 — manual + auto refresh. Refetches every JSON snapshot
+// + the cloud notes table, then re-renders the current view. Tom's ask
+// was: "after Claude makes code changes the numbers should reflect
+// the new state without a hard browser refresh."
+let _refreshInFlight = false;
+async function refreshAdminData(source = "manual") {
+  if (_refreshInFlight) return;
+  _refreshInFlight = true;
+  try {
+    await loadLiveData();
+    await loadAdminData();
+    render();
+    if (source === "manual") flashRefreshIndicator();
+  } finally {
+    _refreshInFlight = false;
+  }
+}
+
+function flashRefreshIndicator() {
+  const indicator = document.querySelector("[data-refresh-indicator]");
+  if (!indicator) return;
+  indicator.classList.add("is-flashing");
+  setTimeout(() => indicator.classList.remove("is-flashing"), 600);
+}
+
+function relativeTimeString(iso) {
+  if (!iso) return "never";
+  const seconds = Math.max(0, Math.round((Date.now() - +new Date(iso)) / 1000));
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return formatDate(iso);
 }
 
 function liveItemsForView(viewId) {
@@ -1181,17 +1363,30 @@ function defaultItemsForView(viewId) {
     }));
   }
   if (viewId === "vendors") {
-    return DEFAULT_VENDOR_CATEGORIES.map((v, i) => ({
-      id: `default-vendor-${slug(v[0])}`,
-      source: "default",
-      itemType: "vendor",
-      title: v[0],
-      status: "active",
-      category: "Vendor category",
-      sortOrder: i + 1,
-      description: v[1],
-      payload: { category: v[0], currentBehavior: v[1] },
-    }));
+    // Phase 5z+10 — each vendor row carries five copy fields so the
+    // detail panel reads as a card explaining what this vendor does,
+    // when they show up, and how they connect to the rest of the app.
+    return DEFAULT_VENDOR_CATEGORIES.map((v, i) => {
+      const [label, role, handles, surfaces, connects] = v;
+      const description = [role, handles].filter(Boolean).join(" ");
+      return {
+        id: `default-vendor-${slug(label)}`,
+        source: "default",
+        itemType: "vendor",
+        title: label,
+        status: "active",
+        category: "Vendor type",
+        sortOrder: i + 1,
+        description,
+        payload: {
+          category: label,
+          role,
+          whatTheyHandle: handles,
+          whenTheyAppear: surfaces,
+          howTheyConnect: connects,
+        },
+      };
+    });
   }
   if (viewId === "searches") {
     return DEFAULT_SEARCHES.map((s, i) => ({
@@ -1255,6 +1450,9 @@ function render() {
   el.search.value = state.search;
   el.statusFilter.value = state.statusFilter;
   el.newItem.textContent = state.view === "notes" ? "Add note" : "Add item";
+  // Phase 5z+10 — keep the "last synced X ago" indicator current
+  // whenever the view re-renders (e.g. after a refresh).
+  if (el.refreshTime) el.refreshTime.textContent = relativeTimeString(state.lastDataLoadAt);
   renderNav();
 
   // Phase 4b — Preview-entire-quiz button is only relevant on the quiz view.
@@ -3455,6 +3653,7 @@ function viewIdForType(type) {
       system: "systems",
       vehicle: "vehicles",
       prompt: "prompts",
+      vendor: "vendors",
     }[type] || "quiz"
   );
 }
@@ -4095,38 +4294,46 @@ function renderNotesView() {
       .some((s) => String(s).toLowerCase().includes(query));
   };
 
-  // Phase 5z+8 — gather every search-matching top-level note BEFORE
-  // applying the intent / applied toggles, so the pill counts stay stable
-  // as Tom flips between intents (Apple Mail / Linear pattern).
+  // Phase 5z+8/+10 — gather every search-matching top-level note BEFORE
+  // applying the segment + intent filters, so the pill counts stay
+  // stable as Tom flips between buckets (Apple Mail / Linear pattern).
   const queryMatched = state.notes.filter((n) => !n.parentNoteId).filter(matchesQuery);
-  const intentCounts = countNotesByIntent(queryMatched);
-  const appliedCount = queryMatched.filter((n) => n.appliedAt).length;
-  const pendingCount = queryMatched.length - appliedCount;
+  const pendingNotes = queryMatched.filter((n) => !n.appliedAt);
+  const appliedNotes = queryMatched.filter((n) => n.appliedAt);
+  const segment = state.notesAppliedSegment === "applied" ? "applied" : "pending";
+  // Intent counts run against whichever segment is active so the pills
+  // reflect "what's available in this segment", not "what exists overall".
+  const segmentNotes = segment === "applied" ? appliedNotes : pendingNotes;
+  const intentCounts = countNotesByIntent(segmentNotes);
 
-  // Apply the intent filter + applied toggle.
+  // Apply the intent filter on top of the segment.
   const intentFilter = state.notesIntentFilter || "all";
-  const showApplied = state.notesShowApplied !== false;
-  const topLevel = queryMatched.filter((n) => {
-    if (!showApplied && n.appliedAt) return false;
+  const topLevel = segmentNotes.filter((n) => {
     if (intentFilter !== "all" && (n.intent || "feedback") !== intentFilter) return false;
     return true;
   });
 
-  // Three-tier stat row stays the same — these read against the FULL
-  // notes table (not the filtered view) so the totals don't shift as
-  // Tom narrows the list.
-  const statsHtml = `
-    <div class="admin-stats__tiles">
-      <div class="admin-stat"><strong>${queryMatched.length}</strong><span>${query ? "Matching" : "Notes"}</span></div>
-      <div class="admin-stat"><strong>${state.notes.filter((n) => !n.appliedAt && ["change_request","proposal_add","proposal_delete"].includes(n.intent)).length}</strong><span>Pending</span></div>
-      <div class="admin-stat"><strong>${state.notes.filter((n) => n.appliedAt).length}</strong><span>Applied</span></div>
+  // Phase 5z+10 — Two-segment top row replaces the old 3-tile stats +
+  // show-applied toggle. The active segment is the primary lens; intent
+  // pills narrow within it.
+  const segmentBtn = (key, label, count, sub) => {
+    const isActive = segment === key;
+    return `<button type="button" class="admin-segment ${isActive ? "is-active" : ""}" data-notes-segment="${escapeHtml(key)}">
+      <span class="admin-segment__label">${escapeHtml(label)}</span>
+      <span class="admin-segment__count">${count}</span>
+      <span class="admin-segment__sub admin-muted">${escapeHtml(sub)}</span>
+    </button>`;
+  };
+
+  const segmentRow = `
+    <div class="admin-segments">
+      ${segmentBtn("pending", "Not applied", pendingNotes.length, "Open work. Claude will analyze each one.")}
+      ${segmentBtn("applied", "Applied", appliedNotes.length, "Resolved history. No further analysis.")}
     </div>
   `;
 
-  // Phase 5z+8 — intent + applied filter row. `notesIntent` axis matches
-  // the existing `attachFacetPillHandlers` convention (state[axis+'Filter']),
-  // and the applied toggle uses its own data attribute so a single click
-  // flips state.notesShowApplied.
+  // Phase 5z+8/+10 — intent filter pills (re-using the facet-pill style)
+  // narrow the active segment to a single intent.
   const intentPill = (value, label, count, title) => {
     const isActive = intentFilter === value;
     return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""}" data-facet-axis="notesIntent" data-facet-value="${escapeHtml(value)}" title="${escapeHtml(title)}">
@@ -4140,49 +4347,39 @@ function renderNotesView() {
       <div class="admin-facet-row">
         <div class="admin-facet-row__head">
           <span class="admin-facet-row__label">Intent</span>
-          <span class="admin-facet-row__caption admin-muted">Narrow the list to a single note kind. Counts honor the search box.</span>
+          <span class="admin-facet-row__caption admin-muted">Narrow the ${segment === "applied" ? "applied" : "open"} list to a single note kind.</span>
         </div>
         <div class="admin-facet-row__pills">
-          ${intentPill("all", "All", queryMatched.length, "Show every note matching the current search.")}
-          ${intentPill("change_request", "Change request", intentCounts.change_request, "Concrete edits Tom wants Claude to apply next session — usually scoped to a quiz question, template, or routine.")}
-          ${intentPill("feedback", "Feedback", intentCounts.feedback, "Default catch-all for observations and reactions that don't ask Claude to change anything.")}
-          ${intentPill("proposal_add", "Proposal · add", intentCounts.proposal_add, "Suggested NEW entity — a missing template, system, routine, or quiz answer.")}
-          ${intentPill("proposal_delete", "Proposal · cut", intentCounts.proposal_delete, "Candidate for removal — duplicate, low-value, or orphaned entity.")}
-          ${intentPill("bug", "Bug", intentCounts.bug, "Something is broken in the app or admin lab. Usually paired with a screenshot description in the body.")}
-          ${intentPill("idea", "Idea", intentCounts.idea, "Long-horizon thinking — explore later, not next session.")}
-          ${intentPill("question_for_claude", "Question for Claude", intentCounts.question_for_claude, "Answer-first notes — Claude responds in a reply before any code change happens.")}
-        </div>
-      </div>
-      <div class="admin-facet-row admin-facet-row--grouping">
-        <div class="admin-facet-row__head">
-          <span class="admin-facet-row__label">Applied</span>
-          <span class="admin-facet-row__caption admin-muted">Already-applied notes carry the audit trail — hide them when you only want what's still open.</span>
-        </div>
-        <div class="admin-facet-row__pills">
-          <button type="button" class="admin-facet-pill ${showApplied ? "is-active" : ""}" data-notes-show-applied="true" title="Default. Show every matching note, including the ones already applied to the codebase. Applied notes carry an 'applied' pill + commit hash on hover.">
-            <span class="admin-facet-pill__label">Show applied</span>
-            <span class="admin-facet-pill__count">${appliedCount}</span>
-          </button>
-          <button type="button" class="admin-facet-pill ${!showApplied ? "is-active" : ""}" data-notes-show-applied="false" title="Hide notes that already landed in code. The list shrinks to whatever's still pending — useful when prepping the next session's worklist.">
-            <span class="admin-facet-pill__label">Hide applied (pending only)</span>
-            <span class="admin-facet-pill__count">${pendingCount}</span>
-          </button>
+          ${intentPill("all", "All", segmentNotes.length, `Show every ${segment === "applied" ? "applied" : "open"} note.`)}
+          ${intentPill("change_request", "Change request", intentCounts.change_request, "Specific edits we want made — usually attached to a quiz question, template, or routine.")}
+          ${intentPill("feedback", "Feedback", intentCounts.feedback, "Reactions and observations that don't ask for a change.")}
+          ${intentPill("proposal_add", "Proposal · add", intentCounts.proposal_add, "An idea for something new — a missing task, system, routine, or quiz answer.")}
+          ${intentPill("proposal_delete", "Proposal · cut", intentCounts.proposal_delete, "An entity that probably shouldn't be there — duplicate, low-value, or out of date.")}
+          ${intentPill("bug", "Bug", intentCounts.bug, "Something is broken. Usually paired with a screenshot.")}
+          ${intentPill("idea", "Idea", intentCounts.idea, "Bigger-picture thinking. Parked for later, not next session.")}
+          ${intentPill("question_for_claude", "Question for Claude", intentCounts.question_for_claude, "Asks for an answer first. Claude replies before any change is made.")}
         </div>
       </div>
     </div>
   `;
 
-  el.stats.innerHTML = `${statsHtml}${filtersHtml}`;
+  el.stats.innerHTML = `${segmentRow}${filtersHtml}`;
 
-  // Wire the intent pills via the existing facet handler convention,
-  // plus a dedicated handler for the applied toggle.
-  attachFacetPillHandlers(el.stats);
-  el.stats.querySelectorAll("[data-notes-show-applied]").forEach((btn) => {
+  // Wire the segment buttons + intent pills.
+  el.stats.querySelectorAll("[data-notes-segment]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.notesShowApplied = btn.dataset.notesShowApplied === "true";
+      state.notesAppliedSegment = btn.dataset.notesSegment === "applied" ? "applied" : "pending";
+      // Reset the intent filter when switching segments — counts shift
+      // and a previously-active pill might be empty in the new segment.
+      state.notesIntentFilter = "all";
+      // Drop any selected note since it may not exist in the new segment.
+      if (state.selected && (state.notesAppliedSegment === "applied") !== !!state.selected.appliedAt) {
+        state.selected = null;
+      }
       renderNotesView();
     });
   });
+  attachFacetPillHandlers(el.stats);
 
   el.list.innerHTML = topLevel.map((note) => {
     const canJump = noteCanJumpToEntity(note);
@@ -4222,9 +4419,13 @@ function renderNotesView() {
       </div>
     `;
   }).join("") || emptyListHtml(
-    queryMatched.length === 0
-      ? (query ? `No notes match "${query}".` : "No notes yet.")
-      : `No notes match the active filters. ${queryMatched.length} ${queryMatched.length === 1 ? "note" : "notes"} hidden — clear the intent pill or toggle Show applied.`
+    segmentNotes.length === 0
+      ? (query
+          ? `No ${segment === "applied" ? "applied" : "open"} notes match "${query}".`
+          : segment === "applied"
+          ? "Nothing applied yet. Notes land here once Claude or you mark them resolved."
+          : "No open notes. Add one from any entity's detail panel — or write a general note from the toolbar.")
+      : `No notes match the intent filter. ${segmentNotes.length} ${segmentNotes.length === 1 ? "note" : "notes"} in the ${segment === "applied" ? "applied" : "open"} bucket — click All to see them.`
   );
 
   // Phase 5z+3 — Wire row-level delete buttons (separate from the row
@@ -4262,15 +4463,19 @@ function renderNotesView() {
     el.noteFocused?.classList.add("is-hidden");
     el.emptyDetail.classList.remove("is-hidden");
     el.detail.classList.add("is-hidden");
-    const filterIsActive = intentFilter !== "all" || !showApplied;
+    const filterIsActive = intentFilter !== "all";
     el.emptyDetail.querySelector("h3").textContent = query
       ? `${topLevel.length} note${topLevel.length === 1 ? "" : "s"} matching "${query}"`
       : filterIsActive
-      ? `${topLevel.length} of ${queryMatched.length} note${queryMatched.length === 1 ? "" : "s"} shown.`
+      ? `${topLevel.length} of ${segmentNotes.length} ${segment === "applied" ? "applied" : "open"} note${segmentNotes.length === 1 ? "" : "s"} shown.`
+      : segment === "applied"
+      ? "Pick an applied note to read its history."
       : "Pick a note to read it.";
     el.emptyDetail.querySelector("p").textContent = query
-      ? "Click any matching note to open it on the right. Search clears when you switch surfaces or hit Esc."
-      : "Click any note to open it in the focused panel. You'll see the body, the entity it's attached to, Claude's analysis (impact / validity / better approach), and inline edit / delete / mark-applied / reply controls — all without leaving this tab. Use the View entity link inside the panel if you need to jump.";
+      ? "Click any matching note to open it on the right."
+      : segment === "applied"
+      ? "Applied notes are the audit trail of changes Claude has made. Click one to see what changed and when. No analysis on these — the change already happened."
+      : "Click any note to open it. You'll see the body, the entity it's about, Claude's read on whether the feedback is good and what would happen if we apply it, plus controls to edit, delete, mark applied, or reply — all in one place.";
   }
 }
 
@@ -4449,14 +4654,27 @@ function renderFocusedNotePanelHtml(note, entityItem, analysis) {
         </div>
       ` : ""}
 
-      <!-- 3. Claude's analysis. -->
-      <div class="admin-note-focused__section admin-note-focused__section--analysis">
-        <div class="admin-note-focused__section-head">
-          <h4>Analysis</h4>
-          <span class="admin-muted admin-note-focused__analysis-source">Heuristic. Cross-references current admin data.</span>
+      <!-- 3. Claude's analysis (Not Applied notes only) OR historical
+           card (Applied / Reverted notes). The split keeps the analysis
+           focused on what's still pending, per Tom's ask: "you only give
+           your feedback on the not applied changes so that we can figure
+           out what the impacts are what actually happens." -->
+      ${(!isApplied && !isReverted) ? `
+        <div class="admin-note-focused__section admin-note-focused__section--analysis">
+          <div class="admin-note-focused__section-head">
+            <h4>Claude's read</h4>
+            <span class="admin-muted admin-note-focused__analysis-source">Plain-English summary. Cross-checks current data.</span>
+          </div>
+          ${analysisCardHtml(analysis)}
         </div>
-        ${analysisCardHtml(analysis)}
-      </div>
+      ` : `
+        <div class="admin-note-focused__section admin-note-focused__section--history">
+          <div class="admin-note-focused__section-head">
+            <h4>${isReverted ? "Reverted" : "Applied"}</h4>
+          </div>
+          ${historicalCardHtml(note)}
+        </div>
+      `}
 
       <!-- 4. Replies + reply input. -->
       <div class="admin-note-focused__section">
@@ -4569,121 +4787,160 @@ function attachFocusedNoteHandlers(note, entityItem, analysis) {
   });
 }
 
-// Heuristic note analyzer. Inspects the note's intent + scope + body and
-// cross-references it against current admin data (state.notes,
-// state.adminItems, state.liveData) to produce:
+// =============================================================================
+// Phase 5z+10 — Plain-English note analyzer
+// =============================================================================
 //
-//   {
-//     validity:    { tier: "high" | "medium" | "low", reasons: [string] },
-//     impact:      [string],            // bullet points
-//     blastRadius: { label: string, count: number }[],
-//     alternative: { headline: string, body: string } | null,
-//   }
+// Tom's ask: "Your replies/feedback should be more focused on the feedback
+// itself and if it is good/bad and why. keep it in english and not too
+// technical remember we want normal people to be able to read this that
+// know our app but not the deep technical parts of it."
 //
-// All counts are computed off the data already loaded into state — no
-// extra DB calls. This is intentionally a heuristic engine, not an LLM
-// call: deterministic, fast, runs offline. The analyzer can be upgraded
-// later to also call an edge function if Tom wants live AI analysis.
+// Returns four parts:
+//
+//   verdict     — short line: is this feedback good / soft / unclear?
+//                 + one paragraph saying why.
+//   ifApplied   — what would actually happen if we made this change?
+//                 Plain English, business framing. No code names.
+//   reach       — how many other things does this touch? Friendly counts.
+//                 e.g. "12 other tasks in Plumbing", "6 households if
+//                 we already shipped this".
+//   alternative — when there's a smarter way, suggest it. null otherwise.
+//
+// Only invoked on Not Applied notes — applied notes show a historical
+// card instead. The split keeps Claude's brain on what's still pending,
+// per "you only give your feedback on the not applied changes so that we
+// can figure out what the impacts are what actually happens."
+
 function analyzeNote(note, entityItem) {
   const intent = note.intent || "feedback";
-  const body = (note.body || "").toLowerCase();
+  const body = note.body || "";
+  const lower = body.toLowerCase();
   const wordCount = (body.match(/\S+/g) || []).length;
-  const reasons = [];
-  const impact = [];
-  const blastRadius = [];
+  const ifApplied = [];
+  const reach = [];
   let alternative = null;
-  let tier = "medium";
 
-  // --- Validity heuristics ---
-  // Low signal: very short body OR no scope OR empty.
+  // --- Verdict ---
+  // Plain-English read on whether the feedback is solid, useful, or thin.
+  // Frame: did Tom give us enough to act on cleanly?
+  const verdictParts = [];
+  let tier = "medium";
+  let verdictHeadline = "Worth a read";
+
   if (wordCount < 6) {
     tier = "low";
-    reasons.push(`Body is short (${wordCount} word${wordCount === 1 ? "" : "s"}). Concrete asks usually run 20+ words with file paths or specific values.`);
-  } else if (wordCount > 35) {
-    reasons.push(`Body has ${wordCount} words — substantive enough to act on.`);
-  }
-  if (!note.scopeType || note.scopeType === "general") {
-    reasons.push("No entity scope — Claude has to infer where this lands. Scoped notes are easier to apply mechanically.");
-    if (tier !== "low") tier = "medium";
+    verdictHeadline = "Could use more detail";
+    verdictParts.push("This is short. Concrete asks usually need a sentence or two so we can act without guessing.");
+  } else if (wordCount > 50) {
+    verdictParts.push("Substantive — enough detail to act on.");
   } else {
-    reasons.push(`Scoped to a ${note.scopeType} (${note.scopeTitle || note.scopeId || "—"}). Snapshot captured on save.`);
-  }
-  // Specific signals — file paths, code references, before/after values.
-  if (/\.(swift|ts|tsx|js|md|sql|json)\b/.test(body) || /[A-Z][a-zA-Z0-9]+\.swift/.test(note.body || "")) {
-    reasons.push("Mentions specific file paths — easier for Claude to find the right place.");
-    if (tier === "low") tier = "medium";
-    else tier = "high";
-  }
-  if (/\bbefore:|\bafter:|\bfrom:|\bto:|→|->/.test(body)) {
-    reasons.push("Includes before/after or transformation hints — mechanical fix possible.");
-    if (tier !== "high") tier = "high";
-  }
-  if (note.proposedDiff) {
-    reasons.push("Has a structured proposed_diff — fully mechanical.");
-    tier = "high";
-  }
-  if (note.appliedAt) {
-    reasons.push(`Already applied ${formatDate(note.appliedAt)}${note.appliedCommit ? ` (commit ${note.appliedCommit.slice(0, 7)})` : ""}. No further action needed unless reverted.`);
+    verdictParts.push("Reasonable detail — Claude can usually act on this without going back for clarification.");
   }
 
-  // --- Intent-specific impact + alternatives ---
+  if (!note.scopeType || note.scopeType === "general") {
+    verdictParts.push("Not attached to a specific thing yet. Pin it to a quiz question, task template, routine, or vendor type from that entity's detail panel — that makes it much easier to act on.");
+    if (tier !== "low") tier = "medium";
+  } else {
+    const friendlyScope = friendlyScopeLabel(note.scopeType);
+    verdictParts.push(`Attached to ${friendlyScope === "vendor" ? "a vendor type" : `a ${friendlyScope}`} (${note.scopeTitle || "—"}) — Claude knows exactly where to make the change.`);
+    if (tier === "low") tier = "medium";
+  }
+
+  // High-signal patterns — file paths, before/after, screenshot, structured diff.
+  const mentionsFile = /\.(swift|ts|tsx|js|md|sql|json)\b/.test(lower) || /[A-Z][a-zA-Z0-9]+\.swift/.test(body);
+  const hasTransformation = /\bbefore:|\bafter:|\bfrom:|\bto:|→|->|"[^"]+"\s*(?:to|→|->)\s*"[^"]+"/i.test(body);
+  const hasAttachment = (note.attachmentUrls?.length || note.snapshot?.attachment_urls?.length || 0) > 0;
+  if (mentionsFile) {
+    verdictParts.push("Names specific files — easy to find the right spot.");
+    tier = tier === "low" ? "medium" : "high";
+  }
+  if (hasTransformation) {
+    verdictParts.push("Spells out what to change to what — an exact swap is possible.");
+    tier = "high";
+  }
+  if (note.proposedDiff) {
+    verdictParts.push("Includes a structured patch — Claude can apply it without guessing.");
+    tier = "high";
+  }
+  if (hasAttachment && intent === "bug") {
+    verdictParts.push("Includes a screenshot — that gives us a lot to go on.");
+    tier = tier === "low" ? "medium" : "high";
+  }
+
+  // Is the ask validly aligned with the entity? E.g. asking to delete an
+  // entity that has live dependents is suspicious.
+  if (intent === "proposal_delete" && entityItem) {
+    const t = entityItem.payload || {};
+    const hasBundleChildren = t.bundleTitle && state.adminItems.some((i) => i.payload?.bundleId === t.bundleId && !i.payload?.bundleTitle);
+    if (hasBundleChildren) {
+      verdictParts.push("Heads up: this entity has sub-tasks rolled up under it. Removing it leaves them without a home — see the alternative below.");
+    }
+  }
+
+  if (tier === "high") {
+    verdictHeadline = "Strong ask";
+  } else if (tier === "medium") {
+    verdictHeadline = verdictHeadline === "Could use more detail" ? "Could use more detail" : "Worth a read";
+  }
+
+  // --- "If we apply this, here's what happens" ---
   switch (intent) {
     case "change_request": {
-      impact.push("Claude reads this on next session start and applies the requested change.");
+      ifApplied.push("On Claude's next pass through the code, this change gets made.");
       if (entityItem) {
         const t = entityItem.payload || {};
         if (note.scopeType === "task" || note.scopeType === "handyman" || note.scopeType === "recommended") {
-          if (t.bundleId && t.bundleTitle) {
-            impact.push(`This is a bundle PARENT (${escapeHtml(t.bundleTitle)}). Editing it changes the homeowner-facing visit name, not just one row.`);
-            alternative = {
-              headline: "Edit the bundle parent vs. all children",
-              body: "If the change is just a copy tweak, edit the parent. If it's structural (e.g. dropping a child item), edit the children list directly so the bundle's notes-checklist stays in sync.",
-            };
+          if (t.bundleTitle) {
+            ifApplied.push(`This is a seasonal visit that bundles several individual chores together. The homeowner sees one scheduled task — "${t.bundleTitle}" — that covers all of them. Editing this changes what they see in their calendar.`);
           } else if (t.bundleId) {
-            impact.push(`Bundle child of ${escapeHtml(t.bundleId)} — homeowners never see this row directly. Edits surface in the parent visit's "What's included:" checklist.`);
+            ifApplied.push("This chore is rolled up inside a larger seasonal visit. Homeowners never see it as its own task — it shows up in the 'What's included' checklist on the parent visit.");
           }
           if (t.requiredSubtypes?.length) {
-            impact.push(`Gated on requiredSubtypes: ${t.requiredSubtypes.map(escapeHtml).join(", ")}. Only households satisfying these flags receive this template.`);
+            ifApplied.push(`Only homes that match certain conditions get this task (${t.requiredSubtypes.map(humanizeSubtype).join(", ")}). Other households won't see it at all.`);
           }
-          if (t.assignmentType) {
-            impact.push(`Assignment type: ${escapeHtml(t.assignmentType)}. ${
-              t.assignmentType === "vendor"
-                ? "Always pro — gas, panel, septic, generator. Reframed at runtime to 'Schedule [Vendor]: …'."
-                : t.assignmentType === "personal"
-                ? "DIY only. Hard floor — Q36 preference tier can't flip it."
-                : "Defaults to personal but Q36 + delegation sheet can flip to vendor."
-            }`);
+          if (t.assignmentType === "vendor") {
+            ifApplied.push("Always done by a pro — never DIY-ed. The homeowner sees it as 'Schedule X: …' once their vendor is on file.");
+          } else if (t.assignmentType === "personal") {
+            ifApplied.push("DIY-only — the homeowner does this themselves. The Q36 preference slider can't flip it to a pro.");
+          } else if (t.assignmentType === "either") {
+            ifApplied.push("Defaults to DIY but the homeowner can hand it off to a pro. Q36 preference + the delegation sheet can flip it.");
+          }
+          if (t.isEssential === false) {
+            ifApplied.push("This is opt-in — never auto-added. The homeowner picks it up from Recommended Services or the handyman punch list.");
           }
         } else if (note.scopeType === "routine") {
-          impact.push("Routine changes propagate to every existing routine_visit and to any maintenance_tasks parented under it.");
+          ifApplied.push("Changing this routine updates every household using it. Tasks parented under it on people's calendars also update.");
         } else if (note.scopeType === "question") {
-          impact.push("Quiz question changes affect every property's house_quiz_state on next quiz reopen. Existing answers may need a hydration shim.");
+          ifApplied.push("Anyone in the middle of taking the quiz might see this question shift. Their previous answers may need a one-time fix-up to stay aligned.");
         } else if (note.scopeType === "system") {
-          impact.push("System category changes affect SystemCategoryRegistry + every home_systems row that matched on the old key.");
+          ifApplied.push("Changing a system category affects every household that has this system on file.");
+        } else if (note.scopeType === "vendor") {
+          ifApplied.push("Vendor type changes affect Q15b in the quiz, the maintenance task router, and the Contacts hub on the property page.");
         }
       } else {
-        impact.push("Without a scoped entity, Claude has to infer the target from the body. Add a scope on the entity's detail panel for a cleaner apply.");
+        ifApplied.push("Because this isn't pinned to a specific entity, Claude will read the body and try to figure out where it belongs. Pinning it to the right thing makes the change safer.");
       }
-      // Body keyword detection.
-      if (/delete|remove|drop|cut|kill/.test(body)) {
-        impact.push("Body suggests a DELETE/CUT — review the dependents in the entity preview before applying.");
+      // Body keyword detection — surface intent inferred from words used.
+      if (/\b(delete|remove|drop|cut|kill)\b/.test(lower) && !/drop[-\s]?off/.test(lower)) {
+        ifApplied.push("The wording suggests removal. Worth checking what depends on this entity before applying — see Reach below.");
       }
-      if (/rename|relabel|reword|change.*to/.test(body)) {
-        impact.push("Body suggests a RENAME — Claude will preserve stableId / templateKey if relevant so existing rows don't get duplicated.");
+      if (/\b(rename|relabel|reword|change.*to)\b/.test(lower)) {
+        ifApplied.push("The wording suggests a rename. Claude will preserve the underlying ID so existing households keep their data.");
       }
-      if (/merge|combine|fold/.test(body)) {
-        impact.push("Body suggests a MERGE — Claude will keep the more-recent / better-described row and archive the other.");
+      if (/\b(merge|combine|fold)\b/.test(lower)) {
+        ifApplied.push("The wording suggests merging two things. Claude will keep the better one and archive the other.");
       }
       break;
     }
     case "proposal_add": {
-      impact.push("Claude evaluates the proposal next session and creates the new entity if it survives review.");
+      ifApplied.push("Claude evaluates the proposal on the next pass — if the idea holds up, the new entity gets added.");
       if (note.scopeType && entityItem) {
-        impact.push(`Proposal anchored on existing ${escapeHtml(note.scopeType)} — useful as a sibling/template reference.`);
+        ifApplied.push(`Anchored on an existing ${friendlyScopeLabel(note.scopeType)} — Claude can model the new one after this template's shape.`);
       }
-      // Look for similar existing entities to suggest a merge.
+      // Look for similar existing entities to suggest a merge instead.
       if (state.adminItems.length && note.body) {
-        const tokens = (note.body || "").toLowerCase().split(/\s+/).filter((t) => t.length > 4);
+        const tokens = lower.split(/\s+/).filter((t) => t.length > 4);
         const candidates = state.adminItems
           .filter((i) => i.id !== note.scopeId)
           .map((i) => {
@@ -4696,8 +4953,8 @@ function analyzeNote(note, entityItem) {
           .slice(0, 3);
         if (candidates.length) {
           alternative = {
-            headline: "Similar existing entities — consider merging",
-            body: `Found ${candidates.length} entity title${candidates.length === 1 ? "" : "s"} with token overlap: ${candidates.map((c) => `"${c.item.title}"`).join(", ")}. If the proposed addition is a near-duplicate of one of these, an edit is cheaper than a new entity.`,
+            headline: "Maybe edit one of these instead?",
+            body: `${candidates.length} similar thing${candidates.length === 1 ? "" : "s"} already in the app: ${candidates.map((c) => `"${c.item.title}"`).join(", ")}. If your idea overlaps with any of them, editing the existing one is usually cleaner than adding a new one. Adds blur the catalog over time; edits sharpen it.`,
           };
         }
       }
@@ -4707,133 +4964,206 @@ function analyzeNote(note, entityItem) {
       if (entityItem) {
         const t = entityItem.payload || {};
         if (note.scopeType === "task" || note.scopeType === "recommended" || note.scopeType === "handyman") {
-          if (t.bundleId && t.bundleTitle) {
-            // Bundle parent
+          if (t.bundleTitle) {
             const childCount = state.adminItems.filter((i) => i.payload?.bundleId === t.bundleId && !i.payload?.bundleTitle).length;
-            impact.push(`Deleting this bundle parent would orphan ${childCount} bundle child template${childCount === 1 ? "" : "s"}.`);
-            blastRadius.push({ label: "bundle children orphaned", count: childCount });
+            ifApplied.push(`Removing this seasonal visit leaves ${childCount} sub-task${childCount === 1 ? "" : "s"} without a home. They'd either need to be deleted too or moved into another visit.`);
+            reach.push({ label: "sub-tasks affected", count: childCount });
             alternative = {
-              headline: "Archive the bundle, don't delete it",
-              body: `Setting isEssential: false on the parent stops auto-seeding while keeping the children intact. Existing households keep their already-scheduled bundle tasks.`,
+              headline: "Try opt-in instead of removing",
+              body: "Mark it as opt-in (it stops auto-adding to new households but stays available in Recommended Services). Existing households keep what they already have. If it really needs to disappear, do that in a follow-up after seeing the opt-in numbers.",
             };
-            tier = tier === "high" ? "medium" : tier; // delete-with-children isn't high signal
           } else {
-            impact.push("Single template delete — homeowner schedules will skip this on next reconcile.");
+            ifApplied.push("Single template removed — won't show up on new household schedules. Existing tasks stay until they're completed or archived.");
           }
         } else if (note.scopeType === "question") {
-          impact.push("Deleting a quiz question silently changes the quiz progress numbers for every in-flight household.");
+          ifApplied.push("Removing a quiz question changes the question count for every in-flight household. Their progress bar might jump or their answers above might re-flow.");
           alternative = {
-            headline: "Hide before delete",
-            body: "Set the question to status: 'cut' first so it stops appearing in the quiz but the answers stay readable for analytics. Hard delete on next migration.",
+            headline: "Hide it before deleting",
+            body: "Mark the question as 'cut' first so it stops appearing but the existing answers stay readable for analytics. Hard delete in a later cleanup pass after we're sure nothing references it.",
           };
+        } else if (note.scopeType === "vendor") {
+          ifApplied.push("Removing a vendor type means the Q15b chip disappears for new households and any tasks that route to this vendor will lose their default assignee.");
         }
       }
-      impact.push("Hard delete is irreversible. The audit trail (this note) is the only record of why.");
+      ifApplied.push("Once it's gone, it's gone. This note will be the only record of why we removed it.");
       break;
     }
     case "bug": {
-      impact.push("Claude treats this as a defect to reproduce and fix on next session.");
-      if (note.attachmentUrls?.length || note.snapshot?.attachment_urls?.length) {
-        reasons.push("Has screenshot attachments — high signal.");
-        if (tier !== "high") tier = "high";
-      } else {
-        reasons.push("No screenshot attached — adding one improves repro.");
+      ifApplied.push("Claude tries to reproduce and fix this in the next pass.");
+      if (!hasAttachment) {
+        ifApplied.push("Adding a screenshot would help reproduce it.");
       }
       if (entityItem) {
-        impact.push(`Reproduction surface: ${escapeHtml(note.scopeType)} → ${escapeHtml(entityItem.title || note.scopeTitle || "—")}.`);
+        ifApplied.push(`The likely place to look: ${friendlyScopeLabel(note.scopeType)} → "${entityItem.title || note.scopeTitle || "—"}".`);
       }
       break;
     }
     case "idea": {
-      impact.push("Long-horizon. Saved for later review — Claude won't act on this next session.");
-      tier = "medium";
+      ifApplied.push("Parked for later thinking. Claude won't act on this next session — it's here for when we revisit the bigger direction.");
       break;
     }
     case "question_for_claude": {
-      impact.push("Claude responds via a reply on this note before any code change.");
-      if (note.appliedAt) {
-        impact.push("Already answered (applied_at set).");
-      }
-      tier = "high";
+      ifApplied.push("Claude will answer this in a reply — no code changes happen until we agree on the answer.");
       break;
     }
     case "feedback":
     default: {
-      impact.push("Observation only. No mechanical change unless followed up with a change_request note.");
-      tier = tier === "high" ? "medium" : tier; // feedback is rarely high signal
+      ifApplied.push("Observation only. Nothing happens automatically — if you want a change made, switch the intent to 'Change request' or write a follow-up note.");
       break;
     }
   }
 
-  // --- Blast radius (notes + cross-references) ---
-  // Notes already on this entity (siblings).
+  // --- Reach (cross-references in plain English) ---
+  // Sibling notes on the same entity.
   if (note.scopeId) {
     const siblings = state.notes.filter((n) => n.scopeId === note.scopeId && n.id !== note.id && !n.parentNoteId);
-    if (siblings.length) blastRadius.push({ label: `other notes on this entity`, count: siblings.length });
+    if (siblings.length) reach.push({ label: `other note${siblings.length === 1 ? "" : "s"} on the same thing`, count: siblings.length });
   }
   // Replies on this note.
   const replyCount = state.notes.filter((n) => n.parentNoteId === note.id).length;
-  if (replyCount) blastRadius.push({ label: `replies`, count: replyCount });
-  // Templates sharing systemCategory (for task / recommended / handyman scopes).
+  if (replyCount) reach.push({ label: `repl${replyCount === 1 ? "y" : "ies"} on this note`, count: replyCount });
+  // Templates sharing the same category.
   if (entityItem?.payload?.systemCategory) {
     const cat = entityItem.payload.systemCategory;
     const same = state.adminItems.filter((i) => i.payload?.systemCategory === cat && i.id !== entityItem.id).length;
-    if (same) blastRadius.push({ label: `other templates in ${cat}`, count: same });
+    if (same) reach.push({ label: `other tasks in the ${cat} category`, count: same });
   }
   // Bundle siblings.
-  if (entityItem?.payload?.bundleId) {
+  if (entityItem?.payload?.bundleId && !entityItem.payload?.bundleTitle) {
     const bundle = entityItem.payload.bundleId;
     const siblings = state.adminItems.filter((i) => i.payload?.bundleId === bundle && i.id !== entityItem.id).length;
-    if (siblings) blastRadius.push({ label: `bundle siblings (${bundle})`, count: siblings });
+    const friendly = bundle.replace(/Handyman:/, "").replace(/[_-]/g, " ").trim() || bundle;
+    if (siblings) reach.push({ label: `other items in the ${friendly} visit`, count: siblings });
   }
 
-  return { validity: { tier, reasons }, impact, blastRadius, alternative };
+  return {
+    verdict: { tier, headline: verdictHeadline, reasons: verdictParts },
+    ifApplied,
+    reach,
+    alternative,
+  };
+}
+
+// Phase 5z+10 — translate scope_type values into noun phrases normal
+// users recognize. Keeps the analyzer text out of code-jargon land.
+function friendlyScopeLabel(scopeType) {
+  return (
+    {
+      question: "quiz question",
+      task: "maintenance task",
+      handyman: "handyman item",
+      recommended: "recommended service",
+      routine: "routine",
+      system: "home system",
+      vehicle: "vehicle prompt",
+      prompt: "AI prompt",
+      vendor: "vendor",
+    }[scopeType] || scopeType || "thing"
+  );
+}
+
+// Phase 5z+10 — translate raw subtype tokens into human phrases.
+// "has_pool" → "homes with a pool", "has_well" → "homes on well water",
+// etc. Falls back to the raw token if unknown.
+function humanizeSubtype(token) {
+  const map = {
+    has_pool: "homes with a pool",
+    has_hot_tub: "homes with a hot tub",
+    has_septic: "homes on septic",
+    has_well: "homes on well water",
+    has_solar: "homes with solar",
+    has_generator: "homes with a generator",
+    has_pets: "homes with pets",
+    has_humidifier: "homes with whole-home humidifiers",
+    has_ev_charger: "homes with EV chargers",
+    has_leak_detector: "homes with smart leak detectors",
+    has_central_vacuum: "homes with central vacuum",
+    has_built_in_grill: "homes with a built-in grill",
+    has_outdoor_lighting: "homes with outdoor lighting",
+    has_radon_mitigation: "homes with radon mitigation",
+    has_pool_safety_fence: "homes with a pool safety fence",
+    has_scheduled_valuables: "homes with scheduled valuables coverage",
+    pool_chlorine: "chlorine pools",
+    pool_salt: "salt pools",
+    natural: "homes with natural lawn",
+    synthetic_turf: "homes with synthetic turf",
+    hardscape: "mostly-hardscape yards",
+    has_irrigation: "homes with irrigation",
+    has_fireplace_wood: "homes with a wood fireplace",
+    has_fireplace_gas: "homes with a gas fireplace",
+    has_chimney: "homes with a chimney",
+  };
+  return map[token] || token.replace(/^has_/, "").replace(/_/g, " ");
 }
 
 function entityPreviewCardHtml(item, note) {
+  // Phase 5z+10 — friendly labels + value translation. Replaces raw
+  // field names like "templateKey" / "requiredSubtypes" / "bundleId"
+  // with phrases a non-engineer reads at a glance ("Internal ID",
+  // "Only for homes with...", "Part of bundle"). Keeps the row dense
+  // but readable.
   const t = item.payload || {};
   const rows = [];
-  const push = (k, v) => {
-    if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) return;
-    const display = Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "yes" : "no") : String(v);
-    rows.push(`<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(display)}</dd>`);
+  const push = (label, rawValue, transform) => {
+    if (rawValue === undefined || rawValue === null || rawValue === "" || (Array.isArray(rawValue) && rawValue.length === 0)) return;
+    let display;
+    if (transform) {
+      display = transform(rawValue);
+    } else if (Array.isArray(rawValue)) {
+      display = rawValue.join(", ");
+    } else if (typeof rawValue === "boolean") {
+      display = rawValue ? "Yes" : "No";
+    } else {
+      display = String(rawValue);
+    }
+    rows.push(`<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(display)}</dd>`);
   };
-  push("title", item.title);
-  push("status", item.status);
-  push("category", item.category);
-  // Type-specific fields.
+  // Per-scope field rendering with humanized labels + values.
   if (note.scopeType === "task" || note.scopeType === "handyman" || note.scopeType === "recommended") {
-    push("templateKey", t.templateKey);
-    push("frequency", t.frequency);
-    push("seasonalTiming", t.seasonalTiming);
-    push("assignmentType", t.assignmentType);
-    push("isEssential", t.isEssential !== false);
-    push("requiredSubtypes", t.requiredSubtypes);
-    push("bundleId", t.bundleId);
-    push("bundleTitle", t.bundleTitle);
-    push("diyEffortMinutes", t.diyEffortMinutes);
-    push("safetyFloor", t.safetyFloor);
+    push("Category", t.systemCategory || item.category);
+    push("How often", t.frequency);
+    push("Time of year", t.seasonalTiming);
+    push("Who handles it", t.assignmentType, (v) => ({
+      vendor: "A pro (always — never DIY)",
+      personal: "Homeowner (DIY only)",
+      either: "Either / depends on preference",
+    }[v] || v));
+    push("Auto-added on quiz?", t.isEssential !== false ? "Yes — every household that qualifies" : "No — homeowner opts in");
+    push("Only for homes with…", t.requiredSubtypes, (v) => v.map(humanizeSubtype).join(" · "));
+    if (t.bundleTitle) {
+      push("Seasonal visit", t.bundleTitle);
+    } else if (t.bundleId) {
+      push("Part of visit", t.bundleId.replace(/Handyman:/, "").replace(/[_-]/g, " "));
+    }
+    if (t.diyEffortMinutes) push("DIY effort", `~${t.diyEffortMinutes} min`);
+    if (t.safetyFloor) push("Safety required?", "Yes — must be a pro");
+    push("Internal ID", t.templateKey);
   } else if (note.scopeType === "routine") {
-    push("routine_kind", t.routineKind || t.routine_kind);
-    push("cadence", t.cadenceType || t.cadence_type);
-    push("active_months", t.activeMonths || t.active_months);
-    push("setup_state", t.setupState || t.setup_state);
+    push("Kind", t.routineKind || t.routine_kind);
+    push("Cadence", t.cadenceType || t.cadence_type);
+    push("Active months", t.activeMonths || t.active_months);
+    push("Setup state", t.setupState || t.setup_state);
   } else if (note.scopeType === "question") {
-    push("questionId", t.questionId || t.id);
-    push("kind", t.kind);
-    push("prompt", t.prompt || t.text);
-    if (t.options?.length) push("options", t.options.length + " options");
+    push("Question ID", t.questionId || t.id);
+    push("Kind", t.kind);
+    if (t.prompt || t.text) push("Prompt", (t.prompt || t.text).slice(0, 200) + ((t.prompt || t.text).length > 200 ? "…" : ""));
+    if (t.options?.length) push("Choices", `${t.options.length} options`);
   } else if (note.scopeType === "system") {
-    push("categoryKey", t.categoryKey);
-    push("tier", t.tier);
-    push("priority", t.priority);
+    push("Internal key", t.categoryKey);
+    push("Tier", t.tier);
+    push("Priority", t.priority);
   } else if (note.scopeType === "vehicle") {
-    push("make", t.make);
-    push("model", t.model);
-    push("year", t.year);
+    push("Make", t.make);
+    push("Model", t.model);
+    push("Year", t.year);
   } else if (note.scopeType === "prompt") {
-    push("functionName", t.functionName);
-    push("description", t.description);
+    push("Function", t.functionName);
+    push("Description", t.description);
+  } else if (note.scopeType === "vendor") {
+    if (t.role) push("Role", t.role);
+    if (t.whatTheyHandle) push("What they handle", t.whatTheyHandle);
+    if (t.whenTheyAppear) push("When they appear", t.whenTheyAppear);
+    if (t.howTheyConnect) push("How they connect", t.howTheyConnect);
   }
   return `
     <div class="admin-note-focused__entity">
@@ -4847,34 +5177,38 @@ function entityPreviewCardHtml(item, note) {
 }
 
 function analysisCardHtml(analysis) {
-  const tierLabel = { high: "High signal", medium: "Medium signal", low: "Low signal" }[analysis.validity.tier] || "Medium signal";
-  const tierTone = { high: "active", medium: "draft", low: "cut" }[analysis.validity.tier] || "draft";
+  // Phase 5z+10 — Verdict tier mapping. Plain-English labels Tom's HNW
+  // operators read at a glance. Tone maps into the existing pill palette.
+  const tierLabel = { high: "Strong ask", medium: "Worth a read", low: "Could use more detail" }[analysis.verdict.tier] || "Worth a read";
+  const tierTone = { high: "active", medium: "draft", low: "cut" }[analysis.verdict.tier] || "draft";
   return `
     <div class="admin-note-focused__analysis">
-      <div class="admin-note-focused__analysis-row">
-        <strong>Validity</strong>
-        <span class="admin-pill" data-tone="${escapeHtml(tierTone)}">${escapeHtml(tierLabel)}</span>
-      </div>
-      ${analysis.validity.reasons.length ? `
-        <ul class="admin-note-focused__analysis-list">
-          ${analysis.validity.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}
-        </ul>
-      ` : ""}
-
-      ${analysis.impact.length ? `
-        <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block">
-          <strong>If applied</strong>
+      <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block">
+        <div class="admin-note-focused__analysis-headline">
+          <strong>${escapeHtml(analysis.verdict.headline)}</strong>
+          <span class="admin-pill" data-tone="${escapeHtml(tierTone)}">${escapeHtml(tierLabel)}</span>
+        </div>
+        ${analysis.verdict.reasons.length ? `
           <ul class="admin-note-focused__analysis-list">
-            ${analysis.impact.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}
+            ${analysis.verdict.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}
+          </ul>
+        ` : ""}
+      </div>
+
+      ${analysis.ifApplied.length ? `
+        <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block">
+          <strong>If we apply this</strong>
+          <ul class="admin-note-focused__analysis-list">
+            ${analysis.ifApplied.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}
           </ul>
         </div>
       ` : ""}
 
-      ${analysis.blastRadius.length ? `
+      ${analysis.reach.length ? `
         <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block">
-          <strong>Blast radius</strong>
+          <strong>What else this touches</strong>
           <div class="admin-note-focused__blast">
-            ${analysis.blastRadius.map((b) => `
+            ${analysis.reach.map((b) => `
               <span class="admin-note-focused__blast-pill">
                 <strong>${b.count}</strong>
                 <span>${escapeHtml(b.label)}</span>
@@ -4886,11 +5220,48 @@ function analysisCardHtml(analysis) {
 
       ${analysis.alternative ? `
         <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block admin-note-focused__alternative">
-          <strong>Better approach?</strong>
+          <strong>A better approach?</strong>
           <p><strong>${escapeHtml(analysis.alternative.headline)}</strong></p>
           <p class="admin-muted">${escapeHtml(analysis.alternative.body)}</p>
         </div>
       ` : ""}
+    </div>
+  `;
+}
+
+// Phase 5z+10 — Historical card for Applied / Reverted notes. Replaces
+// the analysis section on the focused note panel when the change has
+// already happened. No analysis — just the resolved-history record.
+function historicalCardHtml(note) {
+  const isReverted = !!note.revertedAt;
+  if (isReverted) {
+    return `
+      <div class="admin-note-focused__history">
+        <p>
+          This was applied on <strong>${escapeHtml(formatDate(note.appliedAt))}</strong>${
+            note.appliedCommit ? ` (commit <code>${escapeHtml(note.appliedCommit.slice(0, 7))}</code>)` : ""
+          } and then <strong>reverted</strong> on ${escapeHtml(formatDate(note.revertedAt))}.
+        </p>
+        <p class="admin-muted">
+          Claude will read the revert as undo instructions on the next session — the original change gets rolled back.
+        </p>
+      </div>
+    `;
+  }
+  const manual = note.appliedCommit === "manual";
+  return `
+    <div class="admin-note-focused__history">
+      <p>
+        Resolved on <strong>${escapeHtml(formatDate(note.appliedAt))}</strong>${
+          note.appliedCommit && !manual ? ` in commit <code>${escapeHtml(note.appliedCommit.slice(0, 7))}</code>` : ""
+        }${manual ? " (marked done manually)" : ""}.
+      </p>
+      <p class="admin-muted">
+        ${manual
+          ? "You marked this resolved without a Claude code change — useful when the work happened outside the session."
+          : "Claude applied this change in a code-shipping session. The note stays here as the audit trail."}
+        No further action unless you click <strong>Revert</strong> to undo it.
+      </p>
     </div>
   `;
 }

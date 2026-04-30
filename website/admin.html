@@ -91,6 +91,17 @@
               <button type="button" class="admin-button is-hidden" data-preview-quiz>
                 Preview entire quiz
               </button>
+              <!-- Phase 5z+10 — Refresh pulls latest snapshots so Tom
+                   sees new counts after Claude ships a code change
+                   without forcing a hard browser reload. Hover shows
+                   "last synced X ago"; clicking re-fetches every JSON
+                   snapshot + the cloud notes table. -->
+              <button type="button" class="admin-button admin-button--ghost admin-refresh" data-refresh-data title="Refresh admin data — pulls the latest counts after a Claude session ships code.">
+                <span class="admin-refresh__icon" aria-hidden="true">↻</span>
+                <span class="admin-refresh__label">Refresh</span>
+                <span class="admin-refresh__indicator" data-refresh-indicator></span>
+                <span class="admin-refresh__time admin-muted" data-refresh-time>—</span>
+              </button>
               <button type="button" class="admin-button" data-export-config>
                 Export config
               </button>
@@ -109,7 +120,13 @@
           <section class="admin-layout">
             <div class="admin-list-panel">
               <div class="admin-list-tools">
-                <input data-search placeholder="Search this view..." />
+                <!-- Phase 5z+10 — Search wrapper hosts an X clear button
+                     that appears once the user has typed. -->
+                <label class="admin-search">
+                  <span class="admin-search__icon" aria-hidden="true">⌕</span>
+                  <input data-search placeholder="Search this view..." />
+                  <button type="button" class="admin-search__clear" data-search-clear aria-label="Clear search" hidden>×</button>
+                </label>
                 <select data-status-filter>
                   <option value="all">All statuses</option>
                   <option value="active">Active</option>
