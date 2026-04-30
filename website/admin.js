@@ -1737,7 +1737,7 @@ function renderList() {
   // disambiguates templates (recipes) from runtime task rows + punch
   // items. Renders above the recommendations panel; dismiss persists
   // in localStorage so power users only see it once.
-  const explainer = renderTasksTabExplainer();
+  const explainer = renderTasksTabExplainer(all);
   const facets = renderFacetPills(all);
   // Phase 5z — Recommendations panel surfaces voice violations,
   // duplicates, and bundle-merge candidates with one-click "Draft note"
@@ -1760,16 +1760,13 @@ function renderList() {
   });
 }
 
-// Phase 67E/F + Approach A Step 6 — Tasks tab explainer. The Tasks tab
-// surfaces 105 non-handyman templates (the recipes that fire as
-// `maintenance_tasks` rows on quiz completion). Without this card it
-// reads as "the homeowner has 105 to-dos" — wrong. Each row is a
-// recipe that becomes a task ONLY when the homeowner's quiz answers
-// satisfy its `requiredSubtypes` gate; an average household lands ~30.
-// Handyman-tier templates aren't here at all (Phase 5z+7) — they fire
-// as punch items on the Handyman tab.
+// Phase 5z+12 — Tasks tab explainer. Plain-English version of the
+// "what is this tab" card. No code-jargon (no MaintenanceTemplates.swift,
+// no requiredSubtypes, no maintenance_tasks rows). Reads naturally to
+// someone who knows the product but not the implementation. Dismissible
+// via the × in the head row; persists in localStorage.
 const TASKS_EXPLAINER_DISMISS_KEY = "havenAdminTasksExplainerDismissedV1";
-function renderTasksTabExplainer() {
+function renderTasksTabExplainer(allItems) {
   if (state.view !== "tasks") return "";
   let dismissed = false;
   try {
@@ -1778,23 +1775,29 @@ function renderTasksTabExplainer() {
     dismissed = false;
   }
   if (dismissed) return "";
+  // Dynamic count — what's actually on the tab (post-handyman-exclusion).
+  // Round to the nearest 5 so the explainer doesn't look stale every
+  // time we add/remove a single template.
+  const onThisTab = applyViewLevelExclusions(allItems || [], "tasks").length;
+  const roundedTotal = onThisTab > 0 ? Math.round(onThisTab / 5) * 5 : null;
+  const totalPhrase = roundedTotal ? `this list of ~${roundedTotal}` : "this list";
   return `
     <div class="admin-explainer admin-explainer--tasks" data-tasks-explainer>
       <div class="admin-explainer__head">
-        <span class="admin-explainer__icon" aria-hidden="true">📐</span>
-        <strong>What you're looking at: template recipes, not runtime tasks.</strong>
-        <button type="button" class="admin-explainer__dismiss" data-dismiss-tasks-explainer title="Got it. Hide this for future sessions.">×</button>
+        <span class="admin-explainer__icon" aria-hidden="true">📋</span>
+        <strong>The master list — not what any one homeowner actually sees.</strong>
+        <button type="button" class="admin-explainer__dismiss" data-dismiss-tasks-explainer title="Got it">×</button>
       </div>
       <p>
-        Each row below is a <strong>template</strong> in <code>MaintenanceTemplates.swift</code>. At quiz completion the
-        reconciler walks every template, checks <code>requiredSubtypes</code> against the household's
-        <code>home_systems</code> rows, and writes a <code>maintenance_tasks</code> row only for matches. An average
-        Westchester household lands ~30 tasks from these ~105 recipes — not 105 tasks.
+        Each row below is a <strong>recipe</strong> for a maintenance task. When a homeowner finishes the quiz,
+        Haven looks at their house — what systems they have, what they told us — and turns the matching recipes
+        into actual tasks on their schedule. Most homeowners end up with around <strong>30 tasks</strong> from
+        ${totalPhrase}, because not every recipe applies to every house.
       </p>
       <p>
-        Handyman-tier templates (DIY-capable, ≤60 min, no <code>safetyFloor</code>) aren't shown here. They fire as
-        <code>handyman_punch_items</code> rows under the Handyman tab and never become <code>maintenance_tasks</code> —
-        homeowners review the punch list and book a single seasonal visit instead of N individual chores.
+        Small handyman work isn't shown here. Items the handyman handles — quick DIY-able things under an hour
+        with no safety risk — live on the <strong>Handyman tab</strong>. Homeowners see those as a single
+        seasonal visit, not as a stream of separate chores.
       </p>
     </div>
   `;
@@ -1846,13 +1849,21 @@ function attachTasksTabExplainerHandlers(host) {
 // when computing the OTHER axes. When computing axis A's own counts,
 // axis A is treated as if "all" is selected (so the pill values are
 // the achievable counts under every other current filter).
-function computeFacetCounts(items, view) {
-  const facetSurface = ["tasks", "handyman", "recommended"].includes(view);
+// Phase 5z+12 — Single source of truth for view-level exclusions.
+// Used by computeFacetCounts AND renderStats so they always agree on
+// "what's actually on this tab" — no more 204 in the stats while the
+// dropdown bar shows 115.
+//
+// Three filters compose: status, view-level (e.g. handyman exclusion
+// on the Tasks tab), and search. The four facet AXIS filters
+// (lifecycle / season / routing / handyman visit) are NOT applied here —
+// those are stacked on top by computeFacetCounts and the list itself.
+function applyViewLevelExclusions(items, view) {
   const q = state.search.trim().toLowerCase();
-  // Apply view-level exclusions first (these never change when the user
-  // toggles facet pills — they're set by search / status / tab choice).
-  const baseFiltered = items.filter((item) => {
+  return items.filter((item) => {
     if (state.statusFilter !== "all" && effectiveStatus(item) !== state.statusFilter) return false;
+    // Tasks tab fully excludes handyman-context templates — they live
+    // exclusively on the Handyman tab per Phase 5z+7.
     if (view === "tasks" && isHandymanContextItem(item)) return false;
     if (q) {
       const hay = [item.title, item.category, item.description, JSON.stringify(item.payload ?? {})].join(" ").toLowerCase();
@@ -1860,6 +1871,14 @@ function computeFacetCounts(items, view) {
     }
     return true;
   });
+}
+
+function computeFacetCounts(items, view) {
+  const facetSurface = ["tasks", "handyman", "recommended"].includes(view);
+  // Apply view-level exclusions (handyman exclusion on Tasks tab,
+  // status, search). These never change when the user toggles facet
+  // pills — they're set by tab choice + the search/status inputs.
+  const baseFiltered = applyViewLevelExclusions(items, view);
   // Apply every facet filter EXCEPT the one named in `skip`. Used so
   // each axis's counts reflect the world filtered by every OTHER axis.
   const applyExcept = (skip) => baseFiltered.filter((item) => {
@@ -3064,26 +3083,42 @@ function countByHandymanVisit(items) {
 }
 
 function renderStats(all, filtered) {
-  // Phase 5t — Split the count into Swift-derived (live) and admin
-  // drafts so Tom can see exactly where the totals come from. Earlier
-  // confusion: "Handyman tab shows 38 active / 118 total" — the 12-row
-  // delta was admin drafts, not live data. Now they're separated.
-  const live = all.filter((item) => item.source === "live");
-  const drafts = all.filter((item) => item.source === "admin");
-  const liveActive = live.filter((item) => effectiveStatus(item) === "active").length;
+  // Phase 5t/5z+12 — Stat tiles. The "On this tab" count reflects
+  // post-view-exclusion total (Tasks tab hides handyman-context items,
+  // for example), so it agrees with the dropdown bar's "All" count.
+  // Tom: "Tasks still shows as '204 LIVE (SWIFT)' when in reality its
+  // less than that because we moved a ton over to handyman punch list
+  // items."
+  //
+  // Three flavors of items roll into the count:
+  //   - live: Swift-derived templates from MaintenanceTemplates.swift
+  //   - admin drafts: rows authored in this lab, separate from Swift
+  //   - cut/defer: quiz tab only, items marked for removal
+  const scoped = applyViewLevelExclusions(all, state.view);
+  const live = scoped.filter((item) => item.source === "live");
+  const drafts = scoped.filter((item) => item.source === "admin");
   const liveTotal = live.length;
+  const liveActive = live.filter((item) => effectiveStatus(item) === "active").length;
   const draftsTotal = drafts.length;
   const draftsActive = drafts.filter((item) => effectiveStatus(item) === "active").length;
-  const cuts = all.filter((item) => effectiveStatus(item) === "cut" || effectiveStatus(item) === "defer").length;
+  const cuts = scoped.filter((item) => effectiveStatus(item) === "cut" || effectiveStatus(item) === "defer").length;
+
+  // Tasks tab gets a more honest "On this tab" framing since handyman
+  // items aren't part of the count. Other tabs keep "Live (Swift)" as
+  // the meta-label since they show every Swift-derived item.
+  const scopedLabel = state.view === "tasks" ? "On this tab" : "Live (Swift)";
+  const scopedTooltip = state.view === "tasks"
+    ? "Tasks tab excludes handyman items — they live on the Handyman tab. This count is what you actually see here."
+    : "Items defined in Swift code. This is the master count from the latest build.";
 
   let html = `
-    <div class="admin-stat"><strong>${liveTotal}</strong><span>Live (Swift)</span></div>
-    <div class="admin-stat"><strong>${liveActive}</strong><span>Live · active</span></div>
+    <div class="admin-stat" title="${escapeHtml(scopedTooltip)}"><strong>${liveTotal}</strong><span>${escapeHtml(scopedLabel)}</span></div>
+    <div class="admin-stat"><strong>${liveActive}</strong><span>Active</span></div>
   `;
   if (draftsTotal > 0) {
     html += `
-      <div class="admin-stat admin-stat--draft" title="Admin drafts you've authored in this lab. They live in admin_content_items in Supabase, not in Swift code. Once approved + applied, they'd be folded into Swift on the next build.">
-        <strong>+${draftsTotal}</strong><span>Admin drafts (${draftsActive} active)</span>
+      <div class="admin-stat admin-stat--draft" title="Admin drafts you've authored in this lab. They live alongside the Swift code and would fold in on the next build.">
+        <strong>+${draftsTotal}</strong><span>Drafts (${draftsActive} active)</span>
       </div>
     `;
   }
