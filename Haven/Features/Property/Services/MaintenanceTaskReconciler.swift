@@ -278,6 +278,18 @@ enum MaintenanceTaskReconciler {
         // Phase 19k: existing dedup keys are templateIds, not titles.
         let existingTemplateIds = Set(existing.compactMap { $0.templateId })
 
+        // Phase 67E/F: handyman-tier templates are routed to
+        // `handyman_punch_items` instead of `maintenance_tasks`. Load
+        // the household's pending punch items so we can dedupe by
+        // `source_template_key` across reruns. RLS scopes to the
+        // current household automatically. Best-effort — falls back to
+        // an empty set if the fetch fails so the reconciler still makes
+        // forward progress.
+        let existingPunchItems = (try? await DatabaseService.shared.fetchPendingHandymanPunchItems(
+            householdId: householdId
+        )) ?? []
+        let existingPunchItemTemplateKeys = Set(existingPunchItems.compactMap { $0.sourceTemplateKey })
+
         // 3. Templates to ADD: in the correct set but not yet present.
         //    Gated on mode — `.removeOnly` skips this half entirely.
         //
@@ -351,6 +363,42 @@ enum MaintenanceTaskReconciler {
                 guard !existingTemplateIds.contains(templateKey) else { continue }
 
                 let template = correctTemplates[index]
+
+                // Phase 67E/F: handyman-tier templates land directly as
+                // `handyman_punch_items` rows, never `maintenance_tasks`.
+                // The five-tier model says small DIY-capable items
+                // (≤60 min, no safety floor, no bundle) belong on the
+                // single handyman rail, where the homeowner accumulates
+                // them and the handyman handles the batch on a seasonal
+                // visit. Routes here BEFORE assignment resolution so the
+                // task table never sees them. Dedup by
+                // `source_template_key` against pending punch items.
+                let isHandymanTier =
+                    !template.safetyFloor &&
+                    template.bundleId == nil &&
+                    (template.routingOverride == .diyDefault || template.routingOverride == .diyCapable) &&
+                    (template.diyEffortMinutes ?? 0) <= 60
+
+                if isHandymanTier {
+                    if !existingPunchItemTemplateKeys.contains(templateKey) {
+                        var punchInsert = HandymanPunchItemInsert(
+                            householdId: householdId,
+                            propertyId: propertyId,
+                            title: template.title
+                        )
+                        punchInsert.description = template.description
+                        punchInsert.notes = template.notes
+                        punchInsert.estimatedMinutes = template.diyEffortMinutes
+                        punchInsert.estimatedCostRange = template.estimatedCostRange
+                        punchInsert.source = "auto_seed_handyman_tier"
+                        punchInsert.sourceTemplateKey = templateKey
+                        if (try? await DatabaseService.shared.createHandymanPunchItem(punchInsert)) != nil {
+                            added.append(template.title)
+                        }
+                    }
+                    continue
+                }
+
                 let result = createTaskFields(
                     template: template,
                     preferenceTier: preferenceTier,

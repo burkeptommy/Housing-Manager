@@ -4,10 +4,20 @@ import Foundation
 /// the homeowner wants their handyman to handle on the next visit.
 ///
 /// `source` values:
-/// - "manual"           — added directly from `HandymanPunchListView`
-/// - "recommended"      — added from "Recommended for your home" (Phase 54C)
-/// - "maintenance_task" — delegated from a maintenance task via the
-///                        "Add to handyman list" action on the task card
+/// - "manual"                   — added directly from `HandymanPunchListView`
+/// - "recommended"              — added from "Recommended for your home" (Phase 54C)
+/// - "maintenance_task"         — legacy delegation from a task (pre-Phase 67E/F)
+/// - "promoted_from_task"       — Phase 67E/F: replaces "maintenance_task"
+///                                for new Add-to-punch-list actions in
+///                                MaintenanceTaskDetailSheet
+/// - "auto_seed_handyman_tier"  — Phase 67E/F: seeded directly by the
+///                                reconciler when a template is handyman-
+///                                tier (DIY-capable, ≤60 min, no safety
+///                                floor, no bundleId)
+/// - "migrated_from_task"       — Phase 67E/F: created by the one-time
+///                                migration that converts pre-67E/F
+///                                handyman-tier maintenance_tasks rows
+///                                into punch items
 struct HandymanPunchItemRow: Codable, Identifiable {
     let id: UUID
     let householdId: UUID
@@ -44,6 +54,14 @@ struct HandymanPunchItemRow: Codable, Identifiable {
     /// render a readable label like "Linked: Boiler").
     let systemLabelSnapshot: String?
     let templateId: UUID?
+    /// Phase 67E/F: in-app `MaintenanceTemplate.templateKey` that seeded
+    /// or migrated this row (e.g. "Plumbing:Test sump pump battery
+    /// backup"). Used by the reconciler to dedupe handyman-tier templates
+    /// across reruns so the same template never lands twice. Distinct
+    /// from `templateId` (which is a UUID FK to `task_proposals` from
+    /// Phase 78); kept as a separate text column so legacy paths don't
+    /// have to load this string.
+    let sourceTemplateKey: String?
     /// Lifecycle status. Distinct from completed_at/archived_at —
     /// "pending" / "assigned" / "in_progress" / "done" / "cancelled".
     let status: String?
@@ -84,6 +102,7 @@ struct HandymanPunchItemRow: Codable, Identifiable {
         case systemId = "system_id"
         case systemLabelSnapshot = "system_label_snapshot"
         case templateId = "template_id"
+        case sourceTemplateKey = "source_template_key"
         case materialRequired = "material_required"
         case costBasis = "cost_basis"
         case addedAfterLock = "added_after_lock"
@@ -127,6 +146,7 @@ struct HandymanPunchItemRow: Codable, Identifiable {
         systemId = (try? c.decodeIfPresent(UUID.self, forKey: .systemId)) ?? nil
         systemLabelSnapshot = (try? c.decodeIfPresent(String.self, forKey: .systemLabelSnapshot)) ?? nil
         templateId = (try? c.decodeIfPresent(UUID.self, forKey: .templateId)) ?? nil
+        sourceTemplateKey = (try? c.decodeIfPresent(String.self, forKey: .sourceTemplateKey)) ?? nil
         status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? nil
         priority = (try? c.decodeIfPresent(String.self, forKey: .priority)) ?? nil
         materialRequired = (try? c.decodeIfPresent(Bool.self, forKey: .materialRequired)) ?? nil
@@ -174,6 +194,11 @@ struct HandymanPunchItemInsert: Codable {
     /// item from a route=handyman task, set this to the task id so the
     /// punch list + task stay in sync.
     var maintenanceTaskId: UUID? = nil
+    /// Phase 67E/F: in-app `MaintenanceTemplate.templateKey` that seeded
+    /// this row. Set on `auto_seed_handyman_tier` /
+    /// `migrated_from_task` / `promoted_from_task` paths so the
+    /// reconciler can dedupe across runs.
+    var sourceTemplateKey: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case title, description, source, notes
@@ -184,5 +209,6 @@ struct HandymanPunchItemInsert: Codable {
         case estimatedMinutes = "estimated_minutes"
         case estimatedCostRange = "estimated_cost_range"
         case maintenanceTaskId = "maintenance_task_id"
+        case sourceTemplateKey = "source_template_key"
     }
 }
