@@ -1206,7 +1206,21 @@ function itemsForCurrentView() {
   if (state.view === "notes") return [];
   const view = currentView();
   const defaults = defaultItemsForView(state.view);
-  const drafts = state.adminItems.filter((item) => item.itemType === view.type);
+  // Phase 5x — Hide shadow rows from the list. A shadow is an
+  // admin_content_items row whose `live_entity_id` points at a Swift
+  // template — it exists ONLY to anchor cloud-side metadata (lock
+  // state, approval, cut/defer/reshape disposition, attached notes)
+  // that can't live in the Swift source. Surfacing shadows as separate
+  // list entries created confusing duplicates ("Exterior painting
+  // refresh" appearing twice with different render paths). Their state
+  // bubbles up to the live row via effectiveLaunchStatus / effectiveStatus.
+  //
+  // Hand-created admin drafts (no live_entity_id) are different — they
+  // ARE net-new entities not yet promoted to Swift, so they keep their
+  // own row.
+  const drafts = state.adminItems.filter((item) =>
+    item.itemType === view.type && !item.liveEntityId
+  );
   return [...drafts, ...defaults].sort((a, b) => {
     if ((a.source === "admin") !== (b.source === "admin")) return a.source === "admin" ? -1 : 1;
     return (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999) || a.title.localeCompare(b.title);
@@ -1724,11 +1738,11 @@ function renderStats(all, filtered) {
   // delta was admin drafts, not live data. Now they're separated.
   const live = all.filter((item) => item.source === "live");
   const drafts = all.filter((item) => item.source === "admin");
-  const liveActive = live.filter((item) => item.status === "active").length;
+  const liveActive = live.filter((item) => effectiveStatus(item) === "active").length;
   const liveTotal = live.length;
   const draftsTotal = drafts.length;
-  const draftsActive = drafts.filter((item) => item.status === "active").length;
-  const cuts = all.filter((item) => item.status === "cut" || item.status === "defer").length;
+  const draftsActive = drafts.filter((item) => effectiveStatus(item) === "active").length;
+  const cuts = all.filter((item) => effectiveStatus(item) === "cut" || effectiveStatus(item) === "defer").length;
 
   let html = `
     <div class="admin-stat"><strong>${liveTotal}</strong><span>Live (Swift)</span></div>
@@ -1769,8 +1783,10 @@ function renderDetail() {
   el.detailSubtitle.textContent = [item.category, item.payload?.questionId, item.payload?.operationalType, item.payload?.cadence]
     .filter(Boolean)
     .join(" · ");
-  el.detailStatus.textContent = item.status;
-  el.detailStatus.dataset.tone = item.status;
+  // Phase 5x — same effectiveStatus bubbling on the detail panel pill.
+  const detailStatus = effectiveStatus(item);
+  el.detailStatus.textContent = detailStatus;
+  el.detailStatus.dataset.tone = detailStatus;
 
   // Phase 4b / 5v / 5w — branch on whether this surface has a
   // structured schema, AND whether the item carries enough payload
@@ -3459,11 +3475,15 @@ function itemRowHtml(item) {
       routingBadge = `<span class="admin-pill admin-pill--routing-${reason.tier}" title="${escapeHtml(reason.tooltip)}">${escapeHtml(reason.label)}</span>`;
     }
   }
+  // Phase 5x — list row reflects the shadow's disposition (cut/defer/
+  // reshape) when one exists, so a curation decision shows on the
+  // single visible row instead of disappearing with the hidden shadow.
+  const status = effectiveStatus(item);
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
         <strong>${escapeHtml(item.title)}</strong>
-        <span class="admin-pill" data-tone="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+        <span class="admin-pill" data-tone="${escapeHtml(status)}">${escapeHtml(status)}</span>
         ${handymanBadge}
         ${lifecycleBadge}
         ${routingBadge}
@@ -4141,7 +4161,7 @@ function filterItems(items) {
   // surfaces. Other surfaces ignore them so legacy behavior is unchanged.
   const facetSurface = ["tasks", "handyman", "recommended"].includes(state.view);
   return items.filter((item) => {
-    if (state.statusFilter !== "all" && item.status !== state.statusFilter) return false;
+    if (state.statusFilter !== "all" && effectiveStatus(item) !== state.statusFilter) return false;
     if (facetSurface) {
       if (state.lifecycleFilter !== "all" && lifecycleOf(item) !== state.lifecycleFilter) return false;
       if (state.seasonFilter !== "all") {
@@ -4964,6 +4984,22 @@ function effectiveLaunchStatus(item) {
   if (item.source === "admin") return item.launchStatus || "draft";
   const shadow = findLockShadow(item);
   return shadow?.launchStatus || "draft";
+}
+
+// Phase 5x — Bubble the shadow's curation status (cut / defer /
+// reshape) up to the live row. Shadows are no longer visible in the
+// list, so without this the disposition would be invisible. With it,
+// a "cut" disposition on the shadow shows the live row as cut, which
+// matches what the user's "Mark cut" action actually means.
+function effectiveStatus(item) {
+  if (item.source === "admin") return item.status || "draft";
+  const shadow = findLockShadow(item);
+  // Shadows default to "active" status when they're created just for
+  // a lock — only treat as override when the user explicitly picked
+  // a curation status (cut / defer / reshape).
+  const dispositionStatuses = new Set(["cut", "defer", "reshape"]);
+  if (shadow?.status && dispositionStatuses.has(shadow.status)) return shadow.status;
+  return item.status || "active";
 }
 
 function dbNoteToUi(row) {
