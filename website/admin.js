@@ -1538,19 +1538,83 @@ function renderList() {
   const all = itemsForCurrentView();
   const filtered = filterItems(all);
   renderStats(all, filtered);
+  // Phase 67E/F + Approach A Step 6 — Tasks-tab explainer that
+  // disambiguates templates (recipes) from runtime task rows + punch
+  // items. Renders above the recommendations panel; dismiss persists
+  // in localStorage so power users only see it once.
+  const explainer = renderTasksTabExplainer();
   const facets = renderFacetPills(all);
   // Phase 5z — Recommendations panel surfaces voice violations,
   // duplicates, and bundle-merge candidates with one-click "Draft note"
   // actions so Tom can act on the audit findings without leaving the tab.
   const recs = renderRecommendationsPanel(all);
-  el.list.innerHTML = (recs ? recs : "") + (facets ? facets : "") + (filtered.map((item) => itemRowHtml(item)).join("") || emptyListHtml());
+  el.list.innerHTML =
+    (explainer ? explainer : "") +
+    (recs ? recs : "") +
+    (facets ? facets : "") +
+    (filtered.map((item) => itemRowHtml(item)).join("") || emptyListHtml());
   attachFacetPillHandlers(el.list);
   attachRecommendationsHandlers(el.list);
+  attachTasksTabExplainerHandlers(el.list);
   el.list.querySelectorAll("[data-item-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selected = all.find((item) => item.id === button.dataset.itemId) ?? null;
       renderList();
       renderDetail();
+    });
+  });
+}
+
+// Phase 67E/F + Approach A Step 6 — Tasks tab explainer. The Tasks tab
+// surfaces 105 non-handyman templates (the recipes that fire as
+// `maintenance_tasks` rows on quiz completion). Without this card it
+// reads as "the homeowner has 105 to-dos" — wrong. Each row is a
+// recipe that becomes a task ONLY when the homeowner's quiz answers
+// satisfy its `requiredSubtypes` gate; an average household lands ~30.
+// Handyman-tier templates aren't here at all (Phase 5z+7) — they fire
+// as punch items on the Handyman tab.
+const TASKS_EXPLAINER_DISMISS_KEY = "havenAdminTasksExplainerDismissedV1";
+function renderTasksTabExplainer() {
+  if (state.view !== "tasks") return "";
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(TASKS_EXPLAINER_DISMISS_KEY) === "1";
+  } catch {
+    dismissed = false;
+  }
+  if (dismissed) return "";
+  return `
+    <div class="admin-explainer admin-explainer--tasks" data-tasks-explainer>
+      <div class="admin-explainer__head">
+        <span class="admin-explainer__icon" aria-hidden="true">📐</span>
+        <strong>What you're looking at: template recipes, not runtime tasks.</strong>
+        <button type="button" class="admin-explainer__dismiss" data-dismiss-tasks-explainer title="Got it. Hide this for future sessions.">×</button>
+      </div>
+      <p>
+        Each row below is a <strong>template</strong> in <code>MaintenanceTemplates.swift</code>. At quiz completion the
+        reconciler walks every template, checks <code>requiredSubtypes</code> against the household's
+        <code>home_systems</code> rows, and writes a <code>maintenance_tasks</code> row only for matches. An average
+        Westchester household lands ~30 tasks from these ~105 recipes — not 105 tasks.
+      </p>
+      <p>
+        Handyman-tier templates (DIY-capable, ≤60 min, no <code>safetyFloor</code>) aren't shown here. They fire as
+        <code>handyman_punch_items</code> rows under the Handyman tab and never become <code>maintenance_tasks</code> —
+        homeowners review the punch list and book a single seasonal visit instead of N individual chores.
+      </p>
+    </div>
+  `;
+}
+function attachTasksTabExplainerHandlers(host) {
+  host.querySelectorAll("[data-dismiss-tasks-explainer]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      try {
+        localStorage.setItem(TASKS_EXPLAINER_DISMISS_KEY, "1");
+      } catch {
+        // localStorage disabled — this session will keep showing the
+        // card. That's fine; it's a clarifier, not a blocker.
+      }
+      const card = btn.closest("[data-tasks-explainer]");
+      if (card) card.remove();
     });
   });
 }

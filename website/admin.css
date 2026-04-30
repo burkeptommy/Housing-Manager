@@ -1030,6 +1030,65 @@
   margin-bottom: 14px;
   padding: 0;
 }
+
+/* Phase 67E/F + Approach A Step 6 — Tasks tab explainer card.
+   Indigo-tinted to distinguish from the salmon recommendations panel —
+   this is reference info, not action items. Dismissible via the × in
+   the head row; persists in localStorage. */
+.admin-explainer {
+  background: linear-gradient(135deg, rgba(69, 58, 112, 0.05), rgba(82, 69, 128, 0.06));
+  border: 1px solid rgba(69, 58, 112, 0.2);
+  border-radius: 14px;
+  margin-bottom: 14px;
+  padding: 14px 18px 12px;
+}
+.admin-explainer__head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.admin-explainer__head strong {
+  flex: 1;
+  font: 600 14px var(--sans);
+}
+.admin-explainer__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.admin-explainer__dismiss {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 700 18px var(--sans);
+  height: 26px;
+  line-height: 1;
+  padding: 0;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  width: 26px;
+}
+.admin-explainer__dismiss:hover {
+  background: rgba(69, 58, 112, 0.08);
+  border-color: rgba(69, 58, 112, 0.25);
+  color: var(--text);
+}
+.admin-explainer p {
+  color: var(--text);
+  font: 500 13px var(--sans);
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+.admin-explainer p:first-of-type {
+  margin-top: 0;
+}
+.admin-explainer code {
+  background: rgba(69, 58, 112, 0.08);
+  border-radius: 4px;
+  font: 600 12px var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  padding: 1px 5px;
+}
 .admin-recs--empty {
   background: rgba(74, 124, 89, 0.05);
   border-color: rgba(74, 124, 89, 0.18);
