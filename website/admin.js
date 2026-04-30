@@ -1772,17 +1772,51 @@ function renderDetail() {
   el.detailStatus.textContent = item.status;
   el.detailStatus.dataset.tone = item.status;
 
-  // Phase 4b — branch on whether this surface has a structured schema.
-  // Phase 5v — Tom's bug: admin drafts (duplicates of live items) were
-  // falling into the bare 5-field curated form even when their payload
-  // carried the full template shape. Now ANY item with a schema-shaped
-  // payload renders the rich schema-driven form, regardless of source.
-  // Admin drafts WITHOUT a payload (truly hand-created) still use the
-  // curated form so we don't render an empty schema for nothing.
+  // Phase 4b / 5v / 5w — branch on whether this surface has a
+  // structured schema, AND whether the item carries enough payload
+  // for the schema form to render usefully.
+  //
+  // Three flavors of admin items the lab has shipped over time:
+  //   1. Hand-created drafts (no live_entity_id, no payload) — the
+  //      legacy "+ Add item" path. Curated 5-field form is correct here.
+  //   2. Duplicates of live entities (no live_entity_id, full payload
+  //      cloned from the live item). Schema form already worked from 5v.
+  //   3. Shadow rows (live_entity_id set, payload = {live_entity_id,
+  //      source: "live_lock"}) — Tom's missing case. These are the
+  //      admin_content_items rows that anchor a lock/approval/disposition
+  //      on top of a Swift-derived live template. The shadow's payload
+  //      is intentionally thin — it points back to the live template.
+  //
+  // Phase 5w fix: for shadow rows, MERGE the underlying live template's
+  // payload in so the schema form renders against full template data.
+  // Admin overlay edits sit on top of the live base.
   const viewId = state.view;
   const schema = SCHEMAS[viewId];
-  const hasSchemaShapedPayload = payloadMatchesSchema(item, viewId);
-  const useSchemaForm = !!schema && (item.source === "live" || hasSchemaShapedPayload);
+  let renderItem = item;
+  let underlyingLive = null;
+  if (item.source === "admin") {
+    underlyingLive = findUnderlyingLiveItem(item);
+    if (underlyingLive) {
+      renderItem = {
+        ...item,
+        payload: {
+          ...(underlyingLive.payload || {}),
+          ...(item.payload || {}),
+        },
+      };
+    }
+  }
+  const hasSchemaShapedPayload = payloadMatchesSchema(renderItem, viewId);
+  const useSchemaForm = !!schema && (renderItem.source === "live" || hasSchemaShapedPayload);
+
+  // Phase 5w — Replace bare "admin task" eyebrow with an explainer
+  // pill that names which flavor of entity we're looking at + what
+  // it means. Tom wasn't sure what "admin task" was; now every
+  // detail panel says it explicitly.
+  const flavorPill = describeEntityFlavor(item, underlyingLive);
+  if (el.detailKind) {
+    el.detailKind.innerHTML = `<span class="admin-eyebrow__flavor admin-eyebrow__flavor--${flavorPill.tone}" title="${escapeHtml(flavorPill.tooltip)}">${escapeHtml(flavorPill.label)}</span>`;
+  }
 
   // Toggle preview-question button on quiz only.
   if (el.previewQuestion) {
@@ -1794,16 +1828,17 @@ function renderDetail() {
     // Hide curated/legacy form. Render schema-driven form into formHost.
     el.curatedForm?.classList.add("is-hidden");
     if (el.formHost) {
-      // Deep-clone payload into editing state so inline edits don't mutate
-      // the cached liveData rendering. Original stays pristine for diff.
+      // Phase 5w — render against the merged payload (live base + admin
+      // overrides) so shadow rows show the full template data. Edits
+      // diff against the merged base; on save, we'll write back only
+      // the deltas to the admin overlay.
       editingState.viewId = viewId;
-      editingState.original = structuredCloneSafe(item.payload ?? {});
-      editingState.current = structuredCloneSafe(item.payload ?? {});
-      // Phase 5r — plain-English summary card BEFORE the form, so anyone
-      // (including non-engineers) can read the entity's purpose without
-      // decoding field names. Summary card itself stays gated on
-      // source==="live" because it surfaces computed cross-entity context.
-      const summaryHtml = renderEntitySummaryCard(item);
+      editingState.original = structuredCloneSafe(renderItem.payload ?? {});
+      editingState.current = structuredCloneSafe(renderItem.payload ?? {});
+      // Phase 5r — plain-English summary card BEFORE the form. The
+      // summary uses the merged payload too, so admin shadows display
+      // the live template's goal / why / proactive surfacing context.
+      const summaryHtml = renderEntitySummaryCard(renderItem);
       el.formHost.innerHTML = summaryHtml + renderEntityForm(viewId, editingState.current, editingState.original);
       attachFormHandlers(el.formHost, viewId, editingState.original, editingState.current, () => {
         renderDiff();
@@ -3599,7 +3634,14 @@ function templatesForSystem(systemCategoryKey) {
 // decoding field names. Works across quiz / tasks / handyman /
 // recommended / systems / routines.
 function renderEntitySummaryCard(item) {
-  if (!item || item.source !== "live") return "";
+  // Phase 5w — render the summary card whenever we have a payload that
+  // can be summarized, regardless of source. Admin shadow rows pass
+  // through here with merged payloads (live template + admin overrides),
+  // so they get the same rich context as the live entity does.
+  if (!item || !item.payload) return "";
+  // Skip for hand-created admin drafts that have no template-shaped
+  // payload — they have nothing to summarize until they're filled in.
+  if (item.source !== "live" && !payloadMatchesSchema(item, viewIdForType(item.itemType))) return "";
   const t = item.itemType;
   if (t === "question") return renderQuizSummaryCard(item);
   if (t === "task" || t === "handyman" || t === "recommended") return renderTaskSummaryCard(item);
@@ -4225,6 +4267,76 @@ async function promoteSelectedItem() {
   state.adminItems.unshift(promoted);
   state.selected = promoted;
   render();
+}
+
+// Phase 5w — For an admin item, find the matching live entity (by
+// liveEntityId or by id-like fields in the admin payload). Used by
+// renderDetail to merge the live template's payload underneath the
+// admin overlay so shadow rows render the full schema form.
+function findUnderlyingLiveItem(adminItem) {
+  if (!adminItem || adminItem.source !== "admin") return null;
+  const surfaceId = viewIdForType(adminItem.itemType);
+  const candidates = liveItemsForView(surfaceId) || [];
+  if (!candidates.length) return null;
+  // Match strategies, in order: explicit liveEntityId column, payload's
+  // live_entity_id field, payload's templateKey/id/categoryKey/etc., or
+  // exact title fallback.
+  const liveId = adminItem.liveEntityId || adminItem.payload?.live_entity_id;
+  if (liveId) {
+    const byLiveId = candidates.find((c) => liveEntityIdFor(c) === liveId);
+    if (byLiveId) return byLiveId;
+  }
+  // Try title match — last-resort but handles older shadow rows that
+  // didn't capture liveEntityId.
+  if (adminItem.title) {
+    const byTitle = candidates.find((c) => c.title === adminItem.title);
+    if (byTitle) return byTitle;
+  }
+  return null;
+}
+
+// Phase 5w — Plain-English explanation of which flavor of entity the
+// detail panel is showing. Replaces the bare "admin task" eyebrow.
+// Tom's question: "I have no clue what an admin task is" — now every
+// entity announces what it is + what it means in a tooltip.
+function describeEntityFlavor(item, underlyingLive) {
+  if (!item) return { label: "—", tone: "neutral", tooltip: "" };
+  if (item.source === "live") {
+    return {
+      label: `Live · ${item.itemType}`,
+      tone: "live",
+      tooltip:
+        "Live template — comes straight from Swift code (e.g. MaintenanceTemplates.swift). " +
+        "Edits here ship as proposal notes; the underlying Swift source changes when Claude applies them in a future session. " +
+        "Every homeowner who completes the quiz gets these.",
+    };
+  }
+  if (item.source === "admin" && underlyingLive) {
+    const launchStatus = item.launchStatus || "draft";
+    return {
+      label: `Admin overlay · ${item.itemType}`,
+      tone: "overlay",
+      tooltip:
+        `Admin overlay on a live ${item.itemType}. The underlying template lives in Swift; this row in admin_content_items adds your overrides on top — locked/approved status, custom notes, disposition (cut/defer/reshape), or attachments. ` +
+        `Current launch status: ${launchStatus}. ` +
+        "Edits save back to admin_content_items.payload directly (no proposal note needed).",
+    };
+  }
+  if (item.source === "admin") {
+    return {
+      label: `Admin draft · ${item.itemType}`,
+      tone: "draft",
+      tooltip:
+        `Hand-created in this lab — not yet promoted into Swift. Lives in admin_content_items only. ` +
+        "When approved + applied by Claude, it would be added to the Swift source on the next build. " +
+        "Use the Promote / Duplicate / Delete buttons to manage its lifecycle.",
+    };
+  }
+  return {
+    label: `${item.source} · ${item.itemType}`,
+    tone: "neutral",
+    tooltip: "Legacy / default fallback row.",
+  };
 }
 
 // Phase 5v — Detect whether an admin item carries a payload that
