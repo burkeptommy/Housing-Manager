@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-30T19:28:38.093Z",
+  "generatedAt": "2026-04-30T19:42:09.457Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift (filtered)",
-  "sourceCommit": "bf9d688e",
+  "sourceCommit": "693691c7",
   "count": 102,
   "entries": [
     {
@@ -184,14 +184,14 @@
       "stableId": null,
       "systemCategory": "Appliance",
       "title": "Replace refrigerator water filter",
-      "description": "Replace the built-in water/ice filter per the manufacturer's schedule. Most fridge filters are rated for 6 months regardless of throughput.",
+      "description": "Haven adds this to your handyman punch list every six months — drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.",
       "frequency": "Semi-annually",
       "priority": "Medium",
       "estimatedCostRange": "$30–$60",
       "isDIY": true,
       "seasonalTiming": null,
       "professionalRequired": false,
-      "notes": "Check your fridge manual for the exact filter part number. Some manufacturers offer subscriptions that auto-ship.",
+      "notes": "Filter SKU varies by fridge model. Pull the model number from the inside-door sticker and search the manufacturer site, or tap your refrigerator in the equipment catalog for a direct reorder link.",
       "requiredSubtypes": [
         "has_fridge_water_dispenser"
       ],
@@ -213,7 +213,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyDefault",
-      "_sourceLine": 1453,
+      "_sourceLine": 1470,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -223,7 +223,15 @@
           "displayPriority": 0
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "description",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Haven adds this to your handyman punch list every six months — drop a fresh f..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -257,7 +265,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1600,
+      "_sourceLine": 1617,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -316,7 +324,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1616,
+      "_sourceLine": 1633,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -376,7 +384,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1632,
+      "_sourceLine": 1649,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -434,7 +442,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1668,
+      "_sourceLine": 1685,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -491,7 +499,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1684,
+      "_sourceLine": 1701,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -548,7 +556,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1700,
+      "_sourceLine": 1717,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -605,7 +613,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1716,
+      "_sourceLine": 1733,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -664,7 +672,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1732,
+      "_sourceLine": 1749,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -721,7 +729,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1749,
+      "_sourceLine": 1766,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -778,7 +786,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1765,
+      "_sourceLine": 1782,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -837,7 +845,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1781,
+      "_sourceLine": 1798,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -894,7 +902,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1798,
+      "_sourceLine": 1815,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -951,7 +959,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1814,
+      "_sourceLine": 1831,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1008,7 +1016,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1834,
+      "_sourceLine": 1851,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1066,7 +1074,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1850,
+      "_sourceLine": 1867,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1124,7 +1132,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1867,
+      "_sourceLine": 1884,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1182,7 +1190,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1884,
+      "_sourceLine": 1901,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1240,7 +1248,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1900,
+      "_sourceLine": 1917,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1298,7 +1306,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1916,
+      "_sourceLine": 1933,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1356,7 +1364,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1932,
+      "_sourceLine": 1949,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1416,7 +1424,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1948,
+      "_sourceLine": 1965,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1474,7 +1482,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1965,
+      "_sourceLine": 1982,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1532,7 +1540,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1981,
+      "_sourceLine": 1998,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1590,7 +1598,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2149,
+      "_sourceLine": 2166,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1632,7 +1640,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2150,
+      "_sourceLine": 2167,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1674,7 +1682,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2151,
+      "_sourceLine": 2168,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1716,7 +1724,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2152,
+      "_sourceLine": 2169,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1758,7 +1766,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2153,
+      "_sourceLine": 2170,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1800,7 +1808,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2154,
+      "_sourceLine": 2171,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1842,7 +1850,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2155,
+      "_sourceLine": 2172,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1884,7 +1892,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2156,
+      "_sourceLine": 2173,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1926,7 +1934,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2157,
+      "_sourceLine": 2174,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1968,7 +1976,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2158,
+      "_sourceLine": 2175,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2010,7 +2018,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2159,
+      "_sourceLine": 2176,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2052,7 +2060,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2162,
+      "_sourceLine": 2179,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2094,7 +2102,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2163,
+      "_sourceLine": 2180,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2136,7 +2144,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2164,
+      "_sourceLine": 2181,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2178,7 +2186,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2165,
+      "_sourceLine": 2182,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2220,7 +2228,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2166,
+      "_sourceLine": 2183,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2262,7 +2270,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2167,
+      "_sourceLine": 2184,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2304,7 +2312,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2168,
+      "_sourceLine": 2185,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2346,7 +2354,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2169,
+      "_sourceLine": 2186,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2388,7 +2396,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2172,
+      "_sourceLine": 2189,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2432,7 +2440,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2173,
+      "_sourceLine": 2190,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2474,7 +2482,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2174,
+      "_sourceLine": 2191,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2516,7 +2524,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2175,
+      "_sourceLine": 2192,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2558,7 +2566,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2176,
+      "_sourceLine": 2193,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2602,7 +2610,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2177,
+      "_sourceLine": 2194,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2644,7 +2652,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2178,
+      "_sourceLine": 2195,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2686,7 +2694,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2179,
+      "_sourceLine": 2196,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2731,7 +2739,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2180,
+      "_sourceLine": 2197,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2773,7 +2781,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2183,
+      "_sourceLine": 2200,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2815,7 +2823,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2184,
+      "_sourceLine": 2201,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2857,7 +2865,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2185,
+      "_sourceLine": 2202,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2899,7 +2907,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2186,
+      "_sourceLine": 2203,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2941,7 +2949,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2187,
+      "_sourceLine": 2204,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2983,7 +2991,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2188,
+      "_sourceLine": 2205,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3025,7 +3033,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2189,
+      "_sourceLine": 2206,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3067,7 +3075,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2192,
+      "_sourceLine": 2209,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3109,7 +3117,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2193,
+      "_sourceLine": 2210,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3151,7 +3159,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2194,
+      "_sourceLine": 2211,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3193,7 +3201,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2195,
+      "_sourceLine": 2212,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3235,7 +3243,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2196,
+      "_sourceLine": 2213,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3277,7 +3285,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2197,
+      "_sourceLine": 2214,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3319,7 +3327,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2198,
+      "_sourceLine": 2215,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3361,7 +3369,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2199,
+      "_sourceLine": 2216,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3406,7 +3414,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2202,
+      "_sourceLine": 2219,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3448,7 +3456,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2203,
+      "_sourceLine": 2220,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3494,7 +3502,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2204,
+      "_sourceLine": 2221,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3539,7 +3547,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2205,
+      "_sourceLine": 2222,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3581,7 +3589,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2206,
+      "_sourceLine": 2223,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3623,7 +3631,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2207,
+      "_sourceLine": 2224,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3665,7 +3673,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2210,
+      "_sourceLine": 2227,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3707,7 +3715,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2211,
+      "_sourceLine": 2228,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3749,7 +3757,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2212,
+      "_sourceLine": 2229,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3791,7 +3799,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2213,
+      "_sourceLine": 2230,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3833,7 +3841,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2214,
+      "_sourceLine": 2231,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3875,7 +3883,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2215,
+      "_sourceLine": 2232,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3917,7 +3925,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2216,
+      "_sourceLine": 2233,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3959,7 +3967,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2217,
+      "_sourceLine": 2234,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4003,7 +4011,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2220,
+      "_sourceLine": 2237,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4047,7 +4055,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2221,
+      "_sourceLine": 2238,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4092,7 +4100,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2222,
+      "_sourceLine": 2239,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4134,7 +4142,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2223,
+      "_sourceLine": 2240,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4176,7 +4184,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2224,
+      "_sourceLine": 2241,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4220,7 +4228,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2227,
+      "_sourceLine": 2244,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4266,7 +4274,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2228,
+      "_sourceLine": 2245,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4310,7 +4318,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2229,
+      "_sourceLine": 2246,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4355,7 +4363,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2230,
+      "_sourceLine": 2247,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4400,7 +4408,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2231,
+      "_sourceLine": 2248,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4442,7 +4450,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2234,
+      "_sourceLine": 2251,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4484,7 +4492,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2235,
+      "_sourceLine": 2252,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4526,7 +4534,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2236,
+      "_sourceLine": 2253,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4568,7 +4576,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2237,
+      "_sourceLine": 2254,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4610,7 +4618,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2238,
+      "_sourceLine": 2255,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4652,7 +4660,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2239,
+      "_sourceLine": 2256,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4696,7 +4704,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2489,
+      "_sourceLine": 2506,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
