@@ -1685,12 +1685,17 @@ function renderRecommendationsPanel(allItems) {
   if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
   const findings = computeRecommendations(allItems);
   const total = findings.voice.length + findings.duplicates.length + findings.bundleCandidates.length;
+  const resolvedCount = loadResolvedRecs().size;
+  const resetButton = resolvedCount > 0
+    ? `<button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-reset title="Undo all resolved/dismissed recommendations and re-run the audit from scratch.">↻ Reset ${resolvedCount} resolved</button>`
+    : "";
   if (total === 0) {
     return `
       <details class="admin-recs admin-recs--empty">
         <summary>
           <span class="admin-recs__title">✓ Recommendations — none</span>
           <span class="admin-muted">No voice / duplicate / grouping issues detected on this surface.</span>
+          ${resetButton}
         </summary>
       </details>
     `;
@@ -1710,6 +1715,7 @@ function renderRecommendationsPanel(allItems) {
           const snippet = (hit.snippet || "").slice(0, 90);
           return recRow({
             kind: "voice",
+            recId: v.recId,
             title: v.item.title,
             tone: "salmon",
             description: `<strong>${escapeHtml(hit.ruleId)}</strong> in field <code>${escapeHtml(hit.field)}</code> — "${escapeHtml(snippet)}…"`,
@@ -1731,6 +1737,7 @@ function renderRecommendationsPanel(allItems) {
         </p>
         ${findings.duplicates.map((d) => recRow({
           kind: "duplicate",
+          recId: d.recId,
           title: `${d.a.title} <span class="admin-muted">↔</span> ${d.b.title}`,
           tone: "indigo",
           description: `<strong>${d.sim}%</strong> title overlap in <code>${escapeHtml(d.cat)}</code>. If they're meant as a semi-annual pair, no action needed — confirm and suppress. If one supersedes the other, propose a merge with the better description.`,
@@ -1753,6 +1760,7 @@ function renderRecommendationsPanel(allItems) {
           const suggestedTitle = `${c.season} ${c.cat} Service`;
           return recRow({
             kind: "bundle_candidate",
+            recId: c.recId,
             title: `${escapeHtml(c.cat)} · ${escapeHtml(c.season)} · ${escapeHtml(c.assignmentType)}`,
             tone: "purple",
             description: `<strong>${c.items.length} templates</strong> could fold into <code>${escapeHtml(suggestedBundleId)}</code> as "<em>${escapeHtml(suggestedTitle)}</em>": ${c.items.map((t) => escapeHtml(t.title)).join(", ")}. Same pattern the existing seasonal bundles already use.`,
@@ -1768,6 +1776,7 @@ function renderRecommendationsPanel(allItems) {
       <summary>
         <span class="admin-recs__title">⚠️ Recommendations <span class="admin-recs__badge admin-recs__badge--total">${total}</span></span>
         <span class="admin-muted">Voice issues, likely duplicates, and grouping candidates. Click any row to draft a proposal note.</span>
+        ${resetButton}
       </summary>
       <div class="admin-recs__body">
         ${voiceHtml}
@@ -1779,7 +1788,11 @@ function renderRecommendationsPanel(allItems) {
 }
 
 function recRow(opts) {
-  const dataAttrs = Object.entries(opts.extraData || {}).map(([k, v]) => `data-rec-${k}="${escapeHtml(JSON.stringify(v))}"`).join(" ");
+  // Phase 5z+2 — emit data attrs in kebab-case (HTML attribute names are
+  // case-insensitive and lowercased by the parser; camelCase here would
+  // be mangled, breaking dataset.* reads). camelKey → camel-key.
+  const camelToKebab = (s) => s.replace(/([A-Z])/g, "-$1").toLowerCase();
+  const dataAttrs = Object.entries(opts.extraData || {}).map(([k, v]) => `data-rec-${camelToKebab(k)}="${escapeHtml(JSON.stringify(v))}"`).join(" ");
   // Phase 5z+1 — title may contain pre-escaped HTML (e.g. duplicate
   // pairs with "↔"). Detect by looking for the marker; otherwise
   // escape the raw string.
@@ -1787,7 +1800,7 @@ function recRow(opts) {
   // Plain-text fallback for the data-rec-title attribute used by note drafting.
   const titlePlain = opts.title.replace(/<[^>]+>/g, "");
   return `
-    <div class="admin-rec admin-rec--${opts.tone}" data-rec-kind="${escapeHtml(opts.kind)}" data-rec-item-id="${escapeHtml(opts.itemId || "")}" data-rec-title="${escapeHtml(titlePlain)}" ${dataAttrs}>
+    <div class="admin-rec admin-rec--${opts.tone}" data-rec-kind="${escapeHtml(opts.kind)}" data-rec-id="${escapeHtml(opts.recId || "")}" data-rec-item-id="${escapeHtml(opts.itemId || "")}" data-rec-title="${escapeHtml(titlePlain)}" ${dataAttrs}>
       <div class="admin-rec__main">
         <strong>${titleHtml}</strong>
         <p class="admin-rec__description">${opts.description}</p>
@@ -1795,18 +1808,63 @@ function recRow(opts) {
       <div class="admin-rec__actions">
         <button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-jump title="Jump to this template's detail panel">Open</button>
         <button type="button" class="admin-button admin-button--primary admin-button--small" data-rec-draft title="Pre-write a structured proposal note Claude will pick up next session">${escapeHtml(opts.primaryLabel || "Draft note")}</button>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-dismiss title="Hide this recommendation without drafting a note (for false positives)">Dismiss</button>
       </div>
     </div>
   `;
 }
 
+// Phase 5z+2 — Track resolved recommendations in localStorage so once
+// Tom drafts a fix proposal, the row disappears from the panel and
+// stays gone across page reloads. Stable ids per kind:
+//   voice:{itemId}:{field}:{rule}
+//   duplicate:{minId}:{maxId}        (sorted to be order-independent)
+//   bundle:{groupKey}
+const RESOLVED_RECS_KEY = "havenAdminResolvedRecsV1";
+function loadResolvedRecs() {
+  try {
+    const raw = localStorage.getItem(RESOLVED_RECS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+function saveResolvedRecs(set) {
+  try {
+    localStorage.setItem(RESOLVED_RECS_KEY, JSON.stringify([...set]));
+  } catch {
+    // localStorage might be full or disabled; silently no-op.
+  }
+}
+function markRecResolved(recId) {
+  const set = loadResolvedRecs();
+  set.add(recId);
+  saveResolvedRecs(set);
+}
+function recId(kind, parts) {
+  // Stable, deterministic id across renders so resolved-set membership
+  // survives re-computation.
+  if (kind === "voice") return `voice:${parts.itemId}:${parts.field}:${parts.rule}`;
+  if (kind === "duplicate") {
+    const ids = [parts.aId, parts.bId].sort();
+    return `duplicate:${ids[0]}:${ids[1]}`;
+  }
+  if (kind === "bundle_candidate") return `bundle:${parts.groupKey}`;
+  return `${kind}:${JSON.stringify(parts)}`;
+}
+
 function computeRecommendations(allItems) {
   const out = { voice: [], duplicates: [], bundleCandidates: [] };
+  const resolved = loadResolvedRecs();
 
   // 1. Voice violations from _lint
   for (const i of allItems) {
     const hits = i.payload?._lint || [];
-    if (hits.length) out.voice.push({ item: i, hits });
+    for (const hit of hits) {
+      const id = recId("voice", { itemId: i.id, field: hit.field, rule: hit.ruleId });
+      if (resolved.has(id)) continue;
+      out.voice.push({ item: i, hits: [hit], recId: id });
+    }
   }
 
   // 2. Likely duplicates — same systemCategory + ≥55% title overlap.
@@ -1835,7 +1893,9 @@ function computeRecommendations(allItems) {
       }
       const sim = jaccard(a.title, b.title);
       if (sim >= 0.55) {
-        out.duplicates.push({ a, b, cat: a.payload?.systemCategory, sim: Math.round(sim * 100) });
+        const id = recId("duplicate", { aId: a.id, bId: b.id });
+        if (resolved.has(id)) continue;
+        out.duplicates.push({ a, b, cat: a.payload?.systemCategory, sim: Math.round(sim * 100), recId: id });
       }
     }
   }
@@ -1854,8 +1914,10 @@ function computeRecommendations(allItems) {
   }
   for (const [key, items] of Object.entries(groups)) {
     if (items.length < 3) continue;
+    const id = recId("bundle_candidate", { groupKey: key });
+    if (resolved.has(id)) continue;
     const [cat, season, assignmentType] = key.split("|");
-    out.bundleCandidates.push({ groupKey: key, cat, season, assignmentType, items });
+    out.bundleCandidates.push({ groupKey: key, cat, season, assignmentType, items, recId: id });
   }
 
   return out;
@@ -1883,7 +1945,33 @@ function attachRecommendationsHandlers(host) {
       e.stopPropagation();
       const rec = btn.closest("[data-rec-kind]");
       if (!rec) return;
-      await draftRecommendationNote(rec.dataset);
+      const success = await draftRecommendationNote(rec.dataset);
+      // Phase 5z+2 — Successful note save → mark this rec resolved so
+      // the row vanishes from the panel and stays gone on reload.
+      if (success && rec.dataset.recId) {
+        markRecResolved(rec.dataset.recId);
+        renderList();
+      }
+    });
+  });
+  host.querySelectorAll("[data-rec-dismiss]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rec = btn.closest("[data-rec-kind]");
+      const recIdValue = rec?.dataset.recId;
+      if (!recIdValue) return;
+      // Dismiss = mark resolved without drafting a note. For false
+      // positives or "I'll deal with it later" cases.
+      markRecResolved(recIdValue);
+      renderList();
+    });
+  });
+  host.querySelectorAll("[data-rec-reset]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!confirm("Reset all resolved/dismissed recommendations? They'll come back into the panel on next render.")) return;
+      saveResolvedRecs(new Set());
+      renderList();
     });
   });
 }
@@ -1983,7 +2071,7 @@ async function draftRecommendationNote(data) {
       `5. xcodebuild -scheme Chez to confirm clean compile.\n\n` +
       `**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.`;
   } else {
-    return;
+    return false;
   }
 
   try {
@@ -1999,12 +2087,21 @@ async function draftRecommendationNote(data) {
         snapshot,
       });
       flashSavePill();
-      alert("Draft note saved. Open the Notes tab to review + edit before sync.");
+      // Phase 5z+2 — Confirmation copy spells out exactly what landed.
+      const summary = kind === "voice"
+        ? `Voice fix proposal saved with the BEFORE/AFTER text. Claude will apply the diff in MaintenanceTemplates.swift next session.`
+        : kind === "duplicate"
+        ? `Merge proposal saved with both templates' full data. Review options in the Notes tab.`
+        : `Bundle proposal saved with the 5-step Swift edit checklist. Review in the Notes tab.`;
+      alert(`✓ ${summary}\n\nThis row will hide from the recommendations panel.`);
+      return true;
     } else {
       console.warn("writeNote not available");
+      return false;
     }
   } catch (err) {
     alert(`Failed to draft note: ${err.message}`);
+    return false;
   }
 }
 
