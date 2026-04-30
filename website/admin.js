@@ -3744,13 +3744,15 @@ function renderDecisionsView() {
   const decisions = computeDecisionQueue();
   el.search.value = state.search || "";
 
-  // Phase 5z+14 — Plain-English summary tiles. Each one is a friendly
-  // count of a single decision kind so Tom knows what's stacking.
+  // Phase 5z+14/+15 — Stats tiles. Decisions tab now only surfaces
+  // auto-detected issues that don't already have a pending note about
+  // them — Tom-authored notes (questions, change requests, proposals)
+  // live on the Notes tab. So the tiles are: everything waiting, plus
+  // the two auto-detected categories (voice/style fixes + needs review).
   el.stats.innerHTML = `
     <div class="admin-stat"><strong>${decisions.length}</strong><span>Decisions waiting</span></div>
-    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "question").length}</strong><span>Questions for you</span></div>
-    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "proposal").length}</strong><span>Pending proposals</span></div>
     <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "lint").length}</strong><span>Voice + style fixes</span></div>
+    <div class="admin-stat"><strong>${decisions.filter((d) => d.severity === "impact").length}</strong><span>Needs review</span></div>
   `;
 
   const filtered = state.search
@@ -3808,68 +3810,50 @@ function renderDecisionsView() {
       ? "Pick a decision to see the details"
       : "No decisions waiting";
     el.emptyDetail.querySelector("p").textContent = decisions.length
-      ? "Click any card on the left. You'll see what the decision is, why it surfaced, what would happen if you act on it, plus one-click buttons for each option — no jumping to other tabs."
-      : "Every surface is clean right now. Decisions show up here when there's a pending question, an open proposal, a voice/style fix to make, or a high-impact entity that hasn't been reviewed.";
+      ? "Click any card on the left. You'll see what the decision is, what would happen if you act on it, plus one-click buttons for each option. Auto-detected issues only — anything you've written a note about lives on the Notes tab."
+      : "Every surface is clean right now. Auto-detected issues show up here — voice / style fixes Claude flagged, and high-impact entities that haven't been reviewed yet. Anything you've already written a note about lives on the Notes tab.";
   }
+}
+
+// Phase 5z+15 — Build a quick lookup of "entities that already have a
+// pending note authored about them." Used to skip lint + impact rows
+// from the decision queue when Tom has already written a note about
+// the entity (the note lives on the Notes tab and is the canonical
+// place to act on it). Keeps Decisions focused on auto-detected
+// issues that don't have a human-authored note yet.
+function entitiesWithPendingNote() {
+  const set = new Set();
+  for (const note of state.notes) {
+    if (note.appliedAt || note.revertedAt) continue;
+    if (!note.scopeId) continue;
+    set.add(`${note.scopeType || "any"}::${note.scopeId}`);
+  }
+  return set;
 }
 
 function computeDecisionQueue() {
   const queue = [];
   const surfaces = ["quiz", "tasks", "routines", "handyman", "systems", "vehicles", "prompts"];
 
-  // 1. question_for_claude pending notes — top priority
-  for (const note of state.notes) {
-    if (note.intent === "question_for_claude" && !note.appliedAt) {
-      queue.push({
-        id: `q4c-${note.id}`,
-        severity: "question",
-        title: `${note.scopeTitle || "Open question"}`,
-        reason: note.body?.slice(0, 200) || "(no body)",
-        itemType: note.scopeType,
-        targetView: viewIdForType(note.scopeType),
-        targetItem: locateLiveItemByScope(note),
-        // Phase 5z+14 — keep the source note id so the focused panel
-        // can route "Open + reply" / "Mark answered" to the right note.
-        noteId: note.id,
-        recommendation: "Reply first. Don't ship code changes until you and Claude agree on the answer.",
-        primaryActions: ["open"],
-      });
-    }
-  }
+  // Phase 5z+15 — Tom: "if something is already in the notes review or
+  // to be worked on then it shouldnt show in decisions."
+  //
+  // Two consequences:
+  //   (a) question_for_claude + change_request + proposal_* note rows
+  //       are dropped from the queue entirely. Those live in the Notes
+  //       tab's "Not applied" bucket, which is where they get acted on.
+  //   (b) Lint + impact rows skip any entity that already has a pending
+  //       note authored about it — Tom is already on it, no need to
+  //       double-surface.
+  const pendingNoteScopes = entitiesWithPendingNote();
+  const hasPendingNote = (item, scopeType) => {
+    if (!item) return false;
+    const scopeId = liveEntityIdFor(item);
+    if (!scopeId) return false;
+    return pendingNoteScopes.has(`${scopeType}::${scopeId}`);
+  };
 
-  // 2. Pending change_request / proposal_* notes
-  for (const note of state.notes) {
-    if (
-      ["change_request", "proposal_add", "proposal_delete"].includes(note.intent) &&
-      !note.appliedAt &&
-      !note.revertedAt
-    ) {
-      const intentLabel = {
-        change_request: "Change request",
-        proposal_add: "Suggested addition",
-        proposal_delete: "Suggested removal",
-      }[note.intent] || note.intent;
-      queue.push({
-        id: `proposal-${note.id}`,
-        severity: "proposal",
-        title: `${intentLabel}: ${note.scopeTitle || "(unscoped)"}`,
-        reason: note.body?.slice(0, 200) || "(no body)",
-        itemType: note.scopeType,
-        targetView: viewIdForType(note.scopeType),
-        targetItem: locateLiveItemByScope(note),
-        noteId: note.id,
-        recommendation:
-          note.intent === "proposal_delete"
-            ? "Open the note for the full impact read. If it's safe, mark applied and Claude will remove it next session."
-            : note.intent === "proposal_add"
-            ? "Open the note for the full read. If it survives review, Claude will add it next session."
-            : "Open the note to see what would change. Mark it applied to ship the edit on the next code session.",
-        primaryActions: ["open"],
-      });
-    }
-  }
-
-  // 3. Lint violations on un-approved live entities — emit one queue
+  // 1. Lint violations on un-approved live entities — emit one queue
   // entry per actual lint hit so Tom sees the specific issue + the
   // offending snippet, not 35 rows of canned copy.
   for (const surfaceId of surfaces) {
@@ -3879,6 +3863,8 @@ function computeDecisionQueue() {
       if (!lintHits.length) continue;
       const launch = effectiveLaunchStatus(item);
       if (launch === "approved" || launch === "shipped") continue;
+      // Phase 5z+15 — skip if already being worked on via a note.
+      if (hasPendingNote(item, item.itemType)) continue;
       for (const hit of lintHits) {
         queue.push({
           id: `lint-${surfaceId}-${item.id}-${hit.ruleId}-${hit.field}`,
@@ -3898,7 +3884,7 @@ function computeDecisionQueue() {
     }
   }
 
-  // 4. High-impact entities not yet approved (top tier in registry, or
+  // 2. High-impact entities not yet approved (top tier in registry, or
   // bundle parents). Cap to 30 to avoid drowning the queue.
   let highImpactCount = 0;
   for (const surfaceId of surfaces) {
@@ -3907,6 +3893,8 @@ function computeDecisionQueue() {
       if (highImpactCount >= 30) break;
       const launch = effectiveLaunchStatus(item);
       if (launch === "approved" || launch === "shipped") continue;
+      // Phase 5z+15 — skip if already being worked on via a note.
+      if (hasPendingNote(item, item.itemType)) continue;
       const high = isHighImpact(item);
       if (!high) continue;
       // Skip if already in queue from earlier rules.
