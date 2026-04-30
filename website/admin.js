@@ -1662,12 +1662,14 @@ function renderFacetPills(allItems) {
       )}
       ${axisRow(
         "Routing",
-        "Who handles this by default?",
+        state.view === "tasks"
+          ? "Who handles this by default? Handyman items live on the Handyman tab — click the Handyman pill below to surface them here too."
+          : "Who handles this by default?",
         [
           pill("routing", "all", "All", allItems.length),
           pill("routing", "vendor", "Vendor", routingCounts.vendor, "Always a pro — gas, panel, roof, septic, generator. Homeowner can't safely take this on."),
           pill("routing", "vendor_or_handyman", "Vendor or Handyman", routingCounts.vendor_or_handyman, "Defaults to a vendor visit, but the handyman can knock it out on a punch-list visit too."),
-          pill("routing", "handyman", "Handyman", routingCounts.handyman, "Punch-list items the handyman tackles. Homeowner can still pull any of these into 'I'll do it myself' if they want."),
+          pill("routing", "handyman", `Handyman${state.view === "tasks" ? " (on Handyman tab)" : ""}`, routingCounts.handyman, "Punch-list items the handyman tackles. On the Tasks tab these are hidden by default and live on the Handyman tab — click this pill to override and show them here too. Homeowner can pull any of these into 'I'll do it myself' at runtime."),
           pill("routing", "homeowner_pull", "I'll do it myself", routingCounts.homeowner_pull, "Always 0 by default. Only populates when the homeowner explicitly pulls a task off another routing lane."),
           pill("routing", "bundled", "Bundled into a visit", routingCounts.bundled, "Bundle children that fold into a parent visit at runtime — Spring Landscaping Service, Pool Opening, Annual Generator Service, etc. The homeowner sees ONE scheduled task per bundle, not the underlying children."),
         ].join("")
@@ -4348,18 +4350,19 @@ function itemRowHtml(item) {
   // reshape) when one exists, so a curation decision shows on the
   // single visible row instead of disappearing with the hidden shadow.
   const status = effectiveStatus(item);
+  // Phase 5z+6 — Pack pills into a dedicated container so they sit
+  // tightly together (4px gap) instead of spreading across the row
+  // via space-between. Pills wrap as a unit when the row is narrow.
+  const statusPill = `<span class="admin-pill" data-tone="${escapeHtml(status)}">${escapeHtml(status)}</span>`;
+  const allPills = [
+    statusPill, handymanBadge, lifecycleBadge, routingBadge,
+    seasonBadge, launchBadge, lintBadge, noteBadge,
+  ].filter((p) => p && p.trim()).join("");
   return `
     <button class="admin-list-item ${isActive ? "is-active" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="admin-list-item__top">
         <strong>${escapeHtml(item.title)}</strong>
-        <span class="admin-pill" data-tone="${escapeHtml(status)}">${escapeHtml(status)}</span>
-        ${handymanBadge}
-        ${lifecycleBadge}
-        ${routingBadge}
-        ${seasonBadge}
-        ${launchBadge}
-        ${lintBadge}
-        ${noteBadge}
+        <span class="admin-list-item__pills">${allPills}</span>
       </div>
       <p>${escapeHtml(item.description || "").slice(0, 220)}</p>
       <div class="admin-list-item__meta">
@@ -5065,6 +5068,11 @@ function filterItems(items) {
       }
       if (state.routingFilter !== "all" && routingOf(item) !== state.routingFilter) return false;
       if (state.view === "handyman" && state.handymanFilter !== "all" && handymanVisitOf(item) !== state.handymanFilter) return false;
+      // Phase 5z+6 — Tasks tab hides handyman-routed templates by
+      // default (they have their own home on the Handyman tab). Power
+      // users can override via the routing filter (clicking
+      // "Handyman" routing pill auto-clears this exclusion).
+      if (state.view === "tasks" && state.routingFilter === "all" && routingOf(item) === "handyman") return false;
     }
     if (!q) return true;
     return [item.title, item.category, item.description, JSON.stringify(item.payload ?? {})]
