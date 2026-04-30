@@ -229,6 +229,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     NotificationCenter.default.post(name: .navigateToVehicle, object: nil, userInfo: ["vehicle_id": vehicleId])
                 }
 
+            // Phase 67E/F seasonal nudge — Mar 1 / Sep 1 reminders
+            // scheduled by `NotificationScheduler.scheduleHandyman
+            // SeasonalReminders`. Routes to Tasks tab in Handyman mode
+            // so the user lands on the punch list. No request_id /
+            // quote_id payload, so we don't post `.openHandymanVisit`.
+            case "handyman_seasonal_reminder":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                NotificationCenter.default.post(name: .handymanModeRequested, object: nil)
+
             // Handyman-side pushes — server sends `type: "handyman_proposed_time"`,
             // `"handyman_accepted_time"`, `"handyman_quote_sent"`,
             // `"handyman_message"` etc. All route to Tasks tab → Handyman

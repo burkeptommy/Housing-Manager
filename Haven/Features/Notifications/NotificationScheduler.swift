@@ -138,6 +138,15 @@ final class NotificationScheduler {
                 scheduleSeasonalReminders()
             }
 
+            // Phase 67E/F: handyman seasonal reminders (Mar 1 / Sep 1).
+            // Lead time is intentionally a month before the dashboard's
+            // HandymanSeasonalReminderCard window opens (Apr 1 / Oct 1
+            // ±14d) so users have runway to book the visit before the
+            // calendar lights up.
+            if prefs.maintenanceDue {
+                scheduleHandymanSeasonalReminders()
+            }
+
         } catch {
             // silently handle — notifications are best-effort
         }
@@ -231,6 +240,76 @@ final class NotificationScheduler {
                 category: "seasonal_reminder"
             )
         }
+    }
+
+    // MARK: - Handyman Seasonal Reminders (Phase 67E/F)
+
+    /// Recurring Mar 1 / Sep 1 push reminders that lead the dashboard's
+    /// HandymanSeasonalReminderCard by one month. Body steers users into
+    /// the Handyman tab to review the punch list and book the next
+    /// visit. Tap routes via the `handyman_seasonal_reminder` type case
+    /// in `AppDelegate.userNotificationCenter(_:didReceive:)`.
+    private func scheduleHandymanSeasonalReminders() {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: .now)
+
+        let anchors: [(season: String, month: Int, day: Int, headline: String)] = [
+            ("spring", 3, 1, "Time to book your spring handyman visit"),
+            ("fall", 9, 1, "Time to book your fall handyman visit"),
+        ]
+
+        for anchor in anchors {
+            var components = DateComponents()
+            components.month = anchor.month
+            components.day = anchor.day
+            components.hour = 9
+            components.minute = 0
+
+            // Pick the soonest future occurrence (this year if still
+            // ahead, else next year). Once the date passes, iOS won't
+            // refire the registered notification, so we re-register on
+            // every `rescheduleAll` pass.
+            components.year = year
+            let thisYear = cal.date(from: components)
+            let useDate: Date
+            let useYear: Int
+            if let d = thisYear, d > .now {
+                useDate = d
+                useYear = year
+            } else {
+                components.year = year + 1
+                guard let d = cal.date(from: components) else { continue }
+                useDate = d
+                useYear = year + 1
+            }
+
+            scheduleHandymanReminder(
+                id: "handyman-seasonal-\(anchor.season)-\(useYear)",
+                title: anchor.headline,
+                body: "Your punch list is ready. Tap to schedule the next visit.",
+                fireDate: useDate,
+                season: anchor.season
+            )
+        }
+    }
+
+    private func scheduleHandymanReminder(id: String, title: String, body: String, fireDate: Date, season: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.categoryIdentifier = "handyman_seasonal_reminder"
+        // userInfo `type` is matched in AppDelegate to route taps into
+        // the Handyman tab.
+        content.userInfo = [
+            "type": "handyman_seasonal_reminder",
+            "season": season,
+        ]
+
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        center.add(request) { _ in }
     }
 
     // MARK: - Private
