@@ -1773,9 +1773,16 @@ function renderDetail() {
   el.detailStatus.dataset.tone = item.status;
 
   // Phase 4b — branch on whether this surface has a structured schema.
+  // Phase 5v — Tom's bug: admin drafts (duplicates of live items) were
+  // falling into the bare 5-field curated form even when their payload
+  // carried the full template shape. Now ANY item with a schema-shaped
+  // payload renders the rich schema-driven form, regardless of source.
+  // Admin drafts WITHOUT a payload (truly hand-created) still use the
+  // curated form so we don't render an empty schema for nothing.
   const viewId = state.view;
   const schema = SCHEMAS[viewId];
-  const hasLiveSchema = !!schema && item.source === "live";
+  const hasSchemaShapedPayload = payloadMatchesSchema(item, viewId);
+  const useSchemaForm = !!schema && (item.source === "live" || hasSchemaShapedPayload);
 
   // Toggle preview-question button on quiz only.
   if (el.previewQuestion) {
@@ -1783,7 +1790,7 @@ function renderDetail() {
     else el.previewQuestion.classList.add("is-hidden");
   }
 
-  if (hasLiveSchema) {
+  if (useSchemaForm) {
     // Hide curated/legacy form. Render schema-driven form into formHost.
     el.curatedForm?.classList.add("is-hidden");
     if (el.formHost) {
@@ -1794,9 +1801,8 @@ function renderDetail() {
       editingState.current = structuredCloneSafe(item.payload ?? {});
       // Phase 5r — plain-English summary card BEFORE the form, so anyone
       // (including non-engineers) can read the entity's purpose without
-      // decoding field names. For bundle children + system-linked tasks
-      // this also includes interactive bundle/system maps with
-      // click-to-jump navigation.
+      // decoding field names. Summary card itself stays gated on
+      // source==="live" because it surfaces computed cross-entity context.
       const summaryHtml = renderEntitySummaryCard(item);
       el.formHost.innerHTML = summaryHtml + renderEntityForm(viewId, editingState.current, editingState.original);
       attachFormHandlers(el.formHost, viewId, editingState.original, editingState.current, () => {
@@ -1805,14 +1811,26 @@ function renderDetail() {
       attachSummaryCardHandlers(el.formHost);
     }
     renderDiff();
-    el.saveItem.textContent = "Save proposed change";
-    el.promoteItem.disabled = true;
-    // Phase 5 — duplicate works on live entities as a proposal_add note.
-    el.duplicateItem.disabled = false;
-    el.duplicateItem.textContent = "Clone as proposal";
-    el.deleteItem.disabled = true;
+    // Phase 5v — Save text + duplicate behavior depend on source. Admin
+    // drafts save edits directly to admin_content_items.payload; live
+    // edits go through the proposal-note flow.
+    if (item.source === "live") {
+      el.saveItem.textContent = "Save proposed change";
+      el.promoteItem.disabled = true;
+      el.duplicateItem.disabled = false;
+      el.duplicateItem.textContent = "Clone as proposal";
+      el.deleteItem.disabled = true;
+    } else {
+      el.saveItem.textContent = "Save draft";
+      el.promoteItem.disabled = item.source === "admin";
+      el.duplicateItem.disabled = false;
+      el.duplicateItem.textContent = "Duplicate";
+      el.deleteItem.disabled = item.source !== "admin";
+    }
   } else {
-    // Curated / legacy mode — keep original form behavior.
+    // Curated / legacy mode — only used now for truly hand-created admin
+    // items that have no template-shaped payload (e.g., the legacy
+    // searches / vendors surfaces, or "+ Add item" with no template basis).
     el.curatedForm?.classList.remove("is-hidden");
     if (el.formHost) el.formHost.innerHTML = "";
     if (el.diffHost) el.diffHost.innerHTML = "";
@@ -4209,6 +4227,63 @@ async function promoteSelectedItem() {
   render();
 }
 
+// Phase 5v — Detect whether an admin item carries a payload that
+// matches the schema's expected shape. We only need a couple of
+// canonical fields per surface — if any of them are present, the
+// schema form can render meaningfully against the payload.
+function payloadMatchesSchema(item, viewId) {
+  const p = item?.payload;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return false;
+  const markers = {
+    quiz: ["id", "kind", "title", "answerOptions"],
+    tasks: ["templateKey", "systemCategory", "title"],
+    handyman: ["templateKey", "systemCategory", "title"],
+    recommended: ["templateKey", "systemCategory", "title"],
+    routines: ["rawValue", "swiftCase"],
+    systems: ["categoryKey", "displayName"],
+    vehicles: ["systemPrompt"],
+    prompts: ["functionName"],
+  }[viewId] || [];
+  if (!markers.length) return false;
+  return markers.some((m) => p[m] != null && p[m] !== "");
+}
+
+// Phase 5v — Save edits made in the schema form against an admin
+// draft directly back to admin_content_items.payload (cloud) or
+// localStorage (local mode). No proposal note needed — admin drafts
+// are already the user's local edits.
+async function saveAdminDraftPayload() {
+  const current = state.selected;
+  if (!current) return;
+  const item = {
+    ...current,
+    source: "admin",
+    payload: structuredCloneSafe(editingState.current ?? current.payload ?? {}),
+    // Mirror visible top-level fields out of the payload so the list row
+    // + nav badges stay in sync without a re-export.
+    title: editingState.current?.title || current.title,
+    description: editingState.current?.description || current.description,
+    category: editingState.current?.systemCategory || editingState.current?.category || current.category,
+    isNew: current.source !== "admin" || current.isNew,
+  };
+
+  if (state.storageMode === "cloud") {
+    try {
+      const saved = await saveItemCloud(item);
+      replaceAdminItem(saved);
+      state.selected = saved;
+    } catch (error) {
+      alert(`Cloud save failed: ${error.message}`);
+      return;
+    }
+  } else {
+    replaceAdminItem(item);
+    writeLocal(LOCAL_ITEMS_KEY, state.adminItems);
+  }
+  flashSavePill();
+  render();
+}
+
 async function duplicateSelectedItem() {
   if (!state.selected) return;
   // Phase 5 — for live entities, "duplicate" becomes a proposal_add note
@@ -4323,6 +4398,15 @@ async function saveSelectedItem() {
   // never direct mutations to admin_content_items.
   if (editingState.viewId && state.selected?.source === "live") {
     await saveLiveProposal();
+    return;
+  }
+
+  // Phase 5v — admin draft using the schema form: the user has been
+  // editing fields in the rich schema view. Save the edited payload
+  // back to admin_content_items.payload directly. No proposal-note
+  // round trip — admin drafts already represent local edits.
+  if (editingState.viewId && state.selected?.source === "admin") {
+    await saveAdminDraftPayload();
     return;
   }
 
