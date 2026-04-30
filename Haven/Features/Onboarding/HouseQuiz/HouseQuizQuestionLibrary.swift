@@ -155,8 +155,8 @@ enum HouseQuizQuestionLibrary {
             id: "q2_siding",
             section: .homeBasics,
             title: "What's your exterior siding?",
-            subtitle: "Some materials need yearly attention, others just once a decade.",
-            kind: .singleChoice,
+            subtitle: "Pick all that apply — many homes mix two or three materials.",
+            kind: .multiSelect,
             answerOptions: [
                 AnswerOption(id: "vinyl", label: "Vinyl"),
                 AnswerOption(id: "wood", label: "Wood"),
@@ -164,7 +164,6 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "stucco", label: "Stucco"),
                 AnswerOption(id: "fiber_cement", label: "Fiber Cement"),
                 AnswerOption(id: "stone", label: "Stone"),
-                AnswerOption(id: "mixed", label: "Mixed"),
             ]
         ),
         // Phase 67D (A3): Q3 + Q3b merged into a single fuel+system combo
@@ -194,42 +193,15 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "not_sure", label: "Not sure / other", icon: "questionmark.circle"),
             ]
         ),
-        HouseQuizQuestion(
-            id: "q4_purchase",
-            section: .homeBasics,
-            title: "How did you get this home?",
-            subtitle: "Add a purchase price if you have it. We'll use it for your investment dashboard.",
-            kind: .currency,
-            answerOptions: [
-                AnswerOption(id: "bought", label: "Bought existing"),
-                AnswerOption(id: "custom_build", label: "Custom build"),
-                AnswerOption(id: "inherited", label: "Inherited"),
-                AnswerOption(id: "other", label: "Other"),
-            ],
-            documentUploadCategory: .mortgage
-        ),
-        HouseQuizQuestion(
-            id: "q5_mortgage",
-            section: .homeBasics,
-            title: "Do you have a mortgage on this home?",
-            subtitle: "We'll surface refinance opportunities when rates move.",
-            kind: .yesNoLender,
-            answerOptions: [
-                AnswerOption(id: "yes", label: "Yes"),
-                AnswerOption(id: "no", label: "No, paid off"),
-                AnswerOption(id: "skip", label: "Prefer not to say"),
-            ],
-            // Phase 67D (A1): only ask about a mortgage when the home was
-            // bought (Q4 = "bought"). Inherited / family pass-down / custom
-            // build paths skip this — they don't have a fresh-purchase
-            // mortgage to upload. Cash buyers fall through and pick "no".
-            // When Q4 is unanswered, fall back to showing Q5 (guard returns
-            // false) so a saved-for-later quiz doesn't lose the prompt.
-            dynamicSkip: { state in
-                guard let q4 = state.answers["q4_purchase"]?.answerId else { return false }
-                return q4 == "inherited" || q4 == "custom_build" || q4 == "other"
-            }
-        ),
+        // Phase 67E/F admin feedback (f2d119cc + b348f04c + f5992eea):
+        // Q4 "How did you get this home?" and Q5 "Do you have a mortgage?"
+        // were dropped. Purchase price is captured + edited via the
+        // PropertyRecapCard (Phase 60.1) using the ATTOM-derived value
+        // as a starting point. Mortgage questions don't drive any flow
+        // post-document-vault, and the "is this a new build?" intent of
+        // Q4 is better served by deriving from ATTOM `yearBuilt` (built
+        // in the last 12 months → flag accordingly). The new-build
+        // derivation is a follow-up; for now both questions are gone.
     ]
 
     // MARK: - Section 2 — Inside Your Home
@@ -251,11 +223,12 @@ enum HouseQuizQuestionLibrary {
             id: "q7_sewer_septic",
             section: .inside,
             title: "Sewer or septic?",
-            subtitle: "Septic systems need pumping every 3-5 years.",
+            subtitle: "Septic systems typically need pumping every 2-3 years.",
             kind: .singleChoice,
             answerOptions: [
                 AnswerOption(id: "sewer", label: "Municipal sewer"),
                 AnswerOption(id: "septic", label: "Septic", icon: "arrow.down.to.line"),
+                AnswerOption(id: "other", label: "Other (compost toilet, off-grid, etc.)", icon: "leaf"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
             ]
         ),
@@ -263,6 +236,7 @@ enum HouseQuizQuestionLibrary {
             id: "q8_water_heater",
             section: .inside,
             title: "What kind of water heater do you have?",
+            subtitle: "Not sure? Snap a photo of the unit and we'll identify it for you.",
             kind: .singleChoice,
             answerOptions: [
                 AnswerOption(id: "tank_gas", label: "Tank, gas"),
@@ -270,7 +244,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "tankless_gas", label: "Tankless, gas"),
                 AnswerOption(id: "tankless_electric", label: "Tankless, electric"),
                 AnswerOption(id: "heat_pump", label: "Heat pump"),
-                AnswerOption(id: "not_sure", label: "Not sure"),
+                AnswerOption(id: "not_sure", label: "Not sure — take a photo and we'll tell you", icon: "camera"),
             ]
         ),
         HouseQuizQuestion(
@@ -405,12 +379,14 @@ enum HouseQuizQuestionLibrary {
             id: "q15_security",
             section: .outside,
             title: "Security or alarm system?",
+            subtitle: "We won't share specifics — your setup stays private to you and any household members you invite.",
             kind: .singleChoice,
             answerOptions: [
                 AnswerOption(id: "monitored", label: "Yes, monitored"),
                 AnswerOption(id: "self_monitored", label: "Yes, self-monitored"),
                 AnswerOption(id: "cameras_only", label: "Cameras only"),
                 AnswerOption(id: "none", label: "None"),
+                AnswerOption(id: "prefer_not_to_answer", label: "Prefer not to answer", icon: "lock"),
             ],
             providerFollowUpAnswerIds: ["monitored"],
             providerTypes: ["security"],

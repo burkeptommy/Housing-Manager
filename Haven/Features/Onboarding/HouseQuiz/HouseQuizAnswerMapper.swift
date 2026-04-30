@@ -56,7 +56,22 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q2_siding":
-                try await persistAttribute("siding_material", value: answer.answerId)
+                // Phase 67E/F (admin feedback bc224f35): Q2 is multiSelect.
+                // Persist the comma-joined sorted list under the existing
+                // `siding_material` attribute key so single-material homes
+                // keep matching their previous value (e.g. "vinyl"). Mixed
+                // homes write something like "brick,vinyl" — downstream
+                // template gating that checks for a substring (e.g.
+                // siding-material-aware power-wash cadence) can split on
+                // comma. The legacy "mixed" sentinel is dropped from Q2's
+                // options since multiSelect captures the actual mix.
+                let sidingValue: String? = {
+                    if let ids = answer.selectedIds, !ids.isEmpty {
+                        return ids.sorted().joined(separator: ",")
+                    }
+                    return answer.answerId
+                }()
+                try await persistAttribute("siding_material", value: sidingValue)
 
             case "q3_heating_system":
                 // Phase 67D (A3): merged Q3 + Q3b. The user picks one of 12
@@ -88,19 +103,14 @@ final class HouseQuizAnswerMapper {
                 )
                 reconciliationResult = reconciliationResult.merging(hvacResult)
 
-            case "q4_purchase":
-                if let custom = answer.customText, let price = Double(digitsOnly(custom)) {
-                    var update = PropertyUpdate()
-                    update.purchasePrice = price
-                    if let kind = answer.answerId {
-                        try await persistAttribute("purchase_kind", value: kind)
-                    }
-                    _ = try await db.updateProperty(id: propertyId, update)
-                }
-
-            case "q5_mortgage":
-                let hasMortgage = answer.answerId == "yes"
-                try await persistAttribute("has_mortgage", value: hasMortgage ? "yes" : "no")
+            // Phase 67E/F admin feedback (f2d119cc + b348f04c + f5992eea):
+            // Q4 "How did you get this home?" and Q5 "Do you have a mortgage?"
+            // were dropped from the quiz library. Their handlers are kept
+            // here as no-ops so any saved-for-later quiz state with those
+            // answer ids round-trips cleanly through the mapper instead of
+            // falling into the unhandled-case path.
+            case "q4_purchase", "q5_mortgage":
+                break
 
             case "q6_water_source":
                 try await persistAttribute("water_source", value: answer.answerId)
