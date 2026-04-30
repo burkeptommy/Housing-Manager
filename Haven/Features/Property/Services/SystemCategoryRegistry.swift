@@ -93,12 +93,14 @@ enum SystemCategoryRegistry {
               displayPriority: 80, icon: "sparkles", defaultCadence: "Biweekly"),
         .init(categoryKey: "Handyman", displayName: "Handyman", tier: .universal,
               displayPriority: 85, icon: "hammer.fill", defaultCadence: "Semi-annually"),
-        // Phase 54E.3: Trash & Recycling lives as a real category so
-        // the hauler (Redding Sanitation, Waste Management, etc.) can
-        // be saved as a contractor, linked from weekly cadences, and
-        // assigned in the contractor directory's "Assign Systems" step.
-        // No maintenance templates — this category is purely a
-        // vendor-anchor, same pattern the Handyman category uses.
+        // Phase 67E/F (admin feedback 05d688b7): Trash & Recycling kept
+        // here as a vendor-anchor category (so haulers can be saved as
+        // contractors with this category, linked from weekly routines,
+        // and assigned in the contractor directory). No maintenance
+        // templates anchor here. Existing legacy `home_systems` rows
+        // for this category are archived by
+        // `runServiceSystemArchiveOnceIfNeeded` (v2) — the registry
+        // entry exists only for the contractor-side ergonomics.
         .init(categoryKey: "Trash & Recycling", displayName: "Trash & Recycling", tier: .universal,
               displayPriority: 90, icon: "trash.fill", defaultCadence: "Weekly"),
     ]

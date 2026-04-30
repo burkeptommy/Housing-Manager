@@ -206,6 +206,12 @@ enum SystemProfileAudit {
             "cleaning service", "tree service", "tree care",
             "window cleaning", "gutter cleaning", "pressure washing",
             "irrigation", "landscaping", "handyman",
+            // Phase 67E/F (admin feedback 05d688b7): Trash & Recycling
+            // is purely a routine surface — the hauler comes weekly,
+            // there's no equipment with serial numbers / install dates.
+            // Existing system rows on legacy households get archived
+            // by the v2 bump on `hasArchivedServiceSystemsP1_*`.
+            "trash & recycling",
         ]
         if serviceCategories.contains(category) {
             addIfMissing("vendor", "Service vendor", "Add the contractor's contact info so Chez can plan visits.", hasVendor)
