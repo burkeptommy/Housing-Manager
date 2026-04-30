@@ -722,6 +722,71 @@ Replaces the Phase 66 `MaintenanceHubView` lobby (8 sections) with a focused 6-s
 
 Decision rows wire through a small `DecisionVendorPicker` wrapper around the existing `ContractorPickerSheet(systemCategory:onSelect:)` — selecting a contractor sets `RoutineUpdate.vendorId` and flips `setupState` to `.active` via `DatabaseService.updateRoutine(id:_:)`.
 
+## Handyman single-rail (Phase 67E/F)
+
+**Single-rail invariant.** Tier-4 ("Handyman only") work lives on **one** rail: `handyman_punch_items`. It never appears as a `maintenance_tasks` row. The reconciler routes there at creation time, the migrations converge existing households onto the new model, the Spring/Fall handyman visit parent templates are deleted, and the bidirectional UI lets users move work between rails without breaking the invariant.
+
+**Reconciler routing (B3).** `MaintenanceTaskReconciler.reconcile(...)` checks `isHandymanTier` BEFORE the standalone-template `createMaintenanceTask` call:
+```swift
+let isHandymanTier =
+    !template.safetyFloor &&
+    template.bundleId == nil &&
+    (template.routingOverride == .diyDefault || template.routingOverride == .diyCapable) &&
+    (template.diyEffortMinutes ?? 0) <= 60
+```
+Match → insert into `handyman_punch_items` with `source = "auto_seed_handyman_tier"` + `source_template_key = templateKey` + skip the maintenance task. Dedup against `existingPunchItemTemplateKeys` (loaded once at the top of reconcile) so reruns don't duplicate. Bundle children with `bundleId: "Handyman:spring"` / `"Handyman:fall"` are NOT touched by this branch — they keep going through the bundle loop.
+
+**Seasonal reminders (B2).** Replace the deleted Spring/Fall visit parent templates with two coordination surfaces:
+- `HandymanSeasonalReminderCard` (dashboard) — Apr 1 / Oct 1 with ±14-day window, gated on `viewModel.handymanSeasonalReminder` non-nil + `hasCompletedAnyQuiz`. Lives at `Haven/Features/Dashboard/Components/HandymanSeasonalReminderCard.swift`.
+- `NotificationScheduler.scheduleHandymanSeasonalReminders` (push) — recurring annual local notifications fired Mar 1 / Sep 1 at 9 AM. Lead time is intentionally one month before the dashboard card opens its window so users have runway to book the visit. Tap routes via `type: "handyman_seasonal_reminder"` in `AppDelegate.userNotificationCenter(_:didReceive:)` to Tasks tab + `.handymanModeRequested`.
+
+**Migrations (B4 + B5).** Two one-time UserDefaults-gated migrations in `AppState.initialize`, after `runDay1CuratorForExistingPropertiesOnceIfNeeded` so the curator's prior re-parenting has settled:
+- `migrateHandymanTierTasksToPunchItemsOnceIfNeeded` (gate `hasMigratedHandymanTierToPunchItems_v1`) — walks active `maintenance_tasks`, skips rows with `lastCompletedDate` (history) or `scheduledDate` (user-touched), and for every row whose templateId resolves to an `isHandymanTier` template creates a punch item with `source = "migrated_from_task"` + archives the source task with `archive_reason = "migrated_to_handyman_punch"`. Posts `.maintenanceTaskChanged` + `.handymanPunchListChanged`.
+- `migrateHandymanVisitsToRemindersOnceIfNeeded` (gate `hasMigratedHandymanVisitsToReminders_v1`) — archives rows whose `templateId` is `"Handyman:Spring handyman visit"` or `"Handyman:Fall handyman visit"` with reason `migrated_to_seasonal_reminder`. Skips rows with `lastCompletedDate` to preserve history. Posts `.maintenanceTaskChanged`.
+
+**Bidirectional UI (B6 + B7).**
+- **Punch → Task** (new): long-press a manual punch item → `PromotePunchItemSheet` opens with a date picker + Schedule button. On confirm, `HandymanPunchListViewModel.promoteToTask(item:scheduledDate:)` creates a `maintenance_tasks` row with `scheduled_date` set, `assignmentType = "personal"`, `assignedRoute = "diy"`, and (when the punch item carries one) `templateId = sourceTemplateKey`. The source punch item is archived with `archive_reason = "promoted_to_task"`.
+- **Task → Punch** (updated from Phase 56.4): `MaintenanceTaskDetailSheet.addToPunchListJustThisTime` and `addToPunchListReassignSeries` now archive the source task with `archive_reason = "moved_to_handyman_punch"` instead of completing it + re-parenting under the handyman routine. The punch item carries `source = "promoted_from_task"` (replaces the legacy `"maintenance_task"`) plus `source_template_key` so future reconciler runs dedupe correctly. Both methods post `.maintenanceTaskChanged` AND `.handymanPunchListChanged`.
+
+**Day1TaskCurator simplification (B8).** The `isDIY → handyman routine` re-parenting branch is removed. Handyman-tier templates no longer reach `maintenance_tasks` from the reconciler, and the B4 migration archived pre-67E/F leftovers, so the curator never sees them. `.either` tasks the homeowner explicitly hires the handyman for still flow through the post-quiz delegation sheet (which assigns a contractor and re-runs the curator's vendor branch).
+
+**Schema (`supabase/migrations/20261006_phase67ef_handyman_tier_routing.sql`):**
+- `handyman_punch_items.source_template_key text` — in-app `MaintenanceTemplate.templateKey` for reconciler dedup. Indexed via `idx_handyman_punch_items_source_template_key` (partial: non-null + non-archived).
+- `handyman_punch_items.archive_reason text` — distinguishes `"promoted_to_task"` from legacy nil dismissals.
+
+**New `source` values** stamped post-67E/F:
+- `auto_seed_handyman_tier` — reconciler-seeded
+- `promoted_from_task` — moved from a maintenance task via Task→Punch
+- `migrated_from_task` — created by the one-time backfill migration
+
+**New `archive_reason` values** (on `maintenance_tasks`):
+- `migrated_to_handyman_punch` — archived by the B4 migration
+- `migrated_to_seasonal_reminder` — archived by the B5 migration
+- `moved_to_handyman_punch` — archived by Task→Punch flow
+
+**New `archive_reason` values** (on `handyman_punch_items`):
+- `promoted_to_task` — archived by Punch→Task flow
+
+**New notification:** `Notification.Name.handymanPunchListChanged` posted whenever the punch-list rail changes. Cleaner refresh signal than `.maintenanceTaskChanged` because the punch-list and task tables no longer share state.
+
+**Files:**
+- Reconciler: `Haven/Features/Property/Services/MaintenanceTaskReconciler.swift` (`reconcile` standalone-template loop)
+- Templates: `Haven/Features/Property/Services/MaintenanceTemplates.swift` (Spring/Fall visit parents deleted)
+- Migrations: `Haven/App/AppState.swift` (`migrateHandymanTier...` + `migrateHandymanVisits...`)
+- Curator: `Haven/Features/Property/Services/Day1TaskCurator.swift` (handyman branch removed)
+- Punch model: `Haven/Features/Property/Models/HandymanPunchItem.swift` (`sourceTemplateKey`, `archivedReason`)
+- Punch UI: `Haven/Features/Property/Views/HandymanPunchListView.swift` (`PromotePunchItemSheet` + `promoteToTask`)
+- Task→Punch: `Haven/Features/Property/Views/MaintenanceTaskDetailSheet.swift` + `Haven/Features/Property/Services/ServiceLibrary.swift::buildPunchItemInsert`
+- Notifications: `Haven/Features/Notifications/NotificationScheduler.swift::scheduleHandymanSeasonalReminders` + `Haven/App/HavenApp.swift` (push handler)
+- Dashboard card: `Haven/Features/Dashboard/Components/HandymanSeasonalReminderCard.swift` (already in flight pre-67E/F)
+- DB: `archiveHandymanPunchItem(id:reason:)` overload in `Haven/Core/Networking/DatabaseService.swift`
+- Schema: `supabase/migrations/20261006_phase67ef_handyman_tier_routing.sql`
+
+**What NOT to do:**
+- Do not seed handyman-tier templates as `maintenance_tasks` rows — the reconciler now intercepts at creation time.
+- Do not re-introduce the Day1TaskCurator handyman branch — duplicate routing breaks the single-rail invariant.
+- Do not add a third visit parent template (e.g. "Summer handyman check") without a matching deletion path — the seasonal reminder card is the canonical coordination surface.
+
 ## Chez Handyman Operations Desk (Web — Phase 67)
 
 Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces the 9 embedded workspace tabs that `handyman.html` was inflating after auth. Lives at `/operations/*` routes; `handyman.html` keeps the auth pitch + sign-in/sign-up form and redirects to `/operations/` after a successful session, preserving `?next=` deep links from the SPA.
