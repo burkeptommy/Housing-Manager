@@ -265,6 +265,13 @@ const state = {
   seasonFilter: "all",    // all | Spring | Summer | Fall | Winter | year_round | Spring/Fall
   routingFilter: "all",   // all | vendor_only | vendor_or_handyman | handyman_only | bundled
   handymanFilter: "all",  // all | spring | fall | library — only used on Handyman tab
+  // Phase 5y — Default Tasks/Handyman/Recommended to "bundle-grouped"
+  // mode: only bundle PARENTS (templates carrying bundleTitle) +
+  // standalones show as their own rows. The 43 non-parent children
+  // are folded into their parent and accessible via the detail panel's
+  // bundle map. Matches how the iOS reconciler surfaces these to the
+  // homeowner (one task per visit, not one per child template).
+  groupBundles: true,
   // Phase 7 — simulator scratch state. Fact bundle + last result so
   // re-rendering the surface doesn't reset Tom's edits.
   simFacts: structuredCloneSafePure(DEFAULT_FACTS),
@@ -1590,8 +1597,36 @@ function renderFacetPills(allItems) {
     `;
   }
 
+  // Phase 5y — Bundle grouping toggle. Default mirrors the iOS reconciler's
+  // "one task per visit" model. Click to flatten and see every individual
+  // template (the audit/inventory mode).
+  const bundleCount = (() => {
+    const seen = new Set();
+    for (const i of allItems) if (i.payload?.bundleId) seen.add(i.payload.bundleId);
+    return seen.size;
+  })();
+  const groupingRow = `
+    <div class="admin-facet-row admin-facet-row--grouping">
+      <div class="admin-facet-row__head">
+        <span class="admin-facet-row__label">Grouping</span>
+        <span class="admin-facet-row__caption admin-muted">
+          Default: bundle children fold into their ${bundleCount} parent visits — same as the homeowner sees in the iOS app.
+        </span>
+      </div>
+      <div class="admin-facet-row__pills">
+        <button type="button" class="admin-facet-pill ${state.groupBundles ? "is-active" : ""}" data-grouping="grouped" title="Default. Bundle children (e.g. 'Annual roof inspection', 'Check for damaged shingles') fold into their parent visit ('Roof and Gutter Service'). The 43 child rows you'd otherwise see are hidden — open any parent's detail panel to see its children inline.">
+          <span class="admin-facet-pill__label">Group bundles (default)</span>
+        </button>
+        <button type="button" class="admin-facet-pill ${!state.groupBundles ? "is-active" : ""}" data-grouping="flat" title="Audit mode. Every individual template surfaces as its own row, including the 43 bundle children. Useful when you need to edit a specific child template directly without opening the parent.">
+          <span class="admin-facet-pill__label">Show all (flat)</span>
+        </button>
+      </div>
+    </div>
+  `;
+
   return `
     <div class="admin-facets">
+      ${groupingRow}
       ${handymanRow}
       ${axisRow(
         "Lifecycle",
@@ -1638,6 +1673,13 @@ function attachFacetPillHandlers(host) {
       const axis = btn.dataset.facetAxis;
       const value = btn.dataset.facetValue;
       state[`${axis}Filter`] = value;
+      renderList();
+    });
+  });
+  // Phase 5y — bundle grouping toggle
+  host.querySelectorAll("[data-grouping]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.groupBundles = btn.dataset.grouping === "grouped";
       renderList();
     });
   });
@@ -3510,6 +3552,18 @@ function routingReason(t) {
   if (t.bundleId) {
     const parentTitle = prettyBundleTitle(t.bundleId);
     const siblings = countBundleSiblings(t.bundleId);
+    // Phase 5y — Differentiate bundle PARENT (has bundleTitle, IS the
+    // homeowner-facing task) from child siblings (no bundleTitle, fold
+    // into the parent at runtime).
+    if (t.bundleTitle) {
+      return {
+        tier: "bundled",
+        label: `Bundles ${siblings - 1} child${siblings - 1 === 1 ? "" : "ren"}`,
+        tooltip:
+          `Bundle parent — this template IS the homeowner's task. ${siblings - 1} other template${siblings - 1 === 1 ? "" : "s"} fold into this single visit at runtime; the homeowner sees ONE scheduled task ("${t.bundleTitle}") instead of ${siblings} separate to-dos. ` +
+          `Trigger: bundleTitle = "${t.bundleTitle}" + bundleId = "${t.bundleId}" in MaintenanceTemplates.swift.`,
+      };
+    }
     return {
       tier: "bundled",
       label: `↳ ${parentTitle}`,
@@ -4161,6 +4215,19 @@ function filterItems(items) {
   // surfaces. Other surfaces ignore them so legacy behavior is unchanged.
   const facetSurface = ["tasks", "handyman", "recommended"].includes(state.view);
   return items.filter((item) => {
+    // Phase 5y — Bundle grouping: when ON (default), hide non-parent
+    // bundle children. A "parent" is a bundle child template that
+    // carries bundleTitle (the row that becomes the homeowner's actual
+    // task). The other children fold into that parent at runtime, so
+    // showing them as separate list rows is duplicative.
+    //
+    // Exception: when the user explicitly filters by lifecycle =
+    // "bundle_child", they're asking to see the children — auto-flatten
+    // so the filter has something to show.
+    if (facetSurface && state.groupBundles && state.lifecycleFilter !== "bundle_child") {
+      const t = item.payload || {};
+      if (t.bundleId && !t.bundleTitle) return false;
+    }
     if (state.statusFilter !== "all" && effectiveStatus(item) !== state.statusFilter) return false;
     if (facetSurface) {
       if (state.lifecycleFilter !== "all" && lifecycleOf(item) !== state.lifecycleFilter) return false;
