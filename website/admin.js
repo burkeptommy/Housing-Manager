@@ -1682,9 +1682,15 @@ function renderFacetPills(allItems) {
 // "Draft proposal note" button that opens the note form pre-filled
 // with a structured body Tom can review + save.
 function renderRecommendationsPanel(allItems) {
-  if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
+  if (!["tasks", "handyman", "recommended", "quiz"].includes(state.view)) return "";
   const findings = computeRecommendations(allItems);
-  const total = findings.voice.length + findings.duplicates.length + findings.bundleCandidates.length + findings.misroutedToTasks.length;
+  const total =
+    findings.voice.length +
+    findings.duplicates.length +
+    findings.bundleCandidates.length +
+    findings.misroutedToTasks.length +
+    findings.quizMergePairs.length +
+    findings.quizDropCandidates.length;
   const resolvedCount = loadResolvedRecs().size;
   const resetButton = resolvedCount > 0
     ? `<button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-reset title="Undo all resolved/dismissed recommendations and re-run the audit from scratch.">↻ Reset ${resolvedCount} resolved</button>`
@@ -1796,11 +1802,64 @@ function renderRecommendationsPanel(allItems) {
       </div>`
     : "";
 
+  // Phase 5z+5 — Quiz-specific sections. Only fire on the Quiz tab.
+  const mergePairsHtml = findings.quizMergePairs.length
+    ? `<div class="admin-recs__section">
+        <h4>🪺 Sub-question merge candidates <span class="admin-recs__badge">${findings.quizMergePairs.length}</span></h4>
+        <p class="admin-recs__what">
+          <strong>What this is:</strong> Sub-questions (q3b / q11b / q12b / q14b / q18b / q25b / q28b — the ones with letter suffixes) that act as conditional follow-ups to a parent question. Most are fine but each adds friction with a separate screen + chapter card flash.<br/>
+          <strong>Why it matters:</strong> Tom's earlier audit (Phase A) identified 8 of these as merge candidates — fold the sub-question into the parent via progressive disclosure (parent answer reveals sub-fields inline) and the homeowner sees ONE screen, not two. Reduces quiz length without losing data.<br/>
+          <strong>Primary action:</strong> Click <em>Draft merge proposal</em> to write a note with the new HouseQuizQuestionKind case (e.g. <code>progressivePool</code>) + the migration logic for in-flight quizzes.
+        </p>
+        ${findings.quizMergePairs.map((m) => recRow({
+          kind: "quiz_merge_pair",
+          recId: m.recId,
+          title: `${escapeHtml(m.parent.payload.id)} <span class="admin-muted">+</span> ${escapeHtml(m.child.payload.id)}`,
+          tone: "indigo",
+          description: `<strong>Parent:</strong> ${escapeHtml(m.parent.title)}<br/><strong>Sub-question:</strong> ${escapeHtml(m.child.title)}<br/>Combine into one screen with progressive disclosure — the parent answer reveals the sub-fields inline.`,
+          primaryLabel: "Draft merge proposal",
+          itemId: m.parent.id,
+          extraData: { parentQuestionId: m.parent.payload.id, childQuestionId: m.child.payload.id },
+        })).join("")}
+      </div>`
+    : "";
+
+  const dropCandidatesHtml = findings.quizDropCandidates.length
+    ? `<div class="admin-recs__section">
+        <h4>✂️ Drop / move / auto-skip candidates <span class="admin-recs__badge">${findings.quizDropCandidates.length}</span></h4>
+        <p class="admin-recs__what">
+          <strong>What this is:</strong> Specific questions flagged for cutting (vestigial), moving (better surface elsewhere), auto-skipping (only relevant in a narrow case), or pre-filling from ATTOM (already in public records). Compiled from Tom's earlier quiz audit.<br/>
+          <strong>Why it matters:</strong> Every removed question is ~20 seconds saved + one less friction point. Goal: 43 → ~30 questions without losing data quality.<br/>
+          <strong>Primary action:</strong> Click <em>Draft change proposal</em> to write a note with the specific Swift edit Claude will apply next session.
+        </p>
+        ${findings.quizDropCandidates.map((d) => {
+          const severityLabel = {
+            "auto-skip": "Auto-skip when prior answer makes it irrelevant",
+            "drop": "Drop entirely",
+            "move": "Move to a dedicated intake",
+            "attom_derive": "Pre-fill from ATTOM, ask only for confirmation",
+            "attom_derive_partial": "Pre-fill price from ATTOM, keep the origin question",
+          }[d.severity] || d.severity;
+          const tone = d.severity === "drop" ? "salmon" : d.severity === "move" ? "indigo" : "purple";
+          return recRow({
+            kind: "quiz_drop_candidate",
+            recId: d.recId,
+            title: `${escapeHtml(d.question.payload.id)} <span class="admin-muted">·</span> ${escapeHtml(severityLabel)}`,
+            tone,
+            description: `<strong>${escapeHtml(d.question.title)}</strong><br/><strong>Why:</strong> ${escapeHtml(d.reason)}<br/><strong>Fix:</strong> ${escapeHtml(d.fix)}`,
+            primaryLabel: "Draft change proposal",
+            itemId: d.question.id,
+            extraData: { questionId: d.question.payload.id, severity: d.severity, reason: d.reason, fix: d.fix },
+          });
+        }).join("")}
+      </div>`
+    : "";
+
   return `
     <details class="admin-recs" open>
       <summary>
         <span class="admin-recs__title">⚠️ Recommendations <span class="admin-recs__badge admin-recs__badge--total">${total}</span></span>
-        <span class="admin-muted">Voice issues, likely duplicates, grouping candidates, and routing-tier mismatches. Click any row to draft a proposal note.</span>
+        <span class="admin-muted">Voice issues, likely duplicates, grouping candidates, routing-tier mismatches, and quiz-quality findings. Click any row to draft a proposal note.</span>
         ${resetButton}
       </summary>
       <div class="admin-recs__body">
@@ -1808,6 +1867,8 @@ function renderRecommendationsPanel(allItems) {
         ${dupesHtml}
         ${candidatesHtml}
         ${misroutedHtml}
+        ${mergePairsHtml}
+        ${dropCandidatesHtml}
       </div>
     </details>
   `;
@@ -1877,11 +1938,20 @@ function recId(kind, parts) {
   }
   if (kind === "bundle_candidate") return `bundle:${parts.groupKey}`;
   if (kind === "misrouted_punch") return `misrouted_punch:${parts.itemId}`;
+  if (kind === "quiz_merge_pair") return `quiz_merge:${parts.parentId}:${parts.childId}`;
+  if (kind === "quiz_drop_candidate") return `quiz_drop:${parts.questionId}`;
   return `${kind}:${JSON.stringify(parts)}`;
 }
 
 function computeRecommendations(allItems) {
-  const out = { voice: [], duplicates: [], bundleCandidates: [], misroutedToTasks: [] };
+  const out = {
+    voice: [],
+    duplicates: [],
+    bundleCandidates: [],
+    misroutedToTasks: [],
+    quizMergePairs: [],
+    quizDropCandidates: [],
+  };
   const resolved = loadResolvedRecs();
 
   // 1. Voice violations from _lint
@@ -1968,7 +2038,74 @@ function computeRecommendations(allItems) {
     out.bundleCandidates.push({ groupKey: key, cat, season, assignmentType, items, recId: id });
   }
 
-  // 4. Misrouted to maintenance_tasks (should be handyman punch items).
+  // 4a. Quiz merge-pair candidates — sub-questions (q*b_* / q*c_*) that
+  // could fold into their parent question via progressive disclosure.
+  // 8 known pairs from Tom's Phase A audit. High-signal: every one of
+  // these reduces quiz length without losing data.
+  const quizItems = allItems.filter((i) => i.itemType === "question" && i.source === "live");
+  const byQuestionId = new Map(quizItems.map((q) => [q.payload?.id, q]));
+  for (const q of quizItems) {
+    const id = q.payload?.id || "";
+    const parentMatch = id.match(/^(q\d+)([bc])_/);
+    if (!parentMatch) continue;
+    const parentId = `${parentMatch[1]}_`;
+    const parent = quizItems.find((p) => (p.payload?.id || "").startsWith(parentId));
+    if (!parent) continue;
+    const recIdValue = recId("quiz_merge_pair", { parentId: parent.payload.id, childId: id });
+    if (resolved.has(recIdValue)) continue;
+    out.quizMergePairs.push({ parent, child: q, recId: recIdValue });
+  }
+
+  // 4b. Quiz drop-candidate findings — hardcoded list from Tom's audit
+  // earlier this session. Each carries a specific reason + concrete fix.
+  const dropCandidates = [
+    {
+      questionId: "q5_mortgage",
+      severity: "auto-skip",
+      reason: "Asked unconditionally, but mortgage only exists when Q4 = purchase. For inheritance / family-pass-down / new-build / cash, Q5 is a confusing dead-end.",
+      fix: "Add a `dynamicSkip` closure on Q5: skip when Q4 answer ∈ {inheritance, family_pass_down, built_new, cash}.",
+    },
+    {
+      questionId: "q23_vehicle_count",
+      severity: "drop",
+      reason: "Vestigial — Q24 (vehicleAdd) handles the primary vehicle directly with a Skip button. Asking for a count first adds friction without value.",
+      fix: "Delete Q23 from HouseQuizQuestionLibrary.swift. Re-title Q24 to 'Add your primary vehicle' with a Skip option.",
+    },
+    {
+      questionId: "q29_estate_docs",
+      severity: "move",
+      reason: "Single multi-select asking what estate docs the homeowner has. Phase 48 already ships a dedicated 6-section EstateIntakeFormView with save-per-answer + proper categorization. Q29 is the wrong place — it short-changes the homeowner.",
+      fix: "Remove Q29 from the quiz. Replace with a milestone card that says 'We have a separate quick estate intake for legal documents' + 'Now / Later' buttons. Now → push EstateIntakeFormView. Later → continue. Either way the quiz proceeds.",
+    },
+    {
+      questionId: "q1_roof_material",
+      severity: "attom_derive",
+      reason: "ATTOM property records often carry roof material. The quiz could open with an 'ATTOM Hello Card' that says 'We see your roof is asphalt — sound right?' with confirm or correct, instead of asking cold.",
+      fix: "Add an ATTOMHelloCard component before Q1 that pre-fills from PropertyLookupResult. Tap any field to correct. Confirmed values stamp `attributes.{field}_source = 'manual'` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.",
+    },
+    {
+      questionId: "q2_siding",
+      severity: "attom_derive",
+      reason: "Same pattern as Q1 — ATTOM has siding material in the property record for many homes. Pre-fill + confirm, don't ask cold.",
+      fix: "Bundle into the same ATTOMHelloCard as Q1. Lower priority than Q1 since siding gets less downstream use.",
+    },
+    {
+      questionId: "q4_purchase",
+      severity: "attom_derive_partial",
+      reason: "Currency input asks for purchase price + ownership origin. ATTOM has the last sale price + date for purchase paths. The origin question (purchase / inheritance / family / built / cash) still needs to be asked, but the price could pre-fill from ATTOM when origin = purchase.",
+      fix: "Keep Q4 but pre-fill the price field from PropertyLookupResult.salesHistory[0].price when origin = purchase. Add a 'From public records' caption + 'Edit' affordance.",
+    },
+  ];
+
+  for (const d of dropCandidates) {
+    const q = byQuestionId.get(d.questionId);
+    if (!q) continue;
+    const recIdValue = recId("quiz_drop_candidate", { questionId: d.questionId });
+    if (resolved.has(recIdValue)) continue;
+    out.quizDropCandidates.push({ question: q, severity: d.severity, reason: d.reason, fix: d.fix, recId: recIdValue });
+  }
+
+  // 5. Misrouted to maintenance_tasks (should be handyman punch items).
   //
   // Phase 5z+4 — Tom's 5-tier model: tier 4 = "tasks just for handymen"
   // (small DIY-friendly items). Per the architecture, those should
@@ -2141,6 +2278,62 @@ async function draftRecommendationNote(data) {
       `4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_${suggestedBundleId.replace(":", "_")}) so existing households' standalone tasks fold into the new bundle parent.\n` +
       `5. xcodebuild -scheme Chez to confirm clean compile.\n\n` +
       `**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.`;
+  } else if (kind === "quiz_merge_pair") {
+    const parentQuestionId = data.recParentQuestionId ? JSON.parse(data.recParentQuestionId) : null;
+    const childQuestionId = data.recChildQuestionId ? JSON.parse(data.recChildQuestionId) : null;
+    const items = itemsForCurrentView();
+    const parent = items.find((i) => i.payload?.id === parentQuestionId);
+    const child = items.find((i) => i.payload?.id === childQuestionId);
+    intent = "change_request";
+    scopeType = "question";
+    scopeId = data.recItemId;
+    scopeTitle = `Merge ${parentQuestionId} + ${childQuestionId}`;
+    snapshot = { parent: parent?.payload, child: child?.payload };
+    body =
+      `**Quiz merge proposal — sub-question fold-in.**\n\n` +
+      `Two consecutive questions could combine into one screen via progressive disclosure:\n\n` +
+      `**Parent:** \`${parentQuestionId}\` — "${parent?.title || "?"}"\n` +
+      `- Kind: \`${parent?.payload?.kind || "?"}\`\n` +
+      `- Options: ${(parent?.payload?.answerOptions || []).length}\n\n` +
+      `**Sub-question:** \`${childQuestionId}\` — "${child?.title || "?"}"\n` +
+      `- Kind: \`${child?.payload?.kind || "?"}\`\n` +
+      `- Options: ${(child?.payload?.answerOptions || []).length}\n` +
+      `- Conditional (\`dynamicSkip\` set): ${child?.payload?.dynamicSkip ? "yes" : "no"}\n\n` +
+      `**Action for Claude next session:**\n` +
+      `1. In \`Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift\`, add a new \`HouseQuizQuestionKind\` case named for the combined flow (e.g. \`progressivePool\`, \`progressiveLawn\`, \`trashWithDays\`, \`garageWithEV\`).\n` +
+      `2. In \`HouseQuizQuestionLibrary.swift\`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on \`HouseQuizAnswer\` (use \`payload\` JSONB to hold both primary + sub answers as one record).\n` +
+      `3. In \`HouseQuizView.swift\`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.\n` +
+      `4. In \`HouseQuizViewModel.hydrateEntryState\`, restore both primary + sub state on resume from the structured payload.\n` +
+      `5. Delete the sub-question entry from \`HouseQuizQuestionLibrary\`. Migration: \`HouseQuizState.migrateMerge${childQuestionId}_v1()\` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.\n` +
+      `6. Update \`HouseQuizAnswerMapper\` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.\n` +
+      `7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.`;
+  } else if (kind === "quiz_drop_candidate") {
+    const questionId = data.recQuestionId ? JSON.parse(data.recQuestionId) : null;
+    const severity = data.recSeverity ? JSON.parse(data.recSeverity) : null;
+    const reason = data.recReason ? JSON.parse(data.recReason) : "";
+    const fix = data.recFix ? JSON.parse(data.recFix) : "";
+    const items = itemsForCurrentView();
+    const question = items.find((i) => i.payload?.id === questionId);
+    intent = severity === "drop" ? "proposal_delete" : "change_request";
+    scopeType = "question";
+    scopeId = data.recItemId;
+    scopeTitle = `${severity}: ${questionId}`;
+    snapshot = question?.payload || null;
+    proposedDiff = { questionId, severity, reason, fix };
+    body =
+      `**Quiz quality proposal — ${severity}.**\n\n` +
+      `**Question:** \`${questionId}\` — "${question?.title || "?"}"\n` +
+      `**Severity:** ${severity}\n\n` +
+      `**Why:** ${reason}\n\n` +
+      `**Specific fix:** ${fix}\n\n` +
+      `**Action for Claude next session:**\n` +
+      (severity === "drop"
+        ? `Delete the \`${questionId}\` entry from \`HouseQuizQuestionLibrary.swift\`. Add a one-time migration that strips this question's saved answer from \`properties.house_quiz_state\` JSONB so resume flows don't trip on it. Update \`milestoneIndices\` (if any) to use stable question IDs not numeric indices, since indices shift after deletion. Bump value-meter deltas if removing this question would zero a milestone bump — redistribute its delta to nearby questions.`
+        : severity === "move"
+        ? `Remove \`${questionId}\` from \`HouseQuizQuestionLibrary.swift\`. Add a milestone card at its old position that prompts the homeowner to open the dedicated intake (e.g. EstateIntakeFormView) inline. The dedicated intake's save-per-answer persistence preserves partial state if abandoned.`
+        : severity.startsWith("attom_derive")
+        ? `Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from \`PropertyLookupResult\` and shows confirmable rows. Confirmed values stamp \`attributes.{field}_source = "manual"\` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.`
+        : `Add a \`dynamicSkip\` closure on \`${questionId}\` per the fix description above. Make sure the closure references stable answer IDs from the prior question, not titles or indices.`);
   } else if (kind === "misrouted_punch") {
     const templateKey = data.recTemplateKey ? JSON.parse(data.recTemplateKey) : null;
     const item = itemsForCurrentView().find((i) => i.id === data.recItemId);
@@ -2190,6 +2383,10 @@ async function draftRecommendationNote(data) {
         ? `Merge proposal saved with both templates' full data. Review options in the Notes tab.`
         : kind === "misrouted_punch"
         ? `Punch-list re-route proposal saved. Claude will flip the seeding path from maintenance_tasks to handyman_punch_items + ship the data migration next session.`
+        : kind === "quiz_merge_pair"
+        ? `Quiz merge proposal saved with the 7-step Swift refactor. Includes new HouseQuizQuestionKind case + migration for in-flight quizzes + value-meter delta redistribution.`
+        : kind === "quiz_drop_candidate"
+        ? `Quiz quality proposal saved. Claude will apply the specific Swift edit (drop / move / auto-skip / ATTOM-derive) next session.`
         : `Bundle proposal saved with the 5-step Swift edit checklist. Review in the Notes tab.`;
       alert(`✓ ${summary}\n\nThis row will hide from the recommendations panel.`);
       return true;
