@@ -1108,6 +1108,53 @@
 .admin-button--primary:hover {
   background: var(--indigo-600, #3d3265);
 }
+
+/* Phase 5z+3 — Delete-note buttons. Per-row × on the Notes tab list,
+   per-card "Delete" on entity detail thread. Both visually subdued
+   so the destructive intent stands out only on hover. */
+.admin-button--danger:hover {
+  background: rgba(237, 105, 85, 0.12) !important;
+  border-color: var(--salmon-dark) !important;
+  color: var(--salmon-dark) !important;
+}
+.admin-list-item-wrap {
+  align-items: stretch;
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+  position: relative;
+}
+.admin-list-item-wrap > .admin-list-item {
+  flex: 1;
+  margin-bottom: 0;
+}
+.admin-list-item__delete {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  font: 700 18px var(--sans);
+  justify-content: center;
+  min-width: 32px;
+  opacity: 0.5;
+  padding: 0;
+  transition: all 120ms ease;
+}
+.admin-list-item-wrap:hover .admin-list-item__delete {
+  opacity: 1;
+}
+.admin-list-item__delete:hover {
+  background: rgba(237, 105, 85, 0.12);
+  border-color: var(--salmon-dark);
+  color: var(--salmon-dark);
+}
+.admin-button--xs {
+  font: 600 10px var(--sans);
+  padding: 3px 8px;
+}
 .admin-rec {
   align-items: flex-start;
   background: #fff;

@@ -1751,8 +1751,9 @@ function renderRecommendationsPanel(allItems) {
     ? `<div class="admin-recs__section">
         <h4>📦 Bundle-merge candidates <span class="admin-recs__badge">${findings.bundleCandidates.length}</span></h4>
         <p class="admin-recs__what">
-          <strong>What this is:</strong> 3+ standalone templates in the same systemCategory + season + assignment that match the existing bundle pattern (Generator:annual, Roofing:spring, Pool/Spa:opening, etc.).<br/>
+          <strong>What this is:</strong> 3+ standalone templates in the same systemCategory + season + assignment that match the existing bundle pattern (Generator:annual, Roofing:spring, Pool/Spa:opening, etc.). <br/>
           <strong>Why it matters:</strong> When a vendor visits, they handle multiple items in ONE trip. Bundling these means the homeowner sees ONE scheduled task ("Schedule Fall HVAC Service") instead of 4 separate to-dos for the same visit. Saves ~3 rows per bundle on the homeowner's list.<br/>
+          <strong>Excluded by design:</strong> Handyman / Cleaning / Trash / Pest / Mosquito / Pet Waste — these flow through the punch-list or routine mechanisms, not the bundle pattern. Adding <code>bundleId</code> to them wouldn't change runtime behavior.<br/>
           <strong>Primary action:</strong> Click <em>Draft bundle proposal</em> to write a structured proposal Claude will apply next session — sets bundleId/bundleTitle on each template, runs the migration to re-parent existing tasks.
         </p>
         ${findings.bundleCandidates.map((c) => {
@@ -1902,12 +1903,33 @@ function computeRecommendations(allItems) {
 
   // 3. Bundle-merge candidates — 3+ standalone templates with the
   // same category + season + assignmentType, no current bundleId.
+  //
+  // Phase 5z+3 — exclude Handyman category. Handyman templates flow
+  // through the PUNCH LIST mechanism (Phase 54B handyman_punch_items
+  // table), not the bundle pattern. The simulator already routes them
+  // to the punch list regardless of bundleId, so adding bundleId
+  // wouldn't change runtime behavior — and the "Spring/Fall Handyman
+  // Visit" parent templates themselves should be HOME-SCREEN
+  // REMINDERS, not maintenance_tasks rows. See docs/CLAUDE.md Phase
+  // 56.4 + 67 architectural intent.
+  //
+  // Excluded categories carry their own dedicated grouping mechanism
+  // and shouldn't surface as bundle candidates.
+  const NON_BUNDLE_CATEGORIES = new Set([
+    "Handyman",            // → handyman_punch_items + seasonal reminders
+    "Cleaning Service",    // → routines (recurring vendor relationship)
+    "Trash & Recycling",   // → routines
+    "Pet Waste",           // → routines
+    "Pest Control",        // → routines
+    "Mosquito & Tick",     // → routines
+  ]);
   const groups = {};
   for (const i of allItems) {
     const t = i.payload || {};
     if (t.bundleId) continue;
     if (!t.seasonalTiming) continue;
     if (!t.systemCategory) continue;
+    if (NON_BUNDLE_CATEGORIES.has(t.systemCategory)) continue;
     const key = `${t.systemCategory}|${t.seasonalTiming}|${t.assignmentType || "either"}`;
     if (!groups[key]) groups[key] = [];
     groups[key].push(i);
@@ -3695,22 +3717,42 @@ function renderNotesView() {
     const jumpHint = canJump
       ? `<span class="admin-list-item__jump" title="Open the ${escapeHtml(note.scopeType)} this note is about">Open ${escapeHtml(note.scopeType)} →</span>`
       : `<span class="admin-pill">general</span>`;
+    // Phase 5z+3 — Delete button on each note row, but ONLY for notes
+    // that haven't been applied yet. Applied notes need Revert (audit
+    // trail). The button stops propagation so clicking it doesn't
+    // trigger the row's jump-to-entity handler.
+    const deleteBtn = !note.appliedAt
+      ? `<button type="button" class="admin-list-item__delete" data-delete-note-row="${escapeHtml(note.id)}" title="Delete this note">×</button>`
+      : "";
     return `
-      <button class="admin-list-item" data-note-id="${escapeHtml(note.id)}">
-        <div class="admin-list-item__top">
-          <strong>${escapeHtml(note.scopeTitle || "General note")}</strong>
-          <span class="admin-pill admin-pill--note">${escapeHtml(intent)}</span>
-          ${author === "claude" ? `<span class="admin-pill admin-pill--note">claude</span>` : ""}
-          ${appliedPill}
-        </div>
-        <p>${escapeHtml((note.body || "").slice(0, 220))}</p>
-        <div class="admin-list-item__meta">
-          <span>${escapeHtml(formatDate(note.createdAt))}</span>
-          ${jumpHint}
-        </div>
-      </button>
+      <div class="admin-list-item-wrap">
+        <button class="admin-list-item" data-note-id="${escapeHtml(note.id)}">
+          <div class="admin-list-item__top">
+            <strong>${escapeHtml(note.scopeTitle || "General note")}</strong>
+            <span class="admin-pill admin-pill--note">${escapeHtml(intent)}</span>
+            ${author === "claude" ? `<span class="admin-pill admin-pill--note">claude</span>` : ""}
+            ${appliedPill}
+          </div>
+          <p>${escapeHtml((note.body || "").slice(0, 220))}</p>
+          <div class="admin-list-item__meta">
+            <span>${escapeHtml(formatDate(note.createdAt))}</span>
+            ${jumpHint}
+          </div>
+        </button>
+        ${deleteBtn}
+      </div>
     `;
   }).join("") || emptyListHtml("No notes yet.");
+
+  // Phase 5z+3 — Wire row-level delete buttons (separate from the row
+  // click which navigates to the entity).
+  el.list.querySelectorAll("[data-delete-note-row]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await deleteNote(btn.dataset.deleteNoteRow);
+    });
+  });
 
   el.list.querySelectorAll("[data-note-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3819,6 +3861,13 @@ function renderContextNotes(item) {
       await revertNote(btn.dataset.revertNote);
     });
   });
+  // Phase 5z+3 — Wire delete buttons on each note card.
+  el.contextNotes.querySelectorAll("[data-delete-note]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await deleteNote(btn.dataset.deleteNote);
+    });
+  });
 }
 
 function renderNoteCard(note, depth) {
@@ -3839,6 +3888,12 @@ function renderNoteCard(note, depth) {
   const revertBtn = isApplied && !isReverted
     ? `<button type="button" class="admin-button admin-button--secondary admin-button--xs" data-revert-note="${escapeHtml(note.id)}">Revert</button>`
     : "";
+  // Phase 5z+3 — Delete button on every note card. Only enabled for
+  // notes that haven't been applied yet (applied notes need to use
+  // Revert instead — keeps the audit trail of what changed).
+  const deleteBtn = !isApplied
+    ? `<button type="button" class="admin-button admin-button--ghost admin-button--xs admin-button--danger" data-delete-note="${escapeHtml(note.id)}" title="Delete this note. Replies (if any) are also removed because parent_note_id has ON DELETE CASCADE.">Delete</button>`
+    : "";
   const attachments = (note.snapshot?.attachment_urls || note.attachmentUrls || [])
     .map((url) => `<img src="${escapeHtml(url)}" alt="attachment" class="admin-note-card__attachment" />`)
     .join("");
@@ -3855,7 +3910,7 @@ function renderNoteCard(note, depth) {
       <small>${escapeHtml(formatDate(note.createdAt))} · target: ${escapeHtml(note.target || "claude")}</small>
       <pre>${escapeHtml(note.body || "")}</pre>
       ${attachments ? `<div class="admin-note-card__attachments">${attachments}</div>` : ""}
-      ${revertBtn ? `<div class="admin-note-card__actions">${revertBtn}</div>` : ""}
+      ${(revertBtn || deleteBtn) ? `<div class="admin-note-card__actions">${revertBtn}${deleteBtn}</div>` : ""}
       ${replies}
     </article>
   `;
@@ -3883,6 +3938,46 @@ async function revertNote(noteId) {
     else renderActivityView();
   } catch (error) {
     alert(`Revert failed: ${error.message}`);
+  }
+}
+
+// Phase 5z+3 — Delete a note. Differs from Revert: revert keeps the
+// row in admin_codex_notes with reverted_at stamped (audit trail);
+// delete actually removes the row. Only allowed for notes that
+// haven't been applied yet — applied notes must use Revert.
+async function deleteNote(noteId) {
+  if (!noteId) return;
+  const note = state.notes.find((n) => n.id === noteId);
+  if (!note) return;
+  if (note.appliedAt) {
+    alert("This note has already been applied. Use Revert instead so the audit trail stays intact.");
+    return;
+  }
+  const replyCount = state.notes.filter((n) => n.parentNoteId === noteId).length;
+  const replyHint = replyCount > 0 ? ` This will also delete ${replyCount} ${replyCount === 1 ? "reply" : "replies"} (parent_note_id has ON DELETE CASCADE).` : "";
+  const preview = (note.body || "").slice(0, 80);
+  if (!confirm(`Delete this note?${replyHint}\n\n"${preview}${(note.body || "").length > 80 ? "…" : ""}"`)) return;
+  if (state.storageMode === "cloud") {
+    try {
+      const { error } = await supabase
+        .from("admin_codex_notes")
+        .delete()
+        .eq("id", noteId);
+      if (error) throw error;
+    } catch (error) {
+      alert(`Delete failed: ${error.message}`);
+      return;
+    }
+  }
+  // Local state — drop the note + any cascading replies.
+  state.notes = state.notes.filter((n) => n.id !== noteId && n.parentNoteId !== noteId);
+  // Re-render the right surface.
+  if (state.view === "notes") {
+    renderNotesView();
+  } else if (state.selected) {
+    renderContextNotes(state.selected);
+  } else if (state.view === "activity") {
+    renderActivityView();
   }
 }
 
