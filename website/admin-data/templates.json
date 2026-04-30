@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-30T15:23:35.024Z",
+  "generatedAt": "2026-04-30T17:30:01.771Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift",
-  "sourceCommit": "290eb1ac",
-  "count": 221,
+  "sourceCommit": "85ba8c59",
+  "count": 219,
   "entries": [
     {
       "templateKey": "Roofing:Professional roof inspection",
@@ -155,14 +155,14 @@
       "stableId": null,
       "systemCategory": "Roofing",
       "title": "Treat moss and algae",
-      "description": "Roofer applies a zinc-strip or oxygen-bleach moss/algae treatment to prevent the dark streaks and shingle damage that biological growth causes. The streaks aren't just cosmetic — moss lifts the granular surface of asphalt shingles and shortens the roof's life by 5–10 years if left untreated.",
+      "description": "Roofer applies a zinc-strip or oxygen-bleach moss/algae treatment to prevent the dark streaks and shingle damage that biological growth causes. The streaks aren't just cosmetic. Moss lifts the granular surface of asphalt shingles and shortens the roof's life by 5–10 years if left untreated.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$50–$200",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Wood shake roofs are fragile and slippery — always pro-only with safety gear. For asphalt, fall application means the rains carry the treatment evenly across the shingles before winter. North-facing slopes show moss first; check those when deciding if you're due.",
+      "notes": "Wood shake roofs are fragile and slippery. Always pro-only with safety gear. For asphalt, fall application means the rains carry the treatment evenly across the shingles before winter. North-facing slopes show moss first; check those when deciding if you're due.",
       "requiredSubtypes": [
         "roof_wood"
       ],
@@ -191,22 +191,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Roofer applies a zinc-strip or oxygen-bleach moss/algae treatment to prevent ..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Wood shake roofs are fragile and slippery — always pro-only with safety gear...."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -459,7 +444,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Best done in late spring after the wood has dried out from winter and before summer heat. Match the existing finish carefully — eggshell on a satin wall reads as a patch even after a few weeks of weathering. Most painters keep your color formulation on file once you've used them.",
+      "notes": "Best done in late spring after the wood has dried out from winter and before summer heat. Match the existing finish carefully. Eggshell on a satin wall reads as a patch even after a few weeks of weathering. Most painters keep your color formulation on file once you've used them.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -486,15 +471,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Best done in late spring after the wood has dried out from winter and before ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -544,7 +521,7 @@
       "stableId": null,
       "systemCategory": "Siding/Exterior",
       "title": "Exterior painting refresh",
-      "description": "Full exterior paint refresh — scraping, priming, and repainting of siding, trim, and exterior features. Major cycle that HNW owners plan and budget for well in advance.",
+      "description": "Full exterior paint refresh. Scraping, priming, and repainting of siding, trim, and exterior features. Major cycle that HNW owners plan and budget for well in advance.",
       "frequency": "Every 10 years",
       "priority": "Medium",
       "estimatedCostRange": "$5,000-15,000",
@@ -578,15 +555,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Full exterior paint refresh — scraping, priming, and repainting of siding, tr..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -726,7 +695,7 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Inspect ductwork for leaks",
-      "description": "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization test or a manual smoke-pencil walkthrough) to find air loss in the supply and return ducts. Most homes lose 20–30% of conditioned air to duct leaks — sealing them recovers that money on every energy bill for the rest of the system's life.",
+      "description": "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization test or a manual smoke-pencil walkthrough) to find air loss in the supply and return ducts. Most homes lose 20–30% of conditioned air to duct leaks. Sealing them recovers that money on every energy bill for the rest of the system's life.",
       "frequency": "Every 2-3 years",
       "priority": "Medium",
       "estimatedCostRange": "$200–$400",
@@ -762,15 +731,7 @@
           "displayPriority": 20
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization t..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -822,14 +783,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Bleed radiators",
-      "description": "Boiler tech opens each radiator's bleed valve in turn to release trapped air, then tops off boiler pressure to spec. Trapped air at the top of a radiator means the bottom half can heat fine while the top stays cold — the room never gets warm even though the system runs constantly.",
+      "description": "Boiler tech opens each radiator's bleed valve in turn to release trapped air, then tops off boiler pressure to spec. Trapped air at the top of a radiator means the bottom half can heat fine while the top stays cold. The room never gets warm even though the system runs constantly.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$50–$150",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Most boiler owners include this in the annual boiler service visit instead of a separate appointment — no point paying two trip charges. If you've noticed any radiator running cold or only warming halfway, it's worth flagging to the tech.",
+      "notes": "Most boiler owners include this in the annual boiler service visit instead of a separate appointment. No point paying two trip charges. If you've noticed any radiator running cold or only warming halfway, it's worth flagging to the tech.",
       "requiredSubtypes": [
         "boiler"
       ],
@@ -858,22 +819,7 @@
           "displayPriority": 20
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Boiler tech opens each radiator's bleed valve in turn to release trapped air,..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Most boiler owners include this in the annual boiler service visit instead of..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -881,14 +827,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Annual boiler service",
-      "description": "Boiler tech runs a full combustion analysis, cleans the burners and combustion chamber, inspects the heat exchanger for cracks (carbon monoxide risk), tests the pressure relief valve, verifies exhaust draft and flue integrity, and checks the expansion tank charge. The most consequential heating-system service in the house — a cracked heat exchanger can leak CO into living spaces.",
+      "description": "Boiler tech runs a full combustion analysis, cleans the burners and combustion chamber, inspects the heat exchanger for cracks (carbon monoxide risk), tests the pressure relief valve, verifies exhaust draft and flue integrity, and checks the expansion tank charge. The most consequential heating-system service in the house. A cracked heat exchanger can leak CO into living spaces.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$200–$400",
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Required for warranty on most boilers — the manufacturer pulls service records when a claim is filed. Schedule in August or early September. Once the first cold snap hits, every boiler tech is booked solid for 2–3 weeks and a routine service turns into an emergency call.",
+      "notes": "Required for warranty on most boilers. The manufacturer pulls service records when a claim is filed. Schedule in August or early September. Once the first cold snap hits, every boiler tech is booked solid for 2–3 weeks and a routine service turns into an emergency call.",
       "requiredSubtypes": [
         "boiler"
       ],
@@ -917,22 +863,7 @@
           "displayPriority": 20
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Boiler tech runs a full combustion analysis, cleans the burners and combustio..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Required for warranty on most boilers — the manufacturer pulls service record..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -940,14 +871,14 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Geothermal loop pressure check",
-      "description": "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak — could be a pinhole in the ground loop, fittings at the manifold, or the heat pump's internal pressure switch. Catching this early prevents a full system shutdown.",
+      "description": "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak. Could be a pinhole in the ground loop, fittings at the manifold, or the heat pump's internal pressure switch. Catching this early prevents a full system shutdown.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$150–$300",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Use the original installer if possible. Geothermal is specialized — most general HVAC techs don't have the loop testing equipment or the training to diagnose ground-side issues.",
+      "notes": "Use the original installer if possible. Geothermal is specialized. Most general HVAC techs don't have the loop testing equipment or the training to diagnose ground-side issues.",
       "requiredSubtypes": [
         "geothermal"
       ],
@@ -976,22 +907,7 @@
           "displayPriority": 20
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Geothermal installer verifies ground loop pressure and antifreeze concentrati..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Use the original installer if possible. Geothermal is specialized — most gene..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -999,7 +915,7 @@
       "stableId": null,
       "systemCategory": "HVAC",
       "title": "Air duct cleaning",
-      "description": "Professional cleaning of the full supply and return ductwork — removes dust, allergens, and debris. Separate from the annual HVAC tune-up.",
+      "description": "Professional cleaning of the full supply and return ductwork. Removes dust, allergens, and debris. Separate from the annual HVAC tune-up.",
       "frequency": "Every 3-5 years",
       "priority": "Medium",
       "estimatedCostRange": "$400-800",
@@ -1035,15 +951,7 @@
           "displayPriority": 20
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Professional cleaning of the full supply and return ductwork — removes dust, ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1146,7 +1054,7 @@
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this — the same root that's slowing one drain will eventually back up the whole house.",
+      "notes": "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this. The same root that's slowing one drain will eventually back up the whole house.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1173,15 +1081,7 @@
           "displayPriority": 30
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Houses with mature trees out front are highest-risk for root intrusion. If yo..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1189,7 +1089,7 @@
       "stableId": null,
       "systemCategory": "Plumbing",
       "title": "Test sump pump battery backup",
-      "description": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years — if it doesn't hold charge, replace before spring rains.",
+      "description": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years. If it doesn't hold charge, replace before spring rains.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "$0 (DIY)",
@@ -1226,15 +1126,7 @@
           "displayPriority": 30
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Unplug the primary sump pump to verify the battery backup engages and can mov..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1539,7 +1431,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Test in spring after the snowmelt and seasonal water-table shifts have moved through. Test sooner if you notice taste, odor, or color changes — those are the canary signs of a contamination event. State health departments often offer free or subsidized testing for private wells.",
+      "notes": "Test in spring after the snowmelt and seasonal water-table shifts have moved through. Test sooner if you notice taste, odor, or color changes. Those are the canary signs of a contamination event. State health departments often offer free or subsidized testing for private wells.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1566,15 +1458,7 @@
           "displayPriority": 60
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Test in spring after the snowmelt and seasonal water-table shifts have moved ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1589,7 +1473,7 @@
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Pump replacement is $1,500–$3,500 — annual inspection catches the early warning signs (cycling more often, lower flow, casing seal issues) and lets you plan the replacement on your schedule rather than during an emergency.",
+      "notes": "Pump replacement is $1,500–$3,500. Annual inspection catches the early warning signs (cycling more often, lower flow, casing seal issues) and lets you plan the replacement on your schedule rather than during an emergency.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1616,15 +1500,7 @@
           "displayPriority": 60
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Pump replacement is $1,500–$3,500 — annual inspection catches the early warni..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1632,14 +1508,14 @@
       "stableId": null,
       "systemCategory": "Electrical",
       "title": "Replace smoke detectors",
-      "description": "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply — this is one of the few maintenance items where the timing isn't optional.",
+      "description": "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.",
       "frequency": "Every 10 years",
       "priority": "High",
       "estimatedCostRange": "$100–$250",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "If you have hardwired/interconnected detectors, replace them all at once with the same model — mixing brands or sensor types in an interconnected system can cause false alarms. Check the manufacture date on every detector while up there; some homes have a mix of newer and older units.",
+      "notes": "If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms. Check the manufacture date on every detector while up there; some homes have a mix of newer and older units.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -1666,22 +1542,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Electrician or handyman replaces smoke detectors that have passed their 10-ye..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "If you have hardwired/interconnected detectors, replace them all at once with..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1696,7 +1557,7 @@
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks — if you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.",
+      "notes": "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks. If you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -1723,15 +1584,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1739,14 +1592,14 @@
       "stableId": null,
       "systemCategory": "Electrical",
       "title": "EV charger inspection",
-      "description": "Electrician inspects the EV charging station hardware, dedicated circuit and breaker, terminations at the charger and the panel, and the charging cable for wear or heat signatures. Higher-amperage L2 installs (40A / 50A circuits) draw more current for longer durations than typical residential loads — a slowly-loosening connection runs hot for months before it fails.",
+      "description": "Electrician inspects the EV charging station hardware, dedicated circuit and breaker, terminations at the charger and the panel, and the charging cable for wear or heat signatures. Higher-amperage L2 installs (40A / 50A circuits) draw more current for longer durations than typical residential loads. A slowly-loosening connection runs hot for months before it fails.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$100-200",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "If your charger is in an unconditioned garage or outdoors, check the housing for rodent damage and water intrusion at the same time. Some manufacturer warranties require documented annual inspection — ask before you buy if you're shopping a new install.",
+      "notes": "If your charger is in an unconditioned garage or outdoors, check the housing for rodent damage and water intrusion at the same time. Some manufacturer warranties require documented annual inspection. Ask before you buy if you're shopping a new install.",
       "requiredSubtypes": [
         "has_ev_charger"
       ],
@@ -1775,22 +1628,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Electrician inspects the EV charging station hardware, dedicated circuit and ..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "If your charger is in an unconditioned garage or outdoors, check the housing ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1977,7 +1815,7 @@
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Schedule before first use each season. Each chimney is swept separately — if you have multiple flues, mention it so the sweep allocates the right amount of time.",
+      "notes": "Schedule before first use each season. Each chimney is swept separately. If you have multiple flues, mention it so the sweep allocates the right amount of time.",
       "requiredSubtypes": [
         "wood"
       ],
@@ -2009,15 +1847,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Schedule before first use each season. Each chimney is swept separately — if ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -2067,7 +1897,7 @@
       "stableId": "Chimney:Annual gas fireplace service",
       "systemCategory": "Chimney",
       "title": "Annual gas fireplace service",
-      "description": "Gas tech inspects burner, pilot light, gas connections, thermopile/thermocouple, and logs. Distinct from a sweep — gas fireplaces don't need creosote cleaning but they do need annual gas-side service.",
+      "description": "Gas tech inspects burner, pilot light, gas connections, thermopile/thermocouple, and logs. Distinct from a sweep. Gas fireplaces don't need creosote cleaning but they do need annual gas-side service.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$150–$300",
@@ -2103,15 +1933,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Gas tech inspects burner, pilot light, gas connections, thermopile/thermocoup..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -2119,7 +1941,7 @@
       "stableId": null,
       "systemCategory": "Windows",
       "title": "Schedule exterior window re-caulking",
-      "description": "Painter or handyman scrapes out cracked or pulling-away exterior caulk around every window and door, applies fresh exterior-grade urethane or polyurethane sealant, and tools the bead clean. Failed exterior caulk is the #1 entry point for water damage to wall framing — catching it early prevents wood rot and the $5K+ repair that follows.",
+      "description": "Painter or handyman scrapes out cracked or pulling-away exterior caulk around every window and door, applies fresh exterior-grade urethane or polyurethane sealant, and tools the bead clean. Failed exterior caulk is the #1 entry point for water damage to wall framing. Catching it early prevents wood rot and the $5K+ repair that follows.",
       "frequency": "Every 2-3 years",
       "priority": "Medium",
       "estimatedCostRange": "$200–$500",
@@ -2149,15 +1971,7 @@
         "in_bundle": null,
         "system_category_meta": null
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Painter or handyman scrapes out cracked or pulling-away exterior caulk around..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -2569,7 +2383,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Timed to soil temps in the low 50s — usually mid-March to mid-April in {state}",
+      "notes": "Timed to soil temps in the low 50s. Usually mid-March to mid-April in {state}",
       "requiredSubtypes": [
         "natural_lawn"
       ],
@@ -2605,15 +2419,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Timed to soil temps in the low 50s — usually mid-March to mid-April in {state}"
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -2673,7 +2479,7 @@
       "stableId": null,
       "systemCategory": "Landscaping",
       "title": "Soil pH test and lime application",
-      "description": "Landscaper pulls soil core samples from a few representative spots, runs a pH test, and applies dolomitic or calcitic lime in measured amounts to bring acidic soil back to 6.0–7.0 where cool-season grasses thrive. Acidic soil locks out nutrients even when you're fertilizing — without correcting pH first, the fertilizer is wasted money.",
+      "description": "Landscaper pulls soil core samples from a few representative spots, runs a pH test, and applies dolomitic or calcitic lime in measured amounts to bring acidic soil back to 6.0–7.0 where cool-season grasses thrive. Acidic soil locks out nutrients even when you're fertilizing. Without correcting pH first, the fertilizer is wasted money.",
       "frequency": "Every 2 years",
       "priority": "Low",
       "estimatedCostRange": "$80–$200",
@@ -2709,15 +2515,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Landscaper pulls soil core samples from a few representative spots, runs a pH..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -2872,7 +2670,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Schedule for early spring before the heaviest pollen weeks — that way the infill is clean before the year's accumulation starts. If you have dogs or kids using the turf heavily, consider every year rather than every two.",
+      "notes": "Schedule for early spring before the heaviest pollen weeks. That way the infill is clean before the year's accumulation starts. If you have dogs or kids using the turf heavily, consider every year rather than every two.",
       "requiredSubtypes": [
         "synthetic_turf"
       ],
@@ -2901,15 +2699,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Schedule for early spring before the heaviest pollen weeks — that way the inf..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -2961,7 +2751,7 @@
       "stableId": null,
       "systemCategory": "Landscaping",
       "title": "Arborist tree health inspection",
-      "description": "Certified arborist inspects mature trees for disease, structural weakness, and storm risk. Liability protection — falling tree damage is often excluded from home insurance if due to visible neglect.",
+      "description": "Certified arborist inspects mature trees for disease, structural weakness, and storm risk. Liability protection. Falling tree damage is often excluded from home insurance if due to visible neglect.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$200–$500",
@@ -2997,15 +2787,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Certified arborist inspects mature trees for disease, structural weakness, an..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -3196,7 +2978,7 @@
       "isDIY": false,
       "seasonalTiming": "Fall",
       "professionalRequired": true,
-      "notes": "Must be done before the first hard freeze. Once water freezes inside a head or valve, it cracks the brass — and you don't find out until spring startup when the system pressurizes and the leaks reveal themselves. In the Northeast, target mid-October.",
+      "notes": "Must be done before the first hard freeze. Once water freezes inside a head or valve, it cracks the brass. And you don't find out until spring startup when the system pressurizes and the leaks reveal themselves. In the Northeast, target mid-October.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -3223,15 +3005,7 @@
           "displayPriority": 0
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Must be done before the first hard freeze. Once water freezes inside a head o..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -3471,7 +3245,7 @@
       "stableId": null,
       "systemCategory": "Pool/Spa",
       "title": "Pool heater service",
-      "description": "Pool heater specialist services the heater — gas heaters get a combustion check, burner cleaning, and pilot/igniter inspection; heat pumps get refrigerant, coil, and defrost-cycle verification. Annual service doubles heater lifespan.",
+      "description": "Pool heater specialist services the heater. Gas heaters get a combustion check, burner cleaning, and pilot/igniter inspection; heat pumps get refrigerant, coil, and defrost-cycle verification. Annual service doubles heater lifespan.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$150-400",
@@ -3507,15 +3281,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Pool heater specialist services the heater — gas heaters get a combustion che..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -3523,7 +3289,7 @@
       "stableId": null,
       "systemCategory": "Pool/Spa",
       "title": "Test and sanitize hot tub water",
-      "description": "Use test strips or a digital tester to check bromine/chlorine, pH, and total alkalinity weekly. Add sanitizer to maintain levels and re-balance pH/alkalinity. Without weekly sanitizer additions, hot tub water gets cloudy + biofilm starts forming inside the plumbing — a much harder problem to recover from than just topping up sanitizer.",
+      "description": "Use test strips or a digital tester to check bromine/chlorine, pH, and total alkalinity weekly. Add sanitizer to maintain levels and re-balance pH/alkalinity. Without weekly sanitizer additions, hot tub water gets cloudy + biofilm starts forming inside the plumbing. A much harder problem to recover from than just topping up sanitizer.",
       "frequency": "Weekly",
       "priority": "High",
       "estimatedCostRange": "$10–$20/month",
@@ -3559,15 +3325,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Use test strips or a digital tester to check bromine/chlorine, pH, and total ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -3619,14 +3377,14 @@
       "stableId": null,
       "systemCategory": "Pool/Spa",
       "title": "Inspect hot tub cover and jets",
-      "description": "Check the cover for cracks, waterlogging (lift one corner — if it's noticeably heavier than the opposite corner, the foam is saturated), and torn vinyl. Test each jet for pressure and verify the aim hasn't drifted. Inspect the cover lifter mechanism if equipped.",
+      "description": "Check the cover for cracks, waterlogging (lift one corner. If it's noticeably heavier than the opposite corner, the foam is saturated), and torn vinyl. Test each jet for pressure and verify the aim hasn't drifted. Inspect the cover lifter mechanism if equipped.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$0–$400 (if cover replacement)",
       "isDIY": true,
       "seasonalTiming": "Spring",
       "professionalRequired": false,
-      "notes": "A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/month in extra heating during cool months. Replacement covers run $300–$500 — pays for itself in 6–12 months. Soaked covers also start to mold inside, which is gross to rest your face on.",
+      "notes": "A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/month in extra heating during cool months. Replacement covers run $300–$500. Pays for itself in 6–12 months. Soaked covers also start to mold inside, which is gross to rest your face on.",
       "requiredSubtypes": [
         "hot_tub"
       ],
@@ -3655,22 +3413,7 @@
           "displayPriority": 10
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Check the cover for cracks, waterlogging (lift one corner — if it's noticeabl..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/mon..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -3867,7 +3610,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Spring is termite swarming season — the easiest time to spot active colonies. Required to maintain most home warranties. If the inspector finds activity, treatment runs $1,500–$5,000 depending on severity, but skipping the inspection can mean a $30K+ structural repair down the line.",
+      "notes": "Spring is termite swarming season. The easiest time to spot active colonies. Required to maintain most home warranties. If the inspector finds activity, treatment runs $1,500–$5,000 depending on severity, but skipping the inspection can mean a $30K+ structural repair down the line.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -3894,15 +3637,7 @@
           "displayPriority": 60
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Spring is termite swarming season — the easiest time to spot active colonies...."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -4110,7 +3845,7 @@
       "stableId": "Security System:Verify alarm system",
       "systemCategory": "Security System",
       "title": "Annual security system check",
-      "description": "Alarm company walk-tests each sensor, confirms panel connectivity, and replaces sensor batteries. Monitored systems self-test between visits — this is the annual confirmation that everything is still registering.",
+      "description": "Alarm company walk-tests each sensor, confirms panel connectivity, and replaces sensor batteries. Monitored systems self-test between visits. This is the annual confirmation that everything is still registering.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$75–$200",
@@ -4150,15 +3885,7 @@
           "displayPriority": 70
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Alarm company walk-tests each sensor, confirms panel connectivity, and replac..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -4221,7 +3948,7 @@
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Output drops gradually so it's hard to notice from monthly bills alone — but a year of accumulated soiling can cost $200–$500 in lost generation depending on system size. Spring is ideal (after pollen settles, before peak production months).",
+      "notes": "Output drops gradually so it's hard to notice from monthly bills alone. But a year of accumulated soiling can cost $200–$500 in lost generation depending on system size. Spring is ideal (after pollen settles, before peak production months).",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -4248,15 +3975,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Output drops gradually so it's hard to notice from monthly bills alone — but ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -4271,7 +3990,7 @@
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Most production warranties require inspection records to honor a claim. If your inverter is approaching 8–10 years old, ask the inspector to flag whether it's nearing replacement age — inverter failure is the #1 cause of unexpected solar downtime.",
+      "notes": "Most production warranties require inspection records to honor a claim. If your inverter is approaching 8–10 years old, ask the inspector to flag whether it's nearing replacement age. Inverter failure is the #1 cause of unexpected solar downtime.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -4298,15 +4017,7 @@
           "displayPriority": 40
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Most production warranties require inspection records to honor a claim. If yo..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -4457,139 +4168,6 @@
       "_recommendation": null
     },
     {
-      "templateKey": "Handyman:Spring handyman visit",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Spring handyman visit",
-      "description": "Seasonal walkthrough and punch list. Your handyman handles small repairs, caulking touch-ups, filter swaps, and anything that's accumulated since the last visit.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$300-800",
-      "isDIY": false,
-      "seasonalTiming": "Spring",
-      "professionalRequired": true,
-      "notes": "\nWhat's typically covered in a spring handyman visit:\n\nHVAC\n• Air filter swap (buy a case, swap during visit)\n• Mini-split filter rinse (if applicable)\n\nPlumbing\n• Washing machine supply hose visual check\n• Sump pump test (if applicable)\n• Well cap and pressure tank visual (if well home)\n• Water softener brine tank visual (if applicable)\n• Whole-house filter swap (if applicable)\n\nExterior\n• Caulking touch-up around windows and doors\n• Driveway crack sealcoat spot-fill\n• Deck/fence screw check\n• Foundation grading walkaround\n• Retaining wall condition check\n\nSafety\n• Smoke and CO detector battery swap\n• Fire extinguisher gauge check\n• Camera perimeter walk-past\n• Verify smoke and CO detectors (self-test confirmation)\n• Test GFCI outlets\n\nAppliances\n• Refrigerator coil vacuum (if accessible)\n• Dishwasher spray arm clean (if not covered by housekeeper)\n• Ice maker filter replacement (if due)\n\nOther (conditional)\n• Crawl space visual for moisture (if applicable)\n• Dehumidifier operation test (if applicable)\n• Septic drain field walkaround (if applicable)\n• Smart leak system test (if applicable)\n• Turf drainage spot-check (synthetic turf homes)\n\nAdd anything you've been meaning to get to — that's what the handyman is for.\n",
-      "requiredSubtypes": [],
-      "isEssential": true,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": "Handyman:spring",
-      "bundleTitle": "Spring Handyman Visit",
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "bundledIntoParent",
-      "_sourceLine": 1587,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": {
-          "bundleId": "Handyman:spring",
-          "bundleTitle": "Spring Handyman Visit",
-          "siblings": [
-            "Handyman:Test smart water leak system",
-            "Handyman:smoke_co_batteries_spring",
-            "Handyman:caulking_inspect_spring",
-            "Handyman:foundation_walkaround_spring",
-            "Handyman:washer_hoses_spring",
-            "Handyman:sump_pump_test_spring",
-            "Handyman:gfci_test_spring",
-            "Handyman:smoke_co_alarm_test_spring",
-            "Handyman:hvac_filter_spring",
-            "Handyman:ceiling_fan_summer",
-            "Handyman:exterior_faucets_reopen"
-          ]
-        },
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "\nWhat's typically covered in a spring handyman visit:\n\nHVAC\n• Air filter swap..."
-        }
-      ],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Fall handyman visit",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Fall handyman visit",
-      "description": "Pre-winter walkthrough and punch list. Your handyman handles weatherproofing, hose-bib winterization, storm door prep, attic insulation check, and any accumulated punch-list items.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$300-800",
-      "isDIY": false,
-      "seasonalTiming": "Fall",
-      "professionalRequired": true,
-      "notes": "\nWhat's typically covered in a fall handyman visit:\n\nWeatherization\n• Exterior faucet winterization and hose bib covers\n• Storm door and weatherstripping check (windows + doors)\n• Window AC removal and storage (if applicable)\n• Door hinge and lock lubrication\n\nHVAC\n• Air filter swap (heating season)\n• Attic insulation check before heating season\n\nGenerator (if applicable)\n• Oil level check\n• Confirm weekly exercise cycle visually\n\nSafety\n• Smoke and CO detector battery swap\n• Smoke detector age check (replace if 9+ years — bring spares)\n• Fire extinguisher gauge check\n• Camera perimeter walk-past\n• Verify smoke and CO detectors (self-test confirmation)\n\nPlumbing\n• Drain cleaning and sink trap check\n• Hose bib shutoff valve test\n\nExterior\n• Seal gaps around pipes and utility entries (pest prevention)\n• Firebox and damper check (wood-burning fireplaces)\n\nOther (conditional)\n• Central vacuum service (if applicable)\n• Radon mitigation fan check (if applicable)\n\nAdd anything you've been meaning to get to.\n",
-      "requiredSubtypes": [],
-      "isEssential": true,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": "Handyman:fall",
-      "bundleTitle": "Fall Handyman Visit",
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "bundledIntoParent",
-      "_sourceLine": 1629,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": {
-          "bundleId": "Handyman:fall",
-          "bundleTitle": "Fall Handyman Visit",
-          "siblings": [
-            "Handyman:Service central vacuum system",
-            "Handyman:Verify radon mitigation fan",
-            "Handyman:smoke_co_batteries_fall",
-            "Handyman:winterize_hose_bibs",
-            "Handyman:drain_hoses_fall",
-            "Handyman:weatherstripping_fall",
-            "Handyman:foundation_gutter_fall",
-            "Handyman:attic_insulation_fall",
-            "Handyman:smoke_co_alarm_test_fall",
-            "Handyman:hvac_filter_fall",
-            "Handyman:ceiling_fan_winter",
-            "Handyman:pipe_insulation_fall"
-          ]
-        },
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "\nWhat's typically covered in a fall handyman visit:\n\nWeatherization\n• Exterio..."
-        }
-      ],
-      "_recommendation": null
-    },
-    {
       "templateKey": "Handyman:Test smart water leak system",
       "stableId": null,
       "systemCategory": "Handyman",
@@ -4620,14 +4198,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1672,
+      "_sourceLine": 1602,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
             "Handyman:foundation_walkaround_spring",
@@ -4654,7 +4231,7 @@
       "stableId": null,
       "systemCategory": "Handyman",
       "title": "Service central vacuum system",
-      "description": "Empty the canister, replace the bag or filter, inspect the hose and attachments, and clear any wall-port clogs. Easy to overlook — lands on the fall handyman visit.",
+      "description": "Empty the canister, replace the bag or filter, inspect the hose and attachments, and clear any wall-port clogs. Easy to overlook. Lands on the fall handyman visit.",
       "frequency": "Annually",
       "priority": "Low",
       "estimatedCostRange": "(bundled)",
@@ -4680,14 +4257,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1688,
+      "_sourceLine": 1618,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
             "Handyman:winterize_hose_bibs",
@@ -4707,15 +4283,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Empty the canister, replace the bag or filter, inspect the hose and attachmen..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -4723,7 +4291,7 @@
       "stableId": null,
       "systemCategory": "Handyman",
       "title": "Verify radon mitigation fan",
-      "description": "Confirm the mitigation fan reads correctly on its manometer — the fan should run continuously. If the manometer is flat on both sides, the fan has failed and needs replacement.",
+      "description": "Confirm the mitigation fan reads correctly on its manometer. The fan should run continuously. If the manometer is flat on both sides, the fan has failed and needs replacement.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -4749,14 +4317,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1704,
+      "_sourceLine": 1634,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:smoke_co_batteries_fall",
             "Handyman:winterize_hose_bibs",
@@ -4776,15 +4343,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Confirm the mitigation fan reads correctly on its manometer — the fan should ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -4816,14 +4375,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1740,
+      "_sourceLine": 1670,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:caulking_inspect_spring",
             "Handyman:foundation_walkaround_spring",
@@ -4874,14 +4432,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1756,
+      "_sourceLine": 1686,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:foundation_walkaround_spring",
@@ -4932,14 +4489,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1772,
+      "_sourceLine": 1702,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -4990,14 +4546,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1788,
+      "_sourceLine": 1718,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5031,7 +4586,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": false,
-      "notes": "Distinct from the Phase 62 battery backup test — this one confirms the primary pump still cycles.",
+      "notes": "Distinct from the Phase 62 battery backup test. This one confirms the primary pump still cycles.",
       "requiredSubtypes": [
         "sump_pump"
       ],
@@ -5050,14 +4605,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1804,
+      "_sourceLine": 1734,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5076,15 +4630,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Distinct from the Phase 62 battery backup test — this one confirms the primar..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5116,14 +4662,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1821,
+      "_sourceLine": 1751,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5150,7 +4695,7 @@
       "stableId": "Handyman:smoke_co_alarm_test_spring",
       "systemCategory": "Handyman",
       "title": "Test smoke and CO detector alarms",
-      "description": "Hold the TEST button on every alarm to confirm the sounder works. Separate from battery swap — this verifies the audio circuit.",
+      "description": "Hold the TEST button on every alarm to confirm the sounder works. Separate from battery swap. This verifies the audio circuit.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -5174,14 +4719,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1837,
+      "_sourceLine": 1767,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5200,15 +4744,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Hold the TEST button on every alarm to confirm the sounder works. Separate fr..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5242,14 +4778,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1853,
+      "_sourceLine": 1783,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5276,7 +4811,7 @@
       "stableId": "Handyman:ceiling_fan_summer",
       "systemCategory": "Handyman",
       "title": "Ceiling fan direction switch (summer)",
-      "description": "Flip ceiling fans to counter-clockwise for downward airflow during cooling season. Reachable units only — the handyman handles the ones requiring a ladder.",
+      "description": "Flip ceiling fans to counter-clockwise for downward airflow during cooling season. Reachable units only. The handyman handles the ones requiring a ladder.",
       "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "(bundled)",
@@ -5300,14 +4835,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1870,
+      "_sourceLine": 1800,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5326,15 +4860,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Flip ceiling fans to counter-clockwise for downward airflow during cooling se..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5366,14 +4892,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1886,
+      "_sourceLine": 1816,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -5400,7 +4925,7 @@
       "stableId": "Handyman:smoke_co_batteries_fall",
       "systemCategory": "Handyman",
       "title": "Replace smoke & CO detector batteries",
-      "description": "Fall battery swap — daylight-saving is the industry's mnemonic. The handyman handles the high-reach units you can't get to safely.",
+      "description": "Fall battery swap. Daylight-saving is the industry's mnemonic. The handyman handles the high-reach units you can't get to safely.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -5424,14 +4949,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1906,
+      "_sourceLine": 1836,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:winterize_hose_bibs",
@@ -5451,15 +4975,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Fall battery swap — daylight-saving is the industry's mnemonic. The handyman ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5491,14 +5007,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1922,
+      "_sourceLine": 1852,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5550,14 +5065,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1939,
+      "_sourceLine": 1869,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5609,14 +5123,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1956,
+      "_sourceLine": 1886,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5668,14 +5181,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1972,
+      "_sourceLine": 1902,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5703,7 +5215,7 @@
       "stableId": "Handyman:attic_insulation_fall",
       "systemCategory": "Handyman",
       "title": "Check attic insulation coverage",
-      "description": "Eye-check the attic — look for areas where insulation has been compressed, blown aside, or compromised by pests. Snap a photo for later reference.",
+      "description": "Eye-check the attic. Look for areas where insulation has been compressed, blown aside, or compromised by pests. Snap a photo for later reference.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "(bundled)",
@@ -5727,14 +5239,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1988,
+      "_sourceLine": 1918,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5754,15 +5265,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Eye-check the attic — look for areas where insulation has been compressed, bl..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5770,7 +5273,7 @@
       "stableId": "Handyman:smoke_co_alarm_test_fall",
       "systemCategory": "Handyman",
       "title": "Test smoke and CO detector alarms",
-      "description": "Fall audio-circuit verification. Press TEST on every alarm — especially important before the heating system starts producing CO.",
+      "description": "Fall audio-circuit verification. Press TEST on every alarm. Especially important before the heating system starts producing CO.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -5794,14 +5297,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2004,
+      "_sourceLine": 1934,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5821,15 +5323,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Fall audio-circuit verification. Press TEST on every alarm — especially impor..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5863,14 +5357,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2020,
+      "_sourceLine": 1950,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5898,7 +5391,7 @@
       "stableId": "Handyman:ceiling_fan_winter",
       "systemCategory": "Handyman",
       "title": "Ceiling fan direction switch (winter)",
-      "description": "Flip ceiling fans to clockwise for gentle upward airflow — pushes warm air pooling at the ceiling back down into the room.",
+      "description": "Flip ceiling fans to clockwise for gentle upward airflow. Pushes warm air pooling at the ceiling back down into the room.",
       "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "(bundled)",
@@ -5922,14 +5415,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2037,
+      "_sourceLine": 1967,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -5949,15 +5441,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Flip ceiling fans to clockwise for gentle upward airflow — pushes warm air po..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -5989,14 +5473,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2053,
+      "_sourceLine": 1983,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -6048,7 +5531,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2077,
+      "_sourceLine": 2007,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6090,7 +5573,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2091,
+      "_sourceLine": 2021,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6108,7 +5591,7 @@
       "stableId": null,
       "systemCategory": "Handyman",
       "title": "Smart home battery sweep",
-      "description": "Handyman replaces batteries across every smart lock, doorbell camera, smoke/CO detector, motion sensor, and smart home hub. Most HNW homes have 15-30 battery-powered devices — this catches the ones the owner never thinks about until they die.",
+      "description": "Handyman replaces batteries across every smart lock, doorbell camera, smoke/CO detector, motion sensor, and smart home hub. Most HNW homes have 15-30 battery-powered devices. This catches the ones the owner never thinks about until they die.",
       "frequency": "Semi-annually",
       "priority": "Medium",
       "estimatedCostRange": "$50–$200",
@@ -6132,7 +5615,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2105,
+      "_sourceLine": 2035,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6142,15 +5625,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Handyman replaces batteries across every smart lock, doorbell camera, smoke/C..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -6158,7 +5633,7 @@
       "stableId": null,
       "systemCategory": "Handyman",
       "title": "Whole-house relamping",
-      "description": "Handyman systematically replaces every light bulb in fixtures that require a ladder or awkward reach — high ceilings, stairwells, exterior sconces, closet recessed cans. One morning vs 12 separate \"I'll get to it\" moments.",
+      "description": "Handyman systematically replaces every light bulb in fixtures that require a ladder or awkward reach. High ceilings, stairwells, exterior sconces, closet recessed cans. One morning vs 12 separate \"I'll get to it\" moments.",
       "frequency": "Annually",
       "priority": "Low",
       "estimatedCostRange": "$150–$500",
@@ -6182,7 +5657,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2119,
+      "_sourceLine": 2049,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6192,15 +5667,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Handyman systematically replaces every light bulb in fixtures that require a ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -6232,7 +5699,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2133,
+      "_sourceLine": 2063,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6274,7 +5741,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2147,
+      "_sourceLine": 2077,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6316,7 +5783,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2161,
+      "_sourceLine": 2091,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6358,7 +5825,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2175,
+      "_sourceLine": 2105,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6400,7 +5867,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2189,
+      "_sourceLine": 2119,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6442,7 +5909,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2203,
+      "_sourceLine": 2133,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6484,7 +5951,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2217,
+      "_sourceLine": 2147,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6526,7 +5993,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2231,
+      "_sourceLine": 2161,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6568,7 +6035,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2245,
+      "_sourceLine": 2175,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6610,7 +6077,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2259,
+      "_sourceLine": 2189,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6652,7 +6119,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2273,
+      "_sourceLine": 2203,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6694,7 +6161,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2287,
+      "_sourceLine": 2217,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6736,7 +6203,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2319,
+      "_sourceLine": 2249,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6778,7 +6245,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2320,
+      "_sourceLine": 2250,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6820,7 +6287,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2321,
+      "_sourceLine": 2251,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6862,7 +6329,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2322,
+      "_sourceLine": 2252,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6904,7 +6371,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2323,
+      "_sourceLine": 2253,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6946,7 +6413,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2324,
+      "_sourceLine": 2254,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6988,7 +6455,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2325,
+      "_sourceLine": 2255,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7030,7 +6497,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2326,
+      "_sourceLine": 2256,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7072,7 +6539,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2327,
+      "_sourceLine": 2257,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7114,7 +6581,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2328,
+      "_sourceLine": 2258,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7156,7 +6623,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2329,
+      "_sourceLine": 2259,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7198,7 +6665,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2330,
+      "_sourceLine": 2260,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7240,7 +6707,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2333,
+      "_sourceLine": 2263,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7282,7 +6749,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2334,
+      "_sourceLine": 2264,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7324,7 +6791,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2335,
+      "_sourceLine": 2265,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7366,7 +6833,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2336,
+      "_sourceLine": 2266,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7408,7 +6875,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2337,
+      "_sourceLine": 2267,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7450,7 +6917,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2338,
+      "_sourceLine": 2268,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7492,7 +6959,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2339,
+      "_sourceLine": 2269,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7534,7 +7001,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2340,
+      "_sourceLine": 2270,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7576,7 +7043,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2343,
+      "_sourceLine": 2273,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7620,7 +7087,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2344,
+      "_sourceLine": 2274,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7662,7 +7129,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2345,
+      "_sourceLine": 2275,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7704,7 +7171,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2346,
+      "_sourceLine": 2276,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7746,7 +7213,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2347,
+      "_sourceLine": 2277,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7788,7 +7255,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2348,
+      "_sourceLine": 2278,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7832,7 +7299,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2349,
+      "_sourceLine": 2279,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7874,7 +7341,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2350,
+      "_sourceLine": 2280,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7916,7 +7383,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2351,
+      "_sourceLine": 2281,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7961,7 +7428,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2352,
+      "_sourceLine": 2282,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8003,7 +7470,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2355,
+      "_sourceLine": 2285,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8045,7 +7512,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2356,
+      "_sourceLine": 2286,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8087,7 +7554,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2357,
+      "_sourceLine": 2287,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8129,7 +7596,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2358,
+      "_sourceLine": 2288,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8171,7 +7638,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2359,
+      "_sourceLine": 2289,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8213,7 +7680,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2360,
+      "_sourceLine": 2290,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8255,7 +7722,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2361,
+      "_sourceLine": 2291,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8297,7 +7764,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2364,
+      "_sourceLine": 2294,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8339,7 +7806,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2365,
+      "_sourceLine": 2295,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8381,7 +7848,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2366,
+      "_sourceLine": 2296,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8423,7 +7890,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2367,
+      "_sourceLine": 2297,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8465,7 +7932,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2368,
+      "_sourceLine": 2298,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8507,7 +7974,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2369,
+      "_sourceLine": 2299,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8549,7 +8016,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2370,
+      "_sourceLine": 2300,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8591,7 +8058,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2371,
+      "_sourceLine": 2301,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8636,7 +8103,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2374,
+      "_sourceLine": 2304,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8678,7 +8145,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2375,
+      "_sourceLine": 2305,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8724,7 +8191,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2376,
+      "_sourceLine": 2306,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8769,7 +8236,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2377,
+      "_sourceLine": 2307,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8811,7 +8278,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2378,
+      "_sourceLine": 2308,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8853,7 +8320,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2379,
+      "_sourceLine": 2309,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8895,7 +8362,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2382,
+      "_sourceLine": 2312,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8937,7 +8404,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2383,
+      "_sourceLine": 2313,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8979,7 +8446,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2384,
+      "_sourceLine": 2314,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9021,7 +8488,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2385,
+      "_sourceLine": 2315,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9063,7 +8530,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2386,
+      "_sourceLine": 2316,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9105,7 +8572,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2387,
+      "_sourceLine": 2317,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9147,7 +8614,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2388,
+      "_sourceLine": 2318,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9189,7 +8656,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2389,
+      "_sourceLine": 2319,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9233,7 +8700,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2392,
+      "_sourceLine": 2322,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9277,7 +8744,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2393,
+      "_sourceLine": 2323,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9322,7 +8789,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2394,
+      "_sourceLine": 2324,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9364,7 +8831,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2395,
+      "_sourceLine": 2325,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9406,7 +8873,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2396,
+      "_sourceLine": 2326,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9450,7 +8917,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2399,
+      "_sourceLine": 2329,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9496,7 +8963,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2400,
+      "_sourceLine": 2330,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9540,7 +9007,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2401,
+      "_sourceLine": 2331,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9585,7 +9052,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2402,
+      "_sourceLine": 2332,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9630,7 +9097,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2403,
+      "_sourceLine": 2333,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9672,7 +9139,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2406,
+      "_sourceLine": 2336,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9714,7 +9181,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2407,
+      "_sourceLine": 2337,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9756,7 +9223,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2408,
+      "_sourceLine": 2338,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9798,7 +9265,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2409,
+      "_sourceLine": 2339,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9840,7 +9307,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2410,
+      "_sourceLine": 2340,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9882,7 +9349,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2411,
+      "_sourceLine": 2341,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9924,7 +9391,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 2426,
+      "_sourceLine": 2356,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9942,7 +9409,7 @@
       "stableId": null,
       "systemCategory": "Mosquito & Tick",
       "title": "Sign up for mosquito and tick season",
-      "description": "Most mosquito and tick vendors run seasonal programs — an every-3-week spray schedule from April through October. Sign up in early spring to lock in your spot on their schedule.",
+      "description": "Most mosquito and tick vendors run seasonal programs. An every-3-week spray schedule from April through October. Sign up in early spring to lock in your spot on their schedule.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "$400-900/season",
@@ -9966,7 +9433,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 2453,
+      "_sourceLine": 2383,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9976,15 +9443,7 @@
           "displayPriority": 110
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Most mosquito and tick vendors run seasonal programs — an every-3-week spray ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -10016,7 +9475,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2480,
+      "_sourceLine": 2410,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10058,7 +9517,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2495,
+      "_sourceLine": 2425,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10100,7 +9559,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2512,
+      "_sourceLine": 2442,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10142,7 +9601,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2533,
+      "_sourceLine": 2463,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10167,7 +9626,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Schedule for late spring after the heaviest pollen settles — that way the cleaning lasts the longest into summer. Hardscape (concrete, stone, pavers) is more forgiving and can take higher pressure if needed. Always confirm with the vendor that they're using soft-wash on siding before they start.",
+      "notes": "Schedule for late spring after the heaviest pollen settles. That way the cleaning lasts the longest into summer. Hardscape (concrete, stone, pavers) is more forgiving and can take higher pressure if needed. Always confirm with the vendor that they're using soft-wash on siding before they start.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -10184,7 +9643,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2553,
+      "_sourceLine": 2483,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10194,15 +9653,7 @@
           "displayPriority": 30
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Schedule for late spring after the heaviest pollen settles — that way the cle..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -10234,7 +9685,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2576,
+      "_sourceLine": 2506,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10276,7 +9727,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2605,
+      "_sourceLine": 2535,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10294,14 +9745,14 @@
       "stableId": null,
       "systemCategory": "Elevator",
       "title": "Annual elevator inspection",
-      "description": "Certified elevator inspector verifies code compliance: emergency stop, door sensors and interlocks, governor and safety brake, hoist cable wear, machine room ventilation, and updated certificate posting. Required by state law in most jurisdictions for residential elevators — failing to keep current can void homeowner's insurance for elevator-related claims.",
+      "description": "Certified elevator inspector verifies code compliance: emergency stop, door sensors and interlocks, governor and safety brake, hoist cable wear, machine room ventilation, and updated certificate posting. Required by state law in most jurisdictions for residential elevators. Failing to keep current can void homeowner's insurance for elevator-related claims.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$300-500",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Keep the certificate on file with other estate documents. If your home is on a service contract with an elevator company (Otis, ThyssenKrupp, etc.), the inspection is usually included — but the certificate is something you need to pull and file yourself.",
+      "notes": "Keep the certificate on file with other estate documents. If your home is on a service contract with an elevator company (Otis, ThyssenKrupp, etc.), the inspection is usually included. But the certificate is something you need to pull and file yourself.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -10318,7 +9769,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2625,
+      "_sourceLine": 2555,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10328,22 +9779,7 @@
           "displayPriority": 90
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Certified elevator inspector verifies code compliance: emergency stop, door s..."
-        },
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Keep the certificate on file with other estate documents. If your home is on ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -10358,7 +9794,7 @@
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Most homes are on a quarterly service contract with the installer or a local specialist. If you've never used the emergency phone, this visit is when to test it — phone batteries die silently and you don't want to find out you can't call out from inside the cab during the next power blip.",
+      "notes": "Most homes are on a quarterly service contract with the installer or a local specialist. If you've never used the emergency phone, this visit is when to test it. Phone batteries die silently and you don't want to find out you can't call out from inside the cab during the next power blip.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -10375,7 +9811,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2626,
+      "_sourceLine": 2556,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10385,15 +9821,7 @@
           "displayPriority": 90
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Most homes are on a quarterly service contract with the installer or a local ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -10408,7 +9836,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Cooling unit failures can ruin a collection overnight — fine wine starts heat-damaging at 75°F+, and most modern units have no built-in alarm if the compressor fails on a Friday night. This is not a category to skip. Most manufacturer warranties require annual documented service.",
+      "notes": "Cooling unit failures can ruin a collection overnight. Fine wine starts heat-damaging at 75°F+, and most modern units have no built-in alarm if the compressor fails on a Friday night. This is not a category to skip. Most manufacturer warranties require annual documented service.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -10425,7 +9853,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2633,
+      "_sourceLine": 2563,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10435,15 +9863,7 @@
           "displayPriority": 95
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Cooling unit failures can ruin a collection overnight — fine wine starts heat..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -10475,7 +9895,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 2648,
+      "_sourceLine": 2578,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -10519,7 +9939,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2667,
+      "_sourceLine": 2597,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,

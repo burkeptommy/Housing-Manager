@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-30T15:23:35.125Z",
+  "generatedAt": "2026-04-30T17:30:01.872Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift (filtered)",
-  "sourceCommit": "290eb1ac",
-  "count": 106,
+  "sourceCommit": "85ba8c59",
+  "count": 104,
   "entries": [
     {
       "templateKey": "Siding/Exterior:Driveway seal coat",
@@ -97,7 +97,7 @@
       "stableId": null,
       "systemCategory": "Plumbing",
       "title": "Test sump pump battery backup",
-      "description": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years — if it doesn't hold charge, replace before spring rains.",
+      "description": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years. If it doesn't hold charge, replace before spring rains.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "$0 (DIY)",
@@ -134,15 +134,7 @@
           "displayPriority": 30
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Unplug the primary sump pump to verify the battery backup engages and can mov..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -235,139 +227,6 @@
       "_recommendation": null
     },
     {
-      "templateKey": "Handyman:Spring handyman visit",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Spring handyman visit",
-      "description": "Seasonal walkthrough and punch list. Your handyman handles small repairs, caulking touch-ups, filter swaps, and anything that's accumulated since the last visit.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$300-800",
-      "isDIY": false,
-      "seasonalTiming": "Spring",
-      "professionalRequired": true,
-      "notes": "\nWhat's typically covered in a spring handyman visit:\n\nHVAC\n• Air filter swap (buy a case, swap during visit)\n• Mini-split filter rinse (if applicable)\n\nPlumbing\n• Washing machine supply hose visual check\n• Sump pump test (if applicable)\n• Well cap and pressure tank visual (if well home)\n• Water softener brine tank visual (if applicable)\n• Whole-house filter swap (if applicable)\n\nExterior\n• Caulking touch-up around windows and doors\n• Driveway crack sealcoat spot-fill\n• Deck/fence screw check\n• Foundation grading walkaround\n• Retaining wall condition check\n\nSafety\n• Smoke and CO detector battery swap\n• Fire extinguisher gauge check\n• Camera perimeter walk-past\n• Verify smoke and CO detectors (self-test confirmation)\n• Test GFCI outlets\n\nAppliances\n• Refrigerator coil vacuum (if accessible)\n• Dishwasher spray arm clean (if not covered by housekeeper)\n• Ice maker filter replacement (if due)\n\nOther (conditional)\n• Crawl space visual for moisture (if applicable)\n• Dehumidifier operation test (if applicable)\n• Septic drain field walkaround (if applicable)\n• Smart leak system test (if applicable)\n• Turf drainage spot-check (synthetic turf homes)\n\nAdd anything you've been meaning to get to — that's what the handyman is for.\n",
-      "requiredSubtypes": [],
-      "isEssential": true,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": "Handyman:spring",
-      "bundleTitle": "Spring Handyman Visit",
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "bundledIntoParent",
-      "_sourceLine": 1587,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": {
-          "bundleId": "Handyman:spring",
-          "bundleTitle": "Spring Handyman Visit",
-          "siblings": [
-            "Handyman:Test smart water leak system",
-            "Handyman:smoke_co_batteries_spring",
-            "Handyman:caulking_inspect_spring",
-            "Handyman:foundation_walkaround_spring",
-            "Handyman:washer_hoses_spring",
-            "Handyman:sump_pump_test_spring",
-            "Handyman:gfci_test_spring",
-            "Handyman:smoke_co_alarm_test_spring",
-            "Handyman:hvac_filter_spring",
-            "Handyman:ceiling_fan_summer",
-            "Handyman:exterior_faucets_reopen"
-          ]
-        },
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "\nWhat's typically covered in a spring handyman visit:\n\nHVAC\n• Air filter swap..."
-        }
-      ],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Fall handyman visit",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Fall handyman visit",
-      "description": "Pre-winter walkthrough and punch list. Your handyman handles weatherproofing, hose-bib winterization, storm door prep, attic insulation check, and any accumulated punch-list items.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$300-800",
-      "isDIY": false,
-      "seasonalTiming": "Fall",
-      "professionalRequired": true,
-      "notes": "\nWhat's typically covered in a fall handyman visit:\n\nWeatherization\n• Exterior faucet winterization and hose bib covers\n• Storm door and weatherstripping check (windows + doors)\n• Window AC removal and storage (if applicable)\n• Door hinge and lock lubrication\n\nHVAC\n• Air filter swap (heating season)\n• Attic insulation check before heating season\n\nGenerator (if applicable)\n• Oil level check\n• Confirm weekly exercise cycle visually\n\nSafety\n• Smoke and CO detector battery swap\n• Smoke detector age check (replace if 9+ years — bring spares)\n• Fire extinguisher gauge check\n• Camera perimeter walk-past\n• Verify smoke and CO detectors (self-test confirmation)\n\nPlumbing\n• Drain cleaning and sink trap check\n• Hose bib shutoff valve test\n\nExterior\n• Seal gaps around pipes and utility entries (pest prevention)\n• Firebox and damper check (wood-burning fireplaces)\n\nOther (conditional)\n• Central vacuum service (if applicable)\n• Radon mitigation fan check (if applicable)\n\nAdd anything you've been meaning to get to.\n",
-      "requiredSubtypes": [],
-      "isEssential": true,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": "Handyman:fall",
-      "bundleTitle": "Fall Handyman Visit",
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "bundledIntoParent",
-      "_sourceLine": 1629,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": {
-          "bundleId": "Handyman:fall",
-          "bundleTitle": "Fall Handyman Visit",
-          "siblings": [
-            "Handyman:Service central vacuum system",
-            "Handyman:Verify radon mitigation fan",
-            "Handyman:smoke_co_batteries_fall",
-            "Handyman:winterize_hose_bibs",
-            "Handyman:drain_hoses_fall",
-            "Handyman:weatherstripping_fall",
-            "Handyman:foundation_gutter_fall",
-            "Handyman:attic_insulation_fall",
-            "Handyman:smoke_co_alarm_test_fall",
-            "Handyman:hvac_filter_fall",
-            "Handyman:ceiling_fan_winter",
-            "Handyman:pipe_insulation_fall"
-          ]
-        },
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "\nWhat's typically covered in a fall handyman visit:\n\nWeatherization\n• Exterio..."
-        }
-      ],
-      "_recommendation": null
-    },
-    {
       "templateKey": "Handyman:Test smart water leak system",
       "stableId": null,
       "systemCategory": "Handyman",
@@ -398,14 +257,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1672,
+      "_sourceLine": 1602,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
             "Handyman:foundation_walkaround_spring",
@@ -432,7 +290,7 @@
       "stableId": null,
       "systemCategory": "Handyman",
       "title": "Service central vacuum system",
-      "description": "Empty the canister, replace the bag or filter, inspect the hose and attachments, and clear any wall-port clogs. Easy to overlook — lands on the fall handyman visit.",
+      "description": "Empty the canister, replace the bag or filter, inspect the hose and attachments, and clear any wall-port clogs. Easy to overlook. Lands on the fall handyman visit.",
       "frequency": "Annually",
       "priority": "Low",
       "estimatedCostRange": "(bundled)",
@@ -458,14 +316,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1688,
+      "_sourceLine": 1618,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
             "Handyman:winterize_hose_bibs",
@@ -485,15 +342,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Empty the canister, replace the bag or filter, inspect the hose and attachmen..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -501,7 +350,7 @@
       "stableId": null,
       "systemCategory": "Handyman",
       "title": "Verify radon mitigation fan",
-      "description": "Confirm the mitigation fan reads correctly on its manometer — the fan should run continuously. If the manometer is flat on both sides, the fan has failed and needs replacement.",
+      "description": "Confirm the mitigation fan reads correctly on its manometer. The fan should run continuously. If the manometer is flat on both sides, the fan has failed and needs replacement.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -527,14 +376,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1704,
+      "_sourceLine": 1634,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:smoke_co_batteries_fall",
             "Handyman:winterize_hose_bibs",
@@ -554,15 +402,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Confirm the mitigation fan reads correctly on its manometer — the fan should ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -594,14 +434,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1740,
+      "_sourceLine": 1670,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:caulking_inspect_spring",
             "Handyman:foundation_walkaround_spring",
@@ -652,14 +491,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1756,
+      "_sourceLine": 1686,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:foundation_walkaround_spring",
@@ -710,14 +548,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1772,
+      "_sourceLine": 1702,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -768,14 +605,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1788,
+      "_sourceLine": 1718,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -809,7 +645,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": false,
-      "notes": "Distinct from the Phase 62 battery backup test — this one confirms the primary pump still cycles.",
+      "notes": "Distinct from the Phase 62 battery backup test. This one confirms the primary pump still cycles.",
       "requiredSubtypes": [
         "sump_pump"
       ],
@@ -828,14 +664,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1804,
+      "_sourceLine": 1734,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -854,15 +689,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "notes",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Distinct from the Phase 62 battery backup test — this one confirms the primar..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -894,14 +721,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1821,
+      "_sourceLine": 1751,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -928,7 +754,7 @@
       "stableId": "Handyman:smoke_co_alarm_test_spring",
       "systemCategory": "Handyman",
       "title": "Test smoke and CO detector alarms",
-      "description": "Hold the TEST button on every alarm to confirm the sounder works. Separate from battery swap — this verifies the audio circuit.",
+      "description": "Hold the TEST button on every alarm to confirm the sounder works. Separate from battery swap. This verifies the audio circuit.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -952,14 +778,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1837,
+      "_sourceLine": 1767,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -978,15 +803,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Hold the TEST button on every alarm to confirm the sounder works. Separate fr..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1020,14 +837,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1853,
+      "_sourceLine": 1783,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -1054,7 +870,7 @@
       "stableId": "Handyman:ceiling_fan_summer",
       "systemCategory": "Handyman",
       "title": "Ceiling fan direction switch (summer)",
-      "description": "Flip ceiling fans to counter-clockwise for downward airflow during cooling season. Reachable units only — the handyman handles the ones requiring a ladder.",
+      "description": "Flip ceiling fans to counter-clockwise for downward airflow during cooling season. Reachable units only. The handyman handles the ones requiring a ladder.",
       "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "(bundled)",
@@ -1078,14 +894,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1870,
+      "_sourceLine": 1800,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -1104,15 +919,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Flip ceiling fans to counter-clockwise for downward airflow during cooling se..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1144,14 +951,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1886,
+      "_sourceLine": 1816,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:spring",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Spring handyman visit",
             "Handyman:Test smart water leak system",
             "Handyman:smoke_co_batteries_spring",
             "Handyman:caulking_inspect_spring",
@@ -1178,7 +984,7 @@
       "stableId": "Handyman:smoke_co_batteries_fall",
       "systemCategory": "Handyman",
       "title": "Replace smoke & CO detector batteries",
-      "description": "Fall battery swap — daylight-saving is the industry's mnemonic. The handyman handles the high-reach units you can't get to safely.",
+      "description": "Fall battery swap. Daylight-saving is the industry's mnemonic. The handyman handles the high-reach units you can't get to safely.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -1202,14 +1008,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1906,
+      "_sourceLine": 1836,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:winterize_hose_bibs",
@@ -1229,15 +1034,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Fall battery swap — daylight-saving is the industry's mnemonic. The handyman ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1269,14 +1066,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1922,
+      "_sourceLine": 1852,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1328,14 +1124,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1939,
+      "_sourceLine": 1869,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1387,14 +1182,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1956,
+      "_sourceLine": 1886,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1446,14 +1240,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1972,
+      "_sourceLine": 1902,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1481,7 +1274,7 @@
       "stableId": "Handyman:attic_insulation_fall",
       "systemCategory": "Handyman",
       "title": "Check attic insulation coverage",
-      "description": "Eye-check the attic — look for areas where insulation has been compressed, blown aside, or compromised by pests. Snap a photo for later reference.",
+      "description": "Eye-check the attic. Look for areas where insulation has been compressed, blown aside, or compromised by pests. Snap a photo for later reference.",
       "frequency": "Annually",
       "priority": "Medium",
       "estimatedCostRange": "(bundled)",
@@ -1505,14 +1298,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1988,
+      "_sourceLine": 1918,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1532,15 +1324,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Eye-check the attic — look for areas where insulation has been compressed, bl..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1548,7 +1332,7 @@
       "stableId": "Handyman:smoke_co_alarm_test_fall",
       "systemCategory": "Handyman",
       "title": "Test smoke and CO detector alarms",
-      "description": "Fall audio-circuit verification. Press TEST on every alarm — especially important before the heating system starts producing CO.",
+      "description": "Fall audio-circuit verification. Press TEST on every alarm. Especially important before the heating system starts producing CO.",
       "frequency": "Semi-annually",
       "priority": "High",
       "estimatedCostRange": "(bundled)",
@@ -1572,14 +1356,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2004,
+      "_sourceLine": 1934,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1599,15 +1382,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Fall audio-circuit verification. Press TEST on every alarm — especially impor..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1641,14 +1416,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2020,
+      "_sourceLine": 1950,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1676,7 +1450,7 @@
       "stableId": "Handyman:ceiling_fan_winter",
       "systemCategory": "Handyman",
       "title": "Ceiling fan direction switch (winter)",
-      "description": "Flip ceiling fans to clockwise for gentle upward airflow — pushes warm air pooling at the ceiling back down into the room.",
+      "description": "Flip ceiling fans to clockwise for gentle upward airflow. Pushes warm air pooling at the ceiling back down into the room.",
       "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "(bundled)",
@@ -1700,14 +1474,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2037,
+      "_sourceLine": 1967,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1727,15 +1500,7 @@
           "displayPriority": 85
         }
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "description",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Flip ceiling fans to clockwise for gentle upward airflow — pushes warm air po..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1767,14 +1532,13 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 2053,
+      "_sourceLine": 1983,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Handyman:fall",
           "bundleTitle": null,
           "siblings": [
-            "Handyman:Fall handyman visit",
             "Handyman:Service central vacuum system",
             "Handyman:Verify radon mitigation fan",
             "Handyman:smoke_co_batteries_fall",
@@ -1826,7 +1590,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2319,
+      "_sourceLine": 2249,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1868,7 +1632,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2320,
+      "_sourceLine": 2250,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1910,7 +1674,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2321,
+      "_sourceLine": 2251,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1952,7 +1716,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2322,
+      "_sourceLine": 2252,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1994,7 +1758,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2323,
+      "_sourceLine": 2253,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2036,7 +1800,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2324,
+      "_sourceLine": 2254,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2078,7 +1842,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2325,
+      "_sourceLine": 2255,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2120,7 +1884,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2326,
+      "_sourceLine": 2256,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2162,7 +1926,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2327,
+      "_sourceLine": 2257,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2204,7 +1968,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2328,
+      "_sourceLine": 2258,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2246,7 +2010,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2329,
+      "_sourceLine": 2259,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2288,7 +2052,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2330,
+      "_sourceLine": 2260,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2330,7 +2094,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2333,
+      "_sourceLine": 2263,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2372,7 +2136,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2334,
+      "_sourceLine": 2264,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2414,7 +2178,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2335,
+      "_sourceLine": 2265,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2456,7 +2220,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2336,
+      "_sourceLine": 2266,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2498,7 +2262,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2337,
+      "_sourceLine": 2267,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2540,7 +2304,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2338,
+      "_sourceLine": 2268,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2582,7 +2346,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2339,
+      "_sourceLine": 2269,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2624,7 +2388,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2340,
+      "_sourceLine": 2270,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2666,7 +2430,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2343,
+      "_sourceLine": 2273,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2710,7 +2474,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2344,
+      "_sourceLine": 2274,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2752,7 +2516,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2345,
+      "_sourceLine": 2275,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2794,7 +2558,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2346,
+      "_sourceLine": 2276,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2836,7 +2600,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2347,
+      "_sourceLine": 2277,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2878,7 +2642,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2348,
+      "_sourceLine": 2278,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2922,7 +2686,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2349,
+      "_sourceLine": 2279,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2964,7 +2728,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2350,
+      "_sourceLine": 2280,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3006,7 +2770,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2351,
+      "_sourceLine": 2281,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3051,7 +2815,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2352,
+      "_sourceLine": 2282,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3093,7 +2857,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2355,
+      "_sourceLine": 2285,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3135,7 +2899,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2356,
+      "_sourceLine": 2286,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3177,7 +2941,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2357,
+      "_sourceLine": 2287,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3219,7 +2983,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2358,
+      "_sourceLine": 2288,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3261,7 +3025,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2359,
+      "_sourceLine": 2289,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3303,7 +3067,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2360,
+      "_sourceLine": 2290,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3345,7 +3109,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2361,
+      "_sourceLine": 2291,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3387,7 +3151,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2364,
+      "_sourceLine": 2294,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3429,7 +3193,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2365,
+      "_sourceLine": 2295,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3471,7 +3235,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2366,
+      "_sourceLine": 2296,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3513,7 +3277,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2367,
+      "_sourceLine": 2297,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3555,7 +3319,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2368,
+      "_sourceLine": 2298,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3597,7 +3361,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2369,
+      "_sourceLine": 2299,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3639,7 +3403,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2370,
+      "_sourceLine": 2300,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3681,7 +3445,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2371,
+      "_sourceLine": 2301,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3726,7 +3490,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2374,
+      "_sourceLine": 2304,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3768,7 +3532,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2375,
+      "_sourceLine": 2305,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3814,7 +3578,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2376,
+      "_sourceLine": 2306,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3859,7 +3623,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2377,
+      "_sourceLine": 2307,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3901,7 +3665,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2378,
+      "_sourceLine": 2308,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3943,7 +3707,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2379,
+      "_sourceLine": 2309,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3985,7 +3749,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2382,
+      "_sourceLine": 2312,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4027,7 +3791,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2383,
+      "_sourceLine": 2313,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4069,7 +3833,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2384,
+      "_sourceLine": 2314,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4111,7 +3875,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2385,
+      "_sourceLine": 2315,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4153,7 +3917,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2386,
+      "_sourceLine": 2316,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4195,7 +3959,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2387,
+      "_sourceLine": 2317,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4237,7 +4001,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2388,
+      "_sourceLine": 2318,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4279,7 +4043,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2389,
+      "_sourceLine": 2319,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4323,7 +4087,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2392,
+      "_sourceLine": 2322,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4367,7 +4131,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2393,
+      "_sourceLine": 2323,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4412,7 +4176,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2394,
+      "_sourceLine": 2324,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4454,7 +4218,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2395,
+      "_sourceLine": 2325,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4496,7 +4260,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2396,
+      "_sourceLine": 2326,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4540,7 +4304,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2399,
+      "_sourceLine": 2329,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4586,7 +4350,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2400,
+      "_sourceLine": 2330,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4630,7 +4394,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2401,
+      "_sourceLine": 2331,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4675,7 +4439,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2402,
+      "_sourceLine": 2332,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4720,7 +4484,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2403,
+      "_sourceLine": 2333,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4762,7 +4526,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2406,
+      "_sourceLine": 2336,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4804,7 +4568,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2407,
+      "_sourceLine": 2337,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4846,7 +4610,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2408,
+      "_sourceLine": 2338,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4888,7 +4652,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2409,
+      "_sourceLine": 2339,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4930,7 +4694,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2410,
+      "_sourceLine": 2340,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4972,7 +4736,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2411,
+      "_sourceLine": 2341,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5016,7 +4780,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2667,
+      "_sourceLine": 2597,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
