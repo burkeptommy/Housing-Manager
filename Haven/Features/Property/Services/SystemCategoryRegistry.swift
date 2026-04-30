@@ -141,7 +141,14 @@ enum SystemCategoryRegistry {
 
     static let specialty: [SystemCategoryMeta] = [
         // Outdoor Amenities
-        .init(categoryKey: "Pool/Spa", displayName: "Pool Service", tier: .specialty,
+        // Phase 67E/F (admin feedback ad88660b): renamed displayName
+        // from "Pool Service" → "Pool". The actual recurring weekly
+        // cleaning is a `pool_service` routine (RoutineKind.poolService),
+        // not a system. The Pool/Spa SYSTEM holds physical pool tasks
+        // (opening, closing, heater service, equipment inspection,
+        // safety fence). Hot tub items live under the separate Hot Tub
+        // category.
+        .init(categoryKey: "Pool/Spa", displayName: "Pool", tier: .specialty,
               displayPriority: 10, icon: "drop.triangle.fill", defaultCadence: "Weekly",
               specialtyGroup: "Outdoor Amenities"),
         .init(categoryKey: "Hot Tub", displayName: "Spa / Hot Tub", tier: .specialty,
@@ -547,6 +554,18 @@ enum SystemCategoryRegistry {
                 vendorBrandColor = nil
             }
 
+            // Phase 67 (G2): the reconciler v2 explicitly flags systems
+            // that had a vendor-required template fire with no matching
+            // contractor. When that flag is true, treat the system as
+            // uncovered regardless of what category-match logic above
+            // would say — the column is the authoritative signal because
+            // it was set at the moment the gap was identified. The
+            // `createContractor` hook clears this flag back to false
+            // when a contractor materializes in the matching category,
+            // so the column stays current under normal flow.
+            let needsCoverageColumn = system.needsVendorCoverage == true
+            let finalIsCovered = isCovered && !needsCoverageColumn
+
             // Cadence
             let cadence: String?
             if let days = system.serviceIntervalDays, days > 0 {
@@ -565,11 +584,11 @@ enum SystemCategoryRegistry {
                     tier: tier,
                     displayPriority: priority,
                     icon: icon,
-                    vendorName: vendorName,
-                    vendorLogoURL: vendorLogoURL,
-                    vendorBrandColor: vendorBrandColor,
+                    vendorName: finalIsCovered ? vendorName : nil,
+                    vendorLogoURL: finalIsCovered ? vendorLogoURL : nil,
+                    vendorBrandColor: finalIsCovered ? vendorBrandColor : nil,
                     cadence: cadence,
-                    isCovered: isCovered,
+                    isCovered: finalIsCovered,
                     systemId: system.id
                 )
             }

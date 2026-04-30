@@ -1398,7 +1398,15 @@ enum MaintenanceTemplates {
             // Users who capture a spa / pool service vendor at Q15b get
             // the pool-service RoutineSeeder archetype instead, which
             // covers spa sanitation on a weekly visit.
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Test and sanitize hot tub water", description: "Use test strips or a digital tester to check bromine/chlorine, pH, and total alkalinity weekly. Add sanitizer to maintain levels and re-balance pH/alkalinity. Without weekly sanitizer additions, hot tub water gets cloudy + biofilm starts forming inside the plumbing. A much harder problem to recover from than just topping up sanitizer.", frequency: "Weekly", priority: "High", estimatedCostRange: "$10–$20/month", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Target ranges: pH 7.2-7.8, alkalinity 80-120 ppm, bromine 3-5 ppm or chlorine 1-3 ppm. Hot tubs sanitize harder than pools because the small water volume + heat speeds chemical breakdown. After a heavy-use night with multiple soakers, dose extra sanitizer and let it circulate before next use.", requiredSubtypes: ["hot_tub"], isEssential: false, assignmentType: .either, diyEffortMinutes: 10),
+            // Phase 67E/F (admin feedback): "Test and sanitize hot tub
+            // water" deleted as a weekly DIY task. The work is real but
+            // it's not a calendar-tracked maintenance task — it's a
+            // recurring sanity check that rolls into either the
+            // pool_service routine (when the user has a service vendor)
+            // or just lives in the homeowner's weekly muscle memory
+            // alongside other weekly hot tub care. Tracking it as a task
+            // makes the punch list / maintenance feed feel cluttered
+            // without changing behavior.
             // TODO Phase 67G: Q12 needs a follow-up question that
             // distinguishes a detached hot tub (own pumps + plumbing,
             // drains independently) from a pool-attached spillover spa
