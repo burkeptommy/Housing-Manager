@@ -168,42 +168,31 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "mixed", label: "Mixed"),
             ]
         ),
+        // Phase 67D (A3): Q3 + Q3b merged into a single fuel+system combo
+        // picker. Eliminates the "fuel only" → "what kind of system" two-step
+        // and uses the 12 combinations that cover ~95% of HNW homes. The
+        // mapper stamps both `heating_fuel` and `hvac_type` attributes from
+        // the chosen combo so existing template gating continues to fire.
         HouseQuizQuestion(
-            id: "q3_heating_fuel",
+            id: "q3_heating_system",
             section: .homeBasics,
-            title: "Heat in a {state} home: what's yours running on?",
+            title: "Heat in a {state} home: what's yours?",
             fallbackTitle: "How do you heat your home?",
-            subtitle: "We use this to schedule fuel deliveries and tank inspections.",
+            subtitle: "Pick whichever sounds closest. We'll use this to schedule HVAC service, fuel deliveries, and tank inspections.",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "natural_gas", label: "Natural Gas", icon: "flame.fill"),
-                AnswerOption(id: "oil", label: "Oil", icon: "fuelpump.fill"),
-                AnswerOption(id: "electric", label: "Electric", icon: "bolt.fill"),
-                AnswerOption(id: "propane", label: "Propane", icon: "flame"),
-                AnswerOption(id: "geothermal", label: "Geothermal", icon: "thermometer.sun.fill"),
-                AnswerOption(id: "not_sure", label: "Not sure"),
-            ]
-        ),
-        // Phase 19b: dedicated HVAC system-type question. The fuel answer in q3
-        // does not uniquely determine HVAC configuration (a gas home can have
-        // central + mini-split, an oil home can have boiler + window units),
-        // so we ask directly here and let the answer drive the maintenance
-        // template selection instead of guessing from the fuel.
-        HouseQuizQuestion(
-            id: "q3b_hvac_type",
-            section: .homeBasics,
-            title: "What kind of HVAC system?",
-            subtitle: "We use this to set the right maintenance schedule for your specific setup.",
-            kind: .singleChoice,
-            answerOptions: [
-                AnswerOption(id: "central_ducted", label: "Central AC + furnace", icon: "wind"),
-                AnswerOption(id: "mini_split", label: "Mini-split / ductless", icon: "fan"),
-                AnswerOption(id: "boiler_with_central_ac", label: "Boiler + central AC", icon: "thermometer.snowflake"),
-                AnswerOption(id: "boiler_radiant", label: "Boiler / radiators (no AC)", icon: "drop.degreesign"),
-                AnswerOption(id: "boiler_with_window_ac", label: "Boiler + window AC units", icon: "wind"),
-                AnswerOption(id: "heat_pump", label: "Heat pump (one system)", icon: "thermometer.medium"),
+                AnswerOption(id: "gas_furnace_central_ac", label: "Natural gas furnace + central AC", icon: "wind"),
+                AnswerOption(id: "gas_boiler_radiators", label: "Natural gas boiler (radiators)", icon: "drop.degreesign"),
+                AnswerOption(id: "gas_boiler_central_ac", label: "Natural gas boiler + central AC", icon: "thermometer.snowflake"),
+                AnswerOption(id: "oil_boiler_radiators", label: "Oil boiler (radiators)", icon: "fuelpump.fill"),
+                AnswerOption(id: "oil_boiler_central_ac", label: "Oil boiler + central AC", icon: "thermometer.snowflake"),
+                AnswerOption(id: "heat_pump_ducted", label: "Heat pump (central ducted)", icon: "thermometer.medium"),
+                AnswerOption(id: "heat_pump_mini_split", label: "Heat pump (mini-splits)", icon: "fan"),
                 AnswerOption(id: "geothermal", label: "Geothermal", icon: "leaf"),
-                AnswerOption(id: "not_sure", label: "Not sure"),
+                AnswerOption(id: "propane_boiler", label: "Propane boiler", icon: "flame"),
+                AnswerOption(id: "propane_furnace_central_ac", label: "Propane furnace + central AC", icon: "flame"),
+                AnswerOption(id: "electric_baseboard", label: "Electric baseboard (no central system)", icon: "bolt.fill"),
+                AnswerOption(id: "not_sure", label: "Not sure / other", icon: "questionmark.circle"),
             ]
         ),
         HouseQuizQuestion(
@@ -230,7 +219,17 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "yes", label: "Yes"),
                 AnswerOption(id: "no", label: "No, paid off"),
                 AnswerOption(id: "skip", label: "Prefer not to say"),
-            ]
+            ],
+            // Phase 67D (A1): only ask about a mortgage when the home was
+            // bought (Q4 = "bought"). Inherited / family pass-down / custom
+            // build paths skip this — they don't have a fresh-purchase
+            // mortgage to upload. Cash buyers fall through and pick "no".
+            // When Q4 is unanswered, fall back to showing Q5 (guard returns
+            // false) so a saved-for-later quiz doesn't lose the prompt.
+            dynamicSkip: { state in
+                guard let q4 = state.answers["q4_purchase"]?.answerId else { return false }
+                return q4 == "inherited" || q4 == "custom_build" || q4 == "other"
+            }
         ),
     ]
 
@@ -316,12 +315,18 @@ enum HouseQuizQuestionLibrary {
     // MARK: - Section 3 — Outside & Landscaping
 
     static let section3: [HouseQuizQuestion] = [
+        // Phase 67D (A4): Q11 progressive disclosure — handler chips up top,
+        // lawn-type chips revealed below when handler is not no_lawn /
+        // garden / hardscape. Months capture (old Q11c) was moved out —
+        // landscaping_active_months now lives in Phase C3's AnnualRhythmScreen.
+        // The kind discriminates dispatch in HouseQuizView; the mapper reads
+        // `answer.payload?["lawnType"]` for the secondary choice.
         HouseQuizQuestion(
             id: "q11_lawn",
             section: .outside,
             title: "Keeping up the {street} yard: you or a pro?",
             fallbackTitle: "Do you have a lawn?",
-            kind: .singleChoice,
+            kind: .progressiveLawn,
             answerOptions: [
                 AnswerOption(id: "diy", label: "Yes, I maintain it"),
                 AnswerOption(id: "pro", label: "Yes, pro service"),
@@ -333,48 +338,15 @@ enum HouseQuizQuestionLibrary {
             providerTypes: ["landscaping"],
             providerSearchPlaceholder: "TruGreen, BrightView, your local crew..."
         ),
-        // Phase 19j — lawn type. Inserted right after q11_lawn so a turf
-        // homeowner gets the right maintenance schedule (brushing, infill,
-        // drainage) instead of a natural-grass schedule (aerate, overseed,
-        // fertilize). Mixed yards get both.
-        //
-        // Skipped when Q11 said "no_lawn" or "garden" — there's no lawn to
-        // ask about the type of.
-        HouseQuizQuestion(
-            id: "q11b_lawn_type",
-            section: .outside,
-            title: "Natural grass, turf, or both?",
-            subtitle: "We'll set up the right care schedule for what you actually have.",
-            kind: .singleChoice,
-            answerOptions: [
-                AnswerOption(id: "natural", label: "Natural grass", icon: "leaf.fill"),
-                AnswerOption(id: "turf", label: "Synthetic turf", icon: "square.grid.3x3.fill"),
-                AnswerOption(id: "mixed", label: "Mixed (both)", icon: "circle.lefthalf.filled"),
-                AnswerOption(id: "not_sure", label: "Not sure"),
-            ],
-            dynamicSkip: { state in
-                let q11 = state.answers["q11_lawn"]?.answerId
-                return q11 == "no_lawn" || q11 == "garden" || q11 == "hardscape"
-            }
-        ),
-        HouseQuizQuestion(
-            id: "q11c_landscaping_months",
-            section: .outside,
-            title: "Which months does your landscaping crew usually come?",
-            subtitle: "Select all that apply. Use Select all if they run year-round.",
-            kind: .multiSelect,
-            answerOptions: monthSelectionOptions,
-            dynamicSkip: { state in
-                guard state.answers["q11_lawn"]?.answerId == "pro" else { return true }
-                return !hasProviderContext(state.answers["q11_lawn"])
-            },
-            supportsSelectAll: true
-        ),
+        // Phase 67D (A5): Q12 progressive disclosure — pool kind + chemistry
+        // on one screen. Hot-tub-only and none paths skip chemistry. The
+        // mapper reads `answer.payload?["chemistry"]` for the saltwater /
+        // chlorine choice. Pool months capture moved to Phase C3.
         HouseQuizQuestion(
             id: "q12_pool",
             section: .outside,
             title: "Pool or hot tub?",
-            kind: .singleChoice,
+            kind: .progressivePool,
             answerOptions: [
                 AnswerOption(id: "in_ground", label: "In-ground pool"),
                 AnswerOption(id: "above_ground", label: "Above-ground"),
@@ -385,53 +357,6 @@ enum HouseQuizQuestionLibrary {
             providerFollowUpAnswerIds: ["in_ground", "above_ground", "hot_tub", "both"],
             providerTypes: ["pool_service"],
             providerSearchPlaceholder: "Leslie's, Pinch A Penny, your pool company..."
-        ),
-        // Build 87: pool chemistry follow-up. Mirrors the Q11/Q11b pattern:
-        // Q12 captures the pool TYPE, Q12b captures the chemistry. This
-        // fixes the pre-existing dead-code bug in the q12_pool handler
-        // where the `poolSubtype` switch was looking for "saltwater" /
-        // "chlorine" answer IDs that Q12 never produced (its actual IDs
-        // are in_ground / above_ground / hot_tub / both / none). Now the
-        // reconciler gets a real subtype so templates gated on
-        // `requiredSubtypes: ["pool_salt"]` or `["pool_chlorine"]`
-        // actually land.
-        HouseQuizQuestion(
-            id: "q12b_pool_chemistry",
-            section: .outside,
-            title: "Saltwater or chlorine?",
-            subtitle: "We'll set up the right care schedule for your pool's chemistry.",
-            kind: .singleChoice,
-            answerOptions: [
-                AnswerOption(id: "saltwater", label: "Saltwater", icon: "drop.circle.fill"),
-                AnswerOption(id: "chlorine", label: "Chlorine", icon: "testtube.2"),
-                AnswerOption(id: "not_sure", label: "Not sure"),
-            ],
-            dynamicSkip: { state in
-                // Skip for pool answers that don't have meaningful chemistry
-                // choices: hot_tub (different chemistry entirely) and none
-                // (no pool). Only in_ground, above_ground, and both have
-                // saltwater-vs-chlorine as a real decision.
-                let q12 = state.answers["q12_pool"]?.answerId
-                return q12 != "in_ground"
-                    && q12 != "above_ground"
-                    && q12 != "both"
-            }
-        ),
-        HouseQuizQuestion(
-            id: "q12c_pool_months",
-            section: .outside,
-            title: "Which months does your pool company cover?",
-            subtitle: "Select the months they handle opening, weekly care, or closing.",
-            kind: .multiSelect,
-            answerOptions: monthSelectionOptions,
-            dynamicSkip: { state in
-                guard let q12 = state.answers["q12_pool"]?.answerId,
-                      ["in_ground", "above_ground", "both"].contains(q12) else {
-                    return true
-                }
-                return !hasProviderContext(state.answers["q12_pool"])
-            },
-            supportsSelectAll: true
         ),
         HouseQuizQuestion(
             id: "q13_pest",
@@ -454,6 +379,12 @@ enum HouseQuizQuestionLibrary {
             providerTypes: ["pest_control"],
             providerSearchPlaceholder: "Terminix, Orkin, your local exterminator..."
         ),
+        // Phase 67D (A6): Q14 stays as singleChoice; the months follow-up
+        // (old Q14b) is gone. Active months for irrigation move to Phase
+        // C3's AnnualRhythmScreen. The `q11b_lawn_type` reference inside the
+        // dynamicSkip below stays alive for the migration window — Phase A's
+        // migration writes lawnType into Q11's payload, so the closure now
+        // reads `q11_lawn.payload?["lawnType"]` instead.
         HouseQuizQuestion(
             id: "q14_irrigation",
             section: .outside,
@@ -466,41 +397,12 @@ enum HouseQuizQuestionLibrary {
             ],
             providerFollowUpAnswerIds: ["full", "drip"],
             providerTypes: ["irrigation"],
-            // Phase 19j — skip irrigation entirely when the user has no
-            // lawn AND their lawn (if any) is pure synthetic turf. A
-            // turf-only home with no garden has nothing to water. Mixed,
-            // natural, and garden households still see the question.
             dynamicSkip: { state in
                 let q11 = state.answers["q11_lawn"]?.answerId
-                let q11b = state.answers["q11b_lawn_type"]?.answerId
                 if q11 == "no_lawn" { return true }
-                // Lawn = "diy" or "pro" but it's pure synthetic turf and
-                // the user explicitly said no garden in Q11 — skip.
-                if q11b == "turf" && (q11 == "diy" || q11 == "pro") {
-                    // Conservative: still ask in case they have garden beds
-                    // separate from the lawn area. Only auto-skip when q11
-                    // was explicitly no_lawn.
-                    return false
-                }
                 return false
             },
             providerSearchPlaceholder: "Your sprinkler company..."
-        ),
-        HouseQuizQuestion(
-            id: "q14b_irrigation_months",
-            section: .outside,
-            title: "Which months does the irrigation system usually run?",
-            subtitle: "We'll use this to save the active season for startup, checks, and winterization.",
-            kind: .multiSelect,
-            answerOptions: monthSelectionOptions,
-            dynamicSkip: { state in
-                guard let q14 = state.answers["q14_irrigation"]?.answerId,
-                      ["full", "drip"].contains(q14) else {
-                    return true
-                }
-                return !hasProviderContext(state.answers["q14_irrigation"])
-            },
-            supportsSelectAll: true
         ),
         HouseQuizQuestion(
             id: "q15_security",
@@ -583,11 +485,17 @@ enum HouseQuizQuestionLibrary {
             documentUploadCategory: .utilityBill,
             providerTypes: ["internet_cable"]
         ),
+        // Phase 67D (A7): Q18 + Q18b merged into one screen. Service kind
+        // chips up top; pickup-day chips revealed below when service is
+        // municipal or private. Private hauler name captured via inline
+        // free-text. `selectedIds` carries the day chips (sun…sat);
+        // `customText` carries the optional hauler name.
         HouseQuizQuestion(
             id: "q18_trash",
             section: .energyServices,
             title: "Trash & recycling?",
-            kind: .singleChoice,
+            subtitle: "Pick every day bins go out if trash and recycling happen separately.",
+            kind: .trashWithDays,
             answerOptions: [
                 AnswerOption(id: "municipal", label: "Municipal"),
                 AnswerOption(id: "private", label: "Private hauler"),
@@ -597,26 +505,6 @@ enum HouseQuizQuestionLibrary {
             providerTypes: ["trash"]
         ),
         HouseQuizQuestion(
-            id: "q18b_trash_day",
-            section: .energyServices,
-            title: "Which days should Chez remind you about pickup?",
-            subtitle: "Pick every day bins go out if trash and recycling happen separately.",
-            kind: .multiSelect,
-            answerOptions: [
-                AnswerOption(id: "sun", label: "Sunday"),
-                AnswerOption(id: "mon", label: "Monday"),
-                AnswerOption(id: "tue", label: "Tuesday"),
-                AnswerOption(id: "wed", label: "Wednesday"),
-                AnswerOption(id: "thu", label: "Thursday"),
-                AnswerOption(id: "fri", label: "Friday"),
-                AnswerOption(id: "sat", label: "Saturday"),
-            ],
-            dynamicSkip: { state in
-                guard let q18 = state.answers["q18_trash"]?.answerId else { return true }
-                return q18 == "not_sure"
-            }
-        ),
-        HouseQuizQuestion(
             id: "q19_heating_provider",
             section: .energyServices,
             title: "Heating fuel provider?",
@@ -624,22 +512,25 @@ enum HouseQuizQuestionLibrary {
             kind: .providerSearch,
             documentUploadCategory: .utilityBill,
             providerTypes: ["oil", "propane", "natural_gas"],
-            // Phase 18b: narrow the picker to just the fuel type the user
-            // confirmed in Q3. Returning [] tells the view model to skip the
-            // question entirely (electric / geothermal homes have no fuel
-            // delivery contract — they're already covered by Q16 electric).
+            // Phase 18b → 67D (A3): Q3 was renamed `q3_heating_system` and
+            // the answer IDs changed from raw fuel tokens to fuel+system
+            // combos. Derive the underlying fuel by mapping the combo.
+            // Returning [] tells the view model to skip Q19 entirely
+            // (electric / geothermal homes have no fuel delivery contract).
             dynamicProviderTypes: { state in
-                guard let fuel = state.answers["q3_heating_fuel"]?.answerId else {
-                    // Q3 unanswered — keep the original three-type behavior so
-                    // a forward-resumed quiz still shows something useful.
-                    return ["oil", "propane", "natural_gas"]
-                }
+                let comboId = state.answers["q3_heating_system"]?.answerId
+                let fuel = HouseQuizFuelDerivation.heatingFuel(from: comboId)
                 switch fuel {
                 case "oil":         return ["oil"]
                 case "propane":     return ["propane"]
                 case "natural_gas": return ["natural_gas"]
-                // electric, geothermal, not_sure — no separate fuel provider
-                default:            return []
+                case "electric", "geothermal", "not_sure":
+                    return []
+                default:
+                    // Q3 unanswered or unknown answer id — keep the original
+                    // three-type behavior so a forward-resumed quiz still
+                    // shows something useful.
+                    return ["oil", "propane", "natural_gas"]
                 }
             }
         ),
@@ -863,6 +754,37 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "mixed", label: "Mix of both", icon: "person.2.fill"),
                 AnswerOption(id: "hire_out", label: "Hire it out", icon: "briefcase.fill"),
             ]
+        ),
+
+        // Phase 67 (C2): Q37 — routines grid. Single screen with three
+        // sections: pre-filled (auto from Q11/Q12/Q13/Q15b vendor captures),
+        // common (universal/regional recurring services like window cleaning
+        // and mosquito spraying), and anything-else (collapsible groups for
+        // HNW lifestyle routines). Each card lets the homeowner confirm
+        // cadence + days/months without re-entering the vendor.
+        HouseQuizQuestion(
+            id: "q37_routines",
+            section: .protectionPeople,
+            chapter: .yourPeople,
+            title: "Your weekly rhythm",
+            subtitle: "Pick the routines that come on a schedule. We've pre-filled vendors you already named.",
+            kind: .routinesGrid,
+            answerOptions: []
+        ),
+
+        // Phase 67 (C3): Q38 — handyman punch list. Ten universal default
+        // items pre-checked + a "Browse more" library + a custom-add row.
+        // Saves create handyman_punch_items rows. The handyman bundle
+        // tasks that pre-Phase-67 reconciler seeded as maintenance_tasks
+        // are gone — Q38 is the new entry point for these items.
+        HouseQuizQuestion(
+            id: "q38_handyman_punchlist",
+            section: .protectionPeople,
+            chapter: .yourPeople,
+            title: "Your handyman list",
+            subtitle: "These are small jobs your handyman can knock out in a single visit. We've pre-checked the most common — uncheck any that don't apply.",
+            kind: .handymanPunchList,
+            answerOptions: []
         ),
     ]
 }

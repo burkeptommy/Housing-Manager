@@ -748,6 +748,12 @@ struct HouseQuizView: View {
                         // .slider case falls through to singleChoiceBody for
                         // backward compat with persisted quiz state.
                         singleChoiceBody(q)
+                    case .routinesGrid:
+                        // Phase 67 (C2): Q37 routines confirmation grid.
+                        routinesGridBody(q)
+                    case .handymanPunchList:
+                        // Phase 67 (C3): Q38 handyman punch list.
+                        handymanPunchListBody(q)
                     }
                 }
 
@@ -3046,6 +3052,46 @@ struct HouseQuizView: View {
         .overlay(
             RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                 .strokeBorder(HavenColors.navy.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Phase 67 (C2/C3) — Q37 routines grid + Q38 handyman punch list
+
+    /// Phase 67 (C2): Q37 — routines confirmation grid. Delegates to the
+    /// `Q37RoutinesGridBody` component so HouseQuizView stays under the
+    /// Swift compiler's body type-check threshold. The component reads
+    /// existing routines for the property and lets the homeowner refine
+    /// the cadence + active months that the reconciler v2 / Q15b path
+    /// auto-created.
+    @ViewBuilder
+    private func routinesGridBody(_ q: HouseQuizQuestion) -> some View {
+        Q37RoutinesGridBody(
+            propertyId: viewModel.property.id,
+            householdId: viewModel.property.householdId,
+            propertyState: viewModel.property.state,
+            propertyHasPets: viewModel.state.answers["q28b_pets"]?.answerId == "has_pets",
+            onContinue: {
+                Task { await viewModel.recordAnswer("reviewed") }
+            }
+        )
+    }
+
+    /// Phase 67 (C3): Q38 — handyman punch list. Delegates to the
+    /// `Q38HandymanPunchListBody` component. Conditional default
+    /// suppression (filter swap drops on `boiler_radiant`, etc.) lives
+    /// inside the component since the answer signals are read off the
+    /// HouseQuiz state.
+    @ViewBuilder
+    private func handymanPunchListBody(_ q: HouseQuizQuestion) -> some View {
+        Q38HandymanPunchListBody(
+            propertyId: viewModel.property.id,
+            householdId: viewModel.property.householdId,
+            hvacType: viewModel.state.answers["q3b_hvac_type"]?.answerId,
+            basementType: viewModel.state.answers["q9_basement"]?.answerId,
+            applianceIds: viewModel.state.answers["q10_appliances"]?.selectedIds ?? [],
+            onContinue: {
+                Task { await viewModel.recordAnswer("reviewed") }
+            }
         )
     }
 

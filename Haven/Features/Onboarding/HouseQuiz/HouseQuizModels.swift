@@ -83,6 +83,22 @@ struct HouseQuizAnswer: Codable, Equatable {
     /// every other question kind. Persisted alongside the other answer
     /// fields in the `house_quiz_state` JSONB column.
     var sliderValue: Int?
+    /// Phase 67D: structured payload for progressive-disclosure question
+    /// kinds (`progressiveLawn`, `progressivePool`, `trashWithDays`,
+    /// `garageWithEV`, `dualInsurance`) that need to capture multiple
+    /// pieces of data on one screen without dedicated typed fields per
+    /// piece. Keys are kind-specific:
+    ///
+    ///   progressiveLawn → ["lawnType": "natural"|"turf"|"mixed"|"not_sure"]
+    ///   progressivePool → ["chemistry": "saltwater"|"chlorine"|"not_sure"]
+    ///   garageWithEV    → ["evCharger": "yes"|"no"]
+    ///   dualInsurance   → ["autoProviderId": "<UUID>", "homeProviderId": "<UUID>"]
+    ///   caretakers (Q28 pets sub-step) → ["petsAnswerId": "dogs"|"cats"|...]
+    ///
+    /// Resilient `try?` decode tolerates entirely-missing payloads on legacy
+    /// answers and unknown future keys. New keys can be added without a
+    /// JSONB schema change because the column is already JSONB.
+    var payload: [String: String]?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -98,6 +114,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         case generatorFuelType = "generator_fuel_type"
         case generatorProviderId = "generator_provider_id"
         case sliderValue = "slider_value"
+        case payload
         case answeredAt = "answered_at"
     }
 
@@ -114,6 +131,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         generatorFuelType: String? = nil,
         generatorProviderId: UUID? = nil,
         sliderValue: Int? = nil,
+        payload: [String: String]? = nil,
         answeredAt: Date = Date()
     ) {
         self.answerId = answerId
@@ -128,14 +146,15 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.generatorFuelType = generatorFuelType
         self.generatorProviderId = generatorProviderId
         self.sliderValue = sliderValue
+        self.payload = payload
         self.answeredAt = answeredAt
     }
 
     /// Resilient decoding so old persisted answers (no `custom_entries`,
     /// `kids`, `expecting_entries`, `home_manager_entry`,
     /// `selected_provider_id`, `secondary_fuel_provider_id`,
-    /// `generator_fuel_type`, `generator_provider_id`, or `slider_value`
-    /// keys) still load cleanly after the schema bump.
+    /// `generator_fuel_type`, `generator_provider_id`, `slider_value`,
+    /// or `payload` keys) still load cleanly after the schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
@@ -150,6 +169,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.generatorFuelType = try? c.decodeIfPresent(String.self, forKey: .generatorFuelType)
         self.generatorProviderId = try? c.decodeIfPresent(UUID.self, forKey: .generatorProviderId)
         self.sliderValue = try? c.decodeIfPresent(Int.self, forKey: .sliderValue)
+        self.payload = try? c.decodeIfPresent([String: String].self, forKey: .payload)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
     }
 }
@@ -374,6 +394,47 @@ enum HouseQuizQuestionKind: String, Codable {
     /// quiz state from build 87 users — the view model treats it as
     /// `.singleChoice` at render time.
     case slider
+    /// Phase 67 (C2): Q37 routines grid. Three sections — pre-filled (auto
+    /// from Q11/Q12/Q13/Q15b vendor captures), common (universal/regional
+    /// recurring services like window cleaning + mosquito spraying), and
+    /// anything-else (collapsible groups for HNW lifestyle routines).
+    /// Each card lets the homeowner confirm cadence + active months.
+    /// Save creates / updates `routines` rows in `setup_state="active"`
+    /// when a vendor is linked, otherwise `setup_state="pending_vendor"`.
+    case routinesGrid
+    /// Phase 67 (C3): Q38 handyman punch list. Ten universal default items
+    /// pre-checked + a "Browse more" library + custom add. Save creates
+    /// `handyman_punch_items` rows with `source="recommended"` for library
+    /// picks and `source="manual"` for custom adds.
+    case handymanPunchList
+    /// Phase 67D (A4): Q11 progressive disclosure — lawn handler chips
+    /// always visible; lawn type chips revealed below when handler is not
+    /// no_lawn / garden / hardscape. `answerId` carries the primary
+    /// (handler) choice; `payload["lawnType"]` carries the secondary.
+    case progressiveLawn
+    /// Phase 67D (A5): Q12 progressive disclosure — pool/hot-tub kind chips
+    /// always visible; chemistry chips revealed below when kind is
+    /// in_ground / above_ground / both. Hot-tub-only and none paths skip
+    /// the chemistry sub-step entirely. `answerId` is the kind;
+    /// `payload["chemistry"]` is the saltwater/chlorine choice.
+    case progressivePool
+    /// Phase 67D (A7): Q18 trash service + pickup days on one screen.
+    /// `answerId` is the service kind (municipal / private / not_sure);
+    /// `selectedIds` is the multi-select day chips (sun…sat); `customText`
+    /// is the optional private hauler name.
+    case trashWithDays
+    /// Phase 67D (A8): Q25 garage type + EV charger on one screen.
+    /// `answerId` is the garage type (attached / semi_attached / detached
+    /// / carport / none); `payload["evCharger"]` is yes/no, hidden when
+    /// garage type is "none".
+    case garageWithEV
+    /// Phase 67D (A9): Q26+Q27 combined into one screen with two
+    /// independently-skippable provider slots (auto + home).
+    /// `payload["autoProviderId"]` and `payload["homeProviderId"]` carry
+    /// the catalog UUIDs; either can be nil when the user skipped that
+    /// slot. Free-form fallback names land in `customEntries` keyed by
+    /// "auto:NAME" / "home:NAME".
+    case dualInsurance
 }
 
 /// One question in the House Quiz library. The library lives in

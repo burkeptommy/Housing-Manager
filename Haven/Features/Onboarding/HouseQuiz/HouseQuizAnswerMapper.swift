@@ -1980,7 +1980,7 @@ final class HouseQuizAnswerMapper {
             // No existing routine — create one. Default cadence comes
             // from the routine kind's expected rhythm. The user can
             // refine later via the setup sheet.
-            let (cadenceType, cadenceInterval, activeMonths) = defaultCadenceForQuizRoutine(kind: kind)
+            let (cadenceType, cadenceInterval, activeMonths) = RoutineGroupingEngine.defaultCadenceForRoutineKind(kind)
             var insert = RoutineInsert(
                 householdId: householdId,
                 propertyId: propertyId,
@@ -2014,30 +2014,6 @@ final class HouseQuizAnswerMapper {
                     propertyId: propertyId
                 )
             }
-        }
-    }
-
-    /// Phase 66: Default cadence per routine kind for routines created at
-    /// Q15b. Matches Day1TaskCurator.defaultCadence but has category-
-    /// specific active_months overrides for seasonal services (snow
-    /// removal December-April, lawn care April-November, etc.).
-    private func defaultCadenceForQuizRoutine(
-        kind: RoutineKind
-    ) -> (RoutineCadenceType, Int, [Int]) {
-        let yearRound = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-        switch kind {
-        case .cleaning: return (.biweekly, 14, yearRound)
-        case .landscaping: return (.weekly, 7, [4, 5, 6, 7, 8, 9, 10, 11])
-        case .poolService: return (.weekly, 7, [5, 6, 7, 8, 9])
-        case .pestControl: return (.quarterly, 91, yearRound)
-        case .petWaste: return (.weekly, 7, yearRound)
-        case .mosquitoTick: return (.monthly, 30, [4, 5, 6, 7, 8, 9, 10])
-        case .snowRemoval: return (.annual, 365, [12, 1, 2, 3, 4])
-        case .gutterCleaning: return (.semiannual, 182, yearRound)
-        case .windowCleaning: return (.semiannual, 182, yearRound)
-        case .treeService: return (.annual, 365, yearRound)
-        case .handymanRecurring: return (.customDays, 9999, yearRound)
-        default: return (.annual, 365, yearRound)
         }
     }
 
