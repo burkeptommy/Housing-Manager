@@ -213,6 +213,18 @@ enum Day1TaskCurator {
                 }
 
                 // Otherwise, create-or-find a pending-vendor routine.
+                //
+                // Phase 67 note: this branch is the LEGACY-MIGRATION path.
+                // Reconciler v2 doesn't create vendor-tier tasks without a
+                // contractor on file (it marks `home_systems.needs_vendor_
+                // coverage` instead), so for new installs this loop never
+                // sees such tasks. The branch still fires for the one-time
+                // backfill on existing installs whose pre-C1 reconciler
+                // had already seeded "Find a contractor for X" tasks —
+                // routing them under a pending-vendor routine before the
+                // C1 archive migration runs gives those legacy users a
+                // "Pick a pro for X" card in Your Services. Don't delete
+                // until every install has run the C1 backfill.
                 if let kind = RoutineGroupingEngine.routineKindFor(systemCategory: category) {
                     let existing = routine(matching: category, in: pendingVendorRoutinesByCategory)
                     let pendingRoutine: RoutineRow?
@@ -252,27 +264,18 @@ enum Day1TaskCurator {
                 continue
             }
 
-            // --- 2. DIY / handyman routes ---
-            if isDIY, shouldRouteDIYToHandyman, let handyman = handymanRoutine {
-                let shouldRoute = shouldRouteToHandyman(
-                    template: template,
-                    task: task,
-                    preferenceTier: preferenceTier
-                )
-                if shouldRoute {
-                    if await linkTask(task.id, to: handyman, db: db, markHandymanRoute: true) {
-                        result.handymanRouted += 1
-                        Analytics.track(.day1CuratorTaskRoutedHandyman, [
-                            "task_id": task.id.uuidString,
-                            "routine_id": handyman.id.uuidString,
-                            "template_id": templateKey
-                        ])
-                        continue
-                    }
-                }
-            }
-
-            // --- 3. Fallback: stays in This Season ---
+            // --- 2. Fallback: stays in This Season ---
+            //
+            // Phase 67E/F: the legacy DIY → handyman re-parenting branch
+            // was removed. Handyman-tier templates (DIY-capable, ≤60 min,
+            // no safetyFloor, no bundleId) now land directly as
+            // `handyman_punch_items` rows from the reconciler, never
+            // reaching `maintenance_tasks`. The B4 migration archived
+            // pre-67E/F rows that previously hit this branch. `.either`
+            // tasks the homeowner explicitly hires the handyman for
+            // still get routed via the post-quiz delegation sheet, which
+            // assigns a contractor and re-runs the curator's vendor
+            // branch on the next pass.
             result.remainingInThisSeason += 1
         }
 
