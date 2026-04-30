@@ -1014,9 +1014,12 @@ final class HouseQuizAnswerMapper {
 
             case "q24_vehicle_add":
                 // Vehicle creation goes through the dedicated AddVehicleView /
-                // VehicleLookupService flow. The mapper just records that the
-                // user reached this step.
-                try await persistAttribute("primary_vehicle_added", value: "true")
+                // VehicleLookupService flow. The mapper just records whether
+                // the user added a primary vehicle or skipped the step.
+                // Phase 67D (A2): "skipped" path persists `false` so the
+                // dashboard "no vehicles yet" empty state still surfaces.
+                let added = answer.answerId == "skipped" ? "false" : "true"
+                try await persistAttribute("primary_vehicle_added", value: added)
 
             case "q25_garage_ev":
                 // Phase 67D (A8): Q25 + Q25b merged. Garage type in

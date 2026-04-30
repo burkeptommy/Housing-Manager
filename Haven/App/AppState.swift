@@ -154,6 +154,11 @@ final class AppState: ObservableObject {
                     Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                     Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
                     Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
+                    // Phase 67D Phase A: rewrite legacy quiz answer IDs
+                    // so users with mid-quiz JSONB resume into the new
+                    // combined-question shape instead of seeing the new
+                    // questions as unanswered.
+                    Task { await Self.migrateHouseQuizP67DOnceIfNeeded() }
                     Task {
                         // Phase 54A: order matters — reseed first so bundle backfill
                         // lands on seasonally-distributed anchor dates; missing-system
@@ -273,6 +278,7 @@ final class AppState: ObservableObject {
                         Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                         Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
                         Task { await Self.migrateBundleConsolidationOnceIfNeeded() }
+                        Task { await Self.migrateHouseQuizP67DOnceIfNeeded() }
                         Task {
                             await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                             await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
@@ -337,6 +343,249 @@ final class AppState: ObservableObject {
     /// same system footprint.
     ///
     /// Runs the reconciler against each property afterward so the new
+    /// Phase 67D Phase A: One-shot JSONB migration that walks every
+    /// property's `house_quiz_state.answers` and rewrites the legacy
+    /// pre-67D keys into the new combined-question shape. Without this,
+    /// resumed quizzes would treat the new `q3_heating_system` /
+    /// `q11_lawn` / `q12_pool` / `q18_trash` / `q25_garage_ev` /
+    /// `q26_insurance` / `q28_household` questions as unanswered (the
+    /// IDs no longer match) and re-prompt the user — losing the value
+    /// meter accretion they'd already earned.
+    ///
+    /// Transformations applied per property (all idempotent — re-runs
+    /// on already-migrated state are no-ops):
+    ///   • `q3_heating_fuel` + `q3b_hvac_type` → `q3_heating_system`
+    ///   • `q11b_lawn_type` → folded into `q11_lawn.payload["lawnType"]`
+    ///   • `q11c_landscaping_months` → dropped (months attribute alive)
+    ///   • `q12b_pool_chemistry` → folded into `q12_pool.payload["chemistry"]`
+    ///   • `q12c_pool_months` → dropped
+    ///   • `q14b_irrigation_months` → dropped
+    ///   • `q18b_trash_day` → `q18_trash.selectedIds`
+    ///   • `q23_vehicle_count` → dropped
+    ///   • `q25b_ev_charger` → folded into `q25_garage_ev.payload["evCharger"]`
+    ///   • `q26_auto_insurance` + `q27_homeowners_insurance` → `q26_insurance` with payload
+    ///   • `q28b_pets` → folded into `q28_household.payload["petsAnswerId"]`
+    ///
+    /// Gated on `hasMigratedHouseQuizP67D_v1` UserDefaults key.
+    @MainActor
+    static func migrateHouseQuizP67DOnceIfNeeded() async {
+        let key = "hasMigratedHouseQuizP67D_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            print("[AppState] Phase 67D migration: fetchProperties failed: \(error)")
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        for property in properties {
+            guard var state = property.houseQuizState else { continue }
+            var changed = false
+
+            // 1. Q3 + Q3b → q3_heating_system
+            if state.answers["q3_heating_system"] == nil,
+               let fuelAnswer = state.answers["q3_heating_fuel"] {
+                let fuel = fuelAnswer.answerId
+                let hvac = state.answers["q3b_hvac_type"]?.answerId
+                let comboId = HouseQuizFuelDerivation.combineHeatingSystem(
+                    fuel: fuel,
+                    hvacType: hvac
+                )
+                state.answers["q3_heating_system"] = HouseQuizAnswer(
+                    answerId: comboId,
+                    answeredAt: fuelAnswer.answeredAt
+                )
+                state.answers.removeValue(forKey: "q3_heating_fuel")
+                state.answers.removeValue(forKey: "q3b_hvac_type")
+                changed = true
+            } else if state.answers["q3_heating_fuel"] != nil
+                       || state.answers["q3b_hvac_type"] != nil {
+                // Defensive cleanup — if q3_heating_system is set but
+                // legacy keys also exist, drop the stragglers.
+                state.answers.removeValue(forKey: "q3_heating_fuel")
+                state.answers.removeValue(forKey: "q3b_hvac_type")
+                changed = true
+            }
+
+            // 2. Q11 + Q11b + Q11c → q11_lawn (payload-extended)
+            if let q11 = state.answers["q11_lawn"], q11.payload?["lawnType"] == nil {
+                if let lawnType = state.answers["q11b_lawn_type"]?.answerId {
+                    var payload = q11.payload ?? [:]
+                    payload["lawnType"] = lawnType
+                    var updated = q11
+                    updated.payload = payload
+                    state.answers["q11_lawn"] = updated
+                    changed = true
+                }
+            }
+            if state.answers["q11b_lawn_type"] != nil {
+                state.answers.removeValue(forKey: "q11b_lawn_type")
+                changed = true
+            }
+            if state.answers["q11c_landscaping_months"] != nil {
+                state.answers.removeValue(forKey: "q11c_landscaping_months")
+                changed = true
+            }
+
+            // 3. Q12 + Q12b + Q12c → q12_pool (payload-extended)
+            if let q12 = state.answers["q12_pool"], q12.payload?["chemistry"] == nil {
+                if let chemistry = state.answers["q12b_pool_chemistry"]?.answerId {
+                    var payload = q12.payload ?? [:]
+                    payload["chemistry"] = chemistry
+                    var updated = q12
+                    updated.payload = payload
+                    state.answers["q12_pool"] = updated
+                    changed = true
+                }
+            }
+            if state.answers["q12b_pool_chemistry"] != nil {
+                state.answers.removeValue(forKey: "q12b_pool_chemistry")
+                changed = true
+            }
+            if state.answers["q12c_pool_months"] != nil {
+                state.answers.removeValue(forKey: "q12c_pool_months")
+                changed = true
+            }
+
+            // 4. Drop Q14b irrigation months
+            if state.answers["q14b_irrigation_months"] != nil {
+                state.answers.removeValue(forKey: "q14b_irrigation_months")
+                changed = true
+            }
+
+            // 5. Q18 + Q18b → q18_trash (selectedIds-extended)
+            if let q18 = state.answers["q18_trash"], q18.selectedIds == nil {
+                if let days = state.answers["q18b_trash_day"]?.selectedIds, !days.isEmpty {
+                    var updated = q18
+                    updated.selectedIds = days
+                    state.answers["q18_trash"] = updated
+                    changed = true
+                }
+            }
+            if state.answers["q18b_trash_day"] != nil {
+                state.answers.removeValue(forKey: "q18b_trash_day")
+                changed = true
+            }
+
+            // 6. Drop Q23 vehicle count
+            if state.answers["q23_vehicle_count"] != nil {
+                state.answers.removeValue(forKey: "q23_vehicle_count")
+                changed = true
+            }
+
+            // 7. Q25 + Q25b → q25_garage_ev (payload-extended)
+            if let q25 = state.answers["q25_garage_ev"], q25.payload?["evCharger"] == nil {
+                if let ev = state.answers["q25b_ev_charger"]?.answerId {
+                    var payload = q25.payload ?? [:]
+                    payload["evCharger"] = ev
+                    var updated = q25
+                    updated.payload = payload
+                    state.answers["q25_garage_ev"] = updated
+                    changed = true
+                }
+            }
+            if state.answers["q25b_ev_charger"] != nil {
+                state.answers.removeValue(forKey: "q25b_ev_charger")
+                changed = true
+            }
+
+            // 8. Q26 + Q27 → q26_insurance (payload-extended)
+            if state.answers["q26_insurance"] == nil {
+                let auto = state.answers["q26_auto_insurance"]
+                let home = state.answers["q27_homeowners_insurance"]
+                if auto != nil || home != nil {
+                    var payload: [String: String] = [:]
+                    if let autoId = auto?.selectedProviderId {
+                        payload["autoProviderId"] = autoId.uuidString
+                    }
+                    if let homeId = home?.selectedProviderId {
+                        payload["homeProviderId"] = homeId.uuidString
+                    }
+                    var customEntries: [String] = []
+                    if let autoName = auto?.customText, auto?.selectedProviderId == nil, !autoName.isEmpty {
+                        customEntries.append("auto:\(autoName)")
+                    }
+                    if let homeName = home?.customText, home?.selectedProviderId == nil, !homeName.isEmpty {
+                        customEntries.append("home:\(homeName)")
+                    }
+                    state.answers["q26_insurance"] = HouseQuizAnswer(
+                        answerId: "selected",
+                        customEntries: customEntries.isEmpty ? nil : customEntries,
+                        payload: payload.isEmpty ? nil : payload,
+                        answeredAt: (auto?.answeredAt ?? home?.answeredAt) ?? Date()
+                    )
+                    changed = true
+                }
+            }
+            if state.answers["q26_auto_insurance"] != nil {
+                state.answers.removeValue(forKey: "q26_auto_insurance")
+                changed = true
+            }
+            if state.answers["q27_homeowners_insurance"] != nil {
+                state.answers.removeValue(forKey: "q27_homeowners_insurance")
+                changed = true
+            }
+
+            // 9. Q28b → folded into q28_household payload
+            if let q28 = state.answers["q28_household"], q28.payload?["petsAnswerId"] == nil {
+                if let pets = state.answers["q28b_pets"]?.answerId {
+                    var payload = q28.payload ?? [:]
+                    payload["petsAnswerId"] = pets
+                    var updated = q28
+                    updated.payload = payload
+                    state.answers["q28_household"] = updated
+                    changed = true
+                }
+            }
+            if state.answers["q28b_pets"] != nil {
+                state.answers.removeValue(forKey: "q28b_pets")
+                changed = true
+            }
+
+            // Also strip from skipped/savedForLater so the deprecated
+            // IDs don't leave dangling references.
+            let droppedIds: Set<String> = [
+                "q3_heating_fuel", "q3b_hvac_type",
+                "q11b_lawn_type", "q11c_landscaping_months",
+                "q12b_pool_chemistry", "q12c_pool_months",
+                "q14b_irrigation_months",
+                "q18b_trash_day",
+                "q23_vehicle_count",
+                "q25b_ev_charger",
+                "q26_auto_insurance", "q27_homeowners_insurance",
+                "q28b_pets",
+            ]
+            let prevSavedCount = state.savedForLater.count
+            state.savedForLater.removeAll { droppedIds.contains($0) }
+            if state.savedForLater.count != prevSavedCount {
+                changed = true
+            }
+            let prevSkippedCount = state.skipped.count
+            state.skipped.removeAll { droppedIds.contains($0) }
+            if state.skipped.count != prevSkippedCount {
+                changed = true
+            }
+
+            guard changed else { continue }
+            do {
+                var update = PropertyUpdate()
+                update.houseQuizState = state
+                _ = try await db.updateProperty(id: property.id, update)
+            } catch {
+                print("[AppState] Phase 67D migration: updateProperty failed for \(property.id): \(error)")
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
     /// rows pick up their applicable templates. Gated on a UserDefaults
     /// key so it only runs once per install.
     @MainActor

@@ -194,6 +194,52 @@ struct HouseQuizView: View {
     /// cancelling on disappear is trivial.
     @State private var skipToastDismissWorkItem: DispatchWorkItem? = nil
 
+    // MARK: - Phase 67D progressive-disclosure state
+    //
+    // Each progressive kind keeps its primary + secondary picks in
+    // local @State until the user taps Continue, at which point the
+    // body commits a single rich answer via `recordAnswer(...)` with
+    // the right payload / selectedIds shape.
+
+    /// Q11 progressiveLawn: primary handler choice + secondary lawn type
+    /// (only when handler is diy/pro). Persisted commit lands in
+    /// `answer.answerId` + `answer.payload["lawnType"]`.
+    @State private var progressiveLawnHandler: String? = nil
+    @State private var progressiveLawnType: String? = nil
+
+    /// Q12 progressivePool: primary kind + secondary chemistry (only
+    /// when kind is in_ground/above_ground/both). Persisted commit
+    /// lands in `answer.answerId` + `answer.payload["chemistry"]`.
+    @State private var progressivePoolKind: String? = nil
+    @State private var progressivePoolChemistry: String? = nil
+
+    /// Q18 trashWithDays: service kind + multi-select day chips +
+    /// optional private hauler name. Persisted commit lands in
+    /// `answer.answerId` + `answer.selectedIds` + `answer.customText`.
+    @State private var progressiveTrashService: String? = nil
+    @State private var progressiveTrashDays: Set<String> = []
+    @State private var progressiveTrashHaulerName: String = ""
+
+    /// Q25 garageWithEV: garage type + EV charger toggle (hidden when
+    /// garage is "none"). Persisted commit lands in `answer.answerId` +
+    /// `answer.payload["evCharger"]`.
+    @State private var progressiveGarageType: String? = nil
+    @State private var progressiveEVCharger: String? = nil
+
+    /// Q26 dualInsurance: independent auto + home provider slots.
+    /// Persisted commit lands in `answer.payload["autoProviderId"]` +
+    /// `answer.payload["homeProviderId"]`, with a free-form fallback
+    /// in `customEntries` keyed by "auto:NAME" / "home:NAME".
+    @State private var progressiveAutoProvider: UtilityProviderRow? = nil
+    @State private var progressiveHomeProvider: UtilityProviderRow? = nil
+    @State private var progressiveAutoCustomName: String = ""
+    @State private var progressiveHomeCustomName: String = ""
+
+    /// Q28 caretakers pets sub-step (folded in from old Q28b).
+    /// Persisted commit lands in `answer.payload["petsAnswerId"]`.
+    @State private var progressivePetsAnswerId: String? = nil
+    @State private var progressiveShowPetsStep: Bool = false
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -856,19 +902,16 @@ struct HouseQuizView: View {
             // Build 88: Q36 converted to .singleChoice. Legacy .slider
             // case falls through to singleChoiceBody for backward compat.
             singleChoiceBody(q)
-        case .progressiveLawn,
-             .progressivePool,
-             .trashWithDays,
-             .garageWithEV,
-             .dualInsurance:
-            // Phase 67D: progressive-disclosure kinds. Initial ship
-            // routes to `singleChoiceBody` which renders the primary
-            // chip set; sub-section UI (lawn type / chemistry /
-            // pickup days / EV charger / second insurance slot) is
-            // captured via `payload` in a follow-up body renderer.
-            // The mapper already reads payload, so graduating to the
-            // full body is a UI-only change.
-            singleChoiceBody(q)
+        case .progressiveLawn:
+            progressiveLawnBody(q)
+        case .progressivePool:
+            progressivePoolBody(q)
+        case .trashWithDays:
+            trashWithDaysBody(q)
+        case .garageWithEV:
+            garageWithEVBody(q)
+        case .dualInsurance:
+            dualInsuranceBody(q)
         }
     }
 
@@ -1146,6 +1189,575 @@ struct HouseQuizView: View {
             .accessibilityLabel(allSelected ? "Deselect all options" : "Select all options")
         }
         .padding(.bottom, HavenTheme.spacing4)
+    }
+
+    // MARK: - Phase 67D progressive-disclosure bodies
+    //
+    // Each progressive body renders the primary chip set, conditionally
+    // reveals a secondary section, and commits a single rich answer
+    // (answerId + payload + selectedIds) when the user taps Continue.
+    // The mapper consumes the combined payload in one pass so we don't
+    // have to round-trip to the DB twice.
+
+    /// Generic chip row used by the progressive bodies. `isSelected` and
+    /// `onTap` are caller-managed so the body can keep selection in
+    /// local @State and defer the persist call to the Continue button.
+    @ViewBuilder
+    private func progressiveChip(
+        label: String,
+        icon: String?,
+        isSelected: Bool,
+        anyChosen: Bool,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptics.selection()
+            onTap()
+        } label: {
+            HStack(spacing: 12) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                        .foregroundStyle(isSelected ? HavenColors.navy800 : HavenColors.navy700)
+                        .frame(width: 24)
+                }
+                Text(label)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
+                    .font(.system(size: isSelected ? 18 : 12, weight: .semibold))
+                    .foregroundStyle(isSelected ? HavenColors.navy : HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing16)
+            .frame(minHeight: 56)
+            .background(isSelected ? HavenColors.navy.opacity(0.08) : HavenColors.creamLight)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(
+                        isSelected ? HavenColors.navy.opacity(0.4) : Color.clear,
+                        lineWidth: 1.5
+                    )
+            }
+            .opacity(!anyChosen || isSelected ? 1.0 : 0.55)
+        }
+        .buttonStyle(.plain)
+        .animation(HavenTheme.animationStandard, value: isSelected)
+    }
+
+    /// Q11 progressiveLawn: primary handler chips + conditional lawn type.
+    /// Pro path also shows the existing inline provider picker so a
+    /// captured landscaping vendor gets stamped into utility_account.
+    private func progressiveLawnBody(_ q: HouseQuizQuestion) -> some View {
+        let showLawnType = ["diy", "pro"].contains(progressiveLawnHandler ?? "")
+
+        return VStack(spacing: HavenTheme.spacing16) {
+            // Section 1 — handler
+            VStack(spacing: HavenTheme.spacing12) {
+                ForEach(q.answerOptions) { option in
+                    progressiveChip(
+                        label: option.label,
+                        icon: option.icon,
+                        isSelected: progressiveLawnHandler == option.id,
+                        anyChosen: progressiveLawnHandler != nil,
+                        onTap: {
+                            progressiveLawnHandler = option.id
+                            // If the user picks a non-pro/diy path, drop
+                            // any stale lawn type — the section disappears.
+                            if !["diy", "pro"].contains(option.id) {
+                                progressiveLawnType = nil
+                            }
+                        }
+                    )
+                }
+            }
+
+            // Section 2 — lawn type (conditional)
+            if showLawnType {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    Text("LAWN TYPE")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("Natural grass, turf, or both?")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    VStack(spacing: HavenTheme.spacing12) {
+                        ForEach(progressiveLawnTypeOptions) { option in
+                            progressiveChip(
+                                label: option.label,
+                                icon: option.icon,
+                                isSelected: progressiveLawnType == option.id,
+                                anyChosen: progressiveLawnType != nil,
+                                onTap: { progressiveLawnType = option.id }
+                            )
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Pro path provider capture (existing inline picker reused)
+            if progressiveLawnHandler == "pro" {
+                providerCaptureInline(answerId: "pro")
+                    .padding(.top, HavenTheme.spacing8)
+            }
+
+            // Continue
+            QuizContinueButton(
+                title: "Continue",
+                disabledReason: progressiveLawnHandler == nil ? "Pick how you handle the lawn." : nil,
+                action: {
+                    commitProgressiveLawn()
+                }
+            )
+        }
+        .animation(HavenTheme.animationStandard, value: showLawnType)
+    }
+
+    private var progressiveLawnTypeOptions: [AnswerOption] {
+        [
+            AnswerOption(id: "natural", label: "Natural grass", icon: "leaf.fill"),
+            AnswerOption(id: "turf", label: "Synthetic turf", icon: "square.grid.3x3.fill"),
+            AnswerOption(id: "mixed", label: "Mixed (both)", icon: "circle.lefthalf.filled"),
+            AnswerOption(id: "not_sure", label: "Not sure", icon: nil),
+        ]
+    }
+
+    private func commitProgressiveLawn() {
+        guard let handler = progressiveLawnHandler else { return }
+        var payload: [String: String] = [:]
+        if let lawnType = progressiveLawnType {
+            payload["lawnType"] = lawnType
+        }
+        Task {
+            await viewModel.recordAnswer(
+                handler,
+                payload: payload.isEmpty ? nil : payload
+            )
+        }
+    }
+
+    /// Q12 progressivePool: kind chips + conditional chemistry chips.
+    /// Hot-tub-only and none paths skip chemistry entirely. Pool/Hot-tub
+    /// paths also show the existing inline provider picker.
+    private func progressivePoolBody(_ q: HouseQuizQuestion) -> some View {
+        let kind = progressivePoolKind ?? ""
+        let showChemistry = ["in_ground", "above_ground", "both"].contains(kind)
+        let showProvider = ["in_ground", "above_ground", "hot_tub", "both"].contains(kind)
+
+        return VStack(spacing: HavenTheme.spacing16) {
+            // Section 1 — pool kind
+            VStack(spacing: HavenTheme.spacing12) {
+                ForEach(q.answerOptions) { option in
+                    progressiveChip(
+                        label: option.label,
+                        icon: option.icon,
+                        isSelected: progressivePoolKind == option.id,
+                        anyChosen: progressivePoolKind != nil,
+                        onTap: {
+                            progressivePoolKind = option.id
+                            // Drop chemistry when the new kind doesn't
+                            // support it (hot_tub / none).
+                            if !["in_ground", "above_ground", "both"].contains(option.id) {
+                                progressivePoolChemistry = nil
+                            }
+                        }
+                    )
+                }
+            }
+
+            // Section 2 — chemistry (conditional)
+            if showChemistry {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    Text("WATER CHEMISTRY")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("Saltwater or chlorine?")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    VStack(spacing: HavenTheme.spacing12) {
+                        ForEach(progressivePoolChemistryOptions) { option in
+                            progressiveChip(
+                                label: option.label,
+                                icon: option.icon,
+                                isSelected: progressivePoolChemistry == option.id,
+                                anyChosen: progressivePoolChemistry != nil,
+                                onTap: { progressivePoolChemistry = option.id }
+                            )
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Pool/hot-tub provider capture (mirrors q13_pest pattern)
+            if showProvider {
+                providerCaptureInline(answerId: kind)
+                    .padding(.top, HavenTheme.spacing8)
+            }
+
+            // Continue
+            QuizContinueButton(
+                title: "Continue",
+                disabledReason: progressivePoolKind == nil ? "Pick a pool or hot tub option." : nil,
+                action: {
+                    commitProgressivePool()
+                }
+            )
+        }
+        .animation(HavenTheme.animationStandard, value: showChemistry)
+    }
+
+    private var progressivePoolChemistryOptions: [AnswerOption] {
+        [
+            AnswerOption(id: "saltwater", label: "Saltwater", icon: "drop.circle.fill"),
+            AnswerOption(id: "chlorine", label: "Chlorine", icon: "testtube.2"),
+            AnswerOption(id: "not_sure", label: "Not sure", icon: nil),
+        ]
+    }
+
+    private func commitProgressivePool() {
+        guard let kind = progressivePoolKind else { return }
+        var payload: [String: String] = [:]
+        if let chemistry = progressivePoolChemistry {
+            payload["chemistry"] = chemistry
+        }
+        Task {
+            await viewModel.recordAnswer(
+                kind,
+                payload: payload.isEmpty ? nil : payload
+            )
+        }
+    }
+
+    /// Q18 trashWithDays: service kind + conditional day-of-week chips +
+    /// optional private hauler name. Days persist as `selectedIds`.
+    private func trashWithDaysBody(_ q: HouseQuizQuestion) -> some View {
+        let service = progressiveTrashService ?? ""
+        let showDays = service == "municipal" || service == "private"
+        let showHauler = service == "private"
+
+        return VStack(spacing: HavenTheme.spacing16) {
+            // Section 1 — service
+            VStack(spacing: HavenTheme.spacing12) {
+                ForEach(q.answerOptions) { option in
+                    progressiveChip(
+                        label: option.label,
+                        icon: option.icon,
+                        isSelected: progressiveTrashService == option.id,
+                        anyChosen: progressiveTrashService != nil,
+                        onTap: {
+                            progressiveTrashService = option.id
+                            if option.id == "not_sure" {
+                                progressiveTrashDays = []
+                                progressiveTrashHaulerName = ""
+                            }
+                        }
+                    )
+                }
+            }
+
+            // Section 2 — pickup days (conditional)
+            if showDays {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    Text("PICKUP DAYS")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("Pick every day bins go out.")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    let dayOptions: [(id: String, label: String)] = [
+                        ("sun", "Sun"), ("mon", "Mon"), ("tue", "Tue"),
+                        ("wed", "Wed"), ("thu", "Thu"), ("fri", "Fri"),
+                        ("sat", "Sat"),
+                    ]
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], spacing: 8) {
+                        ForEach(dayOptions, id: \.id) { day in
+                            let isSelected = progressiveTrashDays.contains(day.id)
+                            Button {
+                                Haptics.selection()
+                                if isSelected {
+                                    progressiveTrashDays.remove(day.id)
+                                } else {
+                                    progressiveTrashDays.insert(day.id)
+                                }
+                            } label: {
+                                Text(day.label)
+                                    .font(HavenTypography.uiButton)
+                                    .foregroundStyle(isSelected ? HavenColors.textOnNavy : HavenColors.textPrimary)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(isSelected ? HavenColors.navy : HavenColors.creamLight)
+                                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Optional hauler name (private only)
+            if showHauler {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    Text("HAULER NAME (OPTIONAL)")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    HavenTextField(
+                        title: "Hauler name",
+                        text: $progressiveTrashHaulerName
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Continue
+            QuizContinueButton(
+                title: "Continue",
+                disabledReason: progressiveTrashService == nil ? "Pick how trash is handled." : nil,
+                action: {
+                    commitTrashWithDays()
+                }
+            )
+        }
+        .animation(HavenTheme.animationStandard, value: showDays)
+    }
+
+    private func commitTrashWithDays() {
+        guard let service = progressiveTrashService else { return }
+        let days = Array(progressiveTrashDays).sorted()
+        let trimmedHauler = progressiveTrashHaulerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            await viewModel.recordAnswer(
+                service,
+                customText: trimmedHauler.isEmpty ? nil : trimmedHauler,
+                selectedIds: days.isEmpty ? nil : days
+            )
+        }
+    }
+
+    /// Q25 garageWithEV: garage type chips + conditional EV charger toggle
+    /// (hidden when garage is "none").
+    private func garageWithEVBody(_ q: HouseQuizQuestion) -> some View {
+        let garage = progressiveGarageType ?? ""
+        let showEV = !garage.isEmpty && garage != "none"
+
+        return VStack(spacing: HavenTheme.spacing16) {
+            // Section 1 — garage type
+            VStack(spacing: HavenTheme.spacing12) {
+                ForEach(q.answerOptions) { option in
+                    progressiveChip(
+                        label: option.label,
+                        icon: option.icon,
+                        isSelected: progressiveGarageType == option.id,
+                        anyChosen: progressiveGarageType != nil,
+                        onTap: {
+                            progressiveGarageType = option.id
+                            if option.id == "none" {
+                                progressiveEVCharger = nil
+                            }
+                        }
+                    )
+                }
+            }
+
+            // Section 2 — EV charger (conditional)
+            if showEV {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    Text("EV CHARGER")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("Do you have a Level 2 EV charger?")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    HStack(spacing: HavenTheme.spacing12) {
+                        ForEach(progressiveEVOptions, id: \.id) { option in
+                            progressiveChip(
+                                label: option.label,
+                                icon: option.icon,
+                                isSelected: progressiveEVCharger == option.id,
+                                anyChosen: progressiveEVCharger != nil,
+                                onTap: { progressiveEVCharger = option.id }
+                            )
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Continue
+            QuizContinueButton(
+                title: "Continue",
+                disabledReason: progressiveGarageType == nil ? "Pick a garage option." : nil,
+                action: {
+                    commitGarageWithEV()
+                }
+            )
+        }
+        .animation(HavenTheme.animationStandard, value: showEV)
+    }
+
+    private var progressiveEVOptions: [AnswerOption] {
+        [
+            AnswerOption(id: "yes", label: "Yes", icon: "bolt.car.fill"),
+            AnswerOption(id: "no", label: "No", icon: "minus.circle"),
+        ]
+    }
+
+    private func commitGarageWithEV() {
+        guard let garage = progressiveGarageType else { return }
+        var payload: [String: String] = [:]
+        if let evCharger = progressiveEVCharger {
+            payload["evCharger"] = evCharger
+        }
+        Task {
+            await viewModel.recordAnswer(
+                garage,
+                payload: payload.isEmpty ? nil : payload
+            )
+        }
+    }
+
+    /// Q26 dualInsurance: two stacked provider pickers (auto + home).
+    /// Either slot is independently skippable. When a slot has a catalog
+    /// pick, payload carries the UUID; free-form names land in
+    /// customEntries with "auto:" / "home:" prefixes.
+    private func dualInsuranceBody(_ q: HouseQuizQuestion) -> some View {
+        VStack(spacing: HavenTheme.spacing24) {
+            // Auto slot
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                Text("AUTO INSURANCE")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+                if let auto = progressiveAutoProvider {
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Text(auto.name)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Button {
+                            progressiveAutoProvider = nil
+                        } label: {
+                            Text("Change")
+                                .font(HavenTypography.uiLabelMedium)
+                                .foregroundStyle(HavenColors.action)
+                        }
+                    }
+                    .padding(HavenTheme.spacing16)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                } else {
+                    UtilityProviderSearchPicker(
+                        providerTypes: ["auto_insurance"],
+                        state: viewModel.property.state,
+                        city: viewModel.property.city,
+                        searchPlaceholder: "GEICO, Progressive, State Farm...",
+                        onSelect: { provider in
+                            progressiveAutoProvider = provider
+                        },
+                        onCustomCreated: { provider in
+                            progressiveAutoProvider = provider
+                        }
+                    )
+                    .id("dualInsurance_auto")
+                    .frame(minHeight: 200)
+                }
+            }
+
+            // Home slot
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                Text("HOMEOWNERS INSURANCE")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+                if let home = progressiveHomeProvider {
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Text(home.name)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Button {
+                            progressiveHomeProvider = nil
+                        } label: {
+                            Text("Change")
+                                .font(HavenTypography.uiLabelMedium)
+                                .foregroundStyle(HavenColors.action)
+                        }
+                    }
+                    .padding(HavenTheme.spacing16)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                } else {
+                    UtilityProviderSearchPicker(
+                        providerTypes: ["home_insurance"],
+                        state: viewModel.property.state,
+                        city: viewModel.property.city,
+                        searchPlaceholder: "Allstate, Liberty Mutual...",
+                        onSelect: { provider in
+                            progressiveHomeProvider = provider
+                        },
+                        onCustomCreated: { provider in
+                            progressiveHomeProvider = provider
+                        }
+                    )
+                    .id("dualInsurance_home")
+                    .frame(minHeight: 200)
+                }
+            }
+
+            // Continue / skip
+            // Both slots are independently skippable, so the Continue
+            // button is always enabled — passing nil disabledReason.
+            QuizContinueButton(
+                title: "Continue",
+                disabledReason: nil,
+                action: {
+                    commitDualInsurance()
+                }
+            )
+        }
+    }
+
+    private func commitDualInsurance() {
+        var payload: [String: String] = [:]
+        if let auto = progressiveAutoProvider {
+            payload["autoProviderId"] = auto.id.uuidString
+        }
+        if let home = progressiveHomeProvider {
+            payload["homeProviderId"] = home.id.uuidString
+        }
+        // Free-form fallback: when a user typed a name without picking
+        // from the catalog (UtilityProviderSearchPicker.onCustomCreated
+        // already provisions a row + UUID, so this is a defensive
+        // backstop — and the answer mapper looks here first when no
+        // payload UUID exists).
+        var customEntries: [String] = []
+        let trimmedAuto = progressiveAutoCustomName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedHome = progressiveHomeCustomName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedAuto.isEmpty && progressiveAutoProvider == nil {
+            customEntries.append("auto:\(trimmedAuto)")
+        }
+        if !trimmedHome.isEmpty && progressiveHomeProvider == nil {
+            customEntries.append("home:\(trimmedHome)")
+        }
+        Task {
+            await viewModel.recordAnswer(
+                "selected",
+                customEntries: customEntries.isEmpty ? nil : customEntries,
+                payload: payload.isEmpty ? nil : payload
+            )
+        }
     }
 
     @ViewBuilder
@@ -1954,11 +2566,29 @@ struct HouseQuizView: View {
     // MARK: - Vehicle add
 
     private func vehicleAddBody(_ q: HouseQuizQuestion) -> some View {
-        QuizVehicleInputSelector(
-            onComplete: {
-                Task { await viewModel.recordAnswer("primary_vehicle_added") }
+        VStack(spacing: HavenTheme.spacing16) {
+            QuizVehicleInputSelector(
+                onComplete: {
+                    Task { await viewModel.recordAnswer("primary_vehicle_added") }
+                }
+            )
+            // Phase 67D (A2): Q23 vehicle count was dropped; users with
+            // no car or who prefer not to add it now need an explicit
+            // skip path. Records "skipped" so the mapper still stamps
+            // `primary_vehicle_added: false` and the question doesn't
+            // re-surface on resume.
+            Button {
+                Haptics.light()
+                Task { await viewModel.recordAnswer("skipped") }
+            } label: {
+                Text("Skip for now")
+                    .font(HavenTypography.uiLabel.weight(.semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .frame(maxWidth: .infinity)
             }
-        )
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Q22 generator inline form (Phase 19i)
@@ -2998,6 +3628,13 @@ struct HouseQuizView: View {
                         }
                     )
                     .transition(.opacity)
+                } else if progressiveShowPetsStep {
+                    // Phase 67D (A10): pets sub-step folded in from old
+                    // Q28b. Renders after the home manager step exits;
+                    // tapping any pet chip commits the final Q28 answer
+                    // with `payload["petsAnswerId"]` for the mapper.
+                    petsStepBody(answerId: answerId)
+                        .transition(.opacity)
                 } else if householdShowHomeManagerStep {
                     homeManagerStepBody(answerId: answerId)
                         .transition(.opacity)
@@ -3160,16 +3797,37 @@ struct HouseQuizView: View {
 
     /// Build 87 (Home Manager expansion) — Q28 finalization. Both the home
     /// manager prompt's Skip path and the inline form's onComplete path
-    /// converge here. Snapshots the pending kids/expecting state, clears
-    /// every Q28 sub-step flag, then records the final answer with the
-    /// optional home manager entry attached for hydration on resume / back.
+    /// converge here.
+    ///
+    /// Phase 67D (A10): now intercepts the commit to show the pets
+    /// sub-step (folded in from old Q28b). The home manager step's exit
+    /// transitions to `progressiveShowPetsStep`; the pets step's chip
+    /// tap calls `commitQ28WithPets(...)` which is the real final
+    /// commit.
     private func finalizeQ28Caretakers(
         answerId: String,
         homeManagerEntry: HomeManagerEntry?
     ) {
+        householdPendingHomeManagerEntry = homeManagerEntry
+        withAnimation(HavenTheme.animationStandard) {
+            householdShowHomeManagerStep = false
+            householdHomeManagerFormMounted = false
+            // Pets step is the new last sub-step; transition into it
+            // here instead of committing immediately.
+            progressiveShowPetsStep = true
+        }
+    }
+
+    /// Phase 67D (A10): real final commit for Q28. The pets chip tap
+    /// (or the "Skip pets" button) calls this with the captured pet
+    /// answer id (nil when skipped).
+    private func commitQ28WithPets(
+        answerId: String,
+        homeManagerEntry: HomeManagerEntry?,
+        petsAnswerId: String?
+    ) {
         let pendingKids = householdPendingKids
         let pendingExpecting = householdPendingExpecting
-        householdPendingHomeManagerEntry = homeManagerEntry
         withAnimation(HavenTheme.animationStandard) {
             householdInviteAnswerId = nil
             householdShowCaretakerStep = false
@@ -3180,17 +3838,57 @@ struct HouseQuizView: View {
             householdPendingExpecting = []
             householdDidSeedExistingKids = false
             householdSkippedSpouseStep = false
+            progressiveShowPetsStep = false
         }
         Task {
-            // Always go through `recordHouseholdAnswer` so the home manager
-            // entry can ride along even when there are no kids/expecting.
-            // The view model handles nil entries identically.
             await viewModel.recordHouseholdAnswer(
                 residentsId: answerId,
                 kids: pendingKids,
                 expecting: pendingExpecting,
-                homeManagerEntry: homeManagerEntry
+                homeManagerEntry: homeManagerEntry,
+                petsAnswerId: petsAnswerId
             )
+        }
+    }
+
+    /// Phase 67D (A10): pets sub-step body. Shown after the home
+    /// manager step exits (either Skip or onComplete). Five chips
+    /// (dogs / cats / both / other / no_pets); tapping any chip
+    /// commits the final Q28 answer with the captured pet id.
+    @ViewBuilder
+    private func petsStepBody(answerId: String) -> some View {
+        let options: [(id: String, label: String, icon: String?)] = [
+            ("dogs", "Dogs", "pawprint.fill"),
+            ("cats", "Cats", "cat.fill"),
+            ("both", "Dogs and cats", "pawprint.circle.fill"),
+            ("other_pets", "Other pets", nil),
+            ("no_pets", "No pets", nil),
+        ]
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            Text("ANY PETS IN THE HOUSEHOLD?")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.2)
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("So your vendors know, and so we can suggest recurring services that keep pets safe.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(options, id: \.id) { option in
+                progressiveChip(
+                    label: option.label,
+                    icon: option.icon,
+                    isSelected: progressivePetsAnswerId == option.id,
+                    anyChosen: progressivePetsAnswerId != nil,
+                    onTap: {
+                        progressivePetsAnswerId = option.id
+                        commitQ28WithPets(
+                            answerId: answerId,
+                            homeManagerEntry: householdPendingHomeManagerEntry,
+                            petsAnswerId: option.id
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -3962,6 +4660,23 @@ struct HouseQuizView: View {
         contractorChipsVendors.removeAll()
         contractorChipsManualNames.removeAll()
         contractorChipsExpanded = nil
+        // Phase 67D — reset progressive-disclosure state so each
+        // progressive-kind visit lands clean.
+        progressiveLawnHandler = nil
+        progressiveLawnType = nil
+        progressivePoolKind = nil
+        progressivePoolChemistry = nil
+        progressiveTrashService = nil
+        progressiveTrashDays = []
+        progressiveTrashHaulerName = ""
+        progressiveGarageType = nil
+        progressiveEVCharger = nil
+        progressiveAutoProvider = nil
+        progressiveHomeProvider = nil
+        progressiveAutoCustomName = ""
+        progressiveHomeCustomName = ""
+        progressivePetsAnswerId = nil
+        progressiveShowPetsStep = false
     }
 
     /// Apr 7, 2026 (build 82): re-populate the local @State variables for
@@ -4152,6 +4867,37 @@ struct HouseQuizView: View {
             // Legacy build 87 users with sliderValue but no answerId
             // will see the question fresh (they pick one of 3 chips).
             break
+        case .progressiveLawn:
+            progressiveLawnHandler = prior.answerId
+            progressiveLawnType = prior.payload?["lawnType"]
+        case .progressivePool:
+            progressivePoolKind = prior.answerId
+            progressivePoolChemistry = prior.payload?["chemistry"]
+        case .trashWithDays:
+            progressiveTrashService = prior.answerId
+            if let ids = prior.selectedIds {
+                progressiveTrashDays = Set(ids)
+            }
+            if let custom = prior.customText {
+                progressiveTrashHaulerName = custom
+            }
+        case .garageWithEV:
+            progressiveGarageType = prior.answerId
+            progressiveEVCharger = prior.payload?["evCharger"]
+        case .dualInsurance:
+            // Hydration of the picker rows themselves is async — the
+            // body fetches by id from `prior.payload` on appear. We
+            // don't keep the UtilityProviderRow in @State on hydration
+            // because it requires a network round-trip.
+            if let custom = prior.customEntries {
+                for entry in custom {
+                    if entry.hasPrefix("auto:") {
+                        progressiveAutoCustomName = String(entry.dropFirst("auto:".count))
+                    } else if entry.hasPrefix("home:") {
+                        progressiveHomeCustomName = String(entry.dropFirst("home:".count))
+                    }
+                }
+            }
         default:
             // Single-choice / yes-no / vehicle-count / providerSearch
             // render their selected state directly from

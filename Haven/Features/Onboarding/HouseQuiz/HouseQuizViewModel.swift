@@ -598,13 +598,27 @@ final class HouseQuizViewModel: ObservableObject {
     /// don't feel like the screen jumped past their tap. Without this
     /// the chip selection animation runs while the next state is already
     /// rendering, which is jarring.
-    func recordAnswer(_ answerId: String, customText: String? = nil, selectedProviderId: UUID? = nil) async {
+    func recordAnswer(
+        _ answerId: String,
+        customText: String? = nil,
+        selectedProviderId: UUID? = nil,
+        selectedIds: [String]? = nil,
+        customEntries: [String]? = nil,
+        payload: [String: String]? = nil
+    ) async {
+        // Phase 67D: `selectedIds` / `customEntries` / `payload` added so
+        // progressive-disclosure kinds (trashWithDays day chips,
+        // dualInsurance customEntries fallback, the lawn/pool/garage
+        // payload-extended captures) can commit a single rich answer
+        // without each kind needing its own dedicated record* method.
         guard let q = currentQuestion else { return }
         let answer = HouseQuizAnswer(
             answerId: answerId,
             customText: customText,
-            selectedIds: nil,
+            selectedIds: selectedIds,
+            customEntries: customEntries,
             selectedProviderId: selectedProviderId,
+            payload: payload,
             answeredAt: Date()
         )
         await persist(answer: answer, for: q)
@@ -778,9 +792,18 @@ final class HouseQuizViewModel: ObservableObject {
         residentsId: String,
         kids: [QuizKidEntry],
         expecting: [QuizExpectingEntry],
-        homeManagerEntry: HomeManagerEntry? = nil
+        homeManagerEntry: HomeManagerEntry? = nil,
+        petsAnswerId: String? = nil
     ) async {
+        // Phase 67D (A10): `petsAnswerId` is the pets sub-step folded
+        // into the Q28 caretakers chain. The mapper reads
+        // `payload["petsAnswerId"]` to stamp `pets` + `has_pets`
+        // attributes and re-reconcile synthetic-turf.
         guard let q = currentQuestion else { return }
+        var payload: [String: String]? = nil
+        if let petsAnswerId {
+            payload = ["petsAnswerId": petsAnswerId]
+        }
         let answer = HouseQuizAnswer(
             answerId: residentsId,
             customText: nil,
@@ -789,6 +812,7 @@ final class HouseQuizViewModel: ObservableObject {
             kids: kids.isEmpty ? nil : kids,
             expectingEntries: expecting.isEmpty ? nil : expecting,
             homeManagerEntry: homeManagerEntry,
+            payload: payload,
             answeredAt: Date()
         )
         await persist(answer: answer, for: q)

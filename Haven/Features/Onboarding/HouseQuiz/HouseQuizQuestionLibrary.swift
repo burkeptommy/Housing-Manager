@@ -754,6 +754,57 @@ enum HouseQuizFuelDerivation {
         }
     }
 
+    /// Phase 67D Phase A migration helper: map a legacy fuel + hvac
+    /// answer pair to the new combined `q3_heating_system` answer id.
+    /// Used by `AppState.migrateHouseQuizP67DOnceIfNeeded` to rewrite
+    /// resumed-quiz JSONB. Falls back to `not_sure` for unknown
+    /// combinations so users in weird states still see the question
+    /// answered (better than re-prompting).
+    static func combineHeatingSystem(fuel: String?, hvacType: String?) -> String {
+        switch (fuel ?? "", hvacType ?? "") {
+        case ("natural_gas", "central_ducted"),
+             ("natural_gas", "mini_split"):
+            return "gas_furnace_central_ac"
+        case ("natural_gas", "boiler_radiant"):
+            return "gas_boiler_radiators"
+        case ("natural_gas", "boiler_with_central_ac"),
+             ("natural_gas", "boiler_with_window_ac"):
+            return "gas_boiler_central_ac"
+        case ("natural_gas", "heat_pump"):
+            return "heat_pump_ducted"
+        case ("natural_gas", _):
+            return "gas_furnace_central_ac"  // fallback for partial captures
+        case ("oil", "boiler_radiant"),
+             ("oil", "boiler_with_window_ac"):
+            return "oil_boiler_radiators"
+        case ("oil", "boiler_with_central_ac"),
+             ("oil", "central_ducted"):
+            return "oil_boiler_central_ac"
+        case ("oil", _):
+            return "oil_boiler_radiators"  // fallback
+        case ("propane", "boiler_radiant"):
+            return "propane_boiler"
+        case ("propane", "central_ducted"),
+             ("propane", "mini_split"):
+            return "propane_furnace_central_ac"
+        case ("propane", _):
+            return "propane_boiler"
+        case ("electric", "heat_pump"):
+            return "heat_pump_ducted"
+        case ("electric", "mini_split"):
+            return "heat_pump_mini_split"
+        case ("electric", "boiler_radiant"),
+             ("electric", "boiler_with_window_ac"):
+            return "electric_baseboard"
+        case ("electric", _):
+            return "heat_pump_ducted"
+        case ("geothermal", _):
+            return "geothermal"
+        default:
+            return "not_sure"
+        }
+    }
+
     /// Phase 67D (A3): the HVAC system subtype lives in the same combo.
     /// The mapper stamps `hvac_type` from this value so existing template
     /// gating (e.g. `requiredSubtypes: ["central_ducted"]`) keeps firing.

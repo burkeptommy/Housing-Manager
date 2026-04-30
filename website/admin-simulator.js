@@ -143,7 +143,27 @@ const QUIZ_ANSWER_MAP = {
     mixed:        { subtypes: { siding_mixed: true } },
   },
 
-  // Q3 — heating fuel
+  // Phase 67D (A3): Q3 + Q3b merged into a single fuel+system combo
+  // picker. Each combo unions the fuel subtype + the HVAC subtype that
+  // the old two-step would have stamped, so downstream subtype-driven
+  // template gating produces identical output to pre-67D presets.
+  q3_heating_system: {
+    gas_furnace_central_ac:        { subtypes: { natural_gas: true, central_ducted: true, ducted: true } },
+    gas_boiler_radiators:          { subtypes: { natural_gas: true, boiler: true, radiant: true } },
+    gas_boiler_central_ac:         { subtypes: { natural_gas: true, boiler: true, central_ducted: true } },
+    oil_boiler_radiators:          { subtypes: { oil: true, boiler: true, radiant: true } },
+    oil_boiler_central_ac:         { subtypes: { oil: true, boiler: true, central_ducted: true } },
+    heat_pump_ducted:              { subtypes: { electric: true, heat_pump: true } },
+    heat_pump_mini_split:          { subtypes: { electric: true, mini_split: true } },
+    geothermal:                    { subtypes: { geothermal: true, heat_pump: true } },
+    propane_boiler:                { subtypes: { propane: true, boiler: true, radiant: true } },
+    propane_furnace_central_ac:    { subtypes: { propane: true, central_ducted: true } },
+    electric_baseboard:            { subtypes: { electric: true } },
+    not_sure:                      { subtypes: { central_ducted: true } },
+  },
+
+  // Phase 67D legacy (kept for backward-compat with persisted simulator
+  // runs from before the merge; new presets use q3_heating_system).
   q3_heating_fuel: {
     natural_gas: { subtypes: { natural_gas: true } },
     oil:         { subtypes: { oil: true } },
@@ -152,8 +172,6 @@ const QUIZ_ANSWER_MAP = {
     geothermal:  { subtypes: { geothermal: true } },
     not_sure:    {},
   },
-
-  // Q3b — HVAC type
   q3b_hvac_type: {
     central_ducted:           { subtypes: { central_ducted: true, ducted: true } },
     mini_split:               { subtypes: { mini_split: true } },
@@ -382,6 +400,9 @@ export const QUIZ_PRESETS = [
     answers: {
       q1_roof_material: "asphalt",
       q2_siding: "vinyl",
+      // Phase 67D (A3): Q3 + Q3b merged. Legacy keys retained as harmless
+      // duplicate signal — the simulator subtype lookup unions them.
+      q3_heating_system: "gas_furnace_central_ac",
       q3_heating_fuel: "natural_gas",
       q3b_hvac_type: "central_ducted",
       q6_water_source: "municipal",
@@ -402,6 +423,9 @@ export const QUIZ_PRESETS = [
       q25b_ev_charger: "yes",
       q28b_pets: "has_pets",
       q36_diy_vs_vendor: "mixed",
+      // Phase 67 (C2/C3) — review-only no-op breadcrumbs.
+      q37_routines: "reviewed",
+      q38_handyman_punchlist: "reviewed",
     },
     factsOverride: { state: "CT", yearBuilt: 1962, squareFootage: 4200 },
   },
@@ -412,6 +436,7 @@ export const QUIZ_PRESETS = [
     answers: {
       q1_roof_material: "slate",
       q2_siding: "brick",
+      q3_heating_system: "oil_boiler_central_ac",
       q3_heating_fuel: "oil",
       q3b_hvac_type: "boiler_with_central_ac",
       q6_water_source: "well",
@@ -438,6 +463,9 @@ export const QUIZ_PRESETS = [
       q25b_ev_charger: "yes",
       q28b_pets: "has_pets",
       q36_diy_vs_vendor: "hire_out",
+      // Phase 67 (C2/C3) — review-only no-op breadcrumbs.
+      q37_routines: "reviewed",
+      q38_handyman_punchlist: "reviewed",
     },
     factsOverride: { state: "CT", yearBuilt: 1924, squareFootage: 9800 },
   },
@@ -448,6 +476,7 @@ export const QUIZ_PRESETS = [
     answers: {
       q1_roof_material: "flat_membrane",
       q2_siding: "brick",
+      q3_heating_system: "heat_pump_mini_split",
       q3_heating_fuel: "electric",
       q3b_hvac_type: "mini_split",
       q6_water_source: "municipal",
@@ -465,6 +494,9 @@ export const QUIZ_PRESETS = [
       q25_garage_ev: "none",
       q28b_pets: "no_pets",
       q36_diy_vs_vendor: "diy",
+      // Phase 67 (C2/C3) — review-only no-op breadcrumbs.
+      q37_routines: "reviewed",
+      q38_handyman_punchlist: "reviewed",
     },
     factsOverride: { state: "MA", yearBuilt: 1995, squareFootage: 1100 },
   },
@@ -475,6 +507,7 @@ export const QUIZ_PRESETS = [
     answers: {
       q1_roof_material: "metal",
       q2_siding: "wood",
+      q3_heating_system: "propane_boiler",
       q3_heating_fuel: "propane",
       q3b_hvac_type: "boiler_radiant",
       q6_water_source: "well",
@@ -493,6 +526,9 @@ export const QUIZ_PRESETS = [
       q25b_ev_charger: "no",
       q28b_pets: "no_pets",
       q36_diy_vs_vendor: "hire_out",
+      // Phase 67 (C2/C3) — review-only no-op breadcrumbs.
+      q37_routines: "reviewed",
+      q38_handyman_punchlist: "reviewed",
     },
     factsOverride: { state: "CA", yearBuilt: 1988, squareFootage: 3200 },
   },
@@ -961,11 +997,55 @@ export function renderSimulatorUI(result) {
 
       ${renderRoutineSection(result.routines || [], result.counts)}
       ${renderPunchListSection(result.punchList)}
+      ${renderVendorCoverageGapsSection(tier.vendor_coverage_gaps)}
       ${tierSection("🚫 Vendor only", "Always a pro — gas, panel, roof, septic. One-off work, not recurring.", tier.vendor_only)}
       ${tierSection("👥 Vendor or Handyman", "Defaults to a vendor visit but the homeowner can flip to handyman.", tier.vendor_or_handyman)}
       ${tierSection("🔨 Handyman only (unbundled)", "DIY-friendly templates that aren't in the spring/fall handyman bundle. These DO seed as tasks today; if you want them on the punch list instead, flag them with bundleId Handyman:spring or Handyman:fall.", tier.handyman_only)}
       ${tierSection("✋ I'll do it myself", "Templates never seed here — runtime-only. (Should always be empty.)", tier.homeowner_only)}
     </div>
+  `;
+}
+
+// Phase 67 (C4) — Vendor coverage gaps. Vendor-tier tasks WITHOUT a
+// contractor on file. Replaces the "Find a contractor for X" rendering
+// in the vendor_only lane with a single consolidated card per
+// systemCategory — mirroring what `VendorCoverageSheet` shows on the
+// homeowner's dashboard.
+function renderVendorCoverageGapsSection(gaps) {
+  if (!gaps || !gaps.length) return "";
+  const grouped = new Map();
+  for (const task of gaps) {
+    const cat = task.systemCategory || "Other";
+    if (!grouped.has(cat)) {
+      grouped.set(cat, []);
+    }
+    grouped.get(cat).push(task);
+  }
+  const cards = [...grouped.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([cat, tasks]) => `
+      <article class="admin-sim__gap-card">
+        <header>
+          <h5>${escapeHtml(cat)}</h5>
+          <span class="admin-pill admin-pill--warn">Needs a pro</span>
+        </header>
+        <p class="admin-muted">${tasks.length} template${tasks.length === 1 ? "" : "s"} would have seeded "Find a contractor for X" tasks. iOS now flags <code>home_systems.needs_vendor_coverage = true</code> instead.</p>
+        <ul class="admin-sim__gap-list">
+          ${tasks.map((t) => `<li>${escapeHtml(t.title)}</li>`).join("")}
+        </ul>
+      </article>
+    `).join("");
+  return `
+    <section class="admin-sim__lane admin-sim__lane--gaps">
+      <header>
+        <h4>🔧 Vendor coverage gaps</h4>
+        <span class="admin-muted">${grouped.size} categor${grouped.size === 1 ? "y" : "ies"}</span>
+      </header>
+      <p class="admin-sim__lane-blurb admin-muted">Phase 67 reconciler v2: instead of seeding "Find a contractor for X" tasks per template, the iOS reconciler marks the system's <code>needs_vendor_coverage = true</code> and the homeowner sees a consolidated VendorCoverageSheet card.</p>
+      <div class="admin-sim__gap-grid">
+        ${cards}
+      </div>
+    </section>
   `;
 }
 
@@ -1203,12 +1283,22 @@ function bucketByAssignmentTier(lanes, facts) {
   // Phase 5p — Routine bucket is empty here because routines are now
   // built fact-driven and pre-extracted from the task lanes upstream.
   // Anything that lands in `lanes` is genuinely a task.
+  //
+  // Phase 67 (C4) — `vendor_coverage_gaps` peels vendor-tier tasks where
+  // the homeowner has NO contractor on file for the system's category out
+  // of the vendor lanes and into a dedicated "🔧 Vendor coverage gaps"
+  // callout. The iOS reconciler v2 stops creating "Find a contractor for X"
+  // maintenance_tasks rows; the simulator mirrors that by stop-rendering
+  // them as tasks in the vendor lane and instead surfacing the gap as a
+  // single card per category — matching what `VendorCoverageSheet`
+  // surfaces on the dashboard.
   const out = {
     routine: [],
     vendor_only: [],
     vendor_or_handyman: [],
     handyman_only: [],
     homeowner_only: [],
+    vendor_coverage_gaps: [],
   };
   const all = [
     ...(lanes.bundles || []),
@@ -1218,6 +1308,15 @@ function bucketByAssignmentTier(lanes, facts) {
   ];
   for (const task of all) {
     const tier = tierForTask(task);
+    const isVendorTier = tier === "vendor_only" || tier === "vendor_or_handyman";
+    if (isVendorTier) {
+      const cat = task.systemCategory;
+      const hasContractor = !!facts?.hasContractorsFor?.[cat];
+      if (!hasContractor) {
+        out.vendor_coverage_gaps.push(task);
+        continue;
+      }
+    }
     out[tier].push(task);
   }
   return out;
@@ -1361,24 +1460,27 @@ export function renderFactForm(facts) {
 const KEY_QUESTIONS = [
   { id: "q1_roof_material", label: "Roof material" },
   { id: "q2_siding", label: "Siding" },
-  { id: "q3_heating_fuel", label: "Heating fuel" },
-  { id: "q3b_hvac_type", label: "HVAC type" },
+  // Phase 67D (A3): Q3 + Q3b merged. Legacy entries kept below for
+  // backward-compat with persisted simulator state.
+  { id: "q3_heating_system", label: "Heating system" },
+  { id: "q3_heating_fuel", label: "Heating fuel (legacy)" },
+  { id: "q3b_hvac_type", label: "HVAC type (legacy)" },
   { id: "q6_water_source", label: "Water source" },
   { id: "q7_sewer_septic", label: "Sewer / septic" },
   { id: "q8_water_heater", label: "Water heater" },
   { id: "q9_basement", label: "Basement / crawl" },
   { id: "q11_lawn", label: "Lawn handling" },
-  { id: "q11b_lawn_type", label: "Lawn type", showIf: (a) => ["diy", "pro"].includes(a.q11_lawn) },
+  { id: "q11b_lawn_type", label: "Lawn type (legacy)", showIf: (a) => ["diy", "pro"].includes(a.q11_lawn) },
   { id: "q12_pool", label: "Pool / hot tub" },
-  { id: "q12b_pool_chemistry", label: "Pool chemistry", showIf: (a) => ["in_ground", "above_ground", "both"].includes(a.q12_pool) },
+  { id: "q12b_pool_chemistry", label: "Pool chemistry (legacy)", showIf: (a) => ["in_ground", "above_ground", "both"].includes(a.q12_pool) },
   { id: "q13_pest", label: "Pest control" },
   { id: "q14_irrigation", label: "Irrigation" },
   { id: "q15_security", label: "Security system" },
   { id: "q21_solar", label: "Solar" },
   { id: "q22_generator", label: "Generator" },
   { id: "q25_garage_ev", label: "Garage" },
-  { id: "q25b_ev_charger", label: "EV charger", showIf: (a) => a.q25_garage_ev && a.q25_garage_ev !== "none" },
-  { id: "q28b_pets", label: "Pets" },
+  { id: "q25b_ev_charger", label: "EV charger (legacy)", showIf: (a) => a.q25_garage_ev && a.q25_garage_ev !== "none" },
+  { id: "q28b_pets", label: "Pets (legacy)" },
   { id: "q36_diy_vs_vendor", label: "DIY vs Vendor preference" },
 ];
 
