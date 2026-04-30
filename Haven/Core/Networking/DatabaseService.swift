@@ -1045,7 +1045,48 @@ final class DatabaseService {
         Task { @MainActor in
             await RoutineSeeder.shared.seedIfNeeded(for: created)
         }
+        // Phase 67 (C1): when a contractor is added in a category that had
+        // gaps marked by the reconciler v2, clear the
+        // `needs_vendor_coverage` flag on every home_systems row in the
+        // matching category so VendorCoverageSheet drops the resolved gap.
+        // Fire-and-forget for the same reason as routine seeding —
+        // contractor creation never blocks on this side effect.
+        Task { @MainActor in
+            await Self.clearVendorCoverageGapsForCategory(
+                created.category,
+                householdId: created.householdId
+            )
+        }
         return created
+    }
+
+    /// Phase 67 (C1): clear `home_systems.needs_vendor_coverage = true` on
+    /// every system in the matching canonical category. Called after a
+    /// contractor is added so the dashboard's VendorCoverageSheet drops
+    /// the resolved gap card. Best-effort — failures are swallowed. RLS
+    /// scopes the read + writes to the caller's household automatically.
+    @MainActor
+    private static func clearVendorCoverageGapsForCategory(
+        _ rawCategory: String?,
+        householdId: UUID
+    ) async {
+        guard let raw = rawCategory, !raw.isEmpty else { return }
+        let canonical = SystemCategoryRegistry.canonical(category: raw) ?? raw
+        let systems: [HomeSystemRow]
+        do {
+            systems = try await DatabaseService.shared.fetchHomeSystems()
+        } catch {
+            return
+        }
+        for system in systems
+        where system.householdId == householdId
+            && system.needsVendorCoverage == true {
+            let systemCanonical = SystemCategoryRegistry.canonical(category: system.category) ?? system.category
+            guard systemCanonical.caseInsensitiveCompare(canonical) == .orderedSame else { continue }
+            var update = HomeSystemUpdate()
+            update.needsVendorCoverage = false
+            _ = try? await DatabaseService.shared.updateHomeSystem(id: system.id, update)
+        }
     }
 
     func updateContractor(id: UUID, _ updates: ContractorUpdate) async throws -> ContractorRow {
@@ -1581,14 +1622,23 @@ final class DatabaseService {
     /// Phase 54B: Soft-delete a punch item (user tapped "Remove" or
     /// "Not relevant"). Sets `archived_at` instead of DELETE so we keep
     /// history for any future audit + undo affordance.
-    func archiveHandymanPunchItem(id: UUID) async throws {
+    ///
+    /// Phase 67E/F: optional `reason` records WHY ("promoted_to_task"
+    /// when the row was converted back into a scheduled task; nil for
+    /// legacy user dismissals).
+    func archiveHandymanPunchItem(id: UUID, reason: String? = nil) async throws {
         struct ArchivePayload: Encodable {
             let archivedAt: String
+            let archiveReason: String?
             enum CodingKeys: String, CodingKey {
                 case archivedAt = "archived_at"
+                case archiveReason = "archive_reason"
             }
         }
-        let payload = ArchivePayload(archivedAt: ISO8601DateFormatter().string(from: Date()))
+        let payload = ArchivePayload(
+            archivedAt: ISO8601DateFormatter().string(from: Date()),
+            archiveReason: reason
+        )
         try await from("handyman_punch_items")
             .update(payload)
             .eq("id", value: id.uuidString)

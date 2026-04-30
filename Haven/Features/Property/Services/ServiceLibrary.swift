@@ -1621,11 +1621,23 @@ enum MaintenanceTaskRoutingSupport {
             title: task.title
         )
         insert.description = task.description
-        insert.source = "maintenance_task"
+        // Phase 67E/F: distinguish promotion (intentional move from
+        // task to punch list) from the legacy "maintenance_task" tag
+        // (which historically meant "delegated from a task" but
+        // overlapped with reconciler-seeded rows). New flag:
+        //   "promoted_from_task" — paired with the source task being
+        //                          archived with reason
+        //                          "moved_to_handyman_punch".
+        insert.source = "promoted_from_task"
         insert.sourceTaskId = task.id
         if let templateKey = task.templateId,
            let template = MaintenanceTemplates.template(forKey: templateKey) {
             insert.estimatedMinutes = template.diyEffortMinutes
+            // Carry the templateKey so the punch item can dedup against
+            // future reconciler runs (matches the auto-seed and
+            // migration paths in MaintenanceTaskReconciler /
+            // AppState.migrateHandymanTierTasksToPunchItemsOnceIfNeeded).
+            insert.sourceTemplateKey = templateKey
         }
         return insert
     }

@@ -568,24 +568,20 @@ struct MaintenanceTaskDetailSheet: View {
         let insert = buildPunchItemInsert()
         do {
             _ = try await db.createHandymanPunchItem(insert)
-            // When a vendor was assigned, mark THIS instance complete so
-            // the original vendor stops seeing it. Recurring schedule
-            // advances normally.
-            if assignedContractor != nil {
-                await MaintenanceViewModel.shared.completeTask(task)
-            }
-            // Phase 66: also link the task to the handyman routine via
-            // `parent_routine_id` so it surfaces under "Next Handyman
-            // Visit" on the new Maintenance hub and hides from the
-            // Scheduled/To-Schedule buckets in MaintenanceScheduleView.
-            // Errors swallowed — the punch item is the canonical action.
-            _ = try? await db.assignTaskToHandymanRoutine(task: task)
+            // Phase 67E/F: handyman work lives on a single rail —
+            // `handyman_punch_items`. The source task is archived with
+            // reason "moved_to_handyman_punch" so it stops appearing
+            // on the maintenance rail. Replaces the prior dual-rail
+            // approach (parent_routine_id + the task still alive on
+            // maintenance_tasks) which made completion semantics
+            // confusing.
+            try? await db.archiveMaintenanceTask(id: task.id, reason: "moved_to_handyman_punch")
             await MainActor.run { currentRoute = "handyman" }
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
                 userInfo: ["action": "routed", "id": task.id.uuidString, "route": "handyman"])
-            NotificationCenter.default.post(name: .routineChanged, object: nil)
+            NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
             Analytics.track(.handymanPunchItemAdded, [
-                "source": "maintenance_task",
+                "source": "promoted_from_task",
                 "task_id": task.id.uuidString,
                 "vendor_was_assigned": assignedContractor != nil,
                 "intent": "just_this_time",
@@ -634,19 +630,26 @@ struct MaintenanceTaskDetailSheet: View {
             update.assignmentType = "either"
             _ = try await db.updateMaintenanceTask(id: task.id, update)
 
-            // 3. Create the punch item and complete this instance.
+            // 3. Create the punch item.
             // Phase 56.6: skip the insert when one already exists for
-            // this source task. We still run the series reassignment
-            // (user explicitly chose "from now on") + mark the current
-            // instance complete; just no duplicate punch item.
+            // this source task. The user explicitly chose "from now
+            // on" so we still run step 4 (archive) regardless.
             let existing = (try? await db.fetchPendingHandymanPunchItems(householdId: task.householdId)) ?? []
             if !existing.contains(where: { $0.sourceTaskId == task.id }) {
                 let insert = buildPunchItemInsert()
                 _ = try await db.createHandymanPunchItem(insert)
             }
-            await MaintenanceViewModel.shared.completeTask(task)
 
-            // 4. Reflect the change in local UI state so the vendor
+            // 4. Phase 67E/F: archive the source task so the whole
+            // recurring series moves off the maintenance rail. Reason
+            // "moved_to_handyman_punch" mirrors the just-this-time
+            // path. (Previously we completed the task here, but
+            // completion advanced the recurrence schedule and the next
+            // instance kept reappearing — exactly the dual-rail
+            // behavior Phase 67E/F is unwinding.)
+            try? await db.archiveMaintenanceTask(id: task.id, reason: "moved_to_handyman_punch")
+
+            // 5. Reflect the change in local UI state so the vendor
             // section disappears immediately instead of waiting for
             // the next sheet presentation.
             await MainActor.run {
@@ -654,16 +657,12 @@ struct MaintenanceTaskDetailSheet: View {
                 currentRoute = "handyman"
             }
 
-            // Phase 66: Link the task to the handyman routine via
-            // `parent_routine_id` so it surfaces under "Next Handyman
-            // Visit" on the new Maintenance hub.
-            _ = try? await db.assignTaskToHandymanRoutine(task: task)
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
                 userInfo: ["action": "routed", "id": task.id.uuidString, "route": "handyman"])
-            NotificationCenter.default.post(name: .routineChanged, object: nil)
+            NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
 
             Analytics.track(.handymanPunchItemAdded, [
-                "source": "maintenance_task",
+                "source": "promoted_from_task",
                 "task_id": task.id.uuidString,
                 "vendor_was_assigned": true,
                 "intent": "reassign_series",

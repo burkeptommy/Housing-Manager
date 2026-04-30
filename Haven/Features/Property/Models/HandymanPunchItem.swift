@@ -34,6 +34,10 @@ struct HandymanPunchItemRow: Codable, Identifiable {
     let completedAt: Date?
     let completedVisitTaskId: UUID?
     let archivedAt: Date?
+    /// Phase 67E/F: distinguishes WHY a row was archived. `nil` for
+    /// legacy soft-deletes; "promoted_to_task" when the user converted
+    /// it back into a scheduled `maintenance_tasks` row.
+    let archivedReason: String?
     /// Phase 64 unification: direct FK to the maintenance_tasks row this
     /// punch item mirrors. When `assigned_route = 'handyman'` on the
     /// task, a row with `maintenance_task_id` set is present. Kept
@@ -96,6 +100,7 @@ struct HandymanPunchItemRow: Codable, Identifiable {
         case completedAt = "completed_at"
         case completedVisitTaskId = "completed_visit_task_id"
         case archivedAt = "archived_at"
+        case archivedReason = "archive_reason"
         case maintenanceTaskId = "maintenance_task_id"
         case assignedVisitTaskId = "assigned_visit_task_id"
         case delegatedFromTaskId = "delegated_from_task_id"
@@ -140,6 +145,7 @@ struct HandymanPunchItemRow: Codable, Identifiable {
         completedAt = (try? c.decodeIfPresent(Date.self, forKey: .completedAt)) ?? nil
         completedVisitTaskId = (try? c.decodeIfPresent(UUID.self, forKey: .completedVisitTaskId)) ?? nil
         archivedAt = (try? c.decodeIfPresent(Date.self, forKey: .archivedAt)) ?? nil
+        archivedReason = (try? c.decodeIfPresent(String.self, forKey: .archivedReason)) ?? nil
         maintenanceTaskId = (try? c.decodeIfPresent(UUID.self, forKey: .maintenanceTaskId)) ?? nil
         assignedVisitTaskId = (try? c.decodeIfPresent(UUID.self, forKey: .assignedVisitTaskId)) ?? nil
         delegatedFromTaskId = (try? c.decodeIfPresent(UUID.self, forKey: .delegatedFromTaskId)) ?? nil

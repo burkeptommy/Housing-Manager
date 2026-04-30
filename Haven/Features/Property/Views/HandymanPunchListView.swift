@@ -17,6 +17,11 @@ struct HandymanPunchListView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showAddSheet = false
     @State private var showScheduleSheet = false
+    /// Phase 67E/F: Punch → Task promotion. When set, presents
+    /// `PromotePunchItemSheet` for the user to pick a date. Only
+    /// `.manual` entries are promotable — `.task` rows are already on
+    /// the maintenance rail.
+    @State private var promotingEntry: HandymanPunchItemRow?
 
     var body: some View {
         Group {
@@ -99,6 +104,24 @@ struct HandymanPunchListView: View {
                 MaintenanceTaskDetailSheet(task: task)
             }
             .presentationDetents([.medium, .large])
+        }
+        // Phase 67E/F: Punch → Task promotion. The sheet builds a
+        // `MaintenanceTaskInsert` from the punch item + a user-picked
+        // date, archives the punch item with reason "promoted_to_task",
+        // and refreshes both surfaces.
+        .sheet(item: $promotingEntry) { item in
+            PromotePunchItemSheet(item: item) { scheduledDate in
+                Task {
+                    await viewModel.promoteToTask(
+                        item: item,
+                        scheduledDate: scheduledDate,
+                        householdId: householdId,
+                        propertyId: propertyId
+                    )
+                    Haptics.success()
+                }
+            }
+            .presentationDetents([.medium])
         }
         .overlay(alignment: .top) {
             if let toast = viewModel.toast {
@@ -217,6 +240,19 @@ struct HandymanPunchListView: View {
                                 .clipShape(Capsule())
                         }
                     }
+                }
+            }
+        }
+        // Phase 67E/F: long-press to promote a manual punch item back to
+        // a scheduled maintenance_tasks row. Hidden for `.task` entries
+        // because those are already on the maintenance rail.
+        .contextMenu {
+            if let manual = entry.manualPunchItem {
+                Button {
+                    Haptics.light()
+                    promotingEntry = manual
+                } label: {
+                    Label("Schedule as task", systemImage: "calendar.badge.plus")
                 }
             }
         }
@@ -390,6 +426,76 @@ struct AddHandymanPunchItemSheet: View {
         } catch {
             errorMessage = "Couldn't save: \(error.localizedDescription)"
             Haptics.error()
+        }
+    }
+}
+
+// MARK: - Promote sheet (Phase 67E/F)
+
+/// Punch → Task promotion. The user picks a date for the new task; we
+/// create a `maintenance_tasks` row with `scheduled_date` set and
+/// archive the source punch item. Inverse of the existing
+/// `MaintenanceTaskDetailSheet.addToPunchListJustThisTime` flow —
+/// gives the user a way to take a long-tail punch-list item and pin
+/// it to a specific date when they want to handle it themselves.
+struct PromotePunchItemSheet: View {
+    let item: HandymanPunchItemRow
+    let onConfirm: (Date) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var scheduledDate: Date = Self.defaultDate()
+
+    private static func defaultDate() -> Date {
+        let cal = Calendar.current
+        let weekday = cal.component(.weekday, from: .now)
+        let daysUntilMonday = (9 - weekday) % 7
+        let offset = daysUntilMonday == 0 ? 7 : daysUntilMonday
+        return cal.date(byAdding: .day, value: offset, to: .now) ?? .now
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.title)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        if let description = item.description, !description.isEmpty {
+                            Text(description)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } footer: {
+                    Text("This moves the item off your punch list and onto your schedule for the date you pick.")
+                        .font(HavenTypography.caption)
+                }
+
+                Section {
+                    DatePicker(
+                        "Schedule for",
+                        selection: $scheduledDate,
+                        in: Date()...,
+                        displayedComponents: .date
+                    )
+                }
+            }
+            .navigationTitle("Schedule as task")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Schedule") {
+                        onConfirm(scheduledDate)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
         }
     }
 }
@@ -731,6 +837,68 @@ final class HandymanPunchListViewModel: ObservableObject {
                 print("[HandymanPunchListViewModel] task unroute failed: \(error)")
             }
         }
+    }
+
+    /// Phase 67E/F: Punch → Task promotion. Inverse of the existing
+    /// "Add to handyman list" action. Builds a fresh maintenance_tasks
+    /// row with `scheduled_date` set to the user's pick, then archives
+    /// the source punch item with reason "promoted_to_task" so it stops
+    /// appearing on the punch list. Posts both
+    /// `.maintenanceTaskChanged` and `.handymanPunchListChanged` so
+    /// every listening surface refreshes in one pass.
+    func promoteToTask(
+        item: HandymanPunchItemRow,
+        scheduledDate: Date,
+        householdId: UUID,
+        propertyId: UUID?
+    ) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateString = formatter.string(from: scheduledDate)
+
+        // Frequency "Once" matches the AddMaintenanceTaskSheet
+        // convention for one-shot user-created tasks. Keeps the
+        // promoted item from getting auto-rescheduled.
+        var insert = MaintenanceTaskInsert(
+            householdId: householdId,
+            title: item.title,
+            frequency: "Once",
+            nextDueDate: dateString
+        )
+        insert.propertyId = propertyId
+        insert.description = item.description
+        insert.notes = item.notes
+        insert.scheduledDate = dateString
+        insert.assignmentType = "personal"
+        insert.assignedRoute = "diy"
+        insert.priority = item.priority
+        // Carry over the in-app templateKey if the punch item came
+        // from the reconciler / migration. Lets the maintenance side
+        // re-link to template metadata for future reframing.
+        insert.templateId = item.sourceTemplateKey
+        insert.isTemplateBased = item.sourceTemplateKey != nil
+
+        do {
+            _ = try await db.createMaintenanceTask(insert)
+            try await db.archiveHandymanPunchItem(id: item.id, reason: "promoted_to_task")
+            await load(householdId: householdId, propertyId: propertyId)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
+            showToast("Scheduled for \(formattedShortDate(scheduledDate))")
+            Analytics.track(.handymanPunchItemRemoved, [
+                "source": "promoted_to_task",
+                "punch_item_id": item.id.uuidString,
+            ])
+        } catch {
+            print("[HandymanPunchListViewModel] promoteToTask failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    private func formattedShortDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f.string(from: date)
     }
 
     /// Phase 60: schedule an ad-hoc handyman visit on a user-chosen date.

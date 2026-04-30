@@ -34,3 +34,12 @@ alter table public.handyman_punch_items
 create index if not exists idx_handyman_punch_items_source_template_key
   on public.handyman_punch_items(household_id, source_template_key)
   where source_template_key is not null and archived_at is null;
+
+-- Phase 67E/F also adds `archive_reason` so the existing soft-delete
+-- path can record WHY a punch item was archived. New reasons:
+--   "promoted_to_task" — user converted the punch item back into a
+--     scheduled `maintenance_tasks` row via the long-press menu in
+--     HandymanPunchListView (commit B6).
+-- Empty / null = legacy archive (pre-67E/F user dismissal).
+alter table public.handyman_punch_items
+  add column if not exists archive_reason text;
