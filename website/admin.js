@@ -367,6 +367,8 @@ const el = {
   paletteInput: document.querySelector("[data-palette-input]"),
   paletteResults: document.querySelector("[data-palette-results]"),
   paletteHint: document.querySelector("[data-palette-hint]"),
+  // Phase 5z+9 — Focused note panel container.
+  noteFocused: document.querySelector("[data-note-focused]"),
 };
 
 const paletteState = { open: false, results: [], activeIndex: 0 };
@@ -743,16 +745,11 @@ function activatePaletteResult(r) {
     return;
   }
   if (r.kind === "note") {
-    if (noteCanJumpToEntity(r.note)) {
-      const targetView = viewIdForType(r.note.scopeType);
-      const targetItem = locateLiveItemByScope(r.note);
-      if (targetView && targetItem) {
-        state.view = targetView;
-        state.selected = targetItem;
-        render();
-        return;
-      }
-    }
+    // Phase 5z+9 — Cmd-K → note now opens the focused note panel on the
+    // Notes tab. The pre-5z+9 behavior was to jump to the entity; the
+    // focused panel surfaces the note + its entity + Claude's analysis
+    // in one place, so the entity-jump is replaced by the View entity
+    // button inside the panel.
     state.view = "notes";
     state.selected = r.note;
     render();
@@ -2666,6 +2663,12 @@ function renderDetail() {
   // Re-show the tabs strip in case the simulator view hid it on the
   // previous render.
   el.detailTabs?.classList.remove("is-hidden");
+  // Phase 5z+9 — Hide the focused-note panel when rendering an entity
+  // detail. Re-show the legacy quick-actions row that focusFor a note
+  // suppresses. Keeps cross-tab navigation clean.
+  el.noteFocused?.classList.add("is-hidden");
+  document.querySelector("[data-detail-quick-actions]")?.classList.remove("is-hidden");
+  el.saveItem.disabled = false;
 
   const item = state.selected;
   if (!item) {
@@ -4238,37 +4241,37 @@ function renderNotesView() {
     button.addEventListener("click", () => {
       const note = state.notes.find((n) => n.id === button.dataset.noteId);
       if (!note) return;
-      // Phase 5c — clicking a note jumps to the entity it was placed on so
-      // Tom can read the existing thread + write a new note in the same
-      // place. General notes (no scope) keep the legacy in-pane editor.
-      if (noteCanJumpToEntity(note)) {
-        const targetView = viewIdForType(note.scopeType);
-        const targetItem = locateLiveItemByScope(note);
-        if (targetView && targetItem) {
-          state.view = targetView;
-          state.selected = targetItem;
-          render();
-          return;
-        }
-      }
-      // Fallback for general notes / orphaned scope: show in pane.
+      // Phase 5z+9 — every note (scoped or general) opens a FOCUSED
+      // note panel on the right. No more entity-jump on click — Tom
+      // wanted the note itself to be the centerpiece, with the entity
+      // shown as a preview card and Claude's analysis surfaced below.
+      // The "View {entity} →" escape hatch lives inside the focused
+      // panel for users who still want to jump.
       state.selected = note;
-      renderGeneralNoteFallback(note);
+      renderFocusedNoteDetail(note);
     });
   });
 
-  // Initial pane state — empty until a note is clicked.
-  el.emptyDetail.classList.remove("is-hidden");
-  el.detail.classList.add("is-hidden");
-  const filterIsActive = intentFilter !== "all" || !showApplied;
-  el.emptyDetail.querySelector("h3").textContent = query
-    ? `${topLevel.length} note${topLevel.length === 1 ? "" : "s"} matching "${query}"`
-    : filterIsActive
-    ? `${topLevel.length} of ${queryMatched.length} note${queryMatched.length === 1 ? "" : "s"} shown.`
-    : "Pick a note to open its entity.";
-  el.emptyDetail.querySelector("p").textContent = query
-    ? "Click any matching note to open the entity it's about. Search clears when you switch surfaces or hit Esc."
-    : "Notes are written about a specific quiz question, template, system, or routine. Click one to open that entity's detail panel — you'll see the full thread and can add another note right there. General notes (no entity scope) stay in this pane. Type in the search box above to filter by body or entity.";
+  // Initial pane state — empty until a note is clicked. If a note is
+  // already selected (e.g. user navigated back to Notes after editing
+  // one), keep it open.
+  if (state.selected && state.notes.some((n) => n.id === state.selected?.id)) {
+    renderFocusedNoteDetail(state.selected);
+  } else {
+    // Hide the focused panel — we're back at the empty state.
+    el.noteFocused?.classList.add("is-hidden");
+    el.emptyDetail.classList.remove("is-hidden");
+    el.detail.classList.add("is-hidden");
+    const filterIsActive = intentFilter !== "all" || !showApplied;
+    el.emptyDetail.querySelector("h3").textContent = query
+      ? `${topLevel.length} note${topLevel.length === 1 ? "" : "s"} matching "${query}"`
+      : filterIsActive
+      ? `${topLevel.length} of ${queryMatched.length} note${queryMatched.length === 1 ? "" : "s"} shown.`
+      : "Pick a note to read it.";
+    el.emptyDetail.querySelector("p").textContent = query
+      ? "Click any matching note to open it on the right. Search clears when you switch surfaces or hit Esc."
+      : "Click any note to open it in the focused panel. You'll see the body, the entity it's attached to, Claude's analysis (impact / validity / better approach), and inline edit / delete / mark-applied / reply controls — all without leaving this tab. Use the View entity link inside the panel if you need to jump.";
+  }
 }
 
 function noteCanJumpToEntity(note) {
@@ -4276,31 +4279,720 @@ function noteCanJumpToEntity(note) {
   return ["question", "task", "handyman", "routine", "system", "vehicle", "prompt"].includes(note.scopeType);
 }
 
-function renderGeneralNoteFallback(note) {
+// =============================================================================
+// Phase 5z+9 — Focused note panel
+// =============================================================================
+//
+// When Tom clicks a note row on the Notes tab, the right pane renders the
+// note itself as the centerpiece (instead of jumping to the entity it's
+// attached to, which was the pre-5z+9 behavior). The panel has four
+// sections:
+//
+//   1. Note preview      — body, intent pill, author, applied/reverted
+//                          status, timestamps. Editable inline via Edit.
+//   2. Entity preview    — read-only summary card of the entity this note
+//                          is on (when scoped). "View entity →" escape hatch.
+//   3. Analysis          — heuristic-driven summary of:
+//                          * Validity tier (high / medium / low) + reasons
+//                          * Impact + blast-radius (counts of dependents)
+//                          * Alternative approach (when one looks better)
+//   4. Replies + actions — threaded note replies, reply input, and the
+//                          full action bar (Edit / Delete / Mark applied /
+//                          Revert / View entity).
+//
+// Edit mode swaps the note body to a textarea + intent dropdown. Delete /
+// Mark applied / Revert all share the existing async helpers (deleteNote,
+// revertNote, plus the new updateNoteFields and markNoteApplied).
+
+function renderFocusedNoteDetail(note) {
+  if (!note) return;
   el.emptyDetail.classList.add("is-hidden");
   el.detail.classList.remove("is-hidden");
+
+  // Hide the schema-driven entity machinery — none of it applies to a
+  // pure note view. The header (kind / title / subtitle / status pill)
+  // stays since we use it to label the panel.
   el.detailTabs?.classList.add("is-hidden");
-  el.curatedForm?.classList.remove("is-hidden");
+  el.curatedForm?.classList.add("is-hidden");
   if (el.formHost) el.formHost.innerHTML = "";
   if (el.diffHost) el.diffHost.innerHTML = "";
-  el.detailKind.textContent = "general note";
-  el.detailTitle.textContent = note.scopeTitle || "Running notes";
-  el.detailSubtitle.textContent = note.createdAt ? formatDate(note.createdAt) : "Saved general note.";
-  el.detailStatus.textContent = note.intent || "feedback";
-  el.detailStatus.dataset.tone = note.appliedAt ? "active" : "draft";
-  el.fieldTitle.value = note.scopeTitle || "General admin note";
-  el.fieldStatus.value = "active";
-  el.fieldCategory.value = note.scopeType || "general";
-  el.fieldSort.value = "0";
-  el.fieldDescription.value = note.body || "";
-  if (el.fieldPayload) el.fieldPayload.value = JSON.stringify(note.snapshot ?? {}, null, 2);
-  el.contextNote.value = "";
-  el.contextNotes.innerHTML = "";
+  // Hide legacy quick-action buttons (Lock, Preview question, etc.).
+  document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
+  // Disable the "Save item" / "Promote" / etc. buttons that live in the
+  // edit pane's action bar — they don't apply here.
   el.promoteItem.disabled = true;
   el.duplicateItem.disabled = true;
   el.deleteItem.disabled = true;
-  el.saveItem.textContent = "Save general note";
-  el.saveNote.textContent = "Save note";
+  // The empty form's Save button is shared infrastructure; neutralize it.
+  el.saveItem.textContent = "Save";
+  el.saveItem.disabled = true;
+
+  // Header eyebrow + title + subtitle + status pill.
+  const intent = note.intent || "feedback";
+  const isApplied = !!note.appliedAt;
+  const isReverted = !!note.revertedAt;
+  el.detailKind.textContent = note.scopeType ? `${note.scopeType} note` : "general note";
+  el.detailTitle.textContent = note.scopeTitle || "General note";
+  const ts = formatDate(note.createdAt);
+  const meta = [`written ${ts}`];
+  if (isApplied) meta.push(`applied ${formatDate(note.appliedAt)}`);
+  if (isReverted) meta.push(`reverted ${formatDate(note.revertedAt)}`);
+  meta.push(`target: ${note.target || "claude"}`);
+  meta.push(`author: ${note.author || "tom"}`);
+  el.detailSubtitle.textContent = meta.join(" · ");
+  el.detailStatus.textContent = isReverted ? "reverted" : isApplied ? "applied" : intent;
+  el.detailStatus.dataset.tone = isReverted ? "cut" : isApplied ? "active" : "draft";
+
+  // Locate the entity (if scoped) so the entity preview + analysis can
+  // pull from its payload. Falls back to whatever's in note.snapshot.
+  const entityItem = noteCanJumpToEntity(note) ? locateLiveItemByScope(note) : null;
+  const analysis = analyzeNote(note, entityItem);
+
+  // Render the focused panel. Show the container (was hidden by default).
+  el.noteFocused?.classList.remove("is-hidden");
+  if (el.noteFocused) {
+    el.noteFocused.innerHTML = renderFocusedNotePanelHtml(note, entityItem, analysis);
+    attachFocusedNoteHandlers(note, entityItem, analysis);
+  }
+}
+
+function renderFocusedNotePanelHtml(note, entityItem, analysis) {
+  const intent = note.intent || "feedback";
+  const isApplied = !!note.appliedAt;
+  const isReverted = !!note.revertedAt;
+  const author = note.author || "tom";
+  const attachments = (note.snapshot?.attachment_urls || note.attachmentUrls || [])
+    .map((url) => `<img src="${escapeHtml(url)}" alt="attachment" class="admin-note-focused__attachment" />`)
+    .join("");
+
+  const replies = state.notes
+    .filter((n) => n.parentNoteId === note.id)
+    .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+
+  return `
+    <section class="admin-note-focused__body">
+      <header class="admin-note-focused__header">
+        <div class="admin-note-focused__header-pills">
+          <span class="admin-pill admin-pill--note" data-tone="${escapeHtml(intentTone(intent))}">${escapeHtml(intent)}</span>
+          ${author === "claude" ? `<span class="admin-pill admin-pill--note">claude</span>` : ""}
+          ${isReverted ? `<span class="admin-pill" data-tone="cut">reverted</span>` : isApplied ? `<span class="admin-pill" data-tone="active">applied</span>` : ""}
+          ${note.scopeType ? `<span class="admin-pill admin-pill--note">on ${escapeHtml(note.scopeType)}</span>` : `<span class="admin-pill admin-pill--note">general</span>`}
+        </div>
+        <div class="admin-note-focused__header-actions">
+          ${noteFocusedActionsHtml(note, entityItem)}
+        </div>
+      </header>
+
+      <!-- 1. Note body — read-only by default, swaps to textarea via Edit. -->
+      <div class="admin-note-focused__section" data-note-section="body">
+        <div class="admin-note-focused__section-head">
+          <h4>Note</h4>
+        </div>
+        <div data-note-body-display>
+          <pre class="admin-note-focused__body-text">${escapeHtml(note.body || "(empty)")}</pre>
+          ${attachments ? `<div class="admin-note-focused__attachments">${attachments}</div>` : ""}
+        </div>
+        <form class="admin-note-focused__edit is-hidden" data-note-edit-form>
+          <label class="admin-note-focused__edit-row">
+            <span>Body</span>
+            <textarea data-note-edit-body rows="6">${escapeHtml(note.body || "")}</textarea>
+          </label>
+          <div class="admin-note-focused__edit-grid">
+            <label>
+              <span>Intent</span>
+              <select data-note-edit-intent>
+                ${["feedback","change_request","proposal_add","proposal_delete","bug","idea","question_for_claude"]
+                  .map((v) => `<option value="${v}" ${intent === v ? "selected" : ""}>${v.replace(/_/g, " ")}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <label>
+              <span>Target</span>
+              <select data-note-edit-target>
+                ${["claude","codex","both"].map((v) => `<option value="${v}" ${(note.target || "claude") === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="admin-note-focused__edit-actions">
+            <button type="submit" class="admin-button admin-button--primary admin-button--small" data-note-edit-save>Save</button>
+            <button type="button" class="admin-button admin-button--ghost admin-button--small" data-note-edit-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 2. Entity preview — only when scoped to a known entity. -->
+      ${entityItem ? `
+        <div class="admin-note-focused__section">
+          <div class="admin-note-focused__section-head">
+            <h4>Entity this note is on</h4>
+            <button type="button" class="admin-button admin-button--ghost admin-button--small" data-note-view-entity>View ${escapeHtml(note.scopeType)} →</button>
+          </div>
+          ${entityPreviewCardHtml(entityItem, note)}
+        </div>
+      ` : note.scopeType && note.scopeType !== "general" ? `
+        <div class="admin-note-focused__section">
+          <div class="admin-note-focused__section-head">
+            <h4>Entity this note is on</h4>
+          </div>
+          <div class="admin-note-focused__entity admin-note-focused__entity--orphaned">
+            <strong>Entity not found in current admin data.</strong>
+            <p class="admin-muted">
+              Scope: <code>${escapeHtml(note.scopeType)}</code> · id: <code>${escapeHtml(note.scopeId || "(none)")}</code>.
+              The entity may have been renamed, deleted, or this note predates the current snapshot.
+              The note's <code>snapshot</code> field still carries what the entity looked like when the note was written.
+            </p>
+            <details class="admin-note-focused__snapshot">
+              <summary>Show captured snapshot</summary>
+              <pre>${escapeHtml(JSON.stringify(note.snapshot ?? {}, null, 2))}</pre>
+            </details>
+          </div>
+        </div>
+      ` : ""}
+
+      <!-- 3. Claude's analysis. -->
+      <div class="admin-note-focused__section admin-note-focused__section--analysis">
+        <div class="admin-note-focused__section-head">
+          <h4>Analysis</h4>
+          <span class="admin-muted admin-note-focused__analysis-source">Heuristic. Cross-references current admin data.</span>
+        </div>
+        ${analysisCardHtml(analysis)}
+      </div>
+
+      <!-- 4. Replies + reply input. -->
+      <div class="admin-note-focused__section">
+        <div class="admin-note-focused__section-head">
+          <h4>Replies <span class="admin-muted">${replies.length}</span></h4>
+        </div>
+        ${replies.length ? `<div class="admin-note-focused__replies">${replies.map((r) => renderNoteCard(r, 1)).join("")}</div>` : `<p class="admin-muted admin-note-focused__empty-replies">No replies yet. Add one below to capture follow-up context or a question.</p>`}
+        <form class="admin-note-focused__reply" data-note-reply-form>
+          <textarea data-note-reply-body rows="3" placeholder="Reply to this note. Useful for clarifying questions, follow-up context, or Claude's draft answer."></textarea>
+          <div class="admin-note-focused__reply-actions">
+            <button type="submit" class="admin-button admin-button--primary admin-button--small" data-note-reply-save>Post reply</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+function noteFocusedActionsHtml(note, entityItem) {
+  const isApplied = !!note.appliedAt;
+  const isReverted = !!note.revertedAt;
+  const buttons = [];
+  // Edit — always available, even on applied notes (in case Tom wants
+  // to amend the body after the fact). The save path stamps an
+  // edited_at field (TBD) but for now we just rewrite body/intent.
+  buttons.push(`<button type="button" class="admin-button admin-button--secondary admin-button--small" data-note-edit-toggle title="Inline-edit the body, intent, and target.">Edit</button>`);
+  // Mark applied — only when not yet applied + not reverted. Useful for
+  // cases where Tom resolved a note manually outside Claude's workflow.
+  if (!isApplied && !isReverted) {
+    buttons.push(`<button type="button" class="admin-button admin-button--secondary admin-button--small" data-note-mark-applied title="Mark this note resolved without going through a Claude session. Stamps applied_at = now and applied_commit = 'manual'.">Mark applied</button>`);
+  }
+  // Revert — only on already-applied notes.
+  if (isApplied && !isReverted) {
+    buttons.push(`<button type="button" class="admin-button admin-button--secondary admin-button--small" data-note-revert title="Mark this applied change as reverted. Claude reads this on next session as undo instructions.">Revert</button>`);
+  }
+  // Delete — only when NOT applied (audit-trail rule preserved).
+  if (!isApplied) {
+    buttons.push(`<button type="button" class="admin-button admin-button--ghost admin-button--small admin-button--danger" data-note-delete title="Hard-delete this note. Replies cascade. Use Revert instead for applied notes.">Delete</button>`);
+  }
+  return buttons.join("");
+}
+
+function attachFocusedNoteHandlers(note, entityItem, analysis) {
+  const root = el.noteFocused;
+  if (!root) return;
+
+  // Edit toggle.
+  root.querySelector("[data-note-edit-toggle]")?.addEventListener("click", () => {
+    root.querySelector("[data-note-body-display]")?.classList.add("is-hidden");
+    root.querySelector("[data-note-edit-form]")?.classList.remove("is-hidden");
+    root.querySelector("[data-note-edit-body]")?.focus();
+  });
+  root.querySelector("[data-note-edit-cancel]")?.addEventListener("click", () => {
+    root.querySelector("[data-note-edit-form]")?.classList.add("is-hidden");
+    root.querySelector("[data-note-body-display]")?.classList.remove("is-hidden");
+  });
+  root.querySelector("[data-note-edit-form]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = root.querySelector("[data-note-edit-body]")?.value?.trim() || "";
+    const intent = root.querySelector("[data-note-edit-intent]")?.value || "feedback";
+    const target = root.querySelector("[data-note-edit-target]")?.value || "claude";
+    if (!body) {
+      alert("Note body can't be empty.");
+      return;
+    }
+    await updateNoteFields(note.id, { body, intent, target });
+  });
+
+  // Mark applied / Revert / Delete.
+  root.querySelector("[data-note-mark-applied]")?.addEventListener("click", async () => {
+    if (!confirm("Mark this note as applied? Stamps applied_at = now + applied_commit = 'manual'. Useful when you resolved the change outside a Claude session.")) return;
+    await markNoteApplied(note.id);
+  });
+  root.querySelector("[data-note-revert]")?.addEventListener("click", async () => {
+    await revertNote(note.id);
+    // Re-render the focused panel to pick up the reverted state.
+    const fresh = state.notes.find((n) => n.id === note.id);
+    if (fresh) renderFocusedNoteDetail(fresh);
+  });
+  root.querySelector("[data-note-delete]")?.addEventListener("click", async () => {
+    await deleteNote(note.id);
+    // deleteNote re-renders the notes view; clear selection so the
+    // empty-state shows.
+    if (state.notes.every((n) => n.id !== note.id)) {
+      state.selected = null;
+      el.noteFocused?.classList.add("is-hidden");
+      el.detail.classList.add("is-hidden");
+      el.emptyDetail.classList.remove("is-hidden");
+    }
+  });
+
+  // View entity escape-hatch.
+  root.querySelector("[data-note-view-entity]")?.addEventListener("click", () => {
+    if (!entityItem) return;
+    const targetView = viewIdForType(note.scopeType);
+    state.view = targetView;
+    state.selected = entityItem;
+    render();
+  });
+
+  // Reply form.
+  root.querySelector("[data-note-reply-form]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = root.querySelector("[data-note-reply-body]")?.value?.trim() || "";
+    if (!body) {
+      alert("Reply can't be empty.");
+      return;
+    }
+    await postNoteReply(note, body);
+  });
+}
+
+// Heuristic note analyzer. Inspects the note's intent + scope + body and
+// cross-references it against current admin data (state.notes,
+// state.adminItems, state.liveData) to produce:
+//
+//   {
+//     validity:    { tier: "high" | "medium" | "low", reasons: [string] },
+//     impact:      [string],            // bullet points
+//     blastRadius: { label: string, count: number }[],
+//     alternative: { headline: string, body: string } | null,
+//   }
+//
+// All counts are computed off the data already loaded into state — no
+// extra DB calls. This is intentionally a heuristic engine, not an LLM
+// call: deterministic, fast, runs offline. The analyzer can be upgraded
+// later to also call an edge function if Tom wants live AI analysis.
+function analyzeNote(note, entityItem) {
+  const intent = note.intent || "feedback";
+  const body = (note.body || "").toLowerCase();
+  const wordCount = (body.match(/\S+/g) || []).length;
+  const reasons = [];
+  const impact = [];
+  const blastRadius = [];
+  let alternative = null;
+  let tier = "medium";
+
+  // --- Validity heuristics ---
+  // Low signal: very short body OR no scope OR empty.
+  if (wordCount < 6) {
+    tier = "low";
+    reasons.push(`Body is short (${wordCount} word${wordCount === 1 ? "" : "s"}). Concrete asks usually run 20+ words with file paths or specific values.`);
+  } else if (wordCount > 35) {
+    reasons.push(`Body has ${wordCount} words — substantive enough to act on.`);
+  }
+  if (!note.scopeType || note.scopeType === "general") {
+    reasons.push("No entity scope — Claude has to infer where this lands. Scoped notes are easier to apply mechanically.");
+    if (tier !== "low") tier = "medium";
+  } else {
+    reasons.push(`Scoped to a ${note.scopeType} (${note.scopeTitle || note.scopeId || "—"}). Snapshot captured on save.`);
+  }
+  // Specific signals — file paths, code references, before/after values.
+  if (/\.(swift|ts|tsx|js|md|sql|json)\b/.test(body) || /[A-Z][a-zA-Z0-9]+\.swift/.test(note.body || "")) {
+    reasons.push("Mentions specific file paths — easier for Claude to find the right place.");
+    if (tier === "low") tier = "medium";
+    else tier = "high";
+  }
+  if (/\bbefore:|\bafter:|\bfrom:|\bto:|→|->/.test(body)) {
+    reasons.push("Includes before/after or transformation hints — mechanical fix possible.");
+    if (tier !== "high") tier = "high";
+  }
+  if (note.proposedDiff) {
+    reasons.push("Has a structured proposed_diff — fully mechanical.");
+    tier = "high";
+  }
+  if (note.appliedAt) {
+    reasons.push(`Already applied ${formatDate(note.appliedAt)}${note.appliedCommit ? ` (commit ${note.appliedCommit.slice(0, 7)})` : ""}. No further action needed unless reverted.`);
+  }
+
+  // --- Intent-specific impact + alternatives ---
+  switch (intent) {
+    case "change_request": {
+      impact.push("Claude reads this on next session start and applies the requested change.");
+      if (entityItem) {
+        const t = entityItem.payload || {};
+        if (note.scopeType === "task" || note.scopeType === "handyman" || note.scopeType === "recommended") {
+          if (t.bundleId && t.bundleTitle) {
+            impact.push(`This is a bundle PARENT (${escapeHtml(t.bundleTitle)}). Editing it changes the homeowner-facing visit name, not just one row.`);
+            alternative = {
+              headline: "Edit the bundle parent vs. all children",
+              body: "If the change is just a copy tweak, edit the parent. If it's structural (e.g. dropping a child item), edit the children list directly so the bundle's notes-checklist stays in sync.",
+            };
+          } else if (t.bundleId) {
+            impact.push(`Bundle child of ${escapeHtml(t.bundleId)} — homeowners never see this row directly. Edits surface in the parent visit's "What's included:" checklist.`);
+          }
+          if (t.requiredSubtypes?.length) {
+            impact.push(`Gated on requiredSubtypes: ${t.requiredSubtypes.map(escapeHtml).join(", ")}. Only households satisfying these flags receive this template.`);
+          }
+          if (t.assignmentType) {
+            impact.push(`Assignment type: ${escapeHtml(t.assignmentType)}. ${
+              t.assignmentType === "vendor"
+                ? "Always pro — gas, panel, septic, generator. Reframed at runtime to 'Schedule [Vendor]: …'."
+                : t.assignmentType === "personal"
+                ? "DIY only. Hard floor — Q36 preference tier can't flip it."
+                : "Defaults to personal but Q36 + delegation sheet can flip to vendor."
+            }`);
+          }
+        } else if (note.scopeType === "routine") {
+          impact.push("Routine changes propagate to every existing routine_visit and to any maintenance_tasks parented under it.");
+        } else if (note.scopeType === "question") {
+          impact.push("Quiz question changes affect every property's house_quiz_state on next quiz reopen. Existing answers may need a hydration shim.");
+        } else if (note.scopeType === "system") {
+          impact.push("System category changes affect SystemCategoryRegistry + every home_systems row that matched on the old key.");
+        }
+      } else {
+        impact.push("Without a scoped entity, Claude has to infer the target from the body. Add a scope on the entity's detail panel for a cleaner apply.");
+      }
+      // Body keyword detection.
+      if (/delete|remove|drop|cut|kill/.test(body)) {
+        impact.push("Body suggests a DELETE/CUT — review the dependents in the entity preview before applying.");
+      }
+      if (/rename|relabel|reword|change.*to/.test(body)) {
+        impact.push("Body suggests a RENAME — Claude will preserve stableId / templateKey if relevant so existing rows don't get duplicated.");
+      }
+      if (/merge|combine|fold/.test(body)) {
+        impact.push("Body suggests a MERGE — Claude will keep the more-recent / better-described row and archive the other.");
+      }
+      break;
+    }
+    case "proposal_add": {
+      impact.push("Claude evaluates the proposal next session and creates the new entity if it survives review.");
+      if (note.scopeType && entityItem) {
+        impact.push(`Proposal anchored on existing ${escapeHtml(note.scopeType)} — useful as a sibling/template reference.`);
+      }
+      // Look for similar existing entities to suggest a merge.
+      if (state.adminItems.length && note.body) {
+        const tokens = (note.body || "").toLowerCase().split(/\s+/).filter((t) => t.length > 4);
+        const candidates = state.adminItems
+          .filter((i) => i.id !== note.scopeId)
+          .map((i) => {
+            const title = (i.title || "").toLowerCase();
+            const overlap = tokens.filter((t) => title.includes(t)).length;
+            return { item: i, overlap };
+          })
+          .filter((c) => c.overlap >= 3)
+          .sort((a, b) => b.overlap - a.overlap)
+          .slice(0, 3);
+        if (candidates.length) {
+          alternative = {
+            headline: "Similar existing entities — consider merging",
+            body: `Found ${candidates.length} entity title${candidates.length === 1 ? "" : "s"} with token overlap: ${candidates.map((c) => `"${c.item.title}"`).join(", ")}. If the proposed addition is a near-duplicate of one of these, an edit is cheaper than a new entity.`,
+          };
+        }
+      }
+      break;
+    }
+    case "proposal_delete": {
+      if (entityItem) {
+        const t = entityItem.payload || {};
+        if (note.scopeType === "task" || note.scopeType === "recommended" || note.scopeType === "handyman") {
+          if (t.bundleId && t.bundleTitle) {
+            // Bundle parent
+            const childCount = state.adminItems.filter((i) => i.payload?.bundleId === t.bundleId && !i.payload?.bundleTitle).length;
+            impact.push(`Deleting this bundle parent would orphan ${childCount} bundle child template${childCount === 1 ? "" : "s"}.`);
+            blastRadius.push({ label: "bundle children orphaned", count: childCount });
+            alternative = {
+              headline: "Archive the bundle, don't delete it",
+              body: `Setting isEssential: false on the parent stops auto-seeding while keeping the children intact. Existing households keep their already-scheduled bundle tasks.`,
+            };
+            tier = tier === "high" ? "medium" : tier; // delete-with-children isn't high signal
+          } else {
+            impact.push("Single template delete — homeowner schedules will skip this on next reconcile.");
+          }
+        } else if (note.scopeType === "question") {
+          impact.push("Deleting a quiz question silently changes the quiz progress numbers for every in-flight household.");
+          alternative = {
+            headline: "Hide before delete",
+            body: "Set the question to status: 'cut' first so it stops appearing in the quiz but the answers stay readable for analytics. Hard delete on next migration.",
+          };
+        }
+      }
+      impact.push("Hard delete is irreversible. The audit trail (this note) is the only record of why.");
+      break;
+    }
+    case "bug": {
+      impact.push("Claude treats this as a defect to reproduce and fix on next session.");
+      if (note.attachmentUrls?.length || note.snapshot?.attachment_urls?.length) {
+        reasons.push("Has screenshot attachments — high signal.");
+        if (tier !== "high") tier = "high";
+      } else {
+        reasons.push("No screenshot attached — adding one improves repro.");
+      }
+      if (entityItem) {
+        impact.push(`Reproduction surface: ${escapeHtml(note.scopeType)} → ${escapeHtml(entityItem.title || note.scopeTitle || "—")}.`);
+      }
+      break;
+    }
+    case "idea": {
+      impact.push("Long-horizon. Saved for later review — Claude won't act on this next session.");
+      tier = "medium";
+      break;
+    }
+    case "question_for_claude": {
+      impact.push("Claude responds via a reply on this note before any code change.");
+      if (note.appliedAt) {
+        impact.push("Already answered (applied_at set).");
+      }
+      tier = "high";
+      break;
+    }
+    case "feedback":
+    default: {
+      impact.push("Observation only. No mechanical change unless followed up with a change_request note.");
+      tier = tier === "high" ? "medium" : tier; // feedback is rarely high signal
+      break;
+    }
+  }
+
+  // --- Blast radius (notes + cross-references) ---
+  // Notes already on this entity (siblings).
+  if (note.scopeId) {
+    const siblings = state.notes.filter((n) => n.scopeId === note.scopeId && n.id !== note.id && !n.parentNoteId);
+    if (siblings.length) blastRadius.push({ label: `other notes on this entity`, count: siblings.length });
+  }
+  // Replies on this note.
+  const replyCount = state.notes.filter((n) => n.parentNoteId === note.id).length;
+  if (replyCount) blastRadius.push({ label: `replies`, count: replyCount });
+  // Templates sharing systemCategory (for task / recommended / handyman scopes).
+  if (entityItem?.payload?.systemCategory) {
+    const cat = entityItem.payload.systemCategory;
+    const same = state.adminItems.filter((i) => i.payload?.systemCategory === cat && i.id !== entityItem.id).length;
+    if (same) blastRadius.push({ label: `other templates in ${cat}`, count: same });
+  }
+  // Bundle siblings.
+  if (entityItem?.payload?.bundleId) {
+    const bundle = entityItem.payload.bundleId;
+    const siblings = state.adminItems.filter((i) => i.payload?.bundleId === bundle && i.id !== entityItem.id).length;
+    if (siblings) blastRadius.push({ label: `bundle siblings (${bundle})`, count: siblings });
+  }
+
+  return { validity: { tier, reasons }, impact, blastRadius, alternative };
+}
+
+function entityPreviewCardHtml(item, note) {
+  const t = item.payload || {};
+  const rows = [];
+  const push = (k, v) => {
+    if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) return;
+    const display = Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "yes" : "no") : String(v);
+    rows.push(`<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(display)}</dd>`);
+  };
+  push("title", item.title);
+  push("status", item.status);
+  push("category", item.category);
+  // Type-specific fields.
+  if (note.scopeType === "task" || note.scopeType === "handyman" || note.scopeType === "recommended") {
+    push("templateKey", t.templateKey);
+    push("frequency", t.frequency);
+    push("seasonalTiming", t.seasonalTiming);
+    push("assignmentType", t.assignmentType);
+    push("isEssential", t.isEssential !== false);
+    push("requiredSubtypes", t.requiredSubtypes);
+    push("bundleId", t.bundleId);
+    push("bundleTitle", t.bundleTitle);
+    push("diyEffortMinutes", t.diyEffortMinutes);
+    push("safetyFloor", t.safetyFloor);
+  } else if (note.scopeType === "routine") {
+    push("routine_kind", t.routineKind || t.routine_kind);
+    push("cadence", t.cadenceType || t.cadence_type);
+    push("active_months", t.activeMonths || t.active_months);
+    push("setup_state", t.setupState || t.setup_state);
+  } else if (note.scopeType === "question") {
+    push("questionId", t.questionId || t.id);
+    push("kind", t.kind);
+    push("prompt", t.prompt || t.text);
+    if (t.options?.length) push("options", t.options.length + " options");
+  } else if (note.scopeType === "system") {
+    push("categoryKey", t.categoryKey);
+    push("tier", t.tier);
+    push("priority", t.priority);
+  } else if (note.scopeType === "vehicle") {
+    push("make", t.make);
+    push("model", t.model);
+    push("year", t.year);
+  } else if (note.scopeType === "prompt") {
+    push("functionName", t.functionName);
+    push("description", t.description);
+  }
+  return `
+    <div class="admin-note-focused__entity">
+      <strong>${escapeHtml(item.title || note.scopeTitle || "—")}</strong>
+      ${item.description ? `<p class="admin-muted admin-note-focused__entity-desc">${escapeHtml(item.description)}</p>` : ""}
+      <dl class="admin-note-focused__entity-fields">
+        ${rows.join("")}
+      </dl>
+    </div>
+  `;
+}
+
+function analysisCardHtml(analysis) {
+  const tierLabel = { high: "High signal", medium: "Medium signal", low: "Low signal" }[analysis.validity.tier] || "Medium signal";
+  const tierTone = { high: "active", medium: "draft", low: "cut" }[analysis.validity.tier] || "draft";
+  return `
+    <div class="admin-note-focused__analysis">
+      <div class="admin-note-focused__analysis-row">
+        <strong>Validity</strong>
+        <span class="admin-pill" data-tone="${escapeHtml(tierTone)}">${escapeHtml(tierLabel)}</span>
+      </div>
+      ${analysis.validity.reasons.length ? `
+        <ul class="admin-note-focused__analysis-list">
+          ${analysis.validity.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}
+        </ul>
+      ` : ""}
+
+      ${analysis.impact.length ? `
+        <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block">
+          <strong>If applied</strong>
+          <ul class="admin-note-focused__analysis-list">
+            ${analysis.impact.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}
+          </ul>
+        </div>
+      ` : ""}
+
+      ${analysis.blastRadius.length ? `
+        <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block">
+          <strong>Blast radius</strong>
+          <div class="admin-note-focused__blast">
+            ${analysis.blastRadius.map((b) => `
+              <span class="admin-note-focused__blast-pill">
+                <strong>${b.count}</strong>
+                <span>${escapeHtml(b.label)}</span>
+              </span>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
+
+      ${analysis.alternative ? `
+        <div class="admin-note-focused__analysis-row admin-note-focused__analysis-row--block admin-note-focused__alternative">
+          <strong>Better approach?</strong>
+          <p><strong>${escapeHtml(analysis.alternative.headline)}</strong></p>
+          <p class="admin-muted">${escapeHtml(analysis.alternative.body)}</p>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function intentTone(intent) {
+  return (
+    {
+      change_request: "active",
+      proposal_add: "active",
+      proposal_delete: "cut",
+      bug: "cut",
+      idea: "draft",
+      question_for_claude: "reshape",
+      feedback: "draft",
+    }[intent] || "draft"
+  );
+}
+
+// Phase 5z+9 — Update an existing note's body / intent / target inline.
+// Used by the focused panel's Edit form. Cloud writes go through the
+// admin_codex_notes UPDATE; local fallback rewrites the in-memory store.
+async function updateNoteFields(noteId, patch) {
+  if (!noteId) return;
+  if (state.storageMode === "cloud") {
+    try {
+      const { data, error } = await supabase
+        .from("admin_codex_notes")
+        .update({
+          body: patch.body,
+          intent: patch.intent,
+          target: patch.target,
+        })
+        .eq("id", noteId)
+        .select("*")
+        .single();
+      if (error) throw error;
+      state.notes = state.notes.map((n) => (n.id === noteId ? dbNoteToUi(data) : n));
+    } catch (error) {
+      alert(`Save failed: ${error.message}`);
+      return;
+    }
+  } else {
+    state.notes = state.notes.map((n) => (n.id === noteId ? { ...n, body: patch.body, intent: patch.intent, target: patch.target } : n));
+    writeLocal(LOCAL_NOTES_KEY, state.notes);
+  }
+  // Re-render notes list + focused panel.
+  if (state.view === "notes") {
+    const fresh = state.notes.find((n) => n.id === noteId);
+    if (fresh) state.selected = fresh;
+    renderNotesView();
+  }
+}
+
+// Phase 5z+9 — Manually mark a note as applied. Stamps applied_at = now,
+// applied_commit = "manual" so syncing scripts can distinguish from
+// scripted-applies. Used when Tom resolves a note outside Claude.
+async function markNoteApplied(noteId) {
+  if (!noteId) return;
+  const stamp = new Date().toISOString();
+  if (state.storageMode === "cloud") {
+    try {
+      const { data, error } = await supabase
+        .from("admin_codex_notes")
+        .update({ applied_at: stamp, applied_commit: "manual" })
+        .eq("id", noteId)
+        .select("*")
+        .single();
+      if (error) throw error;
+      state.notes = state.notes.map((n) => (n.id === noteId ? dbNoteToUi(data) : n));
+    } catch (error) {
+      alert(`Mark applied failed: ${error.message}`);
+      return;
+    }
+  } else {
+    state.notes = state.notes.map((n) => (n.id === noteId ? { ...n, appliedAt: stamp, appliedCommit: "manual" } : n));
+    writeLocal(LOCAL_NOTES_KEY, state.notes);
+  }
+  if (state.view === "notes") {
+    const fresh = state.notes.find((n) => n.id === noteId);
+    if (fresh) state.selected = fresh;
+    renderNotesView();
+  }
+}
+
+// Phase 5z+9 — Post a reply to a parent note from inside the focused
+// panel. Reuses the existing writeNote helper so scope/snapshot/etc
+// stay consistent with how the entity-pane reply flow works.
+async function postNoteReply(parent, body) {
+  if (!parent || !body) return;
+  await writeNote({
+    parentNoteId: parent.id,
+    scopeType: parent.scopeType,
+    scopeId: parent.scopeId,
+    scopeTitle: parent.scopeTitle,
+    body,
+    intent: "feedback",
+    target: parent.target || "claude",
+    snapshot: parent.snapshot ?? {},
+  });
+  if (state.view === "notes") {
+    renderNotesView();
+  }
 }
 
 function renderContextNotes(item) {
@@ -4417,8 +5109,20 @@ async function revertNote(noteId) {
       .single();
     if (error) throw error;
     state.notes = state.notes.map((n) => (n.id === noteId ? dbNoteToUi(data) : n));
-    if (state.selected) renderContextNotes(state.selected);
-    else renderActivityView();
+    // Phase 5z+9 — view-aware refresh. The legacy code called
+    // renderContextNotes(state.selected) which only works when
+    // state.selected is an ENTITY. On the Notes tab state.selected is
+    // a NOTE, so we re-route to renderNotesView (which re-opens the
+    // focused panel via state.selected = fresh note).
+    if (state.view === "notes") {
+      const fresh = state.notes.find((n) => n.id === noteId);
+      if (fresh) state.selected = fresh;
+      renderNotesView();
+    } else if (state.selected) {
+      renderContextNotes(state.selected);
+    } else {
+      renderActivityView();
+    }
   } catch (error) {
     alert(`Revert failed: ${error.message}`);
   }
@@ -5294,8 +5998,36 @@ function filterItems(items) {
 
 async function createNewItem() {
   if (state.view === "notes") {
+    // Phase 5z+9 — Explicitly open the curated form for general-note
+    // creation. Pre-5z+9 this just hid the detail panel and focused
+    // a hidden textarea (broken UX). Now it shows the form pre-cleared
+    // so Tom can type a body + intent and click Save.
     state.selected = null;
     renderNotesView();
+    el.emptyDetail.classList.add("is-hidden");
+    el.detail.classList.remove("is-hidden");
+    el.detailTabs?.classList.add("is-hidden");
+    el.curatedForm?.classList.remove("is-hidden");
+    el.noteFocused?.classList.add("is-hidden");
+    document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
+    if (el.formHost) el.formHost.innerHTML = "";
+    if (el.diffHost) el.diffHost.innerHTML = "";
+    el.detailKind.textContent = "new general note";
+    el.detailTitle.textContent = "Add a general note";
+    el.detailSubtitle.textContent = "Use this for unscoped reflections and admin-lab observations. To attach a note to a quiz question, template, system, or routine, open that entity's detail panel.";
+    el.detailStatus.textContent = "draft";
+    el.detailStatus.dataset.tone = "draft";
+    el.fieldTitle.value = "";
+    el.fieldStatus.value = "active";
+    el.fieldCategory.value = "general";
+    el.fieldSort.value = "0";
+    el.fieldDescription.value = "";
+    if (el.fieldPayload) el.fieldPayload.value = "{}";
+    el.saveItem.textContent = "Save general note";
+    el.saveItem.disabled = false;
+    el.promoteItem.disabled = true;
+    el.duplicateItem.disabled = true;
+    el.deleteItem.disabled = true;
     el.fieldDescription.focus();
     return;
   }
@@ -5965,6 +6697,11 @@ async function writeNote(note) {
           author: full.author,
           proposed_diff: full.proposedDiff ?? null,
           attachment_urls: attachmentUrls,
+          // Phase 5z+9 — thread replies via parent_note_id. Was
+          // previously not part of the insert payload, which meant
+          // replies were silently dropped on the client side. The
+          // focused note panel's reply form depends on this.
+          parent_note_id: full.parentNoteId ?? null,
         })
         .select("*")
         .single();

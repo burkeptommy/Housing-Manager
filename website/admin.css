@@ -4688,3 +4688,351 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =============================================================================
+   Phase 5z+9 — Focused note panel (Notes tab → click a row)
+   =============================================================================
+   Renders inside the admin-detail panel when a note is selected. Replaces
+   the legacy "click a note → jump to entity" behavior with a focused
+   note view that surfaces the body, entity preview, Claude analysis,
+   and inline edit/delete/applied/revert/reply controls in one place. */
+
+.admin-note-focused {
+  display: block;
+}
+
+.admin-note-focused__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-note-focused__header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--neutral-200);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding-bottom: 12px;
+}
+
+.admin-note-focused__header-pills {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-note-focused__header-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-note-focused__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-note-focused__section--analysis {
+  background: rgba(69, 58, 112, 0.03);
+  border: 1px solid rgba(69, 58, 112, 0.12);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.admin-note-focused__section-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.admin-note-focused__section-head h4 {
+  color: var(--text);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.admin-note-focused__analysis-source {
+  font-size: 11px;
+}
+
+.admin-note-focused__body-text {
+  background: rgba(69, 58, 112, 0.04);
+  border-radius: 10px;
+  color: var(--text);
+  font: 500 14px/1.55 var(--sans);
+  margin: 0;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.admin-note-focused__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-note-focused__attachment {
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  height: 96px;
+  object-fit: cover;
+  width: 96px;
+}
+
+/* Inline edit form */
+.admin-note-focused__edit {
+  background: rgba(237, 105, 85, 0.04);
+  border: 1px solid rgba(237, 105, 85, 0.18);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.admin-note-focused__edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-note-focused__edit-row span,
+.admin-note-focused__edit-grid span {
+  color: var(--text-soft);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-note-focused__edit-row textarea {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 500 14px/1.5 var(--sans);
+  min-height: 120px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.admin-note-focused__edit-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.admin-note-focused__edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-note-focused__edit-grid select {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 500 13px var(--sans);
+  padding: 8px 10px;
+}
+
+.admin-note-focused__edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Entity preview card */
+.admin-note-focused__entity {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.admin-note-focused__entity strong {
+  display: block;
+  font: 700 14px var(--sans);
+  margin-bottom: 4px;
+}
+
+.admin-note-focused__entity-desc {
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+
+.admin-note-focused__entity-fields {
+  display: grid;
+  font: 500 12px var(--sans);
+  gap: 4px 14px;
+  grid-template-columns: max-content 1fr;
+  margin: 0;
+}
+
+.admin-note-focused__entity-fields dt {
+  color: var(--text-soft);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-note-focused__entity-fields dd {
+  color: var(--text);
+  margin: 0;
+  word-wrap: break-word;
+}
+
+.admin-note-focused__entity--orphaned {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  border-style: dashed;
+}
+
+.admin-note-focused__entity--orphaned strong {
+  color: var(--text-muted);
+}
+
+.admin-note-focused__snapshot summary {
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  letter-spacing: 0.04em;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+.admin-note-focused__snapshot pre {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  font: 500 11px/1.4 var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  margin-top: 6px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 10px;
+}
+
+/* Analysis card sub-rows */
+.admin-note-focused__analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-note-focused__analysis-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-note-focused__analysis-row--block {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-note-focused__analysis-row strong {
+  color: var(--text);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-note-focused__analysis-list {
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.admin-note-focused__analysis-list li {
+  margin-bottom: 4px;
+}
+
+.admin-note-focused__analysis-list li:last-child {
+  margin-bottom: 0;
+}
+
+.admin-note-focused__blast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-note-focused__blast-pill {
+  align-items: baseline;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  display: inline-flex;
+  font: 500 12px var(--sans);
+  gap: 6px;
+  padding: 4px 12px;
+}
+
+.admin-note-focused__blast-pill strong {
+  color: var(--indigo-700);
+  font: 700 13px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-note-focused__alternative {
+  background: rgba(74, 124, 89, 0.06);
+  border: 1px solid rgba(74, 124, 89, 0.18);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.admin-note-focused__alternative p {
+  font: 500 13px/1.5 var(--sans);
+  margin: 4px 0 0;
+}
+
+.admin-note-focused__alternative p:first-of-type {
+  margin: 0;
+}
+
+/* Replies + reply form */
+.admin-note-focused__replies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-note-focused__empty-replies {
+  font-size: 13px;
+  margin: 0;
+}
+
+.admin-note-focused__reply {
+  background: rgba(69, 58, 112, 0.03);
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.admin-note-focused__reply textarea {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 500 14px/1.5 var(--sans);
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.admin-note-focused__reply-actions {
+  display: flex;
+  justify-content: flex-end;
+}
