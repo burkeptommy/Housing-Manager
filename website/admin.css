@@ -5231,3 +5231,141 @@
 .admin-search__clear:hover {
   background: rgba(0, 0, 0, 0.1);
 }
+
+/* =============================================================================
+   Phase 5z+11 — Compact filter bar with dropdown buttons + popovers
+   ============================================================================= */
+.admin-facet-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-facet-dd {
+  position: relative;
+}
+
+.admin-facet-dd__trigger {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font: 600 13px var(--sans);
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.admin-facet-dd__trigger:hover {
+  background: rgba(69, 58, 112, 0.04);
+  border-color: rgba(69, 58, 112, 0.25);
+}
+
+.admin-facet-dd__trigger.is-active {
+  background: var(--indigo-700);
+  border-color: var(--indigo-700);
+  color: #fff;
+}
+
+.admin-facet-dd.is-open .admin-facet-dd__trigger {
+  border-color: var(--indigo-700);
+  box-shadow: 0 0 0 3px rgba(139, 125, 186, 0.16);
+}
+
+.admin-facet-dd__label {
+  color: var(--text-muted);
+  font: 600 11px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-facet-dd__trigger.is-active .admin-facet-dd__label {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.admin-facet-dd__value {
+  color: var(--text);
+  font: 600 13px var(--sans);
+}
+
+.admin-facet-dd__trigger.is-active .admin-facet-dd__value {
+  color: #fff;
+}
+
+.admin-facet-dd__count {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font: 700 11px var(--sans);
+  padding: 1px 7px;
+}
+
+.admin-facet-dd__trigger.is-active .admin-facet-dd__count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.admin-facet-dd__chevron {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.admin-facet-dd__trigger.is-active .admin-facet-dd__chevron {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.admin-facet-dd__popover {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(69, 58, 112, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  left: 0;
+  max-width: min(420px, calc(100vw - 32px));
+  min-width: 280px;
+  padding: 12px;
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 30;
+}
+
+.admin-facet-dd__popover[hidden] {
+  display: none;
+}
+
+.admin-facet-dd__caption {
+  font: 500 12px/1.45 var(--sans);
+  margin: 0;
+}
+
+.admin-facet-dd__pills {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-facet-bar__clear {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 600 13px var(--sans);
+  margin-left: 4px;
+  padding: 6px 10px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.admin-facet-bar__clear:hover {
+  color: var(--salmon-dark);
+}

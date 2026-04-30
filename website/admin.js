@@ -1820,14 +1820,131 @@ function attachTasksTabExplainerHandlers(host) {
 // grid: fixed-width label + caption on the left, wrapping pill row on
 // the right, so pills always start at the same x and never wrap into
 // the label column.
+// Phase 5z+11 — Cross-axis filter counts.
+//
+// Tom's bug report: "I have all (204) selected, then Summer (2), then
+// I click 'Bundled into visit (57)' but there are actually 0 for
+// bundled into visit. so we need to make sure based on what we select
+// we update these. also the routing math is broken — all says 204…
+// which all tasks should show as only 115 because we got rid of just
+// the handyman ones and moved them to the handyman tab by themselves."
+//
+// Returns per-axis counts that reflect:
+//   1. View-level exclusions (handyman items hidden on Tasks tab,
+//      search query, status filter) — every count is post-exclusion.
+//   2. Cross-axis filtering — each axis's counts reflect what's
+//      available given the OTHER axes' current selections. Click
+//      Summer and the Routing pills shift to the summer subset.
+//
+// Counts shape:
+//   { lifecycle: { all, auto_seed, opt_in, bundle_child, bundle_parent },
+//     season:    { all, Spring, Summer, Fall, Winter, "Spring/Fall", year_round },
+//     routing:   { all, vendor, vendor_or_handyman, handyman, homeowner_pull, bundled },
+//     handyman:  { all, spring, fall, library } }
+//
+// Default-active filter (lifecycleFilter='all' etc) means "no constraint"
+// when computing the OTHER axes. When computing axis A's own counts,
+// axis A is treated as if "all" is selected (so the pill values are
+// the achievable counts under every other current filter).
+function computeFacetCounts(items, view) {
+  const facetSurface = ["tasks", "handyman", "recommended"].includes(view);
+  const q = state.search.trim().toLowerCase();
+  // Apply view-level exclusions first (these never change when the user
+  // toggles facet pills — they're set by search / status / tab choice).
+  const baseFiltered = items.filter((item) => {
+    if (state.statusFilter !== "all" && effectiveStatus(item) !== state.statusFilter) return false;
+    if (view === "tasks" && isHandymanContextItem(item)) return false;
+    if (q) {
+      const hay = [item.title, item.category, item.description, JSON.stringify(item.payload ?? {})].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  // Apply every facet filter EXCEPT the one named in `skip`. Used so
+  // each axis's counts reflect the world filtered by every OTHER axis.
+  const applyExcept = (skip) => baseFiltered.filter((item) => {
+    // Bundle grouping is part of the facet pipeline. Skip when computing
+    // lifecycle counts so the bundle_child pill doesn't drop to 0 when
+    // grouping is on.
+    if (skip !== "lifecycle" && facetSurface && state.groupBundles && state.lifecycleFilter !== "bundle_child") {
+      const t = item.payload || {};
+      if (t.bundleId && !t.bundleTitle) return false;
+    }
+    if (skip !== "lifecycle" && state.lifecycleFilter !== "all" && lifecycleOf(item) !== state.lifecycleFilter) return false;
+    if (skip !== "season" && state.seasonFilter !== "all") {
+      const s = item.payload?.seasonalTiming;
+      if (state.seasonFilter === "year_round" && s) return false;
+      if (state.seasonFilter !== "year_round" && s !== state.seasonFilter) return false;
+    }
+    if (skip !== "routing" && state.routingFilter !== "all" && routingOf(item) !== state.routingFilter) return false;
+    if (skip !== "handyman" && view === "handyman" && state.handymanFilter !== "all" && handymanVisitOf(item) !== state.handymanFilter) return false;
+    return true;
+  });
+
+  // Lifecycle counts.
+  const lcCandidates = applyExcept("lifecycle");
+  const lifecycle = { all: lcCandidates.length, auto_seed: 0, opt_in: 0, bundle_child: 0, bundle_parent: 0 };
+  const bundleSizes = new Map();
+  for (const i of lcCandidates) {
+    const lc = lifecycleOf(i);
+    if (lifecycle[lc] !== undefined) lifecycle[lc]++;
+    if (i.payload?.bundleId) bundleSizes.set(i.payload.bundleId, (bundleSizes.get(i.payload.bundleId) || 0) + 1);
+  }
+  for (const size of bundleSizes.values()) if (size >= 2) lifecycle.bundle_parent++;
+
+  // Season counts.
+  const sCandidates = applyExcept("season");
+  const season = { all: sCandidates.length, Spring: 0, Summer: 0, Fall: 0, Winter: 0, "Spring/Fall": 0, year_round: 0 };
+  for (const i of sCandidates) {
+    const s = i.payload?.seasonalTiming;
+    if (!s) season.year_round++;
+    else if (season[s] !== undefined) season[s]++;
+    else season.year_round++;
+  }
+
+  // Routing counts.
+  const rCandidates = applyExcept("routing");
+  const routing = { all: rCandidates.length, vendor: 0, vendor_or_handyman: 0, handyman: 0, homeowner_pull: 0, bundled: 0 };
+  for (const i of rCandidates) {
+    const r = routingOf(i);
+    if (routing[r] !== undefined) routing[r]++;
+  }
+
+  // Handyman visit counts (only meaningful on the Handyman tab).
+  let handyman = { all: 0, spring: 0, fall: 0, library: 0 };
+  if (view === "handyman") {
+    const hCandidates = applyExcept("handyman");
+    handyman.all = hCandidates.length;
+    for (const i of hCandidates) {
+      const v = handymanVisitOf(i);
+      if (handyman[v] !== undefined) handyman[v]++;
+    }
+  }
+  return { lifecycle, season, routing, handyman };
+}
+
+// Phase 5z+11 — Compact filter bar. Replaces the four stacked rows of
+// pills (each ~80-100px tall) with a single horizontal row of dropdown
+// buttons. Each button shows the axis name + the active value (or
+// "All") + a small chevron. Clicking opens a popover with the pills
+// underneath; clicking a pill or outside dismisses the popover.
+//
+// The pre-5z+11 layout used ~400px of vertical real estate before any
+// list rows rendered. Tom: "is there a better way to view all the
+// filters we have? these are hard to look through." This one-row bar
+// matches Linear / GitHub / Stripe filter conventions: trigger buttons
+// for each axis, popovers for the values.
 function renderFacetPills(allItems) {
   if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
-  // Compute counts on the FULL view so pill counts stay stable across
-  // filter selections — same UX as Apple Mail / Linear.
-  const lifecycleCounts = countByLifecycle(allItems);
-  const seasonCounts = countBySeason(allItems);
-  const routingCounts = countByRouting(allItems);
+  // Phase 5z+11 — Use cross-axis-aware counts so picking Summer
+  // updates the Routing pills to "available given Summer", not globally.
+  const counts = computeFacetCounts(allItems, state.view);
+  const lifecycleCounts = counts.lifecycle;
+  const seasonCounts = counts.season;
+  const routingCounts = counts.routing;
 
+  // Helper: render a single pill inside a popover. Same data-attrs as
+  // before so attachFacetPillHandlers handles the click → state update.
   const pill = (axis, value, label, count, title = "") => {
     if (count === 0 && value !== "all") return "";
     const isActive = state[`${axis}Filter`] === value;
@@ -1837,119 +1954,199 @@ function renderFacetPills(allItems) {
     </button>`;
   };
 
-  const axisRow = (label, caption, pillsHtml) => `
-    <div class="admin-facet-row">
-      <div class="admin-facet-row__head">
-        <span class="admin-facet-row__label">${escapeHtml(label)}</span>
-        <span class="admin-facet-row__caption admin-muted">${caption}</span>
+  // Helper: render a dropdown button + popover for one axis.
+  // `axisKey` is just a unique id used to wire open/close; it doesn't
+  // need to match a state field.
+  // `activeCount` (optional) renders next to the active value as a
+  // small badge so Tom sees the bucket size at a glance.
+  const dropdown = (axisKey, label, activeLabel, isFiltered, caption, pillsHtml, activeCount) => {
+    return `
+      <div class="admin-facet-dd" data-facet-dd="${escapeHtml(axisKey)}">
+        <button type="button" class="admin-facet-dd__trigger ${isFiltered ? "is-active" : ""}" data-facet-dd-trigger="${escapeHtml(axisKey)}">
+          <span class="admin-facet-dd__label">${escapeHtml(label)}:</span>
+          <span class="admin-facet-dd__value">${activeLabel}</span>
+          ${typeof activeCount === "number" ? `<span class="admin-facet-dd__count">${activeCount}</span>` : ""}
+          <span class="admin-facet-dd__chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="admin-facet-dd__popover" data-facet-dd-popover="${escapeHtml(axisKey)}" hidden>
+          ${caption ? `<p class="admin-facet-dd__caption admin-muted">${caption}</p>` : ""}
+          <div class="admin-facet-dd__pills">${pillsHtml}</div>
+        </div>
       </div>
-      <div class="admin-facet-row__pills">${pillsHtml}</div>
-    </div>
-  `;
+    `;
+  };
 
-  // Phase 5s — Handyman-only "Visit" filter row at the top so the parent
-  // visits + their punch items + the library are clearly separated.
-  let handymanRow = "";
+  // Active-value labels for each axis (what the trigger button reads
+  // when something is filtered). Lookups use the same keys the data
+  // attributes use.
+  const seasonLabels = {
+    all: "All",
+    Spring: "🌷 Spring",
+    Summer: "☀️ Summer",
+    Fall: "🍂 Fall",
+    Winter: "❄️ Winter",
+    "Spring/Fall": "🔁 Spring/Fall",
+    year_round: "🔄 Year-round",
+  };
+  const lifecycleLabels = {
+    all: "All",
+    auto_seed: "Auto-seeds",
+    opt_in: "Opt-in",
+    bundle_child: "Bundle child",
+  };
+  const routingLabels = {
+    all: "All",
+    vendor: "Vendor",
+    vendor_or_handyman: "Vendor or Handyman",
+    handyman: "Handyman",
+    homeowner_pull: "I'll do it myself",
+    bundled: "Bundled into a visit",
+  };
+  const handymanLabels = {
+    all: "All",
+    spring: "🌷 Spring visit",
+    fall: "🍂 Fall visit",
+    library: "🛠️ Library",
+  };
+
+  // Build the dropdown buttons one axis at a time.
+  // Bundle grouping (every Tasks/Recommended/Handyman tab — toggle, not a list).
+  const bundleCount = (() => {
+    const seen = new Set();
+    for (const i of allItems) if (i.payload?.bundleId) seen.add(i.payload.bundleId);
+    return seen.size;
+  })();
+  const groupingLabel = state.groupBundles ? "Grouped" : "Flat";
+  const groupingPills = `
+    <button type="button" class="admin-facet-pill ${state.groupBundles ? "is-active" : ""}" data-grouping="grouped">
+      <span class="admin-facet-pill__label">Group bundles</span>
+    </button>
+    <button type="button" class="admin-facet-pill ${!state.groupBundles ? "is-active" : ""}" data-grouping="flat">
+      <span class="admin-facet-pill__label">Show all (flat)</span>
+    </button>
+  `;
+  const groupingDropdown = dropdown(
+    "grouping",
+    "View",
+    groupingLabel,
+    !state.groupBundles, // "Flat" counts as filtered (off-default)
+    `Default folds bundle children into their ${bundleCount} parent visits — same as what the homeowner sees in the iOS app. Click "Show all" to flatten.`,
+    groupingPills
+  );
+
+  // Handyman "Visit" axis — only on the Handyman tab.
+  let visitDropdown = "";
   if (state.view === "handyman") {
-    const counts = countByHandymanVisit(allItems);
+    const handymanCounts = counts.handyman;
     const pillH = (val, label, count, tip) => {
+      if (count === 0 && val !== "all") return "";
       const isActive = state.handymanFilter === val;
       return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""}" data-facet-axis="handyman" data-facet-value="${escapeHtml(val)}" title="${escapeHtml(tip)}">
         <span class="admin-facet-pill__label">${label}</span>
         <span class="admin-facet-pill__count">${count}</span>
       </button>`;
     };
-    handymanRow = `
-      <div class="admin-facet-row">
-        <div class="admin-facet-row__head">
-          <span class="admin-facet-row__label">Visit</span>
-          <span class="admin-facet-row__caption admin-muted">
-            Parent visits (Spring + Fall) auto-populate punch items at season anchors. Library items are opt-in.
-          </span>
-        </div>
-        <div class="admin-facet-row__pills">
-          ${pillH("all", "All", allItems.length, "Show every handyman-eligible template — parent visits + punch items + library.")}
-          ${pillH("spring", "🌷 Spring visit", counts.spring, "The Spring Handyman Visit (parent) + 11 punch-list items that auto-populate inside it. The homeowner sees ONE scheduled task; the handyman knocks out all 11 in one visit.")}
-          ${pillH("fall", "🍂 Fall visit", counts.fall, "The Fall Handyman Visit (parent) + 12 punch-list items that auto-populate inside it.")}
-          ${pillH("library", "🛠️ Library", counts.library, "Standalone DIY-capable templates the homeowner adds opt-in via Recommended Services or the punch list 'Recommended' section.")}
-        </div>
-      </div>
-    `;
+    const visitPills = [
+      pillH("all", "All", handymanCounts.all, "Show every handyman-eligible template."),
+      pillH("spring", "🌷 Spring visit", handymanCounts.spring, "The spring handyman visit + the items that auto-populate inside it."),
+      pillH("fall", "🍂 Fall visit", handymanCounts.fall, "The fall handyman visit + its items."),
+      pillH("library", "🛠️ Library", handymanCounts.library, "Standalone opt-in templates."),
+    ].join("");
+    const visitActive = state.handymanFilter !== "all";
+    const visitActiveLabel = handymanLabels[state.handymanFilter] || "All";
+    visitDropdown = dropdown(
+      "visit",
+      "Visit",
+      visitActiveLabel,
+      visitActive,
+      "Spring + fall handyman visits auto-populate their punch items at the season anchor. Library items are opt-in.",
+      visitPills,
+      counts.handyman[state.handymanFilter] ?? counts.handyman.all
+    );
   }
 
-  // Phase 5y — Bundle grouping toggle. Default mirrors the iOS reconciler's
-  // "one task per visit" model. Click to flatten and see every individual
-  // template (the audit/inventory mode).
-  const bundleCount = (() => {
-    const seen = new Set();
-    for (const i of allItems) if (i.payload?.bundleId) seen.add(i.payload.bundleId);
-    return seen.size;
-  })();
-  const groupingRow = `
-    <div class="admin-facet-row admin-facet-row--grouping">
-      <div class="admin-facet-row__head">
-        <span class="admin-facet-row__label">Grouping</span>
-        <span class="admin-facet-row__caption admin-muted">
-          Default: bundle children fold into their ${bundleCount} parent visits — same as the homeowner sees in the iOS app.
-        </span>
-      </div>
-      <div class="admin-facet-row__pills">
-        <button type="button" class="admin-facet-pill ${state.groupBundles ? "is-active" : ""}" data-grouping="grouped" title="Default. Bundle children (e.g. 'Annual roof inspection', 'Check for damaged shingles') fold into their parent visit ('Roof and Gutter Service'). The 43 child rows you'd otherwise see are hidden — open any parent's detail panel to see its children inline.">
-          <span class="admin-facet-pill__label">Group bundles (default)</span>
-        </button>
-        <button type="button" class="admin-facet-pill ${!state.groupBundles ? "is-active" : ""}" data-grouping="flat" title="Audit mode. Every individual template surfaces as its own row, including the 43 bundle children. Useful when you need to edit a specific child template directly without opening the parent.">
-          <span class="admin-facet-pill__label">Show all (flat)</span>
-        </button>
-      </div>
-    </div>
-  `;
+  // Lifecycle.
+  const lifecyclePillsHtml = [
+    pill("lifecycle", "all", "All", lifecycleCounts.all),
+    pill("lifecycle", "auto_seed", "Auto-seeds", lifecycleCounts.auto_seed, "Fires automatically when the homeowner finishes the quiz."),
+    pill("lifecycle", "opt_in", "Opt-in", lifecycleCounts.opt_in, "Never seeds automatically. Homeowner adds from Recommended Services."),
+    pill("lifecycle", "bundle_child", `Bundle child (${lifecycleCounts.bundle_parent} bundles)`, lifecycleCounts.bundle_child, `Never gets its own task row. Rolls up into a parent visit.`),
+  ].join("");
+  const lifecycleActiveLabel = lifecycleLabels[state.lifecycleFilter] || "All";
+  const lifecycleDropdown = dropdown(
+    "lifecycle",
+    "Lifecycle",
+    lifecycleActiveLabel,
+    state.lifecycleFilter !== "all",
+    "When does this template enter the homeowner's task list?",
+    lifecyclePillsHtml,
+    lifecycleCounts[state.lifecycleFilter] ?? lifecycleCounts.all
+  );
+
+  // Season.
+  const seasonPillsHtml = [
+    pill("season", "all", "All", seasonCounts.all),
+    pill("season", "Spring", "🌷 Spring", seasonCounts.Spring, "Mar–May. HVAC cooling tune-up, irrigation startup, pool open, gutter cleaning."),
+    pill("season", "Summer", "☀️ Summer", seasonCounts.Summer, "Jun–Aug. Exterior painting, deck staining, hardscape repairs."),
+    pill("season", "Fall", "🍂 Fall", seasonCounts.Fall, "Sep–Nov. Winterization: heating tune-up, boiler, chimney, snow plow contract."),
+    pill("season", "Winter", "❄️ Winter", seasonCounts.Winter, "Dec–Feb. Cold-weather indoor projects + dormant tree pruning."),
+    pill("season", "Spring/Fall", "🔁 Spring/Fall", seasonCounts["Spring/Fall"], "Twice-a-year cadence — runs at both seasonal anchors."),
+    pill("season", "year_round", "🔄 Year-round", seasonCounts.year_round, "No seasonal anchor. Homeowner schedules whenever convenient."),
+  ].join("");
+  const seasonActiveLabel = seasonLabels[state.seasonFilter] || "All";
+  const seasonDropdown = dropdown(
+    "season",
+    "Season",
+    seasonActiveLabel,
+    state.seasonFilter !== "all",
+    "When during the year is this typically scheduled?",
+    seasonPillsHtml,
+    seasonCounts[state.seasonFilter] ?? seasonCounts.all
+  );
+
+  // Routing.
+  const routingPillsHtml = [
+    pill("routing", "all", "All", routingCounts.all),
+    pill("routing", "vendor", "Vendor", routingCounts.vendor, "Always a pro — gas, panel, roof, septic, generator."),
+    pill("routing", "vendor_or_handyman", "Vendor or Handyman", routingCounts.vendor_or_handyman, "Defaults to a vendor visit; the handyman can also tackle it on a punch-list visit."),
+    state.view === "tasks"
+      ? ""
+      : pill("routing", "handyman", "Handyman", routingCounts.handyman, "Punch-list items the handyman tackles."),
+    pill("routing", "homeowner_pull", "I'll do it myself", routingCounts.homeowner_pull, "Only populates when the homeowner explicitly pulls a task off another lane."),
+    pill("routing", "bundled", "Bundled into a visit", routingCounts.bundled, "Bundle children that fold into a parent visit at runtime."),
+  ].join("");
+  const routingActiveLabel = routingLabels[state.routingFilter] || "All";
+  const routingDropdown = dropdown(
+    "routing",
+    "Routing",
+    routingActiveLabel,
+    state.routingFilter !== "all",
+    state.view === "tasks"
+      ? "Who handles this by default? Handyman items live on the Handyman tab."
+      : "Who handles this by default?",
+    routingPillsHtml,
+    routingCounts[state.routingFilter] ?? routingCounts.all
+  );
+
+  // "Clear filters" link only when at least one filter is non-default.
+  const anyFiltered =
+    state.lifecycleFilter !== "all" ||
+    state.seasonFilter !== "all" ||
+    state.routingFilter !== "all" ||
+    state.handymanFilter !== "all" ||
+    !state.groupBundles;
+  const clearLink = anyFiltered
+    ? `<button type="button" class="admin-facet-bar__clear" data-facet-clear title="Reset every filter to its default.">✕ Clear filters</button>`
+    : "";
 
   return `
-    <div class="admin-facets">
-      ${groupingRow}
-      ${handymanRow}
-      ${axisRow(
-        "Lifecycle",
-        "When does this template enter the homeowner's task list?",
-        [
-          pill("lifecycle", "all", "All", allItems.length),
-          pill("lifecycle", "auto_seed", "Auto-seeds", lifecycleCounts.auto_seed, "Fires automatically the moment the homeowner finishes the quiz. No homeowner action required."),
-          pill("lifecycle", "opt_in", "Opt-in", lifecycleCounts.opt_in, "Never seeds automatically. Homeowner adds it from Recommended Services or the handyman punch list 'Recommended' section."),
-          pill("lifecycle", "bundle_child", `Bundle child (${lifecycleCounts.bundle_parent} bundles)`, lifecycleCounts.bundle_child, `Never gets its own task row. Rolls up into one of ${lifecycleCounts.bundle_parent} parent visits (e.g. Spring Landscaping Service, Pool Opening Service). Click to see children grouped by bundle.`),
-        ].join("")
-      )}
-      ${axisRow(
-        "Season",
-        "When during the year is this typically scheduled?",
-        [
-          pill("season", "all", "All", allItems.length),
-          pill("season", "Spring", "🌷 Spring", seasonCounts.Spring, "Mar–May. Opening tasks: HVAC cooling tune-up, irrigation startup, pool open, mulching, gutter cleaning."),
-          pill("season", "Summer", "☀️ Summer", seasonCounts.Summer, "Jun–Aug. Warm-weather work: exterior painting, deck staining, hardscape repairs."),
-          pill("season", "Fall", "🍂 Fall", seasonCounts.Fall, "Sep–Nov. Winterization: HVAC heating tune-up, boiler service, chimney sweep, snow plow contract."),
-          pill("season", "Winter", "❄️ Winter", seasonCounts.Winter, "Dec–Feb. Cold-weather indoor projects + dormant tree pruning."),
-          pill("season", "Spring/Fall", "🔁 Spring/Fall", seasonCounts["Spring/Fall"], "Twice-a-year cadence — runs at both seasonal anchors."),
-          pill("season", "year_round", "🔄 Year-round", seasonCounts.year_round, "No seasonal anchor. Homeowner schedules whenever convenient."),
-        ].join("")
-      )}
-      ${axisRow(
-        "Routing",
-        state.view === "tasks"
-          ? "Who handles this by default? Handyman items aren't shown here — they live exclusively on the Handyman tab."
-          : "Who handles this by default?",
-        [
-          pill("routing", "all", "All", allItems.length),
-          pill("routing", "vendor", "Vendor", routingCounts.vendor, "Always a pro — gas, panel, roof, septic, generator. Homeowner can't safely take this on."),
-          pill("routing", "vendor_or_handyman", "Vendor or Handyman", routingCounts.vendor_or_handyman, "Defaults to a vendor visit, but the handyman can knock it out on a punch-list visit too."),
-          // Phase 5z+7 — Handyman pill only shown on non-Tasks surfaces.
-          // On the Tasks tab the count is always 0 (handyman items
-          // excluded entirely), so the pill would be dead weight.
-          state.view === "tasks"
-            ? ""
-            : pill("routing", "handyman", "Handyman", routingCounts.handyman, "Punch-list items the handyman tackles. Homeowner can still pull any of these into 'I'll do it myself' if they want."),
-          pill("routing", "homeowner_pull", "I'll do it myself", routingCounts.homeowner_pull, "Always 0 by default. Only populates when the homeowner explicitly pulls a task off another routing lane."),
-          pill("routing", "bundled", "Bundled into a visit", routingCounts.bundled, "Bundle children that fold into a parent visit at runtime — Spring Landscaping Service, Pool Opening, Annual Generator Service, etc. The homeowner sees ONE scheduled task per bundle, not the underlying children."),
-        ].join("")
-      )}
+    <div class="admin-facet-bar">
+      ${groupingDropdown}
+      ${visitDropdown}
+      ${lifecycleDropdown}
+      ${seasonDropdown}
+      ${routingDropdown}
+      ${clearLink}
     </div>
   `;
 }
@@ -2718,6 +2915,48 @@ function attachFacetPillHandlers(host) {
       state.groupBundles = btn.dataset.grouping === "grouped";
       renderList();
     });
+  });
+  // Phase 5z+11 — Compact filter bar dropdown wiring.
+  // Each dropdown trigger toggles its popover; clicking outside dismisses.
+  // The pill clicks above (data-facet-axis) re-render the whole list,
+  // which closes the popover naturally on the next render.
+  host.querySelectorAll("[data-facet-dd-trigger]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const key = btn.dataset.facetDdTrigger;
+      const popover = host.querySelector(`[data-facet-dd-popover="${CSS.escape(key)}"]`);
+      const wasOpen = popover && !popover.hidden;
+      // Close every other popover first.
+      host.querySelectorAll("[data-facet-dd-popover]").forEach((p) => (p.hidden = true));
+      host.querySelectorAll(".admin-facet-dd").forEach((d) => d.classList.remove("is-open"));
+      if (popover && !wasOpen) {
+        popover.hidden = false;
+        btn.closest(".admin-facet-dd")?.classList.add("is-open");
+      }
+    });
+  });
+  // Click-outside dismiss. Only one global listener active at a time;
+  // re-attached on every renderList call. We can't use { once: true }
+  // because we want to dismiss on clicks anywhere outside the dropdown
+  // until the next renderList. The cleanup happens automatically since
+  // host innerHTML gets replaced.
+  const closeAllPopovers = (event) => {
+    if (event.target.closest("[data-facet-dd]")) return;
+    host.querySelectorAll("[data-facet-dd-popover]").forEach((p) => (p.hidden = true));
+    host.querySelectorAll(".admin-facet-dd").forEach((d) => d.classList.remove("is-open"));
+  };
+  // Use a single document listener to catch clicks anywhere, including
+  // outside the host. Stamped on host so it gets garbage-collected when
+  // the host is re-rendered.
+  document.addEventListener("click", closeAllPopovers, { capture: true });
+  // Clear-all filters link.
+  host.querySelector("[data-facet-clear]")?.addEventListener("click", () => {
+    state.lifecycleFilter = "all";
+    state.seasonFilter = "all";
+    state.routingFilter = "all";
+    state.handymanFilter = "all";
+    state.groupBundles = true;
+    renderList();
   });
 }
 
