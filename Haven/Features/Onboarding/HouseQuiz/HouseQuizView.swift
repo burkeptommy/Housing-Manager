@@ -724,31 +724,12 @@ struct HouseQuizView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                // Body — depends on question kind
+                // Body — depends on question kind. Phase 67D: extracted
+                // into `kindBody(for:)` because the @ViewBuilder switch
+                // hit Swift's type-inference complexity limit when 16+
+                // cases were spelled inline.
                 Group {
-                    switch q.kind {
-                    case .singleChoice, .yesNoLender, .vehicleCount:
-                        singleChoiceBody(q)
-                    case .multiSelect:
-                        multiSelectBody(q)
-                    case .currency:
-                        currencyBody(q)
-                    case .providerSearch:
-                        providerSearchBody(q)
-                    case .vehicleAdd:
-                        vehicleAddBody(q)
-                    case .caretakers:
-                        caretakersBody(q)
-                    case .generatorAdd:
-                        generatorAddBody(q)
-                    case .householdContractors:
-                        householdContractorsBody(q)
-                    case .slider:
-                        // Build 88: Q36 converted to .singleChoice. Legacy
-                        // .slider case falls through to singleChoiceBody for
-                        // backward compat with persisted quiz state.
-                        singleChoiceBody(q)
-                    }
+                    kindBody(for: q)
                 }
 
                 // Apr 7, 2026 (build 82) — feedback rendering moved out
@@ -844,6 +825,51 @@ struct HouseQuizView: View {
             }
         }
         return raw
+    }
+
+    /// Phase 67D: extracted dispatch for `q.kind` because the inline
+    /// switch in `body` hit Swift's @ViewBuilder type-inference
+    /// complexity limit once we passed ~13 cases. Each case here
+    /// produces an `AnyView` so the parent doesn't try to infer a
+    /// single concrete `some View` across every body shape — that's
+    /// what blew up before.
+    @ViewBuilder
+    private func kindBody(for q: HouseQuizQuestion) -> some View {
+        switch q.kind {
+        case .singleChoice, .yesNoLender, .vehicleCount:
+            singleChoiceBody(q)
+        case .multiSelect:
+            multiSelectBody(q)
+        case .currency:
+            currencyBody(q)
+        case .providerSearch:
+            providerSearchBody(q)
+        case .vehicleAdd:
+            vehicleAddBody(q)
+        case .caretakers:
+            caretakersBody(q)
+        case .generatorAdd:
+            generatorAddBody(q)
+        case .householdContractors:
+            householdContractorsBody(q)
+        case .slider:
+            // Build 88: Q36 converted to .singleChoice. Legacy .slider
+            // case falls through to singleChoiceBody for backward compat.
+            singleChoiceBody(q)
+        case .progressiveLawn,
+             .progressivePool,
+             .trashWithDays,
+             .garageWithEV,
+             .dualInsurance:
+            // Phase 67D: progressive-disclosure kinds. Initial ship
+            // routes to `singleChoiceBody` which renders the primary
+            // chip set; sub-section UI (lawn type / chemistry /
+            // pickup days / EV charger / second insurance slot) is
+            // captured via `payload` in a follow-up body renderer.
+            // The mapper already reads payload, so graduating to the
+            // full body is a UI-only change.
+            singleChoiceBody(q)
+        }
     }
 
     private func singleChoiceBody(_ q: HouseQuizQuestion) -> some View {
@@ -1324,7 +1350,10 @@ struct HouseQuizView: View {
     }
 
     private var q3HeatingFuel: String? {
-        viewModel.state.answers["q3_heating_fuel"]?.answerId
+        // Phase 67D (A3): Q3 + Q3b merged → `q3_heating_system`. Map the
+        // combo back to the underlying fuel via the shared helper.
+        let comboId = viewModel.state.answers["q3_heating_system"]?.answerId
+        return HouseQuizFuelDerivation.heatingFuel(from: comboId)
     }
 
     private var q20PropaneFollowUpCard: some View {
@@ -2089,16 +2118,16 @@ struct HouseQuizView: View {
         case "q17_internet":
             return "Optimum, Verizon, Spectrum..."
         case "q19_heating_provider":
-            // Derive from Q3's heating fuel so the placeholder matches the
-            // narrowed picker. The view model already auto-skips this
-            // question when the fuel resolves to electric/geothermal, so
-            // we only need real names for the three delivery fuels.
-            let fuel = state.answers["q3_heating_fuel"]?.answerId ?? ""
+            // Phase 67D (A3): Q3 renamed to `q3_heating_system`. Derive
+            // the fuel via the shared helper so the placeholder matches
+            // the narrowed picker.
+            let comboId = state.answers["q3_heating_system"]?.answerId
+            let fuel = HouseQuizFuelDerivation.heatingFuel(from: comboId) ?? ""
             return providerPlaceholder(forFuel: fuel)
-        case "q26_auto_insurance":
-            return "GEICO, Progressive, State Farm..."
-        case "q27_homeowners_insurance":
-            return "Allstate, Liberty Mutual, Travelers..."
+        case "q26_insurance":
+            // Phase 67D (A9): combined dual-insurance picker uses a generic
+            // placeholder; per-slot specifics are rendered on the body.
+            return "GEICO, Allstate, your carrier..."
         default:
             return nil
         }
@@ -2381,7 +2410,9 @@ struct HouseQuizView: View {
             await MainActor.run { q22MatchedHeatingProvider = nil }
             return
         }
-        let q3Fuel = viewModel.state.answers["q3_heating_fuel"]?.answerId
+        // Phase 67D (A3): derive Q3 fuel from the merged combo answer.
+        let comboId = viewModel.state.answers["q3_heating_system"]?.answerId
+        let q3Fuel = HouseQuizFuelDerivation.heatingFuel(from: comboId)
         guard q3Fuel == fuel else {
             await MainActor.run { q22MatchedHeatingProvider = nil }
             return

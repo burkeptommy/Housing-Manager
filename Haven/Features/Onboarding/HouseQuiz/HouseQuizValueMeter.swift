@@ -36,10 +36,11 @@ enum HouseQuizValueMeter {
             return 14_000
         case "q2_siding":
             return 8_500
-        case "q3_heating_fuel":
-            return 6_000
-        case "q3b_hvac_type":
-            return 12_000
+        case "q3_heating_system":
+            // Phase 67D (A3): Q3 + Q3b merged. Sum of old deltas
+            // (q3_heating_fuel $6k + q3b_hvac_type $12k = $18k) so the
+            // running total at the end of Chapter 1 is unchanged.
+            return 18_000
         case "q4_purchase":
             // Proportional — a pricier home has more downside to protect.
             // Cap at $20K so the meter doesn't overshoot on $5M homes.
@@ -73,14 +74,22 @@ enum HouseQuizValueMeter {
             // Opens the Pros chapter — anchors everything that follows.
             return 10_000
         case "q11_lawn":
-            // Pro capture is worth more than DIY for the meter.
-            return answerId == "pro" ? 11_000 : 5_500
-        case "q11b_lawn_type":
-            return 4_000
+            // Phase 67D (A4): Q11 + Q11b merged. Pro path keeps the vendor
+            // premium ($11k base + $4k lawn-type = $15k); diy/garden/
+            // hardscape land at $5.5k base + $4k lawn-type = $9.5k. When
+            // the lawn-type sub-section is hidden (no_lawn / garden /
+            // hardscape), users still get the base since they finished
+            // the question.
+            return answerId == "pro" ? 15_000 : 9_500
         case "q12_pool":
-            return answerId == "none" ? 3_500 : 9_000
-        case "q12b_pool_chemistry":
-            return 4_500
+            // Phase 67D (A5): Q12 + Q12b merged. Hot-tub-only and none
+            // paths skip the chemistry sub-section — preserve the original
+            // Q12 deltas there. Pool paths sum the chemistry $4.5k.
+            switch answerId {
+            case "none":    return 3_500
+            case "hot_tub": return 9_000
+            default:        return 13_500  // in_ground / above_ground / both
+            }
         case "q13_pest":
             return answerId == "quarterly_pro" || answerId == "termite_bond" ? 9_500 : 5_500
         case "q14_irrigation":
@@ -102,27 +111,29 @@ enum HouseQuizValueMeter {
             return 4_000
         case "q19_heating_provider":
             return 5_500
-        case "q26_auto_insurance":
-            return 7_500
-        case "q27_homeowners_insurance":
-            return 10_500
+        case "q26_insurance":
+            // Phase 67D (A9): Q26 + Q27 merged into a single dual-insurance
+            // screen. Sum of old deltas (auto $7.5k + home $10.5k = $18k).
+            return 18_000
 
         // ── Chapter 3: Your People ───────────────────────────
-        case "q23_vehicle_count":
-            // DELTA scales with the number of vehicles.
-            let count = Int(answerId) ?? (answerId == "4_plus" ? 4 : 1)
-            return min(8_000, 2_500 + Double(count) * 1_500)
         case "q24_vehicle_add":
-            return 6_000
+            // Phase 67D (A2): Q23 vehicle count dropped. Redistribute its
+            // ~$4k average into Q24 (was $6k → now $10k) so the running
+            // total at Chapter 2 entrance is unchanged.
+            return 10_000
         case "q25_garage_ev":
-            return answerId == "none" ? 3_000 : 5_500
-        case "q25b_ev_charger":
-            return answerId == "yes" ? 5_500 : 3_000
+            // Phase 67D (A8): Q25 + Q25b merged. EV path adds $5.5k on
+            // top of garage base; no-garage stays at $3k.
+            if answerId == "none" { return 3_000 }
+            return answer.payload?["evCharger"] == "yes" ? 11_000 : 8_500
         case "q28_household":
-            // Household composition unlocks every downstream people feature.
-            return 9_000
-        case "q28b_pets":
-            return answerId == "no_pets" ? 3_000 : 5_500
+            // Phase 67D (A10): Q28 + Q28b merged. Household composition
+            // base ($9k) plus pets sub-step ($3k–$5.5k from payload).
+            let petsAnswer = answer.payload?["petsAnswerId"]
+            if petsAnswer == "no_pets" { return 12_000 }
+            if petsAnswer != nil { return 14_500 }
+            return 9_000  // pets sub-step not yet completed
         case "q29_estate_docs":
             // Estate vault anchor — the Life tab's whole promise.
             let count = max(1, selectedIds.count)
