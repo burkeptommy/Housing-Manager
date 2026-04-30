@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-30T17:30:01.771Z",
+  "generatedAt": "2026-04-30T19:28:38.007Z",
   "sourceFile": "Haven/Features/Property/Services/MaintenanceTemplates.swift",
-  "sourceCommit": "85ba8c59",
-  "count": 219,
+  "sourceCommit": "bf9d688e",
+  "count": 204,
   "entries": [
     {
       "templateKey": "Roofing:Professional roof inspection",
@@ -107,94 +107,6 @@
       "_recommendation": null
     },
     {
-      "templateKey": "Roofing:Reseal flashing and seams",
-      "stableId": null,
-      "systemCategory": "Roofing",
-      "title": "Reseal flashing and seams",
-      "description": "Roofer inspects every flashing detail (chimney, vent stacks, parapet walls, equipment curbs) and re-applies sealant where the original membrane has lifted, cracked, or pulled away. Pays particular attention to scuppers and drains where ponding water finds the smallest gap. Critical on flat / membrane roofs because gravity isn't helping you here.",
-      "frequency": "Annually",
-      "priority": "High",
-      "estimatedCostRange": "$150–$400",
-      "isDIY": false,
-      "seasonalTiming": "Spring",
-      "professionalRequired": true,
-      "notes": "Schedule before the spring rains. A skipped year can mean a leak path that isn't visible from inside until it's done $5K+ of damage to the ceiling and contents below.",
-      "requiredSubtypes": [
-        "roof_flat"
-      ],
-      "isEssential": true,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": true,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 56,
-      "routing": "vendorDefault",
-      "_sourceLine": 744,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Roofing",
-          "tier": "universal",
-          "displayPriority": 10
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Roofing:Treat moss and algae",
-      "stableId": null,
-      "systemCategory": "Roofing",
-      "title": "Treat moss and algae",
-      "description": "Roofer applies a zinc-strip or oxygen-bleach moss/algae treatment to prevent the dark streaks and shingle damage that biological growth causes. The streaks aren't just cosmetic. Moss lifts the granular surface of asphalt shingles and shortens the roof's life by 5–10 years if left untreated.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$50–$200",
-      "isDIY": false,
-      "seasonalTiming": "Fall",
-      "professionalRequired": true,
-      "notes": "Wood shake roofs are fragile and slippery. Always pro-only with safety gear. For asphalt, fall application means the rains carry the treatment evenly across the shingles before winter. North-facing slopes show moss first; check those when deciding if you're due.",
-      "requiredSubtypes": [
-        "roof_wood"
-      ],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": true,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 56,
-      "routing": "vendorDefault",
-      "_sourceLine": 745,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Roofing",
-          "tier": "universal",
-          "displayPriority": 10
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
       "templateKey": "Roofing:Clean gutters and downspouts",
       "stableId": null,
       "systemCategory": "Roofing",
@@ -223,7 +135,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 746,
+      "_sourceLine": 744,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -273,7 +185,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 747,
+      "_sourceLine": 745,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -323,7 +235,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 754,
+      "_sourceLine": 752,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -342,13 +254,13 @@
       "systemCategory": "Siding/Exterior",
       "title": "Power wash exterior siding",
       "description": "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.",
-      "frequency": "Annually",
+      "frequency": "Semi-annually",
       "priority": "Low",
       "estimatedCostRange": "$200–$400",
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Semi-annual is right for vinyl in our region. Wood, brick, and fiber-cement homes can stretch this to once a year. Mixed-material homes follow the more frequent cadence wherever vinyl is present.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -365,7 +277,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 773,
+      "_sourceLine": 771,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -413,7 +325,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 774,
+      "_sourceLine": 772,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -461,7 +373,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 779,
+      "_sourceLine": 777,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -503,7 +415,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 793,
+      "_sourceLine": 791,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -545,7 +457,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 812,
+      "_sourceLine": 810,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -589,7 +501,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 840,
+      "_sourceLine": 838,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -633,7 +545,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 863,
+      "_sourceLine": 861,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -677,7 +589,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 864,
+      "_sourceLine": 862,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -721,7 +633,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 865,
+      "_sourceLine": 863,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -765,7 +677,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 866,
+      "_sourceLine": 864,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -809,7 +721,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 867,
+      "_sourceLine": 865,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -853,7 +765,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 868,
+      "_sourceLine": 866,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -897,7 +809,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 869,
+      "_sourceLine": 867,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -941,7 +853,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 874,
+      "_sourceLine": 872,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -985,51 +897,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 898,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "HVAC",
-          "tier": "universal",
-          "displayPriority": 20
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "HVAC:Whole-home humidifier service",
-      "stableId": null,
-      "systemCategory": "HVAC",
-      "title": "Whole-home humidifier service",
-      "description": "HVAC tech services the whole-home humidifier: replaces the evaporator pad, checks the water line and solenoid, verifies setpoint against your thermostat.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$75-150",
-      "isDIY": false,
-      "seasonalTiming": "Fall",
-      "professionalRequired": true,
-      "notes": "Often bundled with the fall HVAC tune-up visit.",
-      "requiredSubtypes": [
-        "has_humidifier"
-      ],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": "northeast",
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 42,
-      "routing": "vendorDefault",
-      "_sourceLine": 915,
+      "_sourceLine": 896,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1071,7 +939,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 941,
+      "_sourceLine": 923,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1116,7 +984,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyDefault",
-      "_sourceLine": 947,
+      "_sourceLine": 929,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1134,14 +1002,14 @@
       "stableId": null,
       "systemCategory": "Water Heater",
       "title": "Flush water heater",
-      "description": "Plumber drains and flushes sediment from the tank to maintain heating efficiency.",
+      "description": "Plumber drains and flushes sediment from the tank, tests the T&P relief valve, and inspects the sacrificial anode rod (replace if more than 50% depleted). Standard package keeps the tank free of buildup that drives up gas/electric usage and shortens lifespan.",
       "frequency": "Annually",
       "priority": "High",
       "estimatedCostRange": "$100–$200",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": null,
+      "notes": "Anode rod inspection is part of the standard flush — pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16\" socket and breaker bar, both of which the plumber already has on the truck.",
       "requiredSubtypes": [
         "tank"
       ],
@@ -1162,7 +1030,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 969,
+      "_sourceLine": 951,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1178,53 +1046,15 @@
           "displayPriority": 50
         }
       },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Water Heater:Inspect anode rod",
-      "stableId": null,
-      "systemCategory": "Water Heater",
-      "title": "Inspect anode rod",
-      "description": "Check and replace sacrificial anode rod to prevent tank corrosion. Requires partial drain plus a 1-1/16\" socket and breaker bar.",
-      "frequency": "Every 3 years",
-      "priority": "Medium",
-      "estimatedCostRange": "$80–$200",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": "Replace if more than 50% depleted",
-      "requiredSubtypes": [
-        "tank"
-      ],
-      "isEssential": false,
-      "equipmentKeywords": [
-        "water heater"
-      ],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 970,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Water Heater",
-          "tier": "universal",
-          "displayPriority": 50
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Anode rod inspection is part of the standard flush — pros pull and inspect ev..."
         }
-      },
-      "_lint": [],
+      ],
       "_recommendation": null
     },
     {
@@ -1258,7 +1088,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 971,
+      "_sourceLine": 952,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1310,7 +1140,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 972,
+      "_sourceLine": 953,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1329,13 +1159,13 @@
       "systemCategory": "Septic System",
       "title": "Septic tank pumping",
       "description": "Pumping of septic tank to remove accumulated solids.",
-      "frequency": "Every 3-5 years",
+      "frequency": "Every 2 years",
       "priority": "High",
       "estimatedCostRange": "$300–$600",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Frequency depends on household size and tank size",
+      "notes": "Two-year default for a typical 4-person household with a 1,000-gallon tank. Larger households (6+) should pump annually; small households (1-2 people) with larger tanks can stretch to 3 years. Inspector will tell you the actual sludge level on each visit and recalibrate.",
       "requiredSubtypes": [],
       "isEssential": true,
       "equipmentKeywords": [],
@@ -1352,7 +1182,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 981,
+      "_sourceLine": 962,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1400,7 +1230,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 982,
+      "_sourceLine": 963,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -1448,7 +1278,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 992,
+      "_sourceLine": 973,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1490,7 +1320,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 993,
+      "_sourceLine": 974,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1532,7 +1362,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1003,
+      "_sourceLine": 984,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1574,7 +1404,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1004,
+      "_sourceLine": 985,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1618,7 +1448,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1008,
+      "_sourceLine": 989,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1660,7 +1490,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1028,
+      "_sourceLine": 1009,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1704,7 +1534,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1046,
+      "_sourceLine": 1027,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1748,7 +1578,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1066,
+      "_sourceLine": 1047,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1790,7 +1620,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyDefault",
-      "_sourceLine": 1084,
+      "_sourceLine": 1065,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1837,7 +1667,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1128,
+      "_sourceLine": 1109,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1879,7 +1709,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1149,
+      "_sourceLine": 1130,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1923,7 +1753,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1163,
+      "_sourceLine": 1144,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -1965,7 +1795,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1188,
+      "_sourceLine": 1169,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2003,7 +1833,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1199,
+      "_sourceLine": 1180,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2052,7 +1882,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1200,
+      "_sourceLine": 1181,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2101,7 +1931,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1201,
+      "_sourceLine": 1182,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2150,7 +1980,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1213,
+      "_sourceLine": 1194,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2199,7 +2029,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1214,
+      "_sourceLine": 1195,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2247,7 +2077,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1217,
+      "_sourceLine": 1198,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2298,7 +2128,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1218,
+      "_sourceLine": 1199,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2350,7 +2180,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1219,
+      "_sourceLine": 1200,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2402,7 +2232,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1220,
+      "_sourceLine": 1201,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2453,7 +2283,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1221,
+      "_sourceLine": 1202,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2505,7 +2335,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 1222,
+      "_sourceLine": 1203,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2549,7 +2379,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1223,
+      "_sourceLine": 1204,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -2601,7 +2431,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 1227,
+      "_sourceLine": 1208,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2645,7 +2475,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 1228,
+      "_sourceLine": 1209,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2689,7 +2519,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 1229,
+      "_sourceLine": 1210,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2733,7 +2563,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 1235,
+      "_sourceLine": 1216,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2777,7 +2607,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1256,
+      "_sourceLine": 1237,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2821,7 +2651,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1282,
+      "_sourceLine": 1263,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2865,7 +2695,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1298,
+      "_sourceLine": 1279,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2909,7 +2739,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1314,
+      "_sourceLine": 1295,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2953,7 +2783,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1330,
+      "_sourceLine": 1311,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -2995,7 +2825,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1352,
+      "_sourceLine": 1333,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3037,7 +2867,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1353,
+      "_sourceLine": 1334,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3079,7 +2909,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1360,
+      "_sourceLine": 1341,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3123,14 +2953,15 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1384,
+      "_sourceLine": 1365,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Pool/Spa:opening",
           "bundleTitle": "Pool Opening Service",
           "siblings": [
-            "Pool/Spa:Inspect pool equipment"
+            "Pool/Spa:Inspect pool equipment",
+            "Pool/Spa:Pool heater service"
           ]
         },
         "system_category_meta": {
@@ -3173,7 +3004,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1385,
+      "_sourceLine": 1366,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3221,14 +3052,15 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1386,
+      "_sourceLine": 1367,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
           "bundleId": "Pool/Spa:opening",
           "bundleTitle": null,
           "siblings": [
-            "Pool/Spa:Professional pool opening"
+            "Pool/Spa:Professional pool opening",
+            "Pool/Spa:Pool heater service"
           ]
         },
         "system_category_meta": {
@@ -3252,7 +3084,7 @@
       "isDIY": false,
       "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Pair with pool opening so the heater is ready for the first cool spring night.",
+      "notes": "Folded into the Pool Opening Service bundle so the heater is ready for the first cool spring night.",
       "requiredSubtypes": [
         "pool"
       ],
@@ -3261,7 +3093,7 @@
       "assignmentType": "vendor",
       "diyEffortMinutes": null,
       "diyEffortLabel": null,
-      "bundleId": null,
+      "bundleId": "Pool/Spa:opening",
       "bundleTitle": null,
       "routingOverride": null,
       "safetyFloor": true,
@@ -3270,55 +3102,18 @@
       "regionalPack": null,
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
-      "routing": "vendorDefault",
-      "_sourceLine": 1391,
+      "routing": "bundledIntoParent",
+      "_sourceLine": 1372,
       "_impact": {
         "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Pool/Spa",
-          "tier": "specialty",
-          "displayPriority": 10
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Pool/Spa:Test and sanitize hot tub water",
-      "stableId": null,
-      "systemCategory": "Pool/Spa",
-      "title": "Test and sanitize hot tub water",
-      "description": "Use test strips or a digital tester to check bromine/chlorine, pH, and total alkalinity weekly. Add sanitizer to maintain levels and re-balance pH/alkalinity. Without weekly sanitizer additions, hot tub water gets cloudy + biofilm starts forming inside the plumbing. A much harder problem to recover from than just topping up sanitizer.",
-      "frequency": "Weekly",
-      "priority": "High",
-      "estimatedCostRange": "$10–$20/month",
-      "isDIY": true,
-      "seasonalTiming": null,
-      "professionalRequired": false,
-      "notes": "Target ranges: pH 7.2-7.8, alkalinity 80-120 ppm, bromine 3-5 ppm or chlorine 1-3 ppm. Hot tubs sanitize harder than pools because the small water volume + heat speeds chemical breakdown. After a heavy-use night with multiple soakers, dose extra sanitizer and let it circulate before next use.",
-      "requiredSubtypes": [
-        "hot_tub"
-      ],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "either",
-      "diyEffortMinutes": 10,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 21,
-      "routing": "vendorDefault",
-      "_sourceLine": 1419,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
+        "in_bundle": {
+          "bundleId": "Pool/Spa:opening",
+          "bundleTitle": null,
+          "siblings": [
+            "Pool/Spa:Professional pool opening",
+            "Pool/Spa:Inspect pool equipment"
+          ]
+        },
         "system_category_meta": {
           "categoryKey": "Pool/Spa",
           "tier": "specialty",
@@ -3340,7 +3135,7 @@
       "isDIY": true,
       "seasonalTiming": null,
       "professionalRequired": false,
-      "notes": "Plan for 2-3 hours including drain and refill time.",
+      "notes": "Detached hot tubs only. If your spa shares water with the pool (spillover / attached configuration), skip this — the pool service handles drain and refill via the pool seasonal close. Plan 2-3 hours for the standalone drain + refill cycle.",
       "requiredSubtypes": [
         "hot_tub"
       ],
@@ -3359,7 +3154,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1420,
+      "_sourceLine": 1418,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3369,7 +3164,15 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Detached hot tubs only. If your spa shares water with the pool (spillover / a..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -3384,7 +3187,7 @@
       "isDIY": true,
       "seasonalTiming": "Spring",
       "professionalRequired": false,
-      "notes": "A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/month in extra heating during cool months. Replacement covers run $300–$500. Pays for itself in 6–12 months. Soaked covers also start to mold inside, which is gross to rest your face on.",
+      "notes": "Detached hot tubs only — attached spillover spas don't have removable covers in this sense, and their jet inspection rolls into the pool opening visit. A waterlogged cover loses 20–40% of its insulation value, costing $30–$60/month in extra heating during cool months. Replacement covers run $300–$500. Pays for itself in 6–12 months. Soaked covers also start to mold inside, which is gross to rest your face on.",
       "requiredSubtypes": [
         "hot_tub"
       ],
@@ -3403,7 +3206,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1421,
+      "_sourceLine": 1419,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3413,7 +3216,15 @@
           "displayPriority": 10
         }
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "notes",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Detached hot tubs only — attached spillover spas don't have removable covers ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -3448,7 +3259,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 1428,
+      "_sourceLine": 1426,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3494,7 +3305,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 1450,
+      "_sourceLine": 1448,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3541,7 +3352,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyDefault",
-      "_sourceLine": 1455,
+      "_sourceLine": 1453,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3585,7 +3396,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1476,
+      "_sourceLine": 1474,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3627,7 +3438,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 1503,
+      "_sourceLine": 1501,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -3669,7 +3480,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1518,
+      "_sourceLine": 1516,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3719,7 +3530,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1519,
+      "_sourceLine": 1517,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3769,7 +3580,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1520,
+      "_sourceLine": 1518,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3819,7 +3630,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1521,
+      "_sourceLine": 1519,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3869,7 +3680,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1531,
+      "_sourceLine": 1529,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3917,7 +3728,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1532,
+      "_sourceLine": 1530,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -3965,7 +3776,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1539,
+      "_sourceLine": 1537,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4007,7 +3818,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 1540,
+      "_sourceLine": 1538,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -4049,7 +3860,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1551,
+      "_sourceLine": 1549,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4098,7 +3909,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1552,
+      "_sourceLine": 1550,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4147,7 +3958,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1553,
+      "_sourceLine": 1551,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4198,7 +4009,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1602,
+      "_sourceLine": 1600,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4257,7 +4068,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1618,
+      "_sourceLine": 1616,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4317,7 +4128,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1634,
+      "_sourceLine": 1632,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4375,7 +4186,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1670,
+      "_sourceLine": 1668,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4432,7 +4243,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1686,
+      "_sourceLine": 1684,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4489,7 +4300,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1702,
+      "_sourceLine": 1700,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4546,7 +4357,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1718,
+      "_sourceLine": 1716,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4605,7 +4416,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1734,
+      "_sourceLine": 1732,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4662,7 +4473,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1751,
+      "_sourceLine": 1749,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4719,7 +4530,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1767,
+      "_sourceLine": 1765,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4778,7 +4589,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1783,
+      "_sourceLine": 1781,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4835,7 +4646,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1800,
+      "_sourceLine": 1798,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4892,7 +4703,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1816,
+      "_sourceLine": 1814,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -4949,7 +4760,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1836,
+      "_sourceLine": 1834,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5007,7 +4818,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1852,
+      "_sourceLine": 1850,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5065,7 +4876,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1869,
+      "_sourceLine": 1867,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5123,7 +4934,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1886,
+      "_sourceLine": 1884,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5181,7 +4992,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1902,
+      "_sourceLine": 1900,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5239,7 +5050,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1918,
+      "_sourceLine": 1916,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5297,7 +5108,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1934,
+      "_sourceLine": 1932,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5357,7 +5168,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1950,
+      "_sourceLine": 1948,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5415,7 +5226,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1967,
+      "_sourceLine": 1965,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5473,7 +5284,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "bundledIntoParent",
-      "_sourceLine": 1983,
+      "_sourceLine": 1981,
       "_impact": {
         "gated_by": [],
         "in_bundle": {
@@ -5531,49 +5342,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2007,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Cabinet and door hardware tune-up",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Cabinet and door hardware tune-up",
-      "description": "Handyman tightens loose cabinet pulls, door knobs, hinges, and drawer slides across the house. Lubricates squeaky hinges and replaces any stripped hardware. Small job; big lived-in feel.",
-      "frequency": "Annually",
-      "priority": "Low",
-      "estimatedCostRange": "$100–$300",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": null,
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2021,
+      "_sourceLine": 2005,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5615,49 +5384,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2035,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Whole-house relamping",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Whole-house relamping",
-      "description": "Handyman systematically replaces every light bulb in fixtures that require a ladder or awkward reach. High ceilings, stairwells, exterior sconces, closet recessed cans. One morning vs 12 separate \"I'll get to it\" moments.",
-      "frequency": "Annually",
-      "priority": "Low",
-      "estimatedCostRange": "$150–$500",
-      "isDIY": false,
-      "seasonalTiming": "Fall",
-      "professionalRequired": true,
-      "notes": "Stock your preferred bulbs in advance. Most handymen will bring their own ladder and simple tools.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2049,
+      "_sourceLine": 2019,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5699,7 +5426,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2063,
+      "_sourceLine": 2033,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5741,7 +5468,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2077,
+      "_sourceLine": 2047,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5783,7 +5510,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2091,
+      "_sourceLine": 2061,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5825,7 +5552,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2105,
+      "_sourceLine": 2075,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5844,13 +5571,13 @@
       "systemCategory": "Handyman",
       "title": "Interior caulk refresh",
       "description": "Re-caulk the obvious failure points in kitchens, mudrooms, and baths before water gets behind trim, counters, or fixtures. Good example of low-drama work that prevents bigger repairs.",
-      "frequency": "Annually",
+      "frequency": "Every 3 years",
       "priority": "Medium",
       "estimatedCostRange": "$150–$450",
       "isDIY": false,
       "seasonalTiming": null,
       "professionalRequired": true,
-      "notes": "Escalate to a tile setter or plumber if there is movement, active water damage, or fixture replacement hiding underneath.",
+      "notes": "Modern silicone caulk holds up for 2-3 years before showing failure points. Annual was overkill for most households. Escalate to a tile setter or plumber if there is movement, active water damage, or fixture replacement hiding underneath.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -5867,91 +5594,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2119,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Hang mirrors, art, and shelving",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Hang mirrors, art, and shelving",
-      "description": "Batch the high-value finish work: picture clusters, heavy mirrors, floating shelves, coat hooks, and mudroom organization pieces.",
-      "frequency": "Annually",
-      "priority": "Low",
-      "estimatedCostRange": "$125–$450",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": "High-margin add-on that homeowners love because it clears a long-standing to-do list fast.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2133,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:TV mounting and cord cleanup",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "TV mounting and cord cleanup",
-      "description": "Mount the TV, hide the obvious wire mess, and leave the room looking deliberate instead of half-finished. Great quote lane for handymen who already carry the right anchors and tools.",
-      "frequency": "Annually",
-      "priority": "Low",
-      "estimatedCostRange": "$175–$500",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": "Escalate to an electrician or integrator if in-wall power or major AV changes are required.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2147,
+      "_sourceLine": 2089,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -5993,91 +5636,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2161,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Grab bar and safety hardware install",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Grab bar and safety hardware install",
-      "description": "Install grab bars, handrail returns, better closet lighting, non-slip hardware, and other aging-in-place or child-safety upgrades that do not require a specialist.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$150–$500",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": "One of the strongest trust builders for families managing older parents or multigenerational homes.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2175,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Fixture swap and hardware refresh",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Fixture swap and hardware refresh",
-      "description": "Replace showerheads, faucets, cabinet pulls, towel bars, exterior house numbers, and similar finish hardware when the work stays inside the handyman lane.",
-      "frequency": "Annually",
-      "priority": "Low",
-      "estimatedCostRange": "$125–$450",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": "Escalate when shutoffs are seized, valves are leaking, or wiring/plumbing rough work appears.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2189,
+      "_sourceLine": 2103,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6119,49 +5678,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2203,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Blind and curtain hardware install",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Blind and curtain hardware install",
-      "description": "Install or adjust blinds, shades, curtain rods, privacy hardware, and other finish carpentry items that usually get stuck on a homeowner's list for months.",
-      "frequency": "Annually",
-      "priority": "Low",
-      "estimatedCostRange": "$125–$400",
-      "isDIY": false,
-      "seasonalTiming": null,
-      "professionalRequired": true,
-      "notes": null,
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 28,
-      "routing": "vendorDefault",
-      "_sourceLine": 2217,
+      "_sourceLine": 2117,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6203,7 +5720,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2249,
+      "_sourceLine": 2149,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6245,49 +5762,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2250,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Recaulk interior trim and baseboards",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Recaulk interior trim and baseboards",
-      "description": "Cut out old caulk that's separated from the wall or trim, lay a fresh bead, and tool it clean. Restores a tight, finished look at the seams.",
-      "frequency": "As needed",
-      "priority": "Low",
-      "estimatedCostRange": "$100–$300",
-      "isDIY": true,
-      "seasonalTiming": null,
-      "professionalRequired": false,
-      "notes": null,
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "either",
-      "diyEffortMinutes": 60,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": "diyCapable",
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 14,
-      "routing": "diyCapable",
-      "_sourceLine": 2251,
+      "_sourceLine": 2150,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6329,7 +5804,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2252,
+      "_sourceLine": 2151,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6371,7 +5846,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2253,
+      "_sourceLine": 2152,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6413,7 +5888,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2254,
+      "_sourceLine": 2153,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6455,7 +5930,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2255,
+      "_sourceLine": 2154,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6497,7 +5972,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2256,
+      "_sourceLine": 2155,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6539,7 +6014,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2257,
+      "_sourceLine": 2156,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6581,7 +6056,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2258,
+      "_sourceLine": 2157,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6623,7 +6098,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2259,
+      "_sourceLine": 2158,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6665,7 +6140,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2260,
+      "_sourceLine": 2159,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6707,7 +6182,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2263,
+      "_sourceLine": 2162,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6749,7 +6224,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2264,
+      "_sourceLine": 2163,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6791,7 +6266,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2265,
+      "_sourceLine": 2164,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6833,7 +6308,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2266,
+      "_sourceLine": 2165,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6875,7 +6350,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2267,
+      "_sourceLine": 2166,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6917,7 +6392,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2268,
+      "_sourceLine": 2167,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -6959,7 +6434,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2269,
+      "_sourceLine": 2168,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7001,7 +6476,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2270,
+      "_sourceLine": 2169,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7043,7 +6518,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2273,
+      "_sourceLine": 2172,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7087,7 +6562,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2274,
+      "_sourceLine": 2173,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7129,7 +6604,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2275,
+      "_sourceLine": 2174,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7171,7 +6646,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2276,
+      "_sourceLine": 2175,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7213,49 +6688,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2277,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Handyman",
-          "tier": "universal",
-          "displayPriority": 85
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Handyman:Replace cabinet pulls and knobs",
-      "stableId": null,
-      "systemCategory": "Handyman",
-      "title": "Replace cabinet pulls and knobs",
-      "description": "Update the kitchen, bath, or built-in cabinet hardware. The handyman handles drilling new holes if the spread changes.",
-      "frequency": "As needed",
-      "priority": "Low",
-      "estimatedCostRange": "$75–$200 plus hardware",
-      "isDIY": true,
-      "seasonalTiming": null,
-      "professionalRequired": false,
-      "notes": "About 2 minutes per pull if existing holes match; 5 minutes per pull if drilling new holes.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "either",
-      "diyEffortMinutes": 60,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": "diyCapable",
-      "safetyFloor": false,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 14,
-      "routing": "diyCapable",
-      "_sourceLine": 2278,
+      "_sourceLine": 2176,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7299,7 +6732,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2279,
+      "_sourceLine": 2177,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7341,7 +6774,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2280,
+      "_sourceLine": 2178,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7383,7 +6816,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2281,
+      "_sourceLine": 2179,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7428,7 +6861,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2282,
+      "_sourceLine": 2180,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7470,7 +6903,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2285,
+      "_sourceLine": 2183,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7512,7 +6945,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2286,
+      "_sourceLine": 2184,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7554,7 +6987,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2287,
+      "_sourceLine": 2185,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7596,7 +7029,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2288,
+      "_sourceLine": 2186,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7638,7 +7071,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2289,
+      "_sourceLine": 2187,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7680,7 +7113,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2290,
+      "_sourceLine": 2188,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7722,7 +7155,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2291,
+      "_sourceLine": 2189,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7764,7 +7197,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2294,
+      "_sourceLine": 2192,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7806,7 +7239,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2295,
+      "_sourceLine": 2193,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7848,7 +7281,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2296,
+      "_sourceLine": 2194,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7890,7 +7323,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2297,
+      "_sourceLine": 2195,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7932,7 +7365,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2298,
+      "_sourceLine": 2196,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -7974,7 +7407,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2299,
+      "_sourceLine": 2197,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8016,7 +7449,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2300,
+      "_sourceLine": 2198,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8058,7 +7491,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2301,
+      "_sourceLine": 2199,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8103,7 +7536,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2304,
+      "_sourceLine": 2202,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8145,7 +7578,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2305,
+      "_sourceLine": 2203,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8191,7 +7624,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2306,
+      "_sourceLine": 2204,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8236,7 +7669,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2307,
+      "_sourceLine": 2205,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8278,7 +7711,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2308,
+      "_sourceLine": 2206,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8320,7 +7753,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2309,
+      "_sourceLine": 2207,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8362,7 +7795,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2312,
+      "_sourceLine": 2210,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8404,7 +7837,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2313,
+      "_sourceLine": 2211,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8446,7 +7879,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2314,
+      "_sourceLine": 2212,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8488,7 +7921,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2315,
+      "_sourceLine": 2213,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8530,7 +7963,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2316,
+      "_sourceLine": 2214,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8572,7 +8005,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2317,
+      "_sourceLine": 2215,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8614,7 +8047,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2318,
+      "_sourceLine": 2216,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8656,7 +8089,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2319,
+      "_sourceLine": 2217,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8700,7 +8133,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2322,
+      "_sourceLine": 2220,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8744,7 +8177,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2323,
+      "_sourceLine": 2221,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8789,7 +8222,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2324,
+      "_sourceLine": 2222,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8831,7 +8264,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2325,
+      "_sourceLine": 2223,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8873,7 +8306,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2326,
+      "_sourceLine": 2224,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8917,7 +8350,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2329,
+      "_sourceLine": 2227,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -8963,7 +8396,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2330,
+      "_sourceLine": 2228,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9007,7 +8440,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2331,
+      "_sourceLine": 2229,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9052,7 +8485,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2332,
+      "_sourceLine": 2230,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9097,7 +8530,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2333,
+      "_sourceLine": 2231,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9139,7 +8572,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2336,
+      "_sourceLine": 2234,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9181,7 +8614,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2337,
+      "_sourceLine": 2235,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9223,7 +8656,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2338,
+      "_sourceLine": 2236,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9265,7 +8698,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2339,
+      "_sourceLine": 2237,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9307,7 +8740,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2340,
+      "_sourceLine": 2238,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9349,7 +8782,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2341,
+      "_sourceLine": 2239,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9391,7 +8824,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 2356,
+      "_sourceLine": 2254,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9433,7 +8866,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 42,
       "routing": "vendorDefault",
-      "_sourceLine": 2383,
+      "_sourceLine": 2281,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9441,48 +8874,6 @@
           "categoryKey": "Mosquito & Tick",
           "tier": "conditional",
           "displayPriority": 110
-        }
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "templateKey": "Tree Service:Annual tree assessment",
-      "stableId": null,
-      "systemCategory": "Tree Service",
-      "title": "Annual tree assessment",
-      "description": "Certified arborist walks the property identifying dead limbs, structural weakness, disease, and storm risk. A $300 annual visit catches the $30,000 problems.",
-      "frequency": "Annually",
-      "priority": "Medium",
-      "estimatedCostRange": "$200-500",
-      "isDIY": false,
-      "seasonalTiming": "Spring",
-      "professionalRequired": true,
-      "notes": "Best done in early spring before leaf-out so the structural picture is clear.",
-      "requiredSubtypes": [],
-      "isEssential": false,
-      "equipmentKeywords": [],
-      "assignmentType": "vendor",
-      "diyEffortMinutes": null,
-      "diyEffortLabel": null,
-      "bundleId": null,
-      "bundleTitle": null,
-      "routingOverride": null,
-      "safetyFloor": true,
-      "maxIntervalDays": null,
-      "warrantyLinked": false,
-      "regionalPack": null,
-      "proactiveLeadTimeDays": null,
-      "effectiveLeadTimeDays": 56,
-      "routing": "vendorDefault",
-      "_sourceLine": 2410,
-      "_impact": {
-        "gated_by": [],
-        "in_bundle": null,
-        "system_category_meta": {
-          "categoryKey": "Tree Service",
-          "tier": "conditional",
-          "displayPriority": 80
         }
       },
       "_lint": [],
@@ -9517,7 +8908,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2425,
+      "_sourceLine": 2317,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9559,7 +8950,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2442,
+      "_sourceLine": 2334,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9578,13 +8969,13 @@
       "systemCategory": "Window Cleaning",
       "title": "Exterior window washing",
       "description": "Professional washing of all exterior windows, screens, frame tracks, and sills using purified water systems that leave a streak-free finish without chemical residue. Includes a wipe-down of the frames and removal of any caked pollen, spider webs, and bird debris that builds up in upper corners.",
-      "frequency": "Semi-annually",
+      "frequency": "Annually",
       "priority": "Low",
       "estimatedCostRange": "$200-600",
       "isDIY": false,
-      "seasonalTiming": "Spring/Fall",
+      "seasonalTiming": "Spring",
       "professionalRequired": true,
-      "notes": "Spring after pollen settles and fall before storm windows go on. Quarterly for homes that need to stay immaculate (waterfront, heavy shade with sap, or homes with frequent entertaining). Most premium services include sill and screen cleaning at no extra charge.",
+      "notes": "Annual is the right default for most households. Spring after pollen settles is the optimal window. Bump to semi-annual or quarterly for homes that need to stay immaculate (waterfront with salt spray, heavy shade with tree sap, or homes with frequent entertaining). Most premium services include sill and screen cleaning at no extra charge.",
       "requiredSubtypes": [],
       "isEssential": false,
       "equipmentKeywords": [],
@@ -9601,7 +8992,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2463,
+      "_sourceLine": 2355,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9643,7 +9034,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2483,
+      "_sourceLine": 2375,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9685,7 +9076,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2506,
+      "_sourceLine": 2398,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9727,7 +9118,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2535,
+      "_sourceLine": 2427,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9769,7 +9160,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2555,
+      "_sourceLine": 2447,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9811,7 +9202,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 56,
       "routing": "vendorDefault",
-      "_sourceLine": 2556,
+      "_sourceLine": 2448,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9853,7 +9244,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 28,
       "routing": "vendorDefault",
-      "_sourceLine": 2563,
+      "_sourceLine": 2455,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9895,7 +9286,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 21,
       "routing": "vendorDefault",
-      "_sourceLine": 2578,
+      "_sourceLine": 2470,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,
@@ -9939,7 +9330,7 @@
       "proactiveLeadTimeDays": null,
       "effectiveLeadTimeDays": 14,
       "routing": "diyCapable",
-      "_sourceLine": 2597,
+      "_sourceLine": 2489,
       "_impact": {
         "gated_by": [],
         "in_bundle": null,

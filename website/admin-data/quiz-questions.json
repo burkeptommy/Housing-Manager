@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-30T19:06:45.201Z",
+  "generatedAt": "2026-04-30T19:28:37.971Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift",
-  "sourceCommit": "14f65c52",
-  "count": 30,
+  "sourceCommit": "bf9d688e",
+  "count": 28,
   "entries": [
     {
       "id": "q1_roof_material",
@@ -84,8 +84,8 @@
       "chapter": "yourHome",
       "title": "What's your exterior siding?",
       "fallbackTitle": null,
-      "subtitle": "Some materials need yearly attention, others just once a decade.",
-      "kind": "singleChoice",
+      "subtitle": "Pick all that apply — many homes mix two or three materials.",
+      "kind": "multiSelect",
       "answerOptions": [
         {
           "id": "vinyl",
@@ -122,12 +122,6 @@
           "label": "Stone",
           "icon": null,
           "acceptsCustomInput": false
-        },
-        {
-          "id": "mixed",
-          "label": "Mixed",
-          "icon": null,
-          "acceptsCustomInput": false
         }
       ],
       "documentUploadCategory": null,
@@ -149,7 +143,15 @@
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "subtitle",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Pick all that apply — many homes mix two or three materials."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -245,109 +247,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 175,
-      "_impact": {
-        "creates_systems": [],
-        "unlocks_templates": [],
-        "gates_questions": []
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "id": "q4_purchase",
-      "section": "homeBasics",
-      "chapter": "yourHome",
-      "title": "How did you get this home?",
-      "fallbackTitle": null,
-      "subtitle": "Add a purchase price if you have it. We'll use it for your investment dashboard.",
-      "kind": "currency",
-      "answerOptions": [
-        {
-          "id": "bought",
-          "label": "Bought existing",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "custom_build",
-          "label": "Custom build",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "inherited",
-          "label": "Inherited",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "other",
-          "label": "Other",
-          "icon": null,
-          "acceptsCustomInput": false
-        }
-      ],
-      "documentUploadCategory": "mortgage",
-      "providerFollowUpAnswerIds": [],
-      "providerTypes": [],
-      "dynamicProviderTypes": null,
-      "dynamicSkip": null,
-      "supportsSelectAll": false,
-      "providerSearchPlaceholder": null,
-      "sliderMin": 1,
-      "sliderMax": 10,
-      "sliderLeftLabel": null,
-      "sliderRightLabel": null,
-      "_sourceLine": 197,
-      "_impact": {
-        "creates_systems": [],
-        "unlocks_templates": [],
-        "gates_questions": []
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "id": "q5_mortgage",
-      "section": "homeBasics",
-      "chapter": "yourHome",
-      "title": "Do you have a mortgage on this home?",
-      "fallbackTitle": null,
-      "subtitle": "We'll surface refinance opportunities when rates move.",
-      "kind": "yesNoLender",
-      "answerOptions": [
-        {
-          "id": "yes",
-          "label": "Yes",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "no",
-          "label": "No, paid off",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "skip",
-          "label": "Prefer not to say",
-          "icon": null,
-          "acceptsCustomInput": false
-        }
-      ],
-      "documentUploadCategory": null,
-      "providerFollowUpAnswerIds": [],
-      "providerTypes": [],
-      "dynamicProviderTypes": null,
-      "dynamicSkip": "{ state in\n                guard let q4 = state.answers[\"q4_purchase\"]?.answerId else { return false }\n                return q4 == \"inherited\" || q4 == \"custom_build\" || q4 == \"other\"\n            }",
-      "supportsSelectAll": false,
-      "providerSearchPlaceholder": null,
-      "sliderMin": 1,
-      "sliderMax": 10,
-      "sliderLeftLabel": null,
-      "sliderRightLabel": null,
-      "_sourceLine": 211,
+      "_sourceLine": 174,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -401,7 +301,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 238,
+      "_sourceLine": 210,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -416,7 +316,7 @@
       "chapter": "yourHome",
       "title": "Sewer or septic?",
       "fallbackTitle": null,
-      "subtitle": "Septic systems need pumping every 3-5 years.",
+      "subtitle": "Septic systems typically need pumping every 2-3 years.",
       "kind": "singleChoice",
       "answerOptions": [
         {
@@ -429,6 +329,12 @@
           "id": "septic",
           "label": "Septic",
           "icon": "arrow.down.to.line",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "other",
+          "label": "Other (compost toilet, off-grid, etc.)",
+          "icon": "leaf",
           "acceptsCustomInput": false
         },
         {
@@ -449,7 +355,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 250,
+      "_sourceLine": 222,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -464,7 +370,7 @@
       "chapter": "yourHome",
       "title": "What kind of water heater do you have?",
       "fallbackTitle": null,
-      "subtitle": null,
+      "subtitle": "Not sure? Snap a photo of the unit and we'll identify it for you.",
       "kind": "singleChoice",
       "answerOptions": [
         {
@@ -499,8 +405,8 @@
         },
         {
           "id": "not_sure",
-          "label": "Not sure",
-          "icon": null,
+          "label": "Not sure — take a photo and we'll tell you",
+          "icon": "camera",
           "acceptsCustomInput": false
         }
       ],
@@ -515,13 +421,21 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 262,
+      "_sourceLine": 235,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "answer-label-max-words",
+          "field": "answerOption.label",
+          "severity": "warn",
+          "message": "Answer chip label longer than 7 words gets visually crowded.",
+          "snippet": "Not sure — take a photo and we'll tell you"
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -575,7 +489,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 276,
+      "_sourceLine": 250,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -665,7 +579,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 290,
+      "_sourceLine": 264,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -729,7 +643,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 323,
+      "_sourceLine": 297,
       "_impact": {
         "creates_systems": [
           "Landscaping"
@@ -798,7 +712,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 344,
+      "_sourceLine": 318,
       "_impact": {
         "creates_systems": [
           "Pool/Spa",
@@ -860,7 +774,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 360,
+      "_sourceLine": 334,
       "_impact": {
         "creates_systems": [
           "Pest Control"
@@ -915,7 +829,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 385,
+      "_sourceLine": 359,
       "_impact": {
         "creates_systems": [
           "Irrigation"
@@ -932,7 +846,7 @@
       "chapter": "yourPros",
       "title": "Security or alarm system?",
       "fallbackTitle": null,
-      "subtitle": null,
+      "subtitle": "We won't share specifics — your setup stays private to you and any household members you invite.",
       "kind": "singleChoice",
       "answerOptions": [
         {
@@ -958,6 +872,12 @@
           "label": "None",
           "icon": null,
           "acceptsCustomInput": false
+        },
+        {
+          "id": "prefer_not_to_answer",
+          "label": "Prefer not to answer",
+          "icon": "lock",
+          "acceptsCustomInput": false
         }
       ],
       "documentUploadCategory": null,
@@ -975,7 +895,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 404,
+      "_sourceLine": 378,
       "_impact": {
         "creates_systems": [
           "Security System"
@@ -983,7 +903,15 @@
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [],
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "subtitle",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "We won't share specifics — your setup stays private to you and any household ..."
+        }
+      ],
       "_recommendation": null
     },
     {
@@ -1097,7 +1025,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 426,
+      "_sourceLine": 402,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1128,7 +1056,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 469,
+      "_sourceLine": 445,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1159,7 +1087,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 477,
+      "_sourceLine": 453,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1211,7 +1139,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 489,
+      "_sourceLine": 465,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1244,7 +1172,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 503,
+      "_sourceLine": 479,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1304,7 +1232,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 533,
+      "_sourceLine": 509,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1358,7 +1286,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 560,
+      "_sourceLine": 536,
       "_impact": {
         "creates_systems": [
           "Solar"
@@ -1408,7 +1336,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 572,
+      "_sourceLine": 548,
       "_impact": {
         "creates_systems": [
           "Generator"
@@ -1439,7 +1367,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 591,
+      "_sourceLine": 567,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1499,7 +1427,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 605,
+      "_sourceLine": 581,
       "_impact": {
         "creates_systems": [
           "Garage Door"
@@ -1533,7 +1461,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 634,
+      "_sourceLine": 610,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1593,7 +1521,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 643,
+      "_sourceLine": 619,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1653,7 +1581,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 662,
+      "_sourceLine": 638,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1731,7 +1659,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 676,
+      "_sourceLine": 652,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1779,7 +1707,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 697,
+      "_sourceLine": 673,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],

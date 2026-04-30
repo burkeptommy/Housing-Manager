@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-30T19:06:45.303Z",
+  "generatedAt": "2026-04-30T19:28:38.052Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizAnswerMapper.swift",
-  "sourceCommit": "14f65c52",
+  "sourceCommit": "bf9d688e",
   "note": "Heuristic side-effect digest from regex scan. v2 will parse case bodies with the Swift expression parser.",
   "effectsByQuestion": {
     "q1_roof_material": {
@@ -14,27 +14,15 @@
     },
     "q2_siding": {
       "effects": [
-        "persists property attribute"
+        "(no recognized side effects)"
       ],
-      "rawSnippet": "case \"q2_siding\":\n                try await persistAttribute(\"siding_material\", value: answer.answerId)\n\n            "
+      "rawSnippet": "case \"q2_siding\":\n                \n                \n                \n                \n                \n                \n                \n                \n                \n                let sidingValue: String? = {\n                    if let ids = answer.selectedIds, !ids.isEmpty {\n                "
     },
     "q3_heating_system": {
       "effects": [
         "persists property attribute"
       ],
       "rawSnippet": "case \"q3_heating_system\":\n                \n                \n                \n                \n                \n                \n                guard let comboId = answer.answerId else { break }\n                if let fuel = HouseQuizFuelDerivation.heatingFuel(from: comboId) {\n                    tr"
-    },
-    "q4_purchase": {
-      "effects": [
-        "persists property attribute"
-      ],
-      "rawSnippet": "case \"q4_purchase\":\n                if let custom = answer.customText, let price = Double(digitsOnly(custom)) {\n                    var update = PropertyUpdate()\n                    update.purchasePrice = price\n                    if let kind = answer.answerId {\n                        try await per"
-    },
-    "q5_mortgage": {
-      "effects": [
-        "persists property attribute"
-      ],
-      "rawSnippet": "case \"q5_mortgage\":\n                let hasMortgage = answer.answerId == \"yes\"\n                try await persistAttribute(\"has_mortgage\", value: hasMortgage ? \"yes\" : \"no\")\n\n            "
     },
     "q6_water_source": {
       "effects": [

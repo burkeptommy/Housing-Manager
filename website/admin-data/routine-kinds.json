@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-30T17:30:01.796Z",
+  "generatedAt": "2026-04-30T19:28:38.031Z",
   "sourceFile": "Haven/Features/Property/Models/Routine.swift",
   "seederFile": "Haven/Features/Property/Services/RoutineSeeder.swift",
-  "sourceCommit": "85ba8c59",
+  "sourceCommit": "bf9d688e",
   "count": 20,
   "entries": [
     {
