@@ -1684,7 +1684,7 @@ function renderFacetPills(allItems) {
 function renderRecommendationsPanel(allItems) {
   if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
   const findings = computeRecommendations(allItems);
-  const total = findings.voice.length + findings.duplicates.length + findings.bundleCandidates.length;
+  const total = findings.voice.length + findings.duplicates.length + findings.bundleCandidates.length + findings.misroutedToTasks.length;
   const resolvedCount = loadResolvedRecs().size;
   const resetButton = resolvedCount > 0
     ? `<button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-reset title="Undo all resolved/dismissed recommendations and re-run the audit from scratch.">↻ Reset ${resolvedCount} resolved</button>`
@@ -1772,17 +1772,42 @@ function renderRecommendationsPanel(allItems) {
         }).join("")}
       </div>`
     : "";
+  // Phase 5z+4 — Misrouted-to-tasks section. Catches templates that
+  // should land on the handyman punch list per Tom's 5-tier model
+  // but currently auto-seed as maintenance_tasks rows.
+  const misroutedHtml = findings.misroutedToTasks.length
+    ? `<div class="admin-recs__section">
+        <h4>🪛 Misrouted to maintenance_tasks <span class="admin-recs__badge">${findings.misroutedToTasks.length}</span></h4>
+        <p class="admin-recs__what">
+          <strong>What this is:</strong> Templates with <code>routingOverride: .diyDefault</code> or <code>.diyCapable</code> + <code>diyEffortMinutes ≤ 60</code> + no <code>bundleId</code> + no <code>safetyFloor</code> that auto-seed as <code>maintenance_tasks</code> rows. Per Tom's 5-tier model, these are tier 4 ("tasks just for handymen") and should land as <code>handyman_punch_items</code> directly — not maintenance_tasks rows hidden behind <code>parent_routine_id</code>.<br/>
+          <strong>Why it matters:</strong> Cleaner data model (one row per concept), the homeowner finds them in the right place (Handyman tab punch list, not the main task list), and the bidirectional conversion (task↔punch) becomes straightforward when each side has its own home.<br/>
+          <strong>Primary action:</strong> Click <em>Draft punch-list re-route</em> to write a structured proposal Claude will apply next session — flips the seeding path from <code>MaintenanceTaskInsert</code> to <code>HandymanPunchItemInsert</code> for this template.
+        </p>
+        ${findings.misroutedToTasks.map((m) => recRow({
+          kind: "misrouted_punch",
+          recId: m.recId,
+          title: m.item.title,
+          tone: "purple",
+          description: `Currently seeds as a <code>maintenance_tasks</code> row in <code>${escapeHtml(m.item.payload?.systemCategory || "?")}</code>. Should seed directly as a <code>handyman_punch_items</code> row instead — homeowner finds it in the Handyman tab's auto-populated punch list, not buried under <code>parent_routine_id</code> in the main maintenance schedule.`,
+          primaryLabel: "Draft punch-list re-route",
+          itemId: m.item.id,
+          extraData: { templateKey: m.item.payload?.templateKey },
+        })).join("")}
+      </div>`
+    : "";
+
   return `
     <details class="admin-recs" open>
       <summary>
         <span class="admin-recs__title">⚠️ Recommendations <span class="admin-recs__badge admin-recs__badge--total">${total}</span></span>
-        <span class="admin-muted">Voice issues, likely duplicates, and grouping candidates. Click any row to draft a proposal note.</span>
+        <span class="admin-muted">Voice issues, likely duplicates, grouping candidates, and routing-tier mismatches. Click any row to draft a proposal note.</span>
         ${resetButton}
       </summary>
       <div class="admin-recs__body">
         ${voiceHtml}
         ${dupesHtml}
         ${candidatesHtml}
+        ${misroutedHtml}
       </div>
     </details>
   `;
@@ -1851,11 +1876,12 @@ function recId(kind, parts) {
     return `duplicate:${ids[0]}:${ids[1]}`;
   }
   if (kind === "bundle_candidate") return `bundle:${parts.groupKey}`;
+  if (kind === "misrouted_punch") return `misrouted_punch:${parts.itemId}`;
   return `${kind}:${JSON.stringify(parts)}`;
 }
 
 function computeRecommendations(allItems) {
-  const out = { voice: [], duplicates: [], bundleCandidates: [] };
+  const out = { voice: [], duplicates: [], bundleCandidates: [], misroutedToTasks: [] };
   const resolved = loadResolvedRecs();
 
   // 1. Voice violations from _lint
@@ -1940,6 +1966,29 @@ function computeRecommendations(allItems) {
     if (resolved.has(id)) continue;
     const [cat, season, assignmentType] = key.split("|");
     out.bundleCandidates.push({ groupKey: key, cat, season, assignmentType, items, recId: id });
+  }
+
+  // 4. Misrouted to maintenance_tasks (should be handyman punch items).
+  //
+  // Phase 5z+4 — Tom's 5-tier model: tier 4 = "tasks just for handymen"
+  // (small DIY-friendly items). Per the architecture, those should
+  // create handyman_punch_items rows directly at quiz completion, not
+  // maintenance_tasks rows that get hidden behind parent_routine_id.
+  // Detection: isEssential=true (auto-seeds) + diyDefault/diyCapable
+  // routing + ≤60min effort + not in a bundle (bundles handled
+  // separately) + not safety-floor (safety-floor templates can never
+  // be punch items).
+  for (const i of allItems) {
+    const t = i.payload || {};
+    if (t.isEssential === false) continue;
+    if (t.bundleId) continue;
+    if (t.safetyFloor === true) continue;
+    if (t.routingOverride !== "diyDefault" && t.routingOverride !== "diyCapable") continue;
+    const effort = t.diyEffortMinutes;
+    if (effort != null && effort > 60) continue;
+    const id = recId("misrouted_punch", { itemId: i.id });
+    if (resolved.has(id)) continue;
+    out.misroutedToTasks.push({ item: i, recId: id });
   }
 
   return out;
@@ -2092,6 +2141,31 @@ async function draftRecommendationNote(data) {
       `4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_${suggestedBundleId.replace(":", "_")}) so existing households' standalone tasks fold into the new bundle parent.\n` +
       `5. xcodebuild -scheme Chez to confirm clean compile.\n\n` +
       `**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.`;
+  } else if (kind === "misrouted_punch") {
+    const templateKey = data.recTemplateKey ? JSON.parse(data.recTemplateKey) : null;
+    const item = itemsForCurrentView().find((i) => i.id === data.recItemId);
+    intent = "change_request";
+    scopeType = "task";
+    scopeId = data.recItemId;
+    scopeTitle = title;
+    proposedDiff = {
+      from: { destination: "maintenance_tasks", parent_routine_id: "<handyman routine UUID>" },
+      to:   { destination: "handyman_punch_items" },
+    };
+    snapshot = item?.payload || null;
+    body =
+      `**Punch-list re-route proposal.**\n\n` +
+      `Template "${title}" (templateKey: \`${templateKey || "?"}\`) currently seeds as a \`maintenance_tasks\` row at quiz completion. Day1TaskCurator then re-parents it under the singleton handyman routine via \`parent_routine_id\` — which hides it from the main task list but leaves it in maintenance_tasks anyway.\n\n` +
+      `Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a \`handyman_punch_items\` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.\n\n` +
+      `**Action for Claude next session:**\n` +
+      `1. In \`MaintenanceTaskReconciler.reconcile(...)\`, when the template's tier resolves to handyman (routingOverride .diyDefault/.diyCapable + effort ≤ 60 + no safety floor), insert into \`handyman_punch_items\` instead of \`maintenance_tasks\`.\n` +
+      `2. The punch item carries \`source: "auto_seed_handyman_tier"\` so the punch list view can sort auto-populated items separately from manual additions.\n` +
+      `3. Add a one-time migration in \`AppState.initialize()\` (gated on \`hasMigratedHandymanTierToPunchItems_v1\`) that finds existing \`maintenance_tasks\` rows for this templateKey + archives them + creates equivalent \`handyman_punch_items\` rows.\n` +
+      `4. Verify Day1TaskCurator no longer needs to re-parent this template (it'll be skipped at the source).\n` +
+      `5. Update CLAUDE.md to document: handyman-tier templates seed punch items directly.\n\n` +
+      `**Bidirectional UI affordances** (separate but related work):\n` +
+      `- Punch item → Task: "Schedule as a task" action on each punch item card. Creates a maintenance_task with \`scheduled_date\` set, archives the punch item with reason \`promoted_to_task\`.\n` +
+      `- Task → Punch item: "Move to handyman list" action on each task detail sheet (already exists per Phase 56.4 docs). Archives the task with reason \`moved_to_handyman_punch\`, creates the punch item.`;
   } else {
     return false;
   }
@@ -2114,6 +2188,8 @@ async function draftRecommendationNote(data) {
         ? `Voice fix proposal saved with the BEFORE/AFTER text. Claude will apply the diff in MaintenanceTemplates.swift next session.`
         : kind === "duplicate"
         ? `Merge proposal saved with both templates' full data. Review options in the Notes tab.`
+        : kind === "misrouted_punch"
+        ? `Punch-list re-route proposal saved. Claude will flip the seeding path from maintenance_tasks to handyman_punch_items + ship the data migration next session.`
         : `Bundle proposal saved with the 5-step Swift edit checklist. Review in the Notes tab.`;
       alert(`✓ ${summary}\n\nThis row will hide from the recommendations panel.`);
       return true;
