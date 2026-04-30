@@ -983,6 +983,113 @@
   font-size: 14px;
   padding: 4px 14px;
 }
+/* Phase 5z — Recommendations panel above the Tasks/Handyman/Recommended
+   list. Three sections (voice / duplicates / bundle candidates), each
+   row has Open + Draft note buttons. */
+.admin-recs {
+  background: linear-gradient(135deg, rgba(237, 105, 85, 0.05), rgba(160, 120, 30, 0.04));
+  border: 1px solid rgba(237, 105, 85, 0.25);
+  border-radius: 14px;
+  margin-bottom: 14px;
+  padding: 0;
+}
+.admin-recs--empty {
+  background: rgba(74, 124, 89, 0.05);
+  border-color: rgba(74, 124, 89, 0.18);
+}
+.admin-recs > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  list-style: none;
+  padding: 12px 16px;
+}
+.admin-recs > summary::-webkit-details-marker {
+  display: none;
+}
+.admin-recs > summary::before {
+  content: "▸";
+  color: var(--text-muted);
+  font: 700 12px var(--sans);
+  transition: transform 120ms ease;
+}
+.admin-recs[open] > summary::before {
+  transform: rotate(90deg);
+}
+.admin-recs__title {
+  color: var(--text);
+  font: 700 14px var(--sans);
+}
+.admin-recs__badge {
+  background: rgba(237, 105, 85, 0.18);
+  border-radius: 999px;
+  color: var(--salmon-dark);
+  font: 700 11px var(--sans);
+  margin-left: 6px;
+  padding: 2px 8px;
+}
+.admin-recs__badge--total {
+  background: var(--salmon-dark);
+  color: #fff;
+}
+.admin-recs__body {
+  border-top: 1px solid var(--neutral-200);
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+}
+.admin-recs__section h4 {
+  color: var(--text);
+  font: 700 12px var(--sans);
+  margin: 0 0 4px;
+}
+.admin-recs__section p {
+  font: 500 11px var(--sans);
+  margin: 0 0 8px;
+}
+.admin-rec {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-left-width: 3px;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 6px;
+  padding: 8px 12px;
+}
+.admin-rec--salmon { border-left-color: var(--salmon-dark); }
+.admin-rec--indigo { border-left-color: var(--indigo-700); }
+.admin-rec--purple { border-left-color: #5b3585; }
+.admin-rec__main {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.admin-rec__main strong {
+  font: 600 13px var(--sans);
+}
+.admin-rec__main span {
+  font: 500 11px var(--sans);
+  line-height: 1.4;
+}
+.admin-rec__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.admin-button--small {
+  font: 600 11px var(--sans);
+  padding: 4px 10px;
+}
+.admin-button--ghost {
+  background: transparent;
+  border: 1px solid var(--neutral-200);
+  color: var(--text);
+}
+
 /* Phase 5w — Entity-flavor pill in the detail panel eyebrow. Replaces
    the bare "admin task" / "live task" text with a labeled, color-coded
    pill so Tom always knows what kind of entity he's looking at. */

@@ -261,7 +261,11 @@ const state = {
   // Phase 5q — extra filter axes for Tasks / Recommended / Handyman so
   // Tom can narrow 220+ templates down by lifecycle + season + routing
   // without scrolling. Reset to "all" on view change.
-  lifecycleFilter: "all", // all | auto_seed | opt_in | bundle_child | bundle_parent
+  // Phase 5z — Default to auto_seed so the Tasks tab opens with the
+  // 91 templates that fire on quiz completion (≈ what the homeowner
+  // actually gets). Click the Opt-in pill to see the 130 recommended
+  // ones, or "All" to see everything.
+  lifecycleFilter: "auto_seed", // all | auto_seed | opt_in | bundle_child | bundle_parent
   seasonFilter: "all",    // all | Spring | Summer | Fall | Winter | year_round | Spring/Fall
   routingFilter: "all",   // all | vendor_only | vendor_or_handyman | handyman_only | bundled
   handymanFilter: "all",  // all | spring | fall | library — only used on Handyman tab
@@ -1523,8 +1527,13 @@ function renderList() {
   const filtered = filterItems(all);
   renderStats(all, filtered);
   const facets = renderFacetPills(all);
-  el.list.innerHTML = (facets ? facets : "") + (filtered.map((item) => itemRowHtml(item)).join("") || emptyListHtml());
+  // Phase 5z — Recommendations panel surfaces voice violations,
+  // duplicates, and bundle-merge candidates with one-click "Draft note"
+  // actions so Tom can act on the audit findings without leaving the tab.
+  const recs = renderRecommendationsPanel(all);
+  el.list.innerHTML = (recs ? recs : "") + (facets ? facets : "") + (filtered.map((item) => itemRowHtml(item)).join("") || emptyListHtml());
   attachFacetPillHandlers(el.list);
+  attachRecommendationsHandlers(el.list);
   el.list.querySelectorAll("[data-item-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selected = all.find((item) => item.id === button.dataset.itemId) ?? null;
@@ -1667,6 +1676,263 @@ function renderFacetPills(allItems) {
   `;
 }
 
+// Phase 5z — Recommendations panel. Surfaces three buckets of audit
+// findings on Tasks/Handyman/Recommended tabs: voice violations,
+// likely duplicates, and bundle-merge candidates. Each row has a
+// "Draft proposal note" button that opens the note form pre-filled
+// with a structured body Tom can review + save.
+function renderRecommendationsPanel(allItems) {
+  if (!["tasks", "handyman", "recommended"].includes(state.view)) return "";
+  const findings = computeRecommendations(allItems);
+  const total = findings.voice.length + findings.duplicates.length + findings.bundleCandidates.length;
+  if (total === 0) {
+    return `
+      <details class="admin-recs admin-recs--empty">
+        <summary>
+          <span class="admin-recs__title">✓ Recommendations — none</span>
+          <span class="admin-muted">No voice / duplicate / grouping issues detected on this surface.</span>
+        </summary>
+      </details>
+    `;
+  }
+  const voiceHtml = findings.voice.length
+    ? `<div class="admin-recs__section">
+        <h4>🔠 Voice violations <span class="admin-recs__badge">${findings.voice.length}</span></h4>
+        <p class="admin-muted">Em-dashes and other brand-voice issues flagged by website/admin-data/voice-rules.json.</p>
+        ${findings.voice.slice(0, 8).map((v) => recRow({
+          kind: "voice",
+          title: v.item.title,
+          tone: "salmon",
+          detail: v.hits.map((h) => `<code>${escapeHtml(h.field)}</code>: "${escapeHtml((h.snippet || "").slice(0, 70))}…"`).join(" · "),
+          itemId: v.item.id,
+        })).join("")}
+        ${findings.voice.length > 8 ? `<p class="admin-muted">… and ${findings.voice.length - 8} more</p>` : ""}
+      </div>`
+    : "";
+  const dupesHtml = findings.duplicates.length
+    ? `<div class="admin-recs__section">
+        <h4>🔁 Likely duplicates <span class="admin-recs__badge">${findings.duplicates.length}</span></h4>
+        <p class="admin-muted">Same systemCategory + ≥55% title overlap (intentional spring/fall pairs auto-excluded).</p>
+        ${findings.duplicates.map((d) => recRow({
+          kind: "duplicate",
+          title: `${d.a.title} ↔ ${d.b.title}`,
+          tone: "indigo",
+          detail: `${d.cat} · ${d.sim}% overlap. Consider: merge, rename one, or confirm intentional.`,
+          itemId: d.a.id,
+          extraData: { otherId: d.b.id, otherTitle: d.b.title, similarity: d.sim },
+        })).join("")}
+      </div>`
+    : "";
+  const candidatesHtml = findings.bundleCandidates.length
+    ? `<div class="admin-recs__section">
+        <h4>📦 Bundle-merge candidates <span class="admin-recs__badge">${findings.bundleCandidates.length}</span></h4>
+        <p class="admin-muted">3+ standalone templates in the same category + season + assignment that could fold into ONE seasonal visit (like the existing Generator:annual or Roofing:spring bundles).</p>
+        ${findings.bundleCandidates.map((c) => recRow({
+          kind: "bundle_candidate",
+          title: `${c.cat} · ${c.season} · ${c.assignmentType} (${c.items.length} items)`,
+          tone: "purple",
+          detail: c.items.map((t) => `<code>${escapeHtml(t.title)}</code>`).join(", "),
+          itemId: c.items[0].id,
+          extraData: { groupKey: c.groupKey, items: c.items.map((t) => ({ title: t.title, templateKey: t.payload?.templateKey })) },
+        })).join("")}
+      </div>`
+    : "";
+  return `
+    <details class="admin-recs" open>
+      <summary>
+        <span class="admin-recs__title">⚠️ Recommendations <span class="admin-recs__badge admin-recs__badge--total">${total}</span></span>
+        <span class="admin-muted">Voice issues, likely duplicates, and grouping candidates. Click any row to draft a proposal note.</span>
+      </summary>
+      <div class="admin-recs__body">
+        ${voiceHtml}
+        ${dupesHtml}
+        ${candidatesHtml}
+      </div>
+    </details>
+  `;
+}
+
+function recRow(opts) {
+  const dataAttrs = Object.entries(opts.extraData || {}).map(([k, v]) => `data-rec-${k}="${escapeHtml(JSON.stringify(v))}"`).join(" ");
+  return `
+    <div class="admin-rec admin-rec--${opts.tone}" data-rec-kind="${escapeHtml(opts.kind)}" data-rec-item-id="${escapeHtml(opts.itemId || "")}" data-rec-title="${escapeHtml(opts.title)}" ${dataAttrs}>
+      <div class="admin-rec__main">
+        <strong>${opts.title.includes("↔") ? opts.title : escapeHtml(opts.title)}</strong>
+        <span class="admin-muted">${opts.detail}</span>
+      </div>
+      <div class="admin-rec__actions">
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-rec-jump>Open</button>
+        <button type="button" class="admin-button admin-button--small" data-rec-draft>Draft note</button>
+      </div>
+    </div>
+  `;
+}
+
+function computeRecommendations(allItems) {
+  const out = { voice: [], duplicates: [], bundleCandidates: [] };
+
+  // 1. Voice violations from _lint
+  for (const i of allItems) {
+    const hits = i.payload?._lint || [];
+    if (hits.length) out.voice.push({ item: i, hits });
+  }
+
+  // 2. Likely duplicates — same systemCategory + ≥55% title overlap.
+  // Auto-exclude intentional spring/fall pairs (same templateKey base
+  // but different bundleId season suffix — these are correct dupes
+  // designed to fire in BOTH seasonal bundles).
+  const tokenize = (s) => new Set((s || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter((w) => w.length > 2));
+  const jaccard = (a, b) => {
+    const aSet = tokenize(a), bSet = tokenize(b);
+    const inter = [...aSet].filter((x) => bSet.has(x)).length;
+    const union = new Set([...aSet, ...bSet]).size;
+    return union === 0 ? 0 : inter / union;
+  };
+  const tasks = allItems.filter((i) => ["task", "handyman", "recommended"].includes(i.itemType));
+  for (let i = 0; i < tasks.length; i++) {
+    for (let j = i + 1; j < tasks.length; j++) {
+      const a = tasks[i], b = tasks[j];
+      if (a.payload?.systemCategory !== b.payload?.systemCategory) continue;
+      // Skip intentional spring/fall bundle pairs
+      const aIsBundle = !!a.payload?.bundleId;
+      const bIsBundle = !!b.payload?.bundleId;
+      if (aIsBundle && bIsBundle && a.payload.bundleId !== b.payload.bundleId) {
+        const aBase = a.payload.bundleId.split(":")[0];
+        const bBase = b.payload.bundleId.split(":")[0];
+        if (aBase === bBase) continue; // smoke detector spring + fall — intentional
+      }
+      const sim = jaccard(a.title, b.title);
+      if (sim >= 0.55) {
+        out.duplicates.push({ a, b, cat: a.payload?.systemCategory, sim: Math.round(sim * 100) });
+      }
+    }
+  }
+
+  // 3. Bundle-merge candidates — 3+ standalone templates with the
+  // same category + season + assignmentType, no current bundleId.
+  const groups = {};
+  for (const i of allItems) {
+    const t = i.payload || {};
+    if (t.bundleId) continue;
+    if (!t.seasonalTiming) continue;
+    if (!t.systemCategory) continue;
+    const key = `${t.systemCategory}|${t.seasonalTiming}|${t.assignmentType || "either"}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i);
+  }
+  for (const [key, items] of Object.entries(groups)) {
+    if (items.length < 3) continue;
+    const [cat, season, assignmentType] = key.split("|");
+    out.bundleCandidates.push({ groupKey: key, cat, season, assignmentType, items });
+  }
+
+  return out;
+}
+
+function attachRecommendationsHandlers(host) {
+  if (!host) return;
+  host.querySelectorAll("[data-rec-jump]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rec = btn.closest("[data-rec-item-id]");
+      const itemId = rec?.dataset.recItemId;
+      if (!itemId) return;
+      const items = itemsForCurrentView();
+      const target = items.find((i) => i.id === itemId);
+      if (target) {
+        state.selected = target;
+        renderList();
+        renderDetail();
+      }
+    });
+  });
+  host.querySelectorAll("[data-rec-draft]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const rec = btn.closest("[data-rec-kind]");
+      if (!rec) return;
+      await draftRecommendationNote(rec.dataset);
+    });
+  });
+}
+
+// Phase 5z — Pre-format a structured note body per recommendation
+// kind and write it to admin_codex_notes (cloud) or local storage.
+// Tom can review + edit in the Notes tab before it syncs to
+// CLAUDE_ADMIN_NOTES.md for next session.
+async function draftRecommendationNote(data) {
+  const kind = data.recKind;
+  const title = data.recTitle;
+  let body, intent, scopeType, scopeId, scopeTitle;
+
+  if (kind === "voice") {
+    intent = "change_request";
+    scopeType = "task";
+    scopeId = data.recItemId;
+    scopeTitle = title;
+    body =
+      `**Voice fix proposal.**\n\n` +
+      `Template "${title}" has a brand-voice violation flagged by website/admin-data/voice-rules.json. ` +
+      `Most common: em-dashes in description / notes, which read as AI-generated to HNW audience.\n\n` +
+      `Action: replace em-dashes with periods or em-spaces, regenerate the affected fields, re-run the voice lint.`;
+  } else if (kind === "duplicate") {
+    const otherTitle = JSON.parse(data.recOtherTitle || '""');
+    const sim = JSON.parse(data.recSimilarity || "0");
+    intent = "change_request";
+    scopeType = "task";
+    scopeId = data.recItemId;
+    scopeTitle = title;
+    body =
+      `**Duplicate review.**\n\n` +
+      `Detected ${sim}% title overlap between two templates in the same systemCategory:\n` +
+      `1. ${title.split("↔")[0].trim()}\n` +
+      `2. ${otherTitle}\n\n` +
+      `Decide whether to:\n` +
+      `- **Merge** into one template (use the better description; archive the other with stableId override).\n` +
+      `- **Rename** one to make the distinction clear (e.g., add "winter" / "summer" / "exterior" / "interior").\n` +
+      `- **Confirm intentional** — close this note with reason.\n\n` +
+      `If merging, also update any references in HouseQuizAnswerMapper.swift, system seeders, or dashboard cards.`;
+  } else if (kind === "bundle_candidate") {
+    const items = JSON.parse(data.recItems || "[]");
+    const groupKey = data.recGroupKey || "";
+    const [cat, season, at] = groupKey.split("|");
+    const suggestedBundleId = `${cat}:${season.toLowerCase()}`;
+    intent = "proposal_add";
+    scopeType = "task";
+    scopeId = data.recItemId;
+    scopeTitle = `Bundle candidate: ${cat} ${season}`;
+    body =
+      `**Bundle-merge proposal.**\n\n` +
+      `${items.length} standalone templates share the same systemCategory + season + assignmentType — same pattern as the existing Generator:annual or Roofing:spring bundles. Consider folding them into one seasonal visit so the homeowner sees ONE scheduled task instead of ${items.length} separate ones.\n\n` +
+      `**Proposed bundle:** \`${suggestedBundleId}\`\n` +
+      `**Bundle title suggestion:** "${season} ${cat} Service"\n` +
+      `**Templates to fold in:**\n` +
+      items.map((i, idx) => `${idx + 1}. ${i.title} (${i.templateKey || "—"})`).join("\n") +
+      `\n\nAction: in MaintenanceTemplates.swift, add bundleId="${suggestedBundleId}" to all ${items.length}, set bundleTitle="${season} ${cat} Service" on the first one (the parent), and verify the iOS reconciler creates one task instead of ${items.length}. Watch out for: existing standalone tasks in real households (the migration backfillBundlesOnceIfNeeded handles re-parenting, but check the migration runs once per install).\n\nAlternative: if the homeowner-friction case is weak, leave them standalone.`;
+  } else {
+    return;
+  }
+
+  try {
+    if (typeof writeNote === "function") {
+      await writeNote({
+        scopeType,
+        scopeId,
+        scopeTitle,
+        body,
+        intent,
+        target: el.fieldTarget?.value || "claude",
+      });
+      flashSavePill();
+      alert("Draft note saved. Open the Notes tab to review + edit before sync.");
+    } else {
+      console.warn("writeNote not available");
+    }
+  } catch (err) {
+    alert(`Failed to draft note: ${err.message}`);
+  }
+}
+
 function attachFacetPillHandlers(host) {
   host.querySelectorAll("[data-facet-axis]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1687,7 +1953,11 @@ function attachFacetPillHandlers(host) {
 
 function lifecycleOf(item) {
   const t = item.payload || {};
-  if (t.bundleId) return "bundle_child";
+  // Phase 5z — Bundle PARENTS (have bundleTitle, ARE the homeowner-facing
+  // task) classify as auto_seed since they fire on quiz completion. Only
+  // non-parent children classify as bundle_child since they fold into the
+  // parent at runtime.
+  if (t.bundleId && !t.bundleTitle) return "bundle_child";
   if (t.isEssential === false) return "opt_in";
   return "auto_seed";
 }
