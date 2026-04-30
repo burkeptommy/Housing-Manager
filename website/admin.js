@@ -285,6 +285,14 @@ const state = {
   simQuizAnswers: {},
   // Phase 5e — currently-focused architecture object (null = overview).
   archSelectedKey: null,
+  // Phase 5z+8 — Notes tab filters. `notesIntentFilter` narrows the
+  // top-level notes list to a single intent (feedback / change_request /
+  // proposal_add / proposal_delete / bug / idea / question_for_claude).
+  // `notesShowApplied` toggles whether applied notes show up in the list
+  // — default true so the audit trail stays visible, click "Hide applied"
+  // to focus on what's still pending. Both reset to defaults on page load.
+  notesIntentFilter: "all",
+  notesShowApplied: true,
 };
 
 function structuredCloneSafePure(value) {
@@ -992,12 +1000,18 @@ const LIVE_MAPPERS = {
   // Tasks view but filters down to isEssential: false (homeowner opts
   // in). Returning null for essentials skips them via .filter(Boolean)
   // in liveItemsForView.
+  //
+  // Phase 5z+7 — Handyman-context items (standalone Handyman library +
+  // Handyman:spring/fall bundle members) are NOT shown here either.
+  // They live ONLY on the Handyman tab. The Phase 54B handyman punch
+  // list "Recommended" section is the homeowner's discovery surface
+  // for opt-in handyman work; Recommended Services in the iOS app is
+  // for opt-in vendor / non-handyman work.
   recommended: (t, idx) => {
     if (t.isEssential !== false) return null;
-    const inHandymanBundle = t.bundleId?.startsWith("Handyman:");
-    if (inHandymanBundle) return null; // bundle children belong on the Handyman surface
-    const isHandymanLibrary = t.systemCategory === "Handyman" && !t.bundleId;
-    const bucket = isHandymanLibrary ? "🛠️ Handyman library" : `✨ ${t.systemCategory}`;
+    if (t.systemCategory === "Handyman") return null;
+    if (typeof t.bundleId === "string" && t.bundleId.startsWith("Handyman:")) return null;
+    const bucket = `✨ ${t.systemCategory}`;
     return {
       id: `live-recommended-${slug(t.templateKey)}`,
       source: "live",
@@ -1005,11 +1019,9 @@ const LIVE_MAPPERS = {
       title: titleCase(t.title),
       status: "draft", // never active by default — opt-in only
       category: bucket,
-      // Group by bucket (Handyman library first, then alpha by category),
-      // alpha within each bucket.
-      sortOrder: (isHandymanLibrary ? 0 : 1) * 1000 + (titleCase(t.title) || "").charCodeAt(0),
+      sortOrder: (titleCase(t.title) || "").charCodeAt(0),
       description: t.description || t.notes || "",
-      payload: { ...t, _isHandymanLibrary: isHandymanLibrary },
+      payload: { ...t },
       lintCount: (t._lint || []).length,
     };
   },
@@ -1663,13 +1675,18 @@ function renderFacetPills(allItems) {
       ${axisRow(
         "Routing",
         state.view === "tasks"
-          ? "Who handles this by default? Handyman items live on the Handyman tab — click the Handyman pill below to surface them here too."
+          ? "Who handles this by default? Handyman items aren't shown here — they live exclusively on the Handyman tab."
           : "Who handles this by default?",
         [
           pill("routing", "all", "All", allItems.length),
           pill("routing", "vendor", "Vendor", routingCounts.vendor, "Always a pro — gas, panel, roof, septic, generator. Homeowner can't safely take this on."),
           pill("routing", "vendor_or_handyman", "Vendor or Handyman", routingCounts.vendor_or_handyman, "Defaults to a vendor visit, but the handyman can knock it out on a punch-list visit too."),
-          pill("routing", "handyman", `Handyman${state.view === "tasks" ? " (on Handyman tab)" : ""}`, routingCounts.handyman, "Punch-list items the handyman tackles. On the Tasks tab these are hidden by default and live on the Handyman tab — click this pill to override and show them here too. Homeowner can pull any of these into 'I'll do it myself' at runtime."),
+          // Phase 5z+7 — Handyman pill only shown on non-Tasks surfaces.
+          // On the Tasks tab the count is always 0 (handyman items
+          // excluded entirely), so the pill would be dead weight.
+          state.view === "tasks"
+            ? ""
+            : pill("routing", "handyman", "Handyman", routingCounts.handyman, "Punch-list items the handyman tackles. Homeowner can still pull any of these into 'I'll do it myself' if they want."),
           pill("routing", "homeowner_pull", "I'll do it myself", routingCounts.homeowner_pull, "Always 0 by default. Only populates when the homeowner explicitly pulls a task off another routing lane."),
           pill("routing", "bundled", "Bundled into a visit", routingCounts.bundled, "Bundle children that fold into a parent visit at runtime — Spring Landscaping Service, Pool Opening, Annual Generator Service, etc. The homeowner sees ONE scheduled task per bundle, not the underlying children."),
         ].join("")
@@ -2425,7 +2442,15 @@ function attachFacetPillHandlers(host) {
       const axis = btn.dataset.facetAxis;
       const value = btn.dataset.facetValue;
       state[`${axis}Filter`] = value;
-      renderList();
+      // Phase 5z+8 — re-render the right surface. Notes tab owns its own
+      // filter axis (notesIntent) and isn't part of the renderList path,
+      // so route there explicitly. Everything else falls through to the
+      // existing list renderer.
+      if (state.view === "notes") {
+        renderNotesView();
+      } else {
+        renderList();
+      }
     });
   });
   // Phase 5y — bundle grouping toggle
@@ -2495,6 +2520,17 @@ function countBySeason(items) {
 //                        homeowner explicitly pulls a task to themselves
 //   bundled            — has a bundleId; folds into a parent visit at
 //                        runtime instead of surfacing as its own task
+// Phase 5z+7 — "Handyman context" = systemCategory is Handyman OR
+// bundleId starts with Handyman: (the spring/fall bundle members).
+// Used to exclude these items from non-Handyman surfaces (Tasks /
+// Recommended) so they live ONLY on the Handyman tab.
+function isHandymanContextItem(item) {
+  const t = item?.payload || {};
+  if (t.systemCategory === "Handyman") return true;
+  if (typeof t.bundleId === "string" && t.bundleId.startsWith("Handyman:")) return true;
+  return false;
+}
+
 function routingOf(item) {
   const t = item.payload || {};
   if (t.bundleId) return "bundled";
@@ -3958,6 +3994,28 @@ function claudeFileNoteHtml(note, depth = 0) {
   `;
 }
 
+// Phase 5z+8 — Tally notes by intent so the filter pills can show
+// per-intent counts. The 7 buckets match the <select data-field-intent>
+// options in admin.html. Notes that landed before the bug/idea/q4c
+// intents existed default to `feedback`.
+function countNotesByIntent(notes) {
+  const out = {
+    feedback: 0,
+    change_request: 0,
+    proposal_add: 0,
+    proposal_delete: 0,
+    bug: 0,
+    idea: 0,
+    question_for_claude: 0,
+  };
+  for (const n of notes) {
+    const i = n.intent || "feedback";
+    if (i in out) out[i]++;
+    else out.feedback++;
+  }
+  return out;
+}
+
 function renderNotesView() {
   // Phase 5h — text search across body + scope title + scope id. Reuses
   // the existing list-tools search input (state.search) so the same
@@ -3970,15 +4028,94 @@ function renderNotesView() {
       .some((s) => String(s).toLowerCase().includes(query));
   };
 
-  // Top-level notes only; replies stay nested under their parents on the
-  // entity's detail panel.
-  const topLevel = state.notes.filter((n) => !n.parentNoteId).filter(matchesQuery);
+  // Phase 5z+8 — gather every search-matching top-level note BEFORE
+  // applying the intent / applied toggles, so the pill counts stay stable
+  // as Tom flips between intents (Apple Mail / Linear pattern).
+  const queryMatched = state.notes.filter((n) => !n.parentNoteId).filter(matchesQuery);
+  const intentCounts = countNotesByIntent(queryMatched);
+  const appliedCount = queryMatched.filter((n) => n.appliedAt).length;
+  const pendingCount = queryMatched.length - appliedCount;
 
-  el.stats.innerHTML = `
-    <div class="admin-stat"><strong>${topLevel.length}</strong><span>${query ? "Matching" : "Notes"}</span></div>
-    <div class="admin-stat"><strong>${state.notes.filter((n) => !n.appliedAt && ["change_request","proposal_add","proposal_delete"].includes(n.intent)).length}</strong><span>Pending</span></div>
-    <div class="admin-stat"><strong>${state.notes.filter((n) => n.appliedAt).length}</strong><span>Applied</span></div>
+  // Apply the intent filter + applied toggle.
+  const intentFilter = state.notesIntentFilter || "all";
+  const showApplied = state.notesShowApplied !== false;
+  const topLevel = queryMatched.filter((n) => {
+    if (!showApplied && n.appliedAt) return false;
+    if (intentFilter !== "all" && (n.intent || "feedback") !== intentFilter) return false;
+    return true;
+  });
+
+  // Three-tier stat row stays the same — these read against the FULL
+  // notes table (not the filtered view) so the totals don't shift as
+  // Tom narrows the list.
+  const statsHtml = `
+    <div class="admin-stats__tiles">
+      <div class="admin-stat"><strong>${queryMatched.length}</strong><span>${query ? "Matching" : "Notes"}</span></div>
+      <div class="admin-stat"><strong>${state.notes.filter((n) => !n.appliedAt && ["change_request","proposal_add","proposal_delete"].includes(n.intent)).length}</strong><span>Pending</span></div>
+      <div class="admin-stat"><strong>${state.notes.filter((n) => n.appliedAt).length}</strong><span>Applied</span></div>
+    </div>
   `;
+
+  // Phase 5z+8 — intent + applied filter row. `notesIntent` axis matches
+  // the existing `attachFacetPillHandlers` convention (state[axis+'Filter']),
+  // and the applied toggle uses its own data attribute so a single click
+  // flips state.notesShowApplied.
+  const intentPill = (value, label, count, title) => {
+    const isActive = intentFilter === value;
+    return `<button type="button" class="admin-facet-pill ${isActive ? "is-active" : ""}" data-facet-axis="notesIntent" data-facet-value="${escapeHtml(value)}" title="${escapeHtml(title)}">
+      <span class="admin-facet-pill__label">${escapeHtml(label)}</span>
+      <span class="admin-facet-pill__count">${count}</span>
+    </button>`;
+  };
+
+  const filtersHtml = `
+    <div class="admin-facets admin-facets--notes">
+      <div class="admin-facet-row">
+        <div class="admin-facet-row__head">
+          <span class="admin-facet-row__label">Intent</span>
+          <span class="admin-facet-row__caption admin-muted">Narrow the list to a single note kind. Counts honor the search box.</span>
+        </div>
+        <div class="admin-facet-row__pills">
+          ${intentPill("all", "All", queryMatched.length, "Show every note matching the current search.")}
+          ${intentPill("change_request", "Change request", intentCounts.change_request, "Concrete edits Tom wants Claude to apply next session — usually scoped to a quiz question, template, or routine.")}
+          ${intentPill("feedback", "Feedback", intentCounts.feedback, "Default catch-all for observations and reactions that don't ask Claude to change anything.")}
+          ${intentPill("proposal_add", "Proposal · add", intentCounts.proposal_add, "Suggested NEW entity — a missing template, system, routine, or quiz answer.")}
+          ${intentPill("proposal_delete", "Proposal · cut", intentCounts.proposal_delete, "Candidate for removal — duplicate, low-value, or orphaned entity.")}
+          ${intentPill("bug", "Bug", intentCounts.bug, "Something is broken in the app or admin lab. Usually paired with a screenshot description in the body.")}
+          ${intentPill("idea", "Idea", intentCounts.idea, "Long-horizon thinking — explore later, not next session.")}
+          ${intentPill("question_for_claude", "Question for Claude", intentCounts.question_for_claude, "Answer-first notes — Claude responds in a reply before any code change happens.")}
+        </div>
+      </div>
+      <div class="admin-facet-row admin-facet-row--grouping">
+        <div class="admin-facet-row__head">
+          <span class="admin-facet-row__label">Applied</span>
+          <span class="admin-facet-row__caption admin-muted">Already-applied notes carry the audit trail — hide them when you only want what's still open.</span>
+        </div>
+        <div class="admin-facet-row__pills">
+          <button type="button" class="admin-facet-pill ${showApplied ? "is-active" : ""}" data-notes-show-applied="true" title="Default. Show every matching note, including the ones already applied to the codebase. Applied notes carry an 'applied' pill + commit hash on hover.">
+            <span class="admin-facet-pill__label">Show applied</span>
+            <span class="admin-facet-pill__count">${appliedCount}</span>
+          </button>
+          <button type="button" class="admin-facet-pill ${!showApplied ? "is-active" : ""}" data-notes-show-applied="false" title="Hide notes that already landed in code. The list shrinks to whatever's still pending — useful when prepping the next session's worklist.">
+            <span class="admin-facet-pill__label">Hide applied (pending only)</span>
+            <span class="admin-facet-pill__count">${pendingCount}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  el.stats.innerHTML = `${statsHtml}${filtersHtml}`;
+
+  // Wire the intent pills via the existing facet handler convention,
+  // plus a dedicated handler for the applied toggle.
+  attachFacetPillHandlers(el.stats);
+  el.stats.querySelectorAll("[data-notes-show-applied]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.notesShowApplied = btn.dataset.notesShowApplied === "true";
+      renderNotesView();
+    });
+  });
 
   el.list.innerHTML = topLevel.map((note) => {
     const canJump = noteCanJumpToEntity(note);
@@ -4017,7 +4154,11 @@ function renderNotesView() {
         ${deleteBtn}
       </div>
     `;
-  }).join("") || emptyListHtml("No notes yet.");
+  }).join("") || emptyListHtml(
+    queryMatched.length === 0
+      ? (query ? `No notes match "${query}".` : "No notes yet.")
+      : `No notes match the active filters. ${queryMatched.length} ${queryMatched.length === 1 ? "note" : "notes"} hidden — clear the intent pill or toggle Show applied.`
+  );
 
   // Phase 5z+3 — Wire row-level delete buttons (separate from the row
   // click which navigates to the entity).
@@ -4055,8 +4196,11 @@ function renderNotesView() {
   // Initial pane state — empty until a note is clicked.
   el.emptyDetail.classList.remove("is-hidden");
   el.detail.classList.add("is-hidden");
+  const filterIsActive = intentFilter !== "all" || !showApplied;
   el.emptyDetail.querySelector("h3").textContent = query
     ? `${topLevel.length} note${topLevel.length === 1 ? "" : "s"} matching "${query}"`
+    : filterIsActive
+    ? `${topLevel.length} of ${queryMatched.length} note${queryMatched.length === 1 ? "" : "s"} shown.`
     : "Pick a note to open its entity.";
   el.emptyDetail.querySelector("p").textContent = query
     ? "Click any matching note to open the entity it's about. Search clears when you switch surfaces or hit Esc."
@@ -5068,11 +5212,13 @@ function filterItems(items) {
       }
       if (state.routingFilter !== "all" && routingOf(item) !== state.routingFilter) return false;
       if (state.view === "handyman" && state.handymanFilter !== "all" && handymanVisitOf(item) !== state.handymanFilter) return false;
-      // Phase 5z+6 — Tasks tab hides handyman-routed templates by
-      // default (they have their own home on the Handyman tab). Power
-      // users can override via the routing filter (clicking
-      // "Handyman" routing pill auto-clears this exclusion).
-      if (state.view === "tasks" && state.routingFilter === "all" && routingOf(item) === "handyman") return false;
+      // Phase 5z+7 — Tasks tab fully excludes ALL handyman-context
+      // templates (standalone Handyman library + Handyman:spring/fall
+      // bundle parents + their children). Handyman items live ONLY on
+      // the Handyman tab; period. No override toggle. The bidirectional
+      // task ↔ punch flow (Phase 67E/F) is a runtime homeowner action
+      // on a task instance, not a template-level dual-listing concern.
+      if (state.view === "tasks" && isHandymanContextItem(item)) return false;
     }
     if (!q) return true;
     return [item.title, item.category, item.description, JSON.stringify(item.payload ?? {})]

@@ -340,6 +340,26 @@
   margin-bottom: 12px;
 }
 
+/* Phase 5z+8 — When the Notes view nests stat tiles + filter rows
+   inside el.stats, switch the outer container to a column flex so the
+   tile grid stays 3-up at the top and the facet rows stack underneath
+   without inheriting the parent's 3-column grid. */
+.admin-stats:has(.admin-stats__tiles) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-stats__tiles {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.admin-facets--notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .admin-stat {
   background: #fff;
   border: 1px solid var(--neutral-200);
