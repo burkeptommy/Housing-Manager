@@ -769,7 +769,7 @@ enum MaintenanceTemplates {
         // SIDING / EXTERIOR
         // ──────────────────────────────────────────────
         ("Siding/Exterior", [
-            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.", frequency: "Annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Siding/Exterior:annual", bundleTitle: "Annual Exterior Maintenance"),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Semi-annual is right for vinyl in our region. Wood, brick, and fiber-cement homes can stretch this to once a year. Mixed-material homes follow the more frequent cadence wherever vinyl is present.", assignmentType: .vendor, bundleId: "Siding/Exterior:annual", bundleTitle: "Annual Exterior Maintenance"),
             MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Deck and patio annual service", description: "Handyman or deck pro inspects deck boards, railings, and stairs for rot or loose fasteners; spot-seals as needed. Full stain or seal every 2-3 years.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Seal or stain every 2-3 years", isEssential: false, assignmentType: .vendor, bundleId: "Siding/Exterior:annual"),
             // Phase 54C: value-preservation exterior walkarounds. These
             // are NOT bundled into the annual exterior bundle because
@@ -961,7 +961,7 @@ enum MaintenanceTemplates {
         // Phase 52: Septic consolidated from 3 tasks to 2 (1 triennial
         // bundle + 1 quarterly DIY drain field check).
         ("Septic System", [
-            MaintenanceTemplate(systemCategory: "Septic System", title: "Septic tank pumping", description: "Pumping of septic tank to remove accumulated solids.", frequency: "Every 3-5 years", priority: "High", estimatedCostRange: "$300–$600", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Frequency depends on household size and tank size", assignmentType: .vendor, bundleId: "Septic System:triennial", bundleTitle: "Septic Service Visit", safetyFloor: true, maxIntervalDays: 1825),
+            MaintenanceTemplate(systemCategory: "Septic System", title: "Septic tank pumping", description: "Pumping of septic tank to remove accumulated solids.", frequency: "Every 2 years", priority: "High", estimatedCostRange: "$300–$600", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Two-year default for a typical 4-person household with a 1,000-gallon tank. Larger households (6+) should pump annually; small households (1-2 people) with larger tanks can stretch to 3 years. Inspector will tell you the actual sludge level on each visit and recalibrate.", assignmentType: .vendor, bundleId: "Septic System:triennial", bundleTitle: "Septic Service Visit", safetyFloor: true, maxIntervalDays: 1825),
             MaintenanceTemplate(systemCategory: "Septic System", title: "Inspect septic baffles", description: "Septic service inspects baffles during pumping to ensure they're intact.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "Included with pumping", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Done during pumping", assignmentType: .vendor, bundleId: "Septic System:triennial"),
         ]),
 
@@ -2075,13 +2075,13 @@ enum MaintenanceTemplates {
                 systemCategory: "Handyman",
                 title: "Interior caulk refresh",
                 description: "Re-caulk the obvious failure points in kitchens, mudrooms, and baths before water gets behind trim, counters, or fixtures. Good example of low-drama work that prevents bigger repairs.",
-                frequency: "Annually",
+                frequency: "Every 3 years",
                 priority: "Medium",
                 estimatedCostRange: "$150–$450",
                 isDIY: false,
                 seasonalTiming: nil,
                 professionalRequired: true,
-                notes: "Escalate to a tile setter or plumber if there is movement, active water damage, or fixture replacement hiding underneath.",
+                notes: "Modern silicone caulk holds up for 2-3 years before showing failure points. Annual was overkill for most households. Escalate to a tile setter or plumber if there is movement, active water damage, or fixture replacement hiding underneath.",
                 isEssential: false,
                 assignmentType: .vendor
             ),
@@ -2347,13 +2347,13 @@ enum MaintenanceTemplates {
                 systemCategory: "Window Cleaning",
                 title: "Exterior window washing",
                 description: "Professional washing of all exterior windows, screens, frame tracks, and sills using purified water systems that leave a streak-free finish without chemical residue. Includes a wipe-down of the frames and removal of any caked pollen, spider webs, and bird debris that builds up in upper corners.",
-                frequency: "Semi-annually",
+                frequency: "Annually",
                 priority: "Low",
                 estimatedCostRange: "$200-600",
                 isDIY: false,
-                seasonalTiming: "Spring/Fall",
+                seasonalTiming: "Spring",
                 professionalRequired: true,
-                notes: "Spring after pollen settles and fall before storm windows go on. Quarterly for homes that need to stay immaculate (waterfront, heavy shade with sap, or homes with frequent entertaining). Most premium services include sill and screen cleaning at no extra charge.",
+                notes: "Annual is the right default for most households. Spring after pollen settles is the optimal window. Bump to semi-annual or quarterly for homes that need to stay immaculate (waterfront with salt spray, heavy shade with tree sap, or homes with frequent entertaining). Most premium services include sill and screen cleaning at no extra charge.",
                 isEssential: false,
                 assignmentType: .vendor
             ),
