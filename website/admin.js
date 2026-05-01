@@ -397,6 +397,17 @@ const DEFAULT_VENDOR_CATEGORIES = [
     "Captured at Q15b. Conditional — HNW homes often have one even when the landscaping crew is separate.",
     "Creates an opt-in landscape design routine (annual). Templates from the Landscaping category can be reframed as 'Schedule [Designer]: spring planting consultation'.",
   ],
+  // Phase 67I.6: HNW homes work with an interior designer for room
+  // redesigns + paint consultations + furniture sourcing. Project-
+  // based / event-driven, not recurring, so no auto-seeded tasks —
+  // homeowner captures the relationship to request visits on demand.
+  [
+    "Interior designer",
+    "Pro for room redesigns, color consultations, furniture sourcing, and full home makeovers.",
+    "Single-room redos (kitchen, primary bedroom, etc.), paint color consultations, furniture + lighting sourcing, full-home makeovers, art and accessory placement. Project-based, not recurring — the homeowner calls when they want to refresh a space.",
+    "Captured via Property → Contacts (no Q15b chip — design relationships are personal and rare to capture during onboarding).",
+    "Request-on-demand vendor. No auto-seeded tasks; the homeowner schedules visits directly when they want a project.",
+  ],
   [
     "Appliance repair specialist",
     "Pro for Sub-Zero / Wolf / Thermador and other premium-brand service.",
@@ -4027,6 +4038,44 @@ const COMMON_HNW_VENDOR_GAPS = [
   { name: "Garage door technician", role: "Spring tune-up + opener / sensor service. Different from a handyman — GDT carries the parts inventory." },
 ];
 
+// Phase 67I.6: vendor types that intentionally have no auto-seeded
+// tasks. The catalog includes them because HNW homeowners DO have
+// these vendors and need to capture the relationship — but the work
+// itself is either routine-driven or request-on-demand, not
+// template-driven. Audit Finding #3 ("vendors without tasks") is
+// the wrong question for these; they're exempt from the orphan check.
+//
+// Two patterns:
+//
+//   Routine-driven — recurring rhythm via the routines schema
+//   (Phase 54D / 55), not maintenance_tasks. The vendor is captured
+//   at Q15b and the routine handles the cadence + reminders.
+//     • House cleaner ↔ "cleaning" routine
+//     • Pet waste ↔ "pet_waste_removal" routine
+//
+//   Request-on-demand — exist purely for relationship capture; the
+//   homeowner schedules visits directly when they want a project.
+//   Project-based or event-driven work that doesn't fit a recurring
+//   auto-seed cadence.
+//     • Painter (exterior repaint cycles, interior refresh)
+//     • Locksmith (re-key, smart-lock setup, safe service)
+//     • Landscape designer (annual planning, bed redesigns)
+//     • Interior designer (room redos, color consultations)
+//     • Appliance repair specialist (Sub-Zero / Wolf brand service)
+//     • Carpet + upholstery cleaner (annual deep clean — could be
+//       routine-driven if a homeowner books standing visits, but
+//       most treat it as request-on-demand)
+const VENDOR_TYPES_WITHOUT_AUTO_TASKS = new Set([
+  "House cleaner",
+  "Pet waste",
+  "Painter",
+  "Locksmith",
+  "Landscape designer",
+  "Interior designer",
+  "Appliance repair specialist",
+  "Carpet + upholstery cleaner",
+]);
+
 // Common HNW routines we don't already seed via DEFAULT_ROUTINES.
 const COMMON_HNW_ROUTINE_GAPS = [
   { name: "Mail + package management", role: "Daily pickup, sort, hold mail when away. Concierge-style." },
@@ -4186,9 +4235,19 @@ function computeCoverageAudit() {
 
   // -- Finding 3: vendor types with no tasks. For each vendor, count
   //    templates whose systemCategory maps to it.
+  //
+  // Phase 67I.6: vendor types in VENDOR_TYPES_WITHOUT_AUTO_TASKS are
+  // exempt — they intentionally have no auto-seeded work. Two
+  // patterns: routine-driven (House cleaner / Pet waste — recurring
+  // rhythm via the routines schema, not maintenance_tasks) and
+  // request-on-demand (Painter / Locksmith / designers / appliance
+  // specialists / Carpet cleaner — exist for relationship capture,
+  // homeowner schedules visits directly when they want one). Both
+  // are valid catalog entries; flagging them as "orphans" is wrong.
   for (const v of DEFAULT_VENDOR_CATEGORIES) {
     const vendorName = v[0];
     if (vendorName === "Handyman") continue; // handyman covers everything
+    if (VENDOR_TYPES_WITHOUT_AUTO_TASKS.has(vendorName)) continue;
     let count = 0;
     for (const t of templates) {
       const mapped = systemCategoryToVendor[t.systemCategory];
