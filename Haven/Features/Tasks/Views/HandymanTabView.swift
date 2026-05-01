@@ -379,7 +379,6 @@ struct HandymanTabView: View {
             HandymanVisitDetailSheet(
                 visit: visit,
                 vendor: linkedHandyman,
-                children: VisitNotesParser.parsePunchList(from: visit.notes ?? ""),
                 onMessage: {
                     presentedVisit = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -447,17 +446,6 @@ struct HandymanTabView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Inline quote nudge when a quote is attached to this
-                // visit. Tap → opens HandymanQuoteReviewSheet so the
-                // homeowner can scan line items and approve / decline /
-                // open chat.
-                if let q = coordinator.quote {
-                    QuoteNudgeCard(quote: q, onTap: {
-                        Haptics.selection()
-                        presentQuote = true
-                    })
-                }
-
                 // "Upcoming visits" rail — surfaces every other booked
                 // visit from this handyman (e.g. a follow-up created
                 // by Split Visit). Without this the homeowner only
@@ -503,11 +491,10 @@ struct HandymanTabView: View {
         }
     }
 
-    /// Top-level Quotes section. Surfaces every active provider quote
-    /// for this property so the homeowner has a guaranteed entry point
-    /// to the review sheet — even when the quote was built without a
-    /// specific visit linkage and so the visit hero's QuoteNudgeCard
-    /// doesn't show.
+    /// Top-level Quotes section. Single source of truth for active
+    /// provider quotes — surfaces every quote (visit-linked or not) so
+    /// the homeowner has one consistent entry point into the review
+    /// sheet.
     @ViewBuilder
     private var quotesSection: some View {
         let active = coordinator.quoteHistory.filter { q in
@@ -543,7 +530,7 @@ struct HandymanTabView: View {
     }
 
     private var vendorCardSection: some View {
-        Group {
+        VStack(spacing: 12) {
             if let handyman = linkedHandyman {
                 VendorCard(
                     state: .linked(
@@ -555,10 +542,29 @@ struct HandymanTabView: View {
                 )
             } else {
                 VendorCard(state: .empty, onTap: { showFindHandyman = true })
+                // Phase 80 — when no handyman is linked, surface Chez as
+                // the assisted-discovery option below the empty card.
+                ChezEntryButton(
+                    category: .findHandyman,
+                    label: "Have Chez find me a handyman",
+                    caption: "Tom finds a vetted local pro and books the visit.",
+                    context: chezHandymanContext
+                )
             }
         }
         .padding(.horizontal, TasksV5.pageMargin)
         .padding(.bottom, 20)
+    }
+
+    private var chezHandymanContext: [String: String] {
+        var c: [String: String] = [:]
+        if let propertyId { c["property_id"] = propertyId.uuidString }
+        c["punch_item_count"] = String(punchListVM.entries.count)
+        if !punchListVM.entries.isEmpty {
+            let titles = punchListVM.entries.prefix(20).map { "• \($0.title)" }.joined(separator: "\n")
+            c["punch_list_preview"] = titles
+        }
+        return c
     }
 
     private var firstVisitPromptSection: some View {
@@ -816,7 +822,7 @@ struct HandymanTabView: View {
         let visibleItems = Array(items.prefix(4))
         return VStack(alignment: .leading, spacing: 0) {
             SectionLabel(
-                eyebrow: "Punch list for this visit",
+                eyebrow: punchListEyebrow(for: visit),
                 sub: "\(items.count) item\(items.count == 1 ? "" : "s")",
                 action: .init(title: "View all", tone: .indigo, perform: {
                     presentedVisit = visit
@@ -881,7 +887,7 @@ struct HandymanTabView: View {
         let children = visitChildren
         return VStack(alignment: .leading, spacing: 0) {
             SectionLabel(
-                eyebrow: "Punch list for this visit",
+                eyebrow: punchListEyebrow(for: visit),
                 sub: "\(children.count) item\(children.count == 1 ? "" : "s")",
                 action: .init(title: "View all", tone: .indigo, perform: {
                     presentedVisit = visit
@@ -1292,6 +1298,23 @@ struct HandymanTabView: View {
         return "next year"
     }
 
+    /// Punch list section eyebrow. With one upcoming visit it's just
+    /// "Punch list for this visit"; with multiple, name the date so
+    /// the homeowner knows which visit owns these items vs. the others
+    /// in the UPCOMING VISITS rail.
+    private func punchListEyebrow(for visit: MaintenanceTaskDBRow) -> String {
+        guard !additionalUpcomingVisits.isEmpty else {
+            return "Punch list for this visit"
+        }
+        let dateString = visit.scheduledDate ?? visit.nextDueDate
+        guard let date = MaintenanceDateFormatting.date(from: dateString) else {
+            return "Punch list for this visit"
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return "Punch list for \(formatter.string(from: date)) visit"
+    }
+
     private var estimateLabel: String? {
         let totalMinutes = punchListVM.entries.compactMap { $0.estimatedMinutes }.reduce(0, +)
         guard totalMinutes > 0 else { return nil }
@@ -1543,95 +1566,6 @@ private struct AdditionalVisitRow: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(HavenColors.beige200, lineWidth: 1)
         )
-    }
-}
-
-// MARK: - Quote nudge card
-
-/// Small card that surfaces an attached quote on the visit hero. Tap →
-/// opens the HandymanQuoteReviewSheet for full line items + approve /
-/// decline. Status pill mirrors the provider-side language.
-private struct QuoteNudgeCard: View {
-    let quote: ProviderQuoteRow
-    let onTap: () -> Void
-
-    private var statusPillTone: (background: Color, foreground: Color) {
-        switch quote.typedStatus {
-        case .sent, .viewed: return (HavenColors.actionPale, HavenColors.actionPressed)
-        case .approved:      return (HavenColors.success.opacity(0.12), HavenColors.success)
-        case .declined:      return (HavenColors.critical.opacity(0.12), HavenColors.critical)
-        default:             return (HavenColors.indigo50, HavenColors.navy800)
-        }
-    }
-
-    private var statusLabel: String {
-        switch quote.typedStatus {
-        case .sent, .viewed: return "Awaiting your review"
-        case .approved:      return "Approved"
-        case .declined:      return "Declined"
-        case .draft:         return "Draft"
-        default:             return quote.status.replacingOccurrences(of: "_", with: " ").capitalized
-        }
-    }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(HavenColors.actionPale)
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(HavenColors.actionPressed)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("QUOTE")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1.5)
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Text(formatCurrency(quote.total))
-                        .font(HavenTypography.fraunces(size: 22, weight: 700))
-                        .tracking(-0.4)
-                        .foregroundStyle(HavenColors.navy900)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(statusLabel)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(statusPillTone.foreground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule().fill(statusPillTone.background)
-                        )
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(HavenColors.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(HavenColors.beige200, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.maximumFractionDigits = value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
-        return formatter.string(from: NSNumber(value: value)) ?? "$\(Int(value))"
     }
 }
 
@@ -2240,8 +2174,7 @@ final class HandymanRequestCoordinator: ObservableObject {
                     }
                 }
                 // When a quote_sent message lands, reload the quote so
-                // the visit hero's QuoteNudgeCard appears + the
-                // chat's rich quote bubble has live data behind its
+                // the chat's rich quote bubble has live data behind its
                 // "Review quote" button. Without this, the message
                 // shows up but `coordinator.quote` stays nil until
                 // the user manually re-opens the visit.
