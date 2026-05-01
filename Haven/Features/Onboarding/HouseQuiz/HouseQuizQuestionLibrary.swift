@@ -244,7 +244,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "tankless_gas", label: "Tankless, gas"),
                 AnswerOption(id: "tankless_electric", label: "Tankless, electric"),
                 AnswerOption(id: "heat_pump", label: "Heat pump"),
-                AnswerOption(id: "not_sure", label: "Not sure — take a photo and we'll tell you", icon: "camera"),
+                AnswerOption(id: "not_sure", label: "Not sure", icon: "camera"),
             ]
         ),
         HouseQuizQuestion(
@@ -270,7 +270,7 @@ enum HouseQuizQuestionLibrary {
             id: "q9b_renovations",
             section: .inside,
             title: "Any major renovations in the last 10 years?",
-            subtitle: "Pick anything you've done — we'll remember the year so the maintenance schedule reflects it.",
+            subtitle: "Pick anything you've done. We'll remember the year so the maintenance schedule reflects it.",
             kind: .renovationsMultiSelect,
             answerOptions: [
                 AnswerOption(id: "roof_replaced", label: "Roof replaced", icon: "house.fill"),

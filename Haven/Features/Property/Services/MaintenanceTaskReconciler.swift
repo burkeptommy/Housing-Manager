@@ -466,7 +466,19 @@ enum MaintenanceTaskReconciler {
                 let (_, _, firstTemplate) = firstMember
 
                 // Only create parent when it's genuinely new.
-                let shouldCreateParent = !parentExists && !anyPreBundleMemberExists
+                //
+                // Phase 67I: never create a bundle parent task for
+                // Handyman:* bundles. The seasonal handyman visit
+                // parents were deleted in Phase 67E/F (B1) — handyman
+                // work is now single-rail on `handyman_punch_items`.
+                // Members route to the punch list directly (see the
+                // member loop below). Without this guard, the
+                // reconciler would create a confusing parent task with
+                // a child template's title since no member declares
+                // `bundleTitle` post-B1.
+                let shouldCreateParent = !parentExists
+                    && !anyPreBundleMemberExists
+                    && !bundleId.hasPrefix("Handyman:")
 
                 // Resolve the bundle title from the first member that has one.
                 let title = members.compactMap({ $0.2.bundleTitle }).first
@@ -579,9 +591,41 @@ enum MaintenanceTaskReconciler {
                 // already exists for this property OR if its stableId
                 // conflicts. Reconciler's existing templateKey-based
                 // matching handles re-runs cleanly.
+                //
+                // Phase 67I: Handyman:* bundle members route to
+                // `handyman_punch_items` instead of `maintenance_tasks`.
+                // The seasonal handyman visit parent templates were
+                // deleted in Phase 67E/F (B1) — these orphaned children
+                // belong on the punch list (the single rail Phase 67E/F
+                // designated for handyman work). For non-Handyman
+                // bundles (Roofing:spring, HVAC:fall, etc.) members
+                // keep going through maintenance_tasks as before.
+                let isHandymanBundle = bundleId.hasPrefix("Handyman:")
                 for (_, _, memberTemplate) in members {
                     let memberKey = memberTemplate.templateKey
                     if existingTemplateIds.contains(memberKey) { continue }
+
+                    if isHandymanBundle {
+                        // Phase 67E/F single-rail: route to punch items.
+                        // Dedup against existing punch items by
+                        // sourceTemplateKey so the same bundle reconcile
+                        // doesn't create duplicates.
+                        if existingPunchItemTemplateKeys.contains(memberKey) { continue }
+                        var punchInsert = HandymanPunchItemInsert(
+                            householdId: householdId,
+                            propertyId: propertyId,
+                            title: memberTemplate.title
+                        )
+                        punchInsert.description = memberTemplate.description
+                        punchInsert.notes = memberTemplate.notes
+                        punchInsert.estimatedMinutes = memberTemplate.diyEffortMinutes
+                        punchInsert.estimatedCostRange = memberTemplate.estimatedCostRange
+                        punchInsert.source = "auto_seed_handyman_tier"
+                        punchInsert.sourceTemplateKey = memberKey
+                        _ = try? await DatabaseService.shared.createHandymanPunchItem(punchInsert)
+                        continue
+                    }
+
                     var childInsert = MaintenanceTaskInsert(
                         householdId: householdId,
                         title: memberTemplate.title,

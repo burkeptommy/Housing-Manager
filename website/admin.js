@@ -352,6 +352,76 @@ const DEFAULT_VENDOR_CATEGORIES = [
     "Captured at Q15b only when the property has a generator — comes from Q22.",
     "Generator service is a bundle parent (annual visit, multiple sub-tasks). Always vendor with a hard safety floor — the homeowner is never asked to DIY this.",
   ],
+  // Phase 67I (admin proposals 7e73c027 / e487d0e7 / c59adf3a /
+  // a58d750b / 1c3fadd9 / b8ecb13e / 28960b82 / fa8a33fa) — HNW
+  // vendor types the coverage audit flagged as missing.
+  [
+    "Pool service",
+    "Pro for weekly pool chemistry + equipment service.",
+    "Weekly chemistry (chlorine/salt/pH balancing), filter cleaning, pump + heater service, opening + closing, leak detection. Distinct from a house cleaner — pool chemistry needs a specialist.",
+    "Captured at Q15b when Q12 = pool / both. Universal across pool households.",
+    "Creates a `pool_service` routine for the weekly visits. The Pool/Spa system's seasonal bundles (opening, closing) link to the same vendor.",
+  ],
+  [
+    "Window cleaner",
+    "Pro for twice-a-year window + screen cleaning.",
+    "Exterior + interior window washing, screen cleaning, sill + track wipe-down, sometimes paired with gutter cleaning since the ladder's already up.",
+    "Captured at Q15b. Universal — every household has windows.",
+    "Window Cleaning category templates auto-link to this vendor. Often the same crew also does pressure washing.",
+  ],
+  [
+    "Painter",
+    "Pro for interior + exterior repaint cycles.",
+    "Interior repaint every 4-6 years on high-traffic areas, exterior every 7-10. Touch-ups, trim work, color consultations, prep + priming.",
+    "Captured at Q15b when the homeowner has an established relationship. Otherwise stays as an opt-in vendor type for when a project arises.",
+    "Painting category templates (Exterior painting refresh, etc.) auto-link to this vendor.",
+  ],
+  [
+    "Pressure washer",
+    "Pro for driveway / siding / deck pressure washing.",
+    "Annual or every-other-year soft-wash of siding, hard-wash of concrete + pavers, deck + fence cleaning, oxidation removal, mildew treatment.",
+    "Captured at Q15b. Universal — most exterior surfaces benefit from periodic pressure washing.",
+    "Pressure Washing + hardscape templates auto-link. Often the same crew offers window cleaning too.",
+  ],
+  [
+    "Locksmith",
+    "Pro for re-keys, smart-lock setup, and safe service.",
+    "Re-key after move-in or staff changes, smart-lock install + setup, safe combo changes, safe lockouts, mechanical lock service.",
+    "Captured at Q15b. Conditional — homeowner adds when they have a relationship; otherwise rare-as-needed.",
+    "Locksmith templates live in the opt-in library. No auto-seeding.",
+  ],
+  [
+    "Landscape designer",
+    "Pro for annual planting plans + bed redesigns. Distinct from the week-to-week landscaping crew.",
+    "Annual or bi-annual planting plan, bed redesigns, hardscape integration, perennials selection, spring + fall planting recommendations. Strategic — the landscaping crew executes, the designer plans.",
+    "Captured at Q15b. Conditional — HNW homes often have one even when the landscaping crew is separate.",
+    "Creates an opt-in landscape design routine (annual). Templates from the Landscaping category can be reframed as 'Schedule [Designer]: spring planting consultation'.",
+  ],
+  [
+    "Appliance repair specialist",
+    "Pro for Sub-Zero / Wolf / Thermador and other premium-brand service.",
+    "Brand-specific repairs and service — Sub-Zero compressor work, Wolf burner replacement, Thermador oven element. Often factory-network, not generalist.",
+    "Captured at Q15b. Especially relevant for HNW kitchens with high-end appliance suites.",
+    "Appliance category tasks (Sub-Zero filter swap, Wolf range cleaning) auto-link to this vendor when present.",
+  ],
+  [
+    "Carpet + upholstery cleaner",
+    "Pro for annual deep cleaning of carpets, rugs, and upholstered furniture.",
+    "Deep cleaning of wall-to-wall carpet, area rug pickup + drop-off, sofa + chair upholstery cleaning, stain treatment, deodorizing. Often runs at the same time as a window cleaning visit.",
+    "Captured at Q15b. Conditional — homeowner adds when they have a relationship; otherwise opt-in.",
+    "Carpet cleaning template lives in the opt-in library (annual deep clean). No auto-seeding.",
+  ],
+  // Phase 67I (admin proposals 7ebdac1a / 56c707eb / aa555568) —
+  // Crawl Space tasks asked for a basement / waterproofing vendor
+  // type so the homeowner can save American Dry Basements,
+  // Connecticut Basement Systems, etc.
+  [
+    "Waterproofing & basement",
+    "Pro for crawl space + basement waterproofing, drainage, and foundation issues.",
+    "Foundation crack injection, vapor barrier install, sump pump install + service, French drains, mold remediation, drain tile, dehumidifier setup. Companies like American Dry Basements / Connecticut Basement Systems.",
+    "Captured at Q15b when the homeowner has an established relationship. Conditional — humid climates / older basements + crawl spaces need this most.",
+    "Crawl Space templates (vapor barrier, mold inspection, foundation cracks) auto-link to this vendor. Distinct from a general handyman or builder.",
+  ],
 ];
 
 const DEFAULT_SEARCHES = [
