@@ -77,13 +77,20 @@ struct MaintenanceScheduleView: View {
     /// pass the layout up front. Nil means honor the per-property
     /// persisted choice, falling back to `.list`.
     let initialLayout: MaintenanceLayout?
+    /// Phase 67 follow-up: when the YearRibbon's season tile pushes
+    /// into this view, scroll-anchor the Calendar layout to the first
+    /// month of the requested season on appear. Nil leaves the scroll
+    /// position alone.
+    let scrollToSeason: Season?
 
     init(
         filterPropertyId: UUID? = nil,
-        initialLayout: MaintenanceLayout? = nil
+        initialLayout: MaintenanceLayout? = nil,
+        scrollToSeason: Season? = nil
     ) {
         self.prefilterPropertyId = filterPropertyId
         self.initialLayout = initialLayout
+        self.scrollToSeason = scrollToSeason
     }
 
     @StateObject private var viewModel = MaintenanceViewModel.shared
@@ -259,6 +266,19 @@ struct MaintenanceScheduleView: View {
                             .foregroundStyle(HavenColors.textTertiary)
                             .padding(.top, 8)
                         }
+                        // Phase 80 — Chez Concierge entry from the
+                        // empty schedule. When the user lands here with
+                        // nothing on the calendar, the right next step
+                        // isn't always "add a system" — sometimes it's
+                        // "I don't know what I need, help me." Tom takes
+                        // it from there.
+                        ChezEntryButton(
+                            category: .general,
+                            label: "Not sure where to start? Ask Chez",
+                            caption: "Tom maps your home, sets up vendors, and builds your schedule.",
+                            context: ["_source": "maintenance_schedule_empty"]
+                        )
+                        .padding(.top, 12)
                     }
                 }
             } else {
@@ -736,6 +756,7 @@ struct MaintenanceScheduleView: View {
     // MARK: - Task Content
 
     private var taskContent: some View {
+        ScrollViewReader { proxy in
         List {
             Section {
                 // Property filter pills (only when 2+ properties)
@@ -1054,6 +1075,58 @@ struct MaintenanceScheduleView: View {
                 )
             }
         }
+        // Phase 67 follow-up: when a YearRibbon season tile pushed us
+        // here, anchor the calendar to the requested season's first
+        // month once the List has rendered. Re-runs whenever the task
+        // count changes so a still-loading list doesn't cause a no-op
+        // scroll on the first attempt.
+        .onChange(of: viewModel.tasks.count) { _, _ in
+            scrollToSeasonAnchorIfNeeded(proxy: proxy)
+        }
+        .onAppear {
+            scrollToSeasonAnchorIfNeeded(proxy: proxy)
+        }
+        }
+    }
+
+    /// Phase 67 follow-up: scroll the Calendar layout to the first
+    /// month of `scrollToSeason`. No-op when the layout isn't `.calendar`,
+    /// when no season was passed in, or when the target month isn't in
+    /// the calendar window. Wrapped in a small delay because List has to
+    /// finish laying out its sections before the proxy can find the id.
+    private func scrollToSeasonAnchorIfNeeded(proxy: ScrollViewProxy) {
+        guard let season = scrollToSeason, layout == .calendar else { return }
+        guard let key = seasonAnchorMonthKey(for: season) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(HavenTheme.animationStandard) {
+                proxy.scrollTo("month-\(key)", anchor: .top)
+            }
+        }
+    }
+
+    /// First month of the requested season WITHIN the calendar's
+    /// 18-month window. If we're already inside the season, anchor on
+    /// today's month; otherwise walk forward to the next occurrence
+    /// of any month in the season. Returns `yyyy-MM` matching
+    /// `calendarMonths.key`.
+    private func seasonAnchorMonthKey(for season: Season) -> String? {
+        let calendar = Calendar.current
+        let today = Date()
+        let currentMonth = calendar.component(.month, from: today)
+        var anchor = today
+        if !season.months.contains(currentMonth) {
+            for offset in 1...18 {
+                guard let candidate = calendar.date(byAdding: .month, value: offset, to: today) else { continue }
+                let m = calendar.component(.month, from: candidate)
+                if season.months.contains(m) {
+                    anchor = candidate
+                    break
+                }
+            }
+        }
+        let comps = calendar.dateComponents([.year, .month], from: anchor)
+        guard let year = comps.year, let month = comps.month else { return nil }
+        return String(format: "%04d-%02d", year, month)
     }
 
     // MARK: - Phase 51B: Action-based bucket routing
@@ -1811,6 +1884,7 @@ struct MaintenanceScheduleView: View {
                     }
                 } header: {
                     monthHeader(month)
+                        .id("month-\(month.key)")
                 }
             }
         }

@@ -144,6 +144,37 @@ struct VendorCoverageSheet: View {
                 .buttonStyle(.plain)
             }
 
+            // Phase 80 — third option in the gap-card stack: hand the
+            // gap to Tom. Renders as a subtle full-width text button
+            // between the primary CTAs and the dismiss affordance, so
+            // it doesn't compete with "Find a pro" / "I have one" but
+            // is impossible to miss if those don't appeal.
+            Button {
+                Haptics.light()
+                NotificationCenter.default.post(
+                    name: .openChezRequestComposer,
+                    object: nil,
+                    userInfo: [
+                        "category": ChezCategory.findVendor.rawValue,
+                        "context": [
+                            "system_category": item.systemName,
+                            "_source": "vendor_coverage_sheet",
+                        ],
+                    ]
+                )
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.fill.questionmark")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Have Chez handle it")
+                        .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                }
+                .foregroundStyle(HavenColors.action)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+
             Button {
                 Haptics.light()
                 _ = withAnimation {

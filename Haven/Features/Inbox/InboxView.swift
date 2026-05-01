@@ -246,6 +246,18 @@ struct InboxView: View {
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
             }
 
+            // Phase 80 — when the inbox is empty, surface Chez as the
+            // assisted-action escape. Caught-up users still benefit from
+            // knowing they can hand anything off; first-time users see
+            // it as the universal "ask for help" affordance.
+            ChezEntryButton(
+                category: .general,
+                label: "Need help with anything? Ask Chez",
+                caption: "Tom replies within 1 business day.",
+                context: ["_source": "inbox_empty_state"]
+            )
+            .padding(.top, 8)
+
             Spacer()
         }
         .frame(maxWidth: .infinity)

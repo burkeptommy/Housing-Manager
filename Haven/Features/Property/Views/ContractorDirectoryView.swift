@@ -293,6 +293,35 @@ struct ContractorDirectoryView: View {
                     dismiss()
                 }
             )
+
+            // Phase 80 — third option in the FIND A PRO stack: hand the
+            // whole search off to Tom. The composer pre-fills with the
+            // task / system category so Tom has full triage context.
+            findAProCard(
+                title: "Have Chez find one for me",
+                subtitle: "Tom researches vetted local pros and replies within 1 business day.",
+                icon: "person.fill.questionmark",
+                action: {
+                    Haptics.selection()
+                    var ctx: [String: String] = [:]
+                    if let context = delegationContext {
+                        ctx["task_id"] = context.task.id.uuidString
+                        ctx["task_title"] = context.task.title
+                        if let cat = context.systemCategory {
+                            ctx["system_category"] = cat
+                        }
+                    }
+                    NotificationCenter.default.post(
+                        name: .openChezRequestComposer,
+                        object: nil,
+                        userInfo: [
+                            "category": ChezCategory.findVendor.rawValue,
+                            "context": ctx,
+                        ]
+                    )
+                    dismiss()
+                }
+            )
         }
         .padding(.bottom, 8)
     }

@@ -14,6 +14,23 @@ struct NewProjectView: View {
     @State private var isSaving = false
     @State private var error: String?
 
+    /// Phase 80 — context dict for the Chez handoff from this screen.
+    /// Tom gets whatever the user has typed so far, even if they
+    /// haven't saved.
+    private var chezNewProjectContext: [String: String] {
+        var c: [String: String] = [
+            "property_id": propertyID.uuidString,
+            "_source": "new_project_view",
+        ]
+        if !name.isEmpty { c["draft_project_name"] = name }
+        c["category"] = category.rawValue
+        c["approach"] = approach == .diy ? "diy" : "professional"
+        if !description.isEmpty {
+            c["description"] = String(description.prefix(400))
+        }
+        return c
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -94,6 +111,17 @@ struct NewProjectView: View {
                         action: save,
                         isLoading: isSaving,
                         isDisabled: name.trimmingCharacters(in: .whitespaces).isEmpty || (category == .other && description.trimmingCharacters(in: .whitespaces).isEmpty)
+                    )
+
+                    // Phase 80 — Chez Concierge entry. Some users hit
+                    // this screen and stall because they don't actually
+                    // know what they need. Tom takes a half-formed idea
+                    // and builds the project around it.
+                    ChezEntryButton(
+                        category: .general,
+                        label: "Not sure what you need? Ask Chez",
+                        caption: "Tom scopes the project, finds vendors, and gets quotes.",
+                        context: chezNewProjectContext
                     )
                 }
                 .padding(HavenTheme.pageMargin)

@@ -39,6 +39,17 @@ struct QuoteComparisonView: View {
                 } else {
                     needItemizedCard
                 }
+
+                // Phase 80 — Chez Concierge entry below the comparison.
+                // Two quotes is the classic "tiebreaker needed" moment;
+                // Tom can grab a third comparable bid + sanity-check the
+                // existing two against fair-market data.
+                ChezEntryButton(
+                    category: .getQuote,
+                    label: "Have Chez get a third quote",
+                    caption: "Tom finds a comparable pro for a tiebreaker bid and sanity-checks pricing.",
+                    context: chezQuoteComparisonContext
+                )
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             .padding(.top, HavenTheme.spacing12)
@@ -47,6 +58,22 @@ struct QuoteComparisonView: View {
         .background(HavenColors.background)
         .navigationTitle("Compare Quotes")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var chezQuoteComparisonContext: [String: String] {
+        var c: [String: String] = [
+            "_source": "quote_comparison",
+            "quote_count": String(quotes.count),
+        ]
+        let names = quotes.compactMap { $0.vendorName }.joined(separator: ", ")
+        if !names.isEmpty { c["existing_vendors"] = names }
+        let totals = quotes.compactMap { quote -> String? in
+            guard let vendor = quote.vendorName,
+                  let total = quote.analysis.overallAssessment?.totalQuoted else { return nil }
+            return "\(vendor): $\(Int(total))"
+        }.joined(separator: " · ")
+        if !totals.isEmpty { c["totals"] = totals }
+        return c
     }
 
     // MARK: - Need Itemized Quotes

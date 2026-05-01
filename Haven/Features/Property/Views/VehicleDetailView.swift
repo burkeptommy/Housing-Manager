@@ -180,6 +180,12 @@ struct VehicleDetailView: View {
                 // 3. Mechanic card (Step 3 placeholder)
                 mechanicCard
 
+                // 3b. Phase 80 — Chez Concierge entry on the vehicle
+                // surface. Renders only when no mechanic is linked OR
+                // there's an open recall. The two cases need different
+                // copy: "find a mechanic" vs "handle this recall."
+                chezVehicleEntry
+
                 // 4. Cost summary row (Step 4 placeholder)
                 costSummaryRow
 
@@ -834,6 +840,61 @@ struct VehicleDetailView: View {
     // MARK: - Mechanic Card
 
     @State private var showMechanicPicker = false
+
+    /// Phase 80 — Chez entry on the vehicle surface. Two trigger cases:
+    /// (1) no mechanic linked → "find me a mechanic" hand-off, and
+    /// (2) one or more open recalls → "have Chez handle this recall"
+    /// hand-off. When both apply, recall takes precedence (more urgent).
+    /// Returns an empty view when the vehicle is fully covered.
+    @ViewBuilder
+    private var chezVehicleEntry: some View {
+        let openRecallCount = viewModel.recalls.filter { !$0.isResolved }.count
+        let hasMechanic = viewModel.vehicle?.preferredMechanicId
+            .flatMap { mid in viewModel.contractors.first { $0.id == mid } } != nil
+        if openRecallCount > 0 {
+            ChezEntryButton(
+                category: .coordinateTask,
+                label: openRecallCount == 1
+                    ? "Have Chez handle this recall"
+                    : "Have Chez handle these recalls",
+                caption: "Tom finds the right service center, books, and follows up.",
+                context: chezVehicleRecallContext(openCount: openRecallCount)
+            )
+        } else if !hasMechanic {
+            ChezEntryButton(
+                category: .findVendor,
+                label: "Have Chez find me a mechanic",
+                caption: "Tom finds a vetted shop you'll want to keep.",
+                context: chezVehicleMechanicContext
+            )
+        }
+    }
+
+    private var chezVehicleMechanicContext: [String: String] {
+        var c: [String: String] = ["_source": "vehicle_mechanic_card"]
+        if let v = viewModel.vehicle {
+            c["vehicle_id"] = v.id.uuidString
+            c["vehicle"] = "\(v.year) \(v.make) \(v.model)"
+            if let trim = v.trim, !trim.isEmpty { c["trim"] = trim }
+            if let mileage = v.currentMileage { c["mileage"] = "\(mileage)" }
+        }
+        return c
+    }
+
+    private func chezVehicleRecallContext(openCount: Int) -> [String: String] {
+        var c: [String: String] = [
+            "_source": "vehicle_recall",
+            "open_recall_count": String(openCount),
+        ]
+        if let v = viewModel.vehicle {
+            c["vehicle_id"] = v.id.uuidString
+            c["vehicle"] = "\(v.year) \(v.make) \(v.model)"
+        }
+        let openRecalls = viewModel.recalls.filter { !$0.isResolved }.prefix(5)
+        let titles = openRecalls.compactMap { $0.component }.joined(separator: ", ")
+        if !titles.isEmpty { c["recall_components"] = titles }
+        return c
+    }
 
     private var mechanicCard: some View {
         let mechanic = viewModel.vehicle?.preferredMechanicId.flatMap { mechId in

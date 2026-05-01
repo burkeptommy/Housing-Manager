@@ -113,6 +113,14 @@ struct InboxItemDetailView: View {
                     postSaveQuoteActionSection
                 }
 
+                // Phase 80 — Chez Concierge entry for high-value inbox
+                // types. Quotes get a "second opinion" CTA, insurance
+                // claims get a "run point on this" CTA. Both surface
+                // beneath the standard action stack so they read as the
+                // assisted alternative rather than competing with the
+                // primary CTAs.
+                chezConciergeEntry
+
                 Spacer().frame(height: 20)
             }
             .padding(.horizontal, HavenTheme.pageMargin)
@@ -908,6 +916,24 @@ struct InboxItemDetailView: View {
     ///
     /// Create-Project calls `HavenSupabase.processInboxItem` directly
     /// (not through the viewModel's fire-and-forget `processItem`) so
+    /// Phase 80 — Chez Concierge inline entry for high-value inbox
+    /// types. Renders only for `contractor_quote`, `insurance_claim`,
+    /// and `bill_invoice` items where the homeowner often wants a
+    /// real human in the loop. Skipped for `chez_reply_*` types since
+    /// those already deep-link into the request thread.
+    @ViewBuilder
+    private var chezConciergeEntry: some View {
+        let resolvedType = initialItemType ?? item.type
+        if !item.isChezReply, ChezInboxEntryHelper.shouldRender(for: resolvedType) {
+            ChezEntryButton(
+                category: ChezInboxEntryHelper.category(for: resolvedType),
+                label: ChezInboxEntryHelper.label(for: resolvedType),
+                caption: ChezInboxEntryHelper.caption(for: resolvedType),
+                context: ChezInboxEntryHelper.context(item: item, type: resolvedType)
+            )
+        }
+    }
+
     /// the user sees a real loading state and any server error surfaces
     /// inline instead of vanishing into a console log.
     private var postSaveQuoteActionSection: some View {

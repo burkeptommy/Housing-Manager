@@ -845,6 +845,12 @@ struct PropertyDetailView: View {
                         overviewEnhancedDecisionsSection
                         overviewEnhancedValueSection(property: property)
                         overviewEnhancedComingUpSection(property: property)
+                        // Phase 80 — Chez Concierge anchor on the Overview tab.
+                        // Lives at the bottom of the overview after the upcoming
+                        // timeline so it reads as "and if any of this is on your
+                        // plate and you'd rather not — Chez handles it."
+                        overviewChezConciergeAnchor(property: property)
+                            .padding(.horizontal, HavenTheme.pageMargin)
 
                     case .systems:
                         systemCoverageSection
@@ -1398,6 +1404,25 @@ struct PropertyDetailView: View {
     }
 
     // MARK: - Chez v1 Overview — Coming up
+
+    /// Phase 80 — Chez Concierge anchor on the Overview tab. Universal
+    /// "anything on your plate? Chez handles it" surface. Context dict
+    /// names the property + its town/state so Tom has the geography
+    /// without opening another tab.
+    private func overviewChezConciergeAnchor(property: PropertyRow) -> some View {
+        var ctx: [String: String] = [
+            "property_id": property.id.uuidString,
+            "property_name": property.name ?? property.street ?? "Property",
+        ]
+        if let town = property.city, !town.isEmpty { ctx["town"] = town }
+        if let state = property.state, !state.isEmpty { ctx["state"] = state }
+        return ChezEntryButton(
+            category: .general,
+            label: "Have Chez handle anything for you",
+            caption: "Vendor finds, scheduling, quotes, follow-ups — Tom owns it.",
+            context: ctx
+        )
+    }
 
     @ViewBuilder
     private func overviewEnhancedComingUpSection(property: PropertyRow) -> some View {

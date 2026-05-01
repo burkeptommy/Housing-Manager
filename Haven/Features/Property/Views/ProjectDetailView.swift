@@ -77,6 +77,7 @@ struct ProjectDetailView: View {
                         projectContactsSection
                     }
                     askAlfredButton
+                    chezConciergeEntry
                     notesSection
                 }
             }
@@ -1479,6 +1480,62 @@ struct ProjectDetailView: View {
     }
 
     // MARK: - Ask Alfred
+
+    /// Phase 80 — Chez Concierge entry point for projects. Sits next to
+    /// "Ask Alfred" so the homeowner has a clear two-tier escalation:
+    /// AI for questions, real human (Tom) for coordination. Category
+    /// defaults to `getQuote` when the project is still gathering quotes,
+    /// `coordinateTask` once it has an active quote (i.e. work is being
+    /// scheduled / executed). Insurance claims always route as
+    /// `coordinateTask` because that's the canonical "back-and-forth"
+    /// scenario.
+    private var chezConciergeEntry: some View {
+        let category: ChezCategory = {
+            if isInsuranceClaim { return .coordinateTask }
+            if liveProject.activeQuoteId == nil && !isDIY { return .getQuote }
+            return .coordinateTask
+        }()
+        let label: String = {
+            if isInsuranceClaim { return "Have Chez run point on this claim" }
+            if category == .getQuote { return "Have Chez gather quotes for this" }
+            return "Have Chez handle the back-and-forth"
+        }()
+        let caption: String = {
+            if isInsuranceClaim {
+                return "Tom coordinates with the adjuster, contractors, and you."
+            }
+            if category == .getQuote {
+                return "Tom finds vetted pros and gets you comparable bids."
+            }
+            return "Tom owns the vendor coordination so you don't have to."
+        }()
+        return ChezEntryButton(
+            category: category,
+            label: label,
+            caption: caption,
+            context: chezProjectContext
+        )
+    }
+
+    private var chezProjectContext: [String: String] {
+        var c: [String: String] = [
+            "project_id": project.id.uuidString,
+            "project_name": liveProject.name,
+            "project_category": liveProject.category,
+            "project_status": liveProject.status,
+        ]
+        if isInsuranceClaim { c["entry_type"] = "insurance_claim" }
+        if isDIY { c["diy"] = "true" }
+        if let est = liveProject.estimatedBudget { c["estimated_budget"] = "$\(Int(est))" }
+        if let desc = liveProject.description, !desc.isEmpty {
+            c["description"] = String(desc.prefix(400))
+        }
+        if !viewModel.quotes.isEmpty {
+            c["existing_quotes"] = "\(viewModel.quotes.count) on file"
+        }
+        c["property_id"] = liveProject.propertyId.uuidString
+        return c
+    }
 
     private var askAlfredButton: some View {
         Button {

@@ -50,6 +50,24 @@ struct ChatView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        // Phase 80 — escalate from Alfred to Chez. Lives
+                        // first in the menu because "I want a real human"
+                        // is the highest-intent action a user can take
+                        // here.
+                        Button {
+                            Haptics.medium()
+                            NotificationCenter.default.post(
+                                name: .openChezRequestComposer,
+                                object: nil,
+                                userInfo: [
+                                    "category": ChezCategory.general.rawValue,
+                                    "context": chezContextFromAlfred,
+                                ]
+                            )
+                        } label: {
+                            Label("Ask Chez (real person)", systemImage: "person.fill.questionmark")
+                        }
+                        Divider()
                         Button {
                             Haptics.medium()
                             Analytics.track(.chatCleared)
@@ -230,7 +248,22 @@ struct ChatView: View {
                             Button {
                                 Haptics.light()
                                 Analytics.track(.chatSuggestedPromptTapped, ["prompt": chip])
-                                Task { await viewModel.sendSuggestedPrompt(chip) }
+                                // Phase 80 — short-circuit the concierge
+                                // chip so the tap lands the homeowner in
+                                // the Chez composer instead of asking
+                                // Alfred to describe the service.
+                                if chip == "Connect me with my concierge" {
+                                    NotificationCenter.default.post(
+                                        name: .openChezRequestComposer,
+                                        object: nil,
+                                        userInfo: [
+                                            "category": ChezCategory.general.rawValue,
+                                            "context": chezContextFromAlfred,
+                                        ]
+                                    )
+                                } else {
+                                    Task { await viewModel.sendSuggestedPrompt(chip) }
+                                }
                             } label: {
                                 Text(chip)
                                     .font(HavenTypography.bodySmall)
@@ -260,6 +293,29 @@ struct ChatView: View {
 
     private var suggestedChips: [String] {
         ["What documents am I missing?", "Summarize my estate plan", "What maintenance is overdue?", "Find me a plumber near Bethel, CT", "Help me schedule a home service", "Connect me with my concierge"]
+    }
+
+    /// Phase 80 — context dict for the Chez handoff from the chat.
+    /// Includes the active conversation context (when set) so Tom can
+    /// pick up the thread without asking the user to recap.
+    private var chezContextFromAlfred: [String: String] {
+        var c: [String: String] = ["_source": "alfred_chat"]
+        if let contextType, !contextType.isEmpty {
+            c["alfred_context_type"] = contextType
+        }
+        if let contextId {
+            c["alfred_context_id"] = contextId.uuidString
+        }
+        if let contextName, !contextName.isEmpty {
+            c["alfred_context_name"] = contextName
+        }
+        // If there's a recent message thread, attach the user's last
+        // question so Tom has the gist of what they were asking.
+        if let lastUser = viewModel.messages.last(where: { $0.role == .user })?.content,
+           !lastUser.isEmpty {
+            c["last_question"] = String(lastUser.prefix(400))
+        }
+        return c
     }
 
     // MARK: - Message List
