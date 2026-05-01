@@ -1376,17 +1376,9 @@ async function handleDecideProposal(
 // Helpers
 // ============================================================================
 
-async function householdIdForUser(
-  service: ServiceClient,
-  userId: string
-): Promise<string | null> {
-  const { data } = await service
-    .from("users")
-    .select("household_id")
-    .eq("id", userId)
-    .maybeSingle();
-  return (data as { household_id?: string } | null)?.household_id ?? null;
-}
+// Note: `householdIdForUser` is defined once above near the auth helpers.
+// Deno rejects duplicate function declarations at parse time, which would
+// boot-error the entire function — don't add a second copy here.
 
 async function businessHoursDue(service: ServiceClient): Promise<string> {
   // Reuse the public.chez_business_hours_due() Postgres function defined
