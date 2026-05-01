@@ -4180,11 +4180,17 @@ function computeCoverageAudit() {
 
   // -- Finding 7 (Phase 5z+19, merged): high-impact entities not yet
   //    approved. Same dedup against pending notes.
-  let highImpactCount = 0;
+  //
+  // Phase 5z+24 — Tom: "'Entities that need a careful review 30' is
+  // always 30. even when I click one done another shwos up. why?"
+  // The pre-5z+24 code capped the queue at 30 to avoid drowning the
+  // user, but every resolution opened a slot for a new candidate so
+  // the count never moved. Frustrating — Tom never felt progress.
+  // Cap dropped. The full queue shows. As Tom approves / cuts items
+  // the count actually drops by one each time.
   for (const surfaceId of surfaces) {
     const items = liveItemsForView(surfaceId) || [];
     for (const item of items) {
-      if (highImpactCount >= 30) break;
       const launch = effectiveLaunchStatus(item);
       if (launch === "approved" || launch === "shipped") continue;
       if (hasPendingNote(item, item.itemType)) continue;
@@ -4199,7 +4205,6 @@ function computeCoverageAudit() {
         reason: high,
         valueAnalysis: valueAnalysisFor(item),
       });
-      highImpactCount += 1;
     }
   }
 
@@ -5648,12 +5653,11 @@ function computeDecisionQueue() {
   }
 
   // 2. High-impact entities not yet approved (top tier in registry, or
-  // bundle parents). Cap to 30 to avoid drowning the queue.
-  let highImpactCount = 0;
+  // bundle parents). Phase 5z+24 — cap removed; the count must reflect
+  // reality so resolutions actually drop the number.
   for (const surfaceId of surfaces) {
     const items = liveItemsForView(surfaceId) || [];
     for (const item of items) {
-      if (highImpactCount >= 30) break;
       const launch = effectiveLaunchStatus(item);
       if (launch === "approved" || launch === "shipped") continue;
       // Phase 5z+15 — skip if already being worked on via a note.
@@ -5679,7 +5683,6 @@ function computeDecisionQueue() {
         recommendation: value.summary,
         primaryActions: ["open", "approve", "cut"],
       });
-      highImpactCount += 1;
     }
   }
 
