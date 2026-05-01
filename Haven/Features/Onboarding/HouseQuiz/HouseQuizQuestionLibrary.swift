@@ -155,7 +155,7 @@ enum HouseQuizQuestionLibrary {
             id: "q2_siding",
             section: .homeBasics,
             title: "What's your exterior siding?",
-            subtitle: "Pick all that apply — many homes mix two or three materials.",
+            subtitle: "Pick all that apply. Many homes mix two or three materials.",
             kind: .multiSelect,
             answerOptions: [
                 AnswerOption(id: "vinyl", label: "Vinyl"),
@@ -259,6 +259,30 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "crawl_space", label: "Crawl space"),
                 AnswerOption(id: "slab", label: "Slab"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
+            ]
+        ),
+        // Phase 67D (B3): Q9b recent renovations. Drives system-level
+        // `last_replaced_date` so the reconciler suppresses "replace
+        // your X" tasks for systems just replaced. Also feeds future
+        // proactive surfacing ("your roof is 11 years old, replacement
+        // window opens in ~4 years" Phase 67C reasoning).
+        HouseQuizQuestion(
+            id: "q9b_renovations",
+            section: .inside,
+            title: "Any major renovations in the last 10 years?",
+            subtitle: "Pick anything you've done — we'll remember the year so the maintenance schedule reflects it.",
+            kind: .renovationsMultiSelect,
+            answerOptions: [
+                AnswerOption(id: "roof_replaced", label: "Roof replaced", icon: "house.fill"),
+                AnswerOption(id: "kitchen_renovated", label: "Kitchen renovated", icon: "fork.knife"),
+                AnswerOption(id: "bathroom_renovated", label: "Bathroom(s) renovated", icon: "shower.fill"),
+                AnswerOption(id: "hvac_replaced", label: "HVAC replaced", icon: "fan"),
+                AnswerOption(id: "water_heater_replaced", label: "Water heater replaced", icon: "drop.fill"),
+                AnswerOption(id: "windows_replaced", label: "Windows replaced", icon: "rectangle.split.2x1"),
+                AnswerOption(id: "siding_replaced", label: "Siding replaced", icon: "house.lodge"),
+                AnswerOption(id: "addition_structural", label: "Addition or structural work", icon: "building.2"),
+                AnswerOption(id: "solar_added", label: "Solar panels added", icon: "sun.max.fill"),
+                AnswerOption(id: "none", label: "None", icon: "minus.circle"),
             ]
         ),
         HouseQuizQuestion(
@@ -379,7 +403,7 @@ enum HouseQuizQuestionLibrary {
             id: "q15_security",
             section: .outside,
             title: "Security or alarm system?",
-            subtitle: "We won't share specifics — your setup stays private to you and any household members you invite.",
+            subtitle: "We won't share specifics. Your setup stays private to you and any household members you invite.",
             kind: .singleChoice,
             answerOptions: [
                 AnswerOption(id: "monitored", label: "Yes, monitored"),

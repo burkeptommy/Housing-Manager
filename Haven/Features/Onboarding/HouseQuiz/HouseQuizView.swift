@@ -240,6 +240,15 @@ struct HouseQuizView: View {
     @State private var progressivePetsAnswerId: String? = nil
     @State private var progressiveShowPetsStep: Bool = false
 
+    /// Phase 67D (B3): Q9b renovations selections + per-type year
+    /// picker. `selectedIds` drives the chip selection state;
+    /// `years[id] = "2019"` stores per-type year picks. The Continue
+    /// commit encodes years into `customEntries` as "type:year"
+    /// pipe-delimited entries that the mapper parses to push
+    /// `last_replaced_date` to matching `home_systems` rows.
+    @State private var renovationsSelectedIds: Set<String> = []
+    @State private var renovationsYears: [String: Int] = [:]
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -562,6 +571,11 @@ struct HouseQuizView: View {
             onConfirm: {
                 withAnimation(HavenTheme.animationStandard) {
                     recapConfirmed = true
+                    // Phase 67D (B1): bump the protection meter on
+                    // ATTOM confirmation. Adds ~5% of home value as
+                    // "Property baseline confirmed." Idempotent across
+                    // re-confirms via the view model's one-shot guard.
+                    viewModel.accreteAttomConfirmation()
                 }
                 Analytics.track(.quizStarted, [
                     "property_id": viewModel.property.id.uuidString,
@@ -912,6 +926,23 @@ struct HouseQuizView: View {
             garageWithEVBody(q)
         case .dualInsurance:
             dualInsuranceBody(q)
+        case .dateOnly:
+            // Phase 67D (B2/B3) date-only kind. No quiz question
+            // currently uses it — purchase date moved onto the recap
+            // card in B1. Stub kept exhaustive so the enum case stays
+            // available for future Phase B/C questions.
+            singleChoiceBody(q)
+        case .renovationsMultiSelect:
+            // Phase 67D (B3): Q9b renovations. Body is built below
+            // (renovationsMultiSelectBody) — multi-select chips with
+            // inline year pickers per selected item.
+            //
+            // Temporary fall-through to multiSelectBody so the switch
+            // stays exhaustive and the build passes while the real
+            // renovationsMultiSelectBody is being built. Matches the
+            // .slider/.dateOnly pattern above. Drop this fallback once
+            // the dedicated body lands.
+            multiSelectBody(q)
         }
     }
 
@@ -1756,6 +1787,117 @@ struct HouseQuizView: View {
                 "selected",
                 customEntries: customEntries.isEmpty ? nil : customEntries,
                 payload: payload.isEmpty ? nil : payload
+            )
+        }
+    }
+
+    /// Phase 67D (B3): Q9b renovations — multi-select chips with
+    /// per-selection year picker. Selecting a renovation reveals an
+    /// inline year picker below it (current year - 10 ... current year).
+    /// Continue commits via `recordAnswer` with `selectedIds` (chip ids)
+    /// + `customEntries` (type:year pipe-delimited). The mapper reads
+    /// customEntries to push `last_replaced_date` on matching home_systems.
+    private func renovationsMultiSelectBody(_ q: HouseQuizQuestion) -> some View {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        let yearRange = Array((currentYear - 10)...currentYear).reversed()
+
+        return VStack(spacing: HavenTheme.spacing12) {
+            ForEach(q.answerOptions) { option in
+                let isSelected = renovationsSelectedIds.contains(option.id)
+                let isExclusive = option.id == "none"
+                Button {
+                    Haptics.selection()
+                    if isExclusive {
+                        // "None" clears every other selection.
+                        renovationsSelectedIds.removeAll()
+                        renovationsYears.removeAll()
+                        if !isSelected {
+                            renovationsSelectedIds.insert(option.id)
+                        }
+                    } else if isSelected {
+                        renovationsSelectedIds.remove(option.id)
+                        renovationsYears.removeValue(forKey: option.id)
+                    } else {
+                        // Drop "none" if any specific renovation is picked.
+                        renovationsSelectedIds.remove("none")
+                        renovationsSelectedIds.insert(option.id)
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        if let icon = option.icon {
+                            Image(systemName: icon)
+                                .font(.system(size: 16))
+                                .foregroundStyle(isSelected ? HavenColors.navy800 : HavenColors.navy700)
+                                .frame(width: 24)
+                        }
+                        Text(option.label)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(isSelected ? HavenColors.navy : HavenColors.textTertiary)
+                    }
+                    .padding(HavenTheme.spacing16)
+                    .frame(minHeight: 56)
+                    .background(isSelected ? HavenColors.navy.opacity(0.08) : HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                }
+                .buttonStyle(.plain)
+
+                // Inline year picker — revealed when this row is
+                // selected and isn't the "None" sentinel.
+                if isSelected && !isExclusive {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Text("Year:")
+                            .font(HavenTypography.uiLabelMedium)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Picker("Year", selection: Binding(
+                            get: { renovationsYears[option.id] ?? currentYear },
+                            set: { renovationsYears[option.id] = $0 }
+                        )) {
+                            Text("Roughly").tag(0)  // sentinel for "I don't know"
+                            ForEach(yearRange, id: \.self) { year in
+                                Text(String(year)).tag(year)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(HavenColors.navy)
+                        Spacer()
+                    }
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .background(HavenColors.creamLight.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                }
+            }
+
+            QuizContinueButton(
+                title: "Continue",
+                disabledReason: nil,  // every option (including "None") is valid
+                action: {
+                    commitRenovations()
+                }
+            )
+        }
+        .animation(HavenTheme.animationStandard, value: renovationsSelectedIds)
+    }
+
+    private func commitRenovations() {
+        let ids = Array(renovationsSelectedIds).sorted()
+        var customEntries: [String] = []
+        for id in ids where id != "none" {
+            let year = renovationsYears[id] ?? 0
+            // 0 sentinel = "Roughly / unknown". Mapper picks a midpoint
+            // (-5y) when year is 0; otherwise the user-picked year wins.
+            customEntries.append("\(id):\(year)")
+        }
+        Task {
+            await viewModel.recordAnswer(
+                "answered",
+                selectedIds: ids,
+                customEntries: customEntries.isEmpty ? nil : customEntries
             )
         }
     }
@@ -4677,6 +4819,8 @@ struct HouseQuizView: View {
         progressiveHomeCustomName = ""
         progressivePetsAnswerId = nil
         progressiveShowPetsStep = false
+        renovationsSelectedIds = []
+        renovationsYears = [:]
     }
 
     /// Apr 7, 2026 (build 82): re-populate the local @State variables for
