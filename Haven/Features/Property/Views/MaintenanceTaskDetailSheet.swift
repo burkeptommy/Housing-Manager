@@ -43,6 +43,9 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var showCompleteForm = false
     @State private var showSnooze = false
     @State private var snoozeDate = Date()
+    /// Phase 80.2 — Local mirror of `task.chezOwned` for the
+    /// `ChezOwnsToggle` Binding. Seeded from the task on first appear.
+    @State private var localChezOwned: Bool = false
     @State private var showScheduleChat = false
     @State private var showContractorDirectory = false
     @State private var showHandymanPunchList = false
@@ -247,6 +250,32 @@ struct MaintenanceTaskDetailSheet: View {
                 // Header
                 headerSection
 
+                // Phase 80.2 — "Have Chez handle this task" delegation
+                // toggle. Lives right under the header so it's the first
+                // option the user sees on any task, vendor or no vendor.
+                // Smart copy: tasks without a vendor frame as "Chez
+                // sources one"; tasks with a vendor frame as "Chez
+                // coordinates with your vendor."
+                if task.vehicleId == nil {
+                    ChezOwnsToggle(
+                        target: .task(
+                            id: task.id,
+                            title: task.title,
+                            hasVendor: task.assignedContractorId != nil
+                                && (task.needsVendor != true)
+                        ),
+                        isOwned: $localChezOwned,
+                        onChange: { _ in
+                            // Refresh the maintenance list so the badge
+                            // appears on cards immediately.
+                            NotificationCenter.default.post(
+                                name: .maintenanceTaskChanged,
+                                object: nil
+                            )
+                        }
+                    )
+                }
+
                 // Details
                 detailsSection
 
@@ -448,6 +477,9 @@ struct MaintenanceTaskDetailSheet: View {
             vendorSearchSheet
         }
         .task {
+            // Seed the Chez delegation toggle from the task's persisted
+            // state so the switch reflects truth on first paint.
+            localChezOwned = task.isChezOwned
             await loadVendorInfo()
             await loadRoutingContext()
             await loadExistingReminders()

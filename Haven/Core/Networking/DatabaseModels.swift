@@ -2283,6 +2283,19 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     /// vendor-orchestration model. `template_id` remains as a legacy
     /// back-reference while `service_key` powers homeowner grouping.
     let serviceKey: String?
+    /// Phase 80.2: When true, Chez owns coordination for this task —
+    /// finding a vendor (if needed), scheduling, follow-up, and
+    /// reporting back. Stamped via `delegate_task` Edge Function.
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
+    /// Phase 80.2: FK back to the parent `chez_requests` thread that
+    /// owns this task. Lets Chez surface task changes (mark complete,
+    /// reschedule, link a vendor) directly inside the request.
+    let chezRequestId: UUID?
+
+    /// Phase 80.2 helper: defaults nil → false. Use everywhere in the
+    /// UI to skip the optional-handling boilerplate.
+    var isChezOwned: Bool { chezOwned ?? false }
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -2315,6 +2328,9 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case parentRoutineId = "parent_routine_id"
         case bundleParentTaskId = "bundle_parent_task_id"
         case serviceKey = "service_key"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
+        case chezRequestId = "chez_request_id"
     }
 
     /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
@@ -2370,7 +2386,10 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             assignedRoute: nil,
             parentRoutineId: nil,
             bundleParentTaskId: nil,
-            serviceKey: nil
+            serviceKey: nil,
+            chezOwned: nil,
+            chezOwnedAt: nil,
+            chezRequestId: nil
         )
     }
 
@@ -2417,7 +2436,10 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             assignedRoute: nil,
             parentRoutineId: nil,
             bundleParentTaskId: nil,
-            serviceKey: templateId.flatMap { ServiceLibrary.serviceKey(forLegacyTemplateKey: $0) }
+            serviceKey: templateId.flatMap { ServiceLibrary.serviceKey(forLegacyTemplateKey: $0) },
+            chezOwned: nil,
+            chezOwnedAt: nil,
+            chezRequestId: nil
         )
     }
 }
@@ -5040,7 +5062,7 @@ struct LocalVendorResultRow: Codable, Identifiable {
     let website: String?
     let rating: Double?
     let reviewCount: Int?
-    let isHavenCertified: Bool?
+    let isTopRated: Bool?
     let rankPosition: Int?
     let fetchedAt: Date?
 
@@ -5049,7 +5071,7 @@ struct LocalVendorResultRow: Codable, Identifiable {
         case vendorName = "vendor_name"
         case googlePlaceId = "google_place_id"
         case reviewCount = "review_count"
-        case isHavenCertified = "is_haven_certified"
+        case isTopRated = "is_top_rated"
         case rankPosition = "rank_position"
         case fetchedAt = "fetched_at"
     }
@@ -5066,7 +5088,7 @@ struct LocalVendorResultInsert: Codable {
     var website: String?
     var rating: Double?
     var reviewCount: Int?
-    var isHavenCertified: Bool?
+    var isTopRated: Bool?
     var rankPosition: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -5074,7 +5096,7 @@ struct LocalVendorResultInsert: Codable {
         case vendorName = "vendor_name"
         case googlePlaceId = "google_place_id"
         case reviewCount = "review_count"
-        case isHavenCertified = "is_haven_certified"
+        case isTopRated = "is_top_rated"
         case rankPosition = "rank_position"
     }
 }

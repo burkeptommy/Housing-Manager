@@ -988,6 +988,190 @@ async function handleDelegateContractor(
 }
 
 // ============================================================================
+// Phase 80.2 — Per-task delegation
+// ============================================================================
+
+interface DelegateTaskPayload {
+  task_id: string;
+  delegated: boolean;
+  notes?: string;
+}
+
+async function handleDelegateTask(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: DelegateTaskPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const taskId = compactString(payload.task_id);
+  if (!taskId) return json({ error: "task_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  // Pull the task + the linked contractor (if any) so we can route the
+  // category correctly: tasks without a vendor get a `find_vendor`
+  // request, tasks with one get a `coordinate_task` request.
+  const { data: taskData, error: lookupErr } = await service
+    .from("maintenance_tasks")
+    .select("id, household_id, title, description, notes, assigned_contractor_id, needs_vendor, scheduled_date, next_due_date, frequency, system_id, property_id, vehicle_id, chez_request_id")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (lookupErr || !taskData) return json({ error: "task not found" }, 404);
+  const task = taskData as {
+    id: string;
+    household_id: string;
+    title: string;
+    description: string | null;
+    notes: string | null;
+    assigned_contractor_id: string | null;
+    needs_vendor: boolean | null;
+    scheduled_date: string | null;
+    next_due_date: string | null;
+    frequency: string | null;
+    system_id: string | null;
+    property_id: string | null;
+    vehicle_id: string | null;
+    chez_request_id: string | null;
+  };
+  if (task.household_id !== householdId) return json({ error: "not authorized" }, 403);
+
+  const now = new Date().toISOString();
+
+  // Revoke path — flip the bool, keep the request open as audit, but
+  // disconnect so subsequent task changes don't loop back.
+  if (!payload.delegated) {
+    await service
+      .from("maintenance_tasks")
+      .update({ chez_owned: false, chez_owned_at: null })
+      .eq("id", taskId);
+    // System message in the parent thread (if there is one).
+    if (task.chez_request_id) {
+      await service.from("concierge_messages").insert({
+        household_id: householdId,
+        user_id: user.id,
+        request_id: task.chez_request_id,
+        role: "system",
+        content: "Customer revoked Chez's ownership of this task. They'll handle it themselves from here.",
+        attachments: [],
+      });
+    }
+    return json({ ok: true });
+  }
+
+  // Delegate path. Smart routing on whether the task has a vendor.
+  const hasVendor = !!task.assigned_contractor_id && !task.needs_vendor;
+  let vendorRow: { company_name?: string; phone?: string } | null = null;
+  if (hasVendor && task.assigned_contractor_id) {
+    const { data: vendor } = await service
+      .from("contractors")
+      .select("company_name, phone")
+      .eq("id", task.assigned_contractor_id)
+      .maybeSingle();
+    vendorRow = vendor as typeof vendorRow;
+  }
+
+  const category = hasVendor ? "coordinate_task" : "find_vendor";
+  const summary = hasVendor
+    ? `Schedule + manage: ${task.title}`
+    : `Find a vendor for: ${task.title}`;
+  const slaDueAt = await businessHoursDue(service);
+
+  const { data: req, error: reqErr } = await service
+    .from("chez_requests")
+    .insert({
+      household_id: householdId,
+      user_id: user.id,
+      category,
+      summary,
+      context: {
+        _kind: "task_delegation",
+        task_id: taskId,
+        task_title: task.title,
+        has_vendor: hasVendor ? "true" : "false",
+        vendor_name: vendorRow?.company_name ?? "",
+        scheduled_date: task.scheduled_date ?? "",
+        next_due_date: task.next_due_date ?? "",
+        frequency: task.frequency ?? "",
+        notes: payload.notes ?? "",
+      },
+      status: "open",
+      sla_due_at: slaDueAt,
+      last_message_at: now,
+      unread_for_user: false,
+      unread_for_admin: true,
+    })
+    .select("*")
+    .single();
+  if (reqErr || !req) return json({ error: "failed to create request" }, 500);
+
+  // Stamp the task with chez ownership + the parent request id.
+  const r = req as { id: string };
+  await service
+    .from("maintenance_tasks")
+    .update({
+      chez_owned: true,
+      chez_owned_at: now,
+      chez_request_id: r.id,
+    })
+    .eq("id", taskId);
+
+  // System message: explicit + actionable so Chez knows the routing.
+  const description = task.description?.trim() ?? "";
+  const customerNotes = payload.notes?.trim() ?? "";
+  let systemBody: string;
+  if (hasVendor) {
+    const vendorName = vendorRow?.company_name ?? "their vendor";
+    systemBody = `Customer delegated this task to Chez. Coordinate with ${vendorName} to schedule and follow up — they don't want to chase the appointment themselves.\n\nTask: ${task.title}`;
+  } else {
+    systemBody = `Customer asked Chez to source a vendor for this task and own coordination end-to-end. Find a vetted local pro, propose them, and handle scheduling once approved.\n\nTask: ${task.title}`;
+  }
+  if (description) systemBody += `\n\nWhat the task involves:\n${description}`;
+  if (customerNotes) systemBody += `\n\nCustomer notes:\n${customerNotes}`;
+
+  await service.from("concierge_messages").insert({
+    household_id: householdId,
+    user_id: user.id,
+    request_id: r.id,
+    role: "system",
+    content: systemBody,
+    attachments: [],
+  });
+
+  // Push + email to admin.
+  await sendPush(
+    serviceUrl,
+    serviceRoleKey,
+    adminUserIds(),
+    hasVendor
+      ? "Customer asked Chez to handle a task"
+      : "Customer asked Chez to source a vendor",
+    summary,
+    { type: "chez_admin_request", request_id: r.id }
+  );
+  await sendAdminEmail(
+    adminEmails(),
+    `[Chez] ${summary}`,
+    `${systemBody}\n\n${adminPortalUrl(r.id)}`,
+    emailBody({
+      preview: hasVendor
+        ? "Customer handed off task coordination."
+        : "Customer wants Chez to source a vendor.",
+      heading: summary,
+      intro: hasVendor
+        ? `Customer delegated this task to Chez. Vendor on file: ${vendorRow?.company_name ?? "unknown"}.`
+        : "Customer asked Chez to find a vendor for this task and own coordination end-to-end.",
+      bodyText: customerNotes || description || "(no additional notes)",
+      ctaLabel: "Open in admin portal",
+      ctaUrl: adminPortalUrl(r.id),
+    })
+  );
+
+  return json({ ok: true, request_id: r.id });
+}
+
+// ============================================================================
 // Phase 80.1 — Structured proposals
 // ============================================================================
 
@@ -1300,6 +1484,14 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as DelegateContractorPayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+      case "delegate_task":
+        return handleDelegateTask(
+          service,
+          user,
+          body as unknown as DelegateTaskPayload,
           supabaseUrl,
           serviceRoleKey
         );

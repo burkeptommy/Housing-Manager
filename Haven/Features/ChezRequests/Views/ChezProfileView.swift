@@ -458,23 +458,45 @@ struct ChezProfileView: View {
     private var standingEngagementsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("STANDING ENGAGEMENTS")
-            captionText("Routines and vendors Chez owns end-to-end. Manage the toggles on each individual routine or vendor.")
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(HavenColors.textSecondary)
-                Text("Use the \"Chez owns this\" toggle on any routine or vendor. They'll appear here once enabled.")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer()
+            captionText("Everything you've handed off to Chez — routines, vendor relationships, and individual tasks.")
+            NavigationLink {
+                ChezDelegationsListView()
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(HavenColors.action.opacity(0.12))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("View what Chez owns")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("Routines, vendors, and individual tasks Chez is handling for you.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(HavenColors.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(HavenColors.beige200, lineWidth: 1)
+                )
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(HavenColors.beige200.opacity(0.5))
-            )
+            .buttonStyle(.plain)
         }
     }
 

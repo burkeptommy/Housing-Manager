@@ -351,10 +351,15 @@ struct UnifiedTaskCard: View {
 
                 // Center: title + metadata
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(task.title)
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .lineLimit(2)
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(task.title)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(2)
+                        if task.isChezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
 
                     // Phase 19l + 56.4: effort badge only when the task
                     // has a matched template AND no contractor is linked.
@@ -651,10 +656,15 @@ struct UnifiedTaskCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     // Task title (not reframed — user sees the actual task)
-                    Text(task.title)
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .lineLimit(2)
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(task.title)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(2)
+                        if task.isChezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
 
                     // System category
                     if let cat = resolvedCategory, !cat.isEmpty {
@@ -923,6 +933,49 @@ struct UnifiedTaskCard: View {
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
                 .padding(.top, 10)
+
+                // Phase 80.2: "Have Chez source one" inline option
+                // alongside Find-a-pro. The most common moment to want
+                // delegation is precisely the no-vendor branch — the
+                // user is already saying "I don't have a vendor for
+                // this." One tap fires `delegate_task` (no composer,
+                // no second screen) — Chez sources, proposes, and
+                // schedules. Caption is muted so it reads as the
+                // assisted alternative, not a competing primary CTA.
+                Button {
+                    Haptics.medium()
+                    Task {
+                        do {
+                            try await HavenSupabase.delegateTaskToChez(
+                                taskId: task.id, delegated: true
+                            )
+                            Haptics.success()
+                            Analytics.track(.chezDelegationToggled, [
+                                "target": "task",
+                                "delegated": "true",
+                                "source": "find_contractor_card",
+                            ])
+                            NotificationCenter.default.post(
+                                name: .chezRequestChanged, object: nil
+                            )
+                            NotificationCenter.default.post(
+                                name: .maintenanceTaskChanged, object: nil
+                            )
+                        } catch {
+                            Haptics.error()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Or have Chez source one")
+                            .font(HavenTypography.uiCaption)
+                    }
+                    .foregroundStyle(HavenColors.action)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
 
                 // Phase 56.6: "Or add to handyman list" secondary link
                 // for handyman-eligible tasks. Inline routing to the

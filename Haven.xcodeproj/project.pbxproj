@@ -295,6 +295,7 @@
 		581EB59C8135B803A0162F11 /* PropertyListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E445A5A77BF6DC331BFB3B07 /* PropertyListView.swift */; };
 		586E0E719204AEF989FF9DA7 /* ContractorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */; };
 		5877FD51E29C4B180983AF20 /* WarrantyTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6966723A75149E0AA831822 /* WarrantyTrackerView.swift */; };
+		588CDB8226FB78E6B524F663 /* ChezDelegationsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */; };
 		58C28F10A232847437333053 /* PickupDayBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A74778C203DC3788BCBE65C /* PickupDayBanner.swift */; };
 		5931E0623E891998A620F46B /* ContractorPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D67356CC4BAAEA3438CCF1E4 /* ContractorPickerSheet.swift */; };
 		599DE6D8496746E9CE5C6FF0 /* VehicleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97D2B0FAFB54FF91648CA17 /* VehicleDetailView.swift */; };
@@ -751,6 +752,7 @@
 		E844B3B782B687101D043825 /* AlfredLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */; };
 		E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAE3950BF1A95CC45D9C55B /* PushNotificationService.swift */; };
 		E88FC8C0D1E9642313F9CDA8 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDD425AF92101F7B1B5793E /* LoginView.swift */; };
+		E8B6D2FB57F5A3A717F23826 /* ChezDelegationsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */; };
 		E8C6AB41CEB3FDA4FAD2B438 /* HandymanVisitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */; };
 		E8C6BCB762E6405D19B09BEB /* DatabaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECE7A0C3DA1835717111C67 /* DatabaseModels.swift */; };
 		E8D9DE977462730A5C637EDF /* PropertyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */; };
@@ -1054,6 +1056,7 @@
 		7B4CEAEAAB9A80F3874FB94C /* EncryptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionService.swift; sourceTree = "<group>"; };
 		7C2A56293D700D83ACF5FBFC /* HavenPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenPill.swift; sourceTree = "<group>"; };
 		7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractorLogoView.swift; sourceTree = "<group>"; };
+		7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezDelegationsListView.swift; sourceTree = "<group>"; };
 		7D01DDF4F64847EE3ACA4603 /* HookContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookContent.swift; sourceTree = "<group>"; };
 		7EE222CAEC72CDB421341443 /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
 		80692DF12B6F07485A0AA35A /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
@@ -1994,6 +1997,7 @@
 		D6AD08B0E205343ED26B2F57 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */,
 				B87D4673244F2FAD9E17D739 /* ChezProfileView.swift */,
 				C843C1750297B5F7B5273571 /* ChezRequestComposeSheet.swift */,
 				9EF6A66BC91FF4036AF43285 /* ChezRequestDetailView.swift */,
@@ -2386,6 +2390,7 @@
 				8824595153B4BE4B22C8AFFB /* ChatView.swift in Sources */,
 				B1C696A52BA96E7920BCFA7A /* ChatViewModel.swift in Sources */,
 				AC77668356F0306E6AD6CBCB /* ChezConciergeService.swift in Sources */,
+				E8B6D2FB57F5A3A717F23826 /* ChezDelegationsListView.swift in Sources */,
 				CA989FB262B64A512FED5A33 /* ChezDirectorySearchView.swift in Sources */,
 				8890389B83F02A9752632FCB /* ChezDirectoryService.swift in Sources */,
 				D94934C28197EA526838B81A /* ChezEntryButton.swift in Sources */,
@@ -2808,6 +2813,7 @@
 				344ACD784914A80BD4583AB1 /* ChatView.swift in Sources */,
 				7E5468A424B9B41C9DE66F3E /* ChatViewModel.swift in Sources */,
 				02013B6C18B57EAE2AEEBB6C /* ChezConciergeService.swift in Sources */,
+				588CDB8226FB78E6B524F663 /* ChezDelegationsListView.swift in Sources */,
 				68421BBCABCC17C139FBAE0D /* ChezDirectorySearchView.swift in Sources */,
 				0D15EA5FFC86A659709CBFE7 /* ChezDirectoryService.swift in Sources */,
 				1140EEC337F59EA050203A59 /* ChezEntryButton.swift in Sources */,

@@ -173,6 +173,27 @@ extension HavenSupabase {
         )
     }
 
+    /// Phase 80.2 — Hand a single maintenance task off to Chez (or
+    /// revoke). Server-side smart routing: tasks without a vendor get
+    /// a `find_vendor` request, tasks with one get `coordinate_task`.
+    /// The parent `chez_request_id` is stamped back onto the task so
+    /// updates can flow through the conversation thread.
+    static func delegateTaskToChez(
+        taskId: UUID,
+        delegated: Bool,
+        notes: String? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "delegate_task"
+            let task_id: String
+            let delegated: Bool
+            let notes: String?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(task_id: taskId.uuidString, delegated: delegated, notes: notes)
+        )
+    }
+
     // MARK: - Phase 80.1 — Structured proposal decisions
 
     /// Approve / decline / counter a structured proposal. `messageId`

@@ -12,6 +12,12 @@ struct ChezOwnsToggle: View {
     enum Target {
         case routine(id: UUID, label: String)
         case contractor(id: UUID, name: String)
+        /// Phase 80.2 — single-task delegation. `hasVendor` controls
+        /// the copy: tasks without a vendor frame the handoff as
+        /// "Chez sources one and handles scheduling end-to-end",
+        /// tasks with a vendor frame it as "Chez coordinates with
+        /// your vendor."
+        case task(id: UUID, title: String, hasVendor: Bool)
     }
 
     let target: Target
@@ -29,6 +35,8 @@ struct ChezOwnsToggle: View {
         switch target {
         case .routine: return "Have Chez own scheduling"
         case .contractor: return "Make Chez point of contact"
+        case .task(_, _, let hasVendor):
+            return hasVendor ? "Have Chez handle this task" : "Have Chez source a vendor"
         }
     }
 
@@ -39,6 +47,8 @@ struct ChezOwnsToggle: View {
                 return "Chez owns scheduling for \(routineLabel). Visits land on your calendar without asks."
             case .contractor(_, let name):
                 return "Chez handles scheduling and follow-ups with \(name) directly."
+            case .task(_, let title, _):
+                return "Chez owns coordination for \(title). You'll see updates inside the request thread."
             }
         }
         switch target {
@@ -46,6 +56,10 @@ struct ChezOwnsToggle: View {
             return "Chez owns scheduling end-to-end. You'll only see what they did, on the dates it happened."
         case .contractor:
             return "Chez handles all scheduling and follow-ups with this vendor on your behalf."
+        case .task(_, _, let hasVendor):
+            return hasVendor
+                ? "Chez coordinates with your vendor, schedules, and follows up so you don't have to."
+                : "Chez finds a vetted local pro, proposes them, and handles scheduling once you approve."
         }
     }
 
@@ -119,6 +133,12 @@ struct ChezOwnsToggle: View {
                 Text("Chez will own scheduling for \(routineLabel) from now on.")
             case .contractor(_, let name):
                 Text("Chez will be your point of contact for \(name) from now on.")
+            case .task(_, let title, let hasVendor):
+                if hasVendor {
+                    Text("Chez will coordinate with your vendor and schedule this task: \(title).")
+                } else {
+                    Text("Chez will find a vetted vendor for this task and own coordination: \(title).")
+                }
             }
         }
     }
@@ -139,6 +159,10 @@ struct ChezOwnsToggle: View {
                 try await HavenSupabase.delegateContractorToChez(
                     contractorId: id, delegated: delegated, notes: trimmedNotes
                 )
+            case .task(let id, _, _):
+                try await HavenSupabase.delegateTaskToChez(
+                    taskId: id, delegated: delegated, notes: trimmedNotes
+                )
             }
             isOwned = delegated
             pendingNotes = ""
@@ -150,6 +174,13 @@ struct ChezOwnsToggle: View {
             ])
             NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
             NotificationCenter.default.post(name: .chezRequestChanged, object: nil)
+            // Tasks need maintenance refresh too — the delegated task
+            // gets a chez_request_id stamped server-side and listeners
+            // (the maintenance schedule, the property page) re-fetch
+            // to render the new badge.
+            if case .task = target {
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            }
             onChange?(delegated)
         } catch {
             errorMessage = error.localizedDescription
@@ -161,6 +192,7 @@ struct ChezOwnsToggle: View {
         switch target {
         case .routine: return "routine"
         case .contractor: return "contractor"
+        case .task: return "task"
         }
     }
 }
