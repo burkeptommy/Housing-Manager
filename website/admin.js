@@ -297,11 +297,11 @@ const DEFAULT_VENDOR_CATEGORIES = [
     "Tree templates are non-essential by default — the homeowner opts in via Recommended Services unless a problem surfaces.",
   ],
   [
-    "Mosquito & tick",
-    "Seasonal spraying service — typically biweekly or triweekly through warm months.",
-    "Backyard fogging or systemic treatments to keep mosquitoes and ticks down. Often paired with pet-protective programs.",
-    "Captured at Q15b. Conditional — only homes with outdoor living areas get the chip.",
-    "Creates a seasonal routine (April–October) when a vendor is captured. Surfaces on the Routines tab and the Pickup Day Banner.",
+    "Pest control",
+    "Pro for pest extermination + seasonal mosquito & tick spraying. Same vendor handles both — spraying is a typical add-on to the standard pest-control program.",
+    "Termite inspections, ant / spider / rodent treatment, seasonal mosquito + tick fogging or systemic treatments. HNW homes typically pair this with pet-protective programs.",
+    "Captured at Q15b — the existing `mosquito_tick` chip stays in place; chip label TBD whether to relabel to 'Pest control' in a follow-up Swift change.",
+    "Creates a seasonal mosquito routine (April–October) when the vendor is captured. Pest Control templates (termite inspection) and Mosquito & Tick templates (sign-up, seasonal treatment) both auto-link.",
   ],
   [
     "Snow removal",
@@ -421,6 +421,25 @@ const DEFAULT_VENDOR_CATEGORIES = [
     "Foundation crack injection, vapor barrier install, sump pump install + service, French drains, mold remediation, drain tile, dehumidifier setup. Companies like American Dry Basements / Connecticut Basement Systems.",
     "Captured at Q15b when the homeowner has an established relationship. Conditional — humid climates / older basements + crawl spaces need this most.",
     "Crawl Space templates (vapor barrier, mold inspection, foundation cracks) auto-link to this vendor. Distinct from a general handyman or builder.",
+  ],
+  // Phase 67I.3 (admin audit gap-closure) — two vendor types HNW
+  // homes need but the catalog hasn't shipped yet. iOS Q15b chip
+  // for Solar already wired (commit aebcdb65). Elevator stays
+  // homeowner-add via Property → Contacts since residential
+  // elevators are rare.
+  [
+    "Solar service",
+    "Pro for solar panel cleaning + system inspection.",
+    "Twice-a-year panel cleaning (especially after pollen / wildfire / snow seasons), inverter status check, monitoring app re-pairing, post-storm inspection, end-of-warranty audit. Distinct from an electrician — solar-specific certifications cover panel + inverter work.",
+    "Captured at Q15b when Q21 confirmed solar (commit aebcdb65). Universal across solar households.",
+    "Solar category templates (Solar panel cleaning, Solar system inspection) auto-link to this vendor.",
+  ],
+  [
+    "Elevator service",
+    "Pro for residential elevator inspection + service contracts.",
+    "Annual code-compliance inspection (state-mandated for residential elevators in most jurisdictions), quarterly service (cable tension, rail lubrication, door sensor calibration, emergency phone test, cab leveling). Failing to keep current can void homeowner's insurance for elevator-related claims.",
+    "Captured via Property → Contacts (no Q15b chip — too rare to slot into the chip grid). Elevator is a registered specialty system category in SystemCategoryRegistry.",
+    "Elevator category templates (Annual elevator inspection, Quarterly elevator service) auto-link to this vendor.",
   ],
 ];
 
@@ -3983,8 +4002,14 @@ const SYSTEM_CATEGORY_TO_VENDOR = {
   "Roofing/Exterior": "Roofer",
   "Siding/Exterior": "Roofer",
   "Tree Service": "Tree service",
-  "Pest Control": "Mosquito & tick",
-  "Mosquito & Tick Spraying": "Mosquito & tick",
+  // Phase 67I.3: Pest Control + Mosquito & Tick consolidated under
+  // the renamed "Pest control" vendor type. Pest control vendors
+  // cover seasonal spraying as a standard add-on, not a separate
+  // trade. The canonical registry key "Mosquito & Tick" (without
+  // "Spraying" suffix) is now also a recognized lookup.
+  "Pest Control": "Pest control",
+  "Mosquito & Tick Spraying": "Pest control",
+  "Mosquito & Tick": "Pest control",
   "Snow Removal": "Snow removal",
   "Pet Waste Removal": "Pet waste",
   "Septic": "Septic pumper",
@@ -4012,6 +4037,19 @@ const SYSTEM_CATEGORY_TO_VENDOR = {
   "Window Cleaning": "House cleaner",
   "Pressure Washing": "Hardscape / masonry",
   "Driveway Sealcoating": "Hardscape / masonry",
+  // Phase 67I.3 — gap-closure mappings flagged by the Audit tab.
+  // Each key is a systemCategory present on at least one template;
+  // each value is a vendor type that lives in DEFAULT_VENDOR_CATEGORIES.
+  "Water Heater": "Plumber",                         // Flush / T&P / descale tankless — plumbing trade
+  "Well System": "Well water service",               // existing keys were "Well" / "Well Water" — adds the canonical registry key
+  "Windows": "Handyman",                             // exterior re-caulking is handyman class
+  "Pool/Spa": "Pool service",
+  "Pool": "Pool service",                            // alias for legacy templates that may carry "Pool"
+  "Security System": "Handyman",                     // per Tom: handyman covers system check + sensor batteries; security companies don't visit unless deeper work
+  "Solar": "Solar service",
+  "Crawl Space": "Waterproofing & basement",
+  "Elevator": "Elevator service",
+  "Wine Cellar": "HVAC service",                     // mini-split cooling work; homeowner can override per-task
 };
 
 // HNW vendor types that aren't in DEFAULT_VENDOR_CATEGORIES today —
@@ -4077,7 +4115,7 @@ function computeCoverageAudit() {
         category: cat || "(no category)",
         templateKey: t.templateKey,
         reason: cat
-          ? `Category "${cat}" doesn't map to any of the 15 vendor types we carry.`
+          ? `Category "${cat}" doesn't map to any of the ${vendorNames.size} vendor types we carry.`
           : "No systemCategory on this template — there's no way to know who handles it.",
       });
     } else if (!vendorNames.has(mapped)) {
@@ -5308,7 +5346,7 @@ async function handleFocusedAuditAction(finding, action) {
       scopeType: "task",
       scopeId: data.templateKey,
       scopeTitle: data.title,
-      body: `Audit asks Claude to remap the "${data.category}" category to one of the existing 15 vendor categories.\n\nCurrent reason: ${data.reason}\n\nQuickest fix: pick the closest match in DEFAULT_VENDOR_CATEGORIES (or update SYSTEM_CATEGORY_TO_VENDOR in admin.js so the audit stops flagging it).\n\n(Drafted from the Audit tab.)`,
+      body: `Audit asks Claude to remap the "${data.category}" category to one of the existing ${DEFAULT_VENDOR_CATEGORIES.length} vendor categories.\n\nCurrent reason: ${data.reason}\n\nQuickest fix: pick the closest match in DEFAULT_VENDOR_CATEGORIES (or update SYSTEM_CATEGORY_TO_VENDOR in admin.js so the audit stops flagging it).\n\n(Drafted from the Audit tab.)`,
       intent: "change_request",
       target: "claude",
       snapshot: { templateKey: data.templateKey, category: data.category, source: "audit_task_remap" },
