@@ -5751,6 +5751,25 @@
   gap: 10px;
   padding-bottom: 8px;
 }
+/* Phase 67I.5: bulk-approve button on the needs-review section header. */
+.admin-audit__bulk-btn {
+  background: var(--salmon);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  margin-left: auto;
+  padding: 6px 12px;
+  transition: background 0.15s;
+}
+.admin-audit__bulk-btn:hover {
+  background: var(--salmon-dark);
+}
+.admin-audit__bulk-btn:disabled {
+  background: var(--neutral-300);
+  cursor: wait;
+}
 .admin-audit__section-head h3 {
   align-items: baseline;
   color: var(--text);

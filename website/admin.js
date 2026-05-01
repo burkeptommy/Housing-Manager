@@ -4257,6 +4257,14 @@ function computeCoverageAudit() {
   // the count never moved. Frustrating — Tom never felt progress.
   // Cap dropped. The full queue shows. As Tom approves / cuts items
   // the count actually drops by one each time.
+  //
+  // Phase 67I.5: dedupe by liveEntityId across surfaces. The same
+  // template appears on both `tasks` (templates.json) and `handyman`
+  // (handyman-templates.json) — handyman items are a derived view
+  // of the same underlying template. Approving one flips both via
+  // the shared shadow row (keyed on live_entity_id), so showing the
+  // dupe was pure noise. Skipped on second-surface hits.
+  const seenLiveEntityIds = new Set();
   for (const surfaceId of surfaces) {
     const items = liveItemsForView(surfaceId) || [];
     for (const item of items) {
@@ -4267,6 +4275,10 @@ function computeCoverageAudit() {
       if (!high) continue;
       // Skip if already in voice-fixes for this entity (avoid double-listing).
       if (findings.voiceFixes.some((vf) => vf.item.id === item.id)) continue;
+      // Cross-surface dedupe — see comment above.
+      const liveId = liveEntityIdFor(item);
+      if (liveId && seenLiveEntityIds.has(liveId)) continue;
+      if (liveId) seenLiveEntityIds.add(liveId);
       findings.needsReview.push({
         surfaceId,
         item,
@@ -4399,10 +4411,21 @@ function renderAuditView() {
 
   const sectionHtml = (title, kinds, emptyCopy) => {
     const items = findings.filter((f) => kinds.includes(f.kind));
+    // Phase 67I.5: surface a bulk-approve button on the needs-review
+    // section when at least one finding is bulk-approvable. Most of
+    // that section is "look once and bless" rather than "fix"; one
+    // click clears the safe patterns and leaves only the genuinely
+    // uncertain rows for individual review.
+    const isNeedsReview = kinds.length === 1 && kinds[0] === "needs_review";
+    const bulkApprovable = isNeedsReview ? items.filter(isBulkApprovable) : [];
+    const bulkBtnHtml = bulkApprovable.length > 0
+      ? `<button class="admin-audit__bulk-btn" data-bulk-approve="needs_review" type="button">Bulk approve ${bulkApprovable.length} safe ${bulkApprovable.length === 1 ? "entity" : "entities"}</button>`
+      : "";
     return `
       <div class="admin-audit__section">
         <header class="admin-audit__section-head">
           <h3>${escapeHtml(title)} <span class="admin-audit__count">${items.length}</span></h3>
+          ${bulkBtnHtml}
         </header>
         ${items.length === 0
           ? `<p class="admin-audit__empty admin-muted">${escapeHtml(emptyCopy)}</p>`
@@ -4464,6 +4487,24 @@ function renderAuditView() {
       renderFocusedAuditDetail(finding);
       // Re-render the list so the active row gets the highlight.
       renderAuditView();
+    });
+  });
+
+  // Phase 67I.5: wire bulk-approve buttons.
+  el.list.querySelectorAll("[data-bulk-approve]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const kind = btn.dataset.bulkApprove;
+      if (kind !== "needs_review") return;
+      const candidates = findings.filter(
+        (f) => f.kind === "needs_review" && isBulkApprovable(f)
+      );
+      btn.disabled = true;
+      btn.textContent = `Approving ${candidates.length}…`;
+      try {
+        await bulkApproveAuditFindings(candidates);
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
@@ -5790,7 +5831,18 @@ function lintRecommendationFor(hit) {
 
 function isHighImpact(item) {
   const p = item.payload || {};
-  if (p.bundleId) return `Bundle parent (${p.bundleId})`;
+  // Phase 67I.5: only flag bundle PARENTS for review (templates with
+  // `bundleTitle` set). Bundle members (bundleId set, bundleTitle
+  // absent) ride on the parent — when the parent visit is approved,
+  // every "what's included" line item rides along. The homeowner
+  // never sees members as standalone tasks either, so the audit
+  // shouldn't ask Tom to approve them as standalone entities. This
+  // mirrors the iOS UX: one row per visit, sub-tasks revealed inside.
+  if (p.bundleId && p.bundleTitle) return `Bundle parent (${p.bundleId})`;
+  // Bundle members (bundleId set, no bundleTitle) ride on the parent —
+  // bail out before any other rule fires so they never show as their
+  // own row.
+  if (p.bundleId) return null;
   if ((p._impact?.templates_in_category || []).length > 5) {
     return `${p._impact.templates_in_category.length} templates depend on this category`;
   }
@@ -5798,6 +5850,67 @@ function isHighImpact(item) {
   if (p.safetyFloor === true) return "Safety-floor template";
   if (p.requiredSubtypes?.length === 0 && item.itemType === "task") return "Universal template (no gating)";
   return null;
+}
+
+// Phase 67I.5: which needs-review patterns can Tom safely bulk-approve?
+// The audit's "needs review" pool mixes two kinds of work:
+//   (a) "Look at this once and bless it" — bundle parents, safety-floor
+//       templates, universal-tier system rows, opt-in library items.
+//       These are correctly classified; they just haven't been blessed.
+//   (b) "I'm uncertain about this" — universal templates with empty
+//       requiredSubtypes that ARE essential (auto-seed). Could need
+//       gating, could be too universal, could be low value. Real review.
+//
+// Bulk-approve covers (a) only. (b) keeps its individual review row.
+// Saves Tom from clicking through ~80% of the queue manually.
+function isBulkApprovable(finding) {
+  const reason = finding.reason || "";
+  if (reason.startsWith("Bundle parent")) return true;
+  if (reason === "Safety-floor template") return true;
+  if (reason === "Universal-tier system (every household)") return true;
+  if (reason.includes("templates depend on this category")) return true;
+  // Universal-no-gating templates are bulk-approvable when they're
+  // OPT-IN — the homeowner adds them deliberately via Recommended
+  // Services, so universal applicability isn't a problem (the
+  // homeowner is the gate).
+  if (reason === "Universal template (no gating)") {
+    const p = finding.item?.payload || finding.data?.payload || {};
+    if (p.isEssential === false) return true;
+  }
+  return false;
+}
+
+// Phase 67I.5: bulk-approve a set of audit findings. Each goes through
+// the same `toggleLockSelected` write path one entry at a time so the
+// shadow row anchoring is consistent with the per-item flow. Sequential
+// (not parallel) so concurrent updates can't fight over the same shadow.
+async function bulkApproveAuditFindings(findings) {
+  if (!findings.length) return;
+  const ok = confirm(
+    `Approve ${findings.length} catalog ${findings.length === 1 ? "entity" : "entities"} in one batch?\n\n` +
+    `Bundle parents · safety-floor templates · universal-tier system rows · opt-in library items. ` +
+    `Anything genuinely uncertain (essential universal templates that may need gating) stays in the queue.`
+  );
+  if (!ok) return;
+
+  let succeeded = 0;
+  let failed = 0;
+  for (const f of findings) {
+    if (!f.item) continue;
+    state.selected = f.item;
+    try {
+      await toggleLockSelected();
+      succeeded += 1;
+    } catch (err) {
+      failed += 1;
+    }
+  }
+  state.selected = null;
+  state.selectedAudit = null;
+  await refreshAdminData("manual");
+  if (failed > 0) {
+    alert(`Approved ${succeeded} · ${failed} failed (see console).`);
+  }
 }
 
 // Phase 5z+16 — Value analysis for "Needs review" decisions. Tom:
