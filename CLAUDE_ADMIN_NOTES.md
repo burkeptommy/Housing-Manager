@@ -2,260 +2,23 @@
 
 Generated from `admin_codex_notes` where target IN ('claude','both'). When a new Claude session opens, scan this file before doing anything else.
 
-**Synced:** 2026-05-01T02:10:33.878Z
-**Pending:** 11 change requests · **Open questions:** 0 · **Feedback:** 43 · **Applied (last 30d):** 147
+**Synced:** 2026-05-01T13:50:04.340Z
+**Pending:** 0 change requests · **Open questions:** 0 · **Feedback:** 100 · **Applied (last 30d):** 205
 
 Reading order: 1. Questions for Claude. 2. Pending Changes. 3. Open Feedback (by entity). 4. Recently Applied (audit).
-
----
-
-## ⚡ Pending Changes (act on these)
-
-### Replace Refrigerator Water Filter  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: description
-Before: Haven adds this to your handyman punch list every six months — drop a fresh f...
-After: Haven adds this to your handyman punch list every six months. Drop a fresh f...
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Haven adds this to your handyman punch list every six months. Drop a fresh f...",
-  "from": "Haven adds this to your handyman punch list every six months — drop a fresh f...",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "description"
-}
-```
-
-### Inspect Hot Tub Cover and Jets  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: notes
-Before: Detached hot tubs only — attached spillover spas don't have removable covers ...
-After: Detached hot tubs only. Attached spillover spas don't have removable covers ...
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Detached hot tubs only. Attached spillover spas don't have removable covers ...",
-  "from": "Detached hot tubs only — attached spillover spas don't have removable covers ...",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "notes"
-}
-```
-
-### Drain and Refill Hot Tub  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Rewrite to comply with voice rule:
-
-Rule: no-em-dash
-Field: notes
-Current: Detached hot tubs only. If your spa shares water with the pool (spillover / a...
-
-We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session.
-
-(Drafted from the Decisions tab. Claude rewrites the text manually on the next session — there's no mechanical fix Tom can preview.)
-
-**Proposed diff:**
-```json
-{
-  "from": "Detached hot tubs only. If your spa shares water with the pool (spillover / a...",
-  "kind": "voice_rewrite",
-  "rule": "no-em-dash",
-  "field": "notes",
-  "reason": "We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session."
-}
-```
-
-### 6. What kind of water heater do you have?  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: answer-label-max-words
-Field: answerOption.label
-Before: Not sure — take a photo and we'll tell you
-After: Not sure
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Not sure",
-  "from": "Not sure — take a photo and we'll tell you",
-  "kind": "voice_fix",
-  "rule": "answer-label-max-words",
-  "field": "answerOption.label"
-}
-```
-
-### 6. What kind of water heater do you have?  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Voice fix — pre-computed.**
-
-Template "6. What kind of water heater do you have?" has a `answer-label-max-words` violation in field `answerOption.label`.
-
-**BEFORE:**
-> 
-
-**AFTER (proposed):**
-> 
-
-**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
-
-**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
-
-**Proposed diff:**
-```json
-{
-  "answerOption.label": {
-    "to": "",
-    "from": ""
-  }
-}
-```
-
-### Replace Refrigerator Water Filter  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: description
-Before: Haven adds this to your handyman punch list every six months — drop a fresh f...
-After: Haven adds this to your handyman punch list every six months. Drop a fresh f...
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Haven adds this to your handyman punch list every six months. Drop a fresh f...",
-  "from": "Haven adds this to your handyman punch list every six months — drop a fresh f...",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "description"
-}
-```
-
-### Flush Water Heater  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: notes
-Before: Anode rod inspection is part of the standard flush — pros pull and inspect ev...
-After: Anode rod inspection is part of the standard flush. Pros pull and inspect ev...
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Anode rod inspection is part of the standard flush. Pros pull and inspect ev...",
-  "from": "Anode rod inspection is part of the standard flush — pros pull and inspect ev...",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "notes"
-}
-```
-
-### 13. Security or alarm system?  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: subtitle
-Before: We won't share specifics — your setup stays private to you and any household ...
-After: We won't share specifics. Your setup stays private to you and any household ...
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "We won't share specifics. Your setup stays private to you and any household ...",
-  "from": "We won't share specifics — your setup stays private to you and any household ...",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "subtitle"
-}
-```
-
-### 2. What's your exterior siding?  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: subtitle
-Before: Pick all that apply — many homes mix two or three materials.
-After: Pick all that apply. Many homes mix two or three materials.
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Pick all that apply. Many homes mix two or three materials.",
-  "from": "Pick all that apply — many homes mix two or three materials.",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "subtitle"
-}
-```
-
-### 2. What's your exterior siding?  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-Apply voice fix:
-
-Rule: no-em-dash
-Field: subtitle
-Before: Pick all that apply — many homes mix two or three materials.
-After: Pick all that apply. Many homes mix two or three materials.
-
-(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
-
-**Proposed diff:**
-```json
-{
-  "to": "Pick all that apply. Many homes mix two or three materials.",
-  "from": "Pick all that apply — many homes mix two or three materials.",
-  "kind": "voice_fix",
-  "rule": "no-em-dash",
-  "field": "subtitle"
-}
-```
-
-### Prune Shrubs and Hedges  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-This shouldn't be added automatically because how do we know if the home has shrubs or things to prune? This should be an opt-in.
 
 ---
 
 ## 📋 Open Feedback (by entity)
 
 ### ❓ Quiz Questions
+
+#### 13. Security or alarm system?  `q15_security`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Q15 security subtitle em-dash was already replaced in Round 2 (commit 40a3c1d4).
 
 #### 15. Pool or hot tub?  `q12_pool`
 
@@ -264,12 +27,36 @@ This shouldn't be added automatically because how do we know if the home has shr
 **2026-04-30 · feedback · claude**
 Verified. Q12 architecture (Build 87) creates SEPARATE home_systems rows for the two halves of the both answer: a Pool system with the chosen pool-type subtype + 3 children, AND a Hot Tub system with subtype hot_tub. Maintenance templates gate independently — pool templates fire on requiredSubtypes [pool], hot tub templates fire on [hot_tub], so both/in_ground+hot_tub households get the union. Caveat: hot tub Drain-and-refill + cover/jets templates over-fire for households whose hot tub is an attached spillover spa (shares water with the pool). Notes copy on those templates now tells those users to skip — drain rolls into pool service. Q12 follow-up question to distinguish detached vs attached is queued as a TODO in MaintenanceTemplates.swift above the hot-tub templates. Marking applied.
 
+#### 2. What's your exterior siding?  `q2_siding`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — duplicate of 93602e78. Q2 siding subtitle was already fixed.
+
+**2026-05-01 · feedback · claude**
+Stale — Q2 siding subtitle em-dash was already replaced in Round 2 (commit 40a3c1d4).
+
 #### 6. Do you have a mortgage on this home?  `q5_mortgage`
 
 **Section** ? · **Chapter** ? · **Kind** ?
 
 **2026-05-01 · feedback · claude**
 Stale — Q5 mortgage was deleted in Batch 5 (commit 0367137f) per the original feedback note (b348f04c + f5992eea). Mapper retains a no-op case for round-trip safety on saved-for-later quizzes. Marking applied.
+
+#### 6. What kind of water heater do you have?  `q8_water_heater`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Applied — Q8 water heater Not-sure option label simplified.
+
+#### 8. Any major renovations in the last 10 years?  `q9b_renovations`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Applied — Q9b renovations subtitle em-dash replaced with period.
 
 #### attom_derive_partial: q4_purchase  `live-quiz-q4_purchase`
 
@@ -347,7 +134,33 @@ Stale — q28b_pets was folded into Q28 caretakers payload (Phase 67D A10). Mapp
 **2026-05-01 · feedback · claude**
 Stale — q3+q3b were merged into q3_heating_system with 12 fuel+system combo options (Phase 67D A3). Already merged.
 
+#### Merge q9_basement + q9b_renovations  `live-quiz-q9_basement`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Deferred. Q9 + Q9b merge queued behind active Q9b renovationsMultiSelect kind work. Pattern matches Phase 67D progressivePool / progressiveLawn / trashWithDays merges already in place.
+
+**2026-05-01 · feedback · claude**
+Deferred. Q9 + Q9b merge is queued behind the active Q9b renovationsMultiSelect kind work. Once that kind ships and the renovations payload schema is stable, the merge into a progressive parent (e.g. "basementWithRenovations") is straightforward — pattern matches the Phase 67D progressivePool / progressiveLawn / trashWithDays merges already in place.
+
 ### 🛠 Maintenance Templates
+
+#### 6. What kind of water heater do you have?  `live-quiz-q8_water_heater`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Stale — empty proposed_diff. Q8 water heater label was simplified per 651b3c48.
+
+#### 8. Any major renovations in the last 10 years?  `live-quiz-q9b_renovations`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied — same Q9b renovations subtitle voice fix shipped.
 
 #### Annual Chimney Sweep  `Chimney:Annual chimney sweep`
 
@@ -356,6 +169,30 @@ Stale — q3+q3b were merged into q3_heating_system with 12 fuel+system combo op
 
 **2026-04-30 · feedback · claude**
 Investigated. Only one Annual chimney sweep template exists in iOS code (MaintenanceTemplates.swift:1111) gated on requiredSubtypes [wood]. The duplicate display is the admin lab rendering the same template under two scopes — live-task-chimney-annual-chimney-sweep + live-handyman-chimney-annual-chimney-sweep — because the lab presents homeowner and handyman views independently. iOS-side this only seeds once. If the dual rendering in the lab is confusing, we could collapse the two scopes into a single row.
+
+#### Annual cooling unit service  `Wine Cellar:Annual cooling unit service`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied. Annual cooling unit service (Wine Cellar) defaults to the HVAC contractor (Q15b hvac_service) since wine-cellar cooling = mini-split work. Homeowner can override via per-task assignment.
+
+#### Annual elevator inspection  `Elevator:Annual elevator inspection`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied. Annual elevator inspection — Elevator is a registered specialty category. Custom elevator vendors land with category=Elevator and the reconciler matches. No Q15b chip for v1; residential elevators are rare enough that homeowner-add via Property → Contacts is sufficient.
+
+#### Annual security system check  `Security System:Verify alarm system`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Annual security system check routes to the new Q15b security_service chip (gated on Q15 ≠ none). ADT / SimpliSafe / Vivint live in utility_providers as monitoring companies; the security_service chip captures a separate post-monitor security pro for system maintenance + battery + sensor work. Canonical aliases ("alarm", "security service", "alarm company") route any custom-named contractor to Security System.
 
 #### Bundle: "Chimney Fall  `live-task-chimney-annual-chimney-sweep`
 
@@ -381,6 +218,100 @@ Deferring — same quote-leak bug as f58205f9. Re-propose after the lab fixes. N
 **2026-04-30 · feedback · claude**
 Deferring — proposed_diff has a serialization bug: bundleId reads "\"Landscaping:spring" (leading literal double-quote character) and bundleTitle reads "Spring \"Landscaping Service". Looks like the lab is leaking JSON-quoted strings instead of unquoted values. Same bug present in the Chimney Fall and HVAC Fall proposals (c483a5ef and 9aa2e805). Once the lab strips the surrounding quotes, re-propose and I will apply. Architecturally the bundle merge is sensible — same pattern as the existing Generator:annual / Roofing:spring bundles.
 
+#### Check foundation for cracks  `Crawl Space:Check foundation for cracks`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Check foundation for cracks (Crawl Space:annual bundle child) now routes to a Waterproofing & Basement contractor via the new Q15b waterproofing chip + canonical aliases ("waterproofing", "basement waterproofing", "waterproofing & basement", "basement systems", "foundation" → Crawl Space). American Dry Basements / Connecticut Basement Systems land in the right slot.
+
+#### Check vapor barrier condition  `Crawl Space:Check vapor barrier condition`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Check vapor barrier condition routes to the Waterproofing & Basement contractor via the Q15b waterproofing chip.
+
+#### Check Washing Machine Supply Hoses  `Handyman:washer_hoses_spring`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Washing machine supply hoses now route through the handyman punch rail — the Plumbing:annual_inspection bundle's reconciler pass writes `handyman_punch_items` rows for tier-1 handyman tasks instead of `maintenance_tasks`.
+
+#### Descale tankless heater  `Water Heater:Descale tankless heater`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied. Descale tankless heater routes to the HVAC vendor via the Q15b hvac_service chip — boiler+water heater are typically the same trade for HNW homes.
+
+#### Drain and refill hot tub  `Pool/Spa:Drain and refill hot tub`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Drain and refill hot tub now routes to the pool vendor via the Q15b pool_service chip.
+
+**2026-05-01 · feedback · claude**
+Applied — voice rewrite shipped, em-dash removed from Drain and refill hot tub notes block (and en-dashes inside dollar/percent ranges normalized to hyphens).
+
+#### Fire Extinguisher Annual Check  `Electrical:Fire extinguisher annual check`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Fire extinguisher annual check is a Handyman bundle child and now routes to the punch rail.
+
+#### Flush Water Heater  `Water Heater:Flush water heater`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Flush water heater notes em-dash was already replaced in Round 2 (commit 693691c7).
+
+#### Foundation Walkaround: Cracks and Grading  `Handyman:foundation_walkaround_spring`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Foundation walkaround routes through the handyman punch rail at reconcile time. The Crawl Space:annual bundle's pro inspection (mold / cracks / vapor barrier) lives separately and now routes to a Waterproofing & Basement vendor via the new Q15b waterproofing chip + canonical alias (commit aebcdb65).
+
+#### Inspect for mold or mildew  `Crawl Space:Inspect for mold or mildew`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Inspect for mold or mildew routes to the Waterproofing & Basement contractor via the Q15b waterproofing chip.
+
+#### Inspect hot tub cover and jets  `Pool/Spa:Inspect hot tub cover and jets`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Inspect hot tub cover and jets is a Pool/Spa template (subtype=hot_tub); the same captured pool vendor handles hot tubs since most HNW pool services cover both. Q15b chip + aliases land it.
+
+**2026-05-01 · feedback · claude**
+Applied — em-dash replaced with period in hot tub cover/jets notes.
+
+#### Inspect pool equipment  `Pool/Spa:Inspect pool equipment`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Inspect pool equipment routes to the captured pool vendor.
+
 #### New task  `local-1777573048534`
 
 **Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
@@ -388,6 +319,54 @@ Deferring — proposed_diff has a serialization bug: bundleId reads "\"Landscapi
 
 **2026-04-30 · feedback · claude**
 Confirmed admin lab artifact. local-1777573048534 is a local-only test record that never made it into MaintenanceTemplates.swift, so there is nothing on the iOS side to delete. Marking applied — if you want it removed from the lab UI too, hit the trash icon in the admin draft list.
+
+#### Pool closing and winterization  `Pool/Spa:Professional pool closing/winterization`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Pool closing and winterization routes to the captured pool vendor.
+
+#### Pool heater service  `Pool/Spa:Pool heater service`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Pool heater service routes to the captured pool vendor.
+
+#### Pool opening service  `Pool/Spa:Professional pool opening`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Pool opening service routes to the captured pool vendor.
+
+#### Pool safety fence inspection  `Pool/Spa:Pool safety fence inspection`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Pool safety fence inspection is a Pool/Spa template; the new Q15b pool_service chip + canonical "pool" / "pool service" / "pool company" / "spa" aliases route any captured pool vendor to it.
+
+#### Prune Shrubs and Hedges  `Landscaping:Prune shrubs and hedges`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Prune shrubs and hedges flagged isEssential: false so it stays opt-in via Recommended Services rather than auto-seeding for every Landscaping household.
+
+#### Quarterly elevator service  `Elevator:Quarterly elevator service`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · tom**
+if the home has an elevator then we map to an elevator company. that easy.
 
 #### Recaulk Interior Trim and Baseboards ↔ Spot-Paint Interior Trim and Baseboards  `live-handyman-handyman-recaulk-interior-trim-and-baseboards`
 
@@ -438,11 +417,96 @@ Confirmed intentional. Replace and Tighten are separate operations — Replace h
 **Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
 **Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
 
+**2026-05-01 · feedback · claude**
+Stale — duplicate of 2047ccda. Already fixed in Round 2.
+
 **2026-04-30 · feedback · claude**
 Applied via Phase 67E/F handyman-tier routing. The template was already configured as handyman-tier (routingOverride .diyDefault + 10min effort + no safety floor + no bundleId), so the reconciler routes it directly to handyman_punch_items rather than maintenance_tasks — Haven adds it to your handyman punch list automatically every six months. Updated the description + notes to make that explicit and to point homeowners without a handyman to the manufacturer subscription path. True auto-order (Amazon affiliate / one-tap reorder) is still queued as a separate capability ask.
 
 **2026-04-30 · feedback · claude**
 Deferring with a question — when you say Can you please do this for us, do you mean: (a) auto-order the replacement filter via Amazon/manufacturer when the cadence hits, (b) auto-create a one-tap reorder reminder with the SKU pre-filled, or (c) flag the task as auto-handled in the punch list with no user action needed? (a) needs an Amazon affiliate or manufacturer integration + payment plumbing — multi-week feature. (b) is feasible quickly via the existing service_records / equipment_catalog data we already have on most fridges (model number → standard filter SKU). (c) is the lightest. Tell me which and I will scope. Leaving pending until then.
+
+#### Replace sensor batteries  `Security System:Replace sensor batteries`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Sensor batteries already a Handyman bundle child — routes through the punch rail. The new Q15b security_service chip (commit aebcdb65) covers users who want a dedicated alarm-company vendor for the system itself.
+
+#### Replace Smoke & CO Detector Batteries  `Handyman:smoke_co_batteries_spring`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Smoke & CO detector battery replacement now lands as a punch-rail row — Handyman:* bundle members route to handyman_punch_items rather than spawning standalone tasks.
+
+#### Replace Smoke Detectors  `Electrical:Replace smoke detectors`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Replace smoke detectors (every 10 years) is a Handyman bundle child — routes to the punch rail. Distinct from the Electrical:fall bundle's annual electrician work.
+
+#### Schedule exterior window re-caulking  `Windows:Schedule exterior window re-caulking`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied via Phase 67I (commit 69c9b4c5). Schedule exterior window re-caulking is a Handyman bundle child (Handyman:caulking_inspect_spring) and routes through the punch rail.
+
+#### Sign up for mosquito and tick season  `Mosquito & Tick:Sign up for mosquito and tick season`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied. Sign up for mosquito and tick season — existing Q15b mosquito_tick chip mirrors a contractor with category=Mosquito & Tick. Households using their pest-control vendor can pick that contractor via per-task assignment.
+
+#### Solar panel cleaning  `Solar:Professional panel cleaning`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Solar panel cleaning routes to the captured solar vendor via the Q15b solar_service chip.
+
+#### Solar system inspection  `Solar:Professional inspection`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied (commit aebcdb65). Solar system inspection routes to the new Q15b solar_service chip's captured vendor (gated on Q21 ∈ owned/leased).
+
+#### Test T&P relief valve  `Water Heater:Test T&P relief valve`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied. T&P relief valve routes to whoever handles Flush water heater — Q15b hvac_service chip captures the HVAC contractor by default.
+
+#### Well system inspection  `Well System:Professional well inspection`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Applied. Well system inspection is a Well System template; the existing Q15b well_water_service chip mirrors a contractor with category=Well System so the reconciler auto-links.
+
+### 🔨 Handyman Templates
+
+#### Replace Refrigerator Water Filter  `Appliance:Replace refrigerator water filter`
+
+**Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
+**Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Replace refrigerator water filter description was already fixed in Round 2 (commit 693691c7).
 
 ### 🔁 Routine Kinds
 
@@ -538,11 +602,553 @@ Best-judgment outcome: keep Water Treatment as a top-level Specialty system (cur
 **2026-04-30 · feedback · claude**
 Architectural — needs a design call. Current state: Water Treatment category (registry displayName Water Softener / Filtration) is a top-level Specialty system. Well System is a separate top-level Conditional system. Town water is implicit (no system row). Your idea: a parent Water system with child Well/Town/Filtration/Softener nodes. The schema already supports parent_system_id (Phase 60+) so child systems can hang under a parent — Well System already has Acid Neutralizer / UV Filter children per CLAUDE.md. Two options: (a) keep Water Softener / Filtration as its own top-level system (current state) and trust users to manually link via parent_system_id when they have a well; (b) introduce a virtual Water parent that auto-creates with Well + Filtration as children. (b) is cleaner architecturally but needs a quiz Q6 redesign + migration for existing households. Marking deferred until you confirm direction.
 
+### 📝 General Notes
+
+#### Add Appliance repair specialist as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Appliance repair specialist to DEFAULT_VENDOR_CATEGORIES (Sub-Zero / Wolf / Thermador focus).
+
+#### Add Carpet + upholstery cleaner as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Carpet + upholstery cleaner to DEFAULT_VENDOR_CATEGORIES with role description.
+
+#### Add Landscape designer as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Landscape designer to DEFAULT_VENDOR_CATEGORIES, distinct from week-to-week landscaping crew.
+
+#### Add Locksmith as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Locksmith to DEFAULT_VENDOR_CATEGORIES (re-key, smart-lock, safe service).
+
+#### Add Painter as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Painter to DEFAULT_VENDOR_CATEGORIES.
+
+#### Add Pool service as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied. Pool service was added to website/admin.js DEFAULT_VENDOR_CATEGORIES in Phase 67I (commit 69c9b4c5) and Q15b now exposes a pool_service chip (commit aebcdb65) gated on Q12 ≠ none. Captured contractor mirrors with category=Pool/Spa so the existing pool/hot-tub templates auto-route at task creation time.
+
+#### Add Pressure washer as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Pressure washer to DEFAULT_VENDOR_CATEGORIES.
+
+#### Add Window cleaner as a vendor type
+
+**2026-05-01 · feedback · claude**
+Applied — added Window cleaner to DEFAULT_VENDOR_CATEGORIES.
+
+#### Audit: Home gym / equipment service
+
+**2026-05-01 · feedback · claude**
+Deferred. Home gym / equipment service routine = Phase 67J optional-services library follow-up (new RoutineKind enum + RoutineSeeder default + UI surface).
+
+#### Audit: Mail + package management
+
+**2026-05-01 · feedback · claude**
+Deferred. Mail + package management routine = Phase 67J optional-services library follow-up. These 5 lifestyle routines (gym/detail/wine/plants/mail) ship together once RoutineKind + UI library are extended.
+
+#### Audit: Plant care (interior)
+
+**2026-05-01 · feedback · claude**
+Deferred. Plant care (interior) routine = Phase 67J optional-services library follow-up.
+
+#### Audit: Vehicle detail
+
+**2026-05-01 · feedback · claude**
+Deferred. Vehicle detail routine = Phase 67J optional-services library follow-up.
+
+**2026-05-01 · feedback · claude**
+Deferred. Vehicle detail routine = Phase 67J optional-services library follow-up.
+
+#### Audit: Wine inventory check
+
+**2026-05-01 · feedback · claude**
+Deferred. Wine inventory check routine = Phase 67J optional-services library follow-up.
+
+### 📌 vendor
+
+#### Well water service  `Well water service`
+
+**2026-05-01 · feedback · claude**
+Applied. Confirmed: every Well-category template (inspection, water-quality test, shock chlorination) routes through the existing Q15b well_water_service chip. Water Softener lives under Water Treatment though — call out if you want it retagged to Well System.
+
 ---
 
 ## ✅ Recently Applied (last 30 days)
 
 These have already shipped. Review for retroactive QA only.
+
+### Check Washing Machine Supply Hoses  `Handyman:washer_hoses_spring`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This is likely a handyman
+
+### Foundation Walkaround: Cracks and Grading  `Handyman:foundation_walkaround_spring`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This is likely a handyman
+
+### Inspect Exterior Caulking Around Windows & Doors  `Handyman:caulking_inspect_spring`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+This is likely a handyman
+
+### Replace Smoke & CO Detector Batteries  `Handyman:smoke_co_batteries_spring`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This is likely a handyman
+
+### Fire Extinguisher Annual Check  `Electrical:Fire extinguisher annual check`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This is probably for a handyman
+
+### Replace Smoke Detectors  `Electrical:Replace smoke detectors`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This is probably for a handyman right?
+
+### Pet waste  `Pet waste`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+This is a routine so that's maybe why no tasks go to it, having a routine for the pet waste removal vendor is fine.
+
+### Well water service  `Well water service`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Lets make sure any Well task goes to a well water service/vendor here. Also the water softener, well shock etc. the well bundle should go to the well water service.
+
+### Add Carpet + upholstery cleaner as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Carpet + upholstery cleaner" vendor but the catalog doesn't list them.
+
+What they do: Annual deep clean. Often runs at the same time as a window cleaning visit.
+
+Proposal: add "Carpet + upholstery cleaner" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Appliance repair specialist as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Appliance repair specialist" vendor but the catalog doesn't list them.
+
+What they do: Sub-Zero / Wolf / Thermador service. The brands' own factory networks, not a generalist.
+
+Proposal: add "Appliance repair specialist" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Landscape designer as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Landscape designer" vendor but the catalog doesn't list them.
+
+What they do: Annual planting plan + bed redesigns. Distinct from week-to-week landscaping crew.
+
+Proposal: add "Landscape designer" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Locksmith as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Locksmith" vendor but the catalog doesn't list them.
+
+What they do: Re-key after move-in, smart-lock setup, safe service.
+
+Proposal: add "Locksmith" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Pressure washer as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Pressure washer" vendor but the catalog doesn't list them.
+
+What they do: Driveway / siding / deck pressure washing. Annual or every-other-year.
+
+Proposal: add "Pressure washer" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Window cleaner as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Window cleaner" vendor but the catalog doesn't list them.
+
+What they do: Twice-a-year window + screen wash. Often paired with gutter cleaning at the same visit.
+
+Proposal: add "Window cleaner" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Painter as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit 69c9b4c**
+Coverage audit found that HNW homes typically have a "Painter" vendor but the catalog doesn't list them.
+
+What they do: Interior + exterior repaint cycles. Most HNW homes redo high-traffic interior every 4-6 years and exterior every 7-10.
+
+Proposal: add "Painter" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Add Pool service as a vendor type
+
+**2026-05-01 · proposal_add · tom · applied 2026-05-01 · commit aebcdb6**
+Coverage audit found that HNW homes typically have a "Pool service" vendor but the catalog doesn't list them.
+
+What they do: Weekly chemistry + filter / pump care for pools and spas. Distinct from a house cleaner — pool chemistry needs a specialist.
+
+Proposal: add "Pool service" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.
+
+(Drafted from the Audit tab.)
+
+### Audit: Home gym / equipment service
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Lets add this to a routines library that has optional services the homeowners can add
+
+### Audit: Vehicle detail
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Lets add this to a routines library that has optional services the homeowners can add
+
+### Audit: Wine inventory check
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Lets add this to a routines library that has optional services the homeowners can add
+
+### Audit: Plant care (interior)
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Lets add this to a routines library that has optional services the homeowners can add
+
+### Audit: Mail + package management
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Lets add this to a routines library that has optional services the homeowners can add
+
+### Annual cooling unit service  `Wine Cellar:Annual cooling unit service`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+not sure if we need a vendor for this one, but always allow the homeowner to add one of their contacts.
+
+### Annual elevator inspection  `Elevator:Annual elevator inspection`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+If a home has an elevator, then we just map to an elevator vendor. that easy.
+
+### Sign up for mosquito and tick season  `Mosquito & Tick:Sign up for mosquito and tick season`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Mosquito and tick should map to the pest control company - unless the person wants to add their own separate vendor but that would pull from pest control vendors. so this should just map to pest control.
+
+### Check foundation for cracks  `Crawl Space:Check foundation for cracks`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+A lot of people will have a basement/waterproofing type of company like American dry basements, or Connecticut basement systems for example - for stuff like this lets just add a Waterproofing & Basement vendor type.
+
+### Inspect for mold or mildew  `Crawl Space:Inspect for mold or mildew`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+A lot of people will have a basement/waterproofing type of company like American dry basements, or Connecticut basement systems for example - for stuff like this lets just add a Waterproofing & Basement vendor type.
+
+### Check vapor barrier condition  `Crawl Space:Check vapor barrier condition`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+A lot of people will have a basement/waterproofing type of company like American dry basements, or Connecticut basement systems for example - for stuff like this lets just add a Waterproofing & Basement vendor type.
+
+### Solar system inspection  `Solar:Professional inspection`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+If the house has solar panels, then we need a Solar vendor.
+
+### Solar panel cleaning  `Solar:Professional panel cleaning`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+If the house has solar panels, then we need a Solar vendor.
+
+### Replace sensor batteries  `Security System:Replace sensor batteries`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Replacing batteries seems like a handyman task to me.
+
+### Annual security system check  `Security System:Verify alarm system`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Shouldn't we have security vendors like ADT, simplisafe, etc? We have those in our DB, lets make sure this task maps to a security vendor type.
+
+### Pool safety fence inspection  `Pool/Spa:Pool safety fence inspection`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+### Inspect hot tub cover and jets  `Pool/Spa:Inspect hot tub cover and jets`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: notes
+Before: Detached hot tubs only — attached spillover spas don't have removable covers ...
+After: Detached hot tubs only. Attached spillover spas don't have removable covers ...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Detached hot tubs only. Attached spillover spas don't have removable covers ...",
+  "from": "Detached hot tubs only — attached spillover spas don't have removable covers ...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "notes"
+}
+```
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6110763**
+only for detachable hot tubs.
+
+### Drain and refill hot tub  `Pool/Spa:Drain and refill hot tub`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Rewrite to comply with voice rule:
+
+Rule: no-em-dash
+Field: notes
+Current: Detached hot tubs only. If your spa shares water with the pool (spillover / a...
+
+We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session.
+
+(Drafted from the Decisions tab. Claude rewrites the text manually on the next session — there's no mechanical fix Tom can preview.)
+
+**Proposed diff:**
+```json
+{
+  "from": "Detached hot tubs only. If your spa shares water with the pool (spillover / a...",
+  "kind": "voice_rewrite",
+  "rule": "no-em-dash",
+  "field": "notes",
+  "reason": "We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session."
+}
+```
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6110763**
+We may want to have a follow up question about detached hot tubs because you would not do this for a hot tub attached to a pool.
+
+### Pool heater service  `Pool/Spa:Pool heater service`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6110763**
+this should be lumped in with pool opening service.
+
+### Inspect pool equipment  `Pool/Spa:Inspect pool equipment`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+### Pool closing and winterization  `Pool/Spa:Professional pool closing/winterization`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+### Pool opening service  `Pool/Spa:Professional pool opening`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+We need a Pool vendor - pools get serviced as a routine so they definitely need a vendor. And that same vendor will likely do the rest of the pool stuff so lets make sure this maps to a pool vendor.
+
+### Schedule exterior window re-caulking  `Windows:Schedule exterior window re-caulking`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+I think this is a handyman task/punch list item right?
+
+### Well system inspection  `Well System:Professional well inspection`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This should map to a well vendor.
+
+### Test water quality  `Well System:Test water quality`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This should map to a Well vendor. A well vendor is different than a plumber. A well vendor will shock the well, chlorinate/chemical it, soften the water, etc.
+
+### Descale tankless heater  `Water Heater:Descale tankless heater`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This is HVAC also for vendor.
+
+### Test T&P relief valve  `Water Heater:Test T&P relief valve`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Shouldn't this map to a plumber or HVAC? Map to whatever water heater and flush water heater map to.
+
+### Flush water heater  `Water Heater:Flush water heater`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+Shouldn't this be the HVAC vendor as the vendor that is mapped to this task?
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: notes
+Before: Anode rod inspection is part of the standard flush — pros pull and inspect ev...
+After: Anode rod inspection is part of the standard flush. Pros pull and inspect ev...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Anode rod inspection is part of the standard flush. Pros pull and inspect ev...",
+  "from": "Anode rod inspection is part of the standard flush — pros pull and inspect ev...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "notes"
+}
+```
+
+### 8. Any major renovations in the last 10 years?  `q9b_renovations`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: Pick anything you've done — we'll remember the year so the maintenance schedu...
+After: Pick anything you've done. We'll remember the year so the maintenance schedu...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Pick anything you've done. We'll remember the year so the maintenance schedu...",
+  "from": "Pick anything you've done — we'll remember the year so the maintenance schedu...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+### Merge q9_basement + q9b_renovations  `live-quiz-q9_basement`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q9_basement` — "7. Do you have a basement or crawl space?"
+- Kind: `multiSelect`
+- Options: 5
+
+**Sub-question:** `q9b_renovations` — "8. Any major renovations in the last 10 years?"
+- Kind: `renovationsMultiSelect`
+- Options: 10
+- Conditional (`dynamicSkip` set): no
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq9b_renovations_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### 8. Any major renovations in the last 10 years?  `live-quiz-q9b_renovations`
+
+**2026-05-01 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+**Voice fix — pre-computed.**
+
+Template "8. Any major renovations in the last 10 years?" has a `no-em-dash` violation in field `subtitle`.
+
+**BEFORE:**
+> Pick anything you've done — we'll remember the year so the maintenance schedule reflects it.
+
+**AFTER (proposed):**
+> Pick anything you've done. We'll remember the year so the maintenance schedule reflects it.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "subtitle": {
+    "to": "Pick anything you've done. We'll remember the year so the maintenance schedule reflects it.",
+    "from": "Pick anything you've done — we'll remember the year so the maintenance schedule reflects it."
+  }
+}
+```
+
+### Replace Refrigerator Water Filter  `Appliance:Replace refrigerator water filter`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: description
+Before: Haven adds this to your handyman punch list every six months — drop a fresh f...
+After: Haven adds this to your handyman punch list every six months. Drop a fresh f...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Haven adds this to your handyman punch list every six months. Drop a fresh f...",
+  "from": "Haven adds this to your handyman punch list every six months — drop a fresh f...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "description"
+}
+```
+
+### 6. What kind of water heater do you have?  `q8_water_heater`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: answer-label-max-words
+Field: answerOption.label
+Before: Not sure — take a photo and we'll tell you
+After: Not sure
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Not sure",
+  "from": "Not sure — take a photo and we'll tell you",
+  "kind": "voice_fix",
+  "rule": "answer-label-max-words",
+  "field": "answerOption.label"
+}
+```
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
+should we have under the not sure "take a picture and we'll tell you!"
 
 ### 13. Security or alarm system?  `live-quiz-q15_security`
 
@@ -567,6 +1173,33 @@ Template "13. Security or alarm system?" has a `no-em-dash` violation in field `
   "subtitle": {
     "to": "We won't share specifics. Your setup stays private to you and any household members you invite.",
     "from": "We won't share specifics — your setup stays private to you and any household members you invite."
+  }
+}
+```
+
+### 6. What kind of water heater do you have?  `live-quiz-q8_water_heater`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+**Voice fix — pre-computed.**
+
+Template "6. What kind of water heater do you have?" has a `answer-label-max-words` violation in field `answerOption.label`.
+
+**BEFORE:**
+> 
+
+**AFTER (proposed):**
+> 
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "answerOption.label": {
+    "to": "",
+    "from": ""
   }
 }
 ```
@@ -597,6 +1230,110 @@ Template "2. What's your exterior siding?" has a `no-em-dash` violation in field
   }
 }
 ```
+
+### Replace Refrigerator Water Filter  `Appliance:Replace refrigerator water filter`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: description
+Before: Haven adds this to your handyman punch list every six months — drop a fresh f...
+After: Haven adds this to your handyman punch list every six months. Drop a fresh f...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Haven adds this to your handyman punch list every six months. Drop a fresh f...",
+  "from": "Haven adds this to your handyman punch list every six months — drop a fresh f...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "description"
+}
+```
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 693691c**
+Can you please do this for us?
+
+### 13. Security or alarm system?  `q15_security`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: We won't share specifics — your setup stays private to you and any household ...
+After: We won't share specifics. Your setup stays private to you and any household ...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "We won't share specifics. Your setup stays private to you and any household ...",
+  "from": "We won't share specifics — your setup stays private to you and any household ...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
+You should have a "prefer not to answer" option here incase people are cagey about telling an app what their security system is.
+
+### 2. What's your exterior siding?  `q2_siding`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: Pick all that apply — many homes mix two or three materials.
+After: Pick all that apply. Many homes mix two or three materials.
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Pick all that apply. Many homes mix two or three materials.",
+  "from": "Pick all that apply — many homes mix two or three materials.",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 69c9b4c**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: Pick all that apply — many homes mix two or three materials.
+After: Pick all that apply. Many homes mix two or three materials.
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Pick all that apply. Many homes mix two or three materials.",
+  "from": "Pick all that apply — many homes mix two or three materials.",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
+make sure people can check off multiple not just select one.
+
+### Prune Shrubs and Hedges  `Landscaping:Prune shrubs and hedges`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit aebcdb6**
+This shouldn't be added automatically because how do we know if the home has shrubs or things to prune? This should be an opt-in.
 
 ### Replace Refrigerator Water Filter  `live-handyman-appliance-replace-refrigerator-water-filter`
 
@@ -823,20 +1560,10 @@ This is not a system, this is a routine. Fold it into a routine but also check t
 **2026-04-30 · change_request · tom · applied 2026-04-30 · commit bf9d688**
 This is not a system, this is a routine. Fold it into a routine but also check to ensure there aren't duplicate routines before doing so.
 
-### 21. Security or alarm system?  `q15_security`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
-You should have a "prefer not to answer" option here incase people are cagey about telling an app what their security system is.
-
 ### 15. Pool or hot tub?  `q12_pool`
 
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
 lets make sure all the systems understand the maintenance differences for the both option versus a stand alone hot tub
-
-### 9. What kind of water heater do you have?  `q8_water_heater`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
-should we have under the not sure "take a picture and we'll tell you!"
 
 ### 8. Sewer or septic?  `q7_sewer_septic`
 
@@ -858,11 +1585,6 @@ This question doesn't really matter since we don't do anything with it. Should w
 
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
 why do we have this question? I feel like you should just ask if it's a new build and even then can't we scrape the data and only ask if the house was built in the last 12 months?
-
-### 2. What's your exterior siding?  `q2_siding`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
-make sure people can check off multiple not just select one.
 
 ### Exterior Window Washing  `Window Cleaning:Exterior window washing`
 
@@ -914,21 +1636,6 @@ no.
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6b2b7ac**
 dumb.
 
-### Inspect Hot Tub Cover and Jets  `Pool/Spa:Inspect hot tub cover and jets`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6110763**
-only for detachable hot tubs.
-
-### Drain and Refill Hot Tub  `Pool/Spa:Drain and refill hot tub`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6110763**
-We may want to have a follow up question about detached hot tubs because you would not do this for a hot tub attached to a pool.
-
-### Pool Heater Service  `Pool/Spa:Pool heater service`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6110763**
-this should be lumped in with pool opening service.
-
 ### Annual Chimney Sweep  `Chimney:Annual chimney sweep`
 
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 11bc465**
@@ -968,11 +1675,6 @@ I think this is not a thing.
 
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
 I think this is what I accidentally added.
-
-### Replace Refrigerator Water Filter  `Appliance:Replace refrigerator water filter`
-
-**2026-04-30 · feedback · tom · applied 2026-04-30 · commit 693691c**
-Can you please do this for us?
 
 ### Replace Cabinet Pulls and Knobs  `Handyman:Replace cabinet pulls and knobs`
 

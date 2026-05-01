@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-05-01T02:10:32.582Z",
+  "generatedAt": "2026-05-01T13:50:11.984Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift",
-  "sourceCommit": "d03a3d12",
+  "sourceCommit": "aebcdb65",
   "count": 28,
   "entries": [
     {
@@ -397,7 +397,7 @@
         },
         {
           "id": "not_sure",
-          "label": "Not sure — take a photo and we'll tell you",
+          "label": "Not sure",
           "icon": "camera",
           "acceptsCustomInput": false
         }
@@ -419,15 +419,7 @@
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [
-        {
-          "ruleId": "answer-label-max-words",
-          "field": "answerOption.label",
-          "severity": "warn",
-          "message": "Answer chip label longer than 7 words gets visually crowded.",
-          "snippet": "Not sure — take a photo and we'll tell you"
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -496,7 +488,7 @@
       "chapter": "yourHome",
       "title": "Any major renovations in the last 10 years?",
       "fallbackTitle": null,
-      "subtitle": "Pick anything you've done — we'll remember the year so the maintenance schedule reflects it.",
+      "subtitle": "Pick anything you've done. We'll remember the year so the maintenance schedule reflects it.",
       "kind": "renovationsMultiSelect",
       "answerOptions": [
         {
@@ -577,15 +569,7 @@
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "subtitle",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Pick anything you've done — we'll remember the year so the maintenance schedu..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1094,6 +1078,30 @@
           "label": "Generator service",
           "icon": "bolt.batteryblock.fill",
           "acceptsCustomInput": false
+        },
+        {
+          "id": "pool_service",
+          "label": "Pool service",
+          "icon": "drop.triangle.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "solar_service",
+          "label": "Solar service",
+          "icon": "sun.max.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "security_service",
+          "label": "Security / alarm pro",
+          "icon": "shield.lefthalf.filled",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "waterproofing",
+          "label": "Waterproofing & basement",
+          "icon": "drop.fill",
+          "acceptsCustomInput": false
         }
       ],
       "documentUploadCategory": null,
@@ -1138,7 +1146,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 469,
+      "_sourceLine": 500,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1169,7 +1177,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 477,
+      "_sourceLine": 508,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1221,7 +1229,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 489,
+      "_sourceLine": 520,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1254,7 +1262,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 503,
+      "_sourceLine": 534,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1314,7 +1322,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 533,
+      "_sourceLine": 564,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1368,7 +1376,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 560,
+      "_sourceLine": 591,
       "_impact": {
         "creates_systems": [
           "Solar"
@@ -1418,7 +1426,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 572,
+      "_sourceLine": 603,
       "_impact": {
         "creates_systems": [
           "Generator"
@@ -1449,7 +1457,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 591,
+      "_sourceLine": 622,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1509,7 +1517,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 605,
+      "_sourceLine": 636,
       "_impact": {
         "creates_systems": [
           "Garage Door"
@@ -1543,7 +1551,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 634,
+      "_sourceLine": 665,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1603,7 +1611,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 643,
+      "_sourceLine": 674,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1681,7 +1689,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 669,
+      "_sourceLine": 700,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1729,7 +1737,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 690,
+      "_sourceLine": 721,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
