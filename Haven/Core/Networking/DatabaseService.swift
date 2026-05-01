@@ -1669,6 +1669,98 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Bundle Custom Subitems (Phase 67H)
+
+    /// Active subitems for a (household, property, bundle). Excludes
+    /// archived rows. The reconciler appends these to the bundle
+    /// parent's "What's included" notes at every bundle fire.
+    func fetchBundleCustomSubitems(
+        householdId: UUID,
+        propertyId: UUID,
+        bundleId: String
+    ) async throws -> [BundleCustomSubitemRow] {
+        try await from("bundle_custom_subitems")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("property_id", value: propertyId.uuidString)
+            .eq("bundle_id", value: bundleId)
+            .is("archived_at", value: nil)
+            .order("added_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    /// Insert a homeowner-added subitem.
+    func createBundleCustomSubitem(_ insert: BundleCustomSubitemInsert) async throws -> BundleCustomSubitemRow {
+        try await from("bundle_custom_subitems")
+            .insert(insert, returning: .representation)
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Soft-delete. Stays in the table for audit; just disappears
+    /// from "Custom additions" lists and reconciler reads.
+    func archiveBundleCustomSubitem(id: UUID) async throws {
+        struct ArchivePayload: Encodable {
+            let archivedAt: String
+            enum CodingKeys: String, CodingKey {
+                case archivedAt = "archived_at"
+            }
+        }
+        let payload = ArchivePayload(archivedAt: ISO8601DateFormatter().string(from: Date()))
+        try await from("bundle_custom_subitems")
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Reconciler-side: when a bundle parent task is created, attach
+    /// any pending `recurrence='once'` subitems to that task by
+    /// stamping their `scope_task_id`. Once attached, they stop
+    /// surfacing as pending so they can't double-attach to a later
+    /// bundle fire if the user creates another bundle parent before
+    /// the first one completes.
+    func attachOnceSubitemsToBundleTask(ids: [UUID], taskId: UUID) async throws {
+        guard !ids.isEmpty else { return }
+        struct Payload: Encodable {
+            let scopeTaskId: String
+            enum CodingKeys: String, CodingKey {
+                case scopeTaskId = "scope_task_id"
+            }
+        }
+        let payload = Payload(scopeTaskId: taskId.uuidString)
+        try await from("bundle_custom_subitems")
+            .update(payload)
+            .in("id", values: ids.map { $0.uuidString })
+            .execute()
+    }
+
+    /// Bundle-parent-completion lifecycle: when the user marks a
+    /// bundle parent task complete, archive any `recurrence='once'`
+    /// subitems that were attached to it. They served their purpose
+    /// for that visit; future bundle fires shouldn't re-show them.
+    /// Idempotent — safe to call on completion of any task; rows that
+    /// don't match scope_task_id stay untouched.
+    func markOnceSubitemsUsed(taskId: UUID) async throws {
+        struct Payload: Encodable {
+            let usedAt: String
+            let archivedAt: String
+            enum CodingKeys: String, CodingKey {
+                case usedAt = "used_at"
+                case archivedAt = "archived_at"
+            }
+        }
+        let now = ISO8601DateFormatter().string(from: Date())
+        let payload = Payload(usedAt: now, archivedAt: now)
+        try await from("bundle_custom_subitems")
+            .update(payload)
+            .eq("scope_task_id", value: taskId.uuidString)
+            .eq("recurrence", value: "once")
+            .is("archived_at", value: nil)
+            .execute()
+    }
+
     // MARK: - Premier Handyman Program
 
     func fetchHandymanRequests(

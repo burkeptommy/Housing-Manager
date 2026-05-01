@@ -74,6 +74,13 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var recurringCadence = "monthly"
     @State private var isScheduling = false
 
+    // Phase 67H: bundle custom subitems (homeowner additions to a
+    // bundle parent's "What's included" list). Loaded on-appear when
+    // the task is a bundle parent. The "Once" subitems attached to
+    // this specific task render alongside the always-recurring ones.
+    @State private var customSubitems: [BundleCustomSubitemRow] = []
+    @State private var showAddSubitemSheet = false
+
     // Vendor state
     @State private var assignedContractor: ContractorRow?
     @State private var systemCategory: String?
@@ -154,6 +161,14 @@ struct MaintenanceTaskDetailSheet: View {
         if daysUntilDue <= 7 { return HavenColors.critical }
         if daysUntilDue <= 30 { return HavenColors.warning }
         return HavenColors.success
+    }
+
+    /// Phase 67H: true when this task is a bundle parent — has a
+    /// "What's included" block AND a templateId we can use as the
+    /// bundleId for new custom subitems. Drives the Custom Additions
+    /// section + Add button visibility.
+    private var isBundleParent: Bool {
+        !bundledChecklistItems.isEmpty && task.templateId != nil
     }
 
     /// Bundled maintenance tasks often store their generated checklist in
@@ -468,6 +483,83 @@ struct MaintenanceTaskDetailSheet: View {
                     }
                 )
             }
+        }
+        // Phase 67H: bundle custom subitem add sheet. Only relevant for
+        // bundle parents — the Add button is gated on `isBundleParent`
+        // so this sheet is unreachable for standalone tasks even if the
+        // state flag accidentally flips.
+        .sheet(isPresented: $showAddSubitemSheet) {
+            if let bundleId = task.templateId,
+               let propertyId = task.propertyId {
+                AddBundleSubitemSheet(
+                    bundleId: bundleId,
+                    bundleDisplayName: task.title,
+                    propertyId: propertyId,
+                    householdId: task.householdId,
+                    onCreated: { newRow in
+                        // Optimistic insert so the section refreshes
+                        // without an extra DB round-trip.
+                        customSubitems.append(newRow)
+                    }
+                )
+            }
+        }
+        .task {
+            await loadCustomSubitems()
+        }
+    }
+
+    // MARK: - Phase 67H: Bundle Custom Subitems
+
+    /// Loads pending custom subitems (always + once) for this bundle
+    /// parent. No-op when the task isn't a bundle parent. Called from
+    /// the view's `.task` block on appear.
+    private func loadCustomSubitems() async {
+        guard isBundleParent,
+              let bundleId = task.templateId,
+              let propertyId = task.propertyId else { return }
+        do {
+            let rows = try await db.fetchBundleCustomSubitems(
+                householdId: task.householdId,
+                propertyId: propertyId,
+                bundleId: bundleId
+            )
+            // Render the rows that will appear on THIS bundle parent
+            // task: every always-recurring row (regardless of
+            // scope_task_id) + once rows that are either pending
+            // (scope_task_id == nil) or already attached to this task.
+            // Filters out once rows attached to a different bundle
+            // parent so we don't show another visit's queued items.
+            let visible = rows.filter { row in
+                if row.recurrence == "always" { return true }
+                if row.scopeTaskId == nil { return true }
+                return row.scopeTaskId == task.id
+            }
+            await MainActor.run {
+                self.customSubitems = visible
+            }
+        } catch {
+            print("[MaintenanceTaskDetailSheet] loadCustomSubitems failed: \(error)")
+        }
+    }
+
+    /// Soft-delete a subitem from the homeowner's list. Always rows
+    /// stop firing on future bundles; once rows just clear from this
+    /// task's notes block on next refresh.
+    private func archiveCustomSubitem(_ item: BundleCustomSubitemRow) async {
+        do {
+            try await db.archiveBundleCustomSubitem(id: item.id)
+            Haptics.light()
+            await MainActor.run {
+                self.customSubitems.removeAll { $0.id == item.id }
+            }
+            Analytics.track(.bundleCustomSubitemArchived, [
+                "bundle_id": item.bundleId,
+                "recurrence": item.recurrence,
+            ])
+        } catch {
+            print("[MaintenanceTaskDetailSheet] archiveCustomSubitem failed: \(error)")
+            Haptics.error()
         }
     }
 
@@ -1190,6 +1282,72 @@ struct MaintenanceTaskDetailSheet: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
+                    }
+                }
+
+                // Phase 67H: Custom additions section. Only renders for
+                // bundle parents (signal: bundledChecklistItems.isEmpty
+                // == false AND task.templateId is set to a bundleId).
+                // Lists the homeowner's existing always/once subitems
+                // and surfaces an "Add to this visit" button so they
+                // can extend the bundle without leaving the detail sheet.
+                if isBundleParent {
+                    Divider().overlay(HavenColors.beige200)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("CUSTOM ADDITIONS")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+
+                        if customSubitems.isEmpty {
+                            Text("Add anything you've been meaning to flag for this visit.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            ForEach(customSubitems, id: \.id) { item in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("-")
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.title)
+                                            .font(HavenTypography.bodySmall)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        if item.recurrence == "always" {
+                                            Text("Every visit")
+                                                .font(HavenTypography.uiLabelSmall)
+                                                .foregroundStyle(HavenColors.textTertiary)
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                    Button {
+                                        Task { await archiveCustomSubitem(item) }
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove \(item.title)")
+                                }
+                            }
+                        }
+
+                        Button {
+                            Haptics.light()
+                            showAddSubitemSheet = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 14))
+                                Text("Add to this visit")
+                                    .font(HavenTypography.uiLabel)
+                            }
+                            .foregroundStyle(HavenColors.action)
+                        }
+                        .padding(.top, 4)
                     }
                 }
 

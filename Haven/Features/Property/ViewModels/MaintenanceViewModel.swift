@@ -434,6 +434,13 @@ final class MaintenanceViewModel: ObservableObject {
                 ))
             }
 
+            // Phase 67H: archive any `recurrence='once'` bundle custom
+            // subitems that were attached to this task. They served
+            // their purpose for this visit; future bundle fires
+            // shouldn't re-show them. Idempotent — no-op for non-bundle
+            // tasks (no rows match scope_task_id).
+            try? await db.markOnceSubitemsUsed(taskId: task.id)
+
             // Reschedule notifications
             Task { await NotificationScheduler.shared.rescheduleAll() }
 

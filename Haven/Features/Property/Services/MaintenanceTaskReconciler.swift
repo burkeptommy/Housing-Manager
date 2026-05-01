@@ -472,9 +472,29 @@ enum MaintenanceTaskReconciler {
                 let title = members.compactMap({ $0.2.bundleTitle }).first
                     ?? firstTemplate.title
 
+                // Phase 67H: read homeowner-added custom subitems for
+                // this bundle. Two flavors:
+                //   * recurrence='always' — always-pending; appended on
+                //     every fire of the bundle parent
+                //   * recurrence='once' — pending only until attached
+                //     to a specific bundle parent task; archived when
+                //     that parent completes (see `markOnceSubitemsUsed`)
+                // Both render as bullets under a "Custom additions"
+                // sub-heading inside the parent task's notes.
+                let customSubitems: [BundleCustomSubitemRow] = (try? await DatabaseService.shared.fetchBundleCustomSubitems(
+                    householdId: householdId,
+                    propertyId: propertyId,
+                    bundleId: bundleId
+                )) ?? []
+                let pendingCustomSubitems = customSubitems.filter { $0.isPending }
+
                 // Build the "What's included:" checklist from all member titles.
                 let checklist = members.map { "- \($0.2.title)" }.joined(separator: "\n")
-                let bundleNotes = "What's included:\n\(checklist)"
+                var bundleNotes = "What's included:\n\(checklist)"
+                if !pendingCustomSubitems.isEmpty {
+                    let customLines = pendingCustomSubitems.map { "- \($0.title)" }.joined(separator: "\n")
+                    bundleNotes += "\n\nCustom additions:\n\(customLines)"
+                }
 
                 // The bundle is always vendor (bundled = service visit).
                 // Use the same contractor matching as standalone vendor tasks.
@@ -529,8 +549,21 @@ enum MaintenanceTaskReconciler {
                         handymanPreference: handymanPreference,
                         assignmentType: "vendor"
                     )
-                    if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
+                    if let createdParent = try? await DatabaseService.shared.createMaintenanceTask(insert) {
                         added.append(bundleTitle)
+                        // Phase 67H: attach any pending recurrence='once'
+                        // subitems to this newly-created bundle parent so
+                        // the next bundle fire doesn't re-show them. They
+                        // get archived when the parent completes.
+                        let onceIds = pendingCustomSubitems
+                            .filter { $0.recurrence == "once" }
+                            .map { $0.id }
+                        if !onceIds.isEmpty {
+                            try? await DatabaseService.shared.attachOnceSubitemsToBundleTask(
+                                ids: onceIds,
+                                taskId: createdParent.id
+                            )
+                        }
                     }
                 }
 

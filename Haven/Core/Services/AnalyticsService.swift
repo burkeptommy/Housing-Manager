@@ -85,6 +85,9 @@ enum AnalyticsEvent: String {
     case handymanPunchItemAdded = "handyman_punch_item_added"
     case handymanPunchItemRemoved = "handyman_punch_item_removed"
     case handymanPunchListScheduled = "handyman_punch_list_scheduled"
+    /// Phase 67H — bundle custom subitem analytics.
+    case bundleCustomSubitemAdded = "bundle_custom_subitem_added"
+    case bundleCustomSubitemArchived = "bundle_custom_subitem_archived"
     /// Phase 78 — homeowner accepted/declined a proposal from the handyman
     /// (flagged task, after-lock punch addition, follow-up visit).
     case handymanProposalResponded = "handyman_proposal_responded"
