@@ -1419,7 +1419,7 @@ struct PropertyDetailView: View {
         return ChezEntryButton(
             category: .general,
             label: "Have Chez handle anything for you",
-            caption: "Vendor finds, scheduling, quotes, follow-ups — Tom owns it.",
+            caption: "Vendor finds, scheduling, quotes, follow-ups — Chez owns it.",
             context: ctx
         )
     }

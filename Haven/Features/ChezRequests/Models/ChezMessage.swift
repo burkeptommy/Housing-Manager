@@ -6,7 +6,7 @@ import Foundation
 enum ChezMessageRole: String, Codable {
     case user        // homeowner-authored
     case concierge   // Tom-authored
-    case system      // status changes ("Tom marked this resolved")
+    case system      // status changes ("Chez marked this resolved")
 }
 
 /// Attachment metadata serialized into `concierge_messages.attachments` JSONB.
@@ -42,9 +42,14 @@ struct ChezMessageRow: Codable, Identifiable, Hashable {
     let attachments: [ChezAttachmentMeta]
     let readAt: Date?
     let createdAt: Date
+    /// Phase 80.1 — Structured proposal payload (vendor / date_slot /
+    /// cost / quote variants). When non-nil, the message bubble
+    /// renders an inline `ChezProposalCard` with Approve / Counter /
+    /// Decline buttons.
+    let proposal: ChezProposal?
 
     enum CodingKeys: String, CodingKey {
-        case id, role, content, attachments
+        case id, role, content, attachments, proposal
         case requestId = "request_id"
         case householdId = "household_id"
         case userId = "user_id"
@@ -63,9 +68,158 @@ struct ChezMessageRow: Codable, Identifiable, Hashable {
         attachments = (try? c.decodeIfPresent([ChezAttachmentMeta].self, forKey: .attachments)) ?? []
         readAt = (try? c.decodeIfPresent(Date.self, forKey: .readAt)) ?? nil
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
+        proposal = (try? c.decodeIfPresent(ChezProposal.self, forKey: .proposal)) ?? nil
     }
 
     var typedRole: ChezMessageRole {
         ChezMessageRole(rawValue: role) ?? .user
+    }
+}
+
+// MARK: - Phase 80.1 structured proposals
+
+/// A structured proposal Chez sends in the thread. Renders as an
+/// inline `ChezProposalCard` with Approve / Counter / Decline actions
+/// when the homeowner views it. Server-side this is a JSONB blob on
+/// `concierge_messages.proposal`; here it's a typed Codable.
+struct ChezProposal: Codable, Hashable {
+    let kind: String           // "vendor" | "date_slot" | "cost" | "quote"
+    let status: String         // "pending" | "approved" | "declined" | "countered"
+    let decidedAt: Date?
+    let vendor: ChezProposalVendor?
+    let dateSlot: ChezProposalDateSlot?
+    let cost: ChezProposalCost?
+    let quote: ChezProposalQuote?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, status, vendor, cost, quote
+        case decidedAt = "decided_at"
+        case dateSlot = "date_slot"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? ""
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "pending"
+        decidedAt = (try? c.decodeIfPresent(Date.self, forKey: .decidedAt)) ?? nil
+        vendor = (try? c.decodeIfPresent(ChezProposalVendor.self, forKey: .vendor)) ?? nil
+        dateSlot = (try? c.decodeIfPresent(ChezProposalDateSlot.self, forKey: .dateSlot)) ?? nil
+        cost = (try? c.decodeIfPresent(ChezProposalCost.self, forKey: .cost)) ?? nil
+        quote = (try? c.decodeIfPresent(ChezProposalQuote.self, forKey: .quote)) ?? nil
+    }
+
+    var typedKind: ChezProposalKind {
+        ChezProposalKind(rawValue: kind) ?? .vendor
+    }
+
+    var typedStatus: ChezProposalStatusValue {
+        ChezProposalStatusValue(rawValue: status) ?? .pending
+    }
+
+    var isPending: Bool { typedStatus == .pending }
+}
+
+enum ChezProposalKind: String, Codable {
+    case vendor
+    case dateSlot = "date_slot"
+    case cost
+    case quote
+}
+
+enum ChezProposalStatusValue: String, Codable {
+    case pending
+    case approved
+    case declined
+    case countered
+}
+
+struct ChezProposalVendor: Codable, Hashable {
+    let name: String?
+    let phone: String?
+    let rating: Double?
+    let reviewCount: Int?
+    let estimatedCost: Double?
+    let estimatedWindow: String?
+    let rationale: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, phone, rating, rationale
+        case reviewCount = "review_count"
+        case estimatedCost = "estimated_cost"
+        case estimatedWindow = "estimated_window"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil
+        phone = (try? c.decodeIfPresent(String.self, forKey: .phone)) ?? nil
+        rating = (try? c.decodeIfPresent(Double.self, forKey: .rating)) ?? nil
+        reviewCount = (try? c.decodeIfPresent(Int.self, forKey: .reviewCount)) ?? nil
+        estimatedCost = (try? c.decodeIfPresent(Double.self, forKey: .estimatedCost)) ?? nil
+        estimatedWindow = (try? c.decodeIfPresent(String.self, forKey: .estimatedWindow)) ?? nil
+        rationale = (try? c.decodeIfPresent(String.self, forKey: .rationale)) ?? nil
+    }
+}
+
+struct ChezProposalDateSlot: Codable, Hashable {
+    let options: [ChezProposalDateOption]?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        options = (try? c.decodeIfPresent([ChezProposalDateOption].self, forKey: .options)) ?? nil
+    }
+
+    enum CodingKeys: String, CodingKey { case options }
+}
+
+struct ChezProposalDateOption: Codable, Hashable {
+    let label: String?
+    let iso: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? nil
+        iso = (try? c.decodeIfPresent(String.self, forKey: .iso)) ?? nil
+    }
+
+    enum CodingKeys: String, CodingKey { case label, iso }
+}
+
+struct ChezProposalCost: Codable, Hashable {
+    let amount: Double?
+    let currency: String?
+    let scope: String?
+    let vendorName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case amount, currency, scope
+        case vendorName = "vendor_name"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        amount = (try? c.decodeIfPresent(Double.self, forKey: .amount)) ?? nil
+        currency = (try? c.decodeIfPresent(String.self, forKey: .currency)) ?? nil
+        scope = (try? c.decodeIfPresent(String.self, forKey: .scope)) ?? nil
+        vendorName = (try? c.decodeIfPresent(String.self, forKey: .vendorName)) ?? nil
+    }
+}
+
+struct ChezProposalQuote: Codable, Hashable {
+    let vendorName: String?
+    let total: Double?
+    let validUntil: String?
+
+    enum CodingKeys: String, CodingKey {
+        case total
+        case vendorName = "vendor_name"
+        case validUntil = "valid_until"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        vendorName = (try? c.decodeIfPresent(String.self, forKey: .vendorName)) ?? nil
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? nil
+        validUntil = (try? c.decodeIfPresent(String.self, forKey: .validUntil)) ?? nil
     }
 }

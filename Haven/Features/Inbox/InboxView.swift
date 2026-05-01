@@ -253,7 +253,7 @@ struct InboxView: View {
             ChezEntryButton(
                 category: .general,
                 label: "Need help with anything? Ask Chez",
-                caption: "Tom replies within 1 business day.",
+                caption: "Chez replies within 1 business day.",
                 context: ["_source": "inbox_empty_state"]
             )
             .padding(.top, 8)

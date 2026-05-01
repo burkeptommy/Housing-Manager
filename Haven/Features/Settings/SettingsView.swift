@@ -47,6 +47,41 @@ struct SettingsView: View {
                 }
             }
 
+            // Phase 80.1 — Chez concierge top-level entry. Lives ABOVE
+            // Account so the homeowner sees it as the premium escape
+            // hatch first thing on the Settings surface.
+            Section {
+                NavigationLink {
+                    ChezProfileView()
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(HavenColors.action.opacity(0.14))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "person.fill.questionmark")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(HavenColors.action)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Your Chez profile")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Standing instructions, spending limits, and household preferences.")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .lineLimit(2)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            } header: {
+                Text("CHEZ CONCIERGE")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+
             Section {
                 NavigationLink {
                     ProfileView()
@@ -258,19 +293,19 @@ struct SettingsView: View {
                         .foregroundStyle(HavenColors.textSecondary)
                 }
 
-                Link(destination: URL(string: "https://havenhome.dev/privacy")!) {
+                Link(destination: URL(string: "https://getchez.com/privacy")!) {
                     Label("Privacy Policy", systemImage: "hand.raised.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
                 }
 
-                Link(destination: URL(string: "https://havenhome.dev/terms")!) {
+                Link(destination: URL(string: "https://getchez.com/terms")!) {
                     Label("Terms of Service", systemImage: "doc.text.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
                 }
 
-                Link(destination: URL(string: "mailto:tom@havenhome.dev")!) {
+                Link(destination: URL(string: "mailto:tom@getchez.com")!) {
                     Label("Contact Support", systemImage: "envelope.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)

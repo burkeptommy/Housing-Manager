@@ -35,7 +35,7 @@ struct ChezEntryButton: View {
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     } else {
-                        Text("Tom replies within 1 business day.")
+                        Text("Chez replies within 1 business day.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -115,15 +115,15 @@ enum ChezInboxEntryHelper {
     static func caption(for type: String) -> String {
         switch type {
         case "contractor_quote":
-            return "Tom gathers a comparable bid and a fair-market read."
+            return "Chez gathers a comparable bid and a fair-market read."
         case "insurance_claim":
-            return "Tom coordinates with the adjuster, contractors, and you."
+            return "Chez coordinates with the adjuster, contractors, and you."
         case "bill_invoice":
-            return "Tom checks for fair pricing, errors, or overcharges."
+            return "Chez checks for fair pricing, errors, or overcharges."
         case "project_created":
-            return "Tom owns the back-and-forth so you don't have to."
+            return "Chez owns the back-and-forth so you don't have to."
         default:
-            return "Tom replies within 1 business day."
+            return "Chez replies within 1 business day."
         }
     }
 

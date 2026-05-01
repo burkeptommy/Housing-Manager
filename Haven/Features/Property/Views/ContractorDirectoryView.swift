@@ -299,7 +299,7 @@ struct ContractorDirectoryView: View {
             // task / system category so Tom has full triage context.
             findAProCard(
                 title: "Have Chez find one for me",
-                subtitle: "Tom researches vetted local pros and replies within 1 business day.",
+                subtitle: "Chez researches vetted local pros and replies within 1 business day.",
                 icon: "person.fill.questionmark",
                 action: {
                     Haptics.selection()
@@ -475,6 +475,9 @@ enum ContractorActivityEvent: Identifiable {
 struct ContractorDetailView: View {
     let initialContractor: ContractorRow
     @State private var contractor: ContractorRow
+    /// Phase 80.1 — Local mirror of `contractor.chezOwned` for the
+    /// `ChezOwnsToggle` Binding. Re-syncs when `contractor` reloads.
+    @State private var localChezOwned: Bool = false
     @State private var serviceRecords: [ServiceRecordRow] = []
     @State private var showDeleteConfirmation = false
     @State private var showEditSheet = false
@@ -512,6 +515,7 @@ struct ContractorDetailView: View {
     init(contractor: ContractorRow) {
         self.initialContractor = contractor
         _contractor = State(initialValue: contractor)
+        _localChezOwned = State(initialValue: contractor.isChezOwned)
     }
 
     /// Unified activity timeline sorted desc, limited to the last 90 days
@@ -634,6 +638,15 @@ struct ContractorDetailView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
                 heroCard
                 quickActionsRow
+                // Phase 80.1 — Recurring delegation toggle. Lives near
+                // the top of the contractor surface so the homeowner
+                // sees the "make Chez point of contact" option as a
+                // first-class affordance, not a buried setting.
+                ChezOwnsToggle(
+                    target: .contractor(id: contractor.id, name: contractor.companyName),
+                    isOwned: $localChezOwned,
+                    onChange: nil
+                )
                 if !linkedRoutines.isEmpty { routinesSection }
                 if !upcomingTasks.isEmpty { upcomingSection }
                 contractsSection

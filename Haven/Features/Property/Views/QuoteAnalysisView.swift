@@ -152,7 +152,7 @@ struct QuoteAnalysisView: View {
         ChezEntryButton(
             category: .getQuote,
             label: "Have Chez get a second quote",
-            caption: "Tom gathers a comparable bid and a fair-market read.",
+            caption: "Chez gathers a comparable bid and a fair-market read.",
             context: chezQuoteContext(analysis)
         )
         .padding(.top, HavenTheme.spacing12)

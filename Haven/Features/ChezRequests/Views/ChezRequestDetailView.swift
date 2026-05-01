@@ -182,6 +182,25 @@ struct ChezRequestDetailView: View {
                     message: msg,
                     attachmentURLResolver: { meta in
                         await viewModel.attachmentURL(for: meta)
+                    },
+                    onProposalCounter: { proposal in
+                        // Phase 80.1 — Counter prefills the reply
+                        // composer with a template. The user fills in
+                        // the specific change they want and sends; Chez
+                        // takes it from there.
+                        let template: String = {
+                            switch proposal.typedKind {
+                            case .vendor:
+                                return "I'd rather not go with \(proposal.vendor?.name ?? "this vendor"). Can you propose another option?"
+                            case .dateSlot:
+                                return "These times don't work — could we look at "
+                            case .cost:
+                                return "That cost is higher than I expected. Is there room to negotiate or a leaner scope?"
+                            case .quote:
+                                return "A few line items on this quote feel off. Can you push back on "
+                            }
+                        }()
+                        viewModel.replyText = template
                     }
                 )
             }

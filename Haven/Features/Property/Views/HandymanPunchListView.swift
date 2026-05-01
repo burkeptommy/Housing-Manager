@@ -288,7 +288,7 @@ struct HandymanPunchListView: View {
             ChezEntryButton(
                 category: .findHandyman,
                 label: "Have Chez find me a handyman",
-                caption: "Tom finds a vetted local pro and books the visit.",
+                caption: "Chez finds a vetted local pro and books the visit.",
                 context: chezPunchContext
             )
             .padding(.top, HavenTheme.spacing4)

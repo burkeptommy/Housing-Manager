@@ -101,6 +101,102 @@ extension HavenSupabase {
         _ = try await callConciergeEdgeFunction(body: payload)
     }
 
+    // MARK: - Phase 80.1 — Standing instructions / household profile
+
+    /// Read the household's Chez profile. Returns an empty profile if
+    /// nothing is set yet (vs. throwing) so the calling UI shows the
+    /// "set up your profile" empty state cleanly.
+    static func fetchChezProfile() async throws -> ChezProfile {
+        struct Wrapper: Decodable { let profile: ChezProfile? }
+        struct Body: Encodable { let action = "fetch_profile" }
+        let data = try await callConciergeEdgeFunction(body: Body())
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .havenISO8601
+        let wrapper = try decoder.decode(Wrapper.self, from: data)
+        return wrapper.profile ?? ChezProfile()
+    }
+
+    /// Update the household's Chez profile. Server-side does a deep
+    /// merge by default — pass `replace: true` to wipe and replace.
+    @discardableResult
+    static func updateChezProfile(
+        _ profile: ChezProfile,
+        replace: Bool = false
+    ) async throws -> ChezProfile {
+        struct Body: Encodable {
+            let action = "update_profile"
+            let profile: ChezProfile
+            let replace: Bool
+        }
+        struct Wrapper: Decodable { let profile: ChezProfile? }
+        let data = try await callConciergeEdgeFunction(body: Body(profile: profile, replace: replace))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .havenISO8601
+        let wrapper = try decoder.decode(Wrapper.self, from: data)
+        return wrapper.profile ?? profile
+    }
+
+    // MARK: - Phase 80.1 — Recurring delegation
+
+    /// Hand a routine off to Chez (or revoke). Server creates a
+    /// "Standing engagement" parent request + system message + push.
+    static func delegateRoutineToChez(
+        routineId: UUID,
+        delegated: Bool,
+        notes: String? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "delegate_routine"
+            let routine_id: String
+            let delegated: Bool
+            let notes: String?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(routine_id: routineId.uuidString, delegated: delegated, notes: notes)
+        )
+    }
+
+    /// Set Chez as the point of contact for a vendor (or revoke).
+    static func delegateContractorToChez(
+        contractorId: UUID,
+        delegated: Bool,
+        notes: String? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "delegate_contractor"
+            let contractor_id: String
+            let delegated: Bool
+            let notes: String?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(contractor_id: contractorId.uuidString, delegated: delegated, notes: notes)
+        )
+    }
+
+    // MARK: - Phase 80.1 — Structured proposal decisions
+
+    /// Approve / decline / counter a structured proposal. `messageId`
+    /// is the `concierge_messages.id` of the proposal-bearing message.
+    static func decideChezProposal(
+        messageId: UUID,
+        decision: ChezProposalDecision,
+        note: String? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "decide_proposal"
+            let message_id: String
+            let decision: String
+            let note: String?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(
+                message_id: messageId.uuidString,
+                decision: decision.rawValue,
+                note: note
+            )
+        )
+    }
+
     // MARK: - Internal
 
     /// Direct fetch to the chez-concierge Edge Function. Mirrors the
@@ -175,4 +271,24 @@ extension JSONDecoder.DateDecodingStrategy {
             )
         }
     }
+}
+
+// MARK: - Phase 80.1 types
+
+enum ChezProposalDecision: String {
+    case approved
+    case declined
+    case countered
+}
+
+extension Notification.Name {
+    /// Phase 80.1 — Posted whenever the Chez profile changes. Listeners
+    /// (composer footer caption, dashboard nudge, settings preview)
+    /// reload to reflect the new state.
+    static let chezProfileChanged = Notification.Name("chezProfileChanged")
+
+    /// Phase 80.1 — Posted when a routine or contractor is delegated
+    /// to (or revoked from) Chez. Listeners refresh badges + the
+    /// "Standing engagements" surfaces.
+    static let chezDelegationChanged = Notification.Name("chezDelegationChanged")
 }

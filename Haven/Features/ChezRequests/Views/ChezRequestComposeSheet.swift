@@ -136,7 +136,7 @@ struct ChezRequestComposeSheet: View {
                 Text("Ask Chez")
                     .font(HavenTypography.title)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Tom replies within 1 business day.")
+                Text("Chez replies within 1 business day.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
             }
@@ -435,7 +435,7 @@ struct ChezRequestComposeSheet: View {
                         .progressViewStyle(.circular)
                         .tint(.white)
                 }
-                Text(viewModel.didSucceed ? "Sent · Tom is on it" : "Send to Chez")
+                Text(viewModel.didSucceed ? "Sent · Chez is on it" : "Send to Chez")
                     .font(HavenTypography.uiButton)
                 Image(systemName: viewModel.didSucceed ? "checkmark.circle.fill" : "paperplane.fill")
                     .font(.system(size: 14, weight: .semibold))

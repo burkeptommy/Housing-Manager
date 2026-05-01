@@ -264,6 +264,11 @@ struct RoutineRow: Codable, Identifiable {
     /// Phase 66: "shop_managed" | "self_managed" | nil. Only populated for
     /// scope="vehicle" routines.
     let programMode: String?
+    /// Phase 80.1: When true, Chez owns scheduling for this routine —
+    /// vendor visits land on the homeowner's calendar without a per-visit
+    /// ask. Stamped via `delegate_routine` Edge Function action.
+    let chezOwned: Bool
+    let chezOwnedAt: Date?
     let createdAt: Date
     let updatedAt: Date
 
@@ -302,6 +307,8 @@ struct RoutineRow: Codable, Identifiable {
         case serviceContractId = "service_contract_id"
         case vehicleId = "vehicle_id"
         case programMode = "program_mode"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -348,6 +355,8 @@ struct RoutineRow: Codable, Identifiable {
         self.scope = (try? c.decodeIfPresent(String.self, forKey: .scope)) ?? "property"
         self.vehicleId = try? c.decodeIfPresent(UUID.self, forKey: .vehicleId)
         self.programMode = try? c.decodeIfPresent(String.self, forKey: .programMode)
+        self.chezOwned = (try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)) ?? false
+        self.chezOwnedAt = (try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)) ?? nil
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
         self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     }

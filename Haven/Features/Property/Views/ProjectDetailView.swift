@@ -1502,12 +1502,12 @@ struct ProjectDetailView: View {
         }()
         let caption: String = {
             if isInsuranceClaim {
-                return "Tom coordinates with the adjuster, contractors, and you."
+                return "Chez coordinates with the adjuster, contractors, and you."
             }
             if category == .getQuote {
-                return "Tom finds vetted pros and gets you comparable bids."
+                return "Chez finds vetted pros and gets you comparable bids."
             }
-            return "Tom owns the vendor coordination so you don't have to."
+            return "Chez owns the vendor coordination so you don't have to."
         }()
         return ChezEntryButton(
             category: category,

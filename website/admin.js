@@ -4891,7 +4891,10 @@ function renderFocusedChezPanelHtml(req) {
     }
     const isAdmin = role === "concierge";
     const sideClass = isAdmin ? "admin-chez__msg--admin" : "admin-chez__msg--user";
-    const senderLabel = isAdmin ? "Tom (Chez)" : "Homeowner";
+    // Internal-only label so Tom remembers which side is which when
+    // operating the portal. The homeowner only ever sees "Chez" in the
+    // iOS app — this label never leaves the admin surface.
+    const senderLabel = isAdmin ? "Chez (you)" : "Homeowner";
     const attachmentsHtml = (m.attachments || []).map((att) => {
       return `
         <div class="admin-chez__attach">
@@ -4900,6 +4903,10 @@ function renderFocusedChezPanelHtml(req) {
         </div>
       `;
     }).join("");
+    // Phase 80.1 — Render structured proposals as a colored card with
+    // status pill so Tom can see at a glance which proposals are still
+    // pending the homeowner's decision.
+    const proposalHtml = m.proposal ? renderProposalCardHtml(m.proposal) : "";
     return `
       <div class="admin-chez__msg ${sideClass}">
         <div class="admin-chez__msg-head">
@@ -4907,10 +4914,16 @@ function renderFocusedChezPanelHtml(req) {
           <span class="admin-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
         </div>
         ${m.content ? `<p>${escapeHtml(m.content)}</p>` : ""}
+        ${proposalHtml}
         ${attachmentsHtml}
       </div>
     `;
   }).join("");
+
+  // Phase 80.1 — Profile + spending tier summary at the top of the
+  // panel so Tom can see the customer's standing instructions before
+  // typing anything. Pulled lazy on focus.
+  const profileHtml = renderChezProfileSummaryHtml(req);
 
   const statusOptions = ["open", "waiting_customer", "resolved"]
     .map((s) => `<option value="${s}" ${s === req.status ? "selected" : ""}>${CHEZ_STATUS_LABELS[s]}</option>`)
@@ -4957,6 +4970,8 @@ function renderFocusedChezPanelHtml(req) {
         </div>
       </header>
 
+      ${profileHtml}
+
       ${contextLines ? `
         <section class="admin-chez__context">
           <h3>Details from the homeowner</h3>
@@ -4972,11 +4987,220 @@ function renderFocusedChezPanelHtml(req) {
       ${composerHtml}
 
       <section class="admin-chez__quick-actions">
+        <button type="button" class="admin-button admin-button--ghost" data-chez-action="propose">Propose vendor / date / cost</button>
         <button type="button" class="admin-button admin-button--ghost" data-chez-action="waiting">Mark waiting on customer</button>
         <button type="button" class="admin-button admin-button--ghost" data-chez-action="resolved">Mark resolved</button>
       </section>
     </section>
   `;
+}
+
+// Phase 80.1 — Profile summary shown at the top of every focused chez
+// panel. Lazy-loaded once per request open; cached on
+// `state.chezProfilesByHousehold` keyed by household_id so subsequent
+// opens within the session don't re-fetch.
+function renderChezProfileSummaryHtml(req) {
+  const householdId = req.household_id;
+  if (!householdId) return "";
+  state.chezProfilesByHousehold = state.chezProfilesByHousehold || {};
+  const profile = state.chezProfilesByHousehold[householdId];
+  if (profile === undefined) {
+    // Kick off lazy fetch; re-render when it resolves.
+    fetchChezHouseholdProfile(householdId);
+    return `
+      <section class="admin-chez__profile">
+        <h3>Customer profile</h3>
+        <p class="admin-muted">Loading standing instructions…</p>
+      </section>
+    `;
+  }
+  if (!profile || Object.keys(profile).length === 0) {
+    return `
+      <section class="admin-chez__profile admin-chez__profile--empty">
+        <h3>Customer profile</h3>
+        <p class="admin-muted">No standing instructions on file. Customer hasn't filled their Chez profile yet.</p>
+      </section>
+    `;
+  }
+  const tiers = profile.spending_tiers || {};
+  const tierLine = (tiers.auto_approve_under !== undefined)
+    ? `Auto-approve &lt; $${tiers.auto_approve_under} · Ping &lt; $${tiers.ping_under} · Always ask &gt; $${tiers.explicit_above}`
+    : "Spending tiers not set — defaults apply.";
+  const aboutUs = profile.about_us || "";
+  const comm = profile.communication || {};
+  const vendor = profile.vendor_preferences || {};
+  const log = profile.logistics || {};
+  const lines = [];
+  if (aboutUs) lines.push(`<div><strong>About us:</strong> ${escapeHtml(aboutUs)}</div>`);
+  if (vendor.budget_orientation) lines.push(`<div><strong>Budget orientation:</strong> ${escapeHtml(vendor.budget_orientation)}</div>`);
+  if (vendor.notes) lines.push(`<div><strong>Vendor notes:</strong> ${escapeHtml(vendor.notes)}</div>`);
+  if (comm.vacation_mode) lines.push(`<div><strong>Vacation mode ON.</strong> ${escapeHtml(comm.vacation_notes || "")}</div>`);
+  if (log.has_pets && log.pet_notes) lines.push(`<div><strong>Pets:</strong> ${escapeHtml(log.pet_notes)}</div>`);
+  if (log.entry_instructions) lines.push(`<div><strong>Entry:</strong> ${escapeHtml(log.entry_instructions)}</div>`);
+  return `
+    <section class="admin-chez__profile">
+      <h3>Customer profile</h3>
+      <div class="admin-chez__profile-tier" data-tone="amber">${tierLine}</div>
+      ${lines.length ? `<div class="admin-chez__profile-lines">${lines.join("")}</div>` : ""}
+    </section>
+  `;
+}
+
+async function fetchChezHouseholdProfile(householdId) {
+  state.chezProfilesByHousehold = state.chezProfilesByHousehold || {};
+  if (state.chezProfilesByHousehold[householdId] !== undefined) return;
+  // Optimistic null marker to prevent duplicate fetches.
+  state.chezProfilesByHousehold[householdId] = null;
+  try {
+    const { data, error } = await supabase
+      .from("households")
+      .select("chez_profile")
+      .eq("id", householdId)
+      .maybeSingle();
+    if (error) throw error;
+    state.chezProfilesByHousehold[householdId] = data?.chez_profile ?? {};
+    // Re-render the panel if it's still showing this request.
+    if (state.selectedChezRequest) {
+      renderFocusedChezDetail(state.selectedChezRequest);
+    }
+  } catch (e) {
+    console.warn("[admin] chez profile fetch failed", e);
+    state.chezProfilesByHousehold[householdId] = {};
+  }
+}
+
+// Phase 80.1 — Render a structured proposal as a colored card so Tom
+// can see at a glance whether it's pending / approved / declined and
+// what kind it is. Mirrors the iOS `ChezProposalCard` shape.
+function renderProposalCardHtml(proposal) {
+  if (!proposal || !proposal.kind) return "";
+  const status = proposal.status || "pending";
+  const tone = status === "approved" ? "green"
+             : status === "declined" ? "red"
+             : status === "countered" ? "amber"
+             : "amber";
+  const kindLabel = {
+    vendor: "Vendor proposal",
+    date_slot: "Date options",
+    cost: "Cost proposal",
+    quote: "Quote proposal",
+  }[proposal.kind] || "Proposal";
+  let body = "";
+  if (proposal.kind === "vendor" && proposal.vendor) {
+    const v = proposal.vendor;
+    body = `
+      <strong>${escapeHtml(v.name || "(unnamed vendor)")}</strong>
+      ${v.estimated_cost ? `<div>Estimated: $${escapeHtml(String(v.estimated_cost))}</div>` : ""}
+      ${v.estimated_window ? `<div>Earliest: ${escapeHtml(v.estimated_window)}</div>` : ""}
+      ${v.rationale ? `<div class="admin-muted">${escapeHtml(v.rationale)}</div>` : ""}
+    `;
+  } else if (proposal.kind === "date_slot" && proposal.date_slot) {
+    body = (proposal.date_slot.options || [])
+      .map((o) => `<div>📅 ${escapeHtml(o.label || o.iso || "—")}</div>`)
+      .join("");
+  } else if (proposal.kind === "cost" && proposal.cost) {
+    body = `
+      <strong>$${escapeHtml(String(proposal.cost.amount || ""))}</strong>
+      ${proposal.cost.scope ? `<div>${escapeHtml(proposal.cost.scope)}</div>` : ""}
+    `;
+  } else if (proposal.kind === "quote" && proposal.quote) {
+    body = `
+      <strong>${escapeHtml(proposal.quote.vendor_name || "")}</strong>
+      ${proposal.quote.total ? `<div>Total: $${escapeHtml(String(proposal.quote.total))}</div>` : ""}
+    `;
+  }
+  return `
+    <div class="admin-chez__proposal">
+      <div class="admin-chez__proposal-head">
+        <strong>${kindLabel}</strong>
+        <span class="admin-pill" data-tone="${tone}">${escapeHtml(status)}</span>
+      </div>
+      <div class="admin-chez__proposal-body">${body}</div>
+    </div>
+  `;
+}
+
+// Phase 80.1 — "Propose vendor / date / cost" affordance. Opens a
+// minimal prompt-driven flow rather than a full modal — keeps the
+// admin surface small while still letting Tom send structured
+// proposals one click after typing.
+async function startProposalFlow(req) {
+  const kind = window.prompt("What kind of proposal? Type one of: vendor / date / cost / quote", "vendor");
+  if (!kind) return;
+  const k = kind.trim().toLowerCase();
+  if (!["vendor", "date", "cost", "quote"].includes(k)) {
+    alert("Pick one of: vendor / date / cost / quote");
+    return;
+  }
+  const content = window.prompt("Optional message to attach to the proposal (one line):", "");
+  let proposal = null;
+  if (k === "vendor") {
+    const name = window.prompt("Vendor name:", "");
+    if (!name) return;
+    const cost = window.prompt("Estimated cost (number, optional):", "");
+    const slot = window.prompt("Earliest available window (e.g. 'Tue 2pm'):", "");
+    const rationale = window.prompt("Why this vendor (optional):", "");
+    proposal = {
+      kind: "vendor",
+      vendor: {
+        name: name.trim(),
+        estimated_cost: cost ? Number(cost) : undefined,
+        estimated_window: slot || undefined,
+        rationale: rationale || undefined,
+      },
+    };
+  } else if (k === "date") {
+    const opts = window.prompt("Date options, comma-separated labels (e.g. 'Tue 2pm, Wed 9am'):", "");
+    if (!opts) return;
+    proposal = {
+      kind: "date_slot",
+      date_slot: {
+        options: opts.split(",").map((s) => ({ label: s.trim(), iso: null })),
+      },
+    };
+  } else if (k === "cost") {
+    const amount = window.prompt("Cost amount in USD (number):", "");
+    if (!amount) return;
+    const scope = window.prompt("Scope (one line):", "");
+    const vendor = window.prompt("Vendor name (optional):", "");
+    proposal = {
+      kind: "cost",
+      cost: {
+        amount: Number(amount),
+        scope: scope || undefined,
+        vendor_name: vendor || undefined,
+        currency: "USD",
+      },
+    };
+  } else if (k === "quote") {
+    const vendor = window.prompt("Vendor name:", "");
+    if (!vendor) return;
+    const total = window.prompt("Quote total in USD:", "");
+    proposal = {
+      kind: "quote",
+      quote: {
+        vendor_name: vendor.trim(),
+        total: total ? Number(total) : undefined,
+      },
+    };
+  }
+  if (!proposal) return;
+  try {
+    await callChezConcierge({
+      action: "propose",
+      request_id: req.id,
+      proposal,
+      content: content || "",
+    });
+    await loadAdminData();
+    await loadChezMessages(req.id);
+    const refreshed = state.chezRequests.find((r) => r.id === req.id);
+    if (refreshed) state.selectedChezRequest = refreshed;
+    renderChezRequestsView();
+  } catch (err) {
+    console.error("[admin] propose failed", err);
+    alert(`Couldn't send proposal: ${err.message || err}`);
+  }
 }
 
 function attachChezPanelHandlers(req) {
@@ -5040,6 +5264,8 @@ function attachChezPanelHandlers(req) {
         await performChezTransition(req, "resolved");
       } else if (action === "reopen") {
         await performChezTransition(req, "open");
+      } else if (action === "propose") {
+        await startProposalFlow(req);
       }
     });
   });

@@ -47,7 +47,7 @@ struct QuoteComparisonView: View {
                 ChezEntryButton(
                     category: .getQuote,
                     label: "Have Chez get a third quote",
-                    caption: "Tom finds a comparable pro for a tiebreaker bid and sanity-checks pricing.",
+                    caption: "Chez finds a comparable pro for a tiebreaker bid and sanity-checks pricing.",
                     context: chezQuoteComparisonContext
                 )
             }

@@ -275,7 +275,7 @@ struct MaintenanceScheduleView: View {
                         ChezEntryButton(
                             category: .general,
                             label: "Not sure where to start? Ask Chez",
-                            caption: "Tom maps your home, sets up vendors, and builds your schedule.",
+                            caption: "Chez maps your home, sets up vendors, and builds your schedule.",
                             context: ["_source": "maintenance_schedule_empty"]
                         )
                         .padding(.top, 12)

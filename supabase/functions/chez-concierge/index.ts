@@ -59,6 +59,9 @@ interface ConciergeRequestRow {
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
+  /// Phase 80.1 — denormalized counter of proposals still awaiting the
+  /// homeowner's decision. Maintained by `propose` / `decide_proposal`.
+  pending_proposal_count?: number;
 }
 
 interface AttachmentMeta {
@@ -445,8 +448,8 @@ async function handleReply(
       ? "chez_reply_action_needed"
       : "chez_reply_informational";
     const inboxTitle = ackRequired
-      ? `Tom needs your answer: ${request.summary}`
-      : `Tom replied: ${request.summary}`;
+      ? `Chez needs your answer: ${request.summary}`
+      : `Chez replied: ${request.summary}`;
     await service.from("inbox_items").insert({
       household_id: request.household_id,
       type: inboxType,
@@ -472,10 +475,10 @@ async function handleReply(
     if (newStatus !== request.status) {
       const systemBody =
         newStatus === "resolved"
-          ? "Tom marked this resolved."
+          ? "Chez marked this resolved."
           : newStatus === "waiting_customer"
-          ? "Tom is waiting on your answer."
-          : "Tom reopened this request.";
+          ? "Chez is waiting on your answer."
+          : "Chez reopened this request.";
       await service.from("concierge_messages").insert({
         household_id: request.household_id,
         user_id: request.user_id,  // anchor for RLS
@@ -491,7 +494,7 @@ async function handleReply(
       serviceUrl,
       serviceRoleKey,
       [request.user_id],
-      ackRequired ? "Tom needs your answer" : "Tom replied",
+      ackRequired ? "Chez needs your answer" : "Chez replied",
       content.slice(0, 140),
       { type: "chez_request_reply", request_id: request.id }
     );
@@ -582,7 +585,7 @@ async function handleMarkRead(
 interface TransitionPayload {
   request_id: string;
   to_status: "open" | "waiting_customer" | "resolved";
-  note?: string;  // optional system message body ("Tom marked this resolved with a note")
+  note?: string;  // optional system message body ("Chez marked this resolved with a note")
 }
 
 async function handleTransition(
@@ -627,8 +630,10 @@ async function handleTransition(
     })
     .eq("id", request.id);
 
-  // System message in the thread for the audit trail.
-  const actorLabel = isAdmin ? "Tom" : "Homeowner";
+  // System message in the thread for the audit trail. Both labels read
+  // as "Chez" or "you" from the homeowner's view — the admin portal
+  // (Tom) is intentionally invisible in user-facing copy.
+  const actorLabel = isAdmin ? "Chez" : "You";
   const systemBody =
     toStatus === "resolved"
       ? `${actorLabel} marked this resolved.`
@@ -653,7 +658,7 @@ async function handleTransition(
         household_id: request.household_id,
         type: "chez_reply_informational",
         title: `Resolved: ${request.summary}`,
-        summary: payload.note || "Tom marked this concierge request resolved.",
+        summary: payload.note || "Chez marked this concierge request resolved.",
         seen: false,
         needs_action: false,
         metadata: { chez_request_id: request.id, status_change: toStatus },
@@ -681,6 +686,537 @@ async function handleTransition(
   }
 
   return json({ ok: true });
+}
+
+// ============================================================================
+// Phase 80.1 — Household profile (standing instructions for Chez)
+// ============================================================================
+
+interface UpdateProfilePayload {
+  profile: Record<string, unknown>;
+  /// When true, replaces the entire profile. Default false → deep-merges
+  /// the payload into the existing profile so partial updates are easy.
+  replace?: boolean;
+}
+
+async function handleFetchProfile(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+  const { data, error } = await service
+    .from("households")
+    .select("chez_profile")
+    .eq("id", householdId)
+    .maybeSingle();
+  if (error) return json({ error: error.message }, 500);
+  return json({ profile: (data as { chez_profile?: unknown })?.chez_profile ?? {} });
+}
+
+async function handleUpdateProfile(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: UpdateProfilePayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+  const incoming = (payload.profile ?? {}) as Record<string, unknown>;
+  let nextProfile: Record<string, unknown> = incoming;
+  if (!payload.replace) {
+    // Deep-merge into the existing profile so partial updates work.
+    const { data: existing } = await service
+      .from("households")
+      .select("chez_profile")
+      .eq("id", householdId)
+      .maybeSingle();
+    const current = (existing as { chez_profile?: Record<string, unknown> } | null)
+      ?.chez_profile ?? {};
+    nextProfile = deepMergeProfile(current, incoming);
+  }
+  // Stamp completion timestamp on first non-empty fill.
+  const completion = (nextProfile._completion as Record<string, unknown> | undefined) ?? {};
+  if (!completion.filled_at && Object.keys(nextProfile).filter((k) => k !== "_completion").length > 0) {
+    completion.filled_at = new Date().toISOString();
+  }
+  completion.last_edited_at = new Date().toISOString();
+  nextProfile._completion = completion;
+  const { error } = await service
+    .from("households")
+    .update({ chez_profile: nextProfile })
+    .eq("id", householdId);
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, profile: nextProfile });
+}
+
+// Recursive deep-merge for nested JSONB profile updates.
+function deepMergeProfile(
+  base: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === undefined) {
+      delete out[key];
+      continue;
+    }
+    const existing = out[key];
+    if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      typeof existing === "object" &&
+      existing !== null &&
+      !Array.isArray(existing)
+    ) {
+      out[key] = deepMergeProfile(
+        existing as Record<string, unknown>,
+        value as Record<string, unknown>
+      );
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+// ============================================================================
+// Phase 80.1 — Recurring delegation
+// ============================================================================
+
+interface DelegateRoutinePayload {
+  routine_id: string;
+  delegated: boolean;       // true to hand off, false to revoke
+  notes?: string;           // optional one-line context for Chez
+}
+
+interface DelegateContractorPayload {
+  contractor_id: string;
+  delegated: boolean;
+  notes?: string;
+}
+
+async function handleDelegateRoutine(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: DelegateRoutinePayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const routineId = compactString(payload.routine_id);
+  if (!routineId) return json({ error: "routine_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: routine, error: lookupErr } = await service
+    .from("routines")
+    .select("id, household_id, label, vendor_id")
+    .eq("id", routineId)
+    .maybeSingle();
+  if (lookupErr || !routine) return json({ error: "routine not found" }, 404);
+  if ((routine as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateErr } = await service
+    .from("routines")
+    .update({
+      chez_owned: !!payload.delegated,
+      chez_owned_at: payload.delegated ? now : null,
+    })
+    .eq("id", routineId);
+  if (updateErr) return json({ error: updateErr.message }, 500);
+
+  // Create a parent chez_request that captures the standing engagement
+  // so it has a thread + push hook to Tom. Title says "Standing
+  // engagement" so it visually distinguishes from one-shot requests.
+  if (payload.delegated) {
+    const summary = `Standing engagement: ${(routine as { label: string }).label}`;
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: user.id,
+        category: "coordinate_task",
+        summary,
+        context: {
+          _kind: "standing_engagement_routine",
+          routine_id: routineId,
+          notes: payload.notes ?? "",
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: false,
+        unread_for_admin: true,
+      })
+      .select("*")
+      .single();
+    if (req) {
+      const r = req as { id: string };
+      // System message in the new thread.
+      await service.from("concierge_messages").insert({
+        household_id: householdId,
+        user_id: user.id,
+        request_id: r.id,
+        role: "system",
+        content: `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        attachments: [],
+      });
+      await sendPush(
+        serviceUrl,
+        serviceRoleKey,
+        adminUserIds(),
+        "Customer delegated a routine to Chez",
+        summary,
+        { type: "chez_admin_request", request_id: r.id }
+      );
+      await sendAdminEmail(
+        adminEmails(),
+        `[Chez] New standing engagement: ${(routine as { label: string }).label}`,
+        `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+        emailBody({
+          preview: "Customer handed off a recurring routine to Chez.",
+          heading: "New standing engagement",
+          intro: `The customer wants Chez to own scheduling for "${(routine as { label: string }).label}" from now on.`,
+          bodyText: payload.notes ?? "(no additional notes)",
+          ctaLabel: "Open in admin portal",
+          ctaUrl: adminPortalUrl(r.id),
+        })
+      );
+    }
+  }
+  return json({ ok: true });
+}
+
+async function handleDelegateContractor(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: DelegateContractorPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const contractorId = compactString(payload.contractor_id);
+  if (!contractorId) return json({ error: "contractor_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: contractor, error: lookupErr } = await service
+    .from("contractors")
+    .select("id, household_id, company_name, category")
+    .eq("id", contractorId)
+    .maybeSingle();
+  if (lookupErr || !contractor) return json({ error: "contractor not found" }, 404);
+  if ((contractor as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateErr } = await service
+    .from("contractors")
+    .update({
+      chez_owned: !!payload.delegated,
+      chez_owned_at: payload.delegated ? now : null,
+    })
+    .eq("id", contractorId);
+  if (updateErr) return json({ error: updateErr.message }, 500);
+
+  if (payload.delegated) {
+    const c = contractor as { company_name: string; category: string | null };
+    const summary = `Standing engagement: ${c.company_name}`;
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: user.id,
+        category: "coordinate_task",
+        summary,
+        context: {
+          _kind: "standing_engagement_contractor",
+          contractor_id: contractorId,
+          contractor_category: c.category ?? "",
+          notes: payload.notes ?? "",
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: false,
+        unread_for_admin: true,
+      })
+      .select("*")
+      .single();
+    if (req) {
+      const r = req as { id: string };
+      await service.from("concierge_messages").insert({
+        household_id: householdId,
+        user_id: user.id,
+        request_id: r.id,
+        role: "system",
+        content: `Customer set Chez as point of contact for ${c.company_name}. From now on, you handle scheduling and follow-ups directly with this vendor.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        attachments: [],
+      });
+      await sendPush(
+        serviceUrl,
+        serviceRoleKey,
+        adminUserIds(),
+        "Customer made Chez point of contact for a vendor",
+        summary,
+        { type: "chez_admin_request", request_id: r.id }
+      );
+      await sendAdminEmail(
+        adminEmails(),
+        `[Chez] New standing engagement: ${c.company_name}`,
+        `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+        emailBody({
+          preview: `Customer made Chez point of contact for ${c.company_name}.`,
+          heading: "New standing engagement",
+          intro: `The customer wants Chez to be point of contact for ${c.company_name} from now on.`,
+          bodyText: payload.notes ?? "(no additional notes)",
+          ctaLabel: "Open in admin portal",
+          ctaUrl: adminPortalUrl(r.id),
+        })
+      );
+    }
+  }
+  return json({ ok: true });
+}
+
+// ============================================================================
+// Phase 80.1 — Structured proposals
+// ============================================================================
+
+interface ProposePayload {
+  request_id: string;
+  proposal: {
+    kind: "vendor" | "date_slot" | "cost" | "quote";
+    [key: string]: unknown;
+  };
+  /// Optional textual preface that lands as the message body.
+  /// e.g. "Here's my recommendation — Smith Plumbing has a same-day slot
+  /// open Tuesday."
+  content?: string;
+}
+
+interface DecideProposalPayload {
+  message_id: string;
+  decision: "approved" | "declined" | "countered";
+  /// Optional counter-offer text or decline reason.
+  note?: string;
+}
+
+async function handlePropose(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: ProposePayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user || !isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+  const proposal = payload.proposal;
+  if (!proposal || !proposal.kind ||
+      !["vendor", "date_slot", "cost", "quote"].includes(proposal.kind as string)) {
+    return json({ error: "valid proposal.kind required" }, 400);
+  }
+  const { data: requestData, error: lookupErr } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (lookupErr || !requestData) return json({ error: "request not found" }, 404);
+  const request = requestData as ConciergeRequestRow;
+
+  const now = new Date().toISOString();
+  const proposalWithStatus = {
+    ...proposal,
+    status: "pending",
+  };
+  const content = compactString(payload.content ?? "");
+  const { data: message, error: msgErr } = await service
+    .from("concierge_messages")
+    .insert({
+      household_id: request.household_id,
+      user_id: request.user_id,
+      request_id: request.id,
+      role: "concierge",
+      content: content || `Chez sent you a proposal — tap to review.`,
+      attachments: [],
+      proposal: proposalWithStatus,
+      proposal_kind: proposal.kind,
+    })
+    .select("*")
+    .single();
+  if (msgErr || !message) return json({ error: "failed to insert proposal" }, 500);
+
+  await service
+    .from("chez_requests")
+    .update({
+      last_message_at: now,
+      unread_for_user: true,
+      unread_for_admin: request.unread_for_admin,
+      pending_proposal_count: (request.pending_proposal_count ?? 0) + 1,
+    })
+    .eq("id", request.id);
+
+  await sendPush(
+    serviceUrl,
+    serviceRoleKey,
+    [request.user_id],
+    "Chez has a proposal for you",
+    content || `Tap to review Chez's recommendation.`,
+    { type: "chez_request_reply", request_id: request.id }
+  );
+
+  return json({ ok: true, message });
+}
+
+async function handleDecideProposal(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: DecideProposalPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const messageId = compactString(payload.message_id);
+  const decision = payload.decision;
+  if (!messageId || !["approved", "declined", "countered"].includes(decision)) {
+    return json({ error: "message_id + valid decision required" }, 400);
+  }
+  const { data: messageRow, error: lookupErr } = await service
+    .from("concierge_messages")
+    .select("*")
+    .eq("id", messageId)
+    .maybeSingle();
+  if (lookupErr || !messageRow) return json({ error: "message not found" }, 404);
+  const message = messageRow as {
+    id: string;
+    request_id: string;
+    household_id: string;
+    user_id: string;
+    proposal: Record<string, unknown> | null;
+  };
+  if (!message.proposal) return json({ error: "not a proposal" }, 400);
+  if ((message.proposal as { status?: string }).status !== "pending") {
+    return json({ error: "already decided" }, 409);
+  }
+
+  // Verify the request belongs to the user's household.
+  const { data: req } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", message.request_id)
+    .maybeSingle();
+  if (!req) return json({ error: "request not found" }, 404);
+  const request = req as ConciergeRequestRow;
+  const isOwner = user.id === request.user_id;
+  if (!isOwner) return json({ error: "not authorized" }, 403);
+
+  const now = new Date().toISOString();
+  const updatedProposal = {
+    ...(message.proposal as Record<string, unknown>),
+    status: decision,
+    decided_at: now,
+  };
+  await service
+    .from("concierge_messages")
+    .update({ proposal: updatedProposal })
+    .eq("id", messageId);
+
+  // Insert a system message reflecting the decision.
+  const decisionLabel = decision === "approved" ? "approved" :
+                       decision === "declined" ? "declined" : "countered";
+  const noteSuffix = payload.note ? `\n\n${payload.note}` : "";
+  await service.from("concierge_messages").insert({
+    household_id: request.household_id,
+    user_id: request.user_id,
+    request_id: request.id,
+    role: "system",
+    content: `You ${decisionLabel} Chez's proposal.${noteSuffix}`,
+    attachments: [],
+  });
+
+  // Update the parent request: decrement pending counter, bump
+  // last_message_at + admin unread.
+  await service
+    .from("chez_requests")
+    .update({
+      last_message_at: now,
+      unread_for_admin: true,
+      pending_proposal_count: Math.max(0, (request.pending_proposal_count ?? 0) - 1),
+    })
+    .eq("id", request.id);
+
+  // Push admin so they can act on the decision (book vendor, send next
+  // proposal, etc.).
+  const summary = decision === "approved"
+    ? `Customer approved your proposal on "${request.summary}"`
+    : decision === "declined"
+    ? `Customer declined your proposal on "${request.summary}"`
+    : `Customer countered your proposal on "${request.summary}"`;
+  await sendPush(
+    serviceUrl,
+    serviceRoleKey,
+    adminUserIds(),
+    summary,
+    payload.note || "",
+    { type: "chez_admin_request", request_id: request.id }
+  );
+  await sendAdminEmail(
+    adminEmails(),
+    `[Chez] ${summary}`,
+    `${summary}\n\n${payload.note ?? ""}\n\n${adminPortalUrl(request.id)}`,
+    emailBody({
+      preview: summary,
+      heading: summary,
+      intro: payload.note || "(no additional notes)",
+      bodyText: "",
+      ctaLabel: "Open in admin portal",
+      ctaUrl: adminPortalUrl(request.id),
+    })
+  );
+
+  return json({ ok: true });
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+async function householdIdForUser(
+  service: ServiceClient,
+  userId: string
+): Promise<string | null> {
+  const { data } = await service
+    .from("users")
+    .select("household_id")
+    .eq("id", userId)
+    .maybeSingle();
+  return (data as { household_id?: string } | null)?.household_id ?? null;
+}
+
+async function businessHoursDue(service: ServiceClient): Promise<string> {
+  // Reuse the public.chez_business_hours_due() Postgres function defined
+  // in the 20261201 migration. Same call shape as `handleSubmit` —
+  // takes a start_at arg. Falls back to naive +24h on any failure.
+  const { data, error } = await service.rpc(
+    "chez_business_hours_due",
+    { start_at: new Date().toISOString() }
+  );
+  if (error || !data) {
+    const fallback = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    return fallback.toISOString();
+  }
+  return data as string;
 }
 
 // ============================================================================
@@ -739,6 +1275,54 @@ serve(async (req: Request) => {
           supabaseUrl,
           serviceRoleKey
         );
+
+      // Phase 80.1 — household profile (standing instructions for Chez)
+      case "fetch_profile":
+        return handleFetchProfile(service, user);
+      case "update_profile":
+        return handleUpdateProfile(
+          service,
+          user,
+          body as unknown as UpdateProfilePayload
+        );
+
+      // Phase 80.1 — recurring delegation (Chez owns a routine / vendor)
+      case "delegate_routine":
+        return handleDelegateRoutine(
+          service,
+          user,
+          body as unknown as DelegateRoutinePayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+      case "delegate_contractor":
+        return handleDelegateContractor(
+          service,
+          user,
+          body as unknown as DelegateContractorPayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+
+      // Phase 80.1 — structured proposals (Chez proposes vendor / date /
+      // cost / quote, homeowner approves / declines / counters)
+      case "propose":
+        return handlePropose(
+          service,
+          user,
+          body as unknown as ProposePayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+      case "decide_proposal":
+        return handleDecideProposal(
+          service,
+          user,
+          body as unknown as DecideProposalPayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+
       default:
         return json({ error: `unknown action: ${action}` }, 400);
     }

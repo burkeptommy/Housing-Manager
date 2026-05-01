@@ -857,14 +857,14 @@ struct VehicleDetailView: View {
                 label: openRecallCount == 1
                     ? "Have Chez handle this recall"
                     : "Have Chez handle these recalls",
-                caption: "Tom finds the right service center, books, and follows up.",
+                caption: "Chez finds the right service center, books, and follows up.",
                 context: chezVehicleRecallContext(openCount: openRecallCount)
             )
         } else if !hasMechanic {
             ChezEntryButton(
                 category: .findVendor,
                 label: "Have Chez find me a mechanic",
-                caption: "Tom finds a vetted shop you'll want to keep.",
+                caption: "Chez finds a vetted shop you'll want to keep.",
                 context: chezVehicleMechanicContext
             )
         }

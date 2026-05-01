@@ -321,7 +321,7 @@ struct DashboardView: View {
                             ChezEntryButton(
                                 category: .general,
                                 label: "Need help? Ask Chez",
-                                caption: "Tom replies within 1 business day.",
+                                caption: "Chez replies within 1 business day.",
                                 context: [:]
                             )
                             .padding(.top, HavenTheme.spacing4)

@@ -2010,7 +2010,7 @@ struct MaintenanceTaskDetailSheet: View {
                         ChezEntryButton(
                             category: .coordinateTask,
                             label: "Have Chez handle this for me",
-                            caption: "Tom finds the pro, schedules, and follows up.",
+                            caption: "Chez finds the pro, schedules, and follows up.",
                             context: chezTaskContext
                         )
                         .padding(.top, HavenTheme.spacing8)

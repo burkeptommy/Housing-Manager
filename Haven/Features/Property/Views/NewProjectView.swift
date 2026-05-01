@@ -120,7 +120,7 @@ struct NewProjectView: View {
                     ChezEntryButton(
                         category: .general,
                         label: "Not sure what you need? Ask Chez",
-                        caption: "Tom scopes the project, finds vendors, and gets quotes.",
+                        caption: "Chez scopes the project, finds vendors, and gets quotes.",
                         context: chezNewProjectContext
                     )
                 }

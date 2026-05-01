@@ -6240,3 +6240,54 @@
   gap: 10px;
   margin-top: 4px;
 }
+
+/* Phase 80.1 — Profile + proposal cards in the focused chez panel */
+
+.admin-chez__profile {
+  background: rgba(245, 224, 217, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.admin-chez__profile h3 {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+.admin-chez__profile--empty {
+  background: rgba(100, 116, 139, 0.06);
+}
+.admin-chez__profile-tier {
+  background: rgba(234, 179, 8, 0.16);
+  border-radius: 8px;
+  color: rgb(161, 98, 7);
+  font: 600 12px var(--sans);
+  margin-bottom: 8px;
+  padding: 6px 10px;
+}
+.admin-chez__profile-lines {
+  display: grid;
+  font: 400 13px var(--sans);
+  gap: 4px;
+}
+
+.admin-chez__proposal {
+  background: rgba(237, 105, 85, 0.06);
+  border: 1px solid rgba(237, 105, 85, 0.3);
+  border-radius: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+}
+.admin-chez__proposal-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.admin-chez__proposal-body {
+  font: 400 13px var(--sans);
+}
+.admin-chez__proposal-body div {
+  margin-top: 2px;
+}

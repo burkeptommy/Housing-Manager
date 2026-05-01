@@ -726,7 +726,7 @@ struct FindLocalVendorSheet: View {
         ChezEntryButton(
             category: .findVendor,
             label: "Have a Chez Home Manager find one for me",
-            caption: "Tom researches vetted local pros and replies within 1 business day.",
+            caption: "Chez researches vetted local pros and replies within 1 business day.",
             context: chezContext
         )
     }

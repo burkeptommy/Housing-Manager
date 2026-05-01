@@ -808,6 +808,11 @@ struct HomeSystemRow: Identifiable {
     /// read filters `archived_at IS NULL` so an archived row is
     /// invisible without being lost. Mirrors the routines pattern.
     let archivedAt: Date?
+    /// Phase 67 (reconciler v2): set when a vendor-required template
+    /// targets this system but no matching contractor exists. Replaces
+    /// the legacy "Find a contractor for X" seeded task. Read by
+    /// `VendorCoverageSheet` to surface the consolidated gap card.
+    let needsVendorCoverage: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status, subtype
@@ -840,6 +845,7 @@ struct HomeSystemRow: Identifiable {
         case installDateAttomPrefilled = "install_date_attom_prefilled"
         case installDateConfirmedAt = "install_date_confirmed_at"
         case archivedAt = "archived_at"
+        case needsVendorCoverage = "needs_vendor_coverage"
     }
 }
 
@@ -893,6 +899,7 @@ extension HomeSystemRow: Decodable {
         installDateAttomPrefilled = try? c.decodeIfPresent(Bool.self, forKey: .installDateAttomPrefilled)
         installDateConfirmedAt = try? c.decodeIfPresent(Date.self, forKey: .installDateConfirmedAt)
         archivedAt = try? c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        needsVendorCoverage = try? c.decodeIfPresent(Bool.self, forKey: .needsVendorCoverage)
     }
 }
 
@@ -1026,6 +1033,10 @@ struct HomeSystemUpdate: Codable {
     /// service-row backfill retires Pet Waste / Cleaning / Trash &
     /// Recycling / etc. rows.
     var archivedAt: Date?
+    /// Phase 67 (reconciler v2): toggled by the reconciler when a
+    /// vendor-required template targets this system but no matching
+    /// contractor exists. Cleared when a contractor is added.
+    var needsVendorCoverage: Bool?
 
     enum CodingKeys: String, CodingKey {
         case name, category, manufacturer, notes, status, subtype
@@ -1054,6 +1065,7 @@ struct HomeSystemUpdate: Codable {
         case installDateAttomPrefilled = "install_date_attom_prefilled"
         case installDateConfirmedAt = "install_date_confirmed_at"
         case archivedAt = "archived_at"
+        case needsVendorCoverage = "needs_vendor_coverage"
     }
 }
 
@@ -1167,6 +1179,15 @@ struct ContractorRow: Codable, Identifiable {
     /// Phase 19k: How this contractor was added — "manual", "quiz",
     /// "find_vendor" (Google Places), or "chez_field" (provider directory).
     let source: String?
+    /// Phase 80.1: When true, Chez is the homeowner's point of contact
+    /// for this vendor — handles scheduling and follow-ups directly with
+    /// them. Stamped via `delegate_contractor` Edge Function action.
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
+
+    /// Phase 80.1 helper: defaults nil → false. Use this everywhere in
+    /// the UI to avoid optional-handling at every call site.
+    var isChezOwned: Bool { chezOwned ?? false }
 
     enum CodingKeys: String, CodingKey {
         case id, phone, email, specialties, address, rating, notes, category, source, website
@@ -1179,6 +1200,8 @@ struct ContractorRow: Codable, Identifiable {
         case utilityProviderId = "utility_provider_id"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
     }
 }
 

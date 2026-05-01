@@ -431,6 +431,11 @@ enum AnalyticsEvent: String {
     case chezRequestOpened = "chez_request_opened"
     case chezRequestReopened = "chez_request_reopened"
     case chezRequestMarkedRead = "chez_request_marked_read"
+    // Phase 80.1 — profile, delegation, proposals
+    case chezProfileViewed = "chez_profile_viewed"
+    case chezProfileSaved = "chez_profile_saved"
+    case chezDelegationToggled = "chez_delegation_toggled"
+    case chezProposalDecided = "chez_proposal_decided"
 
     // MARK: - Errors
     case errorOccurred = "error_occurred"

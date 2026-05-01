@@ -2,11 +2,16 @@ import SwiftUI
 
 /// Phase 80 — One bubble in the request thread. Three role variants:
 ///   - user        — homeowner-authored (right-aligned salmon)
-///   - concierge   — Tom-authored (left-aligned cream w/ navy text)
+///   - concierge   — Chez-authored (left-aligned cream w/ navy text)
 ///   - system      — status-change row (centered grey divider)
 struct ChezMessageBubble: View {
     let message: ChezMessageRow
     let attachmentURLResolver: ((ChezAttachmentMeta) async -> URL?)?
+    /// Phase 80.1 — Called when the user taps "Counter" on a proposal
+    /// card. Parent (the detail view) opens the reply composer
+    /// prefilled with a counter template. Optional so existing call
+    /// sites stay source-compatible.
+    var onProposalCounter: ((ChezProposal) -> Void)? = nil
 
     var body: some View {
         switch message.typedRole {
@@ -68,7 +73,7 @@ struct ChezMessageBubble: View {
             ZStack {
                 Circle().fill(HavenColors.navy800)
                     .frame(width: 28, height: 28)
-                Text("T")
+                Text("C")
                     .font(HavenTypography.uiLabelSmall)
                     .foregroundStyle(Color.white)
             }
@@ -89,6 +94,18 @@ struct ChezMessageBubble: View {
                                 )
                         )
                         .frame(maxWidth: 320, alignment: .leading)
+                }
+                // Phase 80.1 — Inline structured proposal card. Renders
+                // when the message carries a `proposal` JSONB payload.
+                // Sits between the text and the timestamp so it reads
+                // as part of the same concierge message.
+                if let proposal = message.proposal {
+                    ChezProposalCard(
+                        proposal: proposal,
+                        messageId: message.id,
+                        onCounter: onProposalCounter
+                    )
+                    .frame(maxWidth: 360, alignment: .leading)
                 }
                 Text(timestampString)
                     .font(HavenTypography.caption)

@@ -3,7 +3,11 @@ import SwiftUI
 
 /// Phase 80 — Chez Concierge.
 ///
-/// A homeowner-submitted request to the Chez Home Manager (Tom).
+/// A homeowner-submitted request to Chez (the concierge service).
+/// All user-facing copy refers to "Chez" — the homeowner never sees a
+/// real human's name on the front-end, even though the admin portal
+/// is operated by Tom. This keeps the brand consistent and lets the
+/// service scale beyond a single operator without copy churn.
 /// Categories cover the main "I need help with this" surfaces in the app
 /// (find a vendor / get a quote / schedule a visit / coordinate a task /
 /// find a handyman / general). Status is the lifecycle from submission
@@ -48,17 +52,17 @@ enum ChezCategory: String, Codable, CaseIterable, Identifiable {
     var promptCaption: String {
         switch self {
         case .findVendor:
-            return "Tell us what you're looking for and any preferences. Tom will research vetted local options and reply with a few picks."
+            return "Tell us what you're looking for and any preferences. Chez researches vetted local options and replies with a few picks."
         case .getQuote:
-            return "Share what you need quoted (and any quotes you've received). Tom will gather competitive numbers and a fair-market read."
+            return "Share what you need quoted (and any quotes you've received). Chez gathers competitive numbers and a fair-market read."
         case .scheduleVisit:
-            return "Tell us what's needed and your preferred timing. Tom coordinates with the right pro and proposes options."
+            return "Tell us what's needed and your preferred timing. Chez coordinates with the right pro and proposes options."
         case .coordinateTask:
-            return "Hand off the back-and-forth. Tom will work with the vendor or pro on your behalf."
+            return "Hand off the back-and-forth. Chez works with the vendor or pro on your behalf."
         case .findHandyman:
-            return "Tell us what's on your punch list. Tom finds a handyman and books the visit."
+            return "Tell us what's on your punch list. Chez finds a handyman and books the visit."
         case .general:
-            return "Anything else on your mind. Tom will figure out the right next step."
+            return "Anything else on your mind. Chez figures out the right next step."
         }
     }
 }
@@ -165,7 +169,7 @@ struct ChezRequestRow: Codable, Identifiable {
     }
 
     /// Friendly relative-time caption for the SLA, from the homeowner's
-    /// point of view. Tom replies within 1 business day.
+    /// point of view. Chez replies within 1 business day.
     var homeownerSlaCaption: String {
         if typedStatus == .resolved {
             if let resolvedAt {
@@ -174,25 +178,25 @@ struct ChezRequestRow: Codable, Identifiable {
             return "Resolved"
         }
         if typedStatus == .waitingCustomer {
-            return "Tom needs your answer"
+            return "Chez needs your answer"
         }
         let now = Date()
         if slaDueAt < now {
-            return "Tom is on it"
+            return "Chez is on it"
         }
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         formatter.dateStyle = .none
         let cal = Calendar.current
         if cal.isDateInToday(slaDueAt) {
-            return "Tom replies by \(formatter.string(from: slaDueAt)) today"
+            return "Chez replies by \(formatter.string(from: slaDueAt)) today"
         }
         if cal.isDateInTomorrow(slaDueAt) {
-            return "Tom replies by \(formatter.string(from: slaDueAt)) tomorrow"
+            return "Chez replies by \(formatter.string(from: slaDueAt)) tomorrow"
         }
         let dayFormatter = DateFormatter()
         dayFormatter.dateStyle = .medium
-        return "Tom replies by \(dayFormatter.string(from: slaDueAt))"
+        return "Chez replies by \(dayFormatter.string(from: slaDueAt))"
     }
 
     static let relativeFormatter: RelativeDateTimeFormatter = {

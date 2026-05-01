@@ -69,6 +69,10 @@ struct RoutineEditSheet: View {
     @State private var errorMessage: String?
     @State private var showDeleteConfirm: Bool = false
     @State private var isDeleting: Bool = false
+    /// Phase 80.1 — Local mirror of `existing.chezOwned`. Bound to the
+    /// ChezOwnsToggle so the user sees an immediate flip; the toggle
+    /// itself talks to the chez-concierge edge function.
+    @State private var chezOwned: Bool = false
 
     /// Phase 56.5: Duplicate-prevention data pulled in alongside the
     /// existing contractors hydration. Loaded on appear; re-scanned
@@ -220,6 +224,22 @@ struct RoutineEditSheet: View {
             Section("Notes (optional)") {
                 TextField("Anything extra", text: $notes, axis: .vertical)
                     .lineLimit(2...5)
+            }
+
+            // Phase 80.1 — Recurring delegation. Only on EXISTING
+            // routines (you can't delegate something not yet saved).
+            // Posts to the chez-concierge edge function which creates
+            // a parent "Standing engagement" thread server-side.
+            if let routine = existing {
+                Section {
+                    ChezOwnsToggle(
+                        target: .routine(id: routine.id, label: routine.label),
+                        isOwned: $chezOwned,
+                        onChange: nil
+                    )
+                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    .listRowBackground(Color.clear)
+                }
             }
 
             // Phase 55.3: Delete affordance inside the edit sheet so
@@ -439,6 +459,7 @@ struct RoutineEditSheet: View {
                 estimatedCostDollars = String(cents / 100)
             }
             notes = existing.notes ?? ""
+            chezOwned = existing.chezOwned
             if let vendorId = existing.vendorId {
                 Task { await hydrateVendor(id: vendorId) }
             }
