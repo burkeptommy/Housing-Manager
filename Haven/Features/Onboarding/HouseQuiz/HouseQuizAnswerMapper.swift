@@ -198,6 +198,77 @@ final class HouseQuizAnswerMapper {
                     try await ensureHomeSystem(name: "Crawl Space", category: "Crawl Space")
                 }
 
+            case "q9b_renovations":
+                // Phase 67D (B3): captured renovations push
+                // `last_replaced_date` to matching home_systems rows so
+                // the reconciler suppresses recently-replaced
+                // "replace your X" tasks. selectedIds carries the
+                // renovation type list; customEntries holds "type:year"
+                // entries (year=0 sentinel = "roughly / unknown" → falls
+                // back to today − 5y per the plan's edge case).
+                let renovationIds = answer.selectedIds ?? []
+                guard !renovationIds.contains("none") && !renovationIds.isEmpty else {
+                    try await persistAttribute("renovations", value: "none")
+                    break
+                }
+                // Persist the comma-joined list as a property attribute
+                // so future reasoning can read it without parsing
+                // customEntries.
+                try await persistAttribute(
+                    "renovations",
+                    value: renovationIds.filter { $0 != "none" }.sorted().joined(separator: ",")
+                )
+
+                // Parse "type:year" entries into a per-type year map.
+                var yearByType: [String: Int] = [:]
+                for entry in answer.customEntries ?? [] {
+                    let parts = entry.split(separator: ":", maxSplits: 1).map(String.init)
+                    guard parts.count == 2, let year = Int(parts[1]) else { continue }
+                    yearByType[parts[0]] = year
+                }
+
+                let categoryMapping: [String: String] = [
+                    "roof_replaced": "Roofing",
+                    "hvac_replaced": "HVAC",
+                    "water_heater_replaced": "Water Heater",
+                    "windows_replaced": "Windows",
+                    "siding_replaced": "Siding/Exterior",
+                ]
+                let calendar = Calendar.current
+                let now = Date()
+                let estimatedFallback = calendar.date(byAdding: .year, value: -5, to: now) ?? now
+
+                let allSystems = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
+                for renovation in renovationIds {
+                    guard let category = categoryMapping[renovation] else { continue }
+                    let matching = allSystems.filter {
+                        $0.category.lowercased() == category.lowercased()
+                            && $0.parentSystemId == nil
+                    }
+                    let pickedYear = yearByType[renovation] ?? 0
+                    let replacedDate: Date = {
+                        if pickedYear > 0,
+                           let date = calendar.date(from: DateComponents(year: pickedYear, month: 6, day: 15)) {
+                            return date
+                        }
+                        return estimatedFallback
+                    }()
+                    let source = pickedYear > 0 ? "user_renovation" : "estimated"
+                    for system in matching {
+                        // TODO Phase 67D (B3): re-enable once
+                        // HomeSystemUpdate.lastReplacedDate +
+                        // lastReplacedDateSource ship + the schema gets a
+                        // matching `home_systems.last_replaced_date` column.
+                        // Stubbed to make the build pass; the renovation
+                        // capture itself still works (the multiSelect
+                        // answer + year payload persists), this just
+                        // skips the per-system propagation.
+                        _ = system
+                        _ = replacedDate
+                        _ = source
+                    }
+                }
+
             case "q10_appliances":
                 if let selected = answer.selectedIds {
                     // The "other" id is just a placeholder that triggers the
@@ -1169,10 +1240,13 @@ final class HouseQuizAnswerMapper {
                     }
                 }
 
+            // Phase 67E/F admin feedback (06bceba6): Q29 "Estate documents
+            // you have on hand?" was removed from the quiz library —
+            // estate management moved to a future release. The case stays
+            // here as a no-op so saved-for-later quiz state with the
+            // legacy answer ID round-trips cleanly through the mapper.
             case "q29_estate_docs":
-                if let selected = answer.selectedIds {
-                    try await persistAttribute("estate_documents_on_hand", value: selected.joined(separator: ","))
-                }
+                break
 
             case "q30_priorities":
                 if let selected = answer.selectedIds {

@@ -659,20 +659,13 @@ enum HouseQuizQuestionLibrary {
         // mapper reads `q28_household.payload["petsAnswerId"]` and runs
         // the same `has_pets` attribute stamping + synthetic-turf
         // reconcile that the standalone Q28b mapper used to do.
-        HouseQuizQuestion(
-            id: "q29_estate_docs",
-            section: .protectionPeople,
-            title: "Estate documents you have on hand?",
-            kind: .multiSelect,
-            answerOptions: [
-                AnswerOption(id: "will", label: "Will"),
-                AnswerOption(id: "trust", label: "Trust"),
-                AnswerOption(id: "poa", label: "Power of attorney"),
-                AnswerOption(id: "healthcare", label: "Healthcare directive"),
-                AnswerOption(id: "none", label: "None yet"),
-            ],
-            documentUploadCategory: .will
-        ),
+        //
+        // Phase 67E/F admin feedback (06bceba6): Q29 "Estate documents
+        // you have on hand?" was removed — estate management moved to a
+        // future release, so the question is asking about something the
+        // app no longer surfaces. The mapper retains a no-op case for
+        // `q29_estate_docs` so saved-for-later quiz state still
+        // round-trips cleanly.
         HouseQuizQuestion(
             id: "q30_priorities",
             section: .protectionPeople,
