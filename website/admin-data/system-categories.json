@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-05-01T13:50:12.037Z",
+  "generatedAt": "2026-05-01T16:31:54.164Z",
   "sourceFile": "Haven/Features/Property/Services/SystemCategoryRegistry.swift",
-  "sourceCommit": "aebcdb65",
+  "sourceCommit": "3642eea6",
   "count": 44,
   "entries": [
     {
@@ -180,6 +180,7 @@
       "_sourceLine": 94,
       "_impact": {
         "templates_in_category": [
+          "Handyman:Schedule exterior window re-caulking",
           "Handyman:Test smart water leak system",
           "Handyman:Service central vacuum system",
           "Handyman:Verify radon mitigation fan",

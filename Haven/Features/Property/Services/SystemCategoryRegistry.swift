@@ -431,6 +431,34 @@ enum SystemCategoryRegistry {
         return ca == cb
     }
 
+    /// Phase 67I.4: vendor-routing lookup. A system category answers
+    /// "what kind of vendor services this?" — distinct from
+    /// `canonical()` which preserves system identity. Example:
+    /// `vendorCategoryFor("Water Heater")` → `"Plumber"` because a
+    /// plumber services water heaters, but the Water Heater system
+    /// row keeps its own identity in vendor coverage. Single source
+    /// of truth lives at `website/admin-data/vendor-routing.json`,
+    /// loaded by `RemoteConfig.shared.vendorRouting`. The same map
+    /// drives admin's coverage audit (admin.js `SYSTEM_CATEGORY_TO_VENDOR`
+    /// reads the identical file) so both consumers stay in lockstep.
+    ///
+    /// Returns nil for unmapped categories (caller falls back to
+    /// direct category match against contractor.category). Lookup
+    /// is case-insensitive on the canonical key.
+    @MainActor
+    static func vendorCategoryFor(systemCategory: String?) -> String? {
+        guard let raw = systemCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        let routing = RemoteConfig.shared.vendorRouting
+        if let direct = routing[raw] { return direct }
+        // Case-insensitive fallback so "water heater" matches the
+        // canonical "Water Heater" key in the JSON.
+        for (key, value) in routing where key.caseInsensitiveCompare(raw) == .orderedSame {
+            return value
+        }
+        return nil
+    }
+
     /// Whether a system category should appear in the Vendor Coverage list.
     /// Sub-systems and child systems (parentSystemId != nil) are excluded.
     static func showInVendorCoverage(category: String, parentSystemId: UUID?) -> Bool {

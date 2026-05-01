@@ -168,6 +168,7 @@
 		344ACD784914A80BD4583AB1 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED21C0DF2E3D8D95B0B24D0 /* ChatView.swift */; };
 		3480D1EF9B0FCD3195E4C9C7 /* EditProjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CEEF4793EF037DC223ABD08 /* EditProjectSheet.swift */; };
 		34CF06B05870D488A0BE391B /* EnrichmentCardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA15E42BF53B7395A47F986A /* EnrichmentCardEngine.swift */; };
+		34F16F554E829287BED37281 /* vendor-routing.json in Resources */ = {isa = PBXBuildFile; fileRef = 24AFEBF8E72A1B4DB97516DB /* vendor-routing.json */; };
 		350E1A0D0315F5E1B95D789B /* HouseholdStaffStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDCCEE76628155483DFF9776 /* HouseholdStaffStrip.swift */; };
 		3515C2E591B9F9DCE0757F43 /* VendorTaskGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263A6340D75E45C5C76CC9DB /* VendorTaskGrouping.swift */; };
 		35316F162DBF5D9139B99651 /* IndigoGradientCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77BC4FCF0CC7FABC8B4D6AC4 /* IndigoGradientCard.swift */; };
@@ -182,6 +183,7 @@
 		372ABCE174A43E38C3AECBEC /* UtilityAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DF7A5BC749EE76956FF9449 /* UtilityAccountsSection.swift */; };
 		3774C65A00E721AD8728FFC0 /* GooglePlacesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62102C006E50FF36746E336 /* GooglePlacesService.swift */; };
 		378F8041C217FCE8EB24D790 /* HouseQuizAnswerFeedbackCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */; };
+		37AA364223150EAC6CB4C4E3 /* vendor-routing.json in Resources */ = {isa = PBXBuildFile; fileRef = 24AFEBF8E72A1B4DB97516DB /* vendor-routing.json */; };
 		37C9117DDA7035D6461E4E4E /* InvoiceReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0972BEE391C1FC6F3F7291C7 /* InvoiceReviewSheet.swift */; };
 		389EEB9E5E8E29628C9AAA6E /* HandymanTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE252A208C6E260188E1A3E /* HandymanTabView.swift */; };
 		38B39E5859638E8DA023F2AD /* VehicleConfirmationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C043C7EC273658100F01935F /* VehicleConfirmationCard.swift */; };
@@ -398,6 +400,7 @@
 		7FA1F693D6D91CA622A162B6 /* PropertyDecisionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489B2A7C6A61B8D82B6DEA2B /* PropertyDecisionSheets.swift */; };
 		7FE4CC1A6C62E39107E279F3 /* ValuationRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901435EF475F88C576845DA9 /* ValuationRange.swift */; };
 		8034F5DF8ACD52209125C4CB /* PauseAppointmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85FDEA4F5E833F18CD0012A /* PauseAppointmentSheet.swift */; };
+		80873D0EE67C45AE0FE9A7D3 /* RemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB71385C28F23E329C0C7C38 /* RemoteConfig.swift */; };
 		81289BECD1ED118D3BA3C64C /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4EFE16C22592FE1D0F76B1 /* Endpoints.swift */; };
 		812C44A9E8BC5524A5C385FA /* ServiceContractSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C4293076703BBB693DB832 /* ServiceContractSheet.swift */; };
 		813C5013752C60325B242E61 /* SystemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */; };
@@ -479,6 +482,7 @@
 		9A0EBD5E235B70DC914483D3 /* PropertyHeroHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2954C058A9CF516AFE40C2A8 /* PropertyHeroHeader.swift */; };
 		9A74F9F2F8CA9F6CF700987E /* MaintenancePreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80AFE03CC0595186E4E4DC0 /* MaintenancePreferencesView.swift */; };
 		9AB8E07CFCDAECA953661AC4 /* SystemSubtypePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFF252E761E38911656477 /* SystemSubtypePicker.swift */; };
+		9AE925AFF003DC7043082FBF /* RemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB71385C28F23E329C0C7C38 /* RemoteConfig.swift */; };
 		9B58C999BD24633286E60B0F /* HandymanQuoteReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FED03016D07CE267F7DBB2 /* HandymanQuoteReviewSheet.swift */; };
 		9C009157F9F81A8EB13D2F1C /* Property.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABB0AD3DDD56272B9730CDBA /* Property.swift */; };
 		9C9F18A6F3E1A26A1E9B6465 /* SystemSubtypePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFF252E761E38911656477 /* SystemSubtypePicker.swift */; };
@@ -866,6 +870,7 @@
 		2218FB82A32E8E479EB1078E /* Color+Haven.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Haven.swift"; sourceTree = "<group>"; };
 		232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTemplates.swift; sourceTree = "<group>"; };
 		233D55DE28A313B5BEEAF39C /* DuplicateDismissalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDismissalStore.swift; sourceTree = "<group>"; };
+		24AFEBF8E72A1B4DB97516DB /* vendor-routing.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "vendor-routing.json"; sourceTree = "<group>"; };
 		263A6340D75E45C5C76CC9DB /* VendorTaskGrouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorTaskGrouping.swift; sourceTree = "<group>"; };
 		26F7EBF06E0A22151872C30C /* DocumentUploadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUploadViewModel.swift; sourceTree = "<group>"; };
 		27D9389BAAEE43E4F4E56927 /* PropertyRecapEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyRecapEditSheet.swift; sourceTree = "<group>"; };
@@ -1138,6 +1143,7 @@
 		D9B96EE37657BD097DB98878 /* ChezDirectoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezDirectoryService.swift; sourceTree = "<group>"; };
 		DB2C3C183F8B5FB668ADBCC4 /* DocumentUploadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUploadManager.swift; sourceTree = "<group>"; };
 		DB35F3710C0269686BE2C4E4 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
+		DB71385C28F23E329C0C7C38 /* RemoteConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfig.swift; sourceTree = "<group>"; };
 		DBC7CA202538BC2C257BA508 /* ChatDocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDocumentCard.swift; sourceTree = "<group>"; };
 		DDCCEE76628155483DFF9776 /* HouseholdStaffStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdStaffStrip.swift; sourceTree = "<group>"; };
 		DECE7A0C3DA1835717111C67 /* DatabaseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseModels.swift; sourceTree = "<group>"; };
@@ -1328,6 +1334,14 @@
 				E124BAA7A405ECE94C1745F2 /* QuizFinaleTotals.swift */,
 			);
 			path = HouseQuiz;
+			sourceTree = "<group>";
+		};
+		3E619DEC3B0B78F7C1B0F7C4 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				DB71385C28F23E329C0C7C38 /* RemoteConfig.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		3F9E2AB52AC1D176BAF11E97 /* Views */ = {
@@ -1581,6 +1595,14 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
+		796621F6C6A755E9DF03E5F4 /* RemoteConfig */ = {
+			isa = PBXGroup;
+			children = (
+				24AFEBF8E72A1B4DB97516DB /* vendor-routing.json */,
+			);
+			path = RemoteConfig;
+			sourceTree = "<group>";
+		};
 		7A4AFB110F1BD0EA860A222B /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -1600,6 +1622,7 @@
 			children = (
 				FA36D8D6CB59830094A69E80 /* Components */,
 				B5F6D0261654099E51540D8C /* Extensions */,
+				3E619DEC3B0B78F7C1B0F7C4 /* Services */,
 				FEDA1B396680394601B654B6 /* Theme */,
 				EABAAB45E1DAED892725E4F5 /* Utilities */,
 				4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */,
@@ -1636,6 +1659,7 @@
 		93FFFE50BB1123018D02E386 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				796621F6C6A755E9DF03E5F4 /* RemoteConfig */,
 				8FC4B4D10494E8767E9A0642 /* Assets.xcassets */,
 			);
 			path = Resources;
@@ -2169,6 +2193,7 @@
 				0E1B140D96F6075D860380D5 /* BrandColors.json in Resources */,
 				41BBCB98E7DAB82B051B8C1D /* CLAUDE.md in Resources */,
 				37272803AB55B96F55ACAF17 /* DESIGN_RULES.md in Resources */,
+				37AA364223150EAC6CB4C4E3 /* vendor-routing.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2181,6 +2206,7 @@
 				6C50B346F5E57C14E75DAA0E /* BrandColors.json in Resources */,
 				0E18DAC5A34E8DE3D4847614 /* CLAUDE.md in Resources */,
 				42F87AAB644BC5C4E20611FD /* DESIGN_RULES.md in Resources */,
+				34F16F554E829287BED37281 /* vendor-routing.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2474,6 +2500,7 @@
 				B4155C91AD6A8AF79CABE5C3 /* RecentActivityFeed.swift in Sources */,
 				DE27802A7827953DF55AA4AC /* RecommendedServicesView.swift in Sources */,
 				602E9646248523990734BE70 /* RegionalPack.swift in Sources */,
+				80873D0EE67C45AE0FE9A7D3 /* RemoteConfig.swift in Sources */,
 				D12D311A8B216DF6AB4A29DE /* Routine.swift in Sources */,
 				102F013F9D54AF97DD2FEE36 /* RoutineDetailView.swift in Sources */,
 				34164E0D96AE73EEBBBB6D4E /* RoutineEditSheet.swift in Sources */,
@@ -2877,6 +2904,7 @@
 				5573C5EC725CF72690D3A1A9 /* RecentActivityFeed.swift in Sources */,
 				4CEE857764CED0021F511244 /* RecommendedServicesView.swift in Sources */,
 				5B4C8F854BF0956F23975B1D /* RegionalPack.swift in Sources */,
+				9AE925AFF003DC7043082FBF /* RemoteConfig.swift in Sources */,
 				6196D0DC4CB089EAEBE2BEE5 /* Routine.swift in Sources */,
 				D915AC0B9E76B379DC4D8C62 /* RoutineDetailView.swift in Sources */,
 				B6A02EBC9FBACC866051F4E2 /* RoutineEditSheet.swift in Sources */,

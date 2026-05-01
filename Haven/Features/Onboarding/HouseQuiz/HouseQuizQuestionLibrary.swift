@@ -442,7 +442,13 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "electrician", label: "Electrician", icon: "bolt.fill"),
                 AnswerOption(id: "roofer", label: "Roofer", icon: "house.fill"),
                 AnswerOption(id: "tree_service", label: "Tree service", icon: "tree.fill"),
-                AnswerOption(id: "mosquito_tick", label: "Mosquito & tick", icon: "ladybug.fill"),
+                // Phase 67I.4: chip label is "Pest control" — matches the
+                // renamed admin vendor type. Pest-control vendors handle
+                // seasonal mosquito spraying as a standard add-on; not a
+                // separate trade. Chip ID stays `mosquito_tick` so existing
+                // saved answers round-trip; the answer mapper still stamps
+                // category "Mosquito & Tick" (canonical registry key).
+                AnswerOption(id: "mosquito_tick", label: "Pest control", icon: "ladybug.fill"),
                 AnswerOption(id: "snow_removal", label: "Snow removal", icon: "snowflake"),
                 AnswerOption(id: "pet_waste", label: "Pet waste", icon: "pawprint.circle.fill"),
                 AnswerOption(id: "septic_pumper", label: "Septic pumper", icon: "circle.dashed"),

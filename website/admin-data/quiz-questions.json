@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-05-01T13:50:11.984Z",
+  "generatedAt": "2026-05-01T16:31:54.091Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift",
-  "sourceCommit": "aebcdb65",
+  "sourceCommit": "3642eea6",
   "count": 28,
   "entries": [
     {
@@ -1033,7 +1033,7 @@
         },
         {
           "id": "mosquito_tick",
-          "label": "Mosquito & tick",
+          "label": "Pest control",
           "icon": "ladybug.fill",
           "acceptsCustomInput": false
         },
@@ -1146,7 +1146,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 500,
+      "_sourceLine": 506,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1177,7 +1177,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 508,
+      "_sourceLine": 514,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1229,7 +1229,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 520,
+      "_sourceLine": 526,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1262,7 +1262,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 534,
+      "_sourceLine": 540,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1322,7 +1322,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 564,
+      "_sourceLine": 570,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1376,7 +1376,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 591,
+      "_sourceLine": 597,
       "_impact": {
         "creates_systems": [
           "Solar"
@@ -1426,7 +1426,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 603,
+      "_sourceLine": 609,
       "_impact": {
         "creates_systems": [
           "Generator"
@@ -1457,7 +1457,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 622,
+      "_sourceLine": 628,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1517,7 +1517,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 636,
+      "_sourceLine": 642,
       "_impact": {
         "creates_systems": [
           "Garage Door"
@@ -1551,7 +1551,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 665,
+      "_sourceLine": 671,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1611,7 +1611,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 674,
+      "_sourceLine": 680,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1689,7 +1689,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 700,
+      "_sourceLine": 706,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1737,7 +1737,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 721,
+      "_sourceLine": 727,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],

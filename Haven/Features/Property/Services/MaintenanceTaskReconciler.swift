@@ -318,6 +318,18 @@ enum MaintenanceTaskReconciler {
                    let pref = allContractors.first(where: { $0.id == prefId }) {
                     return pref
                 }
+                // Phase 67I.4: vendor-routing fallback. After direct
+                // category + specialty match, consult the shared
+                // vendor-routing map (RemoteConfig.shared.vendorRouting)
+                // so categories like "Water Heater" / "Wine Cellar" /
+                // "Windows" / "Security System" route to a Plumber /
+                // HVAC / Handyman contractor when no exact-category
+                // contractor exists. Mirrors admin.js
+                // SYSTEM_CATEGORY_TO_VENDOR — both consumers read the
+                // same JSON at website/admin-data/vendor-routing.json.
+                let routedVendorType = SystemCategoryRegistry.vendorCategoryFor(
+                    systemCategory: systemCategory
+                )
                 return allContractors.first { contractor in
                     if let cat = contractor.category,
                        cat.caseInsensitiveCompare(systemCategory) == .orderedSame {
@@ -325,6 +337,16 @@ enum MaintenanceTaskReconciler {
                     }
                     if let specs = contractor.specialties,
                        specs.contains(where: { $0.caseInsensitiveCompare(systemCategory) == .orderedSame }) {
+                        return true
+                    }
+                    if let routed = routedVendorType,
+                       let cat = contractor.category,
+                       cat.caseInsensitiveCompare(routed) == .orderedSame {
+                        return true
+                    }
+                    if let routed = routedVendorType,
+                       let specs = contractor.specialties,
+                       specs.contains(where: { $0.caseInsensitiveCompare(routed) == .orderedSame }) {
                         return true
                     }
                     return false

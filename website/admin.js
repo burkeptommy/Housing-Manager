@@ -1157,6 +1157,12 @@ const LIVE_SOURCES = [
   "edge-function-prompts",
   "quiz-feedback",
   "quiz-mapper-effects",
+  // Phase 67I.4: vendor-routing map. Single source of truth for
+  // SYSTEM_CATEGORY_TO_VENDOR; iOS reads the same file via
+  // RemoteConfig.shared.vendorRouting (bundled at
+  // Haven/Resources/RemoteConfig/vendor-routing.json, refreshed
+  // from havenhome.dev/admin-data/vendor-routing.json on launch).
+  "vendor-routing",
 ];
 
 // Phase 5u/5z+10 — Cache-bust admin-data fetches with a per-LOAD
@@ -3990,81 +3996,35 @@ function renderDiff() {
 // Each finding rolls up with a count + a clickable list of the
 // underlying entities + a one-click action.
 
-// Maps from systemCategory → vendor type. Drives finding #1 + #3.
-// Multiple categories can map to the same vendor (Plumbing → Plumber).
-// Categories that map to "any" (every household has handyman) never
-// flag finding #1.
-const SYSTEM_CATEGORY_TO_VENDOR = {
-  "HVAC": "HVAC service",
-  "Plumbing": "Plumber",
-  "Electrical": "Electrician",
-  "Roofing": "Roofer",
-  "Roofing/Exterior": "Roofer",
-  "Siding/Exterior": "Roofer",
-  "Tree Service": "Tree service",
-  // Phase 67I.3: Pest Control + Mosquito & Tick consolidated under
-  // the renamed "Pest control" vendor type. Pest control vendors
-  // cover seasonal spraying as a standard add-on, not a separate
-  // trade. The canonical registry key "Mosquito & Tick" (without
-  // "Spraying" suffix) is now also a recognized lookup.
-  "Pest Control": "Pest control",
-  "Mosquito & Tick Spraying": "Pest control",
-  "Mosquito & Tick": "Pest control",
-  "Snow Removal": "Snow removal",
-  "Pet Waste Removal": "Pet waste",
-  "Septic": "Septic pumper",
-  "Septic System": "Septic pumper",
-  "Well Water": "Well water service",
-  "Well": "Well water service",
-  "Chimney": "Chimney sweep",
-  "Fireplace": "Chimney sweep",
-  "Landscaping": "Tree service",
-  "Hardscape": "Hardscape / masonry",
-  "Generator": "Generator service",
-  "Cleaning Service": "House cleaner",
-  "Handyman": "Handyman",
-  "Air Quality": "HVAC service",
-  "Irrigation": "Tree service",
-  "Doors": "Handyman",
-  "Garage": "Handyman",
-  "Garage Door": "Handyman",
-  "Smoke Detectors": "Electrician",
-  "Appliance": "Handyman",
-  "Foundation": "Handyman",
-  "Attic & Foundation": "Handyman",
-  "Driveway": "Hardscape / masonry",
-  "Outdoor Lighting": "Electrician",
-  "Window Cleaning": "House cleaner",
-  "Pressure Washing": "Hardscape / masonry",
-  "Driveway Sealcoating": "Hardscape / masonry",
-  // Phase 67I.3 — gap-closure mappings flagged by the Audit tab.
-  // Each key is a systemCategory present on at least one template;
-  // each value is a vendor type that lives in DEFAULT_VENDOR_CATEGORIES.
-  "Water Heater": "Plumber",                         // Flush / T&P / descale tankless — plumbing trade
-  "Well System": "Well water service",               // existing keys were "Well" / "Well Water" — adds the canonical registry key
-  "Windows": "Handyman",                             // exterior re-caulking is handyman class
-  "Pool/Spa": "Pool service",
-  "Pool": "Pool service",                            // alias for legacy templates that may carry "Pool"
-  "Security System": "Handyman",                     // per Tom: handyman covers system check + sensor batteries; security companies don't visit unless deeper work
-  "Solar": "Solar service",
-  "Crawl Space": "Waterproofing & basement",
-  "Elevator": "Elevator service",
-  "Wine Cellar": "HVAC service",                     // mini-split cooling work; homeowner can override per-task
-};
+// Phase 67I.4: vendor-routing map is now server-driven. Source of
+// truth is `website/admin-data/vendor-routing.json`, fetched at
+// admin load via the existing `loadLiveData` flow. iOS reads the
+// same file (bundled at Haven/Resources/RemoteConfig/vendor-routing.json,
+// refreshed via RemoteConfig.shared in the iOS app on launch). One
+// edit to the JSON updates both clients — no admin.js bump or iOS
+// rebuild needed for taxonomy-only changes.
+//
+// Drives finding #1 + #3. Returns an empty object until the first
+// fetch lands (admin treats every category as unmapped on cold load,
+// which is fine — render() runs after loadLiveData finishes).
+function getSystemCategoryToVendor() {
+  return state.liveData?.["vendor-routing"]?.map || {};
+}
 
 // HNW vendor types that aren't in DEFAULT_VENDOR_CATEGORIES today —
 // surfaced as finding #4. Curated to high-confidence common HNW
 // services. Tom can act on any of them by drafting a proposal_add note.
+//
+// Phase 67I.4: pruned to just Garage door technician — every other
+// entry from the original list landed in the catalog through Phase 67I
+// (Pool service / Painter / Window cleaner / Pressure washer /
+// Locksmith / Landscape designer / Appliance repair specialist /
+// Carpet + upholstery cleaner) or Phase 67I.3 (Solar service /
+// Elevator service). Adding Garage door technician requires deciding
+// whether to fold it into "Handyman" (most homes) or split it out
+// (HNW homes with multi-bay garages + premium openers).
 const COMMON_HNW_VENDOR_GAPS = [
-  { name: "Pool service", role: "Weekly chemistry + filter / pump care for pools and spas. Distinct from a house cleaner — pool chemistry needs a specialist." },
-  { name: "Painter", role: "Interior + exterior repaint cycles. Most HNW homes redo high-traffic interior every 4-6 years and exterior every 7-10." },
-  { name: "Window cleaner", role: "Twice-a-year window + screen wash. Often paired with gutter cleaning at the same visit." },
-  { name: "Pressure washer", role: "Driveway / siding / deck pressure washing. Annual or every-other-year." },
   { name: "Garage door technician", role: "Spring tune-up + opener / sensor service. Different from a handyman — GDT carries the parts inventory." },
-  { name: "Locksmith", role: "Re-key after move-in, smart-lock setup, safe service." },
-  { name: "Landscape designer", role: "Annual planting plan + bed redesigns. Distinct from week-to-week landscaping crew." },
-  { name: "Appliance repair specialist", role: "Sub-Zero / Wolf / Thermador service. The brands' own factory networks, not a generalist." },
-  { name: "Carpet + upholstery cleaner", role: "Annual deep clean. Often runs at the same time as a window cleaning visit." },
 ];
 
 // Common HNW routines we don't already seed via DEFAULT_ROUTINES.
@@ -4094,6 +4054,7 @@ function computeCoverageAudit() {
 
   // Build the set of vendor categories we actually carry.
   const vendorNames = new Set(DEFAULT_VENDOR_CATEGORIES.map((v) => v[0]));
+  const systemCategoryToVendor = getSystemCategoryToVendor();
 
   // -- Finding 1: tasks without a vendor type that can do them.
   // Walk every template (auto-seed + opt-in) and check whether its
@@ -4108,7 +4069,7 @@ function computeCoverageAudit() {
       (t.routingOverride === "diyDefault" || t.routingOverride === "diyCapable") &&
       typeof t.diyEffortMinutes === "number" && t.diyEffortMinutes <= 60) continue;
     const cat = t.systemCategory || "";
-    const mapped = SYSTEM_CATEGORY_TO_VENDOR[cat];
+    const mapped = systemCategoryToVendor[cat];
     if (!mapped) {
       findings.tasksWithoutVendor.push({
         title: t.title,
@@ -4230,7 +4191,7 @@ function computeCoverageAudit() {
     if (vendorName === "Handyman") continue; // handyman covers everything
     let count = 0;
     for (const t of templates) {
-      const mapped = SYSTEM_CATEGORY_TO_VENDOR[t.systemCategory];
+      const mapped = systemCategoryToVendor[t.systemCategory];
       if (mapped === vendorName) count++;
     }
     if (count === 0) {

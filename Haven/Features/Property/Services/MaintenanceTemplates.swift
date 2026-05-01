@@ -1191,11 +1191,30 @@ enum MaintenanceTemplates {
         // ──────────────────────────────────────────────
         // WINDOWS & DOORS
         // ──────────────────────────────────────────────
-        ("Windows", [
-            // Phase 58: weatherstripping + lock checks folded into Handyman
-            // bundles. Exterior re-caulking stays as a standalone vendor
-            // task — real work that warrants a dedicated visit.
-            MaintenanceTemplate(systemCategory: "Windows", title: "Schedule exterior window re-caulking", description: "Painter or handyman scrapes out cracked or pulling-away exterior caulk around every window and door, applies fresh exterior-grade urethane or polyurethane sealant, and tools the bead clean. Failed exterior caulk is the #1 entry point for water damage to wall framing. Catching it early prevents wood rot and the $5K+ repair that follows.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$200–$500", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Look for caulk that's pulled away from the trim, has hairline cracks, or has yellowed (older silicone). Schedule before fall rains so the new bead has dry weather to skin over before winter freeze-thaw cycles stress it. Often paired with a touch-up paint visit in the same trip.", isEssential: false, assignmentType: .vendor),
+        // Phase 67I.4: re-homed exterior re-caulking under Handyman as
+        // a Handyman:fall bundle child per Tom's call ("I think this
+        // is a handyman task / punch list item right?"). Phase 67E/F's
+        // Handyman:* bundle reconciler routes it to the punch rail
+        // (handyman_punch_items) at task creation time. The Windows
+        // category had no other templates and isn't in
+        // SystemCategoryRegistry — folding the lone entry into Handyman
+        // removes an orphan category entirely.
+        ("Handyman", [
+            MaintenanceTemplate(
+                systemCategory: "Handyman",
+                title: "Schedule exterior window re-caulking",
+                description: "Painter or handyman scrapes out cracked or pulling-away exterior caulk around every window and door, applies fresh exterior-grade urethane or polyurethane sealant, and tools the bead clean. Failed exterior caulk is the #1 entry point for water damage to wall framing. Catching it early prevents wood rot and the $5K+ repair that follows.",
+                frequency: "Every 2-3 years",
+                priority: "Medium",
+                estimatedCostRange: "(bundled)",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Look for caulk that's pulled away from the trim, has hairline cracks, or has yellowed (older silicone). Schedule before fall rains so the new bead has dry weather to skin over before winter freeze-thaw cycles stress it. Often paired with a touch-up paint visit in the same trip.",
+                isEssential: false,
+                assignmentType: .vendor,
+                bundleId: "Handyman:fall"
+            ),
         ]),
 
         // Phase 58: Doors category dissolved. Hinge lube + weatherstripping

@@ -36,6 +36,13 @@ targets:
     resources:
       - path: Haven/Resources/Assets.xcassets
       - path: Haven/Resources/Fonts
+      # Phase 67I.4: bundled remote-config JSON snapshots. Synced from
+      # website/admin-data/ via scripts/sync-bundled-config.mjs before
+      # each release so the iOS app ships with the latest server copy.
+      # Bundled flat (group) so Bundle.main.url(forResource:withExtension:)
+      # resolves files by base name without a subdirectory hint.
+      - path: Haven/Resources/RemoteConfig
+        type: group
     dependencies:
       - package: Supabase
         product: Supabase
@@ -90,6 +97,10 @@ targets:
     resources:
       - path: Haven/Resources/Assets.xcassets
       - path: Haven/Resources/Fonts
+      # Phase 67I.4: bundled remote-config JSON snapshots (same as
+      # the homeowner Haven target — field app reads the same config).
+      - path: Haven/Resources/RemoteConfig
+        type: group
     dependencies:
       - package: Supabase
         product: Supabase
