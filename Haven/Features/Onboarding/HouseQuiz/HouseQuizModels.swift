@@ -422,6 +422,18 @@ enum HouseQuizQuestionKind: String, Codable {
     /// slot. Free-form fallback names land in `customEntries` keyed by
     /// "auto:NAME" / "home:NAME".
     case dualInsurance
+    /// Phase 67D (B2): Q4b purchase date. Renders a DatePicker (.date
+    /// style) with optional Skip secondary button. `customText`
+    /// carries the ISO date string ("yyyy-MM-dd") so resilient
+    /// JSONB decoding doesn't fight a Date-typed field.
+    case dateOnly
+    /// Phase 67D (B3): Q9b recent renovations. Multi-select chips with
+    /// inline year pickers per selected option. `selectedIds` carries
+    /// the renovation type ids (roof_replaced, kitchen_renovated, …);
+    /// `customEntries` carries "type:year" pipe-delimited entries
+    /// (e.g. "roof_replaced:2019") so the mapper can push
+    /// `last_replaced_date` to matching home_systems.
+    case renovationsMultiSelect
 }
 
 /// One question in the House Quiz library. The library lives in

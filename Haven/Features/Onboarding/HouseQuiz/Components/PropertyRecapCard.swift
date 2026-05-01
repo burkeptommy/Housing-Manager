@@ -19,11 +19,22 @@ struct PropertyRecapCard: View {
 
     /// Phase 60.1: Identifiable so `.sheet(item:)` can route edits to the
     /// right editor without losing state between presentations.
+    ///
+    /// Phase 67D (B1): Extended with `bedrooms`, `bathrooms`, `lotSize`,
+    /// `purchaseDate` to round out the ATTOM data surface. Each new row
+    /// reads from `property.attributes` (JSONB) or the dedicated column,
+    /// and the edit sheet writes through `PropertyUpdate`. Q4 and Q5
+    /// were removed from the quiz in `0367137f`, so purchase price +
+    /// purchase date both live here now.
     enum PropertyEditField: String, Identifiable {
         case yearBuilt
         case squareFootage
         case purchasePrice
         case estimatedValue
+        case bedrooms
+        case bathrooms
+        case lotSize
+        case purchaseDate
 
         var id: String { rawValue }
     }
@@ -185,9 +196,30 @@ struct PropertyRecapCard: View {
             )
             factRow(
                 label: "Square footage",
-                value: property.squareFootage.map { "\($0.formatted()) sqft" } ?? "Not on file",
+                value: property.squareFootage.map { "\(Int($0).formatted()) sqft" } ?? "Not on file",
                 accent: property.squareFootage == nil ? .missing : .normal,
                 field: .squareFootage
+            )
+            // Phase 67D (B1): bedrooms / bathrooms / lot size from
+            // `attributes` JSONB. ATTOM stamps these at property
+            // creation; user taps to correct any field.
+            factRow(
+                label: "Bedrooms",
+                value: bedroomsDisplay,
+                accent: bedroomsValue == nil ? .missing : .normal,
+                field: .bedrooms
+            )
+            factRow(
+                label: "Bathrooms",
+                value: bathroomsDisplay,
+                accent: bathroomsValue == nil ? .missing : .normal,
+                field: .bathrooms
+            )
+            factRow(
+                label: "Lot size",
+                value: lotSizeDisplay,
+                accent: lotSizeValue == nil ? .missing : .normal,
+                field: .lotSize
             )
             factRow(
                 label: "Purchase price",
@@ -195,7 +227,88 @@ struct PropertyRecapCard: View {
                 accent: purchasePriceAccent,
                 field: .purchasePrice
             )
+            // Phase 67D (B1): Q4/Q5 dropped from quiz (commit 0367137f);
+            // purchase date now lives here so years-owned analytics
+            // still has a source. ATTOM stamps `last_sale_date` at
+            // creation; user can correct or fill via tap.
+            factRow(
+                label: "Purchased on",
+                value: purchaseDateDisplay,
+                accent: property.purchaseDate == nil ? .missing : .normal,
+                field: .purchaseDate
+            )
         }
+    }
+
+    private var purchaseDateDisplay: String {
+        // PropertyRow.purchaseDate is String? (ISO yyyy-MM-dd) per
+        // DatabaseModels. Parse and re-format to "MMM d, yyyy" for the
+        // recap card display. Falls back gracefully if parsing fails.
+        guard let raw = property.purchaseDate else { return "Not on file" }
+        if let parsed = Self.isoDateFormatter.date(from: raw) {
+            return Self.displayDateFormatter.string(from: parsed)
+        }
+        return raw  // best-effort fallback for non-ISO strings
+    }
+
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    private static let displayDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
+    // MARK: - Phase 67D (B1): attribute-backed fact accessors
+
+    private var bedroomsValue: Int? {
+        guard let raw = property.attributes?["bedrooms"]?.stringValue,
+              let count = Int(raw) else { return nil }
+        return count
+    }
+
+    private var bedroomsDisplay: String {
+        guard let count = bedroomsValue else { return "Not on file" }
+        return count == 1 ? "1 bedroom" : "\(count) bedrooms"
+    }
+
+    private var bathroomsValue: Double? {
+        guard let raw = property.attributes?["bathrooms"]?.stringValue,
+              let count = Double(raw) else { return nil }
+        return count
+    }
+
+    private var bathroomsDisplay: String {
+        guard let count = bathroomsValue else { return "Not on file" }
+        let formatter = NumberFormatter()
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        let str = formatter.string(from: NSNumber(value: count)) ?? "\(count)"
+        return count == 1 ? "1 bathroom" : "\(str) bathrooms"
+    }
+
+    private var lotSizeValue: Double? {
+        guard let raw = property.attributes?["lot_size"]?.stringValue,
+              let size = Double(raw) else { return nil }
+        return size
+    }
+
+    private var lotSizeDisplay: String {
+        guard let size = lotSizeValue else { return "Not on file" }
+        // ATTOM lot_size is in square feet — show acreage when > 0.5
+        // acres (21,780 sqft) since acres reads more naturally for
+        // suburban/HNW lots.
+        if size > 21_780 {
+            let acres = size / 43_560
+            return String(format: "%.2f acres", acres)
+        }
+        return "\(Int(size).formatted()) sqft"
     }
 
     private var purchasePriceDisplay: String {

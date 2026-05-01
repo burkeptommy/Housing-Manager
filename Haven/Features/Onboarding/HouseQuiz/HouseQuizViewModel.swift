@@ -336,6 +336,24 @@ final class HouseQuizViewModel: ObservableObject {
         Haptics.light()
     }
 
+    /// Phase 67D (B1): bump the meter when the user confirms the ATTOM
+    /// recap card. The "we already know your home" trust moment earns
+    /// 5% of the home's estimated value as "Property baseline confirmed."
+    /// Fires once per recap confirm; subsequent confirms (e.g. when a
+    /// user back-navigates to the recap and re-confirms) are idempotent
+    /// via `recapConfirmedDidAccrete` — we never double-count.
+    func accreteAttomConfirmation() {
+        guard !recapConfirmedDidAccrete else { return }
+        recapConfirmedDidAccrete = true
+        let baseline = (property.currentEstimatedValue ?? 500_000) * 0.05
+        protectedValue += baseline
+        Haptics.light()
+    }
+
+    /// Phase 67D (B1): one-shot guard so `accreteAttomConfirmation()`
+    /// can't double-count if the user re-enters the recap surface.
+    @Published private(set) var recapConfirmedDidAccrete: Bool = false
+
     private let mapper: HouseQuizAnswerMapper
     private let db = DatabaseService.shared
 
