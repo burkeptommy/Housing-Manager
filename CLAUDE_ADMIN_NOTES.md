@@ -2,7 +2,7 @@
 
 Generated from `admin_codex_notes` where target IN ('claude','both'). When a new Claude session opens, scan this file before doing anything else.
 
-**Synced:** 2026-05-01T01:55:17.651Z
+**Synced:** 2026-05-01T02:10:33.878Z
 **Pending:** 11 change requests · **Open questions:** 0 · **Feedback:** 43 · **Applied (last 30d):** 147
 
 Reading order: 1. Questions for Claude. 2. Pending Changes. 3. Open Feedback (by entity). 4. Recently Applied (audit).
