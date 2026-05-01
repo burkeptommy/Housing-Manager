@@ -4020,46 +4020,97 @@ function computeCoverageAudit() {
     }
   }
 
-  // -- Finding 2: quiz questions that don't drive anything. Heuristic —
-  //    look for questions whose status is cut/defer or whose answers
-  //    don't appear in any template's _impact.gated_by list.
+  // -- Finding 2: quiz questions that don't drive anything.
+  //
+  // Phase 5z+23 — Tom: "we need to make sure we dont have false
+  // positives since this is a huge part of our application." Eight
+  // wiring signals checked per question. A question must trip ZERO
+  // signals to flag as adrift.
   const questions = (state.liveData["quiz-questions"]?.entries) || [];
-  // Gather all subtype tokens referenced by any template gate so we
-  // can check question coverage.
   const referencedSubtypes = new Set();
   for (const t of templates) {
     for (const s of t.requiredSubtypes || []) referencedSubtypes.add(s);
   }
+  // Standard kinds — anything outside this set is a custom-wired
+  // SwiftUI body that by definition has its own UI plumbing.
+  const STANDARD_QUIZ_KINDS = new Set([
+    "singleChoice", "multiSelect", "currency", "slider", "yesNo",
+  ]);
+  // Kinds that always have downstream wiring (system creation, vendor
+  // capture, vehicle add, etc.) — kept as a friendlier label set.
+  const drivenKinds = new Set([
+    "vehicleAdd", "vehicleCount", "yesNoLender", "providerSearch",
+    "caretakers", "generatorAdd", "householdContractors",
+  ]);
+  // Allowlist for questions whose wiring lives in
+  // HouseQuizAnswerMapper.swift (property-attribute stamps that
+  // gate templates indirectly). These are wired but the wiring
+  // doesn't surface in the JSON snapshot. Audit the snapshot
+  // exporter to add stamps_attributes to _impact and this allowlist
+  // can shrink.
+  const KNOWN_WIRED_QUESTIONS = new Set([
+    "q6_water_source",     // sets property.water_source
+    "q7_sewer_septic",     // sets property.sewer_septic; gates Septic templates
+    "q8_water_heater",     // sets property.water_heater_type
+    "q9_basement",         // sets property.basement attributes
+    "q20_other_fuels",     // sets property fuel inventory
+    "q30_priorities",      // ranks home-care priorities; drives recommendation order
+    "q36_diy_vs_vendor",   // sets vendor preference tier (drives reconciler routing!)
+  ]);
+
   for (const q of questions) {
     const id = q.questionId || q.id;
     if (!id) continue;
-    // Skip questions explicitly marked cut/defer — Tom already knows.
     const status = (q.status || "").toLowerCase();
     if (["cut", "defer", "reshape"].includes(status)) continue;
-    // Heuristic: a question is "wired" if any of its answer ids OR
-    // its questionId appears in the referencedSubtypes set, OR if it
-    // creates a system / contractor (Q15b style — flagged via
-    // `creates_system` / `creates_contractor` metadata if present).
+
     const wires = new Set();
+    // Signal 1: the question id appears in a template's requiredSubtypes.
     if (referencedSubtypes.has(id)) wires.add("template-gate-self");
+    // Signal 2: an answer id appears in a template's requiredSubtypes.
     for (const a of q.options || q.answerOptions || []) {
       const aid = a.id || a.value;
       if (aid && referencedSubtypes.has(aid)) wires.add("template-gate-answer");
       if (aid && referencedSubtypes.has(`${id}_${aid}`)) wires.add("template-gate-composite");
     }
+    // Signal 3: the snapshot's _impact block knows about creates /
+    // unlocks / gates relationships. Phase 5z+23 — Tom's q1_roof_material
+    // example has _impact.creates_systems: ["Roofing"] but the old
+    // heuristic ignored _impact entirely. False-positive root cause.
+    const impact = q._impact || {};
+    if ((impact.creates_systems || []).length > 0) wires.add("creates-system");
+    if ((impact.unlocks_templates || []).length > 0) wires.add("unlocks-templates");
+    if ((impact.gates_questions || []).length > 0) wires.add("gates-questions");
+    // Signal 4: legacy creates_* flags (older exporter format).
     if (q.creates_system || q.creates_contractor || q.creates_routine) wires.add("creates-entity");
-    // Some questions clearly drive UI-level branches (skip rules,
-    // dynamic visibility, etc.) — heuristically count "yesNoLender"
-    // / "vehicleAdd" / "providerSearch" / "caretakers" kinds as wired.
-    const drivenKinds = new Set(["vehicleAdd", "vehicleCount", "yesNoLender", "providerSearch", "caretakers", "generatorAdd", "householdContractors"]);
+    // Signal 5: provider picker. providerTypes set OR
+    // providerFollowUpAnswerIds non-empty means the question creates
+    // / links a provider entity.
+    if ((q.providerTypes || []).length > 0) wires.add("provider-picker");
+    if ((q.providerFollowUpAnswerIds || []).length > 0) wires.add("provider-followup");
+    // Signal 6: document upload escape hatch. The question lets the
+    // homeowner skip + upload a doc; the analyze-document edge
+    // function picks up the answer downstream.
+    if (q.documentUploadCategory) wires.add("doc-upload");
+    // Signal 7: dynamic skip rule means this question's answers feed
+    // visibility logic for OTHER questions.
+    if (q.dynamicSkip) wires.add("dynamic-skip");
+    // Signal 8: kind-based wiring. Custom kinds (not in the standard
+    // set) are by definition custom-wired SwiftUI bodies.
     if (drivenKinds.has(q.kind)) wires.add("kind-driven");
+    if (q.kind && !STANDARD_QUIZ_KINDS.has(q.kind) && !drivenKinds.has(q.kind)) {
+      wires.add("custom-kind");
+    }
+    // Signal 9: explicit allowlist for known-wired questions.
+    if (KNOWN_WIRED_QUESTIONS.has(id)) wires.add("known-wired");
+
     if (wires.size === 0) {
       findings.quizUnwired.push({
         questionId: id,
         title: q.title || q.prompt || q.text || id,
         chapter: q.chapter || q.section || "",
         kind: q.kind || "",
-        reason: "We can't trace this question to anything downstream — no template gates on its answers, it doesn't create a system or vendor, and its kind doesn't drive a known UI branch.",
+        reason: "We can't trace this question to anything downstream — no template gates on its answers, no system / vendor / template wiring in the JSON snapshot, and its kind isn't custom-wired. This is genuinely adrift.",
       });
     }
   }
