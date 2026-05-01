@@ -458,6 +458,37 @@ enum HouseQuizQuestionLibrary {
                 // supplier captured inline on Q22.
                 AnswerOption(id: "hardscape", label: "Hardscape / masonry", icon: "square.grid.2x2.fill"),
                 AnswerOption(id: "generator_service", label: "Generator service", icon: "bolt.batteryblock.fill"),
+                // Phase 67I (admin notes 87ecf7bc / cac81a51 / cce8f021 /
+                // b39ad52e / 1b9b1d37 / 53e515f4 / d16df828 / fa8a33fa):
+                // pool service vendor chip — visible only when Q12 said
+                // pool/spa/hot_tub. Pools and hot tubs always need a
+                // weekly chemistry + filter / pump pro, distinct from a
+                // house cleaner. Mapped to "Pool/Spa" category so any
+                // pool/hot tub maintenance template auto-routes to the
+                // captured contractor at task creation time.
+                AnswerOption(id: "pool_service", label: "Pool service", icon: "drop.triangle.fill"),
+                // Phase 67I (admin notes d0a87c83 / 93651914): solar
+                // vendor chip — visible only when Q21 confirmed solar.
+                // Solar panel cleaning + inspection always need a solar
+                // contractor (different trade from electrician). Mapped
+                // to "Solar" category so the existing Solar templates
+                // route to the captured vendor.
+                AnswerOption(id: "solar_service", label: "Solar service", icon: "sun.max.fill"),
+                // Phase 67I (admin note 0e765ead): security vendor chip —
+                // visible only when Q15 said yes. ADT / SimpliSafe /
+                // Vivint live in `utility_providers` already; this chip
+                // captures the post-monitor company so the annual
+                // security system check task routes to the right pro.
+                AnswerOption(id: "security_service", label: "Security / alarm pro", icon: "shield.lefthalf.filled"),
+                // Phase 67I (admin notes 7ebdac1a / 56c707eb / aa555568):
+                // waterproofing & basement vendor chip — universally
+                // visible because mold / cracks / vapor barrier issues
+                // can show up in any home with a basement or crawl
+                // space. Mapped to "Crawl Space" via the canonical
+                // category aliases so the existing Crawl Space
+                // templates auto-route. Examples: American Dry
+                // Basements, Connecticut Basement Systems.
+                AnswerOption(id: "waterproofing", label: "Waterproofing & basement", icon: "drop.fill"),
             ],
             dynamicSkip: { _ in false }  // never skip — empty answers are allowed
         ),

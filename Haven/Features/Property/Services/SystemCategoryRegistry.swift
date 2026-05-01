@@ -370,6 +370,32 @@ enum SystemCategoryRegistry {
             "pet waste removal":      "Pet Waste",
             "dog waste":              "Pet Waste",
             "dog poop":               "Pet Waste",
+            // Phase 67I: pool extra aliases (pool / pool service / spa
+            // already mapped above; just fill in the gaps).
+            "pool company":           "Pool/Spa",
+            "pool maintenance":       "Pool/Spa",
+            // Phase 67I: solar aliases.
+            "solar service":          "Solar",
+            "solar company":          "Solar",
+            "solar panels":           "Solar",
+            "solar pv":               "Solar",
+            // Phase 67I: security aliases (security already mapped
+            // above to "Security System"; just fill in the gaps).
+            "security service":       "Security System",
+            "alarm":                  "Security System",
+            "alarm company":          "Security System",
+            "alarm monitoring":       "Security System",
+            // Phase 67I: waterproofing aliases. Crawl Space templates
+            // (foundation cracks, mold, vapor barrier) are what these
+            // contractors actually service. Registry key is
+            // "Crawl Space" so the alias collapses every variant.
+            "waterproofing":          "Crawl Space",
+            "basement waterproofing": "Crawl Space",
+            "waterproofing & basement": "Crawl Space",
+            "waterproofing and basement": "Crawl Space",
+            "basement systems":       "Crawl Space",
+            "foundation":             "Crawl Space",
+            "foundation repair":      "Crawl Space",
         ]
         if let mapped = variantMap[lower] {
             return mapped

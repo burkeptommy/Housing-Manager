@@ -1813,6 +1813,20 @@ final class HouseQuizAnswerMapper {
         case "snow_removal":       return "Snow Removal"
         case "mosquito_tick":      return "Mosquito & Tick"
         case "pet_waste":          return "Pet Waste"
+        // Phase 67I new chips: pool / solar / security / waterproofing.
+        // Each mirrors the captured contractor with a category that
+        // matches existing template + system rows so the reconciler
+        // auto-links them at task creation time.
+        case "pool_service":       return "Pool/Spa"
+        case "solar_service":      return "Solar"
+        case "security_service":   return "Security System"
+        // Waterproofing maps to "Crawl Space" — the only category in the
+        // registry whose templates (foundation cracks, mold, vapor
+        // barrier) match what a basement / waterproofing contractor
+        // actually services. SystemCategoryRegistry aliases route
+        // verbose contractor labels ("Waterproofing & Basement",
+        // "Basement Waterproofing") onto the same canonical key.
+        case "waterproofing":      return "Crawl Space"
         default:                   return nil
         }
     }

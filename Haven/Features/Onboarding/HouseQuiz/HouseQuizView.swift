@@ -3486,6 +3486,36 @@ struct HouseQuizView: View {
                 // offer a generator-service vendor later.
                 let q22 = viewModel.state.answers["q22_generator"]?.answerId
                 return q22 != nil && q22 != "none"
+            case "pool_service":
+                // Phase 67I: pool service chip surfaces only when Q12
+                // confirmed a pool, hot tub, or both. Q12 lives in
+                // section 3 (before Q15b on the default order) so the
+                // answer is reliable on the first pass.
+                let q12 = answers["q12_pool"]?.answerId
+                return q12 != nil && q12 != "none"
+            case "solar_service":
+                // Phase 67I: solar vendor chip only when Q21 captured an
+                // owned or leased solar system. Q21 lives in section 5
+                // (after Q15b on the default order); hide on first
+                // pass and rely on post-Q21 flows to offer a solar
+                // vendor later. On resumed quizzes the answer is set
+                // and the chip surfaces.
+                let q21 = answers["q21_solar"]?.answerId
+                return q21 == "yes_owned" || q21 == "yes_leased"
+            case "security_service":
+                // Phase 67I: security vendor chip only when Q15 confirms
+                // a system (monitored / self_monitored / cameras_only).
+                // Q15 lives just before Q15b in section 3 so the
+                // answer is always available. Hide for "none" and
+                // "prefer_not_to_answer".
+                let q15 = answers["q15_security"]?.answerId
+                return q15 == "monitored" || q15 == "self_monitored" || q15 == "cameras_only"
+            case "waterproofing":
+                // Phase 67I: waterproofing & basement chip surfaces for
+                // every household. Mold / cracks / vapor-barrier
+                // concerns can show up in any home regardless of
+                // whether the quiz captured a basement on Q9.
+                return true
             default:
                 return true
             }
