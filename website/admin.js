@@ -4833,7 +4833,20 @@ function auditRecommendationFor(finding) {
       </div>
     `;
 
-    // Action set + recommended primary depend on the decisive pick.
+    // Phase 5z+22 — Tom: "if its giving me a recommendation to edit
+    // the task — dont tell me to manually go do it. claude should
+    // just take this one and put a change request in with a button
+    // click that I enter."
+    //
+    // For "edit" picks we now render a "Draft this fix" primary
+    // button that writes the change-request note for Tom. Mechanical
+    // fixes (em-dash, Professional-X) ship with a structured
+    // proposed_diff the voice-fix script auto-applies. Rewrite picks
+    // (vague title, thin description) ship a regular change_request
+    // note describing what to change — Claude rewrites manually.
+    //
+    // The "Open to edit manually" option stays as a secondary so
+    // power users can still hand-edit if they want.
     const actions = [];
     const whatHappens = [];
     if (pick.action === "approve") {
@@ -4841,13 +4854,21 @@ function auditRecommendationFor(finding) {
       actions.push({ id: "review-open", label: "Open to edit" });
       actions.push({ id: "review-cut", label: "Cut it from the catalog", danger: true });
       whatHappens.push(`<strong>Looks good — lock it in:</strong> stops showing up in your audit list. Every new homeowner still gets it on their schedule. Nothing changes for them.`);
-      whatHappens.push(`<strong>Open to edit:</strong> jumps to the Tasks tab so you can tweak wording / frequency / cost / who handles it.`);
+      whatHappens.push(`<strong>Open to edit:</strong> jumps to the Tasks tab so you can tweak wording / frequency / cost / who handles it yourself.`);
       whatHappens.push(`<strong>Cut it from the catalog:</strong> new homeowners won't see it. Existing homeowners keep it on their schedule until they complete or archive it themselves.`);
     } else if (pick.action === "edit") {
-      actions.push({ id: "review-open", label: "Open to edit", primary: true });
+      const isMechanical = pick.fix?.kind === "mechanical";
+      const fixLabel = isMechanical ? "Apply Claude's fix" : "Draft this fix for Claude";
+      actions.push({ id: "review-draft-fix", label: fixLabel, primary: true });
+      actions.push({ id: "review-open", label: "Open to edit manually" });
       actions.push({ id: "review-approve", label: "Lock as-is anyway" });
       actions.push({ id: "review-cut", label: "Cut it from the catalog", danger: true });
-      whatHappens.push(`<strong>Open to edit:</strong> jumps to the Tasks tab so you can fix the title / fill in the description / adjust whatever's off.`);
+      if (isMechanical) {
+        whatHappens.push(`<strong>${escapeHtml(fixLabel)}:</strong> Claude writes a structured note with the exact before/after below. The voice-fix script applies it on the next code session — no manual editing required.`);
+      } else {
+        whatHappens.push(`<strong>${escapeHtml(fixLabel)}:</strong> Claude writes a change-request note describing what needs to change (no specific replacement text — Claude picks the wording on the next session). You don't have to hand-edit anything.`);
+      }
+      whatHappens.push(`<strong>Open to edit manually:</strong> jumps to the Tasks tab so you can rewrite it yourself if you'd rather pick the exact wording.`);
       whatHappens.push(`<strong>Lock as-is anyway:</strong> approves the current wording and stops showing it here. Use this if you disagree with the recommendation.`);
       whatHappens.push(`<strong>Cut it from the catalog:</strong> removes it entirely. New homeowners won't see it.`);
     } else {
@@ -4867,9 +4888,40 @@ function auditRecommendationFor(finding) {
         }))
       : [];
 
+    // Phase 5z+22 — Append the suggested before/after preview to the
+    // context block when we have a mechanical fix. Tom can see the
+    // rewrite before clicking Apply.
+    let contextWithFix = contextHtml;
+    if (pick.fix?.kind === "mechanical") {
+      contextWithFix += `
+        <div class="admin-decision-focused__lint">
+          <div class="admin-decision-focused__lint-block">
+            <strong>${escapeHtml(pick.fix.field)} — current</strong>
+            <pre>${escapeHtml(pick.fix.from || "")}</pre>
+          </div>
+          <div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--suggested">
+            <strong>${escapeHtml(pick.fix.field)} — Claude's fix</strong>
+            <pre>${escapeHtml(pick.fix.to || "")}</pre>
+          </div>
+        </div>
+      `;
+    } else if (pick.fix?.kind === "rewrite") {
+      contextWithFix += `
+        <div class="admin-decision-focused__lint">
+          <div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--rewrite">
+            <strong>What Claude will do</strong>
+            <p>${escapeHtml(pick.fix.instruction || "Rewrite this on the next session.")}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // Stash the pick on the finding so the action handler can read it.
+    finding.data._pick = pick;
+
     return {
       recommendation: pick.recommendation,
-      contextHtml,
+      contextHtml: contextWithFix,
       whatHappens,
       actions: [...actions, ...substituteActions],
     };
@@ -4882,20 +4934,23 @@ function auditRecommendationFor(finding) {
   };
 }
 
-// Phase 5z+21 — Pick a specific action (approve / edit / cut) for a
-// "needs review" finding based on content quality + value tier. Tom's
-// frustration: the old "skim carefully before locking" line was an
-// instruction, not a decision. Now the recommendation reads as "do
-// this exact thing." Heuristic order:
+// Phase 5z+21/+22 — Pick a specific action (approve / edit / cut) for
+// a "needs review" finding based on content quality + value tier.
+// Each "edit" pick also carries a `fix` payload describing exactly
+// what should change — mechanical (suggested before/after we can
+// preview) or rewrite (Claude does it on the next session). The
+// focused panel reads `fix` and renders a one-click "Draft this fix"
+// button so Tom doesn't have to manually edit.
 //
-//   safety floor          → approve  (always keep)
-//   bundle parent          → approve  (already vetted as a visit)
-//   value tier = low       → cut       (filler — not pulling weight)
-//   description missing or
-//     <40 chars            → edit      (homeowner sees just a title)
-//   title has voice issues → edit      (em-dash, "Professional X")
-//   title too short / vague → edit
-//   else                    → approve   (content is fine as-is)
+// Heuristic order:
+//   safety floor              → approve
+//   bundle parent             → approve
+//   value tier = low          → cut
+//   description missing/<40   → edit (rewrite — Claude writes)
+//   em-dash in copy           → edit (mechanical — voice fix)
+//   "Professional X" title    → edit (mechanical — rename)
+//   title <8 chars OR 1 word  → edit (rewrite — Claude rewrites)
+//   else                      → approve
 function decisivePickFor(item, value) {
   const t = item.payload || {};
   const title = (item.title || "").trim();
@@ -4904,48 +4959,95 @@ function decisivePickFor(item, value) {
   if (t.safetyFloor === true) {
     return {
       action: "approve",
+      fix: null,
       recommendation: `Safety-required work — homeowners can't safely DIY this. Lock it in. The wording is fine; the audit's just flagging it because it's not yet marked approved.`,
     };
   }
   if (t.bundleTitle) {
     return {
       action: "approve",
+      fix: null,
       recommendation: `This is a seasonal visit that bundles several individual tasks together. Bundle parents are already vetted by the time they ship. Lock it in.`,
     };
   }
   if (value?.tier === "low") {
     return {
       action: "cut",
+      fix: null,
       recommendation: `Low-value chore most HNW homeowners would forget without missing. ${value.reasoning ? value.reasoning.split(".")[0] + "." : ""} Cut it — open the slot for a higher-value HNW service.`,
     };
   }
   if (!description || description.length < 40) {
     return {
       action: "edit",
-      recommendation: `Description is ${description ? "thin" : "missing"}. Every homeowner sees just the title — that's not enough context for them to act on. Open to edit and write a sentence or two: what they actually do, what equipment they need, what "good" looks like.`,
+      fix: {
+        kind: "rewrite",
+        field: "description",
+        currentValue: description || null,
+        instruction: `Write a sentence or two describing exactly what gets done, what equipment is needed, and what "good" looks like. The current description is ${description ? `${description.length} chars — too thin` : "empty"}.`,
+      },
+      recommendation: `Description is ${description ? "thin" : "missing"}. Every homeowner sees just the title — that's not enough context for them to act on. Click below to draft a "fill in the description" change request.`,
     };
   }
+  // Em-dash → mechanical fix (period replacement).
   if (/—/.test(title) || /—/.test(description)) {
+    const target = /—/.test(title) ? "title" : "description";
+    const current = target === "title" ? title : description;
+    const fixed = current.replace(/\s+—\s+/g, ". ").replace(/—/g, ", ")
+      .replace(/\.\s+([a-z])/g, (_, c) => `. ${c.toUpperCase()}`)
+      .replace(/\s\s+/g, " ").trim();
     return {
       action: "edit",
-      recommendation: `Wording uses an em-dash (—) which reads as AI-generated to HNW homeowners. Open to edit and replace with a period or comma.`,
+      fix: {
+        kind: "mechanical",
+        rule: "no-em-dash",
+        field: target,
+        from: current,
+        to: fixed,
+        currentValue: current,
+        suggestedValue: fixed,
+      },
+      recommendation: `${target === "title" ? "Title" : "Description"} uses an em-dash (—), which reads as AI-generated to HNW homeowners. Click below to apply Claude's voice fix in one shot.`,
     };
   }
+  // "Professional X" → mechanical rename to "Annual X".
   if (/^Professional\s+/i.test(title)) {
+    const fixed = title.replace(/^Professional\s+/i, "Annual ");
     return {
       action: "edit",
-      recommendation: `Title starts with "Professional X" — Haven's voice rule says use "Annual X" instead. Open to edit and rename.`,
+      fix: {
+        kind: "mechanical",
+        rule: "no-professional-x-titles",
+        field: "title",
+        from: title,
+        to: fixed,
+        currentValue: title,
+        suggestedValue: fixed,
+      },
+      recommendation: `Title starts with "Professional X" — Haven's voice rule says use "Annual X" instead. Click below to rename in one shot.`,
     };
   }
-  if (title.length < 12 || title.split(/\s+/).length < 3) {
+  // Phase 5z+22 — Tom: "Bleed Radiators" is FINE — 2-word action-
+  // first titles read cleanly. Loosened from <12 chars / <3 words
+  // to <8 chars / <2 words. Catches genuinely-vague titles like
+  // "Boiler" or "Inspection" without false-positiving on tight
+  // verb-noun pairs.
+  if (title.length < 8 || title.split(/\s+/).length < 2) {
     return {
       action: "edit",
-      recommendation: `Title is short / vague. Open to edit and make it action-first ("Tune up the boiler" reads better than "Boiler service").`,
+      fix: {
+        kind: "rewrite",
+        field: "title",
+        currentValue: title,
+        instruction: `Rewrite the title to be action-first (verb + noun, e.g. "Tune up the boiler", "Inspect attic insulation"). Current title is too short to read clearly on a homeowner's task list.`,
+      },
+      recommendation: `Title is too short to scan cleanly on a task list. Click below to draft a "rewrite the title to be action-first" change request.`,
     };
   }
   // Default — content looks solid.
   return {
     action: "approve",
+    fix: null,
     recommendation: `This looks good as-is. Title is sharp, description is specific, frequency + assignment are set. Lock it in so it stops showing up in your audit list.`,
   };
 }
@@ -5257,6 +5359,74 @@ async function handleFocusedAuditAction(finding, action) {
       state.selected = data.targetItem;
       render();
     }
+    return;
+  }
+  if (action === "review-draft-fix") {
+    // Phase 5z+22 — One-click "draft this fix" from the focused
+    // audit panel. Mechanical fixes write a structured voice_fix
+    // note (apply-voice-fixes script handles it). Rewrite picks
+    // write a regular change_request describing what to change.
+    const pick = data._pick;
+    const item = data.targetItem;
+    if (!pick || !pick.fix || !item) {
+      alert("No fix payload — can't draft this automatically.");
+      return;
+    }
+    const fix = pick.fix;
+    if (fix.kind === "mechanical") {
+      const body = `Apply voice fix:\n\nRule: ${fix.rule || "voice"}\nField: ${fix.field}\nBefore: ${fix.from}\nAfter: ${fix.to}\n\n(Drafted from the Audit tab → Needs review → Apply Claude's fix.)`;
+      await writeNote({
+        scopeType: item.itemType,
+        scopeId: liveEntityIdFor(item),
+        scopeTitle: item.title,
+        body,
+        intent: "change_request",
+        target: "claude",
+        proposedDiff: {
+          kind: "voice_fix",
+          rule: fix.rule || "voice",
+          field: fix.field,
+          from: fix.from,
+          to: fix.to,
+        },
+        snapshot: {
+          itemType: item.itemType,
+          payload: item.payload,
+          source: "audit_focused_panel_mechanical_fix",
+          capturedAt: new Date().toISOString(),
+        },
+      });
+      state.selectedAudit = null;
+      alert(`Voice fix drafted as a note. Claude will apply it on the next session.\n\nBefore: ${fix.from}\nAfter:  ${fix.to}`);
+      render();
+      return;
+    }
+    // Rewrite kind — describe what to change without a specific
+    // before/after.
+    const body = `Rewrite this entity to comply with audit feedback:\n\nField: ${fix.field}\nCurrent value: ${fix.currentValue || "(empty)"}\n\nWhat needs to change: ${fix.instruction}\n\n(Drafted from the Audit tab → Needs review → Draft this fix.)`;
+    await writeNote({
+      scopeType: item.itemType,
+      scopeId: liveEntityIdFor(item),
+      scopeTitle: item.title,
+      body,
+      intent: "change_request",
+      target: "claude",
+      proposedDiff: {
+        kind: "audit_rewrite",
+        field: fix.field,
+        currentValue: fix.currentValue,
+        instruction: fix.instruction,
+      },
+      snapshot: {
+        itemType: item.itemType,
+        payload: item.payload,
+        source: "audit_focused_panel_rewrite",
+        capturedAt: new Date().toISOString(),
+      },
+    });
+    state.selectedAudit = null;
+    alert(`Rewrite request drafted as a note. Claude will pick the right wording on the next session.\n\nField: ${fix.field}\nCurrent: ${fix.currentValue || "(empty)"}`);
+    render();
     return;
   }
   if (action?.startsWith("review-substitute-")) {
