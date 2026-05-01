@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-30T19:42:09.300Z",
+  "generatedAt": "2026-05-01T01:55:16.845Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift",
-  "sourceCommit": "693691c7",
+  "sourceCommit": "31c8e12a",
   "count": 28,
   "entries": [
     {
@@ -84,7 +84,7 @@
       "chapter": "yourHome",
       "title": "What's your exterior siding?",
       "fallbackTitle": null,
-      "subtitle": "Pick all that apply — many homes mix two or three materials.",
+      "subtitle": "Pick all that apply. Many homes mix two or three materials.",
       "kind": "multiSelect",
       "answerOptions": [
         {
@@ -143,15 +143,7 @@
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "subtitle",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "Pick all that apply — many homes mix two or three materials."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -499,6 +491,104 @@
       "_recommendation": null
     },
     {
+      "id": "q9b_renovations",
+      "section": "inside",
+      "chapter": "yourHome",
+      "title": "Any major renovations in the last 10 years?",
+      "fallbackTitle": null,
+      "subtitle": "Pick anything you've done — we'll remember the year so the maintenance schedule reflects it.",
+      "kind": "renovationsMultiSelect",
+      "answerOptions": [
+        {
+          "id": "roof_replaced",
+          "label": "Roof replaced",
+          "icon": "house.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "kitchen_renovated",
+          "label": "Kitchen renovated",
+          "icon": "fork.knife",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "bathroom_renovated",
+          "label": "Bathroom(s) renovated",
+          "icon": "shower.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "hvac_replaced",
+          "label": "HVAC replaced",
+          "icon": "fan",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "water_heater_replaced",
+          "label": "Water heater replaced",
+          "icon": "drop.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "windows_replaced",
+          "label": "Windows replaced",
+          "icon": "rectangle.split.2x1",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "siding_replaced",
+          "label": "Siding replaced",
+          "icon": "house.lodge",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "addition_structural",
+          "label": "Addition or structural work",
+          "icon": "building.2",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "solar_added",
+          "label": "Solar panels added",
+          "icon": "sun.max.fill",
+          "acceptsCustomInput": false
+        },
+        {
+          "id": "none",
+          "label": "None",
+          "icon": "minus.circle",
+          "acceptsCustomInput": false
+        }
+      ],
+      "documentUploadCategory": null,
+      "providerFollowUpAnswerIds": [],
+      "providerTypes": [],
+      "dynamicProviderTypes": null,
+      "dynamicSkip": null,
+      "supportsSelectAll": false,
+      "providerSearchPlaceholder": null,
+      "sliderMin": 1,
+      "sliderMax": 10,
+      "sliderLeftLabel": null,
+      "sliderRightLabel": null,
+      "_sourceLine": 269,
+      "_impact": {
+        "creates_systems": [],
+        "unlocks_templates": [],
+        "gates_questions": []
+      },
+      "_lint": [
+        {
+          "ruleId": "no-em-dash",
+          "field": "subtitle",
+          "severity": "error",
+          "message": "No em dashes — read as AI-generated to HNW audience",
+          "snippet": "Pick anything you've done — we'll remember the year so the maintenance schedu..."
+        }
+      ],
+      "_recommendation": null
+    },
+    {
       "id": "q10_appliances",
       "section": "inside",
       "chapter": "yourHome",
@@ -579,7 +669,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 264,
+      "_sourceLine": 288,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -643,7 +733,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 297,
+      "_sourceLine": 321,
       "_impact": {
         "creates_systems": [
           "Landscaping"
@@ -712,7 +802,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 318,
+      "_sourceLine": 342,
       "_impact": {
         "creates_systems": [
           "Pool/Spa",
@@ -774,7 +864,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 334,
+      "_sourceLine": 358,
       "_impact": {
         "creates_systems": [
           "Pest Control"
@@ -829,7 +919,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 359,
+      "_sourceLine": 383,
       "_impact": {
         "creates_systems": [
           "Irrigation"
@@ -846,7 +936,7 @@
       "chapter": "yourPros",
       "title": "Security or alarm system?",
       "fallbackTitle": null,
-      "subtitle": "We won't share specifics — your setup stays private to you and any household members you invite.",
+      "subtitle": "We won't share specifics. Your setup stays private to you and any household members you invite.",
       "kind": "singleChoice",
       "answerOptions": [
         {
@@ -895,7 +985,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 378,
+      "_sourceLine": 402,
       "_impact": {
         "creates_systems": [
           "Security System"
@@ -903,15 +993,7 @@
         "unlocks_templates": [],
         "gates_questions": []
       },
-      "_lint": [
-        {
-          "ruleId": "no-em-dash",
-          "field": "subtitle",
-          "severity": "error",
-          "message": "No em dashes — read as AI-generated to HNW audience",
-          "snippet": "We won't share specifics — your setup stays private to you and any household ..."
-        }
-      ],
+      "_lint": [],
       "_recommendation": null
     },
     {
@@ -1025,7 +1107,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 402,
+      "_sourceLine": 426,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1056,7 +1138,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 445,
+      "_sourceLine": 469,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1087,7 +1169,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 453,
+      "_sourceLine": 477,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1139,7 +1221,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 465,
+      "_sourceLine": 489,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1172,7 +1254,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 479,
+      "_sourceLine": 503,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1232,7 +1314,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 509,
+      "_sourceLine": 533,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1286,7 +1368,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 536,
+      "_sourceLine": 560,
       "_impact": {
         "creates_systems": [
           "Solar"
@@ -1336,7 +1418,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 548,
+      "_sourceLine": 572,
       "_impact": {
         "creates_systems": [
           "Generator"
@@ -1367,7 +1449,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 567,
+      "_sourceLine": 591,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1427,7 +1509,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 581,
+      "_sourceLine": 605,
       "_impact": {
         "creates_systems": [
           "Garage Door"
@@ -1461,7 +1543,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 610,
+      "_sourceLine": 634,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1521,67 +1603,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 619,
-      "_impact": {
-        "creates_systems": [],
-        "unlocks_templates": [],
-        "gates_questions": []
-      },
-      "_lint": [],
-      "_recommendation": null
-    },
-    {
-      "id": "q29_estate_docs",
-      "section": "protectionPeople",
-      "chapter": "yourPeople",
-      "title": "Estate documents you have on hand?",
-      "fallbackTitle": null,
-      "subtitle": null,
-      "kind": "multiSelect",
-      "answerOptions": [
-        {
-          "id": "will",
-          "label": "Will",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "trust",
-          "label": "Trust",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "poa",
-          "label": "Power of attorney",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "healthcare",
-          "label": "Healthcare directive",
-          "icon": null,
-          "acceptsCustomInput": false
-        },
-        {
-          "id": "none",
-          "label": "None yet",
-          "icon": null,
-          "acceptsCustomInput": false
-        }
-      ],
-      "documentUploadCategory": "will",
-      "providerFollowUpAnswerIds": [],
-      "providerTypes": [],
-      "dynamicProviderTypes": null,
-      "dynamicSkip": null,
-      "supportsSelectAll": false,
-      "providerSearchPlaceholder": null,
-      "sliderMin": 1,
-      "sliderMax": 10,
-      "sliderLeftLabel": null,
-      "sliderRightLabel": null,
-      "_sourceLine": 638,
+      "_sourceLine": 643,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1659,7 +1681,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 652,
+      "_sourceLine": 669,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],
@@ -1707,7 +1729,7 @@
       "sliderMax": 10,
       "sliderLeftLabel": null,
       "sliderRightLabel": null,
-      "_sourceLine": 673,
+      "_sourceLine": 690,
       "_impact": {
         "creates_systems": [],
         "unlocks_templates": [],

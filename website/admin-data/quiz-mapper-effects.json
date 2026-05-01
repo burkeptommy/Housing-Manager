@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-30T19:42:09.401Z",
+  "generatedAt": "2026-05-01T01:55:16.940Z",
   "sourceFile": "Haven/Features/Onboarding/HouseQuiz/HouseQuizAnswerMapper.swift",
-  "sourceCommit": "693691c7",
+  "sourceCommit": "31c8e12a",
   "note": "Heuristic side-effect digest from regex scan. v2 will parse case bodies with the Swift expression parser.",
   "effectsByQuestion": {
     "q1_roof_material": {
@@ -51,6 +51,12 @@
         "(no recognized side effects)"
       ],
       "rawSnippet": "case \"q9_basement\":\n                \n                \n                \n                let basementSelections: [String] = {\n                    if let ids = answer.selectedIds, !ids.isEmpty { return ids }\n                    if let id = answer.answerId { return [id] }\n                    return []\n"
+    },
+    "q9b_renovations": {
+      "effects": [
+        "persists property attribute"
+      ],
+      "rawSnippet": "case \"q9b_renovations\":\n                \n                \n                \n                \n                \n                \n                \n                let renovationIds = answer.selectedIds ?? []\n                guard !renovationIds.contains(\"none\") && !renovationIds.isEmpty else {\n         "
     },
     "q10_appliances": {
       "effects": [
@@ -171,12 +177,6 @@
         "persists property attribute"
       ],
       "rawSnippet": "case \"q28_household\":\n                if let id = answer.answerId {\n                    try await persistAttribute(\"household_residents\", value: id)\n"
-    },
-    "q29_estate_docs": {
-      "effects": [
-        "persists property attribute"
-      ],
-      "rawSnippet": "case \"q29_estate_docs\":\n                if let selected = answer.selectedIds {\n                    try await persistAttribute(\"estate_documents_on_hand\", value: selected.joined(separator: \",\"))\n"
     },
     "q30_priorities": {
       "effects": [

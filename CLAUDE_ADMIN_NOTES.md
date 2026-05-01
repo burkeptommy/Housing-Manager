@@ -2,8 +2,8 @@
 
 Generated from `admin_codex_notes` where target IN ('claude','both'). When a new Claude session opens, scan this file before doing anything else.
 
-**Synced:** 2026-04-30T19:42:10.176Z
-**Pending:** 23 change requests · **Open questions:** 0 · **Feedback:** 26 · **Applied (last 30d):** 118
+**Synced:** 2026-05-01T01:55:17.651Z
+**Pending:** 11 change requests · **Open questions:** 0 · **Feedback:** 43 · **Applied (last 30d):** 147
 
 Reading order: 1. Questions for Claude. 2. Pending Changes. 3. Open Feedback (by entity). 4. Recently Applied (audit).
 
@@ -11,620 +11,245 @@ Reading order: 1. Questions for Claude. 2. Pending Changes. 3. Open Feedback (by
 
 ## ⚡ Pending Changes (act on these)
 
-### attom_derive_partial: q4_purchase  \[change_request\]
+### Replace Refrigerator Water Filter  \[change_request\]
 
 **2026-04-30 · change_request · tom**
-**Quiz quality proposal — attom_derive_partial.**
+Apply voice fix:
 
-**Question:** `q4_purchase` — "5. How did you get this home?"
-**Severity:** attom_derive_partial
+Rule: no-em-dash
+Field: description
+Before: Haven adds this to your handyman punch list every six months — drop a fresh f...
+After: Haven adds this to your handyman punch list every six months. Drop a fresh f...
 
-**Why:** Currency input asks for purchase price + ownership origin. ATTOM has the last sale price + date for purchase paths. The origin question (purchase / inheritance / family / built / cash) still needs to be asked, but the price could pre-fill from ATTOM when origin = purchase.
-
-**Specific fix:** Keep Q4 but pre-fill the price field from PropertyLookupResult.salesHistory[0].price when origin = purchase. Add a 'From public records' caption + 'Edit' affordance.
-
-**Action for Claude next session:**
-Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from `PropertyLookupResult` and shows confirmable rows. Confirmed values stamp `attributes.{field}_source = "manual"` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
 
 **Proposed diff:**
 ```json
 {
-  "fix": "Keep Q4 but pre-fill the price field from PropertyLookupResult.salesHistory[0].price when origin = purchase. Add a 'From public records' caption + 'Edit' affordance.",
-  "reason": "Currency input asks for purchase price + ownership origin. ATTOM has the last sale price + date for purchase paths. The origin question (purchase / inheritance / family / built / cash) still needs to be asked, but the price could pre-fill from ATTOM when origin = purchase.",
-  "severity": "attom_derive_partial",
-  "questionId": "q4_purchase"
+  "to": "Haven adds this to your handyman punch list every six months. Drop a fresh f...",
+  "from": "Haven adds this to your handyman punch list every six months — drop a fresh f...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "description"
 }
 ```
 
-### attom_derive: q2_siding  \[change_request\]
+### Inspect Hot Tub Cover and Jets  \[change_request\]
 
 **2026-04-30 · change_request · tom**
-**Quiz quality proposal — attom_derive.**
+Apply voice fix:
 
-**Question:** `q2_siding` — "2. What's your exterior siding?"
-**Severity:** attom_derive
+Rule: no-em-dash
+Field: notes
+Before: Detached hot tubs only — attached spillover spas don't have removable covers ...
+After: Detached hot tubs only. Attached spillover spas don't have removable covers ...
 
-**Why:** Same pattern as Q1 — ATTOM has siding material in the property record for many homes. Pre-fill + confirm, don't ask cold.
-
-**Specific fix:** Bundle into the same ATTOMHelloCard as Q1. Lower priority than Q1 since siding gets less downstream use.
-
-**Action for Claude next session:**
-Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from `PropertyLookupResult` and shows confirmable rows. Confirmed values stamp `attributes.{field}_source = "manual"` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
 
 **Proposed diff:**
 ```json
 {
-  "fix": "Bundle into the same ATTOMHelloCard as Q1. Lower priority than Q1 since siding gets less downstream use.",
-  "reason": "Same pattern as Q1 — ATTOM has siding material in the property record for many homes. Pre-fill + confirm, don't ask cold.",
-  "severity": "attom_derive",
-  "questionId": "q2_siding"
+  "to": "Detached hot tubs only. Attached spillover spas don't have removable covers ...",
+  "from": "Detached hot tubs only — attached spillover spas don't have removable covers ...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "notes"
 }
 ```
 
-### attom_derive: q1_roof_material  \[change_request\]
+### Drain and Refill Hot Tub  \[change_request\]
 
 **2026-04-30 · change_request · tom**
-**Quiz quality proposal — attom_derive.**
+Rewrite to comply with voice rule:
 
-**Question:** `q1_roof_material` — "1. Your {yearBuilt} {street} roof: what's on top?"
-**Severity:** attom_derive
+Rule: no-em-dash
+Field: notes
+Current: Detached hot tubs only. If your spa shares water with the pool (spillover / a...
 
-**Why:** ATTOM property records often carry roof material. The quiz could open with an 'ATTOM Hello Card' that says 'We see your roof is asphalt — sound right?' with confirm or correct, instead of asking cold.
+We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session.
 
-**Specific fix:** Add an ATTOMHelloCard component before Q1 that pre-fills from PropertyLookupResult. Tap any field to correct. Confirmed values stamp `attributes.{field}_source = 'manual'` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
-
-**Action for Claude next session:**
-Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from `PropertyLookupResult` and shows confirmable rows. Confirmed values stamp `attributes.{field}_source = "manual"` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+(Drafted from the Decisions tab. Claude rewrites the text manually on the next session — there's no mechanical fix Tom can preview.)
 
 **Proposed diff:**
 ```json
 {
-  "fix": "Add an ATTOMHelloCard component before Q1 that pre-fills from PropertyLookupResult. Tap any field to correct. Confirmed values stamp `attributes.{field}_source = 'manual'` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.",
-  "reason": "ATTOM property records often carry roof material. The quiz could open with an 'ATTOM Hello Card' that says 'We see your roof is asphalt — sound right?' with confirm or correct, instead of asking cold.",
-  "severity": "attom_derive",
-  "questionId": "q1_roof_material"
+  "from": "Detached hot tubs only. If your spa shares water with the pool (spillover / a...",
+  "kind": "voice_rewrite",
+  "rule": "no-em-dash",
+  "field": "notes",
+  "reason": "We couldn't compute a clean before→after automatically. Claude will rewrite the line to drop the em-dash on the next session."
 }
 ```
 
-### 39. Estate documents you have on hand?  \[proposal_delete\]
+### 6. What kind of water heater do you have?  \[change_request\]
 
-**2026-04-30 · proposal_delete · tom**
-We don't do estate management anymore and that got moved to a future release so we should be getting rid of all estate questions including this one.
+**2026-04-30 · change_request · tom**
+Apply voice fix:
 
-### drop: q23_vehicle_count  \[proposal_delete\]
+Rule: answer-label-max-words
+Field: answerOption.label
+Before: Not sure — take a photo and we'll tell you
+After: Not sure
 
-**2026-04-30 · proposal_delete · tom**
-**Quiz quality proposal — drop.**
-
-**Question:** `q23_vehicle_count` — "31. How many cars do you own?"
-**Severity:** drop
-
-**Why:** Vestigial — Q24 (vehicleAdd) handles the primary vehicle directly with a Skip button. Asking for a count first adds friction without value.
-
-**Specific fix:** Delete Q23 from HouseQuizQuestionLibrary.swift. Re-title Q24 to 'Add your primary vehicle' with a Skip option.
-
-**Action for Claude next session:**
-Delete the `q23_vehicle_count` entry from `HouseQuizQuestionLibrary.swift`. Add a one-time migration that strips this question's saved answer from `properties.house_quiz_state` JSONB so resume flows don't trip on it. Update `milestoneIndices` (if any) to use stable question IDs not numeric indices, since indices shift after deletion. Bump value-meter deltas if removing this question would zero a milestone bump — redistribute its delta to nearby questions.
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
 
 **Proposed diff:**
 ```json
 {
-  "fix": "Delete Q23 from HouseQuizQuestionLibrary.swift. Re-title Q24 to 'Add your primary vehicle' with a Skip option.",
-  "reason": "Vestigial — Q24 (vehicleAdd) handles the primary vehicle directly with a Skip button. Asking for a count first adds friction without value.",
-  "severity": "drop",
-  "questionId": "q23_vehicle_count"
+  "to": "Not sure",
+  "from": "Not sure — take a photo and we'll tell you",
+  "kind": "voice_fix",
+  "rule": "answer-label-max-words",
+  "field": "answerOption.label"
 }
 ```
 
-### 6. Do you have a mortgage on this home?  \[proposal_delete\]
-
-**2026-04-30 · proposal_delete · tom**
-This question doesn't really matter since we don't do anything with it. Should we just drop it?
-
-### Merge q28_household + q28b_pets  \[change_request\]
+### 6. What kind of water heater do you have?  \[change_request\]
 
 **2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
+**Voice fix — pre-computed.**
 
-Two consecutive questions could combine into one screen via progressive disclosure:
+Template "6. What kind of water heater do you have?" has a `answer-label-max-words` violation in field `answerOption.label`.
 
-**Parent:** `q28_household` — "37. Who lives here, and who else helps?"
-- Kind: `caretakers`
-- Options: 5
+**BEFORE:**
+> 
 
-**Sub-question:** `q28b_pets` — "38. Any pets in the household?"
-- Kind: `singleChoice`
-- Options: 5
-- Conditional (`dynamicSkip` set): no
+**AFTER (proposed):**
+> 
 
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq28b_pets_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
 
-### Merge q25_garage_ev + q25b_ev_charger  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q25_garage_ev` — "33. What kind of garage do you have?"
-- Kind: `singleChoice`
-- Options: 5
-
-**Sub-question:** `q25b_ev_charger` — "34. Do you have a Level 2 EV charger?"
-- Kind: `singleChoice`
-- Options: 2
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq25b_ev_charger_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q18_trash + q18b_trash_day  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q18_trash` — "25. Trash & recycling?"
-- Kind: `singleChoice`
-- Options: 3
-
-**Sub-question:** `q18b_trash_day` — "26. Which days should Chez remind you about pickup?"
-- Kind: `multiSelect`
-- Options: 7
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq18b_trash_day_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q15_security + q15b_household_contractors  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q15_security` — "21. Security or alarm system?"
-- Kind: `singleChoice`
-- Options: 4
-
-**Sub-question:** `q15b_household_contractors` — "22. Got any pros on speed dial?"
-- Kind: `householdContractors`
-- Options: 15
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq15b_household_contractors_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q14_irrigation + q14b_irrigation_months  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q14_irrigation` — "19. Sprinkler or irrigation?"
-- Kind: `singleChoice`
-- Options: 3
-
-**Sub-question:** `q14b_irrigation_months` — "20. Which months does the irrigation system usually run?"
-- Kind: `multiSelect`
-- Options: 0
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq14b_irrigation_months_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q12_pool + q12c_pool_months  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q12_pool` — "15. Pool or hot tub?"
-- Kind: `singleChoice`
-- Options: 5
-
-**Sub-question:** `q12c_pool_months` — "17. Which months does your pool company cover?"
-- Kind: `multiSelect`
-- Options: 0
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq12c_pool_months_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q12_pool + q12b_pool_chemistry  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q12_pool` — "15. Pool or hot tub?"
-- Kind: `singleChoice`
-- Options: 5
-
-**Sub-question:** `q12b_pool_chemistry` — "16. Saltwater or chlorine?"
-- Kind: `singleChoice`
-- Options: 3
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq12b_pool_chemistry_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q11_lawn + q11c_landscaping_months  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q11_lawn` — "12. Keeping up the {street} yard: you or a pro?"
-- Kind: `singleChoice`
-- Options: 5
-
-**Sub-question:** `q11c_landscaping_months` — "14. Which months does your landscaping crew usually come?"
-- Kind: `multiSelect`
-- Options: 0
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq11c_landscaping_months_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q11_lawn + q11b_lawn_type  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q11_lawn` — "12. Keeping up the {street} yard: you or a pro?"
-- Kind: `singleChoice`
-- Options: 5
-
-**Sub-question:** `q11b_lawn_type` — "13. Natural grass, turf, or both?"
-- Kind: `singleChoice`
-- Options: 4
-- Conditional (`dynamicSkip` set): yes
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq11b_lawn_type_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Merge q3_heating_fuel + q3b_hvac_type  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Quiz merge proposal — sub-question fold-in.**
-
-Two consecutive questions could combine into one screen via progressive disclosure:
-
-**Parent:** `q3_heating_fuel` — "3. Heat in a {state} home: what's yours running on?"
-- Kind: `singleChoice`
-- Options: 6
-
-**Sub-question:** `q3b_hvac_type` — "4. What kind of HVAC system?"
-- Kind: `singleChoice`
-- Options: 8
-- Conditional (`dynamicSkip` set): no
-
-**Action for Claude next session:**
-1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
-2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
-3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
-4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
-5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq3b_hvac_type_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
-6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
-7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
-
-### Replace Cabinet Pulls and Knobs ↔ Tighten Loose Cabinet Pulls and Knobs  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Duplicate review — concrete merge analysis.**
-
-Detected 57% title overlap, same systemCategory:
-
-**Template A:** Replace Cabinet Pulls and Knobs
-- Description: "Update the kitchen, bath, or built-in cabinet hardware. The handyman handles drilling new holes if the spread changes.…"
-- Frequency: As needed · Cost: $75–$200 plus hardware
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Template B:** Tighten Loose Cabinet Pulls and Knobs
-- Description: "Snug up hardware throughout the kitchen, bath, and built-ins. Often paired with a hinge tune-up on the same visit.…"
-- Frequency: Annually · Cost: $50–$100
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Action for Claude next session:** Decide one of:
-1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
-2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
-3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
-
-### Recaulk Interior Trim and Baseboards ↔ Spot-Paint Interior Trim and Baseboards  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Duplicate review — concrete merge analysis.**
-
-Detected 67% title overlap, same systemCategory:
-
-**Template A:** Recaulk Interior Trim and Baseboards
-- Description: "Cut out old caulk that's separated from the wall or trim, lay a fresh bead, and tool it clean. Restores a tight, finished look at the seams.…"
-- Frequency: As needed · Cost: $100–$300
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Template B:** Spot-Paint Interior Trim and Baseboards
-- Description: "Touch up scuffs and chips on trim, baseboards, and door casings. The handyman matches sheen and color from your existing paint can.…"
-- Frequency: As needed · Cost: $75–$200
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Action for Claude next session:** Decide one of:
-1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
-2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
-3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
-
-### Replace Cabinet Pulls and Knobs ↔ Tighten Loose Cabinet Pulls and Knobs  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Duplicate review — concrete merge analysis.**
-
-Detected 57% title overlap, same systemCategory:
-
-**Template A:** Replace Cabinet Pulls and Knobs
-- Description: "Update the kitchen, bath, or built-in cabinet hardware. The handyman handles drilling new holes if the spread changes.…"
-- Frequency: As needed · Cost: $75–$200 plus hardware
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Template B:** Tighten Loose Cabinet Pulls and Knobs
-- Description: "Snug up hardware throughout the kitchen, bath, and built-ins. Often paired with a hinge tune-up on the same visit.…"
-- Frequency: Annually · Cost: $50–$100
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Action for Claude next session:** Decide one of:
-1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
-2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
-3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
-
-### Recaulk Interior Trim and Baseboards ↔ Spot-Paint Interior Trim and Baseboards  \[change_request\]
-
-**2026-04-30 · change_request · tom**
-**Duplicate review — concrete merge analysis.**
-
-Detected 67% title overlap, same systemCategory:
-
-**Template A:** Recaulk Interior Trim and Baseboards
-- Description: "Cut out old caulk that's separated from the wall or trim, lay a fresh bead, and tool it clean. Restores a tight, finished look at the seams.…"
-- Frequency: As needed · Cost: $100–$300
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Template B:** Spot-Paint Interior Trim and Baseboards
-- Description: "Touch up scuffs and chips on trim, baseboards, and door casings. The handyman matches sheen and color from your existing paint can.…"
-- Frequency: As needed · Cost: $75–$200
-- Seasonal: year-round
-- Assignment: either
-- Subtypes: []
-
-**Action for Claude next session:** Decide one of:
-1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
-2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
-3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
-
-### Bundle: "Landscaping Spring  \[proposal_add\]
-
-**2026-04-30 · proposal_add · tom**
-**Bundle-merge proposal — pre-structured.**
-
-Pattern match: 4 standalone templates share systemCategory=`"Landscaping` + seasonalTiming=`Spring` + assignmentType=`vendor"`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see 4 separate task rows.
-
-**Proposed:**
-- bundleId: `"Landscaping:spring`
-- bundleTitle: "Spring "Landscaping Service" (set on the FIRST template only — that becomes the parent)
-- Templates to fold in:
-  1. Top Up Turf Infill (templateKey: Landscaping:Top up turf infill)
-  2. Power Rake and Groom Turf (templateKey: Landscaping:Power rake and groom turf)
-  3. Deep Clean Synthetic Turf (templateKey: Landscaping:Deep clean synthetic turf)
-  4. Outdoor Lighting Service (templateKey: Landscaping:Outdoor lighting service)
-
-**Action for Claude next session:**
-1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add `bundleId: ""Landscaping:spring"` to all 4 templates listed.
-2. Set `bundleTitle: "Spring "Landscaping Service"` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).
-3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.
-4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_"Landscaping_spring) so existing households' standalone tasks fold into the new bundle parent.
-5. xcodebuild -scheme Chez to confirm clean compile.
-
-**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
 
 **Proposed diff:**
 ```json
 {
-  "members": [
-    {
-      "title": "Top Up Turf Infill",
-      "templateKey": "Landscaping:Top up turf infill"
-    },
-    {
-      "title": "Power Rake and Groom Turf",
-      "templateKey": "Landscaping:Power rake and groom turf"
-    },
-    {
-      "title": "Deep Clean Synthetic Turf",
-      "templateKey": "Landscaping:Deep clean synthetic turf"
-    },
-    {
-      "title": "Outdoor Lighting Service",
-      "templateKey": "Landscaping:Outdoor lighting service"
-    }
-  ],
-  "bundleId": "\"Landscaping:spring",
-  "bundleTitle": "Spring \"Landscaping Service",
-  "parentTemplateKey": "Landscaping:Top up turf infill"
+  "answerOption.label": {
+    "to": "",
+    "from": ""
+  }
 }
 ```
 
-### Bundle: "Chimney Fall  \[proposal_add\]
+### Replace Refrigerator Water Filter  \[change_request\]
 
-**2026-04-30 · proposal_add · tom**
-**Bundle-merge proposal — pre-structured.**
+**2026-04-30 · change_request · tom**
+Apply voice fix:
 
-Pattern match: 3 standalone templates share systemCategory=`"Chimney` + seasonalTiming=`Fall` + assignmentType=`vendor"`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see 3 separate task rows.
+Rule: no-em-dash
+Field: description
+Before: Haven adds this to your handyman punch list every six months — drop a fresh f...
+After: Haven adds this to your handyman punch list every six months. Drop a fresh f...
 
-**Proposed:**
-- bundleId: `"Chimney:fall`
-- bundleTitle: "Fall "Chimney Service" (set on the FIRST template only — that becomes the parent)
-- Templates to fold in:
-  1. Annual Chimney Sweep (templateKey: Chimney:Annual chimney sweep)
-  2. Inspect Chimney Cap and Crown (templateKey: Chimney:Inspect chimney cap and crown)
-  3. Annual Gas Fireplace Service (templateKey: Chimney:Annual gas fireplace service)
-
-**Action for Claude next session:**
-1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add `bundleId: ""Chimney:fall"` to all 3 templates listed.
-2. Set `bundleTitle: "Fall "Chimney Service"` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).
-3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.
-4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_"Chimney_fall) so existing households' standalone tasks fold into the new bundle parent.
-5. xcodebuild -scheme Chez to confirm clean compile.
-
-**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
 
 **Proposed diff:**
 ```json
 {
-  "members": [
-    {
-      "title": "Annual Chimney Sweep",
-      "templateKey": "Chimney:Annual chimney sweep"
-    },
-    {
-      "title": "Inspect Chimney Cap and Crown",
-      "templateKey": "Chimney:Inspect chimney cap and crown"
-    },
-    {
-      "title": "Annual Gas Fireplace Service",
-      "templateKey": "Chimney:Annual gas fireplace service"
-    }
-  ],
-  "bundleId": "\"Chimney:fall",
-  "bundleTitle": "Fall \"Chimney Service",
-  "parentTemplateKey": "Chimney:Annual chimney sweep"
+  "to": "Haven adds this to your handyman punch list every six months. Drop a fresh f...",
+  "from": "Haven adds this to your handyman punch list every six months — drop a fresh f...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "description"
 }
 ```
 
-### Bundle: "HVAC Fall  \[proposal_add\]
+### Flush Water Heater  \[change_request\]
 
-**2026-04-30 · proposal_add · tom**
-**Bundle-merge proposal — pre-structured.**
+**2026-04-30 · change_request · tom**
+Apply voice fix:
 
-Pattern match: 4 standalone templates share systemCategory=`"HVAC` + seasonalTiming=`Fall` + assignmentType=`vendor"`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see 4 separate task rows.
+Rule: no-em-dash
+Field: notes
+Before: Anode rod inspection is part of the standard flush — pros pull and inspect ev...
+After: Anode rod inspection is part of the standard flush. Pros pull and inspect ev...
 
-**Proposed:**
-- bundleId: `"HVAC:fall`
-- bundleTitle: "Fall "HVAC Service" (set on the FIRST template only — that becomes the parent)
-- Templates to fold in:
-  1. HVAC Tune-Up (heating) (templateKey: HVAC:Professional HVAC tune-up (heating))
-  2. Bleed Radiators (templateKey: HVAC:Bleed radiators)
-  3. Annual Boiler Service (templateKey: HVAC:Annual boiler service)
-  4. Whole-Home Humidifier Service (templateKey: HVAC:Whole-home humidifier service)
-
-**Action for Claude next session:**
-1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add `bundleId: ""HVAC:fall"` to all 4 templates listed.
-2. Set `bundleTitle: "Fall "HVAC Service"` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).
-3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.
-4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_"HVAC_fall) so existing households' standalone tasks fold into the new bundle parent.
-5. xcodebuild -scheme Chez to confirm clean compile.
-
-**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
 
 **Proposed diff:**
 ```json
 {
-  "members": [
-    {
-      "title": "HVAC Tune-Up (heating)",
-      "templateKey": "HVAC:Professional HVAC tune-up (heating)"
-    },
-    {
-      "title": "Bleed Radiators",
-      "templateKey": "HVAC:Bleed radiators"
-    },
-    {
-      "title": "Annual Boiler Service",
-      "templateKey": "HVAC:Annual boiler service"
-    },
-    {
-      "title": "Whole-Home Humidifier Service",
-      "templateKey": "HVAC:Whole-home humidifier service"
-    }
-  ],
-  "bundleId": "\"HVAC:fall",
-  "bundleTitle": "Fall \"HVAC Service",
-  "parentTemplateKey": "HVAC:Professional HVAC tune-up (heating)"
+  "to": "Anode rod inspection is part of the standard flush. Pros pull and inspect ev...",
+  "from": "Anode rod inspection is part of the standard flush — pros pull and inspect ev...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "notes"
 }
 ```
+
+### 13. Security or alarm system?  \[change_request\]
+
+**2026-04-30 · change_request · tom**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: We won't share specifics — your setup stays private to you and any household ...
+After: We won't share specifics. Your setup stays private to you and any household ...
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "We won't share specifics. Your setup stays private to you and any household ...",
+  "from": "We won't share specifics — your setup stays private to you and any household ...",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+### 2. What's your exterior siding?  \[change_request\]
+
+**2026-04-30 · change_request · tom**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: Pick all that apply — many homes mix two or three materials.
+After: Pick all that apply. Many homes mix two or three materials.
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Pick all that apply. Many homes mix two or three materials.",
+  "from": "Pick all that apply — many homes mix two or three materials.",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+### 2. What's your exterior siding?  \[change_request\]
+
+**2026-04-30 · change_request · tom**
+Apply voice fix:
+
+Rule: no-em-dash
+Field: subtitle
+Before: Pick all that apply — many homes mix two or three materials.
+After: Pick all that apply. Many homes mix two or three materials.
+
+(Drafted from the Decisions tab. The voice-fix script picks up this note's proposed_diff next session.)
+
+**Proposed diff:**
+```json
+{
+  "to": "Pick all that apply. Many homes mix two or three materials.",
+  "from": "Pick all that apply — many homes mix two or three materials.",
+  "kind": "voice_fix",
+  "rule": "no-em-dash",
+  "field": "subtitle"
+}
+```
+
+### Prune Shrubs and Hedges  \[change_request\]
+
+**2026-04-30 · change_request · tom**
+This shouldn't be added automatically because how do we know if the home has shrubs or things to prune? This should be an opt-in.
 
 ---
 
@@ -638,6 +263,89 @@ Pattern match: 4 standalone templates share systemCategory=`"HVAC` + seasonalTim
 
 **2026-04-30 · feedback · claude**
 Verified. Q12 architecture (Build 87) creates SEPARATE home_systems rows for the two halves of the both answer: a Pool system with the chosen pool-type subtype + 3 children, AND a Hot Tub system with subtype hot_tub. Maintenance templates gate independently — pool templates fire on requiredSubtypes [pool], hot tub templates fire on [hot_tub], so both/in_ground+hot_tub households get the union. Caveat: hot tub Drain-and-refill + cover/jets templates over-fire for households whose hot tub is an attached spillover spa (shares water with the pool). Notes copy on those templates now tells those users to skip — drain rolls into pool service. Q12 follow-up question to distinguish detached vs attached is queued as a TODO in MaintenanceTemplates.swift above the hot-tub templates. Marking applied.
+
+#### 6. Do you have a mortgage on this home?  `q5_mortgage`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Q5 mortgage was deleted in Batch 5 (commit 0367137f) per the original feedback note (b348f04c + f5992eea). Mapper retains a no-op case for round-trip safety on saved-for-later quizzes. Marking applied.
+
+#### attom_derive_partial: q4_purchase  `live-quiz-q4_purchase`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Q4 was deleted entirely in Batch 5 per earlier feedback (purchase price now flows through PropertyRecapCard which already pulls from ATTOM). The ATTOM pre-fill proposal is obsolete. Marking applied.
+
+#### drop: q23_vehicle_count  `live-quiz-q23_vehicle_count`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Q23 vehicle_count was already removed (Phase 67D); Q24 vehicleAdd handles the primary vehicle directly with a Skip option. Verified by grep over current HouseQuizQuestionLibrary. Marking applied.
+
+#### Merge q11_lawn + q11b_lawn_type  `live-quiz-q11_lawn`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q11b_lawn_type was merged into the progressiveLawn kind (Phase 67D A4). Already merged.
+
+**2026-05-01 · feedback · claude**
+Stale — q11c_landscaping_months was removed; landscaping months moved to Phase C3 AnnualRhythmScreen. Already addressed.
+
+#### Merge q12_pool + q12b_pool_chemistry  `live-quiz-q12_pool`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q12b_pool_chemistry was merged into the progressivePool kind (Build 87). Already merged.
+
+**2026-05-01 · feedback · claude**
+Stale — q12c_pool_months was removed; pool months moved to Phase C3 AnnualRhythmScreen. Already addressed.
+
+#### Merge q14_irrigation + q14b_irrigation_months  `live-quiz-q14_irrigation`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q14b_irrigation_months was removed; active months for irrigation moved to Phase C3 AnnualRhythmScreen. Already addressed.
+
+#### Merge q15_security + q15b_household_contractors  `live-quiz-q15_security`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Skipped per follow-up call. 15 contractor chips on the same screen as the 4-option security question would be visually overwhelming. Q15 + Q15b stay as separate consecutive screens. Marking applied as a deliberate non-merge.
+
+#### Merge q18_trash + q18b_trash_day  `live-quiz-q18_trash`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q18b_trash_day was merged into the trashWithDays progressive kind (Phase 67D). Already merged.
+
+#### Merge q25_garage_ev + q25b_ev_charger  `live-quiz-q25_garage_ev`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q25b_ev_charger was merged into the garageWithEV progressive kind (Phase 67D). Already merged.
+
+#### Merge q28_household + q28b_pets  `live-quiz-q28_household`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q28b_pets was folded into Q28 caretakers payload (Phase 67D A10). Mapper reads q28_household.payload[petsAnswerId]. Already merged.
+
+#### Merge q3_heating_fuel + q3b_hvac_type  `live-quiz-q3_heating_fuel`
+
+**Section** ? · **Chapter** ? · **Kind** ?
+
+**2026-05-01 · feedback · claude**
+Stale — q3+q3b were merged into q3_heating_system with 12 fuel+system combo options (Phase 67D A3). Already merged.
 
 ### 🛠 Maintenance Templates
 
@@ -686,6 +394,9 @@ Confirmed admin lab artifact. local-1777573048534 is a local-only test record th
 **Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
 **Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
 
+**2026-05-01 · feedback · claude**
+Stale — duplicate of cdf26a9e. Recaulk interior trim and baseboards was deleted in Batch 1 (commit 6b2b7acd). Marking applied.
+
 **2026-04-30 · feedback · claude**
 Duplicate of cdf26a9e — same pair. Confirmed intentional. See reply on cdf26a9e.
 
@@ -693,6 +404,9 @@ Duplicate of cdf26a9e — same pair. Confirmed intentional. See reply on cdf26a9
 
 **Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
 **Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Recaulk interior trim and baseboards was deleted in Batch 1 (commit 6b2b7acd). Spot-Paint remains, but the duplicate pair is resolved. Marking applied.
 
 **2026-04-30 · feedback · claude**
 Confirmed intentional. Recaulk and Spot-Paint are separate trade actions — caulking is sealant, spot-paint is finish coat, both done independently. Recommend allowlisting the pair in the duplicate detector. Leaving pending so you can choose: (a) suppress in detector and close, or (b) override and merge.
@@ -702,6 +416,9 @@ Confirmed intentional. Recaulk and Spot-Paint are separate trade actions — cau
 **Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
 **Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
 
+**2026-05-01 · feedback · claude**
+Stale — duplicate of 6cca28be. Replace cabinet pulls and knobs was deleted in Batch 1 (commit 6b2b7acd). Marking applied.
+
 **2026-04-30 · feedback · claude**
 Duplicate of 6cca28be — same pair. Confirmed intentional. See reply on 6cca28be.
 
@@ -709,6 +426,9 @@ Duplicate of 6cca28be — same pair. Confirmed intentional. See reply on 6cca28b
 
 **Category** ? · **Frequency** ? · **Priority** ? · **Cost** ?  
 **Assignment** ? · **Routing** ? · **Safety floor** false · **Essential** ?
+
+**2026-05-01 · feedback · claude**
+Stale — Replace cabinet pulls and knobs was deleted in Batch 1 (commit 6b2b7acd). Tighten Loose remains, but with no second template to dup against, the duplicate detector should suppress this pair on the next admin lab refresh. Marking applied.
 
 **2026-04-30 · feedback · claude**
 Confirmed intentional. Replace and Tighten are separate operations — Replace happens during a renovation/upgrade (drilling new holes), Tighten happens during routine handyman maintenance. Different trade actions, different cadences. Recommend allowlisting the pair in the duplicate detector. Leaving pending so you can choose: (a) suppress in detector and close, or (b) override and merge.
@@ -824,6 +544,230 @@ Architectural — needs a design call. Current state: Water Treatment category (
 
 These have already shipped. Review for retroactive QA only.
 
+### 13. Security or alarm system?  `live-quiz-q15_security`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 40a3c1d**
+**Voice fix — pre-computed.**
+
+Template "13. Security or alarm system?" has a `no-em-dash` violation in field `subtitle`.
+
+**BEFORE:**
+> We won't share specifics — your setup stays private to you and any household members you invite.
+
+**AFTER (proposed):**
+> We won't share specifics. Your setup stays private to you and any household members you invite.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "subtitle": {
+    "to": "We won't share specifics. Your setup stays private to you and any household members you invite.",
+    "from": "We won't share specifics — your setup stays private to you and any household members you invite."
+  }
+}
+```
+
+### 2. What's your exterior siding?  `live-quiz-q2_siding`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 40a3c1d**
+**Voice fix — pre-computed.**
+
+Template "2. What's your exterior siding?" has a `no-em-dash` violation in field `subtitle`.
+
+**BEFORE:**
+> Pick all that apply — many homes mix two or three materials.
+
+**AFTER (proposed):**
+> Pick all that apply. Many homes mix two or three materials.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "subtitle": {
+    "to": "Pick all that apply. Many homes mix two or three materials.",
+    "from": "Pick all that apply — many homes mix two or three materials."
+  }
+}
+```
+
+### Replace Refrigerator Water Filter  `live-handyman-appliance-replace-refrigerator-water-filter`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 40a3c1d**
+**Voice fix — pre-computed.**
+
+Template "Replace Refrigerator Water Filter" has a `no-em-dash` violation in field `description`.
+
+**BEFORE:**
+> Haven adds this to your handyman punch list every six months — drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.
+
+**AFTER (proposed):**
+> Haven adds this to your handyman punch list every six months. Drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "description": {
+    "to": "Haven adds this to your handyman punch list every six months. Drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.",
+    "from": "Haven adds this to your handyman punch list every six months — drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval."
+  }
+}
+```
+
+**2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
+**Punch-list re-route proposal.**
+
+Template "Replace Refrigerator Water Filter" (templateKey: `Appliance:Replace refrigerator water filter`) currently seeds as a `maintenance_tasks` row at quiz completion. Day1TaskCurator then re-parents it under the singleton handyman routine via `parent_routine_id` — which hides it from the main task list but leaves it in maintenance_tasks anyway.
+
+Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a `handyman_punch_items` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.
+
+**Action for Claude next session:**
+1. In `MaintenanceTaskReconciler.reconcile(...)`, when the template's tier resolves to handyman (routingOverride .diyDefault/.diyCapable + effort ≤ 60 + no safety floor), insert into `handyman_punch_items` instead of `maintenance_tasks`.
+2. The punch item carries `source: "auto_seed_handyman_tier"` so the punch list view can sort auto-populated items separately from manual additions.
+3. Add a one-time migration in `AppState.initialize()` (gated on `hasMigratedHandymanTierToPunchItems_v1`) that finds existing `maintenance_tasks` rows for this templateKey + archives them + creates equivalent `handyman_punch_items` rows.
+4. Verify Day1TaskCurator no longer needs to re-parent this template (it'll be skipped at the source).
+5. Update CLAUDE.md to document: handyman-tier templates seed punch items directly.
+
+**Bidirectional UI affordances** (separate but related work):
+- Punch item → Task: "Schedule as a task" action on each punch item card. Creates a maintenance_task with `scheduled_date` set, archives the punch item with reason `promoted_to_task`.
+- Task → Punch item: "Move to handyman list" action on each task detail sheet (already exists per Phase 56.4 docs). Archives the task with reason `moved_to_handyman_punch`, creates the punch item.
+
+**Proposed diff:**
+```json
+{
+  "to": {
+    "destination": "handyman_punch_items"
+  },
+  "from": {
+    "destination": "maintenance_tasks",
+    "parent_routine_id": "<handyman routine UUID>"
+  }
+}
+```
+
+### Replace Refrigerator Water Filter  `live-task-appliance-replace-refrigerator-water-filter`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 40a3c1d**
+**Voice fix — pre-computed.**
+
+Template "Replace Refrigerator Water Filter" has a `no-em-dash` violation in field `description`.
+
+**BEFORE:**
+> Haven adds this to your handyman punch list every six months — drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.
+
+**AFTER (proposed):**
+> Haven adds this to your handyman punch list every six months. Drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "description": {
+    "to": "Haven adds this to your handyman punch list every six months. Drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.",
+    "from": "Haven adds this to your handyman punch list every six months — drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval."
+  }
+}
+```
+
+**2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
+**Punch-list re-route proposal.**
+
+Template "Replace Refrigerator Water Filter" (templateKey: `Appliance:Replace refrigerator water filter`) currently seeds as a `maintenance_tasks` row at quiz completion. Day1TaskCurator then re-parents it under the singleton handyman routine via `parent_routine_id` — which hides it from the main task list but leaves it in maintenance_tasks anyway.
+
+Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a `handyman_punch_items` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.
+
+**Action for Claude next session:**
+1. In `MaintenanceTaskReconciler.reconcile(...)`, when the template's tier resolves to handyman (routingOverride .diyDefault/.diyCapable + effort ≤ 60 + no safety floor), insert into `handyman_punch_items` instead of `maintenance_tasks`.
+2. The punch item carries `source: "auto_seed_handyman_tier"` so the punch list view can sort auto-populated items separately from manual additions.
+3. Add a one-time migration in `AppState.initialize()` (gated on `hasMigratedHandymanTierToPunchItems_v1`) that finds existing `maintenance_tasks` rows for this templateKey + archives them + creates equivalent `handyman_punch_items` rows.
+4. Verify Day1TaskCurator no longer needs to re-parent this template (it'll be skipped at the source).
+5. Update CLAUDE.md to document: handyman-tier templates seed punch items directly.
+
+**Bidirectional UI affordances** (separate but related work):
+- Punch item → Task: "Schedule as a task" action on each punch item card. Creates a maintenance_task with `scheduled_date` set, archives the punch item with reason `promoted_to_task`.
+- Task → Punch item: "Move to handyman list" action on each task detail sheet (already exists per Phase 56.4 docs). Archives the task with reason `moved_to_handyman_punch`, creates the punch item.
+
+**Proposed diff:**
+```json
+{
+  "to": {
+    "destination": "handyman_punch_items"
+  },
+  "from": {
+    "destination": "maintenance_tasks",
+    "parent_routine_id": "<handyman routine UUID>"
+  }
+}
+```
+
+### Drain and Refill Hot Tub  `live-task-pool-spa-drain-and-refill-hot-tub`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 40a3c1d**
+**Voice fix — pre-computed.**
+
+Template "Drain and Refill Hot Tub" has a `no-em-dash` violation in field `notes`.
+
+**BEFORE:**
+> Detached hot tubs only. If your spa shares water with the pool (spillover / attached configuration), skip this — the pool service handles drain and refill via the pool seasonal close. Plan 2-3 hours for the standalone drain + refill cycle.
+
+**AFTER (proposed):**
+> Detached hot tubs only. If your spa shares water with the pool (spillover / attached configuration), skip this. The pool service handles drain and refill via the pool seasonal close. Plan 2-3 hours for the standalone drain + refill cycle.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "notes": {
+    "to": "Detached hot tubs only. If your spa shares water with the pool (spillover / attached configuration), skip this. The pool service handles drain and refill via the pool seasonal close. Plan 2-3 hours for the standalone drain + refill cycle.",
+    "from": "Detached hot tubs only. If your spa shares water with the pool (spillover / attached configuration), skip this — the pool service handles drain and refill via the pool seasonal close. Plan 2-3 hours for the standalone drain + refill cycle."
+  }
+}
+```
+
+### Flush Water Heater  `live-task-water-heater-flush-water-heater`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 40a3c1d**
+**Voice fix — pre-computed.**
+
+Template "Flush Water Heater" has a `no-em-dash` violation in field `notes`.
+
+**BEFORE:**
+> Anode rod inspection is part of the standard flush — pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16" socket and breaker bar, both of which the plumber already has on the truck.
+
+**AFTER (proposed):**
+> Anode rod inspection is part of the standard flush. Pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16" socket and breaker bar, both of which the plumber already has on the truck.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "notes": {
+    "to": "Anode rod inspection is part of the standard flush. Pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16\" socket and breaker bar, both of which the plumber already has on the truck.",
+    "from": "Anode rod inspection is part of the standard flush — pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16\" socket and breaker bar, both of which the plumber already has on the truck."
+  }
+}
+```
+
 ### Pool Service  `Pool/Spa`
 
 **2026-04-30 · change_request · tom · applied 2026-04-30 · commit 77b8419**
@@ -903,6 +847,9 @@ need an option for other, such as a compost toilet. off grid people have that
 
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
 Since we're taking the document vault off I think we should delete this. it's intrusive and better to shorten the quiz.
+
+**2026-04-30 · proposal_delete · tom · applied 2026-05-01 · commit 31c8e12**
+This question doesn't really matter since we don't do anything with it. Should we just drop it?
 
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 0367137**
 This question doesn't really matter since we don't do anything with it. Should we just drop it?
@@ -1037,6 +984,409 @@ Delete.
 **2026-04-30 · feedback · tom · applied 2026-04-30 · commit 6b2b7ac**
 Delete this. No one does this.
 
+### attom_derive_partial: q4_purchase  `live-quiz-q4_purchase`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz quality proposal — attom_derive_partial.**
+
+**Question:** `q4_purchase` — "5. How did you get this home?"
+**Severity:** attom_derive_partial
+
+**Why:** Currency input asks for purchase price + ownership origin. ATTOM has the last sale price + date for purchase paths. The origin question (purchase / inheritance / family / built / cash) still needs to be asked, but the price could pre-fill from ATTOM when origin = purchase.
+
+**Specific fix:** Keep Q4 but pre-fill the price field from PropertyLookupResult.salesHistory[0].price when origin = purchase. Add a 'From public records' caption + 'Edit' affordance.
+
+**Action for Claude next session:**
+Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from `PropertyLookupResult` and shows confirmable rows. Confirmed values stamp `attributes.{field}_source = "manual"` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+
+**Proposed diff:**
+```json
+{
+  "fix": "Keep Q4 but pre-fill the price field from PropertyLookupResult.salesHistory[0].price when origin = purchase. Add a 'From public records' caption + 'Edit' affordance.",
+  "reason": "Currency input asks for purchase price + ownership origin. ATTOM has the last sale price + date for purchase paths. The origin question (purchase / inheritance / family / built / cash) still needs to be asked, but the price could pre-fill from ATTOM when origin = purchase.",
+  "severity": "attom_derive_partial",
+  "questionId": "q4_purchase"
+}
+```
+
+### attom_derive: q2_siding  `live-quiz-q2_siding`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz quality proposal — attom_derive.**
+
+**Question:** `q2_siding` — "2. What's your exterior siding?"
+**Severity:** attom_derive
+
+**Why:** Same pattern as Q1 — ATTOM has siding material in the property record for many homes. Pre-fill + confirm, don't ask cold.
+
+**Specific fix:** Bundle into the same ATTOMHelloCard as Q1. Lower priority than Q1 since siding gets less downstream use.
+
+**Action for Claude next session:**
+Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from `PropertyLookupResult` and shows confirmable rows. Confirmed values stamp `attributes.{field}_source = "manual"` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+
+**Proposed diff:**
+```json
+{
+  "fix": "Bundle into the same ATTOMHelloCard as Q1. Lower priority than Q1 since siding gets less downstream use.",
+  "reason": "Same pattern as Q1 — ATTOM has siding material in the property record for many homes. Pre-fill + confirm, don't ask cold.",
+  "severity": "attom_derive",
+  "questionId": "q2_siding"
+}
+```
+
+### attom_derive: q1_roof_material  `live-quiz-q1_roof_material`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz quality proposal — attom_derive.**
+
+**Question:** `q1_roof_material` — "1. Your {yearBuilt} {street} roof: what's on top?"
+**Severity:** attom_derive
+
+**Why:** ATTOM property records often carry roof material. The quiz could open with an 'ATTOM Hello Card' that says 'We see your roof is asphalt — sound right?' with confirm or correct, instead of asking cold.
+
+**Specific fix:** Add an ATTOMHelloCard component before Q1 that pre-fills from PropertyLookupResult. Tap any field to correct. Confirmed values stamp `attributes.{field}_source = 'manual'` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+
+**Action for Claude next session:**
+Don't delete the question — pre-fill it. Build/extend the ATTOMHelloCard component (or a per-field equivalent) that reads from `PropertyLookupResult` and shows confirmable rows. Confirmed values stamp `attributes.{field}_source = "manual"` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.
+
+**Proposed diff:**
+```json
+{
+  "fix": "Add an ATTOMHelloCard component before Q1 that pre-fills from PropertyLookupResult. Tap any field to correct. Confirmed values stamp `attributes.{field}_source = 'manual'` so future ATTOM refreshes don't override. Falls through to manual input cleanly when ATTOM has no record.",
+  "reason": "ATTOM property records often carry roof material. The quiz could open with an 'ATTOM Hello Card' that says 'We see your roof is asphalt — sound right?' with confirm or correct, instead of asking cold.",
+  "severity": "attom_derive",
+  "questionId": "q1_roof_material"
+}
+```
+
+### 39. Estate documents you have on hand?  `q29_estate_docs`
+
+**2026-04-30 · proposal_delete · tom · applied 2026-05-01 · commit 2514c78**
+We don't do estate management anymore and that got moved to a future release so we should be getting rid of all estate questions including this one.
+
+### drop: q23_vehicle_count  `live-quiz-q23_vehicle_count`
+
+**2026-04-30 · proposal_delete · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz quality proposal — drop.**
+
+**Question:** `q23_vehicle_count` — "31. How many cars do you own?"
+**Severity:** drop
+
+**Why:** Vestigial — Q24 (vehicleAdd) handles the primary vehicle directly with a Skip button. Asking for a count first adds friction without value.
+
+**Specific fix:** Delete Q23 from HouseQuizQuestionLibrary.swift. Re-title Q24 to 'Add your primary vehicle' with a Skip option.
+
+**Action for Claude next session:**
+Delete the `q23_vehicle_count` entry from `HouseQuizQuestionLibrary.swift`. Add a one-time migration that strips this question's saved answer from `properties.house_quiz_state` JSONB so resume flows don't trip on it. Update `milestoneIndices` (if any) to use stable question IDs not numeric indices, since indices shift after deletion. Bump value-meter deltas if removing this question would zero a milestone bump — redistribute its delta to nearby questions.
+
+**Proposed diff:**
+```json
+{
+  "fix": "Delete Q23 from HouseQuizQuestionLibrary.swift. Re-title Q24 to 'Add your primary vehicle' with a Skip option.",
+  "reason": "Vestigial — Q24 (vehicleAdd) handles the primary vehicle directly with a Skip button. Asking for a count first adds friction without value.",
+  "severity": "drop",
+  "questionId": "q23_vehicle_count"
+}
+```
+
+### Merge q28_household + q28b_pets  `live-quiz-q28_household`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q28_household` — "37. Who lives here, and who else helps?"
+- Kind: `caretakers`
+- Options: 5
+
+**Sub-question:** `q28b_pets` — "38. Any pets in the household?"
+- Kind: `singleChoice`
+- Options: 5
+- Conditional (`dynamicSkip` set): no
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq28b_pets_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q25_garage_ev + q25b_ev_charger  `live-quiz-q25_garage_ev`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q25_garage_ev` — "33. What kind of garage do you have?"
+- Kind: `singleChoice`
+- Options: 5
+
+**Sub-question:** `q25b_ev_charger` — "34. Do you have a Level 2 EV charger?"
+- Kind: `singleChoice`
+- Options: 2
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq25b_ev_charger_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q18_trash + q18b_trash_day  `live-quiz-q18_trash`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q18_trash` — "25. Trash & recycling?"
+- Kind: `singleChoice`
+- Options: 3
+
+**Sub-question:** `q18b_trash_day` — "26. Which days should Chez remind you about pickup?"
+- Kind: `multiSelect`
+- Options: 7
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq18b_trash_day_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q15_security + q15b_household_contractors  `live-quiz-q15_security`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q15_security` — "21. Security or alarm system?"
+- Kind: `singleChoice`
+- Options: 4
+
+**Sub-question:** `q15b_household_contractors` — "22. Got any pros on speed dial?"
+- Kind: `householdContractors`
+- Options: 15
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq15b_household_contractors_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q14_irrigation + q14b_irrigation_months  `live-quiz-q14_irrigation`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q14_irrigation` — "19. Sprinkler or irrigation?"
+- Kind: `singleChoice`
+- Options: 3
+
+**Sub-question:** `q14b_irrigation_months` — "20. Which months does the irrigation system usually run?"
+- Kind: `multiSelect`
+- Options: 0
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq14b_irrigation_months_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q12_pool + q12c_pool_months  `live-quiz-q12_pool`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q12_pool` — "15. Pool or hot tub?"
+- Kind: `singleChoice`
+- Options: 5
+
+**Sub-question:** `q12c_pool_months` — "17. Which months does your pool company cover?"
+- Kind: `multiSelect`
+- Options: 0
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq12c_pool_months_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q12_pool` — "15. Pool or hot tub?"
+- Kind: `singleChoice`
+- Options: 5
+
+**Sub-question:** `q12b_pool_chemistry` — "16. Saltwater or chlorine?"
+- Kind: `singleChoice`
+- Options: 3
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq12b_pool_chemistry_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q11_lawn + q11c_landscaping_months  `live-quiz-q11_lawn`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q11_lawn` — "12. Keeping up the {street} yard: you or a pro?"
+- Kind: `singleChoice`
+- Options: 5
+
+**Sub-question:** `q11c_landscaping_months` — "14. Which months does your landscaping crew usually come?"
+- Kind: `multiSelect`
+- Options: 0
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq11c_landscaping_months_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q11_lawn` — "12. Keeping up the {street} yard: you or a pro?"
+- Kind: `singleChoice`
+- Options: 5
+
+**Sub-question:** `q11b_lawn_type` — "13. Natural grass, turf, or both?"
+- Kind: `singleChoice`
+- Options: 4
+- Conditional (`dynamicSkip` set): yes
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq11b_lawn_type_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Merge q3_heating_fuel + q3b_hvac_type  `live-quiz-q3_heating_fuel`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Quiz merge proposal — sub-question fold-in.**
+
+Two consecutive questions could combine into one screen via progressive disclosure:
+
+**Parent:** `q3_heating_fuel` — "3. Heat in a {state} home: what's yours running on?"
+- Kind: `singleChoice`
+- Options: 6
+
+**Sub-question:** `q3b_hvac_type` — "4. What kind of HVAC system?"
+- Kind: `singleChoice`
+- Options: 8
+- Conditional (`dynamicSkip` set): no
+
+**Action for Claude next session:**
+1. In `Haven/Features/Onboarding/HouseQuiz/HouseQuizModels.swift`, add a new `HouseQuizQuestionKind` case named for the combined flow (e.g. `progressivePool`, `progressiveLawn`, `trashWithDays`, `garageWithEV`).
+2. In `HouseQuizQuestionLibrary.swift`, replace the parent question's kind with the new combined kind. Move the sub-question's answer options into a structured payload field on `HouseQuizAnswer` (use `payload` JSONB to hold both primary + sub answers as one record).
+3. In `HouseQuizView.swift`, add a body renderer for the new kind: parent radio at top, sub-fields revealed below when not in the skip branch.
+4. In `HouseQuizViewModel.hydrateEntryState`, restore both primary + sub state on resume from the structured payload.
+5. Delete the sub-question entry from `HouseQuizQuestionLibrary`. Migration: `HouseQuizState.migrateMergeq3b_hvac_type_v1()` reads existing answers for the old sub-question and folds them into the new combined answer. Gate on UserDefaults.
+6. Update `HouseQuizAnswerMapper` to read both primary + sub from the new payload and fire all the same side effects the old separate flow did. Don't drop any.
+7. Sum the value-meter deltas of the two old questions onto the new combined question so the meter math doesn't regress.
+
+### Replace Cabinet Pulls and Knobs ↔ Tighten Loose Cabinet Pulls and Knobs  `live-task-handyman-replace-cabinet-pulls-and-knobs`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Duplicate review — concrete merge analysis.**
+
+Detected 57% title overlap, same systemCategory:
+
+**Template A:** Replace Cabinet Pulls and Knobs
+- Description: "Update the kitchen, bath, or built-in cabinet hardware. The handyman handles drilling new holes if the spread changes.…"
+- Frequency: As needed · Cost: $75–$200 plus hardware
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Template B:** Tighten Loose Cabinet Pulls and Knobs
+- Description: "Snug up hardware throughout the kitchen, bath, and built-ins. Often paired with a hinge tune-up on the same visit.…"
+- Frequency: Annually · Cost: $50–$100
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Action for Claude next session:** Decide one of:
+1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
+2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
+3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
+
+### Recaulk Interior Trim and Baseboards ↔ Spot-Paint Interior Trim and Baseboards  `live-task-handyman-recaulk-interior-trim-and-baseboards`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Duplicate review — concrete merge analysis.**
+
+Detected 67% title overlap, same systemCategory:
+
+**Template A:** Recaulk Interior Trim and Baseboards
+- Description: "Cut out old caulk that's separated from the wall or trim, lay a fresh bead, and tool it clean. Restores a tight, finished look at the seams.…"
+- Frequency: As needed · Cost: $100–$300
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Template B:** Spot-Paint Interior Trim and Baseboards
+- Description: "Touch up scuffs and chips on trim, baseboards, and door casings. The handyman matches sheen and color from your existing paint can.…"
+- Frequency: As needed · Cost: $75–$200
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Action for Claude next session:** Decide one of:
+1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
+2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
+3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
+
 ### Test Sump Pump Battery Backup  `live-handyman-plumbing-test-sump-pump-battery-backup`
 
 **2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
@@ -1095,39 +1445,6 @@ Template "Test Sump Pump Battery Backup" has a `no-em-dash` violation in field `
 }
 ```
 
-### Replace Refrigerator Water Filter  `live-handyman-appliance-replace-refrigerator-water-filter`
-
-**2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
-**Punch-list re-route proposal.**
-
-Template "Replace Refrigerator Water Filter" (templateKey: `Appliance:Replace refrigerator water filter`) currently seeds as a `maintenance_tasks` row at quiz completion. Day1TaskCurator then re-parents it under the singleton handyman routine via `parent_routine_id` — which hides it from the main task list but leaves it in maintenance_tasks anyway.
-
-Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a `handyman_punch_items` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.
-
-**Action for Claude next session:**
-1. In `MaintenanceTaskReconciler.reconcile(...)`, when the template's tier resolves to handyman (routingOverride .diyDefault/.diyCapable + effort ≤ 60 + no safety floor), insert into `handyman_punch_items` instead of `maintenance_tasks`.
-2. The punch item carries `source: "auto_seed_handyman_tier"` so the punch list view can sort auto-populated items separately from manual additions.
-3. Add a one-time migration in `AppState.initialize()` (gated on `hasMigratedHandymanTierToPunchItems_v1`) that finds existing `maintenance_tasks` rows for this templateKey + archives them + creates equivalent `handyman_punch_items` rows.
-4. Verify Day1TaskCurator no longer needs to re-parent this template (it'll be skipped at the source).
-5. Update CLAUDE.md to document: handyman-tier templates seed punch items directly.
-
-**Bidirectional UI affordances** (separate but related work):
-- Punch item → Task: "Schedule as a task" action on each punch item card. Creates a maintenance_task with `scheduled_date` set, archives the punch item with reason `promoted_to_task`.
-- Task → Punch item: "Move to handyman list" action on each task detail sheet (already exists per Phase 56.4 docs). Archives the task with reason `moved_to_handyman_punch`, creates the punch item.
-
-**Proposed diff:**
-```json
-{
-  "to": {
-    "destination": "handyman_punch_items"
-  },
-  "from": {
-    "destination": "maintenance_tasks",
-    "parent_routine_id": "<handyman routine UUID>"
-  }
-}
-```
-
 ### Fire Extinguisher Annual Check  `live-handyman-electrical-fire-extinguisher-annual-check`
 
 **2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
@@ -1160,6 +1477,58 @@ Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should se
   }
 }
 ```
+
+### Replace Cabinet Pulls and Knobs ↔ Tighten Loose Cabinet Pulls and Knobs  `live-handyman-handyman-replace-cabinet-pulls-and-knobs`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Duplicate review — concrete merge analysis.**
+
+Detected 57% title overlap, same systemCategory:
+
+**Template A:** Replace Cabinet Pulls and Knobs
+- Description: "Update the kitchen, bath, or built-in cabinet hardware. The handyman handles drilling new holes if the spread changes.…"
+- Frequency: As needed · Cost: $75–$200 plus hardware
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Template B:** Tighten Loose Cabinet Pulls and Knobs
+- Description: "Snug up hardware throughout the kitchen, bath, and built-ins. Often paired with a hinge tune-up on the same visit.…"
+- Frequency: Annually · Cost: $50–$100
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Action for Claude next session:** Decide one of:
+1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
+2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
+3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
+
+### Recaulk Interior Trim and Baseboards ↔ Spot-Paint Interior Trim and Baseboards  `live-handyman-handyman-recaulk-interior-trim-and-baseboards`
+
+**2026-04-30 · change_request · tom · applied 2026-05-01 · commit 31c8e12**
+**Duplicate review — concrete merge analysis.**
+
+Detected 67% title overlap, same systemCategory:
+
+**Template A:** Recaulk Interior Trim and Baseboards
+- Description: "Cut out old caulk that's separated from the wall or trim, lay a fresh bead, and tool it clean. Restores a tight, finished look at the seams.…"
+- Frequency: As needed · Cost: $100–$300
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Template B:** Spot-Paint Interior Trim and Baseboards
+- Description: "Touch up scuffs and chips on trim, baseboards, and door casings. The handyman matches sheen and color from your existing paint can.…"
+- Frequency: As needed · Cost: $75–$200
+- Seasonal: year-round
+- Assignment: either
+- Subtypes: []
+
+**Action for Claude next session:** Decide one of:
+1. **Merge** — pick the better description, keep the broader subtype gate, set stableId on the survivor pointing at the deleted one's templateKey so completion history doesn't orphan.
+2. **Rename one** — make the distinction concrete (add "winter"/"summer"/"interior"/"exterior" to one title).
+3. **Confirm intentional** — close this note with reason; lab can suppress the duplicate detector for this pair via voice-rules.json or a similar allowlist.
 
 ### Verify Radon Mitigation Fan  `live-handyman-handyman-verify-radon-mitigation-fan`
 
@@ -1580,6 +1949,182 @@ Add anything you've been meaning to get to — that's what the handyman is for.
 }
 ```
 
+### Bundle: "Landscaping Spring  `live-task-landscaping-top-up-turf-infill`
+
+**2026-04-30 · proposal_add · tom · applied 2026-05-01 · commit a3f9d8e**
+**Bundle-merge proposal — pre-structured.**
+
+Pattern match: 4 standalone templates share systemCategory=`"Landscaping` + seasonalTiming=`Spring` + assignmentType=`vendor"`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see 4 separate task rows.
+
+**Proposed:**
+- bundleId: `"Landscaping:spring`
+- bundleTitle: "Spring "Landscaping Service" (set on the FIRST template only — that becomes the parent)
+- Templates to fold in:
+  1. Top Up Turf Infill (templateKey: Landscaping:Top up turf infill)
+  2. Power Rake and Groom Turf (templateKey: Landscaping:Power rake and groom turf)
+  3. Deep Clean Synthetic Turf (templateKey: Landscaping:Deep clean synthetic turf)
+  4. Outdoor Lighting Service (templateKey: Landscaping:Outdoor lighting service)
+
+**Action for Claude next session:**
+1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add `bundleId: ""Landscaping:spring"` to all 4 templates listed.
+2. Set `bundleTitle: "Spring "Landscaping Service"` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).
+3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.
+4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_"Landscaping_spring) so existing households' standalone tasks fold into the new bundle parent.
+5. xcodebuild -scheme Chez to confirm clean compile.
+
+**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.
+
+**Proposed diff:**
+```json
+{
+  "members": [
+    {
+      "title": "Top Up Turf Infill",
+      "templateKey": "Landscaping:Top up turf infill"
+    },
+    {
+      "title": "Power Rake and Groom Turf",
+      "templateKey": "Landscaping:Power rake and groom turf"
+    },
+    {
+      "title": "Deep Clean Synthetic Turf",
+      "templateKey": "Landscaping:Deep clean synthetic turf"
+    },
+    {
+      "title": "Outdoor Lighting Service",
+      "templateKey": "Landscaping:Outdoor lighting service"
+    }
+  ],
+  "bundleId": "\"Landscaping:spring",
+  "bundleTitle": "Spring \"Landscaping Service",
+  "parentTemplateKey": "Landscaping:Top up turf infill"
+}
+```
+
+### Bundle: "Chimney Fall  `live-task-chimney-annual-chimney-sweep`
+
+**2026-04-30 · proposal_add · tom · applied 2026-05-01 · commit a3f9d8e**
+**Bundle-merge proposal — pre-structured.**
+
+Pattern match: 3 standalone templates share systemCategory=`"Chimney` + seasonalTiming=`Fall` + assignmentType=`vendor"`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see 3 separate task rows.
+
+**Proposed:**
+- bundleId: `"Chimney:fall`
+- bundleTitle: "Fall "Chimney Service" (set on the FIRST template only — that becomes the parent)
+- Templates to fold in:
+  1. Annual Chimney Sweep (templateKey: Chimney:Annual chimney sweep)
+  2. Inspect Chimney Cap and Crown (templateKey: Chimney:Inspect chimney cap and crown)
+  3. Annual Gas Fireplace Service (templateKey: Chimney:Annual gas fireplace service)
+
+**Action for Claude next session:**
+1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add `bundleId: ""Chimney:fall"` to all 3 templates listed.
+2. Set `bundleTitle: "Fall "Chimney Service"` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).
+3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.
+4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_"Chimney_fall) so existing households' standalone tasks fold into the new bundle parent.
+5. xcodebuild -scheme Chez to confirm clean compile.
+
+**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.
+
+**Proposed diff:**
+```json
+{
+  "members": [
+    {
+      "title": "Annual Chimney Sweep",
+      "templateKey": "Chimney:Annual chimney sweep"
+    },
+    {
+      "title": "Inspect Chimney Cap and Crown",
+      "templateKey": "Chimney:Inspect chimney cap and crown"
+    },
+    {
+      "title": "Annual Gas Fireplace Service",
+      "templateKey": "Chimney:Annual gas fireplace service"
+    }
+  ],
+  "bundleId": "\"Chimney:fall",
+  "bundleTitle": "Fall \"Chimney Service",
+  "parentTemplateKey": "Chimney:Annual chimney sweep"
+}
+```
+
+**2026-04-30 · change_request · tom · applied 2026-04-30 · commit 671327b**
+**Voice fix — pre-computed.**
+
+Template "Annual Chimney Sweep" has a `no-em-dash` violation in field `notes`.
+
+**BEFORE:**
+> Schedule before first use each season. Each chimney is swept separately — if you have multiple flues, mention it so the sweep allocates the right amount of time.
+
+**AFTER (proposed):**
+> Schedule before first use each season. Each chimney is swept separately. If you have multiple flues, mention it so the sweep allocates the right amount of time.
+
+**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
+
+**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
+
+**Proposed diff:**
+```json
+{
+  "notes": {
+    "to": "Schedule before first use each season. Each chimney is swept separately. If you have multiple flues, mention it so the sweep allocates the right amount of time.",
+    "from": "Schedule before first use each season. Each chimney is swept separately — if you have multiple flues, mention it so the sweep allocates the right amount of time."
+  }
+}
+```
+
+### Bundle: "HVAC Fall  `live-task-hvac-professional-hvac-tune-up-heating`
+
+**2026-04-30 · proposal_add · tom · applied 2026-05-01 · commit a3f9d8e**
+**Bundle-merge proposal — pre-structured.**
+
+Pattern match: 4 standalone templates share systemCategory=`"HVAC` + seasonalTiming=`Fall` + assignmentType=`vendor"`. Same shape as the existing Generator:annual / Roofing:spring / Pool/Spa:opening bundles. The vendor handles all of them in one visit anyway, so the homeowner shouldn't see 4 separate task rows.
+
+**Proposed:**
+- bundleId: `"HVAC:fall`
+- bundleTitle: "Fall "HVAC Service" (set on the FIRST template only — that becomes the parent)
+- Templates to fold in:
+  1. HVAC Tune-Up (heating) (templateKey: HVAC:Professional HVAC tune-up (heating))
+  2. Bleed Radiators (templateKey: HVAC:Bleed radiators)
+  3. Annual Boiler Service (templateKey: HVAC:Annual boiler service)
+  4. Whole-Home Humidifier Service (templateKey: HVAC:Whole-home humidifier service)
+
+**Action for Claude next session:**
+1. In Haven/Features/Property/Services/MaintenanceTemplates.swift, add `bundleId: ""HVAC:fall"` to all 4 templates listed.
+2. Set `bundleTitle: "Fall "HVAC Service"` on the FIRST template in the list (the parent — its title becomes the homeowner's task title).
+3. Verify each child gets its templateKey preserved via stableId so existing completion history doesn't orphan.
+4. Confirm AppState.backfillBundlesOnceIfNeeded re-runs (bump migration key to v_"HVAC_fall) so existing households' standalone tasks fold into the new bundle parent.
+5. xcodebuild -scheme Chez to confirm clean compile.
+
+**Alternative:** if these templates have meaningfully different scheduling (e.g., one needs to happen 4 weeks before the others), leave them standalone.
+
+**Proposed diff:**
+```json
+{
+  "members": [
+    {
+      "title": "HVAC Tune-Up (heating)",
+      "templateKey": "HVAC:Professional HVAC tune-up (heating)"
+    },
+    {
+      "title": "Bleed Radiators",
+      "templateKey": "HVAC:Bleed radiators"
+    },
+    {
+      "title": "Annual Boiler Service",
+      "templateKey": "HVAC:Annual boiler service"
+    },
+    {
+      "title": "Whole-Home Humidifier Service",
+      "templateKey": "HVAC:Whole-home humidifier service"
+    }
+  ],
+  "bundleId": "\"HVAC:fall",
+  "bundleTitle": "Fall \"HVAC Service",
+  "parentTemplateKey": "HVAC:Professional HVAC tune-up (heating)"
+}
+```
+
 ### Test Sump Pump Battery Backup  `live-task-plumbing-test-sump-pump-battery-backup`
 
 **2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
@@ -1634,39 +2179,6 @@ Template "Test Sump Pump Battery Backup" has a `no-em-dash` violation in field `
   "description": {
     "to": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years. If it doesn't hold charge, replace before spring rains.",
     "from": "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years — if it doesn't hold charge, replace before spring rains."
-  }
-}
-```
-
-### Replace Refrigerator Water Filter  `live-task-appliance-replace-refrigerator-water-filter`
-
-**2026-04-30 · change_request · tom · applied 2026-04-30 · commit 872eefb**
-**Punch-list re-route proposal.**
-
-Template "Replace Refrigerator Water Filter" (templateKey: `Appliance:Replace refrigerator water filter`) currently seeds as a `maintenance_tasks` row at quiz completion. Day1TaskCurator then re-parents it under the singleton handyman routine via `parent_routine_id` — which hides it from the main task list but leaves it in maintenance_tasks anyway.
-
-Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a `handyman_punch_items` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.
-
-**Action for Claude next session:**
-1. In `MaintenanceTaskReconciler.reconcile(...)`, when the template's tier resolves to handyman (routingOverride .diyDefault/.diyCapable + effort ≤ 60 + no safety floor), insert into `handyman_punch_items` instead of `maintenance_tasks`.
-2. The punch item carries `source: "auto_seed_handyman_tier"` so the punch list view can sort auto-populated items separately from manual additions.
-3. Add a one-time migration in `AppState.initialize()` (gated on `hasMigratedHandymanTierToPunchItems_v1`) that finds existing `maintenance_tasks` rows for this templateKey + archives them + creates equivalent `handyman_punch_items` rows.
-4. Verify Day1TaskCurator no longer needs to re-parent this template (it'll be skipped at the source).
-5. Update CLAUDE.md to document: handyman-tier templates seed punch items directly.
-
-**Bidirectional UI affordances** (separate but related work):
-- Punch item → Task: "Schedule as a task" action on each punch item card. Creates a maintenance_task with `scheduled_date` set, archives the punch item with reason `promoted_to_task`.
-- Task → Punch item: "Move to handyman list" action on each task detail sheet (already exists per Phase 56.4 docs). Archives the task with reason `moved_to_handyman_punch`, creates the punch item.
-
-**Proposed diff:**
-```json
-{
-  "to": {
-    "destination": "handyman_punch_items"
-  },
-  "from": {
-    "destination": "maintenance_tasks",
-    "parent_routine_id": "<handyman routine UUID>"
   }
 }
 ```
@@ -2736,33 +3248,6 @@ Template "Annual Gas Fireplace Service" has a `no-em-dash` violation in field `d
   "description": {
     "to": "Gas tech inspects burner, pilot light, gas connections, thermopile/thermocouple, and logs. Distinct from a sweep. Gas fireplaces don't need creosote cleaning but they do need annual gas-side service.",
     "from": "Gas tech inspects burner, pilot light, gas connections, thermopile/thermocouple, and logs. Distinct from a sweep — gas fireplaces don't need creosote cleaning but they do need annual gas-side service."
-  }
-}
-```
-
-### Annual Chimney Sweep  `live-task-chimney-annual-chimney-sweep`
-
-**2026-04-30 · change_request · tom · applied 2026-04-30 · commit 671327b**
-**Voice fix — pre-computed.**
-
-Template "Annual Chimney Sweep" has a `no-em-dash` violation in field `notes`.
-
-**BEFORE:**
-> Schedule before first use each season. Each chimney is swept separately — if you have multiple flues, mention it so the sweep allocates the right amount of time.
-
-**AFTER (proposed):**
-> Schedule before first use each season. Each chimney is swept separately. If you have multiple flues, mention it so the sweep allocates the right amount of time.
-
-**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.
-
-**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.
-
-**Proposed diff:**
-```json
-{
-  "notes": {
-    "to": "Schedule before first use each season. Each chimney is swept separately. If you have multiple flues, mention it so the sweep allocates the right amount of time.",
-    "from": "Schedule before first use each season. Each chimney is swept separately — if you have multiple flues, mention it so the sweep allocates the right amount of time."
   }
 }
 ```

@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-30T19:42:09.413Z",
+  "generatedAt": "2026-05-01T01:55:16.951Z",
   "sourceFile": "supabase/functions/vehicle-lookup/index.ts",
-  "sourceCommit": "693691c7",
+  "sourceCommit": "31c8e12a",
   "sourceExists": true,
   "systemPrompt": null,
   "cachedSamples": [],
