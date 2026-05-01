@@ -858,10 +858,16 @@ enum MaintenanceTemplates {
         // HVAC
         // ──────────────────────────────────────────────
         ("HVAC", [
-            MaintenanceTemplate(systemCategory: "HVAC", title: "HVAC tune-up (cooling)", description: "HVAC tech inspects and services the air conditioning system before summer. Includes refrigerant level check, condenser coil cleaning, capacitor and contactor inspection, blower motor lubrication, condensate drain flush, and a full system performance test under load. Catches small issues before they become a hot-day breakdown.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Book in February or early March. Most HVAC vendors are fully booked by April once the first warm week hits, and you don't want to be calling around the day your AC stops working in July. Most manufacturer warranties require documented annual service to stay valid.", requiredSubtypes: ["has_ac"], assignmentType: .vendor, stableId: "HVAC:Professional HVAC tune-up (cooling)", maxIntervalDays: 420, warrantyLinked: true),
+            // Phase 67G: HVAC:spring bundle. AC tune-up + mini-split
+            // service + condensate drain flush all happen on the same
+            // spring HVAC tech visit. Subtype gates control which
+            // children render per household — has_ac shows the AC
+            // tune-up + condensate drain; mini_split households get
+            // the outdoor unit inspection too.
+            MaintenanceTemplate(systemCategory: "HVAC", title: "HVAC tune-up (cooling)", description: "HVAC tech inspects and services the air conditioning system before summer. Includes refrigerant level check, condenser coil cleaning, capacitor and contactor inspection, blower motor lubrication, condensate drain flush, and a full system performance test under load. Catches small issues before they become a hot-day breakdown.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Book in February or early March. Most HVAC vendors are fully booked by April once the first warm week hits, and you don't want to be calling around the day your AC stops working in July. Most manufacturer warranties require documented annual service to stay valid.", requiredSubtypes: ["has_ac"], assignmentType: .vendor, stableId: "HVAC:Professional HVAC tune-up (cooling)", bundleId: "HVAC:spring", bundleTitle: "Spring HVAC Service", maxIntervalDays: 420, warrantyLinked: true),
             MaintenanceTemplate(systemCategory: "HVAC", title: "HVAC tune-up (heating)", description: "HVAC tech inspects and services the heating system before winter. Includes burner inspection and cleaning, heat exchanger check for cracks (carbon monoxide risk), gas valve and pilot test, blower motor service, thermostat calibration, and a full ignition cycle test. Critical safety check for gas-fired systems.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Book in August or early September. The first cold snap floods every HVAC vendor's voicemail and turns a routine $200 tune-up into a 2-week wait. Annual service is required to maintain most manufacturer warranties.", requiredSubtypes: ["has_furnace"], assignmentType: .vendor, stableId: "HVAC:Professional HVAC tune-up (heating)", bundleId: "HVAC:fall", bundleTitle: "Fall HVAC Service", maxIntervalDays: 420, warrantyLinked: true),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect ductwork for leaks", description: "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization test or a manual smoke-pencil walkthrough) to find air loss in the supply and return ducts. Most homes lose 20–30% of conditioned air to duct leaks. Sealing them recovers that money on every energy bill for the rest of the system's life.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Older homes (pre-2000) and homes with ductwork running through unconditioned spaces (attic, crawl) benefit most. If your second floor is always 5–10°F off the first floor, leaky ducts are the #1 suspect.", requiredSubtypes: ["ducted"], isEssential: false, assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect mini-split outdoor unit", description: "HVAC tech clears leaves and debris from the outdoor condenser, checks refrigerant line insulation for cracks, washes the coil, verifies the disconnect switch and surge protector, and confirms the unit is level on its pad. Mini-splits can lose 10-20% efficiency to a dirty coil alone.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Often bundled into the spring AC tune-up if your HVAC vendor handles both ducted and ductless. Confirm before booking separately.", requiredSubtypes: ["mini_split"], assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect mini-split outdoor unit", description: "HVAC tech clears leaves and debris from the outdoor condenser, checks refrigerant line insulation for cracks, washes the coil, verifies the disconnect switch and surge protector, and confirms the unit is level on its pad. Mini-splits can lose 10-20% efficiency to a dirty coil alone.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Often bundled into the spring AC tune-up if your HVAC vendor handles both ducted and ductless. Confirm before booking separately.", requiredSubtypes: ["mini_split"], assignmentType: .vendor, bundleId: "HVAC:spring"),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Bleed radiators", description: "Boiler tech opens each radiator's bleed valve in turn to release trapped air, then tops off boiler pressure to spec. Trapped air at the top of a radiator means the bottom half can heat fine while the top stays cold. The room never gets warm even though the system runs constantly.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Most boiler owners include this in the annual boiler service visit instead of a separate appointment. No point paying two trip charges. If you've noticed any radiator running cold or only warming halfway, it's worth flagging to the tech.", requiredSubtypes: ["boiler"], assignmentType: .vendor, bundleId: "HVAC:fall"),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Annual boiler service", description: "Boiler tech runs a full combustion analysis, cleans the burners and combustion chamber, inspects the heat exchanger for cracks (carbon monoxide risk), tests the pressure relief valve, verifies exhaust draft and flue integrity, and checks the expansion tank charge. The most consequential heating-system service in the house. A cracked heat exchanger can leak CO into living spaces.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Required for warranty on most boilers. The manufacturer pulls service records when a claim is filed. Schedule in August or early September. Once the first cold snap hits, every boiler tech is booked solid for 2–3 weeks and a routine service turns into an emergency call.", requiredSubtypes: ["boiler"], assignmentType: .vendor, bundleId: "HVAC:fall", safetyFloor: true, maxIntervalDays: 420, warrantyLinked: true),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Geothermal loop pressure check", description: "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak. Could be a pinhole in the ground loop, fittings at the manifold, or the heat pump's internal pressure switch. Catching this early prevents a full system shutdown.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Use the original installer if possible. Geothermal is specialized. Most general HVAC techs don't have the loop testing equipment or the training to diagnose ground-side issues.", requiredSubtypes: ["geothermal"], assignmentType: .vendor, safetyFloor: true),
@@ -908,6 +914,7 @@ enum MaintenanceTemplates {
                 isEssential: false,
                 assignmentType: .either,
                 diyEffortMinutes: 10,
+                bundleId: "HVAC:spring",
                 routingOverride: .diyCapable
             ),
         ]),
@@ -981,8 +988,18 @@ enum MaintenanceTemplates {
             // Phase 58: GFCI test, smoke detector verify, CO detector verify
             // all killed — modern devices self-test. Battery replacement
             // folded into Handyman:spring/fall defaults.
-            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms. Check the manufacture date on every detector while up there; some homes have a mix of newer and older units.", isEssential: false, assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "Electrical", title: "Inspect electrical panel", description: "Electrician opens the main breaker panel to check for signs of wear: burned or discolored bus bars, loose terminations, corrosion, water staining, and breakers that feel warm to the touch under load. Catches the early warning signs of a panel that's nearing end-of-life or has a high-current connection slowly arcing.", frequency: "Every 3 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks. If you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.", isEssential: false, assignmentType: .vendor, safetyFloor: true),
+            // Phase 67G: Electrical:fall bundle. Same electrician can
+            // run the heat cable check (annual, drives the bundle's
+            // cadence), panel inspection (3yr), IR scan (3yr), and
+            // smoke detector replacement (10yr) on a single fall
+            // visit. Mixed cadences are fine — the bundle parent
+            // fires annually with heat cable, and the longer-cadence
+            // children render in "What's included" only on their
+            // actual due years (or whenever the user opts in via
+            // Recommended for your home). All four are
+            // `isEssential: false` — the bundle stays opt-in.
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms. Check the manufacture date on every detector while up there; some homes have a mix of newer and older units.", isEssential: false, assignmentType: .vendor, bundleId: "Electrical:fall"),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Inspect electrical panel", description: "Electrician opens the main breaker panel to check for signs of wear: burned or discolored bus bars, loose terminations, corrosion, water staining, and breakers that feel warm to the touch under load. Catches the early warning signs of a panel that's nearing end-of-life or has a high-current connection slowly arcing.", frequency: "Every 3 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks. If you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.", isEssential: false, assignmentType: .vendor, bundleId: "Electrical:fall", safetyFloor: true),
             // Phase 57: EV charger inspection — annual electrical check of
             // the Level 2 charger, dedicated circuit, and connections.
             // Gated on `has_ev_charger` property flag.
@@ -1019,6 +1036,7 @@ enum MaintenanceTemplates {
                 notes: "Ask for thermal images to be included in the service report for your home records.",
                 isEssential: false,
                 assignmentType: .vendor,
+                bundleId: "Electrical:fall",
                 safetyFloor: true
             ),
             // Phase 67A: Heat cable inspection. Gated on `has_heat_cables`
@@ -1038,6 +1056,8 @@ enum MaintenanceTemplates {
                 requiredSubtypes: ["has_heat_cables"],
                 isEssential: false,
                 assignmentType: .vendor,
+                bundleId: "Electrical:fall",
+                bundleTitle: "Fall Electrical Service",
                 safetyFloor: true,
                 regionalPack: .northeast
             ),
@@ -1286,6 +1306,14 @@ enum MaintenanceTemplates {
             // off lawns. `stableId` preserves the legacy `templateId`
             // values so existing tasks dedupe correctly after the
             // migration.
+            // Phase 67G: Landscaping:hardscape_annual bundle. Pressure
+            // wash + joint sand + drainage check land on the same
+            // hardscape specialist visit (or DIY weekend). All three
+            // gated on `["hardscape"]` so they only fire for hardscape
+            // households. Quarterly weed-treatment intentionally NOT
+            // bundled — quarterly cadence wouldn't fit an annual
+            // bundle parent without firing 4× per year. Stays
+            // standalone.
             MaintenanceTemplate(
                 systemCategory: "Landscaping",
                 title: "Pressure wash patio and walkways",
@@ -1300,7 +1328,9 @@ enum MaintenanceTemplates {
                 requiredSubtypes: ["hardscape"],
                 assignmentType: .either,
                 diyEffortMinutes: 120,
-                stableId: "landscaping:hardscape_pressure_wash"
+                stableId: "landscaping:hardscape_pressure_wash",
+                bundleId: "Landscaping:hardscape_annual",
+                bundleTitle: "Annual Hardscape Service"
             ),
             MaintenanceTemplate(
                 systemCategory: "Landscaping",
@@ -1316,7 +1346,8 @@ enum MaintenanceTemplates {
                 requiredSubtypes: ["hardscape"],
                 assignmentType: .either,
                 diyEffortMinutes: 60,
-                stableId: "landscaping:hardscape_joint_sand"
+                stableId: "landscaping:hardscape_joint_sand",
+                bundleId: "Landscaping:hardscape_annual"
             ),
             MaintenanceTemplate(
                 systemCategory: "Landscaping",
@@ -1348,7 +1379,8 @@ enum MaintenanceTemplates {
                 requiredSubtypes: ["hardscape"],
                 assignmentType: .either,
                 diyEffortMinutes: 30,
-                stableId: "landscaping:hardscape_drainage_check"
+                stableId: "landscaping:hardscape_drainage_check",
+                bundleId: "Landscaping:hardscape_annual"
             ),
         ]),
 
@@ -1357,7 +1389,12 @@ enum MaintenanceTemplates {
         // ──────────────────────────────────────────────
         ("Irrigation", [
             MaintenanceTemplate(systemCategory: "Irrigation", title: "Winterize irrigation system", description: "Irrigation tech connects an air compressor to the system, isolates each zone in turn, and blows compressed air through the lines until water stops emerging from the heads. Drains the backflow preventer and shuts the main supply at the curb stop. A single skipped year on a freeze-prone climate can split mainlines underground.", frequency: "Annually", priority: "High", estimatedCostRange: "$75–$150", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Must be done before the first hard freeze. Once water freezes inside a head or valve, it cracks the brass. And you don't find out until spring startup when the system pressurizes and the leaks reveal themselves. In the Northeast, target mid-October.", assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "Irrigation", title: "Spring startup irrigation", description: "Irrigation service gradually pressurizes the system zone by zone, watching for unexpected geysers from cracked heads or split lines that froze over winter. Adjusts spray patterns for fresh landscape growth, replaces broken heads, and tests the rain sensor and controller. Sets the seasonal watering schedule.", frequency: "Annually", priority: "High", estimatedCostRange: "$75–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Schedule for after the last hard freeze (mid-April in the Northeast, earlier south). If your vendor pressurizes before the ground thaws fully you risk a burst on a still-frozen line.", assignmentType: .vendor),
+            // Phase 67G: Irrigation:spring bundle. Spring startup +
+            // backflow test happen on the same visit (most irrigation
+            // vendors include backflow with startup anyway). Winter
+            // winterization stays standalone — different season, same
+            // vendor but no scheduling overlap with spring work.
+            MaintenanceTemplate(systemCategory: "Irrigation", title: "Spring startup irrigation", description: "Irrigation service gradually pressurizes the system zone by zone, watching for unexpected geysers from cracked heads or split lines that froze over winter. Adjusts spray patterns for fresh landscape growth, replaces broken heads, and tests the rain sensor and controller. Sets the seasonal watering schedule.", frequency: "Annually", priority: "High", estimatedCostRange: "$75–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Schedule for after the last hard freeze (mid-April in the Northeast, earlier south). If your vendor pressurizes before the ground thaws fully you risk a burst on a still-frozen line.", assignmentType: .vendor, bundleId: "Irrigation:spring", bundleTitle: "Spring Irrigation Startup"),
             // Phase 62: Backflow preventer test. Universal for irrigation
             // systems — most municipalities legally require an annual
             // certified-tester inspection. Vendor-only because it
@@ -1375,7 +1412,8 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Spring",
                 professionalRequired: true,
                 notes: "Your water utility may send an annual reminder. Many irrigation services include the test with spring startup.",
-                assignmentType: .vendor
+                assignmentType: .vendor,
+                bundleId: "Irrigation:spring"
             ),
         ]),
 
@@ -2348,6 +2386,13 @@ enum MaintenanceTemplates {
             // Landscaping category as long as they have mature_trees
             // flagged. Tree Service category retains Pruning and crown
             // thinning + other dedicated arborist work.
+            // Phase 67G: Tree Service:annual bundle. Same arborist
+            // visit handles both routine pruning and roof-clearance
+            // trimming. Trim-trees-away-from-roof drives the bundle's
+            // annual cadence; pruning-and-crown-thinning is every 3
+            // years and surfaces in the bundle's "What's included" on
+            // its own due cycle. `isEssential: false` flags preserved
+            // — the bundle stays opt-in via Recommended for your home.
             MaintenanceTemplate(
                 systemCategory: "Tree Service",
                 title: "Pruning and crown thinning",
@@ -2361,6 +2406,7 @@ enum MaintenanceTemplates {
                 notes: "Dormant-season pruning (Dec-Mar) is safest for the trees and cheapest for you.",
                 isEssential: false,
                 assignmentType: .vendor,
+                bundleId: "Tree Service:annual",
                 safetyFloor: true
             ),
             // Phase 58: moved from Roofing — branch trimming within 10 ft
@@ -2378,6 +2424,8 @@ enum MaintenanceTemplates {
                 notes: "Arborist required for large trees",
                 isEssential: false,
                 assignmentType: .vendor,
+                bundleId: "Tree Service:annual",
+                bundleTitle: "Annual Arborist Visit",
                 safetyFloor: true
             ),
         ]),
