@@ -5940,3 +5940,61 @@
   min-height: 36px;
   padding: 6px 10px;
 }
+
+/* =============================================================================
+   Phase 5z+21 — Needs-review content card (focused audit panel)
+   ============================================================================= */
+.admin-audit-needsreview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-audit-needsreview__audience {
+  background: rgba(69, 58, 112, 0.05);
+  border-left: 3px solid rgba(69, 58, 112, 0.4);
+  border-radius: 0 8px 8px 0;
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.admin-audit-needsreview__card {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.admin-audit-needsreview__title {
+  color: var(--text);
+  font: 700 16px var(--sans);
+  margin: 0 0 6px;
+}
+
+.admin-audit-needsreview__desc {
+  color: var(--text);
+  font: 500 13px/1.55 var(--sans);
+  margin: 0 0 10px;
+}
+
+.admin-audit-needsreview__fields {
+  display: grid;
+  font: 500 12px var(--sans);
+  gap: 4px 14px;
+  grid-template-columns: max-content 1fr;
+  margin: 0;
+}
+
+.admin-audit-needsreview__fields dt {
+  color: var(--text-soft);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-audit-needsreview__fields dd {
+  color: var(--text);
+  margin: 0;
+}

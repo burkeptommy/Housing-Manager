@@ -4782,63 +4782,96 @@ function auditRecommendationFor(finding) {
       ],
     };
   }
-  // Phase 5z+19 — Needs review (high-impact entities, merged from
-  // Decisions). Uses the existing valueAnalysisFor engine.
+  // Phase 5z+19/+21 — Needs review. Tom's frustration: "I have no
+  // idea what this means. is it asking me to keep or remove the
+  // task?" Make it decisive: pick approve / edit / cut explicitly,
+  // surface the actual entity content so Tom can read it without
+  // jumping tabs, and frame each action's effect in concrete user-
+  // facing terms (what happens to homeowners, not abstract Haven
+  // plumbing).
   if (finding.kind === "needs_review") {
-    const value = finding.data.valueAnalysis || valueAnalysisFor(finding.data.targetItem || {});
-    const tierBadge = {
-      high: { tone: "active", label: "High value" },
-      medium: { tone: "draft", label: "Worth a review" },
-      low: { tone: "cut", label: "Low value" },
-    }[value.tier] || { tone: "draft", label: value.tier };
-    const substitutesActions = (value.substitutes || []).map((_, i) => ({
-      id: `review-substitute-${i}`,
-      label: `Draft swap → ${(value.substitutes[i] || "").split("(")[0].trim().slice(0, 40)}…`,
-    }));
-    const isLow = value.tier === "low";
-    const baseActions = isLow
-      ? [
-          { id: "review-cut", label: "Cut entity", primary: true, danger: true },
-          { id: "review-approve", label: "Approve + lock" },
-          { id: "review-open", label: "Open to edit" },
-        ]
-      : [
-          { id: "review-approve", label: "Approve + lock", primary: true },
-          { id: "review-open", label: "Open to edit" },
-          { id: "review-cut", label: "Cut entity", danger: true },
-        ];
-    return {
-      recommendation: value.summary,
-      contextHtml: `
-        <div class="admin-decision-focused__impact">
-          <div class="admin-decision-focused__value-row">
-            <span class="admin-pill" data-tone="${escapeHtml(tierBadge.tone)}">${escapeHtml(tierBadge.label)}</span>
-            <p class="admin-decision-focused__value-summary">${escapeHtml(value.reasoning || finding.reason)}</p>
-          </div>
-          <p class="admin-muted admin-decision-focused__value-why">${escapeHtml(finding.reason)}</p>
+    const item = finding.data.targetItem || {};
+    const t = item.payload || {};
+    const value = finding.data.valueAnalysis || valueAnalysisFor(item);
+    const pick = decisivePickFor(item, value);
+    // Build the actual content card so Tom reads the title/desc/etc.
+    const description = (item.description || t.description || "").trim();
+    const frequency = t.frequency || "—";
+    const seasonal = t.seasonalTiming || "Year-round";
+    const assignment = ({
+      vendor: "A pro (always)",
+      personal: "Homeowner (DIY only)",
+      either: "Either — homeowner or pro",
+    })[t.assignmentType] || t.assignmentType || "—";
+    const cost = t.estimatedCostRange || "—";
+    const universal = (t.requiredSubtypes || []).length === 0;
+    const audience = universal
+      ? "Every homeowner who finishes the quiz gets this on their schedule."
+      : `Only homes that match certain conditions get this (${(t.requiredSubtypes || []).map((s) => (typeof humanizeSubtype === "function" ? humanizeSubtype(s) : s)).join(", ")}).`;
+
+    const contextHtml = `
+      <div class="admin-audit-needsreview">
+        <p class="admin-audit-needsreview__audience"><strong>Who sees this:</strong> ${escapeHtml(audience)}</p>
+        <div class="admin-audit-needsreview__card">
+          <h5 class="admin-audit-needsreview__title">${escapeHtml(item.title || finding.title)}</h5>
+          ${description ? `<p class="admin-audit-needsreview__desc">${escapeHtml(description)}</p>` : `<p class="admin-audit-needsreview__desc admin-muted"><em>No description set. The homeowner sees just the title — that's likely too thin.</em></p>`}
+          <dl class="admin-audit-needsreview__fields">
+            <dt>How often</dt><dd>${escapeHtml(frequency)}</dd>
+            <dt>Time of year</dt><dd>${escapeHtml(seasonal)}</dd>
+            <dt>Who handles it</dt><dd>${escapeHtml(assignment)}</dd>
+            <dt>Cost</dt><dd>${escapeHtml(cost)}</dd>
+          </dl>
         </div>
         ${value.substitutes && value.substitutes.length ? `
           <div class="admin-decision-focused__substitutes">
-            <strong>Higher-value swap ideas</strong>
-            <p class="admin-muted">If this slot opens up, these are the kinds of things HNW Westchester homes actually want tracked.</p>
+            <strong>If you cut it, here's what HNW homes actually want instead</strong>
             <ul>
-              ${value.substitutes.map((s) => `<li><span class="admin-decision-focused__substitute-text">${escapeHtml(s)}</span></li>`).join("")}
+              ${value.substitutes.slice(0, 5).map((s) => `<li><span class="admin-decision-focused__substitute-text">${escapeHtml(s)}</span></li>`).join("")}
             </ul>
           </div>
         ` : ""}
-      `,
-      whatHappens: isLow
-        ? [
-            `<strong>Cut entity</strong> removes it. The slot opens up for a higher-value HNW service.`,
-            `<strong>Approve + lock</strong> keeps it as-is. Only do this if you've thought about it and decided it's pulling its weight.`,
-            `<strong>Open to edit</strong> jumps to the entity so you can rework wording / cadence / cost.`,
-          ]
-        : [
-            `<strong>Approve + lock</strong> tells Haven this entity is final. It stops surfacing here.`,
-            `<strong>Open to edit</strong> jumps to the entity's full detail panel.`,
-            `<strong>Cut entity</strong> removes it. New households won't see it.`,
-          ],
-      actions: [...baseActions, ...substitutesActions],
+      </div>
+    `;
+
+    // Action set + recommended primary depend on the decisive pick.
+    const actions = [];
+    const whatHappens = [];
+    if (pick.action === "approve") {
+      actions.push({ id: "review-approve", label: "Looks good — lock it in", primary: true });
+      actions.push({ id: "review-open", label: "Open to edit" });
+      actions.push({ id: "review-cut", label: "Cut it from the catalog", danger: true });
+      whatHappens.push(`<strong>Looks good — lock it in:</strong> stops showing up in your audit list. Every new homeowner still gets it on their schedule. Nothing changes for them.`);
+      whatHappens.push(`<strong>Open to edit:</strong> jumps to the Tasks tab so you can tweak wording / frequency / cost / who handles it.`);
+      whatHappens.push(`<strong>Cut it from the catalog:</strong> new homeowners won't see it. Existing homeowners keep it on their schedule until they complete or archive it themselves.`);
+    } else if (pick.action === "edit") {
+      actions.push({ id: "review-open", label: "Open to edit", primary: true });
+      actions.push({ id: "review-approve", label: "Lock as-is anyway" });
+      actions.push({ id: "review-cut", label: "Cut it from the catalog", danger: true });
+      whatHappens.push(`<strong>Open to edit:</strong> jumps to the Tasks tab so you can fix the title / fill in the description / adjust whatever's off.`);
+      whatHappens.push(`<strong>Lock as-is anyway:</strong> approves the current wording and stops showing it here. Use this if you disagree with the recommendation.`);
+      whatHappens.push(`<strong>Cut it from the catalog:</strong> removes it entirely. New homeowners won't see it.`);
+    } else {
+      // cut
+      actions.push({ id: "review-cut", label: "Cut it from the catalog", primary: true, danger: true });
+      actions.push({ id: "review-approve", label: "Lock as-is anyway" });
+      actions.push({ id: "review-open", label: "Open to edit instead" });
+      whatHappens.push(`<strong>Cut it from the catalog:</strong> removes it entirely. New homeowners won't see it. Existing homeowners keep what they already have until they complete or archive.`);
+      whatHappens.push(`<strong>Lock as-is anyway:</strong> approves it and stops showing it here. Use this if you think it's worth keeping.`);
+      whatHappens.push(`<strong>Open to edit instead:</strong> jumps to the Tasks tab so you can rework it before deciding.`);
+    }
+    // Substitute action buttons (low-tier only, when we have a list).
+    const substituteActions = pick.action === "cut" && value.substitutes && value.substitutes.length
+      ? value.substitutes.slice(0, 3).map((_, i) => ({
+          id: `review-substitute-${i}`,
+          label: `Draft swap → ${(value.substitutes[i] || "").split("(")[0].trim().slice(0, 30)}…`,
+        }))
+      : [];
+
+    return {
+      recommendation: pick.recommendation,
+      contextHtml,
+      whatHappens,
+      actions: [...actions, ...substituteActions],
     };
   }
   return {
@@ -4846,6 +4879,74 @@ function auditRecommendationFor(finding) {
     contextHtml: "",
     whatHappens: [],
     actions: [],
+  };
+}
+
+// Phase 5z+21 — Pick a specific action (approve / edit / cut) for a
+// "needs review" finding based on content quality + value tier. Tom's
+// frustration: the old "skim carefully before locking" line was an
+// instruction, not a decision. Now the recommendation reads as "do
+// this exact thing." Heuristic order:
+//
+//   safety floor          → approve  (always keep)
+//   bundle parent          → approve  (already vetted as a visit)
+//   value tier = low       → cut       (filler — not pulling weight)
+//   description missing or
+//     <40 chars            → edit      (homeowner sees just a title)
+//   title has voice issues → edit      (em-dash, "Professional X")
+//   title too short / vague → edit
+//   else                    → approve   (content is fine as-is)
+function decisivePickFor(item, value) {
+  const t = item.payload || {};
+  const title = (item.title || "").trim();
+  const description = (item.description || t.description || "").trim();
+
+  if (t.safetyFloor === true) {
+    return {
+      action: "approve",
+      recommendation: `Safety-required work — homeowners can't safely DIY this. Lock it in. The wording is fine; the audit's just flagging it because it's not yet marked approved.`,
+    };
+  }
+  if (t.bundleTitle) {
+    return {
+      action: "approve",
+      recommendation: `This is a seasonal visit that bundles several individual tasks together. Bundle parents are already vetted by the time they ship. Lock it in.`,
+    };
+  }
+  if (value?.tier === "low") {
+    return {
+      action: "cut",
+      recommendation: `Low-value chore most HNW homeowners would forget without missing. ${value.reasoning ? value.reasoning.split(".")[0] + "." : ""} Cut it — open the slot for a higher-value HNW service.`,
+    };
+  }
+  if (!description || description.length < 40) {
+    return {
+      action: "edit",
+      recommendation: `Description is ${description ? "thin" : "missing"}. Every homeowner sees just the title — that's not enough context for them to act on. Open to edit and write a sentence or two: what they actually do, what equipment they need, what "good" looks like.`,
+    };
+  }
+  if (/—/.test(title) || /—/.test(description)) {
+    return {
+      action: "edit",
+      recommendation: `Wording uses an em-dash (—) which reads as AI-generated to HNW homeowners. Open to edit and replace with a period or comma.`,
+    };
+  }
+  if (/^Professional\s+/i.test(title)) {
+    return {
+      action: "edit",
+      recommendation: `Title starts with "Professional X" — Haven's voice rule says use "Annual X" instead. Open to edit and rename.`,
+    };
+  }
+  if (title.length < 12 || title.split(/\s+/).length < 3) {
+    return {
+      action: "edit",
+      recommendation: `Title is short / vague. Open to edit and make it action-first ("Tune up the boiler" reads better than "Boiler service").`,
+    };
+  }
+  // Default — content looks solid.
+  return {
+    action: "approve",
+    recommendation: `This looks good as-is. Title is sharp, description is specific, frequency + assignment are set. Lock it in so it stops showing up in your audit list.`,
   };
 }
 
