@@ -49,19 +49,40 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
+// Phase 5z+18 — VIEWS now carries a `group` field so the left nav can
+// render section headers. Tom: "we should also categorize our left
+// hand panel to make it easier to navigate like a real site."
+//
+// Five sections:
+//   action     — what needs your attention RIGHT NOW (Audit, Decisions)
+//   catalog    — the editable content (Quiz, Tasks, Routines, etc.)
+//   reference  — data the catalog references (Systems, Vendors, Prompts)
+//   archive    — your running log + history (Notes, Activity)
+//   tools      — sandboxes + reference docs (Simulate, Architecture, Claude file)
 const VIEWS = [
+  {
+    id: "audit",
+    label: "Audit",
+    type: "audit",
+    group: "action",
+    title: "Coverage Audit",
+    eyebrow: "Mismatches + gaps in the catalog",
+    subtitle: "Five auto-detected coverage checks. Tasks without a vendor type that can do them, quiz questions that don't drive anything, vendors with no tasks, missing vendor types HNW homes typically have, missing routines. Click any row for the full read + a one-click action.",
+  },
   {
     id: "decisions",
     label: "Decisions",
     type: "decision",
+    group: "action",
     title: "Decisions Queue",
     eyebrow: "Curate to launch",
-    subtitle: "Auto-flagged entities awaiting your call. Approve, cut, or note for Claude.",
+    subtitle: "Auto-detected issues that don't already have a note about them. Voice / style fixes + entities flagged for review.",
   },
   {
     id: "quiz",
     label: "Quiz",
     type: "question",
+    group: "catalog",
     title: "Quiz Builder",
     eyebrow: "Onboarding",
     subtitle: "Every quiz question with full Swift-side configuration. Notes round-trip to Claude.",
@@ -71,6 +92,7 @@ const VIEWS = [
     id: "tasks",
     label: "Tasks",
     type: "task",
+    group: "catalog",
     title: "Maintenance Templates",
     eyebrow: "MaintenanceTemplates.swift",
     subtitle: "Every template Haven seeds — full field set, lint warnings, bundle membership.",
@@ -80,6 +102,7 @@ const VIEWS = [
     id: "routines",
     label: "Routines",
     type: "routine",
+    group: "catalog",
     title: "Routine Kinds",
     eyebrow: "RoutineKind enum + RoutineSeeder defaults",
     subtitle: "The 20 kinds of recurring rhythms (vendor + cadence) the app understands.",
@@ -89,6 +112,7 @@ const VIEWS = [
     id: "handyman",
     label: "Handyman",
     type: "handyman",
+    group: "catalog",
     title: "Handyman Library + Punch List",
     eyebrow: "Spring auto-pops · Fall auto-pops · Library opt-in",
     subtitle:
@@ -99,6 +123,7 @@ const VIEWS = [
     id: "recommended",
     label: "Recommended",
     type: "recommended",
+    group: "catalog",
     title: "Recommended Services + Optional Tasks",
     eyebrow: "isEssential: false — homeowner opts in",
     subtitle:
@@ -106,9 +131,20 @@ const VIEWS = [
     liveSource: "templates",
   },
   {
+    id: "vehicles",
+    label: "Vehicles",
+    type: "vehicle",
+    group: "catalog",
+    title: "Vehicle Task Generation",
+    eyebrow: "vehicle-lookup edge function + canonical vehicle catalog",
+    subtitle: "The prompt that generates per-vehicle maintenance schedules + the catalog of common vehicle tasks the prompt produces. Notes you write here ride into the prompt's behavior next session.",
+    liveSource: "vehicle-task-prompt",
+  },
+  {
     id: "systems",
     label: "Systems",
     type: "system",
+    group: "reference",
     title: "System Categories",
     eyebrow: "SystemCategoryRegistry",
     subtitle: "Tiered registry that gates vendor coverage + drives template grouping.",
@@ -118,57 +154,63 @@ const VIEWS = [
     id: "vendors",
     label: "Vendors",
     type: "vendor",
+    group: "reference",
     title: "Vendor Types",
     eyebrow: "Who shows up to do the work",
     subtitle:
       "Every kind of vendor the app understands — handyman, plumber, HVAC, etc. The quiz captures these in Q15b, the maintenance reconciler routes pro work to them, and the Contacts hub surfaces them as cards on the property page.",
   },
   {
-    id: "vehicles",
-    label: "Vehicles",
-    type: "vehicle",
-    title: "Vehicle Task Generation",
-    eyebrow: "vehicle-lookup edge function",
-    subtitle: "The prompt that generates per-vehicle maintenance schedules.",
-    liveSource: "vehicle-task-prompt",
-  },
-  {
     id: "prompts",
     label: "Prompts",
     type: "prompt",
+    group: "reference",
     title: "Edge Function Prompts",
     eyebrow: "supabase/functions/*/index.ts",
     subtitle: "All 50+ Edge Functions — first system prompt, model, and notes.",
     liveSource: "edge-function-prompts",
   },
   {
-    id: "simulator",
-    label: "Simulate",
-    type: "simulator",
-    title: "Reconciler Simulator",
-    eyebrow: "What would seed?",
-    subtitle: "Pick property facts and see what tasks the reconciler would create. JS port of MaintenanceTaskReconciler + Day1TaskCurator.",
-  },
-  {
     id: "searches",
     label: "Searches",
     type: "search",
+    group: "reference",
     title: "Search Builders (legacy)",
     eyebrow: "Provider and system search",
     subtitle: "Hand-curated search-surface defaults. Will fold into Vendors+Systems eventually.",
   },
   {
+    id: "notes",
+    label: "Notes",
+    type: "note",
+    group: "archive",
+    title: "All Notes",
+    eyebrow: "Product memory for Claude + Codex",
+    subtitle: "Every contextual note you've saved. Filter by intent + target.",
+  },
+  {
     id: "activity",
     label: "Activity",
     type: "activity",
+    group: "archive",
     title: "Recent Activity",
     eyebrow: "Applied + reverted timeline",
     subtitle: "Every change Claude has shipped, in reverse-chronological order.",
   },
   {
+    id: "simulator",
+    label: "Simulate",
+    type: "simulator",
+    group: "tools",
+    title: "Reconciler Simulator",
+    eyebrow: "What would seed?",
+    subtitle: "Pick property facts and see what tasks the reconciler would create. JS port of MaintenanceTaskReconciler + Day1TaskCurator.",
+  },
+  {
     id: "architecture",
     label: "Architecture",
     type: "architecture",
+    group: "tools",
     title: "Object Architecture",
     eyebrow: "What objects exist + how they relate",
     subtitle: "Walkable map of every entity, its key fields, and its relationships. Click any “→ X” link to jump to the related object's card.",
@@ -177,18 +219,20 @@ const VIEWS = [
     id: "claude_file",
     label: "Claude file",
     type: "claude_file",
+    group: "tools",
     title: "CLAUDE_ADMIN_NOTES.md (live preview)",
     eyebrow: "What Claude reads next session",
     subtitle: "Live render of what's in your notes file right now. Mirrors the sync script's output without needing a local terminal.",
   },
-  {
-    id: "notes",
-    label: "Notes",
-    type: "note",
-    title: "All Notes",
-    eyebrow: "Product memory for Claude + Codex",
-    subtitle: "Every contextual note you've saved. Filter by intent + target.",
-  },
+];
+
+// Phase 5z+18 — Group labels for the left nav. Order here = render order.
+const VIEW_GROUPS = [
+  { id: "action",    label: "Needs attention" },
+  { id: "catalog",   label: "Catalog" },
+  { id: "reference", label: "Reference" },
+  { id: "archive",   label: "Notes & history" },
+  { id: "tools",     label: "Tools" },
 ];
 
 const DEFAULT_ROUTINES = [
@@ -1091,11 +1135,57 @@ function liveItemsForView(viewId) {
   if (!mapper) return null;
 
   const entries = src.entries || src.functions || [];
-  // Vehicle-task-prompt is a single entity, not an array. Wrap it.
+  // Vehicle-task-prompt is a single entity, not an array. Wrap it +
+  // append the canonical vehicle-task catalog so the tab shows what
+  // the prompt typically produces, not just "1 prompt." Phase 5z+18.
   if (view.id === "vehicles") {
-    return [mapper(src, 0)];
+    return [mapper(src, 0), ...canonicalVehicleTaskItems()];
   }
   return entries.map((entry, idx) => mapper(entry, idx)).filter(Boolean);
+}
+
+// Phase 5z+18 — Canonical vehicle task catalog. The vehicle-lookup
+// edge function generates these per VIN at runtime, but they're a
+// stable set across most cars. Surfacing them on the Vehicles tab
+// gives Tom something to read + write notes on, instead of staring at
+// a single edge-function prompt entry.
+const CANONICAL_VEHICLE_TASKS = [
+  { title: "Oil + filter change", interval: "5,000–7,500 mi or 6 mo", category: "Service", note: "Synthetic oil schedule depends on the manufacturer." },
+  { title: "Tire rotation", interval: "5,000–7,500 mi", category: "Service", note: "Often paired with oil change so the homeowner only books one visit." },
+  { title: "Brake inspection", interval: "Annually or every 12,000 mi", category: "Safety", note: "Pad thickness, rotor wear, fluid level. Most shops do this free at oil change." },
+  { title: "Tire replacement (set of 4)", interval: "40,000–60,000 mi", category: "Service", note: "AI scales by tire-life prediction from the VIN model." },
+  { title: "Cabin air filter", interval: "Every 15,000–25,000 mi", category: "Comfort", note: "Easy DIY on most cars. The prompt flags it for the homeowner." },
+  { title: "Engine air filter", interval: "Every 15,000–30,000 mi", category: "Service", note: "Easy DIY on most cars." },
+  { title: "Wiper blades", interval: "Every 6–12 months", category: "Safety", note: "Replace before driving in heavy rain." },
+  { title: "12V battery test", interval: "Annually", category: "Reliability", note: "Most batteries fail at 4–5 years. Spring + fall test catches it before a no-start." },
+  { title: "Coolant flush", interval: "Every 60,000 mi or 5 yr", category: "Service", note: "Skipping leads to corrosion + radiator failure." },
+  { title: "Transmission service", interval: "Every 60,000–100,000 mi", category: "Service", note: "Manufacturer schedule varies — AI uses the VIN spec." },
+  { title: "Brake fluid flush", interval: "Every 2 years", category: "Safety", note: "Old brake fluid absorbs moisture and softens the pedal." },
+  { title: "Spark plugs", interval: "Every 60,000–100,000 mi", category: "Service", note: "Iridium plugs last longer; the AI checks the VIN spec." },
+  { title: "Annual state inspection", interval: "Annually (state-dependent)", category: "Compliance", note: "AI surfaces the right window for the registered state." },
+  { title: "Registration renewal", interval: "Annually or every 2 yr", category: "Compliance", note: "Reminder fires 30 days before expiry." },
+  { title: "Insurance renewal", interval: "Every 6 or 12 mo", category: "Compliance", note: "Reminder fires 30 days before expiry." },
+  { title: "Recall check", interval: "Quarterly", category: "Safety", note: "Polled from NHTSA via the check-vehicle-recalls edge function." },
+];
+
+function canonicalVehicleTaskItems() {
+  return CANONICAL_VEHICLE_TASKS.map((t, i) => ({
+    id: `canon-vehicle-task-${slug(t.title)}`,
+    source: "default",
+    itemType: "vehicle",
+    title: t.title,
+    status: "active",
+    category: t.category || "Vehicle task",
+    sortOrder: i + 100, // sit below the prompt entry
+    description: `Typical interval: ${t.interval}. ${t.note || ""}`,
+    payload: {
+      title: t.title,
+      typicalInterval: t.interval,
+      category: t.category,
+      note: t.note,
+      _isCanonicalVehicleTask: true,
+    },
+  }));
 }
 
 const LIVE_MAPPERS = {
@@ -1467,7 +1557,9 @@ function render() {
     else el.previewQuiz.classList.add("is-hidden");
   }
 
-  if (state.view === "notes") {
+  if (state.view === "audit") {
+    renderAuditView();
+  } else if (state.view === "notes") {
     renderNotesView();
   } else if (state.view === "decisions") {
     renderDecisionsView();
@@ -1703,12 +1795,12 @@ function jumpToRoutine(kind) {
 
 function renderNav() {
   const counts = countByView();
-  el.nav.innerHTML = VIEWS.map((view) => {
+  // Phase 5z+18 — Render the nav grouped by section. Groups appear in
+  // VIEW_GROUPS order; within each group, VIEWS preserves its source
+  // order. The section header is a small uppercase label between
+  // groups so the eye chunks the long list.
+  const renderButton = (view) => {
     const c = counts[view.id];
-    // Phase 5z+13 — Single clean number per tab. No more "+drafts"
-    // notation — drafts are folded into the tab total. 0-count tabs
-    // grey out so the eye skips them. Tool views (Simulator,
-    // Architecture, Claude file) get no badge at all.
     let badge = "";
     if (c === null || c === undefined) {
       badge = "";
@@ -1723,7 +1815,18 @@ function renderNav() {
         ${badge}
       </button>
     `;
+  };
+  const groupHtml = VIEW_GROUPS.map((group) => {
+    const views = VIEWS.filter((v) => (v.group || "catalog") === group.id);
+    if (views.length === 0) return "";
+    return `
+      <div class="admin-nav__group">
+        <span class="admin-nav__group-label">${escapeHtml(group.label)}</span>
+        ${views.map(renderButton).join("")}
+      </div>
+    `;
   }).join("");
+  el.nav.innerHTML = groupHtml;
   el.nav.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       state.view = button.dataset.view;
@@ -3755,6 +3858,466 @@ function renderDiff() {
     el.saveItem.classList.add("admin-button--has-changes");
   } else {
     el.saveItem.classList.remove("admin-button--has-changes");
+  }
+}
+
+// =============================================================================
+// Phase 5z+18 — Coverage Audit
+// =============================================================================
+//
+// Tom: "We need to have AI also review any mismatches in the admin
+// portal it needs to be our first stop." Five auto-detected coverage
+// checks surface as the first tab on the left:
+//
+//   1. Tasks without a vendor type that can do them. Cross-references
+//      every template's systemCategory against the 15 vendor categories.
+//      A task whose category doesn't map to ANY vendor type means
+//      there's no one in the catalog who can actually be hired for it.
+//
+//   2. Quiz questions that don't drive anything. Heuristic — flagged
+//      when the question's status is "cut"/"defer"/"reshape" (so it's
+//      already been called out) OR its questionId doesn't appear in
+//      any template's _impact gates.
+//
+//   3. Vendor types with no tasks. Flagged when no template's
+//      systemCategory maps to this vendor.
+//
+//   4. Vendor types that HNW homes typically have but the catalog
+//      doesn't. Curated list of common HNW vendor types vs. the 15
+//      we ship.
+//
+//   5. Routines HNW homes typically have but we don't seed. Curated
+//      list vs. DEFAULT_ROUTINES.
+//
+// Each finding rolls up with a count + a clickable list of the
+// underlying entities + a one-click action.
+
+// Maps from systemCategory → vendor type. Drives finding #1 + #3.
+// Multiple categories can map to the same vendor (Plumbing → Plumber).
+// Categories that map to "any" (every household has handyman) never
+// flag finding #1.
+const SYSTEM_CATEGORY_TO_VENDOR = {
+  "HVAC": "HVAC service",
+  "Plumbing": "Plumber",
+  "Electrical": "Electrician",
+  "Roofing": "Roofer",
+  "Roofing/Exterior": "Roofer",
+  "Siding/Exterior": "Roofer",
+  "Tree Service": "Tree service",
+  "Pest Control": "Mosquito & tick",
+  "Mosquito & Tick Spraying": "Mosquito & tick",
+  "Snow Removal": "Snow removal",
+  "Pet Waste Removal": "Pet waste",
+  "Septic": "Septic pumper",
+  "Septic System": "Septic pumper",
+  "Well Water": "Well water service",
+  "Well": "Well water service",
+  "Chimney": "Chimney sweep",
+  "Fireplace": "Chimney sweep",
+  "Landscaping": "Tree service",
+  "Hardscape": "Hardscape / masonry",
+  "Generator": "Generator service",
+  "Cleaning Service": "House cleaner",
+  "Handyman": "Handyman",
+  "Air Quality": "HVAC service",
+  "Irrigation": "Tree service",
+  "Doors": "Handyman",
+  "Garage": "Handyman",
+  "Garage Door": "Handyman",
+  "Smoke Detectors": "Electrician",
+  "Appliance": "Handyman",
+  "Foundation": "Handyman",
+  "Attic & Foundation": "Handyman",
+  "Driveway": "Hardscape / masonry",
+  "Outdoor Lighting": "Electrician",
+  "Window Cleaning": "House cleaner",
+  "Pressure Washing": "Hardscape / masonry",
+  "Driveway Sealcoating": "Hardscape / masonry",
+};
+
+// HNW vendor types that aren't in DEFAULT_VENDOR_CATEGORIES today —
+// surfaced as finding #4. Curated to high-confidence common HNW
+// services. Tom can act on any of them by drafting a proposal_add note.
+const COMMON_HNW_VENDOR_GAPS = [
+  { name: "Pool service", role: "Weekly chemistry + filter / pump care for pools and spas. Distinct from a house cleaner — pool chemistry needs a specialist." },
+  { name: "Painter", role: "Interior + exterior repaint cycles. Most HNW homes redo high-traffic interior every 4-6 years and exterior every 7-10." },
+  { name: "Window cleaner", role: "Twice-a-year window + screen wash. Often paired with gutter cleaning at the same visit." },
+  { name: "Pressure washer", role: "Driveway / siding / deck pressure washing. Annual or every-other-year." },
+  { name: "Garage door technician", role: "Spring tune-up + opener / sensor service. Different from a handyman — GDT carries the parts inventory." },
+  { name: "Locksmith", role: "Re-key after move-in, smart-lock setup, safe service." },
+  { name: "Landscape designer", role: "Annual planting plan + bed redesigns. Distinct from week-to-week landscaping crew." },
+  { name: "Appliance repair specialist", role: "Sub-Zero / Wolf / Thermador service. The brands' own factory networks, not a generalist." },
+  { name: "Carpet + upholstery cleaner", role: "Annual deep clean. Often runs at the same time as a window cleaning visit." },
+];
+
+// Common HNW routines we don't already seed via DEFAULT_ROUTINES.
+const COMMON_HNW_ROUTINE_GAPS = [
+  { name: "Mail + package management", role: "Daily pickup, sort, hold mail when away. Concierge-style." },
+  { name: "Plant care (interior)", role: "Weekly watering + monthly fertilizing for indoor plants. Often handled by the cleaner but worth tracking separately." },
+  { name: "Wine inventory check", role: "Monthly count + temperature audit on the cellar. Lets the homeowner spot drift before bottles take damage." },
+  { name: "Vehicle detail", role: "Monthly or quarterly exterior + interior detail. Especially for households with daily-driver + collector mix." },
+  { name: "Home gym / equipment service", role: "Annual service on Peloton, Tonal, treadmill, etc. Easy to forget until something fails." },
+];
+
+function computeCoverageAudit() {
+  const findings = {
+    tasksWithoutVendor: [],
+    quizUnwired: [],
+    vendorsWithoutTasks: [],
+    missingVendorTypes: [],
+    missingRoutines: [],
+  };
+
+  // Build the set of vendor categories we actually carry.
+  const vendorNames = new Set(DEFAULT_VENDOR_CATEGORIES.map((v) => v[0]));
+
+  // -- Finding 1: tasks without a vendor type that can do them.
+  // Walk every template (auto-seed + opt-in) and check whether its
+  // systemCategory maps to a known vendor. Handyman-context items are
+  // skipped — handyman covers anything by definition.
+  const templates = (state.liveData["templates"]?.entries) || [];
+  for (const t of templates) {
+    if (t.systemCategory === "Handyman") continue;
+    if (typeof t.bundleId === "string" && t.bundleId.startsWith("Handyman:")) continue;
+    // Phase 67E/F handyman tier — also covered by handyman.
+    if (t.safetyFloor !== true && !t.bundleId &&
+      (t.routingOverride === "diyDefault" || t.routingOverride === "diyCapable") &&
+      typeof t.diyEffortMinutes === "number" && t.diyEffortMinutes <= 60) continue;
+    const cat = t.systemCategory || "";
+    const mapped = SYSTEM_CATEGORY_TO_VENDOR[cat];
+    if (!mapped) {
+      findings.tasksWithoutVendor.push({
+        title: t.title,
+        category: cat || "(no category)",
+        templateKey: t.templateKey,
+        reason: cat
+          ? `Category "${cat}" doesn't map to any of the 15 vendor types we carry.`
+          : "No systemCategory on this template — there's no way to know who handles it.",
+      });
+    } else if (!vendorNames.has(mapped)) {
+      findings.tasksWithoutVendor.push({
+        title: t.title,
+        category: cat,
+        templateKey: t.templateKey,
+        reason: `Category maps to "${mapped}" but that vendor type isn't in the catalog yet.`,
+      });
+    }
+  }
+
+  // -- Finding 2: quiz questions that don't drive anything. Heuristic —
+  //    look for questions whose status is cut/defer or whose answers
+  //    don't appear in any template's _impact.gated_by list.
+  const questions = (state.liveData["quiz-questions"]?.entries) || [];
+  // Gather all subtype tokens referenced by any template gate so we
+  // can check question coverage.
+  const referencedSubtypes = new Set();
+  for (const t of templates) {
+    for (const s of t.requiredSubtypes || []) referencedSubtypes.add(s);
+  }
+  for (const q of questions) {
+    const id = q.questionId || q.id;
+    if (!id) continue;
+    // Skip questions explicitly marked cut/defer — Tom already knows.
+    const status = (q.status || "").toLowerCase();
+    if (["cut", "defer", "reshape"].includes(status)) continue;
+    // Heuristic: a question is "wired" if any of its answer ids OR
+    // its questionId appears in the referencedSubtypes set, OR if it
+    // creates a system / contractor (Q15b style — flagged via
+    // `creates_system` / `creates_contractor` metadata if present).
+    const wires = new Set();
+    if (referencedSubtypes.has(id)) wires.add("template-gate-self");
+    for (const a of q.options || q.answerOptions || []) {
+      const aid = a.id || a.value;
+      if (aid && referencedSubtypes.has(aid)) wires.add("template-gate-answer");
+      if (aid && referencedSubtypes.has(`${id}_${aid}`)) wires.add("template-gate-composite");
+    }
+    if (q.creates_system || q.creates_contractor || q.creates_routine) wires.add("creates-entity");
+    // Some questions clearly drive UI-level branches (skip rules,
+    // dynamic visibility, etc.) — heuristically count "yesNoLender"
+    // / "vehicleAdd" / "providerSearch" / "caretakers" kinds as wired.
+    const drivenKinds = new Set(["vehicleAdd", "vehicleCount", "yesNoLender", "providerSearch", "caretakers", "generatorAdd", "householdContractors"]);
+    if (drivenKinds.has(q.kind)) wires.add("kind-driven");
+    if (wires.size === 0) {
+      findings.quizUnwired.push({
+        questionId: id,
+        title: q.title || q.prompt || q.text || id,
+        chapter: q.chapter || q.section || "",
+        kind: q.kind || "",
+        reason: "We can't trace this question to anything downstream — no template gates on its answers, it doesn't create a system or vendor, and its kind doesn't drive a known UI branch.",
+      });
+    }
+  }
+
+  // -- Finding 3: vendor types with no tasks. For each vendor, count
+  //    templates whose systemCategory maps to it.
+  for (const v of DEFAULT_VENDOR_CATEGORIES) {
+    const vendorName = v[0];
+    if (vendorName === "Handyman") continue; // handyman covers everything
+    let count = 0;
+    for (const t of templates) {
+      const mapped = SYSTEM_CATEGORY_TO_VENDOR[t.systemCategory];
+      if (mapped === vendorName) count++;
+    }
+    if (count === 0) {
+      findings.vendorsWithoutTasks.push({
+        vendor: vendorName,
+        role: v[1] || "",
+        reason: "No template's systemCategory maps to this vendor type. Either the catalog is missing tasks for this trade, or this vendor type is a relic and could be cut.",
+      });
+    }
+  }
+
+  // -- Finding 4: missing vendor types HNW homes typically have.
+  for (const gap of COMMON_HNW_VENDOR_GAPS) {
+    findings.missingVendorTypes.push({ ...gap });
+  }
+
+  // -- Finding 5: missing routines HNW homes typically have.
+  const existingRoutineNames = new Set(DEFAULT_ROUTINES.map((r) => (r[0] || "").toLowerCase()));
+  for (const gap of COMMON_HNW_ROUTINE_GAPS) {
+    if (!existingRoutineNames.has(gap.name.toLowerCase())) {
+      findings.missingRoutines.push({ ...gap });
+    }
+  }
+
+  return findings;
+}
+
+function renderAuditView() {
+  const audit = computeCoverageAudit();
+  const total =
+    audit.tasksWithoutVendor.length +
+    audit.quizUnwired.length +
+    audit.vendorsWithoutTasks.length +
+    audit.missingVendorTypes.length +
+    audit.missingRoutines.length;
+  el.search.value = state.search || "";
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${total}</strong><span>Mismatches found</span></div>
+    <div class="admin-stat"><strong>${audit.tasksWithoutVendor.length}</strong><span>Tasks without a vendor</span></div>
+    <div class="admin-stat"><strong>${audit.quizUnwired.length}</strong><span>Quiz questions adrift</span></div>
+    <div class="admin-stat"><strong>${audit.missingVendorTypes.length + audit.missingRoutines.length}</strong><span>Coverage gaps</span></div>
+  `;
+
+  const sectionHtml = (title, items, render, emptyCopy) => `
+    <div class="admin-audit__section">
+      <header class="admin-audit__section-head">
+        <h3>${escapeHtml(title)} <span class="admin-audit__count">${items.length}</span></h3>
+      </header>
+      ${items.length === 0
+        ? `<p class="admin-audit__empty admin-muted">${escapeHtml(emptyCopy)}</p>`
+        : items.map(render).join("")}
+    </div>
+  `;
+
+  el.list.innerHTML = `
+    <div class="admin-audit">
+      <p class="admin-audit__intro">
+        Five auto-detected mismatches between the catalog (Tasks, Routines, Vendors, Quiz) and what HNW homes typically need. This is the first place to look when something feels off — a task that shouldn't be there, a question that doesn't drive anything, a vendor with no work to do, a vendor type the catalog should have but doesn't.
+      </p>
+      ${sectionHtml(
+        "Tasks without a vendor that can do them",
+        audit.tasksWithoutVendor,
+        (t) => `
+          <div class="admin-audit__row">
+            <div class="admin-audit__row-top">
+              <strong>${escapeHtml(t.title)}</strong>
+              <span class="admin-pill admin-pill--note">${escapeHtml(t.category)}</span>
+            </div>
+            <p class="admin-audit__row-reason">${escapeHtml(t.reason)}</p>
+            <div class="admin-audit__row-actions">
+              <button type="button" class="admin-button admin-button--secondary admin-button--small" data-audit-action="open-task" data-template-key="${escapeHtml(t.templateKey || "")}">Open template</button>
+              <button type="button" class="admin-button admin-button--ghost admin-button--small" data-audit-action="propose-vendor" data-category="${escapeHtml(t.category)}">Propose adding a vendor</button>
+            </div>
+          </div>
+        `,
+        "Every task in the catalog maps to a vendor type that can do it. Nothing orphaned."
+      )}
+      ${sectionHtml(
+        "Quiz questions that don't drive anything",
+        audit.quizUnwired,
+        (q) => `
+          <div class="admin-audit__row">
+            <div class="admin-audit__row-top">
+              <strong>${escapeHtml(q.title || q.questionId)}</strong>
+              <span class="admin-pill admin-pill--note">${escapeHtml(q.chapter || q.kind || "")}</span>
+            </div>
+            <p class="admin-audit__row-reason">${escapeHtml(q.reason)}</p>
+            <div class="admin-audit__row-actions">
+              <button type="button" class="admin-button admin-button--secondary admin-button--small" data-audit-action="open-question" data-question-id="${escapeHtml(q.questionId)}">Open question</button>
+              <button type="button" class="admin-button admin-button--ghost admin-button--small" data-audit-action="propose-cut" data-question-id="${escapeHtml(q.questionId)}">Propose cutting it</button>
+            </div>
+          </div>
+        `,
+        "Every quiz question is wired to something — answers gate a template, create a system, or drive a known UI branch."
+      )}
+      ${sectionHtml(
+        "Vendors without tasks",
+        audit.vendorsWithoutTasks,
+        (v) => `
+          <div class="admin-audit__row">
+            <div class="admin-audit__row-top">
+              <strong>${escapeHtml(v.vendor)}</strong>
+            </div>
+            <p class="admin-audit__row-reason">${escapeHtml(v.reason)}</p>
+            <div class="admin-audit__row-actions">
+              <button type="button" class="admin-button admin-button--secondary admin-button--small" data-audit-action="open-vendor" data-vendor="${escapeHtml(v.vendor)}">Open vendor</button>
+              <button type="button" class="admin-button admin-button--ghost admin-button--small" data-audit-action="propose-tasks" data-vendor="${escapeHtml(v.vendor)}">Propose tasks for this vendor</button>
+            </div>
+          </div>
+        `,
+        "Every vendor type has at least one task in the catalog that maps to it."
+      )}
+      ${sectionHtml(
+        "Vendor types HNW homes typically have but we don't carry",
+        audit.missingVendorTypes,
+        (v) => `
+          <div class="admin-audit__row admin-audit__row--gap">
+            <div class="admin-audit__row-top">
+              <strong>${escapeHtml(v.name)}</strong>
+              <span class="admin-pill" data-tone="reshape">Catalog gap</span>
+            </div>
+            <p class="admin-audit__row-reason">${escapeHtml(v.role)}</p>
+            <div class="admin-audit__row-actions">
+              <button type="button" class="admin-button admin-button--primary admin-button--small" data-audit-action="propose-vendor-type" data-name="${escapeHtml(v.name)}" data-role="${escapeHtml(v.role)}">Draft "add this vendor type" note</button>
+            </div>
+          </div>
+        `,
+        "The catalog already covers every vendor type HNW homes typically have."
+      )}
+      ${sectionHtml(
+        "Routines HNW homes typically have but we don't seed",
+        audit.missingRoutines,
+        (r) => `
+          <div class="admin-audit__row admin-audit__row--gap">
+            <div class="admin-audit__row-top">
+              <strong>${escapeHtml(r.name)}</strong>
+              <span class="admin-pill" data-tone="reshape">Catalog gap</span>
+            </div>
+            <p class="admin-audit__row-reason">${escapeHtml(r.role)}</p>
+            <div class="admin-audit__row-actions">
+              <button type="button" class="admin-button admin-button--primary admin-button--small" data-audit-action="propose-routine" data-name="${escapeHtml(r.name)}" data-role="${escapeHtml(r.role)}">Draft "add this routine" note</button>
+            </div>
+          </div>
+        `,
+        "The catalog already covers every common HNW routine."
+      )}
+    </div>
+  `;
+
+  // Wire audit-row actions.
+  el.list.querySelectorAll("[data-audit-action]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await handleAuditAction(btn.dataset);
+    });
+  });
+
+  el.emptyDetail.classList.remove("is-hidden");
+  el.detail.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
+  el.emptyDetail.querySelector("h3").textContent = "Click any row's action button on the left.";
+  el.emptyDetail.querySelector("p").textContent = "Each finding here has a one-click button — open the underlying entity, propose a fix as a note, or draft a 'we should add this' proposal. The catalog is healthy when this list reaches zero.";
+}
+
+async function handleAuditAction(dataset) {
+  const action = dataset.auditAction;
+  if (action === "open-task" && dataset.templateKey) {
+    const items = liveItemsForView("tasks") || [];
+    const target = items.find((i) => i.payload?.templateKey === dataset.templateKey);
+    if (target) {
+      state.view = "tasks";
+      state.selected = target;
+      render();
+    }
+    return;
+  }
+  if (action === "open-question" && dataset.questionId) {
+    const items = liveItemsForView("quiz") || [];
+    const target = items.find((i) => i.payload?.questionId === dataset.questionId);
+    if (target) {
+      state.view = "quiz";
+      state.selected = target;
+      render();
+    }
+    return;
+  }
+  if (action === "open-vendor" && dataset.vendor) {
+    const items = liveItemsForView("vendors") || [];
+    const target = items.find((i) => i.payload?.category === dataset.vendor);
+    if (target) {
+      state.view = "vendors";
+      state.selected = target;
+      render();
+    }
+    return;
+  }
+  if (action === "propose-vendor" && dataset.category) {
+    await writeNote({
+      scopeType: "general",
+      scopeId: null,
+      scopeTitle: `Add a vendor type for ${dataset.category}`,
+      body: `Coverage audit found tasks in the "${dataset.category}" category but no vendor type that can do them.\n\nProposal: add a vendor entry that covers this category, OR remap "${dataset.category}" to an existing vendor type.\n\n(Drafted from the Audit tab.)`,
+      intent: "proposal_add",
+      target: "claude",
+      snapshot: { category: dataset.category, source: "coverage_audit" },
+    });
+    alert(`Drafted a proposal note for "${dataset.category}". Check the Notes tab.`);
+    return;
+  }
+  if (action === "propose-cut" && dataset.questionId) {
+    await writeNote({
+      scopeType: "question",
+      scopeId: dataset.questionId,
+      scopeTitle: dataset.questionId,
+      body: `Coverage audit flagged this question as not driving anything in the app — no template gates on its answers, it doesn't create a system or vendor, and its kind doesn't drive a known UI branch.\n\nProposal: cut it from the quiz, OR (if it should drive something) document what it should drive in a follow-up note.\n\n(Drafted from the Audit tab.)`,
+      intent: "proposal_delete",
+      target: "claude",
+      snapshot: { questionId: dataset.questionId, source: "coverage_audit" },
+    });
+    alert(`Drafted a "cut this question" proposal note. Check the Notes tab.`);
+    return;
+  }
+  if (action === "propose-tasks" && dataset.vendor) {
+    await writeNote({
+      scopeType: "vendor",
+      scopeId: dataset.vendor,
+      scopeTitle: dataset.vendor,
+      body: `Coverage audit found that the "${dataset.vendor}" vendor type has no tasks mapping to it.\n\nProposal: either add tasks under this vendor's trade category, OR cut the vendor type if it's a relic.\n\n(Drafted from the Audit tab.)`,
+      intent: "proposal_add",
+      target: "claude",
+      snapshot: { vendor: dataset.vendor, source: "coverage_audit" },
+    });
+    alert(`Drafted a proposal note for "${dataset.vendor}". Check the Notes tab.`);
+    return;
+  }
+  if (action === "propose-vendor-type" && dataset.name) {
+    await writeNote({
+      scopeType: "general",
+      scopeId: null,
+      scopeTitle: `Add ${dataset.name} as a vendor type`,
+      body: `Coverage audit found that HNW homes typically have a "${dataset.name}" vendor but the catalog doesn't list them.\n\nWhat they do: ${dataset.role || "(see audit description)"}\n\nProposal: add "${dataset.name}" to DEFAULT_VENDOR_CATEGORIES with a role description and example tasks. The Q15b chip array picks it up automatically.\n\n(Drafted from the Audit tab.)`,
+      intent: "proposal_add",
+      target: "claude",
+      snapshot: { name: dataset.name, role: dataset.role, source: "coverage_audit_vendor_gap" },
+    });
+    alert(`Drafted a "add ${dataset.name}" proposal note.`);
+    return;
+  }
+  if (action === "propose-routine" && dataset.name) {
+    await writeNote({
+      scopeType: "general",
+      scopeId: null,
+      scopeTitle: `Add ${dataset.name} as a routine`,
+      body: `Coverage audit found that HNW homes typically have a "${dataset.name}" routine but the catalog doesn't seed it.\n\nWhat it is: ${dataset.role || "(see audit description)"}\n\nProposal: add "${dataset.name}" to DEFAULT_ROUTINES with a default cadence + day-time, and surface a Q15b-equivalent chip if it's vendor-backed.\n\n(Drafted from the Audit tab.)`,
+      intent: "proposal_add",
+      target: "claude",
+      snapshot: { name: dataset.name, role: dataset.role, source: "coverage_audit_routine_gap" },
+    });
+    alert(`Drafted a "add ${dataset.name}" proposal note.`);
+    return;
   }
 }
 
@@ -6984,6 +7547,13 @@ function renderQuizSummaryCard(item) {
     ? escapeHtml(q.subtitle)
     : `<em class="admin-muted">No subtitle set. Add one to explain why we're asking.</em>`;
 
+  // Phase 5z+18 — Plain-English "what this does for the app" line up
+  // top. Tom: "every quiz question needs to do something in our app,
+  // and it needs to be the very first thing we see on the quiz
+  // question details 'HERE IS WHAT THIS QUESTION DOES FOR THE APP'
+  // in plain english."
+  const whatThisDoes = describeQuizImpactPlainEnglish(q, impact);
+
   // "What it creates" — bullet list of impacts
   const createsBullets = [];
   if (impact.creates_systems.length) {
@@ -7021,6 +7591,11 @@ function renderQuizSummaryCard(item) {
         <p class="admin-summary__placement admin-muted">${placement}</p>
       </header>
 
+      <div class="admin-summary__lead">
+        <span class="admin-summary__lead-eyebrow">Here is what this question does for the app</span>
+        <p class="admin-summary__lead-body">${whatThisDoes}</p>
+      </div>
+
       <div class="admin-summary__body">
         <div class="admin-summary__section">
           <h4>🎯 Goal — what the homeowner sees</h4>
@@ -7040,6 +7615,47 @@ function renderQuizSummaryCard(item) {
       </div>
     </section>
   `;
+}
+
+// Phase 5z+18 — Plain-English summary of what a quiz question does
+// for the app. Stitches together the impact heuristic into a sentence
+// or two that reads naturally to a non-engineer.
+function describeQuizImpactPlainEnglish(q, impact) {
+  const phrases = [];
+  if (impact.creates_systems?.length) {
+    const sys = impact.creates_systems.map(escapeHtml).join(", ");
+    phrases.push(`Adds the <strong>${sys}</strong> system to the homeowner's profile when answered.`);
+  }
+  if (impact.creates_contractor) {
+    phrases.push(`Captures a <strong>${escapeHtml(impact.creates_contractor)}</strong> vendor and saves them on the household.`);
+  }
+  if (impact.drives_attributes?.length) {
+    const list = impact.drives_attributes.slice(0, 4).map((a) => `<code>${escapeHtml(a)}</code>`).join(", ");
+    phrases.push(`Stamps property attributes (${list}) that gate which maintenance tasks the household receives.`);
+  }
+  if (impact.gates_questions?.length) {
+    phrases.push(`Affects whether ${impact.gates_questions.length} downstream question${impact.gates_questions.length === 1 ? "" : "s"} appear${impact.gates_questions.length === 1 ? "s" : ""} later in the quiz.`);
+  }
+  if (q.documentUploadCategory) {
+    phrases.push(`Lets the homeowner skip and upload a <code>${escapeHtml(q.documentUploadCategory)}</code> document instead of typing the answer.`);
+  }
+  // Special-case kinds that drive UI machinery rather than data.
+  const kindDrivers = {
+    vehicleAdd: "Walks the homeowner through adding a vehicle (VIN decode, AI maintenance schedule).",
+    vehicleCount: "Sets up how many vehicles the next steps capture.",
+    yesNoLender: "Captures lender-specific data (insurance / mortgage routing).",
+    providerSearch: "Picks a utility / advisor / vendor from Haven's directory and links them to the household.",
+    caretakers: "Captures spouse + kids + home-manager profile so the right people get invited and assigned.",
+    generatorAdd: "Captures generator type + fuel + supplier so the right service templates seed.",
+    householdContractors: "Q15b — captures every recurring vendor the household already has on retainer.",
+  };
+  if (kindDrivers[q.kind]) {
+    phrases.push(escapeHtml(kindDrivers[q.kind]).replace(/&lt;code&gt;/g, "<code>").replace(/&lt;\/code&gt;/g, "</code>"));
+  }
+  if (phrases.length === 0) {
+    return `<em class="admin-muted">We can't trace this question to anything downstream. It might be informational only, or its wiring isn't captured in the impact heuristic — review the form fields below.</em>`;
+  }
+  return phrases.join(" ");
 }
 
 function renderTaskSummaryCard(item) {
@@ -8289,6 +8905,11 @@ function countByView() {
 }
 
 function countForView(view) {
+  if (view.id === "audit") {
+    // Phase 5z+18 — total mismatches found across all five checks.
+    const a = computeCoverageAudit();
+    return a.tasksWithoutVendor.length + a.quizUnwired.length + a.vendorsWithoutTasks.length + a.missingVendorTypes.length + a.missingRoutines.length;
+  }
   if (view.id === "notes") {
     // Top-level notes only (replies nest under their parents).
     return state.notes.filter((n) => !n.parentNoteId).length;

@@ -5695,3 +5695,145 @@
   border-radius: 12px;
   padding: 12px 14px;
 }
+
+
+/* =============================================================================
+   Phase 5z+18 — Left nav groups
+   ============================================================================= */
+.admin-nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.admin-nav__group:last-child {
+  margin-bottom: 0;
+}
+.admin-nav__group-label {
+  color: rgba(255, 255, 255, 0.4);
+  font: 700 10px var(--sans);
+  letter-spacing: 0.1em;
+  margin: 4px 12px 4px;
+  text-transform: uppercase;
+}
+
+/* =============================================================================
+   Phase 5z+18 — Coverage Audit view
+   ============================================================================= */
+.admin-audit {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 4px 24px;
+}
+.admin-audit__intro {
+  background: rgba(69, 58, 112, 0.05);
+  border: 1px solid rgba(69, 58, 112, 0.2);
+  border-radius: 12px;
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+  padding: 12px 14px;
+}
+.admin-audit__section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.admin-audit__section-head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--neutral-200);
+  display: flex;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.admin-audit__section-head h3 {
+  align-items: baseline;
+  color: var(--text);
+  display: flex;
+  font: 700 14px var(--sans);
+  gap: 8px;
+  margin: 0;
+}
+.admin-audit__count {
+  background: rgba(237, 105, 85, 0.18);
+  border-radius: 999px;
+  color: var(--salmon-dark);
+  font: 700 11px var(--sans);
+  padding: 2px 8px;
+}
+.admin-audit__empty {
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+  padding: 4px 2px;
+}
+.admin-audit__row {
+  background: rgba(237, 105, 85, 0.04);
+  border: 1px solid rgba(237, 105, 85, 0.2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+}
+.admin-audit__row--gap {
+  background: rgba(69, 58, 112, 0.04);
+  border-color: rgba(69, 58, 112, 0.25);
+}
+.admin-audit__row-top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-audit__row-top strong {
+  color: var(--text);
+  flex: 1;
+  font: 700 14px var(--sans);
+}
+.admin-audit__row-reason {
+  color: var(--text);
+  font: 500 13px/1.5 var(--sans);
+  margin: 0;
+}
+.admin-audit__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* =============================================================================
+   Phase 5z+18 — Summary lead block (quiz "What this question does")
+   ============================================================================= */
+.admin-summary__lead {
+  background: linear-gradient(135deg, rgba(237, 105, 85, 0.08), rgba(237, 105, 85, 0.02));
+  border: 1px solid rgba(237, 105, 85, 0.35);
+  border-left: 4px solid var(--salmon-dark);
+  border-radius: 12px;
+  margin: 14px 0 0;
+  padding: 12px 16px;
+}
+.admin-summary__lead-eyebrow {
+  color: var(--salmon-dark);
+  display: block;
+  font: 700 10px var(--sans);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.admin-summary__lead-body {
+  color: var(--text);
+  font: 500 14px/1.5 var(--sans);
+  margin: 0;
+}
+.admin-summary__lead-body code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  font: 600 12px var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  padding: 1px 5px;
+}
