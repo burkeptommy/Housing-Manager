@@ -528,6 +528,12 @@ const el = {
   decisionFocused: document.querySelector("[data-decision-focused]"),
   // Phase 5z+19 — Focused audit panel container.
   auditFocused: document.querySelector("[data-audit-focused]"),
+  // Phase 5z+20 — Legacy entity-detail "Note for Claude" form +
+  // action button row. Hidden when a focused panel (note / decision /
+  // audit) is open so the focused panel's own copy of these surfaces
+  // takes over without competing for visual real estate.
+  notesBox: document.querySelector("[data-notes-box]"),
+  detailActionsRow: document.querySelector("[data-detail-actions]"),
 };
 
 const paletteState = { open: false, results: [], activeIndex: 0 };
@@ -3279,14 +3285,16 @@ function renderDetail() {
   // Re-show the tabs strip in case the simulator view hid it on the
   // previous render.
   el.detailTabs?.classList.remove("is-hidden");
-  // Phase 5z+9 / 5z+14 / 5z+19 — Hide the focused note / decision /
-  // audit panels when rendering an entity detail. Re-show the legacy
-  // quick-actions row that focused panels suppress. Keeps cross-tab
-  // navigation clean.
+  // Phase 5z+9 / 5z+14 / 5z+19 / 5z+20 — Hide the focused note /
+  // decision / audit panels when rendering an entity detail. Re-show
+  // the legacy quick-actions row + detail-actions row + notes-box
+  // that focused panels suppress. Keeps cross-tab navigation clean.
   el.noteFocused?.classList.add("is-hidden");
   el.decisionFocused?.classList.add("is-hidden");
   el.auditFocused?.classList.add("is-hidden");
   document.querySelector("[data-detail-quick-actions]")?.classList.remove("is-hidden");
+  el.detailActionsRow?.classList.remove("is-hidden");
+  el.notesBox?.classList.remove("is-hidden");
   el.saveItem.disabled = false;
 
   const item = state.selected;
@@ -4374,6 +4382,11 @@ function renderFocusedAuditDetail(finding) {
   document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
   el.noteFocused?.classList.add("is-hidden");
   el.decisionFocused?.classList.add("is-hidden");
+  // Phase 5z+20 — hide the legacy detail-actions row + notes-box so
+  // the focused panel content reads cleanly. Each focused panel
+  // includes its own "Note for Claude" form at the bottom.
+  el.detailActionsRow?.classList.add("is-hidden");
+  el.notesBox?.classList.add("is-hidden");
   el.promoteItem.disabled = true;
   el.duplicateItem.disabled = true;
   el.deleteItem.disabled = true;
@@ -4400,6 +4413,76 @@ function renderFocusedAuditDetail(finding) {
     el.auditFocused.innerHTML = renderFocusedAuditPanelHtml(finding);
     attachFocusedAuditHandlers(finding);
   }
+}
+
+// Phase 5z+20 — Shared "Note for Claude" form rendered at the BOTTOM
+// of every focused panel (decision + audit). Tom: "have claudes
+// recommendations go above the note for claude section. I should be
+// able to understand what was identified easily first, the problem is
+// presents, what claudes fix suggestions will do, and then see what
+// actions to take. the notes for claude should be below that"
+//
+// The reading order is now: identification → recommendation →
+// alternatives → actions → custom note.
+function focusedNoteFormHtml() {
+  return `
+    <div class="admin-decision-focused__section admin-decision-focused__section--notes">
+      <div class="admin-decision-focused__section-head">
+        <h4>Note for Claude</h4>
+        <span class="admin-muted admin-decision-focused__action-hint">Optional. Add context, ask a question, or document a decision.</span>
+      </div>
+      <form class="admin-focused-note-form" data-focused-note-form>
+        <textarea data-focused-note-body rows="3" placeholder="What's on your mind about this? (optional)"></textarea>
+        <div class="admin-focused-note-form__row">
+          <label class="admin-focused-note-form__field">
+            <span>Intent</span>
+            <select data-focused-note-intent>
+              <option value="feedback">Feedback (just remember)</option>
+              <option value="change_request">Change request (apply next session)</option>
+              <option value="proposal_add">Proposal: add new entity</option>
+              <option value="proposal_delete">Proposal: cut this entity</option>
+              <option value="bug">Bug</option>
+              <option value="idea">Idea (explore later)</option>
+              <option value="question_for_claude">Question for Claude (answer first)</option>
+            </select>
+          </label>
+          <button type="submit" class="admin-button admin-button--primary admin-button--small" data-focused-note-save>Save note</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+// Phase 5z+20 — Wire a focused-panel note form to writeNote. Caller
+// passes a scopeBuilder() callback that returns the scope object
+// (scopeType, scopeId, scopeTitle, snapshot) at submit time so the
+// scope reflects the current decision/audit context.
+function attachFocusedNoteFormHandler(root, scopeBuilder) {
+  const form = root?.querySelector("[data-focused-note-form]");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = form.querySelector("[data-focused-note-body]")?.value?.trim() || "";
+    const intent = form.querySelector("[data-focused-note-intent]")?.value || "feedback";
+    if (!body) {
+      alert("Note can't be empty.");
+      return;
+    }
+    const scope = (typeof scopeBuilder === "function" ? scopeBuilder() : null) || {};
+    await writeNote({
+      scopeType: scope.scopeType || "general",
+      scopeId: scope.scopeId || null,
+      scopeTitle: scope.scopeTitle || "Focused-panel note",
+      body,
+      intent,
+      target: "claude",
+      snapshot: scope.snapshot || {},
+    });
+    // Clear the form so the user can write another if they want.
+    form.querySelector("[data-focused-note-body]").value = "";
+    form.querySelector("[data-focused-note-intent]").value = "feedback";
+    alert("Note saved. Open the Notes tab to see it.");
+  });
 }
 
 function renderFocusedAuditPanelHtml(finding) {
@@ -4442,11 +4525,65 @@ function renderFocusedAuditPanelHtml(finding) {
           `).join("")}
         </div>
       </div>
+
+      ${focusedNoteFormHtml()}
     </section>
   `;
 }
 
+// Phase 5z+20 — Per-kind scope builder for the focused audit panel's
+// note form. Returns the scope object writeNote expects.
+function buildAuditNoteScope(finding) {
+  if (!finding) return { scopeType: "general", scopeId: null, scopeTitle: "Audit note" };
+  const data = finding.data || {};
+  if (finding.kind === "task_no_vendor") {
+    return {
+      scopeType: "task",
+      scopeId: data.templateKey,
+      scopeTitle: data.title || finding.title,
+      snapshot: { source: "audit_focused_panel", finding: finding.kind, category: data.category },
+    };
+  }
+  if (finding.kind === "quiz_adrift") {
+    return {
+      scopeType: "question",
+      scopeId: data.questionId,
+      scopeTitle: data.title || data.questionId,
+      snapshot: { source: "audit_focused_panel", finding: finding.kind },
+    };
+  }
+  if (finding.kind === "vendor_no_tasks") {
+    return {
+      scopeType: "vendor",
+      scopeId: data.vendor,
+      scopeTitle: data.vendor,
+      snapshot: { source: "audit_focused_panel", finding: finding.kind },
+    };
+  }
+  if (finding.kind === "voice_fix" || finding.kind === "needs_review") {
+    const item = data.targetItem || {};
+    return {
+      scopeType: item.itemType,
+      scopeId: liveEntityIdFor(item),
+      scopeTitle: item.title || finding.title,
+      snapshot: { source: "audit_focused_panel", finding: finding.kind, payload: item.payload },
+    };
+  }
+  // missing_vendor / missing_routine — general scope.
+  return {
+    scopeType: "general",
+    scopeId: null,
+    scopeTitle: `Audit: ${finding.title}`,
+    snapshot: { source: "audit_focused_panel", finding: finding.kind, name: data.name, role: data.role },
+  };
+}
+
 function attachFocusedAuditHandlers(finding) {
+  // Phase 5z+20 — wire the bottom-of-panel note form. Scope depends
+  // on the finding kind: scoped-entity findings (task/quiz/vendor)
+  // attach to the relevant scope; missing-vendor / missing-routine
+  // are general (no entity yet).
+  attachFocusedNoteFormHandler(el.auditFocused, () => buildAuditNoteScope(finding));
   el.auditFocused?.querySelectorAll("[data-audit-fa]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       await handleFocusedAuditAction(finding, btn.dataset.auditFa);
@@ -5587,6 +5724,9 @@ function renderFocusedDecisionDetail(decision) {
   if (el.diffHost) el.diffHost.innerHTML = "";
   document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
   el.noteFocused?.classList.add("is-hidden");
+  // Phase 5z+20 — hide the legacy detail-actions row + notes-box.
+  el.detailActionsRow?.classList.add("is-hidden");
+  el.notesBox?.classList.add("is-hidden");
   el.promoteItem.disabled = true;
   el.duplicateItem.disabled = true;
   el.deleteItem.disabled = true;
@@ -5830,11 +5970,25 @@ function renderFocusedDecisionPanelHtml(decision) {
         </div>
         <div class="admin-decision-focused__actions">${actionsHtml}</div>
       </div>
+
+      ${focusedNoteFormHtml()}
     </section>
   `;
 }
 
 function attachFocusedDecisionHandlers(decision) {
+  // Phase 5z+20 — wire the bottom-of-panel note form for decisions
+  // (legacy code path — Decisions tab is folded into Audit but the
+  // renderer is still callable via the redirect).
+  attachFocusedNoteFormHandler(el.decisionFocused, () => {
+    const item = decision.targetItem || {};
+    return {
+      scopeType: item.itemType || decision.itemType || "general",
+      scopeId: item ? liveEntityIdFor(item) : null,
+      scopeTitle: item.title || decision.title,
+      snapshot: { source: "decision_focused_panel", severity: decision.severity },
+    };
+  });
   el.decisionFocused?.querySelectorAll("[data-decision-fa]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       // Phase 5z+16 — propose_substitute carries an index via
@@ -6908,6 +7062,11 @@ function renderFocusedNoteDetail(note) {
   if (el.diffHost) el.diffHost.innerHTML = "";
   // Hide legacy quick-action buttons (Lock, Preview question, etc.).
   document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
+  // Phase 5z+20 — hide the legacy detail-actions row + notes-box. The
+  // focused note panel has its own reply form which is the right
+  // surface for "add a note about this note."
+  el.detailActionsRow?.classList.add("is-hidden");
+  el.notesBox?.classList.add("is-hidden");
   // Disable the "Save item" / "Promote" / etc. buttons that live in the
   // edit pane's action bar — they don't apply here.
   el.promoteItem.disabled = true;

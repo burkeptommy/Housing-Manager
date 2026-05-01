@@ -5878,3 +5878,65 @@
   font: 600 12px var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
   padding: 1px 5px;
 }
+
+/* =============================================================================
+   Phase 5z+20 — In-panel "Note for Claude" form (focused decision +
+   focused audit panels)
+   ============================================================================= */
+.admin-decision-focused__section--notes {
+  border-top: 1px solid var(--neutral-200);
+  margin-top: 4px;
+  padding-top: 14px;
+}
+
+.admin-focused-note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-focused-note-form textarea {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 500 14px/1.5 var(--sans);
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.admin-focused-note-form textarea:focus {
+  border-color: var(--indigo-400);
+  box-shadow: 0 0 0 3px rgba(139, 125, 186, 0.16);
+  outline: none;
+}
+
+.admin-focused-note-form__row {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-focused-note-form__field {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-focused-note-form__field span {
+  color: var(--text-soft);
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-focused-note-form__field select {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  font: 500 13px var(--sans);
+  min-height: 36px;
+  padding: 6px 10px;
+}
