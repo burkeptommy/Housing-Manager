@@ -2001,10 +2001,50 @@ struct MaintenanceTaskDetailSheet: View {
                                 .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
+
+                        // Phase 80 — Chez Concierge entry. The user is on
+                        // a vendorless task and doesn't want to add their
+                        // own contractor or batch into the handyman list;
+                        // tapping this hands off the whole coordination
+                        // job to Tom (find a pro, schedule, follow up).
+                        ChezEntryButton(
+                            category: .coordinateTask,
+                            label: "Have Chez handle this for me",
+                            caption: "Tom finds the pro, schedules, and follows up.",
+                            context: chezTaskContext
+                        )
+                        .padding(.top, HavenTheme.spacing8)
                     }
                 }
             }
         }
+    }
+
+    /// Phase 80 — context dict handed to the Chez composer when delegating
+    /// a maintenance task. Includes everything Tom needs to triage without
+    /// asking follow-ups.
+    private var chezTaskContext: [String: String] {
+        var c: [String: String] = [
+            "task_id": task.id.uuidString,
+            "task_title": task.title,
+        ]
+        if let cat = systemCategory, !cat.isEmpty {
+            c["system_category"] = cat
+        }
+        if let sysId = task.systemId?.uuidString { c["system_id"] = sysId }
+        if let propId = task.propertyId?.uuidString { c["property_id"] = propId }
+        // Both scheduled and next-due dates are stored as ISO strings;
+        // pass through the first non-empty one as a plain text date.
+        if let scheduled = task.scheduledDate, !scheduled.isEmpty {
+            c["due"] = scheduled
+        } else if !task.nextDueDate.isEmpty {
+            c["due"] = task.nextDueDate
+        }
+        if let notes = task.notes, !notes.isEmpty {
+            // Truncate to keep the context dict tidy server-side.
+            c["notes"] = String(notes.prefix(400))
+        }
+        return c
     }
 
     // MARK: - Phase 51B: Schedule Visit (inline on detail sheet)

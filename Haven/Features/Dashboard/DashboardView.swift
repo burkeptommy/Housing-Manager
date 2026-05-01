@@ -165,6 +165,25 @@ struct DashboardView: View {
                             )
                         }
 
+                        // Phase 67 (G1): seasonal "Time to book your handyman"
+                        // reminder. Computed from the singleton handyman_recurring
+                        // routine + pending punch items + ±14 days of the
+                        // April / October anchor. Placed above Up Next so the
+                        // homeowner sees the seasonal nudge before they wade
+                        // into the task list.
+                        if viewModel.hasCompletedAnyQuiz,
+                           let reminder = viewModel.handymanSeasonalReminder {
+                            HandymanSeasonalReminderCard(reminder: reminder) {
+                                NotificationCenter.default.post(
+                                    name: .switchToTab, object: nil, userInfo: ["tab": 2]
+                                )
+                                NotificationCenter.default.post(
+                                    name: .handymanModeRequested, object: nil
+                                )
+                            }
+                            .padding(.horizontal, HavenTheme.spacing20)
+                        }
+
                         if viewModel.hasCompletedAnyQuiz {
                             thisWeekSection
                         }
@@ -291,6 +310,22 @@ struct DashboardView: View {
                         // from Contacts → Add or discover, so three
                         // entry points remain without the dashboard
                         // clutter.
+
+                        // Phase 80 — Chez Concierge entry. Subtle
+                        // "Need help with anything? Ask Chez" pill
+                        // anchored near the bottom of the dashboard.
+                        // Gated on `hasCompletedAnyQuiz` so first-day
+                        // users aren't pulled away from the quiz CTA;
+                        // post-quiz it's the universal escape hatch.
+                        if viewModel.hasCompletedAnyQuiz {
+                            ChezEntryButton(
+                                category: .general,
+                                label: "Need help? Ask Chez",
+                                caption: "Tom replies within 1 business day.",
+                                context: [:]
+                            )
+                            .padding(.top, HavenTheme.spacing4)
+                        }
 
                         // Chez v1: FoundationCard (estate intake nudge) removed.
                         // Estate management is out of v1 scope; the card and

@@ -144,6 +144,39 @@ struct QuoteAnalysisView: View {
                     .foregroundStyle(HavenColors.success)
             }
         }
+
+        // Phase 80 — Chez Concierge entry. Once the user has the AI's
+        // analysis on screen, they often want a second opinion or want
+        // Tom to negotiate / find a comparison quote. This pill is the
+        // canonical handoff for that.
+        ChezEntryButton(
+            category: .getQuote,
+            label: "Have Chez get a second quote",
+            caption: "Tom gathers a comparable bid and a fair-market read.",
+            context: chezQuoteContext(analysis)
+        )
+        .padding(.top, HavenTheme.spacing12)
+    }
+
+    /// Phase 80 — context for the Chez handoff. Includes vendor name,
+    /// project name, quoted total, and assessment so Tom can act without
+    /// asking the user to re-summarize.
+    private func chezQuoteContext(_ analysis: QuoteAnalysis) -> [String: String] {
+        var c: [String: String] = [
+            "project_id": project.id.uuidString,
+            "project_name": project.name,
+        ]
+        if let vendor = analysis.vendor?.name { c["vendor"] = vendor }
+        if let total = analysis.overallAssessment?.totalQuoted {
+            c["quoted_total"] = "$\(Int(total))"
+        }
+        if let fair = analysis.overallAssessment?.estimatedFairTotal {
+            c["fair_market_estimate"] = "$\(Int(fair))"
+        }
+        if let rating = analysis.overallAssessment?.rating {
+            c["assessment"] = rating
+        }
+        return c
     }
 
     // MARK: - Cards

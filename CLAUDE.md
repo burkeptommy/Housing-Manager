@@ -42,9 +42,9 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 - **Team ID:** `RW9CWCAWGQ`
 - **Supabase project:** `jsucwnkntdrxhysojgri` (`https://jsucwnkntdrxhysojgri.supabase.co`)
 - **Supabase anon key:** In `AppConfig.swift`
-- **Website:** havenhome.dev (static site in `website/` directory, Docker/nginx)
-- **Email domain:** alfred.havenhome.dev (SendGrid Inbound Parse)
-- **Developer email:** tom@havenhome.dev
+- **Website:** getchez.com (static site in `website/` directory, Docker/nginx, Vercel)
+- **Email domain:** alfred.getchez.com (SendGrid Inbound Parse — Phase 71). Legacy alfred.havenhome.dev still routes to receive-email during the transition window so old forwards keep working; the receive-email regex matches both, and household_email_addresses rows have been rewritten to the canonical getchez.com form.
+- **Developer email:** tom@getchez.com
 
 ## Third-Party APIs
 
@@ -53,7 +53,7 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 - **ATTOM Data Solutions** -- Primary property data provider. AVM with confidence score, tax assessment, sales history, owner info. Env var: `ATTOM_API_KEY`.
 - **RentCast** -- Fallback property data (when ATTOM returns no results). Env var: `RENTCAST_API_KEY`.
 - **Brandfetch API** -- Brand logos for vendors, contractors, manufacturers, utility providers. `BrandLogoCache` actor provides session-level caching (both URL and full response with brand color/domain). Logos display in system detail, contractor cards, utility accounts, vehicle hero, etc.
-- **SendGrid** -- Inbound Parse for email pipeline (alfred.havenhome.dev), transactional email
+- **SendGrid** -- Inbound Parse for email pipeline (alfred.getchez.com canonical, legacy alfred.havenhome.dev still active), transactional email from `hello@getchez.com` / `tom@getchez.com` / `alfred@getchez.com`. Both domains are authenticated for outbound sender auth (DKIM via auto-rotated CNAMEs) and SPF includes `_spf.google.com` plus `sendgrid.net`.
 - **Stripe** -- Payment infrastructure (test mode, publishable key in client)
 - **Apple Sign In** -- Primary auth method
 - **NHTSA APIs** -- Vehicle VIN decode and recall checking
@@ -134,7 +134,7 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 │   ├── migrations/                # 70+ migration files
 │   ├── schema.sql
 │   └── config.toml
-├── website/                       # havenhome.dev (index.html, security.html, Docker/nginx)
+├── website/                       # getchez.com (index.html, security.html, Docker/nginx, Vercel)
 ├── catalog-data/                  # 34 SQL seed files for equipment catalog
 ├── scripts/
 ├── preserved/                     # Legacy assets, credentials, branding
@@ -143,7 +143,7 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 
 ## Supabase Database (Key Tables)
 
-households, users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id, service_interval_days, service_interval_source), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor), documents (vehicle_id, project_id, visible_to_home_managers, linked_attorney_contact_id), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source), service_records, service_contracts, chat_messages, concierge_messages, scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items, inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls, estate_state (Phase 48), estate_pdf_exports (Phase 48)
+households, users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id, service_interval_days, service_interval_source), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor), documents (vehicle_id, project_id, visible_to_home_managers, linked_attorney_contact_id), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source), service_records, service_contracts, chat_messages, concierge_messages (Phase 80: request_id FK, attachments JSONB, 'system' role for status-change rows), scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items (Phase 80: related_chez_request_id FK + chez_reply_action_needed / chez_reply_informational / chez_status_change types), inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls, estate_state (Phase 48), estate_pdf_exports (Phase 48), chez_requests (Phase 80 — homeowner concierge requests with category/status/sla_due_at)
 
 **RLS is on everything.** All tables scoped by `household_id`. Service role key is only used in Edge Functions.
 
@@ -171,6 +171,7 @@ See `supabase/functions/CLAUDE.md` for detailed patterns and full inventory. Key
 **Catalog:** `enrich-catalog`, `expand-catalog`, `scrape-manuals`, `download-manuals`, `upload-manual`, `send-catalog-request`, `score-property`
 **Local Vendors (Phase 19n):** `find-local-vendors` (Google Places Text Search + 60-day cache via `local_vendor_results` table; returns up to 4 vendors per (town, state, category) with Haven Certified badge on top 2 that meet 4.7+ stars + 25+ reviews + non-chain heuristic)
 **Estate (Phase 48):** `verify-estate-export` (public endpoint, no auth -- validates estate PDF verification tokens, checks expiry/access count, logs hashed IP)
+**Chez Concierge (Phase 80):** `chez-concierge` (single function with action discriminator: `submit` / `reply` / `mark_read` / `transition_status`. Admin allowlist via `CHEZ_ADMIN_EMAILS` env var. Push to admin user IDs + SendGrid email backstop on submit + homeowner reply since Tom doesn't have iOS in admin context. Smart routing: admin replies create `inbox_items` with `chez_reply_action_needed` (when `acknowledgement_required: true`) or `chez_reply_informational`; same call can transition status via optional `to_status`. System-role audit-trail messages auto-insert on status flips.)
 
 ## Estate Intelligence (Phase 48)
 
@@ -197,7 +198,7 @@ See `supabase/functions/CLAUDE.md` for detailed patterns and full inventory. Key
 
 **Staleness tiers:** Info (3yr docs, no life changes), Amber (5yr docs OR life changes post-execution), Critical (7yr docs OR major events OR 2026 TCJA sunset). Computed both client-side (EstateStateService) and server-side (proactive-scan).
 
-**Attorney handoff:** Client-side PDF generation with verification footer on every page. Uploaded encrypted to estate-exports bucket. `verify-estate-export` public Edge Function validates tokens (3-use limit, 7-day expiry, IP-hashed access log). `havenhome.dev/verify?token=<UUID>` static page calls the function.
+**Attorney handoff:** Client-side PDF generation with verification footer on every page. Uploaded encrypted to estate-exports bucket. `verify-estate-export` public Edge Function validates tokens (3-use limit, 7-day expiry, IP-hashed access log). `getchez.com/verify?token=<UUID>` static page calls the function.
 
 **SmartRecommendations:** Estate staleness at priority 5 (critical) and 35 (amber). Existing estate readiness recommendations preserved at lower priorities.
 
@@ -571,7 +572,7 @@ Settings → Household Staff → AddHouseholdStaffSheet remains the manual entry
 
 ## Email Ingestion Pipeline
 
-**Flow:** User forwards email to `[anything]@alfred.havenhome.dev` > SendGrid Inbound Parse > `receive-email` Edge Function > Claude classification > type-specific handling > inbox item created > user reviews in `InboxItemDetailView`.
+**Flow:** User forwards email to `[anything]@alfred.getchez.com` > SendGrid Inbound Parse > `receive-email` Edge Function > Claude classification > type-specific handling > inbox item created > user reviews in `InboxItemDetailView`. (Legacy `@alfred.havenhome.dev` and `@projects.havenhome.dev` still route to the same function for backward compatibility — the regex matches all three.)
 
 **Classification types (9):** `contractor_quote`, `estate_document`, `home_document`, `vehicle_document`, `bill_invoice`, `insurance_claim`, `vendor_contact`, `family`, `other`. Vehicle invoices are `bill_invoice` with `vehicleContext: true`.
 
@@ -651,7 +652,7 @@ AES-256-GCM document encryption, biometric auth, vault lock, screenshot preventi
 
 ## GTM Status
 
-TestFlight active (~10 couples, ~7 active). Estate attorney referral kit in progress. havenhome.dev live with security page. SendGrid email pipeline configured. Push notifications wired end-to-end.
+TestFlight active (~10 couples, ~7 active). Estate attorney referral kit in progress. getchez.com live with security page. SendGrid email pipeline configured. Push notifications wired end-to-end.
 
 ## Routines as first-class Services (Phase 66)
 

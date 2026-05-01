@@ -10,24 +10,62 @@ struct InboxView: View {
         case needsAction = "Needs Action"
         case unread = "Unread"
         case all = "All"
+        /// Phase 80 — Chez Concierge sub-tab. Renders ChezRequestsListView
+        /// instead of the standard items list so the homeowner has a
+        /// dedicated browse surface for everything they've handed off
+        /// to the Chez Home Manager.
+        case chez = "Chez"
     }
 
     @State private var showDeleteConfirm = false
     @State private var itemToDelete: DatabaseService.InboxItemRow?
 
     var body: some View {
+        Group {
+            if filter == .chez {
+                // Chez sub-tab — different content shape (sectioned list of
+                // ChezRequestRow) so we render the dedicated view here,
+                // sitting under the standard filter picker.
+                VStack(spacing: 0) {
+                    filterPicker
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    ChezRequestsListView()
+                }
+                .background(HavenColors.background)
+                .navigationTitle("Inbox")
+                .navigationBarTitleDisplayMode(.inline)
+            } else {
+                inboxItemsList
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openChezRequest)) { notification in
+            // Push handler / cross-screen deep link asks the Chez sub-tab
+            // to take focus. Switch the picker; the list view itself
+            // handles deep-link to detail via NavigationLink + a state pop.
+            if let _ = notification.userInfo?["request_id"] as? String {
+                filter = .chez
+            }
+        }
+    }
+
+    private var filterPicker: some View {
+        Picker("Filter", selection: $filter) {
+            ForEach(InboxFilter.allCases, id: \.self) { f in
+                Text(f.rawValue).tag(f)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var inboxItemsList: some View {
         List {
             // Filter picker
             Section {
-                Picker("Filter", selection: $filter) {
-                    ForEach(InboxFilter.allCases, id: \.self) { f in
-                        Text(f.rawValue).tag(f)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                filterPicker
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
 
             if viewModel.isLoading {
@@ -165,6 +203,11 @@ struct InboxView: View {
             return viewModel.items.filter { !$0.seen }
         case .all:
             return viewModel.items
+        case .chez:
+            // Chez sub-tab renders ChezRequestsListView directly — this
+            // computed prop is not consumed in that path. Returning empty
+            // keeps the type signature stable for the standard list.
+            return []
         }
     }
 

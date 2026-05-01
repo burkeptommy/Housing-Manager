@@ -3371,6 +3371,10 @@ final class DatabaseService {
         let relatedProjectId: UUID?
         let relatedDocumentId: UUID?
         let relatedContractorId: UUID?
+        /// Phase 80 — Chez Concierge: links a `chez_reply_*` inbox item back to
+        /// its parent `chez_requests` row so tapping the inbox item deep-links
+        /// to the correct request thread.
+        let relatedChezRequestId: UUID?
         let seen: Bool
         let needsAction: Bool?
         let actionType: String?
@@ -3400,6 +3404,7 @@ final class DatabaseService {
             case relatedProjectId = "related_project_id"
             case relatedDocumentId = "related_document_id"
             case relatedContractorId = "related_contractor_id"
+            case relatedChezRequestId = "related_chez_request_id"
             case needsAction = "needs_action"
             case actionType = "action_type"
             case actionCompleted = "action_completed"
@@ -3427,6 +3432,7 @@ final class DatabaseService {
             relatedProjectId = try? c.decodeIfPresent(UUID.self, forKey: .relatedProjectId)
             relatedDocumentId = try? c.decodeIfPresent(UUID.self, forKey: .relatedDocumentId)
             relatedContractorId = try? c.decodeIfPresent(UUID.self, forKey: .relatedContractorId)
+            relatedChezRequestId = try? c.decodeIfPresent(UUID.self, forKey: .relatedChezRequestId)
             seen = (try? c.decodeIfPresent(Bool.self, forKey: .seen)) ?? false
             needsAction = try? c.decodeIfPresent(Bool.self, forKey: .needsAction)
             actionType = try? c.decodeIfPresent(String.self, forKey: .actionType)
@@ -3458,8 +3464,19 @@ final class DatabaseService {
             case "contractor_quote": return "doc.text.magnifyingglass"
             case "insurance_claim": return "shield.fill"
             case "family": return "person.2.fill"
+            case "chez_reply_action_needed",
+                 "chez_reply_informational",
+                 "chez_status_change":
+                return "person.fill.questionmark"
             default: return "envelope.fill"
             }
+        }
+
+        /// Phase 80 — true when the item is a Chez reply / status change
+        /// that should deep-link into `ChezRequestDetailView` rather than
+        /// rendering the standard inbox detail chrome.
+        var isChezReply: Bool {
+            type.hasPrefix("chez_reply_") || type == "chez_status_change"
         }
 
         /// Color for the item status
@@ -3533,6 +3550,11 @@ final class DatabaseService {
         // Analysis status
         let analysisSkipped: Bool?
         let analysisSkipReason: String?
+        /// Phase 80 — Chez Concierge: belt-and-suspenders fallback for the
+        /// `inbox_items.related_chez_request_id` column. The Edge Function
+        /// stamps both, but if a row predates the column add we still
+        /// fall back to the metadata blob.
+        let chezRequestIdString: String?
 
         enum CodingKeys: String, CodingKey {
             case subject, classification
@@ -3548,6 +3570,12 @@ final class DatabaseService {
             case vehicleInvoice = "vehicle_invoice"
             case analysisSkipped = "analysis_skipped"
             case analysisSkipReason = "analysis_skip_reason"
+            case chezRequestIdString = "chez_request_id"
+        }
+
+        var chezRequestIdAsUUID: UUID? {
+            guard let raw = chezRequestIdString else { return nil }
+            return UUID(uuidString: raw)
         }
 
         // The classification is nested inside metadata
@@ -3570,6 +3598,7 @@ final class DatabaseService {
             vehicleInvoice = try? c.decodeIfPresent(Bool.self, forKey: .vehicleInvoice)
             analysisSkipped = try? c.decodeIfPresent(Bool.self, forKey: .analysisSkipped)
             analysisSkipReason = try? c.decodeIfPresent(String.self, forKey: .analysisSkipReason)
+            chezRequestIdString = try? c.decodeIfPresent(String.self, forKey: .chezRequestIdString)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
                 vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)
@@ -3787,15 +3816,15 @@ final class DatabaseService {
         }
 
         // Build candidate addresses in priority order:
-        // 1. burke@alfred.havenhome.dev
-        // 2. 146burke@alfred.havenhome.dev (street number + last name)
-        // 3. burke-<short uuid>@alfred.havenhome.dev (failsafe)
+        // 1. burke@alfred.getchez.com
+        // 2. 146burke@alfred.getchez.com (street number + last name)
+        // 3. burke-<short uuid>@alfred.getchez.com (failsafe)
         var candidates: [String] = [
-            "\(baseName)@alfred.havenhome.dev"
+            "\(baseName)@alfred.getchez.com"
         ]
 
         if let num = streetNumber {
-            candidates.append("\(num)\(baseName)@alfred.havenhome.dev")
+            candidates.append("\(num)\(baseName)@alfred.getchez.com")
         }
 
         // Failsafe: append short unique suffixes
@@ -3803,9 +3832,9 @@ final class DatabaseService {
             let shortId = String(UUID().uuidString.prefix(4)).lowercased()
             // Use street number variants first, then random
             if let num = streetNumber, i <= 2 {
-                candidates.append("\(num)\(baseName)\(i)@alfred.havenhome.dev")
+                candidates.append("\(num)\(baseName)\(i)@alfred.getchez.com")
             } else {
-                candidates.append("\(baseName)-\(shortId)@alfred.havenhome.dev")
+                candidates.append("\(baseName)-\(shortId)@alfred.getchez.com")
             }
         }
 

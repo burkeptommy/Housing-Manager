@@ -6,6 +6,123 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 80: Chez Concierge — "Have a Chez Home Manager handle this" (2026-05-01)
+
+Universal escape hatch that lets homeowners delegate any vendor / quote / scheduling / coordination task to Tom. Renders as a salmon-tinted "Have a Chez Home Manager handle this" pill anywhere it makes sense in the app. Tap → composer sheet (auto-fills category + context from the entry point) → submit → request lands in Tom's admin portal with a 24-hour business-day SLA badge. Tom replies with vendors / dates / quotes / follow-ups; replies that need confirmation land in the homeowner's existing **Needs Action** inbox tab, informational replies land in **Unread**, and the full request thread lives in a new **Chez** sub-tab on the Inbox so the homeowner has a dedicated browse surface.
+
+### Architecture decisions
+
+- **Smart inbox routing** (Tom's clarification): admin replies create `inbox_items` rows so they flow through the homeowner's existing Needs Action / Unread / All sorting. Discriminator is an "Acknowledgement required?" checkbox in the admin portal that swaps the type between `chez_reply_action_needed` (lands in Needs Action) and `chez_reply_informational` (lands in Unread). Persistent thread browse lives in the new `Chez` sub-tab on Inbox.
+- **Single Edge Function + action discriminator** mirroring `process-inbox-item`: `submit` / `reply` / `mark_read` / `transition_status`. Admin replies can transition status in one call via optional `to_status` so Tom doesn't have to click twice.
+- **Storage reuse, not a new bucket.** Attachments upload to the existing `documents` bucket under `chez-requests/{user_id}/{filename}` via the standard storage API. Metadata (path / filename / mime / size / uploaded_at) lands as JSONB on `concierge_messages.attachments`. No new bucket policy needed.
+- **Email backstop for admin push.** Tom doesn't have the iOS app installed in the admin context, so silent push delivery isn't enough. Edge Function pushes to `CHEZ_ADMIN_USER_IDS` AND emails `CHEZ_ADMIN_EMAILS` via SendGrid (default `tom@getchez.com`). Email is the primary signal.
+- **24-hour business-day SLA** computed server-side via `chez_business_hours_due` PL/pgSQL function; visual badge only (green / amber / red), no cron, Tom self-monitors.
+
+### Database (`supabase/migrations/20261201_chez_requests.sql`)
+
+- New `chez_requests` table — `category` (`find_vendor` / `get_quote` / `schedule_visit` / `coordinate_task` / `find_handyman` / `general`), `status` (`open` / `waiting_customer` / `resolved`), `summary`, `context jsonb`, `sla_due_at`, `last_message_at`, `unread_for_user`, `unread_for_admin`, `resolved_at`. RLS scoped to household for homeowners + `is_tom_admin()`-gated SELECT/UPDATE for the admin portal (reuses the helper from `20261001_admin_onboarding_lab.sql`).
+- Extended `concierge_messages` with `request_id` FK + `attachments` JSONB + `'system'` role for status-change audit-trail rows. Index on `(request_id, created_at)`.
+- Added `inbox_items.related_chez_request_id` FK so deep-linking from inbox → request thread is a foreign-key follow.
+- `chez_business_hours_due(now())` function walks 24 weekday-hours skipping weekends.
+- `set_chez_requests_updated_at` trigger.
+- Backfill DO block wraps legacy `concierge_messages` rows in synthetic resolved `chez_requests` (one per household per calendar day) so the admin portal's history surface has parents to thread under.
+- Realtime publication membership for `chez_requests` + `concierge_messages`.
+
+### Edge Function (`supabase/functions/chez-concierge/index.ts`)
+
+Single function with action discriminator. Highlights:
+
+- **Auth:** `getAuthenticatedUser` decodes the JWT; `isAdminUser` checks email against `CHEZ_ADMIN_EMAILS` env var. Homeowner-side actions verify `auth.uid()` owns the request.
+- **`submit`:** insert request + first message, compute `sla_due_at`, fire push to admin user IDs + email backstop. Creates the parent + opening user message in one shot.
+- **`reply`:** inserts message, updates `last_message_at` + unread flags, optional status transition via `to_status` (admin-only convenience). Admin replies create an `inbox_items` row + push + insert a system-role audit message in the thread when the same call also transitions status. Homeowner replies on resolved/waiting requests bump the parent back to open.
+- **`mark_read`:** clears unread flag for the caller's side, stamps `read_at` on the other party's messages.
+- **`transition_status`:** centralized status flip with system-message audit trail + push + (when resolved) informational inbox_items row.
+
+### iOS (`Haven/Features/ChezRequests/`)
+
+```
+Models/
+├── ChezRequest.swift               # ChezCategory + ChezStatus enums + ChezRequestRow (resilient init) + payload structs
+└── ChezMessage.swift               # ChezMessageRole + ChezAttachmentMeta (Hashable) + ChezMessageRow
+ViewModels/
+├── ChezRequestsViewModel.swift     # @MainActor; active/past/unread aggregations
+├── ChezRequestComposeViewModel.swift # photos+file ingest into documents bucket; submit
+└── ChezRequestDetailViewModel.swift  # thread + reply composer + reopen + signed-URL resolver
+Views/
+├── ChezRequestComposeSheet.swift   # serif "Ask Chez" hero, prefilled context card, category grid (locked when entry-point-fixed), summary + description fields, attachment tray (PhotosPicker + file importer), salmon submit
+├── ChezRequestsListView.swift      # 4th Inbox sub-tab — Active section + collapsible Resolved section, empty state
+└── ChezRequestDetailView.swift     # header + collapsible context + chat-style thread (system rows centered) + sticky reply composer (text + attachments) OR reopen bar when resolved
+Components/
+├── ChezEntryButton.swift           # Universal pill — posts .openChezRequestComposer with category + context
+├── ChezStatusBadge.swift           # Open / Waiting / Resolved pill, three tones
+├── ChezMessageBubble.swift         # User right (salmon) / Concierge left ("T" avatar, cream) / System (centered grey)
+└── ChezRequestRowCard.swift        # List row: category icon w/ unread dot, summary, status badge, SLA caption, relative timestamp
+```
+
+`Haven/Features/ChezRequests/Services/ChezConciergeService.swift` extends `DatabaseService` (`fetchChezRequests` / `fetchChezMessages` / `fetchChezRequest`) and `HavenSupabase` (`submitChezRequest` / `replyToChezRequest` / `markChezRequestRead` / `reopenChezRequest`) — all writes funnel through a private `callConciergeEdgeFunction` helper that mirrors the existing `callEdgeFunction` URLRequest pattern (bypasses supabase-swift's `invoke` for parsing reasons).
+
+### iOS modifications
+
+- `Haven/App/MainTabView.swift` — three new `Notification.Name` extensions (`.chezRequestChanged` / `.openChezRequest` / `.openChezRequestComposer`); global `ChezRequestComposeSheet` host listening on `.openChezRequestComposer` with `ChezComposerInput` Identifiable wrapper so any entry point fires the sheet without owning state.
+- `Haven/App/HavenApp.swift` push handler — new `case let t where t.hasPrefix("chez_") && t != "chez_admin_request"` switches to Dashboard tab + posts `.openChezRequest` with `request_id`.
+- `Haven/Features/Inbox/InboxView.swift` — added 4th `case chez = "Chez"` to `InboxFilter`. Body splits: when `filter == .chez` renders `ChezRequestsListView()` under the picker; otherwise renders the standard items list. Subscribes to `.openChezRequest` notification and switches `filter = .chez` so push deep links land on the right sub-tab.
+- `Haven/Features/Inbox/InboxItemDetailView.swift` — split body into `mainBody`. When `item.isChezReply == true` and a `relatedChezRequestId` resolves (column or metadata fallback), renders `ChezRequestDetailView(requestId:)` directly.
+- `Haven/Core/Networking/DatabaseService.swift` — `InboxItemRow` gained `relatedChezRequestId: UUID?` + `iconName` cases for `chez_reply_*` / `chez_status_change` + `isChezReply` helper. `InboxMetadata` gained `chezRequestIdString: String?` + `chezRequestIdAsUUID` computed.
+- `Haven/Core/Services/AnalyticsService.swift` — six new events (`.chezEntryButtonTapped`, `.chezRequestSubmitted`, `.chezRequestReplied`, `.chezRequestOpened`, `.chezRequestReopened`, `.chezRequestMarkedRead`).
+
+### Five entry points wired
+
+| File | Where | Pre-fills |
+|---|---|---|
+| `FindLocalVendorSheet.swift` | Below `addMyOwnButton` | category=`find_vendor`, contractor_category, town, state, task_id, task_title |
+| `MaintenanceTaskDetailSheet.swift` | "No vendor" branch of `vendorSection`, after handyman batch CTA | category=`coordinate_task`, task_id, task_title, system_category, system_id, property_id, due, notes |
+| `HandymanPunchListView.swift` | `bottomActionBar` | category=`find_handyman`, punch_item_count, property_id, punch_list_preview (top 20 titles) |
+| `QuoteAnalysisView.swift` | After analysis-results block | category=`get_quote`, project_id, project_name, vendor, quoted_total, fair_market_estimate, assessment |
+| `DashboardView.swift` | Subtle pill below Recent Activity | category=`general`, gated on `hasCompletedAnyQuiz` |
+
+Total iOS edit footprint across the five entry-point files: ~120 LOC of additive code (no existing logic changed).
+
+### Admin portal (`website/admin.js` + `website/admin.css`)
+
+- New `chez` view in the `action` group at the top of `VIEWS` array (above Audit). `state.view === "chez"` routes to `renderChezRequestsView`.
+- State additions: `chezRequests`, `chezMessages` (keyed by request_id), `selectedChezRequest`. Cleared on tab navigation alongside `selectedDecision` / `selectedAudit`.
+- `loadAdminData` fetches `chez_requests` in parallel with admin items + notes. New `loadChezMessages(requestId)` lazy-loads the thread per-request.
+- `renderChezRequestsView` — stats tiles (open / awaiting reply / waiting on customer / resolved this week), urgency-sorted list (overdue first, then unread-for-admin, then most-recent), search filter, click-to-focus.
+- `renderFocusedChezDetail` reuses the audit panel's right-rail container. Inside: header (category + status select + SLA pill), context recap grid, conversation thread (user / concierge / system bubbles), reply composer with **Acknowledgement required?** checkbox + status select for one-click reply+transition, quick-action buttons ("Mark waiting on customer", "Mark resolved", "Reopen" when resolved).
+- `callChezConcierge` wraps the Edge Function with the admin's JWT; status select changes fire immediately, reply form submits + refreshes list/thread/focus.
+- `chezSlaPill` computes green / amber / red / muted bands client-side and re-evaluates each render.
+- `admin.css` appended ~200 LOC of Phase 80 styles (chez__row, chez__msg, chez__composer, chez__resolved-bar, chez__quick-actions, plus tone variants for the SLA pill).
+
+### Verification
+
+- `xcodegen` regenerated `Haven.xcodeproj` (auto-includes the new `Haven/Features/ChezRequests/` tree).
+- `xcodebuild -scheme Chez -destination "platform=iOS Simulator,name=iPhone 17" build` → **`** BUILD SUCCEEDED **`**.
+- `node --check website/admin.js` → parse OK.
+
+### Deploy steps
+
+1. `supabase migration up --linked` (applies `20261201_chez_requests.sql`).
+2. `supabase functions deploy chez-concierge --no-verify-jwt`.
+3. Set Edge Function env vars: `CHEZ_ADMIN_EMAILS=tom@getchez.com` (comma-separated for multi-admin), optional `CHEZ_ADMIN_USER_IDS`, optional `SENDGRID_API_KEY` (already set for other functions).
+4. iOS ships in next TestFlight build — no additional config needed.
+
+### What's intentionally NOT in v1 (deferred)
+
+- Structured vendor proposal cards (Tom proposes vendors as plain text + manual handoff to existing AddVendorSheet)
+- Date-slot proposal cards (Tom suggests dates in plain text)
+- Quote summary cards (Tom describes quotes in plain text + attaches the PDF)
+- Approve / Decline / Request-more buttons on the homeowner side
+- Real-time Supabase subscription on iOS (window-focus refresh suffices for v1)
+- Server-side SLA enforcement (cron + email at 22h)
+- Saved proposal templates on Tom's side
+- Audit-trail event-history table (status transitions live on the row only)
+- Alfred awareness of open requests (chat function doesn't pre-fetch Chez state)
+- 10+ entry points (only the 5 highest-leverage wired in v1)
+
+Each is a clean future addition once Tom sees how the conversation pattern actually plays out in TestFlight.
+
+---
+
 ## Phase 67: Tasks Tab V5 (iOS) + Chez Handyman Operations Desk (Web) (2026-04-27)
 
 Two parallel deliverables landed together against the high-fidelity design handoffs in `~/Downloads/Tasks-Maintenance UIUX-2.zip` and `~/Downloads/Handyman Website.zip`.

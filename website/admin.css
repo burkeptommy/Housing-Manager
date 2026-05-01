@@ -6017,3 +6017,226 @@
   color: var(--text);
   margin: 0;
 }
+
+
+/* =========================================================================
+   Phase 80 — Chez Concierge admin tab
+   ========================================================================= */
+
+.admin-chez__row {
+  position: relative;
+}
+
+.admin-chez__unread-dot {
+  background: var(--salmon);
+  border-radius: 50%;
+  display: inline-block;
+  height: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+  width: 8px;
+}
+
+.admin-pill[data-tone="green"] {
+  background: rgba(34, 197, 94, 0.14);
+  color: rgb(21, 128, 61);
+}
+.admin-pill[data-tone="amber"] {
+  background: rgba(234, 179, 8, 0.16);
+  color: rgb(161, 98, 7);
+}
+.admin-pill[data-tone="red"] {
+  background: rgba(239, 68, 68, 0.16);
+  color: rgb(185, 28, 28);
+}
+.admin-pill[data-tone="muted"] {
+  background: rgba(100, 116, 139, 0.14);
+  color: rgb(71, 85, 105);
+}
+
+.admin-chez__focused {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+}
+
+.admin-chez__focused header.admin-focused__head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-chez__focused h2 {
+  font: 700 22px var(--serif, "New York", Georgia, serif);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.admin-focused__meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-focused__meta select {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 8px;
+  color: var(--text);
+  font: 500 12px var(--sans);
+  padding: 4px 8px;
+}
+
+.admin-chez__context {
+  background: rgba(245, 224, 217, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.admin-chez__context h3 {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+.admin-chez__ctx-grid {
+  display: grid;
+  gap: 6px;
+}
+.admin-chez__ctx-row {
+  align-items: baseline;
+  display: grid;
+  font: 500 13px var(--sans);
+  grid-template-columns: 140px 1fr;
+}
+.admin-chez__ctx-row span {
+  color: var(--text-soft);
+  text-transform: capitalize;
+}
+
+.admin-chez__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-chez__thread h3 {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.admin-chez__msg {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.admin-chez__msg--admin {
+  background: rgba(245, 224, 217, 0.5);
+  border-color: rgba(237, 105, 85, 0.25);
+}
+.admin-chez__msg-head {
+  align-items: baseline;
+  display: flex;
+  font: 500 12px var(--sans);
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.admin-chez__msg p {
+  font: 400 14px var(--sans);
+  margin: 0;
+  white-space: pre-wrap;
+}
+.admin-chez__attach {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  display: flex;
+  font: 500 12px var(--sans);
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 10px;
+}
+.admin-chez__system {
+  align-items: center;
+  display: flex;
+  font: 500 12px var(--sans);
+  gap: 12px;
+  justify-content: center;
+}
+.admin-chez__system span:first-child {
+  background: rgba(100, 116, 139, 0.14);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.admin-chez__composer {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+.admin-chez__composer-label {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.admin-chez__composer textarea {
+  background: var(--bg, #f8f9fa);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 10px;
+  color: var(--text);
+  font: 400 14px var(--sans);
+  min-height: 96px;
+  padding: 10px 12px;
+  resize: vertical;
+  width: 100%;
+}
+.admin-chez__ack {
+  align-items: flex-start;
+  display: flex;
+  font: 400 13px var(--sans);
+  gap: 8px;
+  line-height: 1.4;
+}
+.admin-chez__ack input {
+  margin-top: 3px;
+}
+.admin-chez__composer-row {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.admin-chez__composer-row select {
+  background: var(--bg, #f8f9fa);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 8px;
+  color: var(--text);
+  font: 500 12px var(--sans);
+  padding: 6px 10px;
+}
+.admin-chez__composer-feedback {
+  font: 400 12px var(--sans);
+}
+
+.admin-chez__resolved-bar {
+  align-items: center;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 12px;
+  display: flex;
+  font: 500 13px var(--sans);
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.admin-chez__quick-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}

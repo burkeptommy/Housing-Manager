@@ -74,6 +74,27 @@ extension Notification.Name {
     /// punch-count reads. Both events post when a single action affects
     /// both rails (e.g. promote-to-task, demote-to-punch).
     static let handymanPunchListChanged = Notification.Name("handymanPunchListChanged")
+
+    // MARK: - Phase 80 — Chez Concierge
+
+    /// Posted whenever a Chez request is created, replied to, or
+    /// status-transitioned. Listeners (Inbox tab badge, ChezRequestsList,
+    /// ChezRequestDetail) reload counts + thread.
+    static let chezRequestChanged = Notification.Name("chezRequestChanged")
+
+    /// Posted by the push handler when a `chez_*` notification fires.
+    /// `userInfo["request_id"]` carries the target request UUID.
+    /// `InboxView` listens and switches to the Chez sub-tab + pushes
+    /// `ChezRequestDetailView` for that id.
+    static let openChezRequest = Notification.Name("openChezRequest")
+
+    /// Posted by entry-point buttons throughout the app. The
+    /// `userInfo["context"]` payload carries the prefilled
+    /// `[String: String]` plus `"category"` so the composer auto-fills.
+    /// MainTabView listens and presents `ChezRequestComposeSheet` as a
+    /// global sheet so any entry point can fire it without owning the
+    /// sheet state itself.
+    static let openChezRequestComposer = Notification.Name("openChezRequestComposer")
 }
 
 struct MainTabView: View {
@@ -83,6 +104,13 @@ struct MainTabView: View {
     @State private var showScenarioStudio = false
     @State private var scenarioInitialQuery: String?
     @State private var isKeyboardVisible = false
+
+    // Phase 80 — Chez Concierge composer presentation. Any entry point
+    // (FindLocalVendorSheet, MaintenanceTaskDetailSheet, HandymanPunchListView,
+    // QuoteAnalysisView, DashboardView pill) posts
+    // `.openChezRequestComposer` with category + context payload; we own
+    // the sheet here so callers don't have to thread a binding through.
+    @State private var chezComposerInput: ChezComposerInput?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -176,6 +204,46 @@ struct MainTabView: View {
                 DuplicateResolutionSheet(resolution: resolution, manager: uploadManager)
             }
         }
+        // Phase 80 — Chez composer. Presented globally so any entry-point
+        // button can fire `.openChezRequestComposer` without owning sheet
+        // state. `ChezComposerInput` is the small `Identifiable` payload
+        // the notification carries: category + context dict + whether the
+        // category should be locked (true for everything except .general).
+        .sheet(item: $chezComposerInput) { input in
+            ChezRequestComposeSheet(
+                category: input.category,
+                contextHints: input.contextHints,
+                isCategoryFixed: input.isCategoryFixed
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openChezRequestComposer)) { notification in
+            guard let info = notification.userInfo else { return }
+            let categoryRaw = info["category"] as? String ?? ChezCategory.general.rawValue
+            let category = ChezCategory(rawValue: categoryRaw) ?? .general
+            let context = info["context"] as? [String: String] ?? [:]
+            // Lock the picker for every category except `.general` — the
+            // user landed there from a specific surface, so flipping the
+            // category mid-compose breaks the prefilled context.
+            let isFixed = category != .general
+            chezComposerInput = ChezComposerInput(
+                category: category,
+                contextHints: context,
+                isCategoryFixed: isFixed
+            )
+            Analytics.track(.chezEntryButtonTapped, [
+                "category": category.rawValue,
+                "context_keys": context.keys.sorted().joined(separator: ","),
+            ])
+        }
+    }
+
+    /// Phase 80 — Identifiable wrapper so SwiftUI's `.sheet(item:)` can
+    /// present + dismiss a fresh composer per notification.
+    private struct ChezComposerInput: Identifiable {
+        let id = UUID()
+        let category: ChezCategory
+        let contextHints: [String: String]
+        let isCategoryFixed: Bool
     }
 
     // MARK: - Custom Tab Bar

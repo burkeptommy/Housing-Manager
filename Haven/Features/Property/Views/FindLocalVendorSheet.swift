@@ -110,6 +110,15 @@ struct FindLocalVendorSheet: View {
 
                         addMyOwnButton
                             .padding(.top, HavenTheme.spacing16)
+
+                        // Phase 80 — Chez Concierge escape hatch. After the
+                        // local-vendor search and the "Add my own" path, a
+                        // homeowner who still doesn't know who to call can
+                        // hand the work off to Tom. The composer pre-fills
+                        // category + town + state + display name so Tom has
+                        // full context the moment the request lands.
+                        chezConciergeEntry
+                            .padding(.top, HavenTheme.spacing12)
                     }
                     .padding(.horizontal, HavenTheme.pageMargin)
                     .padding(.top, HavenTheme.spacing16)
@@ -704,6 +713,36 @@ struct FindLocalVendorSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(isAdding)
+    }
+
+    // MARK: - Phase 80 Chez entry
+
+    private var chezConciergeEntry: some View {
+        // ChezEntryButton itself posts `.openChezRequestComposer`;
+        // MainTabView intercepts that and slides the composer up over
+        // this sheet. Leaving FindLocalVendorSheet underneath is fine:
+        // if the user cancels the composer they're back where they
+        // started in vendor-browsing mode.
+        ChezEntryButton(
+            category: .findVendor,
+            label: "Have a Chez Home Manager find one for me",
+            caption: "Tom researches vetted local pros and replies within 1 business day.",
+            context: chezContext
+        )
+    }
+
+    private var chezContext: [String: String] {
+        var c: [String: String] = [
+            "category": categoryDisplayName,
+            "town": town,
+            "state": state,
+            "system_category": systemCategory,
+        ]
+        if let task {
+            c["task_title"] = task.title
+            c["task_id"] = task.id.uuidString
+        }
+        return c
     }
 
     // MARK: - Loading

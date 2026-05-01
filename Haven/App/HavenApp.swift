@@ -43,7 +43,7 @@ struct ChezApp: App {
                     }
                     Analytics.track(.appLaunched)
                     // Deferred deep link fallback: when the user installed
-                    // Chez from a havenhome.dev/join/<code> tap that opened
+                    // Chez from a getchez.com/join/<code> tap that opened
                     // the App Store, iOS doesn't carry the URL through. We
                     // peek at the system pasteboard ONCE on first launch and
                     // pull a 6-char code out if it's there.
@@ -63,13 +63,15 @@ struct ChezApp: App {
     // MARK: - Universal links
 
     /// Handle a universal link or custom-scheme URL. The only path we care
-    /// about today is `https://havenhome.dev/join/<6-char-code>`. The code
-    /// gets stashed in UserDefaults and a notification fires so AddressHookView
-    /// (or any other listening view) can present the InviteCodeEntrySheet
-    /// pre-filled.
+    /// about today is `https://getchez.com/join/<6-char-code>` (with
+    /// legacy `havenhome.dev` still accepted for invites generated before
+    /// the domain switch). The code gets stashed in UserDefaults and a
+    /// notification fires so AddressHookView (or any other listening view)
+    /// can present the InviteCodeEntrySheet pre-filled.
     private func handleIncomingURL(_ url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.host?.lowercased() == "havenhome.dev" else { return }
+              let host = components.host?.lowercased(),
+              host == "getchez.com" || host == "havenhome.dev" else { return }
         let pathComponents = url.pathComponents.filter { $0 != "/" }
         guard pathComponents.count >= 2, pathComponents[0].lowercased() == "join" else { return }
 
@@ -105,7 +107,9 @@ struct ChezApp: App {
             DispatchQueue.main.async {
                 guard matched else { return }
                 guard UIPasteboard.general.hasStrings, let raw = UIPasteboard.general.string else { return }
-                if let url = URL(string: raw), url.host?.lowercased() == "havenhome.dev" {
+                if let url = URL(string: raw),
+                   let host = url.host?.lowercased(),
+                   host == "getchez.com" || host == "havenhome.dev" {
                     handleIncomingURL(url)
                     return
                 }
@@ -262,6 +266,22 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     name: .openHandymanVisit,
                     object: nil,
                     userInfo: payload
+                )
+
+            // Phase 80 — Chez Concierge pushes. Server sends
+            // `type: "chez_request_reply"` (Tom replied), `"chez_status_change"`
+            // (Tom marked open / waiting / resolved), or `"chez_admin_request"`
+            // (admin notify — never delivered to homeowner). All open
+            // route to Dashboard tab so the inbox is reachable, then post
+            // `.openChezRequest` so InboxView switches to the Chez sub-tab
+            // and presents the matching ChezRequestDetailView.
+            case let t where t.hasPrefix("chez_") && t != "chez_admin_request":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+                let requestId = userInfo["request_id"] as? String ?? ""
+                NotificationCenter.default.post(
+                    name: .openChezRequest,
+                    object: nil,
+                    userInfo: ["request_id": requestId]
                 )
 
             default:

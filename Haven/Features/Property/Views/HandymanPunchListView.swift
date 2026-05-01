@@ -280,10 +280,40 @@ struct HandymanPunchListView: View {
                 style: .secondary,
                 icon: "plus"
             )
+
+            // Phase 80 — Chez Concierge entry. When the user has a punch
+            // list assembled but no handyman to call, hand the whole job
+            // off to Tom — he'll find a vetted handyman, share the list,
+            // and book the visit.
+            ChezEntryButton(
+                category: .findHandyman,
+                label: "Have Chez find me a handyman",
+                caption: "Tom finds a vetted local pro and books the visit.",
+                context: chezPunchContext
+            )
+            .padding(.top, HavenTheme.spacing4)
         }
         .padding(.horizontal, HavenTheme.spacing16)
         .padding(.vertical, HavenTheme.spacing12)
         .background(.ultraThinMaterial)
+    }
+
+    /// Phase 80 — context for the Chez handyman handoff. Sends the full
+    /// punch list as a newline-joined string plus the count, so Tom has
+    /// the visible inventory at a glance without opening another tab.
+    /// `viewModel.entries` is already the visible (non-archived /
+    /// non-completed) set, so no extra filtering is needed.
+    private var chezPunchContext: [String: String] {
+        let pending = viewModel.entries
+        var c: [String: String] = [
+            "punch_item_count": String(pending.count),
+            "property_id": propertyId?.uuidString ?? "",
+        ]
+        if !pending.isEmpty {
+            let titles = pending.prefix(20).map { "• \($0.title)" }.joined(separator: "\n")
+            c["punch_list_preview"] = titles
+        }
+        return c
     }
 }
 

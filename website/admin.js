@@ -61,6 +61,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 //   tools      — sandboxes + reference docs (Simulate, Architecture, Claude file)
 const VIEWS = [
   {
+    id: "chez",
+    label: "Chez Requests",
+    type: "chez_request",
+    group: "action",
+    title: "Chez Concierge",
+    eyebrow: "Open homeowner requests, replies, and SLAs",
+    subtitle: "Every request that's come in from a homeowner. Reply, ask follow-ups, propose vendors / dates / quotes — all from one panel. 24-hour business-day SLA on every open request.",
+  },
+  {
     id: "audit",
     label: "Audit",
     type: "audit",
@@ -544,6 +553,18 @@ const state = {
   // Phase 5z+19 — currently-focused audit finding on the Audit tab.
   // Same lifecycle as selectedDecision.
   selectedAudit: null,
+  // Phase 80 — Chez Concierge admin tab. `chezRequests` is the full
+  // list of incoming homeowner requests; `chezMessages` is keyed by
+  // request_id so the focused panel can render its thread without a
+  // round trip per click. `selectedChezRequest` is whichever row is
+  // currently open in the focused panel — survives data refreshes so
+  // the panel stays put while Tom is composing a reply.
+  chezRequests: [],
+  chezMessages: {},
+  selectedChezRequest: null,
+  chezReplyDraft: "",
+  chezReplyAcknowledgement: false,
+  chezReplyStatus: null, // optional status transition
 };
 
 function structuredCloneSafePure(value) {
@@ -1454,7 +1475,11 @@ async function loadAdminData() {
   state.storageMode = "cloud";
   el.storageWarning.hidden = true;
   try {
-    const [{ data: items, error: itemError }, { data: notes, error: noteError }] = await Promise.all([
+    const [
+      { data: items, error: itemError },
+      { data: notes, error: noteError },
+      { data: chez, error: chezError },
+    ] = await Promise.all([
       supabase
         .from("admin_content_items")
         .select("*")
@@ -1465,17 +1490,51 @@ async function loadAdminData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(250),
+      // Phase 80 — Chez Concierge. RLS is open to admin users (email
+      // ∈ allowlist) via a separate policy added in the migration; the
+      // SELECT only succeeds for the household scope unless the caller
+      // is admin. If `chezError` non-null we silently fall back to []
+      // so the rest of the admin tooling stays functional.
+      supabase
+        .from("chez_requests")
+        .select("*")
+        .order("last_message_at", { ascending: false })
+        .limit(200),
     ]);
     if (itemError) throw itemError;
     if (noteError) throw noteError;
     state.adminItems = (items ?? []).map(dbItemToUi);
     state.notes = (notes ?? []).map(dbNoteToUi);
+    state.chezRequests = chezError ? [] : (chez ?? []);
+    if (chezError) console.warn("[admin] chez_requests fetch failed", chezError);
   } catch (error) {
     console.warn("[admin] falling back to local draft mode", error);
     state.storageMode = "local";
     el.storageWarning.hidden = false;
     state.adminItems = readLocal(LOCAL_ITEMS_KEY);
     state.notes = readLocal(LOCAL_NOTES_KEY);
+    state.chezRequests = [];
+  }
+}
+
+// Phase 80 — Chez Concierge: fetch the message thread for a single
+// request. Cached on `state.chezMessages[requestId]` so re-renders
+// (focus refresh, status flip, etc.) don't re-hit Supabase.
+async function loadChezMessages(requestId) {
+  if (!requestId) return [];
+  try {
+    const { data, error } = await supabase
+      .from("concierge_messages")
+      .select("*")
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    state.chezMessages[requestId] = data ?? [];
+    return state.chezMessages[requestId];
+  } catch (error) {
+    console.warn("[admin] chez messages fetch failed", error);
+    state.chezMessages[requestId] = [];
+    return [];
   }
 }
 
@@ -1665,7 +1724,9 @@ function render() {
     else el.previewQuiz.classList.add("is-hidden");
   }
 
-  if (state.view === "audit") {
+  if (state.view === "chez") {
+    renderChezRequestsView();
+  } else if (state.view === "audit") {
     renderAuditView();
   } else if (state.view === "notes") {
     renderNotesView();
@@ -1944,6 +2005,7 @@ function renderNav() {
       state.selected = null;
       state.selectedDecision = null;
       state.selectedAudit = null;
+      state.selectedChezRequest = null;
       state.search = "";
       state.statusFilter = "all";
       state.lifecycleFilter = "all";
@@ -4588,6 +4650,458 @@ function renderAuditView() {
       ? "Each finding opens with Claude's recommended action up top, plus a few alternative options. One click per choice."
       : "Every task has a vendor that can do it, every quiz question drives something, every vendor has work, and the catalog covers what HNW homes typically need. Move to another tab.";
   }
+}
+
+// =============================================================================
+// Phase 80 — Chez Concierge admin tab
+// =============================================================================
+//
+// Lives on the "action" sidebar group, above Audit. Tom works through
+// homeowner requests here: read context, reply, propose vendors / dates,
+// flip status. Reuses the focused-panel right-rail layout already used
+// by Audit + Notes, with a sticky composer at the bottom.
+
+const CHEZ_CATEGORY_LABELS = {
+  find_vendor: "Find a vendor",
+  get_quote: "Get a quote",
+  schedule_visit: "Schedule a visit",
+  coordinate_task: "Coordinate a task",
+  find_handyman: "Find a handyman",
+  general: "General help",
+};
+
+const CHEZ_CATEGORY_ICONS = {
+  find_vendor: "🔍",
+  get_quote: "💰",
+  schedule_visit: "📅",
+  coordinate_task: "✅",
+  find_handyman: "🛠️",
+  general: "💬",
+};
+
+const CHEZ_STATUS_LABELS = {
+  open: "Open",
+  waiting_customer: "Waiting on customer",
+  resolved: "Resolved",
+};
+
+/// Compute a green / amber / red SLA pill from `sla_due_at - now`.
+function chezSlaPill(req) {
+  const status = req.status;
+  if (status === "resolved") return null;
+  if (status === "waiting_customer") {
+    return { tone: "muted", label: "Awaiting customer" };
+  }
+  const due = req.sla_due_at ? new Date(req.sla_due_at).getTime() : 0;
+  const now = Date.now();
+  const remainingMs = due - now;
+  if (remainingMs <= 0) {
+    const overdueHours = Math.round(Math.abs(remainingMs) / 3600000);
+    return { tone: "red", label: `OVERDUE ${overdueHours}h`, overdue: true };
+  }
+  const hoursLeft = Math.round(remainingMs / 3600000);
+  if (hoursLeft <= 4) {
+    return { tone: "amber", label: `SLA: ${hoursLeft}h left` };
+  }
+  return { tone: "green", label: `SLA: ${hoursLeft}h left` };
+}
+
+function chezStatRow(label, value) {
+  return `<div class="admin-stat"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`;
+}
+
+function renderChezRequestsView() {
+  const requests = (state.chezRequests ?? []).slice();
+  el.search.value = state.search || "";
+
+  // Stats: total open · awaiting reply (admin unread or no admin reply yet)
+  // · waiting on customer · resolved this week.
+  const open = requests.filter((r) => r.status === "open").length;
+  const awaitingReply = requests.filter((r) => r.status === "open" && r.unread_for_admin).length;
+  const waiting = requests.filter((r) => r.status === "waiting_customer").length;
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const resolvedThisWeek = requests.filter(
+    (r) => r.status === "resolved" && r.resolved_at && new Date(r.resolved_at).getTime() >= oneWeekAgo
+  ).length;
+  el.stats.innerHTML = [
+    chezStatRow("Total open", open),
+    chezStatRow("Awaiting your reply", awaitingReply),
+    chezStatRow("Waiting on customer", waiting),
+    chezStatRow("Resolved this week", resolvedThisWeek),
+  ].join("");
+
+  // Sort: overdue first, then unread-for-admin, then most-recent activity.
+  const sorted = requests.sort((a, b) => {
+    const aSla = chezSlaPill(a);
+    const bSla = chezSlaPill(b);
+    const aOver = aSla?.overdue ? 1 : 0;
+    const bOver = bSla?.overdue ? 1 : 0;
+    if (aOver !== bOver) return bOver - aOver;
+    const aUnread = a.unread_for_admin ? 1 : 0;
+    const bUnread = b.unread_for_admin ? 1 : 0;
+    if (aUnread !== bUnread) return bUnread - aUnread;
+    const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+    const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  // Optional search filter (over summary, category label, household id).
+  const query = (state.search || "").toLowerCase().trim();
+  const filtered = query
+    ? sorted.filter((r) => {
+        const summary = (r.summary || "").toLowerCase();
+        const cat = (CHEZ_CATEGORY_LABELS[r.category] || "").toLowerCase();
+        return summary.includes(query) || cat.includes(query) || (r.household_id || "").toLowerCase().includes(query);
+      })
+    : sorted;
+
+  const renderRow = (req) => {
+    const isActive = state.selectedChezRequest?.id === req.id;
+    const sla = chezSlaPill(req);
+    const slaHtml = sla
+      ? `<span class="admin-pill" data-tone="${escapeHtml(sla.tone)}">${escapeHtml(sla.label)}</span>`
+      : "";
+    const unreadDot = req.unread_for_admin
+      ? `<span class="admin-chez__unread-dot" title="New activity"></span>`
+      : "";
+    const cat = CHEZ_CATEGORY_ICONS[req.category] || "💬";
+    return `
+      <button type="button" class="admin-audit__row admin-chez__row ${isActive ? "is-active" : ""}" data-chez-id="${escapeHtml(req.id)}">
+        <div class="admin-audit__row-top">
+          <strong>${cat} ${escapeHtml(req.summary || "(no summary)")}</strong>
+          ${slaHtml}
+        </div>
+        <p class="admin-audit__row-reason">
+          ${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || "Request")}
+          · ${escapeHtml(CHEZ_STATUS_LABELS[req.status] || req.status)}
+          ${unreadDot}
+        </p>
+      </button>
+    `;
+  };
+
+  const empty = filtered.length === 0
+    ? `<p class="admin-audit__empty admin-muted">No requests yet. The first homeowner ask will land here.</p>`
+    : "";
+
+  el.list.innerHTML = `
+    <div class="admin-audit admin-chez">
+      <p class="admin-audit__intro">
+        Every Chez Concierge request, ranked by urgency. <strong>Click a row</strong> to open the focused panel: full context, conversation thread, attachment downloads, reply composer, and status controls.
+      </p>
+      ${empty}
+      ${filtered.map(renderRow).join("")}
+    </div>
+  `;
+
+  el.list.querySelectorAll("[data-chez-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.chezId;
+      const req = filtered.find((r) => r.id === id);
+      if (!req) return;
+      state.selectedChezRequest = req;
+      // Pre-load thread before render so the panel doesn't flash empty.
+      await loadChezMessages(id);
+      renderFocusedChezDetail(req);
+      renderChezRequestsView();
+    });
+  });
+
+  // Restore focus or render empty.
+  const stillSelected = state.selectedChezRequest && filtered.some((r) => r.id === state.selectedChezRequest.id);
+  if (stillSelected) {
+    const fresh = filtered.find((r) => r.id === state.selectedChezRequest.id);
+    state.selectedChezRequest = fresh;
+    renderFocusedChezDetail(fresh);
+  } else {
+    state.selectedChezRequest = null;
+    el.auditFocused?.classList.add("is-hidden");
+    el.noteFocused?.classList.add("is-hidden");
+    el.decisionFocused?.classList.add("is-hidden");
+    el.emptyDetail?.classList.remove("is-hidden");
+    el.detail?.classList.add("is-hidden");
+    if (el.emptyDetail) {
+      el.emptyDetail.querySelector("h3").textContent = filtered.length
+        ? "Click a request to open its conversation"
+        : "No requests yet";
+      el.emptyDetail.querySelector("p").textContent = filtered.length
+        ? "The focused panel shows full context, attachments, the message thread, and a reply composer with status controls."
+        : "When a homeowner asks Chez for help — finding a vendor, getting a quote, scheduling a visit — the request lands here.";
+    }
+  }
+}
+
+function renderFocusedChezDetail(req) {
+  if (!req) return;
+  el.emptyDetail?.classList.add("is-hidden");
+  el.detail?.classList.remove("is-hidden");
+  el.detailTabs?.classList.add("is-hidden");
+  el.curatedForm?.classList.add("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
+  el.detailActionsRow?.classList.add("is-hidden");
+  el.notesBox?.classList.add("is-hidden");
+  el.promoteItem.disabled = true;
+  el.duplicateItem.disabled = true;
+  el.deleteItem.disabled = true;
+  el.saveItem.textContent = "Save";
+  el.saveItem.disabled = true;
+
+  // The focused panel reuses the audit panel container so we get the
+  // same right-rail layout for free.
+  if (!el.auditFocused) {
+    console.warn("[admin] auditFocused element missing — Chez panel can't render");
+    return;
+  }
+  el.auditFocused.classList.remove("is-hidden");
+  el.auditFocused.innerHTML = renderFocusedChezPanelHtml(req);
+
+  // Wire the reply form + status pickers + quick actions.
+  attachChezPanelHandlers(req);
+}
+
+function renderFocusedChezPanelHtml(req) {
+  const sla = chezSlaPill(req);
+  const slaPill = sla
+    ? `<span class="admin-pill" data-tone="${escapeHtml(sla.tone)}">${escapeHtml(sla.label)}</span>`
+    : "";
+  const messages = state.chezMessages[req.id] || [];
+
+  // Pretty-print context dict.
+  const contextLines = req.context && typeof req.context === "object"
+    ? Object.entries(req.context)
+        .filter(([k]) => !k.startsWith("_"))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `<div class="admin-chez__ctx-row"><span>${escapeHtml(k.replace(/_/g, " "))}</span><strong>${escapeHtml(String(v))}</strong></div>`)
+        .join("")
+    : "";
+
+  const threadHtml = messages.map((m) => {
+    const role = m.role || "user";
+    if (role === "system") {
+      return `
+        <div class="admin-chez__system">
+          <span>${escapeHtml(m.content || "")}</span>
+          <span class="admin-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
+        </div>
+      `;
+    }
+    const isAdmin = role === "concierge";
+    const sideClass = isAdmin ? "admin-chez__msg--admin" : "admin-chez__msg--user";
+    const senderLabel = isAdmin ? "Tom (Chez)" : "Homeowner";
+    const attachmentsHtml = (m.attachments || []).map((att) => {
+      return `
+        <div class="admin-chez__attach">
+          <span>📎 ${escapeHtml(att.filename || "(file)")}</span>
+          <span class="admin-muted">${escapeHtml(att.mime_type || "")}</span>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="admin-chez__msg ${sideClass}">
+        <div class="admin-chez__msg-head">
+          <strong>${senderLabel}</strong>
+          <span class="admin-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
+        </div>
+        ${m.content ? `<p>${escapeHtml(m.content)}</p>` : ""}
+        ${attachmentsHtml}
+      </div>
+    `;
+  }).join("");
+
+  const statusOptions = ["open", "waiting_customer", "resolved"]
+    .map((s) => `<option value="${s}" ${s === req.status ? "selected" : ""}>${CHEZ_STATUS_LABELS[s]}</option>`)
+    .join("");
+
+  const showReopen = req.status === "resolved";
+  const composerHtml = showReopen
+    ? `
+      <div class="admin-chez__resolved-bar">
+        <span>This request is resolved. Reopen if the homeowner needs more help.</span>
+        <button type="button" class="admin-button" data-chez-action="reopen">Reopen</button>
+      </div>
+    `
+    : `
+      <form data-chez-reply-form class="admin-chez__composer">
+        <label class="admin-chez__composer-label">Reply to homeowner</label>
+        <textarea name="content" rows="5" placeholder="Tell the homeowner what's next…" required></textarea>
+        <label class="admin-chez__ack">
+          <input type="checkbox" name="acknowledgement_required" />
+          <span><strong>Acknowledgement required.</strong> Drops the reply into the homeowner's <em>Needs Action</em> tab. Leave unchecked for purely informational updates.</span>
+        </label>
+        <div class="admin-chez__composer-row">
+          <select name="to_status">
+            <option value="">Keep status: ${CHEZ_STATUS_LABELS[req.status]}</option>
+            ${["open", "waiting_customer", "resolved"]
+              .filter((s) => s !== req.status)
+              .map((s) => `<option value="${s}">Set status: ${CHEZ_STATUS_LABELS[s]}</option>`)
+              .join("")}
+          </select>
+          <button type="submit" class="admin-button admin-button--primary">Send reply</button>
+        </div>
+        <p class="admin-chez__composer-feedback admin-muted" data-chez-feedback></p>
+      </form>
+    `;
+
+  return `
+    <section class="admin-focused admin-chez__focused">
+      <header class="admin-focused__head">
+        <h2>${escapeHtml(req.summary || "(no summary)")}</h2>
+        <div class="admin-focused__meta">
+          <span class="admin-pill admin-pill--note">${CHEZ_CATEGORY_ICONS[req.category] || "💬"} ${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || "Request")}</span>
+          <select data-chez-status>${statusOptions}</select>
+          ${slaPill}
+        </div>
+      </header>
+
+      ${contextLines ? `
+        <section class="admin-chez__context">
+          <h3>Details from the homeowner</h3>
+          <div class="admin-chez__ctx-grid">${contextLines}</div>
+        </section>
+      ` : ""}
+
+      <section class="admin-chez__thread">
+        <h3>Conversation</h3>
+        ${threadHtml || `<p class="admin-muted">No messages yet — the original request is rendering above.</p>`}
+      </section>
+
+      ${composerHtml}
+
+      <section class="admin-chez__quick-actions">
+        <button type="button" class="admin-button admin-button--ghost" data-chez-action="waiting">Mark waiting on customer</button>
+        <button type="button" class="admin-button admin-button--ghost" data-chez-action="resolved">Mark resolved</button>
+      </section>
+    </section>
+  `;
+}
+
+function attachChezPanelHandlers(req) {
+  // Status select — fires immediately on change.
+  const statusSelect = el.auditFocused.querySelector("[data-chez-status]");
+  if (statusSelect) {
+    statusSelect.addEventListener("change", async (e) => {
+      const newStatus = e.target.value;
+      if (!newStatus || newStatus === req.status) return;
+      await performChezTransition(req, newStatus);
+    });
+  }
+
+  // Reply form.
+  const form = el.auditFocused.querySelector("[data-chez-reply-form]");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const content = form.elements.content.value.trim();
+      if (!content) return;
+      const ack = form.elements.acknowledgement_required.checked;
+      const toStatus = form.elements.to_status.value || null;
+      const feedback = form.querySelector("[data-chez-feedback]");
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending…";
+      try {
+        await callChezConcierge({
+          action: "reply",
+          request_id: req.id,
+          content,
+          acknowledgement_required: ack,
+          to_status: toStatus,
+        });
+        if (feedback) feedback.textContent = "Sent.";
+        form.elements.content.value = "";
+        form.elements.acknowledgement_required.checked = false;
+        form.elements.to_status.value = "";
+        await loadAdminData();
+        await loadChezMessages(req.id);
+        const refreshed = state.chezRequests.find((r) => r.id === req.id);
+        if (refreshed) state.selectedChezRequest = refreshed;
+        renderChezRequestsView();
+      } catch (err) {
+        console.error("[admin] chez reply failed", err);
+        if (feedback) feedback.textContent = `Failed: ${err.message || err}`;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Send reply";
+      }
+    });
+  }
+
+  // Quick-action buttons.
+  el.auditFocused.querySelectorAll("[data-chez-action]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const action = btn.dataset.chezAction;
+      if (action === "waiting") {
+        await performChezTransition(req, "waiting_customer");
+      } else if (action === "resolved") {
+        await performChezTransition(req, "resolved");
+      } else if (action === "reopen") {
+        await performChezTransition(req, "open");
+      }
+    });
+  });
+}
+
+async function performChezTransition(req, toStatus) {
+  try {
+    await callChezConcierge({
+      action: "transition_status",
+      request_id: req.id,
+      to_status: toStatus,
+    });
+    await loadAdminData();
+    await loadChezMessages(req.id);
+    const refreshed = state.chezRequests.find((r) => r.id === req.id);
+    if (refreshed) state.selectedChezRequest = refreshed;
+    renderChezRequestsView();
+  } catch (err) {
+    console.error("[admin] chez transition failed", err);
+    alert(`Couldn't update status: ${err.message || err}`);
+  }
+}
+
+/// Wraps the chez-concierge Edge Function. Reuses the existing
+/// supabase auth context — admin email is allowlisted server-side.
+async function callChezConcierge(body) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session) throw new Error("Not signed in");
+  const url = `${SUPABASE_URL}/functions/v1/chez-concierge`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    let message = `Request failed (${resp.status})`;
+    try {
+      const json = JSON.parse(text);
+      if (json.error) message = json.error;
+    } catch {
+      if (text) message = text.slice(0, 200);
+    }
+    throw new Error(message);
+  }
+  return resp.json();
+}
+
+function formatDateTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 // Phase 5z+19 — Focused audit panel renderer. Same shape as the

@@ -424,6 +424,14 @@ enum AnalyticsEvent: String {
     case moneyTransactionRecategorized = "money_transaction_recategorized"
     case moneyBudgetEdited = "money_budget_edited"
 
+    // MARK: - Chez Concierge (Phase 80)
+    case chezEntryButtonTapped = "chez_entry_button_tapped"
+    case chezRequestSubmitted = "chez_request_submitted"
+    case chezRequestReplied = "chez_request_replied"
+    case chezRequestOpened = "chez_request_opened"
+    case chezRequestReopened = "chez_request_reopened"
+    case chezRequestMarkedRead = "chez_request_marked_read"
+
     // MARK: - Errors
     case errorOccurred = "error_occurred"
 }

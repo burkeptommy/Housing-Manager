@@ -51,6 +51,20 @@ struct InboxItemDetailView: View {
     @State private var initialItemType: String?
 
     var body: some View {
+        // Phase 80 — Chez Concierge: when a reply / status-change item has
+        // a linked request, render the request thread directly instead of
+        // the inbox detail chrome. This is the "smart routing" Tom asked
+        // for: replies show up in the user's existing Needs Action / Unread
+        // sorting, but tapping in jumps straight into the conversation.
+        if item.isChezReply, let chezRequestId = item.relatedChezRequestId
+            ?? item.metadata?.chezRequestIdAsUUID {
+            ChezRequestDetailView(requestId: chezRequestId)
+        } else {
+            mainBody
+        }
+    }
+
+    private var mainBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
                 // Status badge
