@@ -114,6 +114,7 @@
 		230E64B5CF29F1235C66DA85 /* EditVehicleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99E29FD8C600AF4BB2F06397 /* EditVehicleSheet.swift */; };
 		233FC12B7786CF70A5EE2A8A /* VersionCheckService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AA28167AD30616B817ACECE /* VersionCheckService.swift */; };
 		2369D7D1B078885DA65402D1 /* SystemCategoryRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E504A0387184689AC684A02 /* SystemCategoryRegistry.swift */; };
+		236B04CD36A9396FF1EA1A5F /* ATTOMHelloCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FB53B9002A2303DA43673A /* ATTOMHelloCard.swift */; };
 		236F4180BA3F326FE2E9BCD5 /* MaintenanceOperationalViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6723E0CE09CC17C68336D66E /* MaintenanceOperationalViews.swift */; };
 		24239D059B2B949DC990587A /* VendorVisitCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A66B9EE954A529D243341EF /* VendorVisitCard.swift */; };
 		24637E5BC6AB01F0CC423E0F /* HouseQuizValueMeter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD48C672798798C77079E4B /* HouseQuizValueMeter.swift */; };
@@ -173,6 +174,7 @@
 		353BDE111D27138F76DFEC06 /* VehicleLookupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D44F4D6FC19F4CE5475D905 /* VehicleLookupService.swift */; };
 		355888DCD1168D6EB16EA195 /* Color+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2218FB82A32E8E479EB1078E /* Color+Haven.swift */; };
 		35A52D3F439C3042D6865EB1 /* VINScannerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A79F1CBC5C229985B274954 /* VINScannerSheet.swift */; };
+		35C1637A64B5F7ADB4818A65 /* Q38HandymanPunchListBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7469C5E2107D7848DE8EF580 /* Q38HandymanPunchListBody.swift */; };
 		35D9FE2D2B0A467EA2F7A045 /* HouseholdStaffStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDCCEE76628155483DFF9776 /* HouseholdStaffStrip.swift */; };
 		370A2A1788921697A909748E /* ScenarioStudioViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C55BD89D3FF9E725F8E5B37 /* ScenarioStudioViewModel.swift */; };
 		37272803AB55B96F55ACAF17 /* DESIGN_RULES.md in Resources */ = {isa = PBXBuildFile; fileRef = D10346B1798B972FA9CA0219 /* DESIGN_RULES.md */; };
@@ -343,6 +345,7 @@
 		70D68C6F6451B5E8664E1B65 /* DocumentAccessDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6E8DFBC88AF3D120717F2F /* DocumentAccessDefaults.swift */; };
 		70D8D72E70C320D147AD6BE9 /* BrandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACB86E8385B0978B65C548D /* BrandTheme.swift */; };
 		71221A75967708FA23C4260D /* DocumentCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03C5495A9EBA23FE8FAB5AD /* DocumentCategory.swift */; };
+		725FB69F06F5F9481292D573 /* Q37RoutinesGridBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531E5B9D8A8F05E15BD6A50F /* Q37RoutinesGridBody.swift */; };
 		727A6C03170FCB8C580C440B /* PropertyCreationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16A8DBA13310387EB6AB2594 /* PropertyCreationService.swift */; };
 		72A2D52A90F3828F85AD0CE2 /* BundledInsuranceSuggestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B20FA7ACAE749FF43F297F5 /* BundledInsuranceSuggestionCard.swift */; };
 		72D8948E111717915487040F /* HouseQuizAnswerMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8AE811AFA8FA636CE93EB2D /* HouseQuizAnswerMapper.swift */; };
@@ -398,6 +401,7 @@
 		813C5013752C60325B242E61 /* SystemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */; };
 		814E77BA0FA8FBF5A6905785 /* AddSystemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58EF9C9FB14640084B3DC45 /* AddSystemView.swift */; };
 		817799A7803A8345B4E5AFD4 /* PauseAppointmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85FDEA4F5E833F18CD0012A /* PauseAppointmentSheet.swift */; };
+		81AC7FA9EA5E2FBEF702175D /* ATTOMHelloCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FB53B9002A2303DA43673A /* ATTOMHelloCard.swift */; };
 		81DB7AF5968F9E41BC70E9B6 /* ContactPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012A4D8E967F9F73E579FAB8 /* ContactPickerView.swift */; };
 		81EE6D934AAC2EDAAF568083 /* MaintenanceTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF47343974F44B306A4C18DE /* MaintenanceTaskRow.swift */; };
 		83473B17FD2FDF0C0B07330D /* SystemGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C235D5924950601DBEC89D /* SystemGroup.swift */; };
@@ -412,6 +416,7 @@
 		84E263024BA7EB0EB1C27CC4 /* TrustedContactDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5964DD20089AE2FA96DD6B3F /* TrustedContactDetailView.swift */; };
 		85EDC669E036389F6A00F5B6 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F21E2347101F280AF6E2FC /* AppState.swift */; };
 		8642A4872399D9AB3358993C /* LinkDocumentToProjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1077727F8CD1C7CEC052D32 /* LinkDocumentToProjectSheet.swift */; };
+		86458F2D5232F30C22A6108B /* HandymanSeasonalReminderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34E3E4F70C0BF8881E1E23B /* HandymanSeasonalReminderCard.swift */; };
 		876699DA7DDA72D3E8154E1E /* SectionLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B1BB4C90A506E3389C3CA8 /* SectionLabel.swift */; };
 		87E58D8F1F374148B31006F8 /* ErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA4AA2E5E444D624BF0A4601 /* ErrorView.swift */; };
 		880BE409C65D58D485B57137 /* PropertyRecapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500D254BE1B20353EADE8828 /* PropertyRecapCard.swift */; };
@@ -503,6 +508,7 @@
 		A50832A03C6A3975D16E74CE /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B1CBF7F1BC549E214B0BEF /* SignUpView.swift */; };
 		A528872911691B5DC9EADED4 /* OverdueMaintenanceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BD10152C540F01FD5A0C2B /* OverdueMaintenanceCard.swift */; };
 		A54AA165F77E2464DDEBA45E /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400015DE6DC09805EC95BF6E /* NotificationSettingsView.swift */; };
+		A561CE338FFA31C6296FC5C3 /* HandymanSeasonalReminderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34E3E4F70C0BF8881E1E23B /* HandymanSeasonalReminderCard.swift */; };
 		A58DED33F9D2F7EB1DCDA401 /* InstallDatePrefiller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6249BFC2EEC544EF640144E4 /* InstallDatePrefiller.swift */; };
 		A622C45DFA88AD5E753A2147 /* SecurityExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091C6E2DE4A0D3F89EA01338 /* SecurityExplainerView.swift */; };
 		A67C92A1218D835213E9E7BF /* HeaderSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0CED2ECB3698ED477BB00D /* HeaderSwitcher.swift */; };
@@ -702,6 +708,7 @@
 		E706EDC98BE7D860C86995B5 /* InboxItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56810297D7D51BAE3CBBFECB /* InboxItemDetailView.swift */; };
 		E7627B10E1380740DE422203 /* HouseholdStaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C82F8F17DB61DE2C6A48C79 /* HouseholdStaffView.swift */; };
 		E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */; };
+		E7F7874F63DC447893D3DF47 /* Q38HandymanPunchListBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7469C5E2107D7848DE8EF580 /* Q38HandymanPunchListBody.swift */; };
 		E844B3B782B687101D043825 /* AlfredLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */; };
 		E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAE3950BF1A95CC45D9C55B /* PushNotificationService.swift */; };
 		E88FC8C0D1E9642313F9CDA8 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDD425AF92101F7B1B5793E /* LoginView.swift */; };
@@ -754,6 +761,7 @@
 		F7D04F0B5A7916E58F2C9935 /* ManageSystemTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */; };
 		F966EFB968FD8BC13DE6D91E /* ScenarioStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */; };
 		F9800BA6DCDBD4C5310F88F9 /* ChapterIntroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6D2F3658561ADE37395D63 /* ChapterIntroCard.swift */; };
+		F9D933AAB68D62A25F73244F /* Q37RoutinesGridBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531E5B9D8A8F05E15BD6A50F /* Q37RoutinesGridBody.swift */; };
 		FA3CFECBA7290E8DF058E112 /* HouseQuizPersonalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A591974F2C6B9ADE8AFE54CF /* HouseQuizPersonalization.swift */; };
 		FA43E1224FC4C151E2FB7F66 /* VendorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F404802C9E338E592601FED /* VendorLogoView.swift */; };
 		FA9F45073A2E4CFFD9415150 /* VaultLockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA76304D2996344500376B8D /* VaultLockService.swift */; };
@@ -935,6 +943,7 @@
 		521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchasePriceInputSheet.swift; sourceTree = "<group>"; };
 		52C5FEDC0CF120BB8C30FC54 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
 		52DFF252E761E38911656477 /* SystemSubtypePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSubtypePicker.swift; sourceTree = "<group>"; };
+		531E5B9D8A8F05E15BD6A50F /* Q37RoutinesGridBody.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Q37RoutinesGridBody.swift; sourceTree = "<group>"; };
 		53FF33F7F6DAF386DA95BF99 /* DocumentAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentAnalysisService.swift; sourceTree = "<group>"; };
 		55B1CBF7F1BC549E214B0BEF /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		56810297D7D51BAE3CBBFECB /* InboxItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItemDetailView.swift; sourceTree = "<group>"; };
@@ -980,6 +989,7 @@
 		715AA20065124665D9D16D60 /* AvatarPhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPhotoService.swift; sourceTree = "<group>"; };
 		740A04DEF46264975B1D1273 /* HavenFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenFieldView.swift; sourceTree = "<group>"; };
 		742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioView.swift; sourceTree = "<group>"; };
+		7469C5E2107D7848DE8EF580 /* Q38HandymanPunchListBody.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Q38HandymanPunchListBody.swift; sourceTree = "<group>"; };
 		74FA247DDBF39F4193808F43 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDocumentsView.swift; sourceTree = "<group>"; };
 		7562263DE9626051715E0AAE /* ServiceLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceLibraryTests.swift; sourceTree = "<group>"; };
@@ -1071,6 +1081,7 @@
 		B31B7C57764591968933F9EF /* ProcessingBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingBanner.swift; sourceTree = "<group>"; };
 		B409D6403804C601F92361B9 /* UtilityProviderSearchPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityProviderSearchPicker.swift; sourceTree = "<group>"; };
 		B5CB7D3968D655AD81168BCE /* MaintenanceReorganizedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceReorganizedCard.swift; sourceTree = "<group>"; };
+		B8FB53B9002A2303DA43673A /* ATTOMHelloCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATTOMHelloCard.swift; sourceTree = "<group>"; };
 		BB90DE1FAE9B5571505CFE68 /* QuoteAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteAnalysisView.swift; sourceTree = "<group>"; };
 		BBC24845830A2362EE847792 /* ChezDirectorySearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezDirectorySearchView.swift; sourceTree = "<group>"; };
 		BC4F1566D1DA1A840DCB8665 /* InviteToHavenSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteToHavenSheet.swift; sourceTree = "<group>"; };
@@ -1109,6 +1120,7 @@
 		D1A089E995B8C1F11C65BFCB /* AdminCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminCatalogService.swift; sourceTree = "<group>"; };
 		D253512E9703A545575048F1 /* PropertyHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyHookView.swift; sourceTree = "<group>"; };
 		D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyRecapEditors.swift; sourceTree = "<group>"; };
+		D34E3E4F70C0BF8881E1E23B /* HandymanSeasonalReminderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanSeasonalReminderCard.swift; sourceTree = "<group>"; };
 		D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizQuestionLibrary.swift; sourceTree = "<group>"; };
 		D3AE3F7AF466829498D26D39 /* AppliancesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppliancesListView.swift; sourceTree = "<group>"; };
 		D435E88C9933145442784A43 /* ActiveMonthsPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveMonthsPicker.swift; sourceTree = "<group>"; };
@@ -1722,6 +1734,7 @@
 			isa = PBXGroup;
 			children = (
 				50CDB01A07790543BFE7B6F0 /* AppliancePictogramGrid.swift */,
+				B8FB53B9002A2303DA43673A /* ATTOMHelloCard.swift */,
 				0B20FA7ACAE749FF43F297F5 /* BundledInsuranceSuggestionCard.swift */,
 				3B6D2F3658561ADE37395D63 /* ChapterIntroCard.swift */,
 				6B4B4BE6A3A6239B38658754 /* DocumentExtractionConflictSheet.swift */,
@@ -1734,6 +1747,8 @@
 				500D254BE1B20353EADE8828 /* PropertyRecapCard.swift */,
 				D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */,
 				27D9389BAAEE43E4F4E56927 /* PropertyRecapEditSheet.swift */,
+				531E5B9D8A8F05E15BD6A50F /* Q37RoutinesGridBody.swift */,
+				7469C5E2107D7848DE8EF580 /* Q38HandymanPunchListBody.swift */,
 				07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */,
 				4627906C9156C09924700848 /* QuizCinematicReveal.swift */,
 				AEBD3CEF411D5B294A285315 /* QuizCompletionSummary.swift */,
@@ -1854,6 +1869,7 @@
 				ADA51D001CCECE0998970343 /* BrowseSpecialtySystemsSheet.swift */,
 				96D1F12E86441667044EB0CA /* CadenceSuggestionCard.swift */,
 				6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */,
+				D34E3E4F70C0BF8881E1E23B /* HandymanSeasonalReminderCard.swift */,
 				9CFFBCDCDA9F773F07AC5C25 /* HomeCoverageHero.swift */,
 				DDCCEE76628155483DFF9776 /* HouseholdStaffStrip.swift */,
 				312B0AF8C491CCA685866EA9 /* HouseholdStrip.swift */,
@@ -2168,6 +2184,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C05BFF1A06A535C280008996 /* APIClient.swift in Sources */,
+				81AC7FA9EA5E2FBEF702175D /* ATTOMHelloCard.swift in Sources */,
 				5A8610597B5105689B0C8B60 /* AccountCreationStep.swift in Sources */,
 				469370ABE49774F042E1AB65 /* ActiveMonthsPicker.swift in Sources */,
 				73DCFB5867CF9D3F3EE0F51E /* ActivityLogView.swift in Sources */,
@@ -2295,6 +2312,7 @@
 				D3439DE6767AE24F1815E62A /* HandymanPunchItem.swift in Sources */,
 				907DF6DB46C7079D4741BF74 /* HandymanPunchListView.swift in Sources */,
 				9B58C999BD24633286E60B0F /* HandymanQuoteReviewSheet.swift in Sources */,
+				86458F2D5232F30C22A6108B /* HandymanSeasonalReminderCard.swift in Sources */,
 				A8DE9719896D1D2D896D4C7A /* HandymanTabView.swift in Sources */,
 				E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */,
 				9EDF63ACEDEC411FB6500535 /* HandymanVisitDetailView.swift in Sources */,
@@ -2423,6 +2441,8 @@
 				CBDF628112334992EFDA96C4 /* PropertyRecapEditors.swift in Sources */,
 				4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */,
 				E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */,
+				725FB69F06F5F9481292D573 /* Q37RoutinesGridBody.swift in Sources */,
+				35C1637A64B5F7ADB4818A65 /* Q38HandymanPunchListBody.swift in Sources */,
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
 				3BC79122ED19721211AAE3AB /* QuickActionsRow.swift in Sources */,
 				D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */,
@@ -2565,6 +2585,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				45228D490EDC7004FB0510DF /* APIClient.swift in Sources */,
+				236B04CD36A9396FF1EA1A5F /* ATTOMHelloCard.swift in Sources */,
 				E46555FD1F54A70E5591E6C7 /* AccountCreationStep.swift in Sources */,
 				C473046A99DF8C2DF71C3A48 /* ActiveMonthsPicker.swift in Sources */,
 				133D67F842D46D55FC613040 /* ActivityLogView.swift in Sources */,
@@ -2692,6 +2713,7 @@
 				D0A8B4F6E40F1BB1CC6D15DB /* HandymanPunchItem.swift in Sources */,
 				E234FE712D979F9C446A21A5 /* HandymanPunchListView.swift in Sources */,
 				E5A3E3DABCEA06E5F3F3AA5D /* HandymanQuoteReviewSheet.swift in Sources */,
+				A561CE338FFA31C6296FC5C3 /* HandymanSeasonalReminderCard.swift in Sources */,
 				389EEB9E5E8E29628C9AAA6E /* HandymanTabView.swift in Sources */,
 				93BF5F19C8AF1B75885CA745 /* HandymanVisitDetailSheet.swift in Sources */,
 				E8C6AB41CEB3FDA4FAD2B438 /* HandymanVisitDetailView.swift in Sources */,
@@ -2820,6 +2842,8 @@
 				FEBC76B713F702B40F4A43E8 /* PropertyRecapEditors.swift in Sources */,
 				578A7C0809B185A31C740F66 /* PurchasePriceInputSheet.swift in Sources */,
 				ECA2B13A0EB2E80DA50E8AFA /* PushNotificationService.swift in Sources */,
+				F9D933AAB68D62A25F73244F /* Q37RoutinesGridBody.swift in Sources */,
+				E7F7874F63DC447893D3DF47 /* Q38HandymanPunchListBody.swift in Sources */,
 				54F9706FAE7FB184BCF20F64 /* QuickActions.swift in Sources */,
 				B87C12D1965CF92EC7D90D9C /* QuickActionsRow.swift in Sources */,
 				8D6CD3DFCF985BAE5079A948 /* QuizCaretakerInlineForm.swift in Sources */,

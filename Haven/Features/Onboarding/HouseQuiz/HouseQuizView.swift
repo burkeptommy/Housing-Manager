@@ -186,6 +186,11 @@ struct HouseQuizView: View {
     /// resets naturally on next NavigationStack presentation.
     @State private var recapConfirmed: Bool = false
 
+    /// Phase 67E/F (admin proposals 04a5992c + 81a03090) — once the
+    /// homeowner confirms / edits / skips the ATTOMHelloCard we don't
+    /// re-show it. Reset naturally on next NavigationStack presentation.
+    @State private var attomCardDismissed: Bool = false
+
     /// Phase 60.1 — field the user tapped to edit on the recap card. Drives
     /// `.sheet(item:)` which routes to `PropertyRecapEditSheet`.
     @State private var editingRecapField: PropertyRecapCard.PropertyEditField? = nil
@@ -277,6 +282,12 @@ struct HouseQuizView: View {
                     // renders its intro card on first entry so the user
                     // knows where they are and how long this leg takes.
                     chapterIntroScreen
+                } else if shouldShowATTOMCard {
+                    // Phase 67E/F (admin proposals 04a5992c + 81a03090).
+                    // ATTOM has roof + siding for this property —
+                    // confirm them in one card before Q1 / Q2 instead of
+                    // asking cold. Falls through when ATTOM has neither.
+                    attomCardScreen
                 } else if viewModel.showMilestoneCard {
                     milestoneCard
                 } else if let q = viewModel.currentQuestion {
@@ -552,6 +563,81 @@ struct HouseQuizView: View {
     /// (2) no quiz answers on file (fresh quiz, not a mid-quiz resume).
     private var shouldShowRecap: Bool {
         !recapConfirmed && viewModel.state.answers.isEmpty
+    }
+
+    // MARK: - ATTOM Hello Card (Phase 67E/F)
+
+    /// True when ATTOM has BOTH roof AND siding for the property AND we
+    /// haven't already shown the card. We require both fields because the
+    /// card commits Q1 + Q2 together — partial fills get awkward (would
+    /// only persist one question while the other still asks cold).
+    /// Requirements:
+    ///   * recap already confirmed (card comes after the trust screen)
+    ///   * we're at index 0 (Q1) — never re-show after answering past Q1
+    ///   * not in chapter intro / milestone / saved review modes
+    ///   * Q1 + Q2 don't yet have answers (resumed quizzes skip the card)
+    ///   * `attom_roof_type` + `attom_exterior_type` both normalize to
+    ///     known Q1 / Q2 answer IDs
+    private var shouldShowATTOMCard: Bool {
+        guard !attomCardDismissed else { return false }
+        guard recapConfirmed else { return false }
+        guard !shouldShowChapterIntro else { return false }
+        guard !viewModel.showMilestoneCard else { return false }
+        guard viewModel.currentQuestion?.id == "q1_roof_material" else { return false }
+        guard viewModel.state.answers["q1_roof_material"] == nil,
+              viewModel.state.answers["q2_siding"] == nil else { return false }
+        let attrs = viewModel.property.attributes
+        let roofRaw = attrs?["attom_roof_type"]?.stringValue
+        let exteriorRaw = attrs?["attom_exterior_type"]?.stringValue
+        let roofId = ATTOMNormalizer.roofId(from: roofRaw)
+        let sidingIds = ATTOMNormalizer.sidingIds(from: exteriorRaw)
+        return roofId != nil && !sidingIds.isEmpty
+    }
+
+    /// Renders the ATTOMHelloCard inside a ScrollView wrapper so the
+    /// shadowed card has page-margin padding consistent with other quiz
+    /// surfaces (recap, chapter intro, milestone).
+    @ViewBuilder
+    private var attomCardScreen: some View {
+        let attrs = viewModel.property.attributes
+        let roofRaw = attrs?["attom_roof_type"]?.stringValue
+        let exteriorRaw = attrs?["attom_exterior_type"]?.stringValue
+        let roofId = ATTOMNormalizer.roofId(from: roofRaw)
+        let roofLabel = ATTOMNormalizer.roofLabel(from: roofRaw)
+        let sidingIds = ATTOMNormalizer.sidingIds(from: exteriorRaw)
+        let sidingLabel = ATTOMNormalizer.sidingLabel(from: sidingIds)
+
+        ScrollView {
+            ATTOMHelloCard(
+                prefilledRoofId: roofId,
+                prefilledRoofLabel: roofLabel,
+                prefilledSidingIds: sidingIds,
+                prefilledSidingLabel: sidingLabel,
+                propertyStreet: viewModel.property.street,
+                onConfirm: {
+                    attomCardDismissed = true
+                    Task {
+                        if let id = roofId {
+                            await viewModel.recordAnswer(id)
+                        }
+                        if !sidingIds.isEmpty {
+                            await viewModel.recordMultiSelect(sidingIds)
+                        }
+                    }
+                },
+                onEditRoof: {
+                    attomCardDismissed = true
+                },
+                onEditSiding: {
+                    attomCardDismissed = true
+                },
+                onSkip: {
+                    attomCardDismissed = true
+                }
+            )
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .padding(.top, HavenTheme.spacing20)
+        }
     }
 
     /// Phase 60.1: "Here's what we found" trust surface. Shows the

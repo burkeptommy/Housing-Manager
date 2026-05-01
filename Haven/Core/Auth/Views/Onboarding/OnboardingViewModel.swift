@@ -659,6 +659,29 @@ final class OnboardingViewModel: ObservableObject {
                         _ = try? await DatabaseService.shared.createHomeSystem(system)
                     }
                     print("[Onboarding] runComplete: createHomeSystems OK count=\(systems.count)")
+
+                    // Phase 67E/F (admin proposals 04a5992c + 81a03090):
+                    // persist raw ATTOM roof + siding strings to
+                    // property.attributes so the ATTOMHelloCard can
+                    // pre-fill Q1 / Q2 at quiz time. The card normalizes
+                    // these to Q1 / Q2 answer IDs at render time —
+                    // storing the raw ATTOM string here keeps the
+                    // mapping logic in one place (the card) and lets us
+                    // tweak normalization without re-fetching ATTOM.
+                    if let roofType = features.roofType {
+                        _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                            propertyId: property.id,
+                            key: "attom_roof_type",
+                            value: .string(roofType)
+                        )
+                    }
+                    if let exteriorType = features.exteriorType {
+                        _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                            propertyId: property.id,
+                            key: "attom_exterior_type",
+                            value: .string(exteriorType)
+                        )
+                    }
                 }
 
                 // Build 89: Pre-quiz task creation removed. Tasks are now
