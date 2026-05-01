@@ -462,7 +462,7 @@ struct ChezRequestComposeSheet: View {
         case .scheduleVisit: return "e.g. Pre-summer pool opening"
         case .coordinateTask: return "e.g. Coordinate roof leak follow-up with Hank"
         case .findHandyman: return "e.g. Handyman for picture hanging + caulking"
-        case .general: return "What can Tom help with?"
+        case .general: return "What can Chez help with?"
         }
     }
 
@@ -473,13 +473,13 @@ struct ChezRequestComposeSheet: View {
         case .getQuote:
             return "Describe the scope. If you've got existing quotes attached, mention how they compare."
         case .scheduleVisit:
-            return "Tell Tom what needs scheduling and your preferred dates / windows."
+            return "Tell Chez what needs scheduling and your preferred dates / windows."
         case .coordinateTask:
-            return "Hand off context — Tom will run the back-and-forth with the vendor."
+            return "Hand off context — Chez runs the back-and-forth with the vendor."
         case .findHandyman:
             return "Walk through what's on the punch list. Photos help."
         case .general:
-            return "The more detail, the better Tom can help."
+            return "The more detail, the better Chez can help."
         }
     }
 

@@ -6,6 +6,71 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 80.2: Per-task Chez delegation (2026-05-01)
+
+Closed the obvious gap in 80.1 — the homeowner could delegate routines + contractors but not individual tasks. Most "I want help with this" moments are a single specific task without a vendor, so the per-task layer is where the offload-feeling actually lands.
+
+**Schema (`20261203_chez_task_delegation.sql`):**
+- `maintenance_tasks.chez_owned BOOLEAN DEFAULT false`
+- `maintenance_tasks.chez_owned_at TIMESTAMPTZ`
+- `maintenance_tasks.chez_request_id UUID REFERENCES chez_requests(id) ON DELETE SET NULL` — bidirectional link so Chez can post task-state updates from inside the parent thread
+- Partial indexes for the admin's standing-engagements filter
+
+**Edge Function — new `delegate_task` action:** Smart category routing on the no-vendor case. Reads `assigned_contractor_id` + `needs_vendor`; tasks without a vendor route through `category=find_vendor`, tasks with one through `coordinate_task`. Builds a parent `chez_requests` row + system message that reads explicit + actionable to the operator ("Customer asked Chez to source a vendor for this task and own coordination end-to-end. Find a vetted local pro, propose them, and handle scheduling once approved."). Stamps `task.chez_request_id` back so the conversation thread owns subsequent task changes. Push + admin email fire on every delegation. Revoke path clears the flags + posts a follow-up system message in the existing thread (audit preserved).
+
+**iOS:**
+- `MaintenanceTaskDBRow` gains `chezOwned`, `chezOwnedAt`, `chezRequestId` + `isChezOwned` helper. Both `synthetic` factories updated to seed nil so memberwise init still compiles.
+- `ChezOwnsToggle.Target` gains `.task(id, title, hasVendor)`. Copy forks: vendor-on-file says "Chez coordinates with your vendor"; no-vendor says "Chez finds a vetted local pro and proposes them".
+- `HavenSupabase.delegateTaskToChez` wrapper around the new action.
+- `MaintenanceTaskDetailSheet` renders the toggle right under the header for any non-vehicle task — gates on `task.vehicleId == nil` because vehicles run their own coordination flow.
+- `UnifiedTaskCard.findContractor` variant gains "Or have Chez source one" inline link below the salmon Find-a-pro CTA (one tap fires `delegate_task` directly, no composer detour). Personal + vendor variants gain a compact `ChezOwnsBadge` next to the title when the task is delegated.
+- `ChezDelegationsListView` (new): single screen aggregating delegated routines + contractors + tasks with quick-revoke pills. Reachable from Settings → Your Chez profile → "View what Chez owns" (replaces the 80.1 placeholder).
+- Profile view's standing-engagements section now opens this list via NavigationLink.
+
+**Verification:** `xcodebuild BUILD SUCCEEDED` on iPhone 17; migration `20261203` applied; chez-concierge function v4 deployed; `node --check website/admin.js` clean.
+
+---
+
+## Phase 80.1: Chez profile, spending tiers, structured proposals, recurring delegation + Tom→Chez rebrand (2026-05-01)
+
+Four big depth additions on top of the Phase 80 foundation. Plus a full user-facing rebrand: every "Tom" string in iOS + Edge Function copy is now "Chez" so homeowners see the brand, not the operator.
+
+### 1. Household profile / standing instructions
+
+- New `households.chez_profile JSONB` with about_us text, communication prefs, vendor prefs, logistics, spending tiers, completion timestamps.
+- iOS: `ChezProfile` model + `ChezProfileViewModel` (debounced save) + 6-section `ChezProfileView` (settings-style scrollable form).
+- Settings hub gains a top "Your Chez profile" entry above Account.
+- Edge Function: `fetch_profile` + `update_profile` actions with server-side deep-merge so partial updates work.
+- Admin portal renders the customer's profile + spending-tier pill above the reply composer so Chez sees standing instructions before drafting.
+
+### 2. Spending tiers
+
+- Lives inside `chez_profile.spending_tiers` — three integer USD thresholds: auto_approve_under, ping_under, explicit_above. Defaults `(200, 500, 500)`.
+- Stepper UI in the profile screen with one-line captions per tier explaining what Chez will do at that threshold.
+
+### 3. Structured proposals — Approve / Counter / Decline
+
+- New `concierge_messages.proposal JSONB` + `proposal_kind` text. Four kinds: vendor / date_slot / cost / quote.
+- iOS: `ChezProposalCard` renders inline in `ChezMessageBubble` when a proposal is attached. Optimistic update on tap.
+- Edge Function: `propose` (admin-only, sends a structured message) + `decide_proposal` (homeowner approve/decline/counter). Counter prefills the reply composer with a kind-aware template.
+- Admin portal: "Propose vendor / date / cost" quick-action runs a stepwise prompt flow that sends a structured message instead of plain text.
+
+### 4. Recurring delegation — Chez owns scheduling
+
+- New `routines.chez_owned` + `contractors.chez_owned` BOOLEANs (with timestamp columns). Indexes for the admin's standing-engagements filter.
+- iOS: `ChezOwnsToggle` reusable component with `.routine` / `.contractor` targets. Wired into `RoutineEditSheet` (after Notes, before Delete) and `ContractorDetailView` (top of the detail page).
+- Compact `ChezOwnsBadge` for list rows.
+- Edge Function: `delegate_routine` + `delegate_contractor` actions create a "Standing engagement" parent `chez_request` with system message + push + admin email.
+
+### Rebrand
+
+- All entry-point captions, SLA captions, system messages, compose hero copy, push notification titles, inbox row titles, admin-portal homeowner-facing strings — every "Tom" → "Chez". Concierge avatar changed from "T" to "C". Internal admin labels say "Chez (you)" so the operator can tell their side from the homeowner's.
+- Hard rule going forward: user-facing copy says "Chez" only.
+
+**Verification:** `xcodebuild BUILD SUCCEEDED` on iPhone 17; `node --check website/admin.js` parses; migration `20261202` applied; chez-concierge function redeployed.
+
+---
+
 ## Phase 80: Chez Concierge — "Have a Chez Home Manager handle this" (2026-05-01)
 
 Universal escape hatch that lets homeowners delegate any vendor / quote / scheduling / coordination task to Tom. Renders as a salmon-tinted "Have a Chez Home Manager handle this" pill anywhere it makes sense in the app. Tap → composer sheet (auto-fills category + context from the entry point) → submit → request lands in Tom's admin portal with a 24-hour business-day SLA badge. Tom replies with vendors / dates / quotes / follow-ups; replies that need confirmation land in the homeowner's existing **Needs Action** inbox tab, informational replies land in **Unread**, and the full request thread lives in a new **Chez** sub-tab on the Inbox so the homeowner has a dedicated browse surface.

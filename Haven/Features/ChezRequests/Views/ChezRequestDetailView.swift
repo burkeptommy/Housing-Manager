@@ -311,7 +311,7 @@ struct ChezRequestDetailView: View {
     }
 
     private var composerField: some View {
-        TextField("Reply to Tom…", text: $viewModel.replyText, axis: .vertical)
+        TextField("Reply to Chez…", text: $viewModel.replyText, axis: .vertical)
             .font(HavenTypography.body)
             .lineLimit(1...5)
             .padding(.horizontal, 12)

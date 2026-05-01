@@ -143,7 +143,7 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 
 ## Supabase Database (Key Tables)
 
-households, users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id, service_interval_days, service_interval_source), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor), documents (vehicle_id, project_id, visible_to_home_managers, linked_attorney_contact_id), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source), service_records, service_contracts, chat_messages, concierge_messages (Phase 80: request_id FK, attachments JSONB, 'system' role for status-change rows), scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items (Phase 80: related_chez_request_id FK + chez_reply_action_needed / chez_reply_informational / chez_status_change types), inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls, estate_state (Phase 48), estate_pdf_exports (Phase 48), chez_requests (Phase 80 — homeowner concierge requests with category/status/sla_due_at)
+households (Phase 80.1: chez_profile JSONB), users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id, service_interval_days, service_interval_source), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor; Phase 80.2: chez_owned BOOLEAN, chez_owned_at, chez_request_id FK), documents (vehicle_id, project_id, visible_to_home_managers, linked_attorney_contact_id), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source; Phase 80.1: chez_owned BOOLEAN, chez_owned_at), service_records, service_contracts, chat_messages, concierge_messages (Phase 80: request_id FK, attachments JSONB, 'system' role for status-change rows; Phase 80.1: proposal JSONB + proposal_kind text for structured Approve/Counter/Decline cards), scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items (Phase 80: related_chez_request_id FK + chez_reply_action_needed / chez_reply_informational / chez_status_change types), inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls, estate_state (Phase 48), estate_pdf_exports (Phase 48), chez_requests (Phase 80 — homeowner concierge requests with category/status/sla_due_at; Phase 80.1: pending_proposal_count denorm), routines (Phase 80.1: chez_owned BOOLEAN, chez_owned_at)
 
 **RLS is on everything.** All tables scoped by `household_id`. Service role key is only used in Edge Functions.
 
@@ -171,7 +171,7 @@ See `supabase/functions/CLAUDE.md` for detailed patterns and full inventory. Key
 **Catalog:** `enrich-catalog`, `expand-catalog`, `scrape-manuals`, `download-manuals`, `upload-manual`, `send-catalog-request`, `score-property`
 **Local Vendors (Phase 19n):** `find-local-vendors` (Google Places Text Search + 60-day cache via `local_vendor_results` table; returns up to 4 vendors per (town, state, category) with Haven Certified badge on top 2 that meet 4.7+ stars + 25+ reviews + non-chain heuristic)
 **Estate (Phase 48):** `verify-estate-export` (public endpoint, no auth -- validates estate PDF verification tokens, checks expiry/access count, logs hashed IP)
-**Chez Concierge (Phase 80):** `chez-concierge` (single function with action discriminator: `submit` / `reply` / `mark_read` / `transition_status`. Admin allowlist via `CHEZ_ADMIN_EMAILS` env var. Push to admin user IDs + SendGrid email backstop on submit + homeowner reply since Tom doesn't have iOS in admin context. Smart routing: admin replies create `inbox_items` with `chez_reply_action_needed` (when `acknowledgement_required: true`) or `chez_reply_informational`; same call can transition status via optional `to_status`. System-role audit-trail messages auto-insert on status flips.)
+**Chez Concierge (Phase 80 / 80.1 / 80.2):** `chez-concierge` (single function with action discriminator. Phase 80 actions: `submit` / `reply` / `mark_read` / `transition_status`. Phase 80.1 added `fetch_profile` / `update_profile` (household standing instructions in `households.chez_profile` JSONB), `delegate_routine` / `delegate_contractor` (recurring delegation), `propose` / `decide_proposal` (structured Approve/Counter/Decline cards). Phase 80.2 added `delegate_task` with smart category routing — tasks without a vendor route through `find_vendor`, tasks with one route through `coordinate_task`. Admin allowlist via `CHEZ_ADMIN_EMAILS` env var. Push to admin user IDs + SendGrid email backstop on every customer-initiated action since Tom doesn't have iOS in admin context. Smart inbox routing: admin replies create `inbox_items` with `chez_reply_action_needed` (when `acknowledgement_required: true`) or `chez_reply_informational`; same call can transition status via optional `to_status`. System-role audit-trail messages auto-insert on status flips. All user-facing strings render as "Chez" — the human operator (Tom) is invisible from the homeowner's view.)
 
 ## Estate Intelligence (Phase 48)
 
@@ -819,6 +819,98 @@ Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces t
 **Mobile:** `<768px` shows a "Use the field app on your phone" interstitial linking to `/handyman-visit.html`. Tablet 768–1279px collapses 3-col layouts (Dispatch, Messages) to single column.
 
 **Local dev:** `cd website/operations && npm install && npm run dev` runs Vite at `localhost:5173/operations/`. Use `python3 -m http.server 8000` from `website/` in another terminal so Vite's proxy can forward `/handyman.html` for the auth flow. Production build: `npm run build` emits to `dist/` → Docker stage 1 picks it up.
+
+## Chez Concierge — homeowner concierge service (Phase 80 / 80.1 / 80.2)
+
+The premium "have someone handle this for me" layer. Homeowners delegate any vendor / quote / scheduling / coordination job to **Chez** (the brand — operated by Tom on the admin portal but the homeowner never sees a real person's name). 24-hour business-day SLA. Tom replies with vendors, dates, quotes, structured proposals; replies that need confirmation flow into the homeowner's existing **Needs Action** inbox tab via `inbox_items`, informational replies into **Unread**, and the full thread browse surface lives in a 4th **Chez** sub-tab on Inbox.
+
+### Hard rule: brand voice
+
+**Every user-facing string says "Chez" — never "Tom" or any human operator's name.** The admin portal is the only surface where "Chez (you)" appears (so the operator can tell their side of the conversation from the homeowner's). Push notifications, inbox titles, in-thread system messages, SLA captions, entry-point button copy — all "Chez". The 80.1 ship rebranded every leftover "Tom" string; new copy must follow this rule.
+
+### Schema highlights
+
+- **`chez_requests`** (Phase 80 — `20261201`) — one row per concierge request. Six categories (`find_vendor`, `get_quote`, `schedule_visit`, `coordinate_task`, `find_handyman`, `general`), three statuses (`open`, `waiting_customer`, `resolved`), `sla_due_at` computed via `chez_business_hours_due()` PL/pgSQL function (skips weekends). RLS: household-scoped for homeowners, `is_tom_admin()`-gated for the admin portal. Phase 80.1 added `pending_proposal_count` denormalized counter.
+- **`concierge_messages`** extended with `request_id` FK, `attachments` JSONB, `'system'` role for status-change rows, `proposal` + `proposal_kind` JSONB for structured Approve/Counter/Decline cards (vendor / date_slot / cost / quote variants).
+- **`households.chez_profile`** (Phase 80.1 — `20261202`) — JSONB blob of standing instructions: `about_us` text, `communication` prefs (preferred channel, vacation mode), `vendor_preferences` (budget orientation, prefer-local-owned, notes), `logistics` (pets, entry instructions), `spending_tiers` (auto_approve_under, ping_under, explicit_above; default `(200, 500, 500)`). Server-side deep-merge so partial updates work. Read on every admin focused-panel render so Chez sees standing instructions before drafting.
+- **`routines.chez_owned`** + **`contractors.chez_owned`** (Phase 80.1) — bool with timestamp. Toggling on creates a "Standing engagement" parent `chez_request` with system message + push + admin email. Routines: Chez owns scheduling. Contractors: Chez is point of contact.
+- **`maintenance_tasks.chez_owned`** + **`chez_request_id`** FK (Phase 80.2 — `20261203`) — per-task delegation with smart category routing. Tasks without a vendor (`needs_vendor=true` OR no `assigned_contractor_id`) route through `category=find_vendor`; tasks with a vendor on file route through `coordinate_task`. The FK lets Chez post task-state updates (mark complete, reschedule, link a vendor) directly from the parent thread.
+- **`inbox_items`** extended with `related_chez_request_id` FK + new types (`chez_reply_action_needed`, `chez_reply_informational`, `chez_status_change`). `InboxItemDetailView` deep-links these types directly into `ChezRequestDetailView`.
+
+### Edge Function: `supabase/functions/chez-concierge/index.ts`
+
+Single function with action discriminator. Auth via `getAuthenticatedUser` + `isAdminUser` (email allowlist via `CHEZ_ADMIN_EMAILS` env var). Push + SendGrid email backstop on every customer-initiated action since the operator may not have iOS in the admin context.
+
+| Action | Caller | Effect |
+|---|---|---|
+| `submit` | homeowner | Insert request + first message + admin push/email + SLA |
+| `reply` | homeowner OR admin | Insert message; admin replies create `inbox_items` row (action_needed vs informational based on `acknowledgement_required`); optional `to_status` for one-click reply+transition |
+| `mark_read` | either | Clear unread flag for caller's side |
+| `transition_status` | either | Update `chez_requests.status` + insert system message + push |
+| `fetch_profile` / `update_profile` (80.1) | homeowner | Read/write `households.chez_profile` with deep-merge default |
+| `delegate_routine` / `delegate_contractor` (80.1) | homeowner | Flip `chez_owned` + create "Standing engagement" parent request + system message + push + admin email |
+| `propose` (80.1) | admin only | Insert structured proposal message (`vendor` / `date_slot` / `cost` / `quote` shape) on a request thread; bumps `pending_proposal_count` |
+| `decide_proposal` (80.1) | homeowner | Approve / decline / counter; stamps `proposal.status`, decrements counter, fires admin push/email |
+| `delegate_task` (80.2) | homeowner | Smart-route: vendorless task → `find_vendor` request; with vendor → `coordinate_task` request. Creates parent thread with rich system message, stamps `task.chez_request_id` back |
+
+### iOS surface (`Haven/Features/ChezRequests/`)
+
+```
+Models/
+├── ChezRequest.swift          # ChezCategory + ChezStatus enums + ChezRequestRow
+├── ChezMessage.swift          # ChezMessageRow + ChezProposal + 4 proposal-kind structs
+└── ChezProfile.swift          # ChezProfile + 4 sub-structs + ChezSpendingTiers
+ViewModels/
+├── ChezRequestsViewModel.swift     # list of requests for the Chez sub-tab
+├── ChezRequestDetailViewModel.swift # single thread + reply send + attachment upload
+├── ChezRequestComposeViewModel.swift # composer state + submit
+└── ChezProfileViewModel.swift       # profile load/debounced-save
+Views/
+├── ChezRequestsListView.swift   # 4th Inbox sub-tab content
+├── ChezRequestDetailView.swift  # thread + reply composer + reopen
+├── ChezRequestComposeSheet.swift # category + summary + description + attachments + submit
+├── ChezProfileView.swift        # 6-section settings-style standing instructions form
+└── ChezDelegationsListView.swift # aggregate of delegated routines + vendors + tasks
+Components/
+├── ChezEntryButton.swift       # Universal "Have Chez handle this" pill (17 wired entry points)
+├── ChezOwnsToggle.swift        # Reusable toggle with .routine / .contractor / .task targets + ChezOwnsBadge
+├── ChezRequestRowCard.swift    # list cell
+├── ChezStatusBadge.swift       # open / waiting / resolved pill
+├── ChezMessageBubble.swift     # one chat bubble — renders ChezProposalCard inline when message has a proposal
+└── ChezProposalCard.swift      # structured Approve/Counter/Decline card (4 kind variants)
+Services/
+└── ChezConciergeService.swift  # DatabaseService + HavenSupabase extensions for all Edge Function actions
+```
+
+### 17 Entry points (where the homeowner sees Chez)
+
+`FindLocalVendorSheet` · `MaintenanceTaskDetailSheet` (no-vendor branch + ChezOwnsToggle near header) · `HandymanPunchListView` · `QuoteAnalysisView` · `DashboardView` (post-quiz pill) · `ProjectDetailView` · `PropertyDetailView` Overview anchor · `ContractorDirectoryView` FIND A PRO section · `VendorCoverageSheet` (per-gap option) · `HandymanTabView` empty state · `MaintenanceScheduleView` empty state · `InboxItemDetailView` for `contractor_quote` / `insurance_claim` / `bill_invoice` / `project_created` · `NewProjectView` · `QuoteComparisonView` · `VehicleDetailView` (mechanic + recall, smart routing) · `InboxView` empty state · `ChatView` toolbar menu + suggested chip · `UnifiedTaskCard` findContractor variant ("Or have Chez source one" inline link).
+
+### Recurring + per-task delegation surfaces
+
+`ChezOwnsToggle` lives in three places:
+- `RoutineEditSheet` → "Have Chez own scheduling" — visits land on the calendar without per-visit asks
+- `ContractorDetailView` → "Make Chez point of contact" — Chez handles all scheduling and follow-ups with that vendor
+- `MaintenanceTaskDetailSheet` (Phase 80.2) → "Have Chez handle this task" or "Have Chez source a vendor" depending on whether a vendor is linked
+
+Tasks/routines/vendors that are delegated show a salmon `ChezOwnsBadge` on their list rows. The `ChezDelegationsListView` (reachable from Settings → Your Chez profile → "View what Chez owns") aggregates all three with quick-revoke pills.
+
+### Admin portal (`website/admin.js`)
+
+New "Chez Requests" tab at the top of the Needs Attention sidebar group. Stats tiles, urgency-sorted list (overdue first), focused panel with:
+- Customer profile summary (lazy-loaded from `households.chez_profile`, shows spending tiers as an amber pill so Tom sees standing authority before drafting)
+- Context recap from the request's JSONB
+- Conversation thread (user / concierge / system bubbles, structured proposals render as colored cards with status pills)
+- Reply composer with Acknowledgement-required checkbox + status select for one-click reply+transition
+- Quick-action row: "Propose vendor / date / cost" (stepwise prompt flow that sends a structured proposal), "Mark waiting on customer", "Mark resolved", "Reopen" when resolved
+
+### Hard rules for new Chez code
+
+- **User-facing copy says "Chez" only.** Never "Tom" or any operator's name in iOS strings, push payloads, system messages, or inbox titles. Internal admin labels can say "Chez (you)".
+- **Every new entry-point ChezEntryButton must pass a context dict** with whatever metadata the surface has (project_id, vendor name, town/state, task_title, etc.). Empty context is acceptable but wasteful — the more Chez sees, the less they have to ask.
+- **Delegation toggles use `ChezOwnsToggle.Target`** — don't roll a custom toggle. The component handles the prompt-for-notes flow, the optimistic-state binding, the network call, the analytics event, and the cross-surface refresh notifications (`.chezDelegationChanged` + `.chezRequestChanged` + `.maintenanceTaskChanged` for tasks).
+- **All writes go through `chez-concierge` Edge Function** so atomic side effects (system messages, pushes, admin emails, parent-request creation) stay server-side. Direct PostgREST writes from iOS skip the side effects and break the audit trail.
+- **Resilient `init(from decoder:)` on every Codable type** per the codebase-wide rule. `ChezProfile`, `ChezProposal`, every sub-struct — all use `try? c.decodeIfPresent` so JSONB shape evolution doesn't break the read path.
 
 ## Progress Tracking
 
