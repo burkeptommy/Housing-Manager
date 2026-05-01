@@ -66,17 +66,8 @@ const VIEWS = [
     type: "audit",
     group: "action",
     title: "Coverage Audit",
-    eyebrow: "Mismatches + gaps in the catalog",
-    subtitle: "Five auto-detected coverage checks. Tasks without a vendor type that can do them, quiz questions that don't drive anything, vendors with no tasks, missing vendor types HNW homes typically have, missing routines. Click any row for the full read + a one-click action.",
-  },
-  {
-    id: "decisions",
-    label: "Decisions",
-    type: "decision",
-    group: "action",
-    title: "Decisions Queue",
-    eyebrow: "Curate to launch",
-    subtitle: "Auto-detected issues that don't already have a note about them. Voice / style fixes + entities flagged for review.",
+    eyebrow: "Every auto-detected issue, in one place",
+    subtitle: "Voice / style fixes, tasks without a vendor, entities awaiting review, quiz questions adrift, vendors without tasks, missing vendor types, missing routines. Anything you've already noted lives on the Notes tab.",
   },
   {
     id: "quiz",
@@ -450,6 +441,9 @@ const state = {
   // Cleared on tab navigation; survives renderDecisionsView re-renders
   // (e.g. after a refresh) so the panel stays open while Tom acts.
   selectedDecision: null,
+  // Phase 5z+19 — currently-focused audit finding on the Audit tab.
+  // Same lifecycle as selectedDecision.
+  selectedAudit: null,
 };
 
 function structuredCloneSafePure(value) {
@@ -532,6 +526,8 @@ const el = {
   refreshIndicator: document.querySelector("[data-refresh-indicator]"),
   // Phase 5z+14 — Focused decision panel container.
   decisionFocused: document.querySelector("[data-decision-focused]"),
+  // Phase 5z+19 — Focused audit panel container.
+  auditFocused: document.querySelector("[data-audit-focused]"),
 };
 
 const paletteState = { open: false, results: [], activeIndex: 0 };
@@ -1562,7 +1558,10 @@ function render() {
   } else if (state.view === "notes") {
     renderNotesView();
   } else if (state.view === "decisions") {
-    renderDecisionsView();
+    // Phase 5z+19 — Decisions tab folded into Audit. Redirect any
+    // stale links / saved state to the new home.
+    state.view = "audit";
+    renderAuditView();
   } else if (state.view === "activity") {
     renderActivityView();
   } else if (state.view === "claude_file") {
@@ -1832,6 +1831,7 @@ function renderNav() {
       state.view = button.dataset.view;
       state.selected = null;
       state.selectedDecision = null;
+      state.selectedAudit = null;
       state.search = "";
       state.statusFilter = "all";
       state.lifecycleFilter = "all";
@@ -3279,12 +3279,13 @@ function renderDetail() {
   // Re-show the tabs strip in case the simulator view hid it on the
   // previous render.
   el.detailTabs?.classList.remove("is-hidden");
-  // Phase 5z+9 / 5z+14 — Hide the focused note + focused decision
-  // panels when rendering an entity detail. Re-show the legacy quick-
-  // actions row that focused panels suppress. Keeps cross-tab
+  // Phase 5z+9 / 5z+14 / 5z+19 — Hide the focused note / decision /
+  // audit panels when rendering an entity detail. Re-show the legacy
+  // quick-actions row that focused panels suppress. Keeps cross-tab
   // navigation clean.
   el.noteFocused?.classList.add("is-hidden");
   el.decisionFocused?.classList.add("is-hidden");
+  el.auditFocused?.classList.add("is-hidden");
   document.querySelector("[data-detail-quick-actions]")?.classList.remove("is-hidden");
   el.saveItem.disabled = false;
 
@@ -3960,12 +3961,19 @@ const COMMON_HNW_ROUTINE_GAPS = [
 ];
 
 function computeCoverageAudit() {
+  // Phase 5z+19 — Audit now also pulls in voice / style fixes and
+  // needs-review entities. Tom: "shouldnt we just fold those both into
+  // 'Audit' since im going to be making decisions on everything in
+  // there." The Decisions tab is gone — every auto-detected issue
+  // flows through here.
   const findings = {
     tasksWithoutVendor: [],
     quizUnwired: [],
     vendorsWithoutTasks: [],
     missingVendorTypes: [],
     missingRoutines: [],
+    voiceFixes: [],
+    needsReview: [],
   };
 
   // Build the set of vendor categories we actually carry.
@@ -4080,146 +4088,628 @@ function computeCoverageAudit() {
     }
   }
 
+  // -- Finding 6 (Phase 5z+19, merged from Decisions): voice / style
+  //    lint hits on un-approved live entities. Skip rows whose entity
+  //    already has a pending note about it (the homeowner is on it).
+  const surfaces = ["quiz", "tasks", "routines", "handyman", "systems", "vehicles", "prompts"];
+  const pendingNoteScopes = entitiesWithPendingNote();
+  const hasPendingNote = (item, scopeType) => {
+    if (!item) return false;
+    const scopeId = liveEntityIdFor(item);
+    if (!scopeId) return false;
+    return pendingNoteScopes.has(`${scopeType}::${scopeId}`);
+  };
+  for (const surfaceId of surfaces) {
+    const items = liveItemsForView(surfaceId) || [];
+    for (const item of items) {
+      const lintHits = item.payload?._lint || [];
+      if (!lintHits.length) continue;
+      const launch = effectiveLaunchStatus(item);
+      if (launch === "approved" || launch === "shipped") continue;
+      if (hasPendingNote(item, item.itemType)) continue;
+      for (const hit of lintHits) {
+        findings.voiceFixes.push({
+          surfaceId,
+          item,
+          lintHit: hit,
+          title: item.title,
+          reason: lintReasonFor(hit),
+        });
+      }
+    }
+  }
+
+  // -- Finding 7 (Phase 5z+19, merged): high-impact entities not yet
+  //    approved. Same dedup against pending notes.
+  let highImpactCount = 0;
+  for (const surfaceId of surfaces) {
+    const items = liveItemsForView(surfaceId) || [];
+    for (const item of items) {
+      if (highImpactCount >= 30) break;
+      const launch = effectiveLaunchStatus(item);
+      if (launch === "approved" || launch === "shipped") continue;
+      if (hasPendingNote(item, item.itemType)) continue;
+      const high = isHighImpact(item);
+      if (!high) continue;
+      // Skip if already in voice-fixes for this entity (avoid double-listing).
+      if (findings.voiceFixes.some((vf) => vf.item.id === item.id)) continue;
+      findings.needsReview.push({
+        surfaceId,
+        item,
+        title: item.title,
+        reason: high,
+        valueAnalysis: valueAnalysisFor(item),
+      });
+      highImpactCount += 1;
+    }
+  }
+
   return findings;
+}
+
+// Phase 5z+19 — Flatten the audit findings into a single keyed array
+// so each row is addressable + the focused panel can resolve a finding
+// by id. Each entry carries:
+//   id        — stable string identifier
+//   kind      — "task_no_vendor" / "quiz_adrift" / "vendor_no_tasks"
+//                / "missing_vendor" / "missing_routine"
+//   title     — what the user reads as the headline
+//   subtitle  — short context line
+//   reason    — the audit's plain-English explanation
+//   data      — kind-specific payload for the focused panel
+function flattenAuditFindings(audit) {
+  const out = [];
+  for (const t of audit.tasksWithoutVendor) {
+    out.push({
+      id: `task-${t.templateKey || slug(t.title)}`,
+      kind: "task_no_vendor",
+      title: t.title,
+      subtitle: t.category,
+      reason: t.reason,
+      data: t,
+    });
+  }
+  for (const q of audit.quizUnwired) {
+    out.push({
+      id: `q-${q.questionId}`,
+      kind: "quiz_adrift",
+      title: q.title || q.questionId,
+      subtitle: q.chapter || q.kind || "quiz question",
+      reason: q.reason,
+      data: q,
+    });
+  }
+  for (const v of audit.vendorsWithoutTasks) {
+    out.push({
+      id: `v-empty-${slug(v.vendor)}`,
+      kind: "vendor_no_tasks",
+      title: v.vendor,
+      subtitle: "Vendor with no tasks",
+      reason: v.reason,
+      data: v,
+    });
+  }
+  for (const v of audit.missingVendorTypes) {
+    out.push({
+      id: `v-missing-${slug(v.name)}`,
+      kind: "missing_vendor",
+      title: v.name,
+      subtitle: "Catalog gap",
+      reason: v.role,
+      data: v,
+    });
+  }
+  for (const r of audit.missingRoutines) {
+    out.push({
+      id: `r-missing-${slug(r.name)}`,
+      kind: "missing_routine",
+      title: r.name,
+      subtitle: "Catalog gap",
+      reason: r.role,
+      data: r,
+    });
+  }
+  // Phase 5z+19 — voice fixes + needs review (merged from Decisions).
+  for (const v of audit.voiceFixes || []) {
+    const hit = v.lintHit || {};
+    out.push({
+      id: `voice-${v.surfaceId}-${v.item.id}-${hit.ruleId}-${hit.field}`,
+      kind: "voice_fix",
+      title: v.item.title,
+      subtitle: friendlyScopeLabel(v.item.itemType) + " · " + (hit.ruleId || ""),
+      reason: v.reason,
+      data: { ...v, targetItem: v.item, targetView: v.surfaceId },
+    });
+  }
+  for (const n of audit.needsReview || []) {
+    out.push({
+      id: `review-${n.surfaceId}-${n.item.id}`,
+      kind: "needs_review",
+      title: n.item.title,
+      subtitle: friendlyScopeLabel(n.item.itemType) + " · " + (n.valueAnalysis?.tier || "review"),
+      reason: n.reason,
+      data: { ...n, targetItem: n.item, targetView: n.surfaceId },
+    });
+  }
+  return out;
 }
 
 function renderAuditView() {
   const audit = computeCoverageAudit();
-  const total =
-    audit.tasksWithoutVendor.length +
-    audit.quizUnwired.length +
-    audit.vendorsWithoutTasks.length +
-    audit.missingVendorTypes.length +
-    audit.missingRoutines.length;
+  const findings = flattenAuditFindings(audit);
   el.search.value = state.search || "";
 
   el.stats.innerHTML = `
-    <div class="admin-stat"><strong>${total}</strong><span>Mismatches found</span></div>
-    <div class="admin-stat"><strong>${audit.tasksWithoutVendor.length}</strong><span>Tasks without a vendor</span></div>
-    <div class="admin-stat"><strong>${audit.quizUnwired.length}</strong><span>Quiz questions adrift</span></div>
-    <div class="admin-stat"><strong>${audit.missingVendorTypes.length + audit.missingRoutines.length}</strong><span>Coverage gaps</span></div>
+    <div class="admin-stat"><strong>${findings.length}</strong><span>Decisions waiting</span></div>
+    <div class="admin-stat"><strong>${audit.voiceFixes.length}</strong><span>Voice + style fixes</span></div>
+    <div class="admin-stat"><strong>${audit.needsReview.length + audit.tasksWithoutVendor.length}</strong><span>Needs review</span></div>
+    <div class="admin-stat"><strong>${audit.missingVendorTypes.length + audit.missingRoutines.length + audit.vendorsWithoutTasks.length + audit.quizUnwired.length}</strong><span>Catalog gaps</span></div>
   `;
 
-  const sectionHtml = (title, items, render, emptyCopy) => `
-    <div class="admin-audit__section">
-      <header class="admin-audit__section-head">
-        <h3>${escapeHtml(title)} <span class="admin-audit__count">${items.length}</span></h3>
-      </header>
-      ${items.length === 0
-        ? `<p class="admin-audit__empty admin-muted">${escapeHtml(emptyCopy)}</p>`
-        : items.map(render).join("")}
-    </div>
-  `;
+  // Phase 5z+19 — Each finding is now a clickable card. Click → opens
+  // the focused audit panel on the right with the recommended action
+  // first + alternatives. Same UX shape as Decisions / Notes.
+  const renderRow = (f) => {
+    const isActive = state.selectedAudit?.id === f.id;
+    const isGap = f.kind === "missing_vendor" || f.kind === "missing_routine";
+    return `
+      <button type="button" class="admin-audit__row ${isGap ? "admin-audit__row--gap" : ""} ${isActive ? "is-active" : ""}" data-audit-id="${escapeHtml(f.id)}">
+        <div class="admin-audit__row-top">
+          <strong>${escapeHtml(f.title)}</strong>
+          ${f.subtitle ? `<span class="admin-pill ${isGap ? "" : "admin-pill--note"}" ${isGap ? `data-tone="reshape"` : ""}>${escapeHtml(f.subtitle)}</span>` : ""}
+        </div>
+        <p class="admin-audit__row-reason">${escapeHtml(f.reason)}</p>
+        <span class="admin-audit__row-cta admin-muted">Click to see what to do →</span>
+      </button>
+    `;
+  };
+
+  const sectionHtml = (title, kinds, emptyCopy) => {
+    const items = findings.filter((f) => kinds.includes(f.kind));
+    return `
+      <div class="admin-audit__section">
+        <header class="admin-audit__section-head">
+          <h3>${escapeHtml(title)} <span class="admin-audit__count">${items.length}</span></h3>
+        </header>
+        ${items.length === 0
+          ? `<p class="admin-audit__empty admin-muted">${escapeHtml(emptyCopy)}</p>`
+          : items.map(renderRow).join("")}
+      </div>
+    `;
+  };
 
   el.list.innerHTML = `
     <div class="admin-audit">
       <p class="admin-audit__intro">
-        Five auto-detected mismatches between the catalog (Tasks, Routines, Vendors, Quiz) and what HNW homes typically need. This is the first place to look when something feels off — a task that shouldn't be there, a question that doesn't drive anything, a vendor with no work to do, a vendor type the catalog should have but doesn't.
+        Every auto-detected issue across the catalog. <strong>Click any card</strong> to see Claude's recommended action plus the alternatives. Anything you've already written a note about lives on the Notes tab — those don't show here.
       </p>
       ${sectionHtml(
+        "Voice / style fixes",
+        ["voice_fix"],
+        "No voice or style violations on un-approved entities. Catalog reads clean."
+      )}
+      ${sectionHtml(
         "Tasks without a vendor that can do them",
-        audit.tasksWithoutVendor,
-        (t) => `
-          <div class="admin-audit__row">
-            <div class="admin-audit__row-top">
-              <strong>${escapeHtml(t.title)}</strong>
-              <span class="admin-pill admin-pill--note">${escapeHtml(t.category)}</span>
-            </div>
-            <p class="admin-audit__row-reason">${escapeHtml(t.reason)}</p>
-            <div class="admin-audit__row-actions">
-              <button type="button" class="admin-button admin-button--secondary admin-button--small" data-audit-action="open-task" data-template-key="${escapeHtml(t.templateKey || "")}">Open template</button>
-              <button type="button" class="admin-button admin-button--ghost admin-button--small" data-audit-action="propose-vendor" data-category="${escapeHtml(t.category)}">Propose adding a vendor</button>
-            </div>
-          </div>
-        `,
+        ["task_no_vendor"],
         "Every task in the catalog maps to a vendor type that can do it. Nothing orphaned."
       )}
       ${sectionHtml(
+        "Entities that need a careful review",
+        ["needs_review"],
+        "No high-impact entities awaiting review. Catalog is locked."
+      )}
+      ${sectionHtml(
         "Quiz questions that don't drive anything",
-        audit.quizUnwired,
-        (q) => `
-          <div class="admin-audit__row">
-            <div class="admin-audit__row-top">
-              <strong>${escapeHtml(q.title || q.questionId)}</strong>
-              <span class="admin-pill admin-pill--note">${escapeHtml(q.chapter || q.kind || "")}</span>
-            </div>
-            <p class="admin-audit__row-reason">${escapeHtml(q.reason)}</p>
-            <div class="admin-audit__row-actions">
-              <button type="button" class="admin-button admin-button--secondary admin-button--small" data-audit-action="open-question" data-question-id="${escapeHtml(q.questionId)}">Open question</button>
-              <button type="button" class="admin-button admin-button--ghost admin-button--small" data-audit-action="propose-cut" data-question-id="${escapeHtml(q.questionId)}">Propose cutting it</button>
-            </div>
-          </div>
-        `,
+        ["quiz_adrift"],
         "Every quiz question is wired to something — answers gate a template, create a system, or drive a known UI branch."
       )}
       ${sectionHtml(
         "Vendors without tasks",
-        audit.vendorsWithoutTasks,
-        (v) => `
-          <div class="admin-audit__row">
-            <div class="admin-audit__row-top">
-              <strong>${escapeHtml(v.vendor)}</strong>
-            </div>
-            <p class="admin-audit__row-reason">${escapeHtml(v.reason)}</p>
-            <div class="admin-audit__row-actions">
-              <button type="button" class="admin-button admin-button--secondary admin-button--small" data-audit-action="open-vendor" data-vendor="${escapeHtml(v.vendor)}">Open vendor</button>
-              <button type="button" class="admin-button admin-button--ghost admin-button--small" data-audit-action="propose-tasks" data-vendor="${escapeHtml(v.vendor)}">Propose tasks for this vendor</button>
-            </div>
-          </div>
-        `,
+        ["vendor_no_tasks"],
         "Every vendor type has at least one task in the catalog that maps to it."
       )}
       ${sectionHtml(
         "Vendor types HNW homes typically have but we don't carry",
-        audit.missingVendorTypes,
-        (v) => `
-          <div class="admin-audit__row admin-audit__row--gap">
-            <div class="admin-audit__row-top">
-              <strong>${escapeHtml(v.name)}</strong>
-              <span class="admin-pill" data-tone="reshape">Catalog gap</span>
-            </div>
-            <p class="admin-audit__row-reason">${escapeHtml(v.role)}</p>
-            <div class="admin-audit__row-actions">
-              <button type="button" class="admin-button admin-button--primary admin-button--small" data-audit-action="propose-vendor-type" data-name="${escapeHtml(v.name)}" data-role="${escapeHtml(v.role)}">Draft "add this vendor type" note</button>
-            </div>
-          </div>
-        `,
+        ["missing_vendor"],
         "The catalog already covers every vendor type HNW homes typically have."
       )}
       ${sectionHtml(
         "Routines HNW homes typically have but we don't seed",
-        audit.missingRoutines,
-        (r) => `
-          <div class="admin-audit__row admin-audit__row--gap">
-            <div class="admin-audit__row-top">
-              <strong>${escapeHtml(r.name)}</strong>
-              <span class="admin-pill" data-tone="reshape">Catalog gap</span>
-            </div>
-            <p class="admin-audit__row-reason">${escapeHtml(r.role)}</p>
-            <div class="admin-audit__row-actions">
-              <button type="button" class="admin-button admin-button--primary admin-button--small" data-audit-action="propose-routine" data-name="${escapeHtml(r.name)}" data-role="${escapeHtml(r.role)}">Draft "add this routine" note</button>
-            </div>
-          </div>
-        `,
+        ["missing_routine"],
         "The catalog already covers every common HNW routine."
       )}
     </div>
   `;
 
-  // Wire audit-row actions.
-  el.list.querySelectorAll("[data-audit-action]").forEach((btn) => {
-    btn.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await handleAuditAction(btn.dataset);
+  // Wire row clicks.
+  el.list.querySelectorAll("[data-audit-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.auditId;
+      const finding = findings.find((f) => f.id === id);
+      if (!finding) return;
+      state.selectedAudit = finding;
+      renderFocusedAuditDetail(finding);
+      // Re-render the list so the active row gets the highlight.
+      renderAuditView();
     });
   });
 
-  el.emptyDetail.classList.remove("is-hidden");
-  el.detail.classList.add("is-hidden");
+  // If a finding was already selected, re-open the focused panel
+  // (e.g. after a re-render triggered by data refresh).
+  const stillSelected = state.selectedAudit && findings.some((f) => f.id === state.selectedAudit.id);
+  if (stillSelected) {
+    const fresh = findings.find((f) => f.id === state.selectedAudit.id);
+    state.selectedAudit = fresh;
+    renderFocusedAuditDetail(fresh);
+  } else {
+    state.selectedAudit = null;
+    el.auditFocused?.classList.add("is-hidden");
+    el.noteFocused?.classList.add("is-hidden");
+    el.decisionFocused?.classList.add("is-hidden");
+    el.emptyDetail.classList.remove("is-hidden");
+    el.detail.classList.add("is-hidden");
+    el.emptyDetail.querySelector("h3").textContent = findings.length
+      ? "Click any card to see what to do"
+      : "No mismatches found";
+    el.emptyDetail.querySelector("p").textContent = findings.length
+      ? "Each finding opens with Claude's recommended action up top, plus a few alternative options. One click per choice."
+      : "Every task has a vendor that can do it, every quiz question drives something, every vendor has work, and the catalog covers what HNW homes typically need. Move to another tab.";
+  }
+}
+
+// Phase 5z+19 — Focused audit panel renderer. Same shape as the
+// focused decision panel: header, recommendation card (salmon, leads),
+// "what we're looking at" context, "what happens if you act" bullets,
+// then the action buttons with the recommended option leftmost.
+function renderFocusedAuditDetail(finding) {
+  if (!finding) return;
+  el.emptyDetail.classList.add("is-hidden");
+  el.detail.classList.remove("is-hidden");
+
+  // Hide every other detail-pane mode.
+  el.detailTabs?.classList.add("is-hidden");
+  el.curatedForm?.classList.add("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
   el.noteFocused?.classList.add("is-hidden");
   el.decisionFocused?.classList.add("is-hidden");
-  el.emptyDetail.querySelector("h3").textContent = "Click any row's action button on the left.";
-  el.emptyDetail.querySelector("p").textContent = "Each finding here has a one-click button — open the underlying entity, propose a fix as a note, or draft a 'we should add this' proposal. The catalog is healthy when this list reaches zero.";
+  el.promoteItem.disabled = true;
+  el.duplicateItem.disabled = true;
+  el.deleteItem.disabled = true;
+  el.saveItem.textContent = "Save";
+  el.saveItem.disabled = true;
+
+  // Header.
+  const kindLabel = {
+    task_no_vendor: "Task without a vendor",
+    quiz_adrift: "Quiz question adrift",
+    vendor_no_tasks: "Vendor with no tasks",
+    missing_vendor: "Missing vendor type",
+    missing_routine: "Missing routine",
+  }[finding.kind] || "Audit finding";
+  const tone = ["missing_vendor", "missing_routine"].includes(finding.kind) ? "reshape" : "draft";
+  el.detailKind.textContent = kindLabel.toLowerCase();
+  el.detailTitle.textContent = finding.title;
+  el.detailSubtitle.textContent = finding.subtitle || "";
+  el.detailStatus.textContent = kindLabel;
+  el.detailStatus.dataset.tone = tone;
+
+  el.auditFocused?.classList.remove("is-hidden");
+  if (el.auditFocused) {
+    el.auditFocused.innerHTML = renderFocusedAuditPanelHtml(finding);
+    attachFocusedAuditHandlers(finding);
+  }
+}
+
+function renderFocusedAuditPanelHtml(finding) {
+  // Each kind has its own recommendation + action set + context body.
+  // Recommended action is always FIRST (primary salmon button).
+  const r = auditRecommendationFor(finding);
+  return `
+    <section class="admin-decision-focused__body">
+      <div class="admin-decision-focused__section admin-decision-focused__section--rec">
+        <div class="admin-decision-focused__section-head">
+          <h4>Claude's recommendation</h4>
+        </div>
+        <p class="admin-decision-focused__rec">${escapeHtml(r.recommendation)}</p>
+      </div>
+
+      <div class="admin-decision-focused__section">
+        <div class="admin-decision-focused__section-head">
+          <h4>What we're looking at</h4>
+        </div>
+        ${r.contextHtml}
+      </div>
+
+      <div class="admin-decision-focused__section">
+        <div class="admin-decision-focused__section-head">
+          <h4>What happens if you act</h4>
+        </div>
+        <div class="admin-decision-focused__what">
+          <ul>${r.whatHappens.map((s) => `<li>${s}</li>`).join("")}</ul>
+        </div>
+      </div>
+
+      <div class="admin-decision-focused__section admin-decision-focused__section--actions">
+        <div class="admin-decision-focused__section-head">
+          <h4>Choose one</h4>
+          <span class="admin-muted admin-decision-focused__action-hint">Recommended action is on the left.</span>
+        </div>
+        <div class="admin-decision-focused__actions">
+          ${r.actions.map((a) => `
+            <button type="button" class="admin-button ${a.primary ? "admin-button--primary" : a.danger ? "admin-button--ghost admin-button--danger" : "admin-button--secondary"} admin-button--small" data-audit-fa="${escapeHtml(a.id)}">${escapeHtml(a.label)}</button>
+          `).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function attachFocusedAuditHandlers(finding) {
+  el.auditFocused?.querySelectorAll("[data-audit-fa]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await handleFocusedAuditAction(finding, btn.dataset.auditFa);
+    });
+  });
+}
+
+// Phase 5z+19 — Per-kind recommendation builder. Returns:
+//   {
+//     recommendation: string,        // headline for the salmon card
+//     contextHtml: string,           // "what we're looking at" body
+//     whatHappens: string[],         // bullets — strings can carry inline HTML
+//     actions: { id, label, primary?, danger? }[]
+//   }
+function auditRecommendationFor(finding) {
+  if (finding.kind === "task_no_vendor") {
+    const t = finding.data;
+    // Use the value analysis to figure out whether to lean toward
+    // "cut" (low value) or "remap to existing vendor" (high value).
+    const item = (state.liveData["templates"]?.entries || []).find((x) => x.templateKey === t.templateKey);
+    const valueItem = item ? { title: item.title, payload: item, description: item.description } : null;
+    const value = valueItem ? valueAnalysisFor(valueItem) : null;
+    const isLowValue = value?.tier === "low";
+    const recommendation = isLowValue
+      ? `Low-value task in a category we don't cover with a vendor. Cut the task — it's not pulling its weight, and adding a brand-new vendor type just to support it is overkill.`
+      : `This task is real work but the catalog has no vendor who can take it. Easiest fix: remap "${t.category}" to an existing vendor type that already does similar work. If that's a stretch, propose adding a new vendor type.`;
+    return {
+      recommendation,
+      contextHtml: `
+        <div class="admin-audit-focused__context">
+          <p><strong>Task:</strong> ${escapeHtml(t.title)}</p>
+          <p><strong>Category:</strong> <code>${escapeHtml(t.category)}</code></p>
+          <p class="admin-muted">${escapeHtml(t.reason)}</p>
+        </div>
+      `,
+      whatHappens: isLowValue
+        ? [
+            `<strong>Cut the task</strong> writes a proposal_delete note. Claude removes the template on the next code session.`,
+            `<strong>Remap to a vendor</strong> drafts a note asking Claude to point ${escapeHtml(t.category)} at one of the 15 existing vendor categories.`,
+            `<strong>Propose adding a vendor</strong> drafts a "we need a vendor for ${escapeHtml(t.category)}" note. Heavier lift than a remap.`,
+            `<strong>Open template</strong> jumps to the Tasks tab so you can read the full template + edit fields.`,
+          ]
+        : [
+            `<strong>Remap to a vendor</strong> drafts a note pointing this category at an existing vendor type. Quickest fix — no new entries to add.`,
+            `<strong>Propose adding a vendor</strong> drafts a proposal note for a brand-new vendor type. Right call when "${escapeHtml(t.category)}" is genuinely a different trade.`,
+            `<strong>Cut the task</strong> writes a proposal_delete note if you decide it's not worth carrying.`,
+            `<strong>Open template</strong> jumps to the Tasks tab so you can read the full template + edit fields.`,
+          ],
+      actions: isLowValue
+        ? [
+            { id: "task-cut", label: "Cut the task", primary: true, danger: true },
+            { id: "task-remap", label: "Remap to existing vendor" },
+            { id: "task-new-vendor", label: "Propose new vendor type" },
+            { id: "task-open", label: "Open template" },
+          ]
+        : [
+            { id: "task-remap", label: "Remap to existing vendor", primary: true },
+            { id: "task-new-vendor", label: "Propose new vendor type" },
+            { id: "task-open", label: "Open template" },
+            { id: "task-cut", label: "Cut the task", danger: true },
+          ],
+    };
+  }
+  if (finding.kind === "quiz_adrift") {
+    const q = finding.data;
+    return {
+      recommendation: `Heads up: this might be a false positive. The audit can't see wiring that lives in HouseQuizAnswerMapper.swift (system-creation rules, contractor-mirror logic). Open the question first to confirm — if it really doesn't drive anything, propose cutting it.`,
+      contextHtml: `
+        <div class="admin-audit-focused__context">
+          <p><strong>Question:</strong> ${escapeHtml(q.title || q.questionId)}</p>
+          <p><strong>ID:</strong> <code>${escapeHtml(q.questionId)}</code></p>
+          ${q.kind ? `<p><strong>Kind:</strong> ${escapeHtml(q.kind)}</p>` : ""}
+          ${q.chapter ? `<p><strong>Chapter:</strong> ${escapeHtml(q.chapter)}</p>` : ""}
+          <p class="admin-muted">${escapeHtml(q.reason)}</p>
+        </div>
+      `,
+      whatHappens: [
+        `<strong>Open question</strong> jumps to the Quiz tab. The "Here is what this question does for the app" lead at the top of the detail panel will tell you whether it really is unwired or whether the audit missed something.`,
+        `<strong>Document its wiring</strong> writes a feedback note explaining what the question DOES drive — useful when the audit's heuristic is missing real wiring. Helps the next session.`,
+        `<strong>Propose cutting it</strong> drafts a proposal_delete note. Use this only after you've confirmed the question really is dead.`,
+      ],
+      actions: [
+        { id: "quiz-open", label: "Open question", primary: true },
+        { id: "quiz-document", label: "Document its wiring" },
+        { id: "quiz-cut", label: "Propose cutting it", danger: true },
+      ],
+    };
+  }
+  if (finding.kind === "vendor_no_tasks") {
+    const v = finding.data;
+    return {
+      recommendation: `Either we're missing tasks for this vendor's trade (add some), or the vendor type is a relic that no template uses (cut it). Open the vendor card first to read the full description, then decide.`,
+      contextHtml: `
+        <div class="admin-audit-focused__context">
+          <p><strong>Vendor type:</strong> ${escapeHtml(v.vendor)}</p>
+          ${v.role ? `<p><strong>What they do:</strong> ${escapeHtml(v.role)}</p>` : ""}
+          <p class="admin-muted">${escapeHtml(v.reason)}</p>
+        </div>
+      `,
+      whatHappens: [
+        `<strong>Open vendor</strong> jumps to the Vendors tab so you can read the full description + write a note in context.`,
+        `<strong>Propose tasks for this vendor</strong> drafts a note asking Claude to add 2-3 templates that map to this vendor's trade.`,
+        `<strong>Cut the vendor type</strong> drafts a proposal_delete note. Use this if no template uses it AND HNW homes don't typically have this vendor.`,
+      ],
+      actions: [
+        { id: "vendor-open", label: "Open vendor", primary: true },
+        { id: "vendor-add-tasks", label: "Propose tasks for this vendor" },
+        { id: "vendor-cut", label: "Cut the vendor type", danger: true },
+      ],
+    };
+  }
+  if (finding.kind === "missing_vendor") {
+    const v = finding.data;
+    return {
+      recommendation: `HNW homes typically have a "${v.name}" — the catalog is missing them. Drafting the proposal note tells Claude to add the entry on the next code session.`,
+      contextHtml: `
+        <div class="admin-audit-focused__context">
+          <p><strong>Vendor type:</strong> ${escapeHtml(v.name)}</p>
+          ${v.role ? `<p><strong>What they do:</strong> ${escapeHtml(v.role)}</p>` : ""}
+        </div>
+      `,
+      whatHappens: [
+        `<strong>Draft "add this vendor type" note</strong> writes a proposal_add note. Claude will add the entry to DEFAULT_VENDOR_CATEGORIES on the next session, including a role description and Q15b chip wiring.`,
+        `<strong>Skip / dismiss</strong> writes a feedback note saying we don't actually want this vendor type. The audit will keep flagging it (it's hardcoded into the curated list), but the note documents your decision.`,
+      ],
+      actions: [
+        { id: "missing-vendor-add", label: "Draft \"add this vendor\" note", primary: true },
+        { id: "missing-vendor-skip", label: "Skip — don't want this vendor" },
+      ],
+    };
+  }
+  if (finding.kind === "missing_routine") {
+    const r = finding.data;
+    return {
+      recommendation: `HNW homes typically have a "${r.name}" routine — the catalog doesn't seed it. Drafting the proposal note tells Claude to add it on the next code session.`,
+      contextHtml: `
+        <div class="admin-audit-focused__context">
+          <p><strong>Routine:</strong> ${escapeHtml(r.name)}</p>
+          ${r.role ? `<p><strong>What it is:</strong> ${escapeHtml(r.role)}</p>` : ""}
+        </div>
+      `,
+      whatHappens: [
+        `<strong>Draft "add this routine" note</strong> writes a proposal_add note. Claude will add the routine to DEFAULT_ROUTINES with a default cadence and surface a Q15b-style chip if it's vendor-backed.`,
+        `<strong>Skip / dismiss</strong> writes a feedback note saying we don't want this routine. The audit will keep flagging it (curated list), but your decision is documented.`,
+      ],
+      actions: [
+        { id: "missing-routine-add", label: "Draft \"add this routine\" note", primary: true },
+        { id: "missing-routine-skip", label: "Skip — don't want this routine" },
+      ],
+    };
+  }
+  // Phase 5z+19 — Voice / style fixes (merged from Decisions). Same
+  // engine as the focused decision panel, ported into the audit
+  // panel. Mechanical fixes get a before/after preview; rule with no
+  // mechanical fix shows "what Claude will do" instead.
+  if (finding.kind === "voice_fix") {
+    const hit = finding.data.lintHit || {};
+    const fix = suggestLintFix(hit);
+    const previewBlock = fix?.kind === "mechanical" && fix.text
+      ? `<div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--suggested">
+          <strong>Suggested fix</strong>
+          <pre>${escapeHtml(fix.text)}</pre>
+        </div>`
+      : fix?.kind === "rewrite" && fix.summary
+      ? `<div class="admin-decision-focused__lint-block admin-decision-focused__lint-block--rewrite">
+          <strong>What Claude will do</strong>
+          <p>${escapeHtml(fix.summary)}</p>
+        </div>`
+      : "";
+    const applyExplain = fix?.kind === "mechanical"
+      ? "applies the exact swap above on the next code session"
+      : "writes a note asking Claude to rewrite the text on the next code session";
+    return {
+      recommendation: lintRecommendationFor(hit) || "Apply the suggested voice fix and move on.",
+      contextHtml: `
+        <div class="admin-decision-focused__lint">
+          <p class="admin-muted">Field: <code>${escapeHtml(hit.field || "—")}</code></p>
+          <div class="admin-decision-focused__lint-block">
+            <strong>What's there now</strong>
+            <pre>${escapeHtml(hit.snippet || "—")}</pre>
+          </div>
+          ${previewBlock}
+        </div>
+      `,
+      whatHappens: [
+        fix ? `<strong>${escapeHtml(fix.label)}</strong> ${escapeHtml(applyExplain)}.` : `<strong>Apply suggested fix</strong> drafts a voice-fix note.`,
+        `<strong>Approve as-is</strong> locks the entity so this lint rule stops flagging it. Use this when the wording is intentional.`,
+        `<strong>Open to edit</strong> jumps to the entity so you can rework the wording yourself.`,
+        `<strong>Cut entity</strong> removes it from the catalog. Use sparingly.`,
+      ],
+      actions: [
+        { id: "voice-apply", label: fix?.label || "Apply suggested fix", primary: true },
+        { id: "voice-approve", label: "Approve as-is" },
+        { id: "voice-open", label: "Open to edit" },
+        { id: "voice-cut", label: "Cut entity", danger: true },
+      ],
+    };
+  }
+  // Phase 5z+19 — Needs review (high-impact entities, merged from
+  // Decisions). Uses the existing valueAnalysisFor engine.
+  if (finding.kind === "needs_review") {
+    const value = finding.data.valueAnalysis || valueAnalysisFor(finding.data.targetItem || {});
+    const tierBadge = {
+      high: { tone: "active", label: "High value" },
+      medium: { tone: "draft", label: "Worth a review" },
+      low: { tone: "cut", label: "Low value" },
+    }[value.tier] || { tone: "draft", label: value.tier };
+    const substitutesActions = (value.substitutes || []).map((_, i) => ({
+      id: `review-substitute-${i}`,
+      label: `Draft swap → ${(value.substitutes[i] || "").split("(")[0].trim().slice(0, 40)}…`,
+    }));
+    const isLow = value.tier === "low";
+    const baseActions = isLow
+      ? [
+          { id: "review-cut", label: "Cut entity", primary: true, danger: true },
+          { id: "review-approve", label: "Approve + lock" },
+          { id: "review-open", label: "Open to edit" },
+        ]
+      : [
+          { id: "review-approve", label: "Approve + lock", primary: true },
+          { id: "review-open", label: "Open to edit" },
+          { id: "review-cut", label: "Cut entity", danger: true },
+        ];
+    return {
+      recommendation: value.summary,
+      contextHtml: `
+        <div class="admin-decision-focused__impact">
+          <div class="admin-decision-focused__value-row">
+            <span class="admin-pill" data-tone="${escapeHtml(tierBadge.tone)}">${escapeHtml(tierBadge.label)}</span>
+            <p class="admin-decision-focused__value-summary">${escapeHtml(value.reasoning || finding.reason)}</p>
+          </div>
+          <p class="admin-muted admin-decision-focused__value-why">${escapeHtml(finding.reason)}</p>
+        </div>
+        ${value.substitutes && value.substitutes.length ? `
+          <div class="admin-decision-focused__substitutes">
+            <strong>Higher-value swap ideas</strong>
+            <p class="admin-muted">If this slot opens up, these are the kinds of things HNW Westchester homes actually want tracked.</p>
+            <ul>
+              ${value.substitutes.map((s) => `<li><span class="admin-decision-focused__substitute-text">${escapeHtml(s)}</span></li>`).join("")}
+            </ul>
+          </div>
+        ` : ""}
+      `,
+      whatHappens: isLow
+        ? [
+            `<strong>Cut entity</strong> removes it. The slot opens up for a higher-value HNW service.`,
+            `<strong>Approve + lock</strong> keeps it as-is. Only do this if you've thought about it and decided it's pulling its weight.`,
+            `<strong>Open to edit</strong> jumps to the entity so you can rework wording / cadence / cost.`,
+          ]
+        : [
+            `<strong>Approve + lock</strong> tells Haven this entity is final. It stops surfacing here.`,
+            `<strong>Open to edit</strong> jumps to the entity's full detail panel.`,
+            `<strong>Cut entity</strong> removes it. New households won't see it.`,
+          ],
+      actions: [...baseActions, ...substitutesActions],
+    };
+  }
+  return {
+    recommendation: "(no recommendation available)",
+    contextHtml: "",
+    whatHappens: [],
+    actions: [],
+  };
 }
 
 async function handleAuditAction(dataset) {
@@ -4317,6 +4807,227 @@ async function handleAuditAction(dataset) {
       snapshot: { name: dataset.name, role: dataset.role, source: "coverage_audit_routine_gap" },
     });
     alert(`Drafted a "add ${dataset.name}" proposal note.`);
+    return;
+  }
+}
+
+// Phase 5z+19 — Action dispatcher for the focused audit panel. Each
+// finding kind has its own action set; this routes the click to the
+// right helper. Most actions either jump to an entity tab or write a
+// note, then re-render so the finding drops out of the list (the
+// audit recomputes against current notes / data).
+async function handleFocusedAuditAction(finding, action) {
+  if (!finding) return;
+  const data = finding.data || {};
+
+  // ---- task_no_vendor ----
+  if (action === "task-cut") {
+    if (!confirm(`Draft a proposal_delete note for "${data.title}"?`)) return;
+    await writeNote({
+      scopeType: "task",
+      scopeId: data.templateKey,
+      scopeTitle: data.title,
+      body: `Audit recommends cutting this template. The "${data.category}" category has no vendor type that can do the work, and value analysis flags the task as low-value.\n\nReason: ${data.reason}\n\n(Drafted from the Audit tab → Tasks without a vendor.)`,
+      intent: "proposal_delete",
+      target: "claude",
+      snapshot: { templateKey: data.templateKey, source: "audit_task_no_vendor" },
+    });
+    state.selectedAudit = null;
+    alert(`Drafted "cut this task" note for "${data.title}".`);
+    render();
+    return;
+  }
+  if (action === "task-remap") {
+    await writeNote({
+      scopeType: "task",
+      scopeId: data.templateKey,
+      scopeTitle: data.title,
+      body: `Audit asks Claude to remap the "${data.category}" category to one of the existing 15 vendor categories.\n\nCurrent reason: ${data.reason}\n\nQuickest fix: pick the closest match in DEFAULT_VENDOR_CATEGORIES (or update SYSTEM_CATEGORY_TO_VENDOR in admin.js so the audit stops flagging it).\n\n(Drafted from the Audit tab.)`,
+      intent: "change_request",
+      target: "claude",
+      snapshot: { templateKey: data.templateKey, category: data.category, source: "audit_task_remap" },
+    });
+    state.selectedAudit = null;
+    alert(`Drafted remap note for "${data.category}".`);
+    render();
+    return;
+  }
+  if (action === "task-new-vendor") {
+    await handleAuditAction({ auditAction: "propose-vendor", category: data.category });
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "task-open") {
+    await handleAuditAction({ auditAction: "open-task", templateKey: data.templateKey });
+    return;
+  }
+
+  // ---- quiz_adrift ----
+  if (action === "quiz-open") {
+    await handleAuditAction({ auditAction: "open-question", questionId: data.questionId });
+    return;
+  }
+  if (action === "quiz-document") {
+    await writeNote({
+      scopeType: "question",
+      scopeId: data.questionId,
+      scopeTitle: data.title || data.questionId,
+      body: `Audit flagged this question as adrift but it might be a false positive.\n\nDocumenting what this question DRIVES so the next audit pass can pick it up:\n\n[fill in: e.g. "Sets has_pool attribute on property", "Creates Pool/Spa system in the home_systems table", "Captures contractor in Q15b chip array", etc.]\n\n(Drafted from the Audit tab → Quiz adrift.)`,
+      intent: "feedback",
+      target: "claude",
+      snapshot: { questionId: data.questionId, source: "audit_quiz_document_wiring" },
+    });
+    state.selectedAudit = null;
+    alert(`Drafted documentation note for "${data.questionId}". Open the Notes tab to fill in the wiring.`);
+    render();
+    return;
+  }
+  if (action === "quiz-cut") {
+    await handleAuditAction({ auditAction: "propose-cut", questionId: data.questionId });
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+
+  // ---- vendor_no_tasks ----
+  if (action === "vendor-open") {
+    await handleAuditAction({ auditAction: "open-vendor", vendor: data.vendor });
+    return;
+  }
+  if (action === "vendor-add-tasks") {
+    await handleAuditAction({ auditAction: "propose-tasks", vendor: data.vendor });
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "vendor-cut") {
+    if (!confirm(`Draft a proposal_delete note for the "${data.vendor}" vendor type?`)) return;
+    await writeNote({
+      scopeType: "vendor",
+      scopeId: data.vendor,
+      scopeTitle: data.vendor,
+      body: `Audit recommends cutting this vendor type. No template's systemCategory maps to it.\n\nReason: ${data.reason}\n\n(Drafted from the Audit tab → Vendor with no tasks.)`,
+      intent: "proposal_delete",
+      target: "claude",
+      snapshot: { vendor: data.vendor, source: "audit_vendor_no_tasks" },
+    });
+    state.selectedAudit = null;
+    alert(`Drafted "cut this vendor" note for "${data.vendor}".`);
+    render();
+    return;
+  }
+
+  // ---- missing_vendor / missing_routine ----
+  if (action === "missing-vendor-add") {
+    await handleAuditAction({ auditAction: "propose-vendor-type", name: data.name, role: data.role });
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "missing-vendor-skip") {
+    await writeNote({
+      scopeType: "general",
+      scopeId: null,
+      scopeTitle: `Don't add ${data.name} as a vendor`,
+      body: `Audit suggested adding "${data.name}" as a vendor type. Decision: skip — not relevant to Haven's audience right now.\n\nThe audit's HNW gap list is hardcoded in admin.js (COMMON_HNW_VENDOR_GAPS), so this finding will keep surfacing until we either add the vendor or strip the entry from that list.\n\n(Drafted from the Audit tab.)`,
+      intent: "feedback",
+      target: "claude",
+      snapshot: { name: data.name, source: "audit_missing_vendor_skip" },
+    });
+    state.selectedAudit = null;
+    alert(`Documented your decision to skip "${data.name}".`);
+    render();
+    return;
+  }
+  if (action === "missing-routine-add") {
+    await handleAuditAction({ auditAction: "propose-routine", name: data.name, role: data.role });
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "missing-routine-skip") {
+    await writeNote({
+      scopeType: "general",
+      scopeId: null,
+      scopeTitle: `Don't add ${data.name} as a routine`,
+      body: `Audit suggested adding "${data.name}" as a routine. Decision: skip — not relevant to Haven's audience right now.\n\nThe audit's HNW routine gap list is hardcoded in admin.js (COMMON_HNW_ROUTINE_GAPS).\n\n(Drafted from the Audit tab.)`,
+      intent: "feedback",
+      target: "claude",
+      snapshot: { name: data.name, source: "audit_missing_routine_skip" },
+    });
+    state.selectedAudit = null;
+    alert(`Documented your decision to skip "${data.name}".`);
+    render();
+    return;
+  }
+
+  // ---- voice_fix (merged from Decisions) ----
+  if (action === "voice-apply") {
+    // Mirror draftLintFixProposal but trigger from the audit context.
+    const decision = {
+      lintHit: data.lintHit,
+      targetItem: data.targetItem,
+    };
+    await draftLintFixProposal(decision);
+    state.selectedAudit = null;
+    return;
+  }
+  if (action === "voice-approve") {
+    state.selected = data.targetItem;
+    await toggleLockSelected();
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "voice-cut") {
+    state.selected = data.targetItem;
+    if (!confirm(`Mark "${data.targetItem.title}" as cut?`)) return;
+    await markCutLive(data.targetItem);
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "voice-open") {
+    if (data.targetItem && data.targetView) {
+      state.view = data.targetView;
+      state.selected = data.targetItem;
+      render();
+    }
+    return;
+  }
+
+  // ---- needs_review (merged from Decisions) ----
+  if (action === "review-approve") {
+    state.selected = data.targetItem;
+    await toggleLockSelected();
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "review-cut") {
+    state.selected = data.targetItem;
+    if (!confirm(`Mark "${data.targetItem.title}" as cut?`)) return;
+    await markCutLive(data.targetItem);
+    state.selectedAudit = null;
+    render();
+    return;
+  }
+  if (action === "review-open") {
+    if (data.targetItem && data.targetView) {
+      state.view = data.targetView;
+      state.selected = data.targetItem;
+      render();
+    }
+    return;
+  }
+  if (action?.startsWith("review-substitute-")) {
+    const idx = parseInt(action.replace("review-substitute-", ""), 10);
+    const substitute = data.valueAnalysis?.substitutes?.[idx];
+    if (!substitute) return;
+    const decision = { targetItem: data.targetItem, valueAnalysis: data.valueAnalysis };
+    await draftSubstituteProposal(decision, substitute);
+    state.selectedAudit = null;
     return;
   }
 }
@@ -8906,16 +9617,15 @@ function countByView() {
 
 function countForView(view) {
   if (view.id === "audit") {
-    // Phase 5z+18 — total mismatches found across all five checks.
+    // Phase 5z+18/+19 — total findings across every audit check
+    // (now also includes voice fixes + needs review, merged from
+    // the old Decisions tab).
     const a = computeCoverageAudit();
-    return a.tasksWithoutVendor.length + a.quizUnwired.length + a.vendorsWithoutTasks.length + a.missingVendorTypes.length + a.missingRoutines.length;
+    return a.tasksWithoutVendor.length + a.quizUnwired.length + a.vendorsWithoutTasks.length + a.missingVendorTypes.length + a.missingRoutines.length + (a.voiceFixes?.length || 0) + (a.needsReview?.length || 0);
   }
   if (view.id === "notes") {
     // Top-level notes only (replies nest under their parents).
     return state.notes.filter((n) => !n.parentNoteId).length;
-  }
-  if (view.id === "decisions") {
-    return computeDecisionQueue().length;
   }
   if (view.id === "activity") {
     let events = 0;
