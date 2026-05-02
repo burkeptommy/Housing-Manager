@@ -1546,6 +1546,206 @@ Write 1-2 sentences (max ~250 characters total) the admin can paste into a propo
 }
 
 // ============================================================================
+// Phase 81.1 — Pre-research / analysis action
+// ============================================================================
+// When Tom opens a Chez request, this action does the legwork so he
+// can spend his time on phone calls + decisions, not data gathering:
+//
+//   1. Loads the request + full household dossier
+//   2. Asks Claude to analyze the situation, infer the vendor
+//      category, draft a call script, and list key questions
+//   3. Matches the inferred category against existing household
+//      vendors (Tier A — already in their network)
+//   4. Pre-fetches local Google Places candidates via the existing
+//      find-local-vendors function (Tier C)
+//   5. Returns the whole bundle so the admin portal can render
+//      "press these 4 vendors, here's the script" without Tom
+//      having to type anything
+
+interface AnalyzeRequestPayload {
+  request_id: string;
+}
+
+async function handleAnalyzeRequest(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: AnalyzeRequestPayload,
+  serviceUrl: string
+) {
+  if (!user || !isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+
+  // 1. Fetch the request + household scope.
+  const { data: requestRow, error: reqErr } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+  const request = requestRow as ConciergeRequestRow;
+
+  // 2. Pull household dossier in parallel — we need property location +
+  //    vendors + standing instructions for the AI prompt.
+  const safe = async <T>(promise: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await promise; }
+    catch (e) { console.warn(`[analyze] ${label} failed:`, e); return null; }
+  };
+  const [householdRes, propertiesRes, contractorsRes] = await Promise.all([
+    safe(service.from("households").select("chez_profile, name").eq("id", request.household_id).maybeSingle(), "household"),
+    safe(service.from("properties").select("*").eq("household_id", request.household_id), "properties"),
+    safe(service.from("contractors").select("*").eq("household_id", request.household_id), "contractors"),
+  ]);
+  const household = (householdRes as { data?: { chez_profile?: Record<string, unknown>; name?: string } } | null)?.data ?? {};
+  const properties = (propertiesRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const contractors = (contractorsRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const property = properties[0] || {};
+  const profile = household.chez_profile || {};
+
+  // 3. Run Claude analysis. Prompt asks for STRUCTURED JSON so the
+  //    admin portal can render typed fields (category, key_questions
+  //    array, call_script string).
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  let analysis: AnalysisResult = {
+    inferred_category: "",
+    summary: "",
+    key_considerations: "",
+    questions_to_ask: [],
+    call_script: "",
+    recommended_approach: "",
+  };
+  if (apiKey) {
+    const propertyContext = property.year_built || property.property_type || property.city
+      ? `${property.year_built ?? ""} ${property.property_type ?? "home"} in ${property.city ?? ""}, ${property.state ?? ""} (${property.square_footage ?? "?"} sq ft)`
+      : "Property details on file are sparse.";
+    const profileBlob = JSON.stringify({
+      about_us: (profile as Record<string, unknown>).about_us,
+      vendor_preferences: (profile as Record<string, unknown>).vendor_preferences,
+      logistics: (profile as Record<string, unknown>).logistics,
+      spending_tiers: (profile as Record<string, unknown>).spending_tiers,
+    }, null, 2);
+    const userPrompt = `You're the Chez Concierge research assistant. A customer just submitted a request — analyze it so Tom (the admin) can act on it in 2 minutes instead of 20.
+
+## Request
+Category: ${request.category}
+Summary: ${request.summary}
+Context payload: ${JSON.stringify(request.context ?? {}, null, 2)}
+
+## Property
+${propertyContext}
+
+## Customer profile
+${profileBlob}
+
+## Existing vendors on file
+${contractors.length === 0 ? "(none)" : contractors.map((c) => `- ${c.company_name} (${c.category ?? "unknown trade"})`).join("\n")}
+
+## Output format — STRICT JSON, no markdown fences
+{
+  "inferred_category": "Single-word/short trade name to use as Google Places category. Examples: 'roofing', 'plumbing', 'crawl space encapsulation', 'tree removal', 'handyman'. This drives the local-vendor search.",
+  "summary": "1-sentence rephrase in Tom's voice — what does the customer actually want?",
+  "key_considerations": "2-3 sentences naming the SPECIFIC factors that matter for THIS homeowner — e.g. age of home, pet/access notes, vendor preferences, budget orientation. Reference real fields, not fluff.",
+  "questions_to_ask": ["3-5 short questions Tom should ask each vendor on the phone. Be specific to this home + situation."],
+  "call_script": "A 3-4 sentence call opener Tom can read on the phone. First-person ('Hi, I'm calling on behalf of a homeowner in [town]…'). Ends with the first question. ~80 words.",
+  "recommended_approach": "1-2 sentence playbook for Tom: how many quotes to gather, what to focus on, anything quirky about this specific homeowner."
+}
+
+Return ONLY the JSON. No preamble.`;
+
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { content?: Array<{ text?: string }> };
+        const text = data.content?.[0]?.text?.trim() ?? "";
+        try {
+          // Claude sometimes wraps JSON in fences despite instructions.
+          const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+          analysis = { ...analysis, ...JSON.parse(cleaned) };
+        } catch (parseErr) {
+          console.warn("[analyze] JSON parse failed; raw:", text.slice(0, 400));
+        }
+      } else {
+        console.warn("[analyze] Claude error:", resp.status, await resp.text());
+      }
+    } catch (e) {
+      console.warn("[analyze] exception:", e);
+    }
+  }
+
+  // 4. Match existing vendors against the inferred category. Loose
+  //    contains-check on either category or specialties so we catch
+  //    the obvious wins.
+  const inferredCat = (analysis.inferred_category || request.category || "").toLowerCase();
+  const existingMatches = contractors.filter((c) => {
+    const cat = String(c.category ?? "").toLowerCase();
+    const specs = Array.isArray(c.specialties) ? (c.specialties as string[]).join(" ").toLowerCase() : "";
+    if (!inferredCat) return false;
+    const tokens = inferredCat.split(/\s+/).filter((t) => t.length > 2);
+    return tokens.some((t) => cat.includes(t) || specs.includes(t));
+  });
+
+  // 5. Pre-fetch Places candidates if we have a category + location.
+  //    Goes through the existing find-local-vendors function so its
+  //    cache + ranking logic stays the source of truth.
+  let placesCandidates: Array<Record<string, unknown>> = [];
+  if (inferredCat && property.city && property.state) {
+    try {
+      const resp = await fetch(`${serviceUrl}/functions/v1/find-local-vendors`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+          apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        },
+        body: JSON.stringify({
+          town: property.city,
+          state: property.state,
+          category: inferredCat,
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { vendors?: Array<Record<string, unknown>> };
+        placesCandidates = (data.vendors ?? []).slice(0, 5);
+      } else {
+        console.warn("[analyze] places fetch error:", resp.status);
+      }
+    } catch (e) {
+      console.warn("[analyze] places fetch exception:", e);
+    }
+  }
+
+  return json({
+    analysis,
+    existing_vendors: existingMatches,
+    places_candidates: placesCandidates,
+    property_location: { city: property.city ?? "", state: property.state ?? "" },
+  });
+}
+
+interface AnalysisResult {
+  inferred_category: string;
+  summary: string;
+  key_considerations: string;
+  questions_to_ask: string[];
+  call_script: string;
+  recommended_approach: string;
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -1692,6 +1892,18 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as SuggestVendorFramingPayload
+        );
+
+      // Phase 81.1 — pre-research action that does ALL the AI heavy
+      // lifting on request open: analyzes the homeowner's situation,
+      // matches existing household vendors, pre-fetches local Places
+      // candidates, drafts a call script. Tom just makes the calls.
+      case "analyze_request":
+        return handleAnalyzeRequest(
+          service,
+          user,
+          body as unknown as AnalyzeRequestPayload,
+          supabaseUrl
         );
 
       default:

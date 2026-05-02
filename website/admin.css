@@ -6800,3 +6800,284 @@
   font-size: 12px;
   white-space: nowrap;
 }
+
+/* ================================================================
+   Phase 81.1 — Compact header + AI analysis panel + vendor cards
+   ================================================================ */
+
+/* Compact one-line header */
+
+.admin-chez__hdr-line {
+  align-items: center;
+  background: rgba(245, 224, 217, 0.35);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+.admin-chez__hdr-line-main {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  font: 400 13px var(--sans);
+  gap: 8px;
+}
+.admin-chez__hdr-flags {
+  display: flex;
+  gap: 6px;
+}
+.admin-chez__hdr-flags span {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+.admin-chez__hdr-line-meta {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+.admin-chez__hdr-tier {
+  background: rgba(234, 179, 8, 0.16);
+  border-radius: 6px;
+  color: rgb(161, 98, 7);
+  font: 600 11px var(--sans);
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.admin-button--small {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* Collapsible context + thread sections */
+
+.admin-chez__context-collapsible,
+.admin-chez__thread-collapsible {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 12px;
+  padding: 0;
+}
+.admin-chez__context-collapsible summary,
+.admin-chez__thread-collapsible summary {
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  letter-spacing: 0.04em;
+  padding: 10px 14px;
+  text-transform: uppercase;
+}
+.admin-chez__context-collapsible[open] summary,
+.admin-chez__thread-collapsible[open] summary {
+  border-bottom: 1px solid var(--border, #edeef0);
+}
+.admin-chez__context-collapsible .admin-chez__ctx-grid {
+  padding: 12px 14px;
+}
+.admin-chez__thread-collapsible .admin-chez__thread {
+  padding: 12px 14px;
+}
+
+/* AI analysis panel */
+
+.admin-chez__analysis {
+  background: linear-gradient(135deg, rgba(237, 105, 85, 0.06) 0%, rgba(245, 224, 217, 0.4) 100%);
+  border: 1px solid rgba(237, 105, 85, 0.18);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.admin-chez__analysis--loading {
+  background: rgba(245, 224, 217, 0.3);
+}
+.admin-chez__analysis--empty {
+  background: rgba(100, 116, 139, 0.06);
+}
+.admin-chez__analysis > header {
+  align-items: center;
+  display: flex;
+  font: 700 12px var(--sans);
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+.admin-chez__analysis-summary {
+  font: 500 14px var(--sans);
+  margin: 0 0 12px;
+}
+.admin-chez__analysis-section {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+}
+.admin-chez__analysis-section h4 {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.06em;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+.admin-chez__analysis-section p {
+  font: 400 13px var(--sans);
+  margin: 0;
+}
+details.admin-chez__analysis-section {
+  padding: 0;
+}
+details.admin-chez__analysis-section summary {
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  letter-spacing: 0.06em;
+  padding: 8px 12px;
+  text-transform: uppercase;
+}
+details.admin-chez__analysis-section[open] summary {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+details.admin-chez__analysis-section ul,
+details.admin-chez__analysis-section pre {
+  margin: 0;
+  padding: 8px 12px 12px 28px;
+  white-space: pre-wrap;
+}
+details.admin-chez__analysis-section pre {
+  background: rgba(0, 0, 0, 0.04);
+  font: 400 12px var(--sans);
+  padding-left: 12px;
+}
+
+/* Vendor candidates section */
+
+.admin-chez__candidates {
+  margin-top: 14px;
+}
+.admin-chez__candidates > header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.admin-chez__candidates h4 {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+/* Per-vendor card */
+
+.admin-chez__vendor-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  transition: border-color 100ms ease;
+}
+.admin-chez__vendor-card.is-recommended {
+  background: rgba(34, 197, 94, 0.06);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.admin-chez__vendor-card.is-noanswer {
+  border-color: rgba(234, 179, 8, 0.4);
+}
+.admin-chez__vendor-card-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.admin-chez__vendor-card-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.admin-chez__vendor-card-title strong {
+  font: 600 14px var(--sans);
+}
+.admin-chez__vendor-card-meta {
+  align-items: flex-end;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  font: 400 12px var(--sans);
+  gap: 2px;
+  text-align: right;
+}
+.admin-chez__vendor-card-actions {
+  display: flex;
+  gap: 8px;
+}
+.admin-chez__vendor-card-actions .admin-button {
+  font-size: 12px;
+}
+
+/* Vendor call form */
+
+.admin-chez__vendor-call-form {
+  border-top: 1px solid var(--border, #edeef0);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.admin-chez__vendor-call-form label {
+  display: block;
+  font: 600 11px var(--sans);
+  margin-bottom: 8px;
+}
+.admin-chez__vendor-call-form input,
+.admin-chez__vendor-call-form select,
+.admin-chez__vendor-call-form textarea {
+  background: var(--bg, #f8f9fa);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 8px;
+  font: 400 13px var(--sans);
+  margin-top: 4px;
+  padding: 6px 10px;
+  width: 100%;
+}
+.admin-chez__vendor-call-form textarea {
+  resize: vertical;
+}
+.admin-chez__vendor-call-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+.admin-chez__vendor-rationale span {
+  align-items: center;
+  display: flex;
+  font: 600 11px var(--sans);
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.admin-chez__vendor-call-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.admin-chez__vendor-recommend {
+  align-items: center;
+  cursor: pointer;
+  display: flex !important;
+  font: 500 13px var(--sans) !important;
+  gap: 8px;
+  margin: 0 !important;
+}
+.admin-chez__vendor-recommend input {
+  margin: 0;
+  width: auto !important;
+}
+
+/* Wider drawer for the full profile */
+
+.admin-chez__dossier-drawer-panel--wide {
+  max-width: 640px;
+}

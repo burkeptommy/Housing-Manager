@@ -4920,10 +4920,16 @@ function renderFocusedChezPanelHtml(req) {
     `;
   }).join("");
 
-  // Phase 80.1 — Profile + spending tier summary at the top of the
-  // panel so Tom can see the customer's standing instructions before
-  // typing anything. Pulled lazy on focus.
-  const profileHtml = renderChezProfileSummaryHtml(req);
+  // Phase 81.1 — Compact header line replaces the Phase 81 inline
+  // dossier flood. One row of identity + a "View profile →" button
+  // that opens the full dossier as a slide-in drawer. Tom shouldn't
+  // need to scroll past 8 cards to get to the conversation.
+  const headerLineHtml = renderCompactHeaderLineHtml(req);
+
+  // Phase 81.1 — AI analysis panel. Auto-runs on request open;
+  // shows pre-researched vendors + call script + key questions
+  // so Tom's job is "make the calls + click send" not "research".
+  const analysisHtml = renderChezAnalysisPanelHtml(req);
 
   const statusOptions = ["open", "waiting_customer", "resolved"]
     .map((s) => `<option value="${s}" ${s === req.status ? "selected" : ""}>${CHEZ_STATUS_LABELS[s]}</option>`)
@@ -4940,17 +4946,17 @@ function renderFocusedChezPanelHtml(req) {
     : `
       <form data-chez-reply-form class="admin-chez__composer">
         <label class="admin-chez__composer-label">Reply to homeowner</label>
-        <textarea name="content" rows="5" placeholder="Tell the homeowner what's next…" required></textarea>
+        <textarea name="content" rows="3" placeholder="Tell the homeowner what's next…" required></textarea>
         <label class="admin-chez__ack">
           <input type="checkbox" name="acknowledgement_required" />
-          <span><strong>Acknowledgement required.</strong> Drops the reply into the homeowner's <em>Needs Action</em> tab. Leave unchecked for purely informational updates.</span>
+          <span><strong>Acknowledgement required.</strong> Lands in their Needs Action tab.</span>
         </label>
         <div class="admin-chez__composer-row">
           <select name="to_status">
             <option value="">Keep status: ${CHEZ_STATUS_LABELS[req.status]}</option>
             ${["open", "waiting_customer", "resolved"]
               .filter((s) => s !== req.status)
-              .map((s) => `<option value="${s}">Set status: ${CHEZ_STATUS_LABELS[s]}</option>`)
+              .map((s) => `<option value="${s}">Set: ${CHEZ_STATUS_LABELS[s]}</option>`)
               .join("")}
           </select>
           <button type="submit" class="admin-button admin-button--primary">Send reply</button>
@@ -4970,29 +4976,286 @@ function renderFocusedChezPanelHtml(req) {
         </div>
       </header>
 
-      ${profileHtml}
+      ${headerLineHtml}
+
+      ${analysisHtml}
 
       ${contextLines ? `
-        <section class="admin-chez__context">
-          <h3>Details from the homeowner</h3>
+        <details class="admin-chez__context-collapsible">
+          <summary>Original request details</summary>
           <div class="admin-chez__ctx-grid">${contextLines}</div>
-        </section>
+        </details>
       ` : ""}
 
-      <section class="admin-chez__thread">
-        <h3>Conversation</h3>
-        ${threadHtml || `<p class="admin-muted">No messages yet — the original request is rendering above.</p>`}
-      </section>
+      <details class="admin-chez__thread-collapsible" ${(messages || []).length > 0 ? "open" : ""}>
+        <summary>Conversation${(messages || []).length ? ` · ${(messages || []).length}` : ""}</summary>
+        <div class="admin-chez__thread">
+          ${threadHtml || `<p class="admin-muted">No messages yet.</p>`}
+        </div>
+      </details>
 
       ${composerHtml}
 
       <section class="admin-chez__quick-actions">
-        <button type="button" class="admin-button admin-button--ghost" data-chez-action="propose">Propose vendor / date / cost</button>
-        <button type="button" class="admin-button admin-button--ghost" data-chez-action="waiting">Mark waiting on customer</button>
+        <button type="button" class="admin-button admin-button--ghost" data-chez-action="propose">Manual proposal</button>
+        <button type="button" class="admin-button admin-button--ghost" data-chez-action="waiting">Waiting on customer</button>
         <button type="button" class="admin-button admin-button--ghost" data-chez-action="resolved">Mark resolved</button>
       </section>
     </section>
   `;
+}
+
+// Phase 81.1 — Compact one-line header that replaces the inline
+// dossier. Tom sees identity + house at a glance, clicks "View
+// profile" to slide in the full drawer (which contains everything
+// the Phase 81 dossier had).
+function renderCompactHeaderLineHtml(req) {
+  const householdId = req.household_id;
+  if (!householdId) return "";
+  state.chezDossiersByHousehold = state.chezDossiersByHousehold || {};
+  const dossier = state.chezDossiersByHousehold[householdId];
+  if (dossier === undefined) {
+    fetchChezHouseholdDossier(householdId);
+    return `
+      <div class="admin-chez__hdr-line">
+        <span class="admin-muted">Loading homeowner context…</span>
+      </div>
+    `;
+  }
+  if (!dossier) {
+    return `
+      <div class="admin-chez__hdr-line">
+        <span class="admin-muted">Homeowner data unavailable.</span>
+      </div>
+    `;
+  }
+  const name = primaryHomeownerLabel(dossier);
+  const property = (dossier.properties && dossier.properties[0]) || null;
+  const tiers = dossier.profile?.spending_tiers || {};
+  const tierLine = (tiers.auto_approve_under !== undefined)
+    ? `Auto $${tiers.auto_approve_under} · Ping $${tiers.ping_under} · Ask &gt;$${tiers.explicit_above}`
+    : `Default tiers (200/500/500)`;
+  const profile = dossier.profile || {};
+  const flags = [];
+  if (profile.communication?.vacation_mode) flags.push("🏖️ Vacation");
+  if (profile.logistics?.has_pets) flags.push("🐾 Pets");
+  if (profile.vendor_preferences?.budget_orientation) flags.push(`💰 ${profile.vendor_preferences.budget_orientation}`);
+  if (profile.vendor_preferences?.prefer_local_owned) flags.push("Local-owned");
+  return `
+    <div class="admin-chez__hdr-line">
+      <div class="admin-chez__hdr-line-main">
+        <strong>${escapeHtml(name)}</strong>
+        ${property ? `<span class="admin-muted">· ${escapeHtml(formatAddress(property))}${property.year_built ? ` · ${escapeHtml(String(property.year_built))} ${escapeHtml(property.property_type || "home")}` : ""}</span>` : ""}
+        ${flags.length ? `<span class="admin-chez__hdr-flags">${flags.map((f) => `<span>${f}</span>`).join("")}</span>` : ""}
+      </div>
+      <div class="admin-chez__hdr-line-meta">
+        <span class="admin-chez__hdr-tier" data-tone="amber">${tierLine}</span>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="open-profile-drawer">View profile →</button>
+      </div>
+    </div>
+  `;
+}
+
+// Phase 81.1 — AI analysis panel state. Cached per request so we
+// don't re-run Claude on every panel re-render. Re-runs only when
+// the user explicitly clicks "Re-analyze".
+function renderChezAnalysisPanelHtml(req) {
+  state.chezAnalysisByRequest = state.chezAnalysisByRequest || {};
+  const cached = state.chezAnalysisByRequest[req.id];
+
+  if (cached === undefined) {
+    // Kick off analysis in the background. Re-renders when done.
+    runChezAnalysis(req.id);
+    return `
+      <section class="admin-chez__analysis admin-chez__analysis--loading">
+        <header>
+          <span>✨ Chez analysis</span>
+          <span class="admin-muted">Researching…</span>
+        </header>
+        <p class="admin-muted">Reading the request, matching existing vendors, pre-fetching local options, drafting your call script.</p>
+      </section>
+    `;
+  }
+  if (cached === null) {
+    return `
+      <section class="admin-chez__analysis admin-chez__analysis--empty">
+        <header>
+          <span>✨ Chez analysis</span>
+          <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="rerun-analysis">Re-run</button>
+        </header>
+        <p class="admin-muted">Analysis didn't return. Click Re-run.</p>
+      </section>
+    `;
+  }
+
+  const a = cached.analysis || {};
+  const existing = cached.existing_vendors || [];
+  const places = cached.places_candidates || [];
+  const allCandidates = [
+    ...existing.map((v) => ({ ...v, _source: "existing" })),
+    ...places.map((v) => ({ ...v, _source: "places" })),
+  ];
+
+  const callState = (state.chezVendorCallsByRequest && state.chezVendorCallsByRequest[req.id]) || {};
+  const recommendedCount = Object.values(callState).filter((s) => s && s.recommended).length;
+
+  return `
+    <section class="admin-chez__analysis">
+      <header>
+        <span>✨ Chez analysis</span>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="rerun-analysis">Re-run</button>
+      </header>
+
+      ${a.summary ? `<p class="admin-chez__analysis-summary">${escapeHtml(a.summary)}</p>` : ""}
+
+      ${a.key_considerations ? `
+        <div class="admin-chez__analysis-section">
+          <h4>Key considerations</h4>
+          <p>${escapeHtml(a.key_considerations)}</p>
+        </div>
+      ` : ""}
+
+      ${a.recommended_approach ? `
+        <div class="admin-chez__analysis-section">
+          <h4>Recommended approach</h4>
+          <p>${escapeHtml(a.recommended_approach)}</p>
+        </div>
+      ` : ""}
+
+      ${(a.questions_to_ask && a.questions_to_ask.length > 0) ? `
+        <details class="admin-chez__analysis-section">
+          <summary>Questions to ask each vendor (${a.questions_to_ask.length})</summary>
+          <ul>${a.questions_to_ask.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>
+        </details>
+      ` : ""}
+
+      ${a.call_script ? `
+        <details class="admin-chez__analysis-section">
+          <summary>Call script</summary>
+          <pre>${escapeHtml(a.call_script)}</pre>
+        </details>
+      ` : ""}
+
+      <div class="admin-chez__candidates">
+        <header>
+          <h4>Vendors to call · ${allCandidates.length}</h4>
+          ${recommendedCount > 0 ? `<button type="button" class="admin-button admin-button--primary admin-button--small" data-action="package-send">Package & send ${recommendedCount} to homeowner</button>` : ""}
+        </header>
+        ${allCandidates.length === 0 ? `<p class="admin-muted">No vendor candidates pre-researched. Use Manual proposal below.</p>` : ""}
+        ${allCandidates.map((v, i) => renderVendorCandidateCardHtml(req, v, i, callState[vendorCandidateKey(v)] || null)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function vendorCandidateKey(v) {
+  return v._source === "existing" ? `existing:${v.id}` : `places:${v.name}`;
+}
+
+function renderVendorCandidateCardHtml(req, v, idx, callData) {
+  const key = vendorCandidateKey(v);
+  const isExpanded = state.chezExpandedVendorKeys?.[req.id]?.[key];
+  const isExisting = v._source === "existing";
+  const name = v.company_name || v.name || "(unnamed)";
+  const phone = v.phone || v.formatted_phone_number || "";
+  const cleanedPhone = String(phone).replace(/[^0-9+]/g, "");
+  const ratingChip = v.rating ? `${v.rating}★ (${v.user_ratings_total || v.review_count || "?"})` : "";
+  const recommended = !!callData?.recommended;
+  const noAnswer = callData?.outcome === "no_answer";
+
+  const callForm = isExpanded ? `
+    <div class="admin-chez__vendor-call-form">
+      <div class="admin-chez__vendor-call-grid">
+        <label>Outcome
+          <select data-vendor-field="outcome">
+            <option value="">— select —</option>
+            <option value="answered" ${callData?.outcome === "answered" ? "selected" : ""}>Answered</option>
+            <option value="no_answer" ${callData?.outcome === "no_answer" ? "selected" : ""}>No answer / VM</option>
+            <option value="not_a_fit" ${callData?.outcome === "not_a_fit" ? "selected" : ""}>Not a fit</option>
+          </select>
+        </label>
+        <label>Earliest availability
+          <input type="text" data-vendor-field="availability" value="${escapeHtml(callData?.availability || "")}" placeholder="e.g. Tue, May 12" />
+        </label>
+        <label>Cost estimate (optional)
+          <input type="text" data-vendor-field="estimated_cost" value="${escapeHtml(callData?.estimated_cost || "")}" placeholder="e.g. $400, $$, range" />
+        </label>
+        <label>Cost detail (optional)
+          <input type="text" data-vendor-field="cost_detail" value="${escapeHtml(callData?.cost_detail || "")}" placeholder="e.g. site visit needed" />
+        </label>
+      </div>
+      <label>Notes
+        <textarea rows="2" data-vendor-field="notes" placeholder="What did they say? Anything quirky?">${escapeHtml(callData?.notes || "")}</textarea>
+      </label>
+      <label class="admin-chez__vendor-rationale">
+        <span>Framing for homeowner — what to say in the proposal card
+          <button type="button" class="admin-chez__proposal-ai-suggest" data-vendor-suggest>✨ Suggest</button>
+        </span>
+        <textarea rows="2" data-vendor-field="rationale" placeholder="Why this vendor fits this specific homeowner.">${escapeHtml(callData?.rationale || "")}</textarea>
+      </label>
+      <div class="admin-chez__vendor-call-actions">
+        <label class="admin-chez__vendor-recommend">
+          <input type="checkbox" data-vendor-field="recommended" ${recommended ? "checked" : ""} />
+          <span>✅ Recommend to homeowner</span>
+        </label>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="collapse-vendor">Done editing</button>
+      </div>
+    </div>
+  ` : "";
+
+  return `
+    <article class="admin-chez__vendor-card${recommended ? " is-recommended" : ""}${noAnswer ? " is-noanswer" : ""}" data-vendor-key="${escapeHtml(key)}">
+      <header class="admin-chez__vendor-card-head">
+        <div class="admin-chez__vendor-card-title">
+          <strong>${idx + 1}. ${escapeHtml(name)}</strong>
+          ${isExisting ? `<span class="admin-pill admin-pill--note">In your network</span>` : ""}
+          ${recommended ? `<span class="admin-pill" data-tone="green">Recommended</span>` : ""}
+          ${callData?.outcome === "no_answer" ? `<span class="admin-pill" data-tone="amber">No answer</span>` : ""}
+          ${callData?.outcome === "not_a_fit" ? `<span class="admin-pill" data-tone="muted">Not a fit</span>` : ""}
+        </div>
+        <div class="admin-chez__vendor-card-meta">
+          ${ratingChip ? `<span>${escapeHtml(ratingChip)}</span>` : ""}
+          ${v.address || v.city || v.formatted_address ? `<span class="admin-muted">${escapeHtml(v.address || v.formatted_address || v.city || "")}</span>` : ""}
+        </div>
+      </header>
+      <div class="admin-chez__vendor-card-actions">
+        ${cleanedPhone ? `<a class="admin-button admin-button--primary admin-button--small" href="tel:${escapeHtml(cleanedPhone)}">📞 ${escapeHtml(phone)}</a>` : ""}
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="${isExpanded ? "collapse-vendor" : "expand-vendor"}">
+          ${isExpanded ? "Hide form" : (callData ? "Edit notes" : "Log this call")}
+        </button>
+      </div>
+      ${callForm}
+    </article>
+  `;
+}
+
+async function runChezAnalysis(requestId, force = false) {
+  state.chezAnalysisByRequest = state.chezAnalysisByRequest || {};
+  state.chezAnalysisInFlight = state.chezAnalysisInFlight || new Set();
+  if (state.chezAnalysisInFlight.has(requestId)) return;
+  if (!force && state.chezAnalysisByRequest[requestId] !== undefined) return;
+  state.chezAnalysisInFlight.add(requestId);
+  if (force) {
+    delete state.chezAnalysisByRequest[requestId];
+    if (state.selectedChezRequest && state.selectedChezRequest.id === requestId) {
+      renderFocusedChezDetail(state.selectedChezRequest);
+    }
+  }
+  try {
+    const result = await callChezConcierge({
+      action: "analyze_request",
+      request_id: requestId,
+    });
+    state.chezAnalysisByRequest[requestId] = result;
+  } catch (e) {
+    console.warn("[admin] analyze_request failed", e);
+    state.chezAnalysisByRequest[requestId] = null;
+  } finally {
+    state.chezAnalysisInFlight.delete(requestId);
+  }
+  if (state.selectedChezRequest && state.selectedChezRequest.id === requestId) {
+    renderFocusedChezDetail(state.selectedChezRequest);
+  }
 }
 
 // Phase 80.1 — Profile summary shown at the top of every focused chez
@@ -5767,6 +6030,218 @@ function attachChezPanelHandlers(req) {
       const entity = btn.dataset.dossierEntity;
       const id = btn.dataset.dossierId;
       openDossierDrawer(req.household_id, entity, id);
+    });
+  });
+
+  // Phase 81.1 — vendor candidate cards in the AI analysis panel.
+  el.auditFocused.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      const action = btn.dataset.action;
+      if (action === "open-profile-drawer") {
+        openHouseholdProfileDrawer(req.household_id);
+      } else if (action === "rerun-analysis") {
+        runChezAnalysis(req.id, true);
+        renderFocusedChezDetail(req);
+      } else if (action === "expand-vendor" || action === "collapse-vendor") {
+        const card = btn.closest("[data-vendor-key]");
+        if (!card) return;
+        const key = card.getAttribute("data-vendor-key");
+        state.chezExpandedVendorKeys = state.chezExpandedVendorKeys || {};
+        state.chezExpandedVendorKeys[req.id] = state.chezExpandedVendorKeys[req.id] || {};
+        state.chezExpandedVendorKeys[req.id][key] = action === "expand-vendor";
+        renderFocusedChezDetail(req);
+      } else if (action === "package-send") {
+        await packageAndSendRecommendedVendors(req);
+      }
+    });
+  });
+
+  // Vendor call-form field bindings — write to in-memory state on
+  // change so the UI keeps current data without round-tripping
+  // through the server. Persisted only when the user clicks
+  // "Package & send" (or could be persisted to local storage if
+  // we want survive refresh; for now memory is enough).
+  el.auditFocused.querySelectorAll("[data-vendor-field]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const card = input.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+      state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+      const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+      const field = input.dataset.vendorField;
+      if (input.type === "checkbox") slot[field] = input.checked;
+      else slot[field] = input.value;
+      // Refresh just enough to update the recommended pill + count
+      // without redrawing from scratch (keeps focus in the input).
+      const cardHeader = card.querySelector(".admin-chez__vendor-card-head");
+      if (field === "recommended" && cardHeader) {
+        // Re-render the whole panel to update Package & send count.
+        renderFocusedChezDetail(req);
+      }
+    });
+  });
+
+  // "✨ Suggest" framing button per vendor card.
+  el.auditFocused.querySelectorAll("[data-vendor-suggest]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const card = btn.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      const cached = state.chezAnalysisByRequest?.[req.id];
+      if (!cached) return;
+      const allCandidates = [
+        ...(cached.existing_vendors || []).map((v) => ({ ...v, _source: "existing" })),
+        ...(cached.places_candidates || []).map((v) => ({ ...v, _source: "places" })),
+      ];
+      const v = allCandidates.find((cand) => vendorCandidateKey(cand) === key);
+      if (!v) return;
+      btn.disabled = true; btn.textContent = "Thinking…";
+      try {
+        const dossier = (state.chezDossiersByHousehold || {})[req.household_id] || {};
+        const profile = dossier.profile || {};
+        const property = (dossier.properties || [])[0];
+        const propertyContext = property
+          ? `${property.year_built ? property.year_built + " " : ""}${property.property_type || "home"} in ${property.city || ""}, ${property.state || ""}`
+          : "";
+        const result = await callChezConcierge({
+          action: "suggest_vendor_framing",
+          household_id: req.household_id,
+          request_summary: req.summary,
+          request_category: req.category,
+          vendor: {
+            name: v.company_name || v.name,
+            category: v.category,
+            rating: v.rating,
+            review_count: v.user_ratings_total || v.review_count,
+          },
+          homeowner_about: profile.about_us,
+          property_context: propertyContext,
+        });
+        if (result.framing) {
+          state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+          state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+          const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+          slot.rationale = result.framing;
+          renderFocusedChezDetail(req);
+        }
+      } catch (err) {
+        console.warn("[admin] suggest framing failed", err);
+      } finally {
+        btn.disabled = false; btn.textContent = "✨ Suggest";
+      }
+    });
+  });
+}
+
+// Phase 81.1 — Package recommended vendors and send each as a
+// proposal message. One click → all recommended vendors land in
+// the homeowner's thread as separate Approve/Counter/Decline cards.
+async function packageAndSendRecommendedVendors(req) {
+  const callState = state.chezVendorCallsByRequest?.[req.id] || {};
+  const cached = state.chezAnalysisByRequest?.[req.id];
+  if (!cached) {
+    alert("Run analysis first.");
+    return;
+  }
+  const allCandidates = [
+    ...(cached.existing_vendors || []).map((v) => ({ ...v, _source: "existing" })),
+    ...(cached.places_candidates || []).map((v) => ({ ...v, _source: "places" })),
+  ];
+  const recommended = [];
+  for (const v of allCandidates) {
+    const key = vendorCandidateKey(v);
+    const data = callState[key];
+    if (data && data.recommended) {
+      recommended.push({ vendor: v, data });
+    }
+  }
+  if (recommended.length === 0) {
+    alert("Mark at least one vendor as Recommended first.");
+    return;
+  }
+  const introText = recommended.length > 1
+    ? `Here are ${recommended.length} options for you. Tap Approve on whichever fits — Chez handles the rest.`
+    : "Chez found a vendor for you. Tap Approve to move forward.";
+  if (!confirm(`Send ${recommended.length} proposal${recommended.length > 1 ? "s" : ""} to the homeowner?`)) return;
+
+  try {
+    for (let i = 0; i < recommended.length; i++) {
+      const { vendor, data } = recommended[i];
+      const proposal = {
+        kind: "vendor",
+        vendor: {
+          name: vendor.company_name || vendor.name,
+          phone: vendor.phone || vendor.formatted_phone_number,
+          rating: vendor.rating,
+          review_count: vendor.user_ratings_total || vendor.review_count,
+          estimated_cost: data.estimated_cost ? (Number.isFinite(Number(data.estimated_cost)) ? Number(data.estimated_cost) : undefined) : undefined,
+          estimated_window: data.availability,
+          rationale: data.rationale,
+        },
+      };
+      // Strip undefined / empty so the card renders cleanly.
+      Object.keys(proposal.vendor).forEach((k) => {
+        if (proposal.vendor[k] === undefined || proposal.vendor[k] === "") delete proposal.vendor[k];
+      });
+      await callChezConcierge({
+        action: "propose",
+        request_id: req.id,
+        proposal,
+        content: i === 0 ? introText : "",
+      });
+    }
+    // Clear the in-memory call state so the user starts fresh after
+    // sending. Keep the analysis cached.
+    if (state.chezVendorCallsByRequest) delete state.chezVendorCallsByRequest[req.id];
+    await loadAdminData();
+    await loadChezMessages(req.id);
+    const refreshed = state.chezRequests.find((r) => r.id === req.id);
+    if (refreshed) state.selectedChezRequest = refreshed;
+    renderChezRequestsView();
+  } catch (err) {
+    console.warn("[admin] package & send failed", err);
+    alert(`Send failed: ${err.message || err}`);
+  }
+}
+
+// Phase 81.1 — Slide-in profile drawer that contains the full
+// household dossier. Replaces the inline-flooded version with a
+// browse-on-demand pattern.
+function openHouseholdProfileDrawer(householdId) {
+  document.querySelector("[data-household-profile-drawer]")?.remove();
+  const dossier = (state.chezDossiersByHousehold || {})[householdId];
+  if (!dossier) {
+    alert("Homeowner data still loading. Try again in a moment.");
+    return;
+  }
+  const drawer = document.createElement("div");
+  drawer.className = "admin-chez__dossier-drawer admin-chez__dossier-drawer--profile";
+  drawer.setAttribute("data-household-profile-drawer", "");
+  drawer.innerHTML = `
+    <div class="admin-chez__dossier-drawer-backdrop" data-drawer-close></div>
+    <aside class="admin-chez__dossier-drawer-panel admin-chez__dossier-drawer-panel--wide">
+      <header>
+        <div>
+          <span class="admin-muted">Homeowner profile</span>
+          <h2>${escapeHtml(primaryHomeownerLabel(dossier))}</h2>
+        </div>
+        <button type="button" data-drawer-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-chez__dossier-drawer-body">
+        ${renderHouseholdDossierHtml(dossier)}
+      </div>
+    </aside>
+  `;
+  document.body.appendChild(drawer);
+  drawer.querySelectorAll("[data-drawer-close]").forEach((b) => b.addEventListener("click", () => drawer.remove()));
+  // Re-bind dossier chips inside the drawer to open the deeper
+  // entity drilldown drawer.
+  drawer.querySelectorAll("[data-dossier-entity]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const entity = btn.dataset.dossierEntity;
+      const id = btn.dataset.dossierId;
+      openDossierDrawer(householdId, entity, id);
     });
   });
 }
