@@ -5563,14 +5563,30 @@ function chezSystemEmoji(cat) {
 }
 
 function renderConciergeVendorsListHtml(dossier) {
-  return (dossier.contractors || []).slice(0, 8).map((c) => {
+  // Phase 83.3 — Sort Chez-sourced contractors first so the operator sees
+  // "we got them this vendor" at the top of the list. The salmon "Sourced
+  // by Chez" badge marks our work in their household.
+  const contractors = (dossier.contractors || []).slice().sort((a, b) => {
+    const aChez = a.chez_recommended_at ? new Date(a.chez_recommended_at).getTime() : 0;
+    const bChez = b.chez_recommended_at ? new Date(b.chez_recommended_at).getTime() : 0;
+    if (aChez !== bChez) return bChez - aChez;
+    return 0;
+  });
+  return contractors.slice(0, 8).map((c) => {
     const initials = (c.company_name || "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
     const rating = c.rating ? `★ ${Number(c.rating).toFixed(1)}` : "";
+    const isChezSourced = !!c.chez_recommended_at;
+    const sourcedTitle = isChezSourced
+      ? `Sourced by Chez ${formatDateOnly(c.chez_recommended_at)}`
+      : "";
     return `
       <button type="button" class="cockpit-row cockpit-row--clickable" data-cockpit-dossier-entity="contractor" data-cockpit-dossier-id="${escapeHtml(c.id)}">
         <span class="cockpit-avatar cockpit-avatar--md cockpit-avatar--vendor">${escapeHtml(initials)}</span>
         <div class="cockpit-row__main">
-          <div class="cockpit-row__title">${escapeHtml(c.company_name || "(unnamed)")}</div>
+          <div class="cockpit-row__title">
+            ${escapeHtml(c.company_name || "(unnamed)")}
+            ${isChezSourced ? `<span class="cockpit-pill cockpit-pill--salmon cockpit-pill--xs" title="${escapeHtml(sourcedTitle)}">Chez</span>` : ""}
+          </div>
           <div class="cockpit-row__sub">${escapeHtml((c.category || "—") + (c.last_engaged ? " · " + relativeTimeString(c.last_engaged) : ""))}</div>
         </div>
         ${rating ? `<span class="cockpit-row__meta">${escapeHtml(rating)}</span>` : ""}
@@ -6316,81 +6332,262 @@ function renderConciergeAlfredSidebarHtml(req) {
   `;
 }
 
-function renderConciergeAlfredActionsHtml(req, dossier) {
+// Phase 83.3 — Lifecycle-aware case progression. The "Resolve this case"
+// card and Quick actions list now mirror the actual stage tracker so the
+// operator sees only what's left to do, not what's already done. The
+// goal is "completed visit" — get the homeowner what they asked for.
+function computeConciergeCaseProgression(req, dossier) {
   const cached = state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id];
   const candidates = cached ? [
     ...((cached.existing_vendors || []).map((v) => ({ ...v, _source: "existing" }))),
     ...((cached.places_candidates || []).map((v) => ({ ...v, _source: "places" }))),
   ].map((v) => ({ ...v, _fit: computeChezVendorFit(v) }))
     .sort((a, b) => b._fit - a._fit) : [];
-  const top3 = candidates.slice(0, 3);
   const callState = (state.chezVendorCallsByRequest && state.chezVendorCallsByRequest[req.id]) || {};
+  const callsLogged = Object.values(callState).filter((s) => s && s.outcome).length;
   const recommendedCount = Object.values(callState).filter((s) => s && s.recommended).length;
+  const messages = state.chezMessages[req.id] || [];
+  const vendorProposals = messages.filter((m) => m.proposal && m.proposal.kind === "vendor");
+  const proposalsSent = vendorProposals.length > 0;
+  const anyApproved = vendorProposals.some((m) => m.proposal.status === "approved");
+  const visits = (state.chezVisitsByRequest || {})[req.id] || [];
+  const livingVisits = visits.filter((v) => v.state !== "cancelled");
+  const visitScheduled = livingVisits.some((v) => v.state === "scheduled");
+  const visitComplete = livingVisits.length > 0 && livingVisits.every((v) => v.state === "completed");
+  const isResolved = req.status === "resolved";
+  // Find the first vendor that's been called but not recommended yet —
+  // that's the natural "next call to log" candidate.
+  const nextUncalledIdx = candidates.findIndex((v) => {
+    const cd = callState[vendorCandidateKey(v)];
+    return !cd || !cd.outcome;
+  });
+  const topVendor = candidates[0];
+
+  return {
+    candidates,
+    topVendor,
+    callsLogged,
+    recommendedCount,
+    proposalsSent,
+    anyApproved,
+    visits,
+    livingVisits,
+    visitScheduled,
+    visitComplete,
+    isResolved,
+    nextUncalledIdx,
+    hasResearch: !!cached && (candidates.length > 0),
+    sentCount: vendorProposals.length,
+    approvedCount: vendorProposals.filter((m) => m.proposal.status === "approved").length,
+  };
+}
+
+function renderConciergeAlfredActionsHtml(req, dossier) {
+  const p = computeConciergeCaseProgression(req, dossier);
+
+  // Build the lifecycle: 8 stages, each with a label + done flag + the
+  // primary action that progresses the case past that stage. We render
+  // ONLY the not-yet-done steps (max 4) so the operator sees what's left,
+  // not a list of work they already did.
+  const allSteps = [
+    {
+      id: "research",
+      label: p.hasResearch
+        ? `Researched ${p.candidates.length} vendor${p.candidates.length === 1 ? "" : "s"}`
+        : "Run vendor research to pull candidates",
+      done: p.hasResearch,
+      action: "rerun-analysis",
+    },
+    {
+      id: "calls",
+      label: p.callsLogged === 0
+        ? `Call vendors and log notes (${Math.min(3, p.candidates.length)} recommended)`
+        : p.callsLogged < Math.min(3, p.candidates.length)
+        ? `Log ${Math.min(3, p.candidates.length) - p.callsLogged} more call${Math.min(3, p.candidates.length) - p.callsLogged === 1 ? "" : "s"}`
+        : `Logged ${p.callsLogged} calls`,
+      done: p.callsLogged >= Math.min(3, Math.max(1, p.candidates.length)),
+      action: p.nextUncalledIdx >= 0 ? "alfred-resolve-open-top" : "alfred-resolve-open-top",
+    },
+    {
+      id: "recommend",
+      label: p.recommendedCount === 0
+        ? "Mark the strongest as Recommended"
+        : `${p.recommendedCount} vendor${p.recommendedCount === 1 ? "" : "s"} marked Recommended`,
+      done: p.recommendedCount > 0,
+      action: "alfred-resolve-open-top",
+    },
+    {
+      id: "send",
+      label: !p.proposalsSent
+        ? `Send ${p.recommendedCount > 0 ? p.recommendedCount + " " : ""}proposal${p.recommendedCount === 1 ? "" : "s"} to the homeowner`
+        : `Sent ${p.sentCount} proposal${p.sentCount === 1 ? "" : "s"}`,
+      done: p.proposalsSent,
+      action: p.recommendedCount > 0 ? "alfred-resolve-with-proposal" : "open-proposal-builder",
+    },
+    {
+      id: "picked",
+      label: !p.anyApproved
+        ? "Wait for homeowner to pick a vendor"
+        : `Homeowner picked ${p.livingVisits[0]?.vendor_name || "a vendor"}`,
+      done: p.anyApproved,
+      action: !p.anyApproved && p.proposalsSent ? "send-checkin-reminder" : null,
+    },
+    {
+      id: "scheduled",
+      label: !p.visitScheduled && !p.visitComplete
+        ? `Confirm visit date${p.livingVisits[0]?.vendor_name ? ` with ${p.livingVisits[0].vendor_name}` : ""}`
+        : "Visit booked",
+      done: p.visitScheduled || p.visitComplete,
+      action: p.anyApproved && !p.visitScheduled ? "scroll-to-visits" : null,
+    },
+    {
+      id: "complete",
+      label: !p.visitComplete
+        ? "After the visit, mark it completed"
+        : "Visit completed — work done",
+      done: p.visitComplete,
+      action: p.visitScheduled ? "scroll-to-visits" : null,
+    },
+    {
+      id: "resolved",
+      label: !p.isResolved ? "Mark case resolved" : "Case resolved",
+      done: p.isResolved,
+      action: p.visitComplete ? "resolved" : null,
+    },
+  ];
+
+  // Show: any not-done steps, plus one trailing done step for context.
+  const remainingSteps = allSteps.filter((s) => !s.done);
+  const visibleSteps = remainingSteps.slice(0, 4);
+
+  // Headline + primary CTA reflect the most pressing next action.
+  let headline = "";
+  let ctaLabel = "";
+  let ctaAction = "";
+
+  if (p.isResolved) {
+    headline = `Case resolved. <span class="cockpit-muted">Reopen if the homeowner needs more help.</span>`;
+    ctaLabel = "Reopen";
+    ctaAction = "reopen";
+  } else if (p.visitComplete) {
+    headline = `Visit completed. <span class="cockpit-muted">Wrap up — mark resolved so this drops off your queue.</span>`;
+    ctaLabel = "Mark resolved";
+    ctaAction = "resolved";
+  } else if (p.visitScheduled) {
+    const when = p.livingVisits.find((v) => v.state === "scheduled")?.scheduled_for;
+    const whenLabel = when ? formatSlotDisplay(when) : "the booked date";
+    headline = `Visit scheduled for ${escapeHtml(whenLabel)}. <span class="cockpit-muted">Mark completed once the visit is done.</span>`;
+    ctaLabel = "Open visit card";
+    ctaAction = "scroll-to-visits";
+  } else if (p.anyApproved) {
+    const vendor = p.livingVisits[0]?.vendor_name || "the vendor";
+    headline = `Homeowner picked ${escapeHtml(vendor)}. <span class="cockpit-muted">Confirm a date with them and mark scheduled.</span>`;
+    ctaLabel = "Confirm visit date";
+    ctaAction = "scroll-to-visits";
+  } else if (p.proposalsSent) {
+    headline = `${p.sentCount} proposal${p.sentCount === 1 ? "" : "s"} out. <span class="cockpit-muted">Waiting on the homeowner to pick — send a check-in note if it stalls.</span>`;
+    ctaLabel = "Send a check-in";
+    ctaAction = "draft-from-brief";
+  } else if (p.recommendedCount > 0) {
+    headline = `${p.recommendedCount} vendor${p.recommendedCount === 1 ? " is" : "s are"} ready to send. <span class="cockpit-muted">One click drafts the proposal and queues your approval.</span>`;
+    ctaLabel = "Open proposal builder";
+    ctaAction = "alfred-resolve-with-proposal";
+  } else if (p.callsLogged > 0) {
+    headline = `${p.callsLogged} call${p.callsLogged === 1 ? "" : "s"} logged. <span class="cockpit-muted">Mark the strongest as Recommended to send.</span>`;
+    ctaLabel = "Open #" + ((p.nextUncalledIdx >= 0 ? p.nextUncalledIdx : 0) + 1) + "'s form";
+    ctaAction = "alfred-resolve-open-top";
+  } else if (p.candidates.length > 0) {
+    const v = p.topVendor;
+    const vname = v?.company_name || v?.name || "top match";
+    headline = `${p.candidates.length} candidates ready. <span class="cockpit-muted">Call ${escapeHtml(vname)} first — they're the best fit.</span>`;
+    ctaLabel = "Open " + escapeForHtml(vname.split(" ")[0]) + "'s call form";
+    ctaAction = "alfred-resolve-open-top";
+  } else {
+    headline = `Coordinate this end-to-end. <span class="cockpit-muted">Source vendors, log calls, send the proposal, track the visit.</span>`;
+    ctaLabel = "Run vendor research";
+    ctaAction = "rerun-analysis";
+  }
+
+  // Quick actions also adapt to the case stage. The list becomes more
+  // useful by surfacing only actions that matter at the current step.
+  const quickActions = [];
+  if (!p.hasResearch) {
+    quickActions.push({ label: "Run vendor research", sub: "Pull existing-network + local Places candidates", action: "rerun-analysis" });
+  }
+  if (p.candidates.length > 0 && p.callsLogged < p.candidates.length) {
+    quickActions.push({ label: "Open next vendor's call form", sub: "Voice the call — Alfred polishes the framing", action: "alfred-resolve-open-top" });
+  }
+  if (p.recommendedCount > 0 && !p.proposalsSent) {
+    quickActions.push({ label: "Send recommended vendors", sub: `Drafts ${p.recommendedCount} Approve/Counter/Decline card${p.recommendedCount === 1 ? "" : "s"}`, action: "alfred-resolve-with-proposal" });
+  }
+  if (p.proposalsSent && !p.anyApproved) {
+    quickActions.push({ label: "Send a warm check-in", sub: "Pre-fills the composer with a nudge", action: "draft-from-brief" });
+  }
+  if (p.anyApproved && !p.visitScheduled) {
+    quickActions.push({ label: "Confirm visit date", sub: "Open the visit card and pick a date/time", action: "scroll-to-visits" });
+  }
+  if (p.visitScheduled && !p.visitComplete) {
+    quickActions.push({ label: "Mark visit completed", sub: "Stamp the outcome and close the loop", action: "scroll-to-visits" });
+  }
+  if (p.visitComplete && !p.isResolved) {
+    quickActions.push({ label: "Mark case resolved", sub: "Drops this off your queue", action: "resolved" });
+  }
+  // Always-available utilities at the end.
+  quickActions.push({ label: "Mark waiting on customer", sub: "Pause SLA until they reply", action: "waiting" });
+  quickActions.push({ label: "Snooze this case", sub: "Resurface later — tracked as a system note", action: "snooze" });
+  if (p.hasResearch) {
+    quickActions.push({ label: "Re-run AI analysis", sub: "Refresh brief + vendor candidates", action: "rerun-analysis" });
+  }
+
+  // Memory provenance: how many vendors Chez has sourced for this
+  // homeowner historically. Pulled from the dossier's contractors with
+  // chez_recommended_at set. Surfaces "we've been good to them" at a
+  // glance.
+  const chezSourced = (dossier?.contractors || []).filter((c) => c.chez_recommended_at);
+  const memoryNote = chezSourced.length
+    ? `${chezSourced.length} vendor${chezSourced.length === 1 ? "" : "s"} sourced by Chez for this household — saved to their profile.`
+    : "First case for this household — picks here become their permanent vendors.";
+
   const sourcesUsed = [
     "request thread",
     "homeowner profile",
     `${dossier?.home_systems?.length || 0} systems`,
     `${dossier?.contractors?.length || 0} vendors`,
     `${dossier?.routines?.length || 0} routines`,
-    candidates.length ? `${candidates.length} vendor candidates` : null,
+    p.candidates.length ? `${p.candidates.length} vendor candidates` : null,
+    p.visits.length ? `${p.visits.length} visit${p.visits.length === 1 ? "" : "s"} on the calendar` : null,
   ].filter(Boolean).join(" · ");
 
-  // The one-shot card adapts its plan to the current case state. If we have
-  // candidates but no recommendations, the plan prepares them. If we have
-  // recommendations, the plan sends them.
-  const planSteps = recommendedCount > 0 ? [
-    `Open the proposal builder with your ${recommendedCount} recommended vendor${recommendedCount === 1 ? "" : "s"}.`,
-    "Send the proposal — homeowner gets Approve/Counter/Decline cards.",
-    "Set status to waiting on customer.",
-    "Watch for the homeowner's pick — Visits panel auto-creates on approve.",
-  ] : top3.length > 0 ? [
-    `Pull up vendor #1 (${top3[0]?.company_name || top3[0]?.name || "top match"}) — log the call.`,
-    "Mark as Recommended once you've spoken to them.",
-    "Repeat for #2 and #3 to give the homeowner choices.",
-    "Click Send proposal — homeowner sees side-by-side cards.",
-  ] : [
-    "Run vendor research to pull existing-network + local Places candidates.",
-    "Call the top 2-3 by AI fit — log notes in their call form.",
-    "Mark the strongest as Recommended.",
-    "Send the proposal to the homeowner.",
-  ];
-
-  const oneShotCta = recommendedCount > 0 ? "Open proposal builder" : top3.length > 0 ? "Open call form for #1" : "Run vendor research";
-  const oneShotAction = recommendedCount > 0 ? "alfred-resolve-with-proposal"
-    : top3.length > 0 ? "alfred-resolve-open-top"
-    : "rerun-analysis";
-
   return `
-    <div class="cockpit-resolve">
+    <div class="cockpit-resolve ${p.isResolved ? "is-resolved" : p.visitComplete ? "is-complete" : ""}">
       <div class="cockpit-resolve__head">
         <span class="cockpit-spark cockpit-spark--sm">✦</span>
-        <span class="cockpit-resolve__eyebrow">Resolve this case</span>
+        <span class="cockpit-resolve__eyebrow">${p.isResolved ? "Case resolved" : "Resolve this case"}</span>
       </div>
-      <div class="cockpit-resolve__headline">
-        ${recommendedCount > 0
-          ? `${recommendedCount} vendor${recommendedCount === 1 ? " is" : "s are"} ready to send. <span class="cockpit-muted">One click drafts the proposal and queues your approval.</span>`
-          : `Coordinate this end-to-end. <span class="cockpit-muted">Call the best-fit vendors, log outcomes, draft the proposal, queue your approval.</span>`}
-      </div>
-      <div class="cockpit-resolve__steps">
-        ${planSteps.map((s, i) => `
-          <div class="cockpit-resolve__step">
-            <span class="cockpit-resolve__step-num">${i + 1}</span>
-            <span class="cockpit-resolve__step-text">${escapeHtml(s)}</span>
-          </div>
-        `).join("")}
-      </div>
-      <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--full" data-cockpit-action="${escapeHtml(oneShotAction)}">
-        <span class="cockpit-spark cockpit-spark--sm" style="color:#fff;">✦</span>${escapeHtml(oneShotCta)}
+      <div class="cockpit-resolve__headline">${headline}</div>
+      ${visibleSteps.length > 0 ? `
+        <div class="cockpit-resolve__steps">
+          ${visibleSteps.map((s, i) => `
+            <div class="cockpit-resolve__step">
+              <span class="cockpit-resolve__step-num">${i + 1}</span>
+              <span class="cockpit-resolve__step-text">${escapeHtml(s.label)}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+      <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--full" data-cockpit-action="${escapeHtml(ctaAction)}">
+        <span class="cockpit-spark cockpit-spark--sm" style="color:#fff;">✦</span>${ctaLabel}
       </button>
     </div>
 
     <div class="cockpit-eyebrow cockpit-eyebrow--space">Quick actions</div>
     <div class="cockpit-actions">
-      ${renderConciergeActionRow("Draft a warm reply", "Pre-fills the composer + shows tone QA", "draft-from-brief")}
-      ${renderConciergeActionRow("Open proposal builder", "Multi-vendor + dates + cost in one form", "open-proposal-builder")}
-      ${renderConciergeActionRow("Mark waiting on customer", "Pause SLA until they reply", "waiting")}
-      ${renderConciergeActionRow("Snooze this case", "Resurface later — tracked as a system note", "snooze")}
-      ${renderConciergeActionRow("Re-run AI analysis", "Refresh case brief + vendor candidates", "rerun-analysis")}
+      ${quickActions.map((a) => renderConciergeActionRow(a.label, a.sub, a.action)).join("")}
+    </div>
+
+    <div class="cockpit-context-box">
+      <div class="cockpit-context-box__eyebrow">Memory · what Chez remembers</div>
+      <div class="cockpit-context-box__body">${escapeHtml(memoryNote)}</div>
     </div>
 
     <div class="cockpit-context-box">
@@ -6399,6 +6596,11 @@ function renderConciergeAlfredActionsHtml(req, dossier) {
     </div>
   `;
 }
+
+// Inline-safe HTML escape variant (the global `escapeHtml` returns a
+// string; this is a pass-through so the template-literal wrapper reads
+// uniformly when interpolating already-escaped pieces).
+function escapeForHtml(s) { return escapeHtml(String(s ?? "")); }
 
 function renderConciergeActionRow(label, sub, action) {
   return `
@@ -6876,6 +7078,40 @@ async function handleConciergeAction(action, req, btn) {
     case "open-proposal-builder":
       startProposalFlow(req);
       return;
+
+    case "scroll-to-visits": {
+      // Jump the workspace to the active visits panel and pulse the first
+      // active card so the operator's eye lands on what they need to do.
+      const host = el.conciergeHost;
+      const target = host?.querySelector(".admin-chez__visits .admin-chez__visit-card") || host?.querySelector(".admin-chez__visits");
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.add("is-pulsing");
+        setTimeout(() => target.classList.remove("is-pulsing"), 1500);
+      }
+      return;
+    }
+
+    case "send-checkin-reminder": {
+      // Pre-fill the composer with a soft check-in nudge so the operator
+      // can send "haven't heard back, want to push?" with one click.
+      const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+      const first = dossier ? primaryHomeownerLabel(dossier).split(" ")[0] : "there";
+      const tone = state.concierge.composer?.[req.id]?.tone || "warm";
+      const drafts = {
+        warm: `Hi ${first} — just making sure my proposal landed. Happy to walk through any of the options on the phone if it'd help. No rush; let me know whenever you're ready.`,
+        direct: `${first} — quick check on the proposal I sent. Any of the options work, or want me to dig further?`,
+        formal: `Hello ${first}, following up on the proposal sent earlier. Please let me know which option you'd like to pursue, or if any modifications would be helpful.`,
+      };
+      state.concierge.composer = state.concierge.composer || {};
+      state.concierge.composer[req.id] = { draft: drafts[tone] || drafts.warm, tone, critique: assessConciergeReplyTone(drafts[tone] || drafts.warm, tone) };
+      // Focus the composer input on the next paint.
+      renderConciergeCockpit();
+      requestAnimationFrame(() => {
+        el.conciergeHost?.querySelector("[data-cockpit-reply-input]")?.focus();
+      });
+      return;
+    }
 
     case "alfred-resolve-with-proposal":
       // One-click: open the proposal builder pre-loaded with the

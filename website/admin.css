@@ -9530,3 +9530,34 @@ details.admin-chez__analysis-section pre {
   gap: 4px;
   flex-wrap: wrap;
 }
+
+/* Phase 83.3 — pulse the visit card when the cockpit jumps to it via
+   the "Confirm visit date" / "Mark completed" CTAs in the Resolve plan. */
+@keyframes cockpit-visit-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(237, 105, 85, 0); }
+  35%  { box-shadow: 0 0 0 6px rgba(237, 105, 85, 0.32); }
+  100% { box-shadow: 0 0 0 0 rgba(237, 105, 85, 0); }
+}
+.admin-chez__visit-card.is-pulsing,
+.admin-chez__visits.is-pulsing {
+  animation: cockpit-visit-pulse 1.5s ease-out 1;
+  border-radius: 12px;
+}
+
+/* Resolve card adapts to the case stage. Subtle visual nod when the
+   case is fully resolved (de-emphasized) or visit complete (success
+   tinted). */
+.cockpit-resolve.is-resolved {
+  opacity: 0.9;
+  background: linear-gradient(135deg, #F2EFF8, #FFFFFF);
+  border-color: var(--indigo-100, #E8E4F2);
+}
+.cockpit-resolve.is-complete {
+  background: linear-gradient(135deg, #EDF6EF, #FFFFFF);
+  border-color: rgba(74, 124, 89, 0.32);
+}
+.cockpit-resolve.is-complete .cockpit-resolve__eyebrow,
+.cockpit-resolve.is-complete .cockpit-resolve__step-num {
+  color: var(--success, #4A7C59);
+  border-color: var(--success, #4A7C59);
+}

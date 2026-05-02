@@ -1344,6 +1344,12 @@ async function handleDecideProposal(
   // chez_visits row so the case shifts from "research" to "track this
   // visit through completion." Defensive: only create if one doesn't
   // already exist for this proposal message (idempotent).
+  //
+  // Phase 83.3 — Also persist the vendor to the household's contractor
+  // catalog, with `chez_request_id` + `chez_recommended_at` provenance.
+  // This is the "memory" layer Tom asked for: once a homeowner picks one
+  // of our recommendations, that vendor lives in their household forever
+  // (iOS Contacts directory, Vendor Coverage, future-case matching).
   if (decision === "approved") {
     const propBlob = (message.proposal as Record<string, unknown>) ?? {};
     const kind = String(propBlob.kind ?? "");
@@ -1351,6 +1357,76 @@ async function handleDecideProposal(
       const vendorBlob = (propBlob.vendor as Record<string, unknown>) ?? {};
       const vendorName = String(vendorBlob.name ?? "").trim() || "(unnamed vendor)";
       const vendorPhone = vendorBlob.phone ? String(vendorBlob.phone) : null;
+      const vendorCategory = vendorBlob.category ? String(vendorBlob.category) : null;
+      const vendorRating = typeof vendorBlob.rating === "number" ? vendorBlob.rating : null;
+      const vendorWebsite = vendorBlob.website ? String(vendorBlob.website) : null;
+      const vendorAddress = vendorBlob.address ? String(vendorBlob.address) : null;
+      const vendorRationale = vendorBlob.rationale ? String(vendorBlob.rationale) : null;
+
+      // === Memory write: upsert contractor by (household_id, lower(name)) ===
+      // Idempotent. If the homeowner already has a contractor with this
+      // company name (e.g. they added it manually before approving), we
+      // UPDATE the chez provenance fields rather than insert a duplicate.
+      let contractorId: string | null = null;
+      try {
+        const { data: existingContractor } = await service
+          .from("contractors")
+          .select("id, source, chez_request_id, chez_recommended_at")
+          .eq("household_id", request.household_id)
+          .ilike("company_name", vendorName)
+          .maybeSingle();
+
+        if (existingContractor) {
+          // Existing row — stamp Chez provenance only if it's not already
+          // attached to a different case (don't clobber prior history).
+          contractorId = (existingContractor as { id: string }).id;
+          const existing = existingContractor as {
+            id: string;
+            chez_request_id: string | null;
+            chez_recommended_at: string | null;
+          };
+          if (!existing.chez_recommended_at) {
+            await service
+              .from("contractors")
+              .update({
+                chez_request_id: request.id,
+                chez_recommended_at: now,
+                // Keep their original source ("manual"/"quiz"/etc.). We
+                // don't overwrite — provenance is captured in the new
+                // chez_request_id field.
+              })
+              .eq("id", contractorId);
+          }
+        } else {
+          // New row — full insert with provenance.
+          const { data: insertedContractor, error: insertErr } = await service
+            .from("contractors")
+            .insert({
+              household_id: request.household_id,
+              company_name: vendorName,
+              category: vendorCategory,
+              phone: vendorPhone,
+              website: vendorWebsite,
+              address: vendorAddress,
+              rating: vendorRating,
+              notes: vendorRationale,
+              source: "chez_recommendation",
+              chez_request_id: request.id,
+              chez_recommended_at: now,
+            })
+            .select("id")
+            .single();
+          if (insertErr) {
+            console.warn("[decide_proposal] contractor insert failed:", insertErr);
+          } else if (insertedContractor) {
+            contractorId = (insertedContractor as { id: string }).id;
+          }
+        }
+      } catch (e) {
+        console.warn("[decide_proposal] contractor upsert exception:", e);
+      }
+
+      // === Visit creation, now linked to the persisted contractor ===
       const { data: existingVisit } = await service
         .from("chez_visits")
         .select("id")
@@ -1365,7 +1441,16 @@ async function handleDecideProposal(
           vendor_phone: vendorPhone,
           vendor_payload: vendorBlob,
           state: "awaiting_date",
+          contractor_id: contractorId,
         });
+      } else if (contractorId) {
+        // Existing visit (e.g. self-healed by fetch_visits) without a
+        // contractor link — patch it now.
+        await service
+          .from("chez_visits")
+          .update({ contractor_id: contractorId })
+          .eq("id", (existingVisit as { id: string }).id)
+          .is("contractor_id", null);
       }
     }
   }
@@ -1887,14 +1972,66 @@ async function handleFetchVisits(
     const toCreate = approvedVendorMessages.filter((m) => !existingIds.has(m.id));
     for (const m of toCreate) {
       const vendorBlob = (m.proposal as Record<string, unknown>).vendor as Record<string, unknown> ?? {};
+      const vendorName = String(vendorBlob.name ?? "").trim() || "(unnamed vendor)";
+      const vendorPhone = vendorBlob.phone ? String(vendorBlob.phone) : null;
+      const householdId = (req as { household_id: string }).household_id;
+
+      // Phase 83.3 — Self-healing memory write. For approvals that
+      // happened before the contractor-upsert path landed, also persist
+      // the vendor here so the household catalog catches up. Idempotent
+      // by (household_id, lower(name)).
+      let contractorId: string | null = null;
+      try {
+        const { data: existingContractor } = await service
+          .from("contractors")
+          .select("id, chez_recommended_at")
+          .eq("household_id", householdId)
+          .ilike("company_name", vendorName)
+          .maybeSingle();
+        if (existingContractor) {
+          contractorId = (existingContractor as { id: string }).id;
+          const stamp = (existingContractor as { chez_recommended_at: string | null }).chez_recommended_at;
+          if (!stamp) {
+            await service
+              .from("contractors")
+              .update({ chez_request_id: requestId, chez_recommended_at: new Date().toISOString() })
+              .eq("id", contractorId);
+          }
+        } else {
+          const { data: insertedContractor } = await service
+            .from("contractors")
+            .insert({
+              household_id: householdId,
+              company_name: vendorName,
+              category: vendorBlob.category ? String(vendorBlob.category) : null,
+              phone: vendorPhone,
+              website: vendorBlob.website ? String(vendorBlob.website) : null,
+              address: vendorBlob.address ? String(vendorBlob.address) : null,
+              rating: typeof vendorBlob.rating === "number" ? vendorBlob.rating : null,
+              notes: vendorBlob.rationale ? String(vendorBlob.rationale) : null,
+              source: "chez_recommendation",
+              chez_request_id: requestId,
+              chez_recommended_at: new Date().toISOString(),
+            })
+            .select("id")
+            .single();
+          if (insertedContractor) {
+            contractorId = (insertedContractor as { id: string }).id;
+          }
+        }
+      } catch (e) {
+        console.warn("[fetch_visits] contractor backfill failed:", e);
+      }
+
       await service.from("chez_visits").insert({
-        household_id: (req as { household_id: string }).household_id,
+        household_id: householdId,
         request_id: requestId,
         proposal_message_id: m.id,
-        vendor_name: String(vendorBlob.name ?? "").trim() || "(unnamed vendor)",
-        vendor_phone: vendorBlob.phone ? String(vendorBlob.phone) : null,
+        vendor_name: vendorName,
+        vendor_phone: vendorPhone,
         vendor_payload: vendorBlob,
         state: "awaiting_date",
+        contractor_id: contractorId,
       });
     }
   }
