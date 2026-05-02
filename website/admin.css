@@ -7081,3 +7081,51 @@ details.admin-chez__analysis-section pre {
 .admin-chez__dossier-drawer-panel--wide {
   max-width: 640px;
 }
+
+/* Phase 81.2 — Multi-slot availability picker + cost combobox */
+
+.admin-chez__slot-section {
+  background: var(--bg, #f8f9fa);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+.admin-chez__slot-section-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  font: 600 11px var(--sans);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.admin-chez__slot-section-head .admin-muted {
+  font-weight: 400;
+  font-size: 11px;
+}
+.admin-chez__slot-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.admin-chez__slot-row input {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 6px;
+  flex: 1;
+  font: 400 13px var(--sans);
+  padding: 6px 10px;
+}
+.admin-chez__slot-row .admin-chez__proposal-row-remove {
+  font-size: 16px;
+}
+
+.admin-chez__vendor-call-form select {
+  appearance: none;
+  background: var(--bg, #f8f9fa) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23677' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  padding-right: 28px;
+}
+
+.admin-chez__vendor-call-form label.is-hidden {
+  display: none;
+}

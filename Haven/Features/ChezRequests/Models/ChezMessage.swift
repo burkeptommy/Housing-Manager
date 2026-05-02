@@ -139,14 +139,26 @@ struct ChezProposalVendor: Codable, Hashable {
     let rating: Double?
     let reviewCount: Int?
     let estimatedCost: Double?
+    /// Phase 81.2 — When the admin picked a range from the cost
+    /// combobox ("$1,000–2,500", "Will quote on site visit"), the
+    /// homeowner sees the verbatim range string instead of a fake-
+    /// precise dollar amount. Falls back to estimatedCost if absent.
+    let estimatedCostRange: String?
     let estimatedWindow: String?
+    /// Phase 81.2 — Multi-slot availability ("Tue PM", "Wed AM",
+    /// "Fri after 2"). Renders as a bulleted list under "Times
+    /// offered" so the homeowner sees every option the vendor gave.
+    /// `estimatedWindow` mirrors the first slot for legacy clients.
+    let availabilitySlots: [String]?
     let rationale: String?
 
     enum CodingKeys: String, CodingKey {
         case name, phone, rating, rationale
         case reviewCount = "review_count"
         case estimatedCost = "estimated_cost"
+        case estimatedCostRange = "estimated_cost_range"
         case estimatedWindow = "estimated_window"
+        case availabilitySlots = "availability_slots"
     }
 
     init(from decoder: Decoder) throws {
@@ -156,7 +168,9 @@ struct ChezProposalVendor: Codable, Hashable {
         rating = (try? c.decodeIfPresent(Double.self, forKey: .rating)) ?? nil
         reviewCount = (try? c.decodeIfPresent(Int.self, forKey: .reviewCount)) ?? nil
         estimatedCost = (try? c.decodeIfPresent(Double.self, forKey: .estimatedCost)) ?? nil
+        estimatedCostRange = (try? c.decodeIfPresent(String.self, forKey: .estimatedCostRange)) ?? nil
         estimatedWindow = (try? c.decodeIfPresent(String.self, forKey: .estimatedWindow)) ?? nil
+        availabilitySlots = (try? c.decodeIfPresent([String].self, forKey: .availabilitySlots)) ?? nil
         rationale = (try? c.decodeIfPresent(String.self, forKey: .rationale)) ?? nil
     }
 }

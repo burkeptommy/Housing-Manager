@@ -1476,6 +1476,18 @@ interface SuggestVendorFramingPayload {
   };
   homeowner_about?: string;
   property_context?: string;
+  /// Phase 81.2 — Tom's raw notes from the phone call. The AI uses
+  /// these to write a polished, recommendation-style summary the
+  /// homeowner sees on the proposal card.
+  call_notes?: string;
+  /// Phase 81.2 — Multi-slot availability ("Tue PM, Wed AM, Fri after 2").
+  /// The AI references these in framing if present so the homeowner
+  /// understands the timing context.
+  availability_slots?: string[];
+  /// Phase 81.2 — Cost range Tom selected from the combobox
+  /// ("$1,000–2,500", "Will quote on site visit", etc.). AI references
+  /// this in framing where helpful — never makes up numbers.
+  cost_range?: string;
 }
 
 async function handleSuggestVendorFraming(
@@ -1500,22 +1512,45 @@ async function handleSuggestVendorFraming(
   const propertyLine = payload.property_context
     ? `Property: ${payload.property_context.slice(0, 200)}`
     : "";
+  const callNotesLine = payload.call_notes
+    ? `\nAdmin's raw notes from phone call:\n"""${payload.call_notes.slice(0, 1000)}"""`
+    : "";
+  const slotsLine = (payload.availability_slots && payload.availability_slots.length > 0)
+    ? `Vendor offered these times: ${payload.availability_slots.join(" · ")}`
+    : "";
+  const costLine = payload.cost_range
+    ? `Cost: ${payload.cost_range}`
+    : "";
 
-  const userPrompt = `You are helping a Chez Concierge admin draft a 1-2 sentence "why this vendor fits" line for a homeowner. Be specific to the homeowner's context. No marketing fluff. Concise + concrete.
+  const userPrompt = `You write the "Why we recommend them" copy that a homeowner reads on a Chez Concierge vendor proposal card. Voice: a trusted friend who's already done the legwork. Professional but human. NEVER marketing fluff. Concrete details over generic praise.
 
-Request: ${payload.request_summary}
+## Request
+${payload.request_summary}
 Category: ${payload.request_category}
 
-Vendor candidate:
+## Vendor candidate
 - Name: ${v.name}
-- Category: ${v.category ?? "unspecified"}
+- Trade: ${v.category ?? "unspecified"}
 - Reputation: ${ratingLine}
-${v.notes ? `- Notes: ${v.notes}` : ""}
+${v.notes ? `- Vendor notes: ${v.notes}` : ""}
+${slotsLine}
+${costLine}
 
+## Homeowner
 ${homeownerLine}
 ${propertyLine}
+${callNotesLine}
 
-Write 1-2 sentences (max ~250 characters total) the admin can paste into a proposal card. Reference the homeowner's specific situation when possible. No preamble. Plain text only.`;
+## Output
+Write 2-3 sentences (max ~320 characters total). Lead with what makes them right for THIS specific homeowner. If admin notes mention something concrete (specializes in old homes, owner is sharp, A+ BBB, no chain), translate it cleanly. Don't quote the admin's notes verbatim — they're internal.
+
+Voice rules:
+- Use "they" or the vendor's name, not "the vendor"
+- Reference the homeowner's specific situation when relevant (year of home, materials, pet access, etc.)
+- If the rationale is just "highly rated", say it once, briefly, and move on
+- Never invent specifics not in the input
+
+Return ONLY the recommendation copy. No preamble, no quotes, no markdown.`;
 
   try {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {

@@ -131,12 +131,41 @@ struct ChezProposalCard: View {
                         .foregroundStyle(HavenColors.textSecondary)
                 }
             }
-            if let cost = proposal.vendor?.estimatedCost {
+            // Phase 81.2 — Prefer the explicit cost-range string if the
+            // admin picked from the combobox ("$1,000–2,500", "Will
+            // quote on site visit"); fall back to the legacy numeric
+            // estimatedCost.
+            if let costRange = proposal.vendor?.estimatedCostRange, !costRange.isEmpty {
+                Text("Estimated: \(costRange)")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+            } else if let cost = proposal.vendor?.estimatedCost {
                 Text("Estimated: $\(Int(cost))")
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textPrimary)
             }
-            if let win = proposal.vendor?.estimatedWindow, !win.isEmpty {
+            // Phase 81.2 — Multi-slot availability list. Renders as a
+            // bulleted list when the admin gave the vendor multiple
+            // options. Falls back to the single estimatedWindow line
+            // for legacy proposals.
+            if let slots = proposal.vendor?.availabilitySlots, !slots.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Times offered:")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    ForEach(slots, id: \.self) { slot in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("•")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Text(slot)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            } else if let win = proposal.vendor?.estimatedWindow, !win.isEmpty {
                 Text("Earliest slot: \(win)")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)

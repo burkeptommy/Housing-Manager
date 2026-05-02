@@ -5163,36 +5163,73 @@ function renderVendorCandidateCardHtml(req, v, idx, callData) {
   const recommended = !!callData?.recommended;
   const noAnswer = callData?.outcome === "no_answer";
 
+  // Phase 81.2 — Multi-slot availability + cost combobox + AI summary.
+  // Tom can add 1-N suggested time windows the vendor offered, pick from
+  // 8 sensible cost ranges (with Custom escape hatch), and get the AI
+  // to summarize his raw notes into homeowner-facing recommendation
+  // copy.
+  const slots = Array.isArray(callData?.availability_slots)
+    ? callData.availability_slots
+    : (callData?.availability ? [callData.availability] : []);
+  const costRange = callData?.cost_range || "";
+  const costCustom = callData?.cost_custom || "";
+  const showCustomCost = costRange === "custom" || (costCustom && !costRange);
+  const slotsHtml = slots.map((s, slotIdx) => `
+    <div class="admin-chez__slot-row">
+      <input type="text" data-vendor-slot-input data-slot-index="${slotIdx}" value="${escapeHtml(s)}" placeholder="e.g. Tue May 12 (PM)" />
+      <button type="button" class="admin-chez__proposal-row-remove" data-action="remove-slot" data-slot-index="${slotIdx}" aria-label="Remove">×</button>
+    </div>
+  `).join("");
+
   const callForm = isExpanded ? `
     <div class="admin-chez__vendor-call-form">
-      <div class="admin-chez__vendor-call-grid">
-        <label>Outcome
-          <select data-vendor-field="outcome">
-            <option value="">— select —</option>
-            <option value="answered" ${callData?.outcome === "answered" ? "selected" : ""}>Answered</option>
-            <option value="no_answer" ${callData?.outcome === "no_answer" ? "selected" : ""}>No answer / VM</option>
-            <option value="not_a_fit" ${callData?.outcome === "not_a_fit" ? "selected" : ""}>Not a fit</option>
-          </select>
-        </label>
-        <label>Earliest availability
-          <input type="text" data-vendor-field="availability" value="${escapeHtml(callData?.availability || "")}" placeholder="e.g. Tue, May 12" />
-        </label>
-        <label>Cost estimate (optional)
-          <input type="text" data-vendor-field="estimated_cost" value="${escapeHtml(callData?.estimated_cost || "")}" placeholder="e.g. $400, $$, range" />
-        </label>
-        <label>Cost detail (optional)
-          <input type="text" data-vendor-field="cost_detail" value="${escapeHtml(callData?.cost_detail || "")}" placeholder="e.g. site visit needed" />
-        </label>
+      <label>Outcome
+        <select data-vendor-field="outcome">
+          <option value="">— select —</option>
+          <option value="answered" ${callData?.outcome === "answered" ? "selected" : ""}>Answered</option>
+          <option value="no_answer" ${callData?.outcome === "no_answer" ? "selected" : ""}>No answer / VM</option>
+          <option value="not_a_fit" ${callData?.outcome === "not_a_fit" ? "selected" : ""}>Not a fit</option>
+        </select>
+      </label>
+
+      <div class="admin-chez__slot-section">
+        <div class="admin-chez__slot-section-head">
+          <span>Times they offered</span>
+          <span class="admin-muted">Add as many as the vendor suggested — homeowner picks one.</span>
+        </div>
+        <div data-vendor-slots>${slotsHtml}</div>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="add-slot">+ Add a time</button>
       </div>
-      <label>Notes
-        <textarea rows="2" data-vendor-field="notes" placeholder="What did they say? Anything quirky?">${escapeHtml(callData?.notes || "")}</textarea>
+
+      <label>Cost (optional — pick a range)
+        <select data-vendor-field="cost_range">
+          <option value="" ${!costRange ? "selected" : ""}>— Will know after site visit —</option>
+          <option value="Will quote on site visit" ${costRange === "Will quote on site visit" ? "selected" : ""}>Will quote on site visit</option>
+          <option value="$100–500" ${costRange === "$100–500" ? "selected" : ""}>$100 – $500</option>
+          <option value="$500–1,000" ${costRange === "$500–1,000" ? "selected" : ""}>$500 – $1,000</option>
+          <option value="$1,000–2,500" ${costRange === "$1,000–2,500" ? "selected" : ""}>$1,000 – $2,500</option>
+          <option value="$2,500–5,000" ${costRange === "$2,500–5,000" ? "selected" : ""}>$2,500 – $5,000</option>
+          <option value="$5,000–10,000" ${costRange === "$5,000–10,000" ? "selected" : ""}>$5,000 – $10,000</option>
+          <option value="$10,000+" ${costRange === "$10,000+" ? "selected" : ""}>$10,000+</option>
+          <option value="custom" ${costRange === "custom" ? "selected" : ""}>Custom — type below</option>
+        </select>
       </label>
+      <label data-vendor-cost-custom-row class="${showCustomCost ? "" : "is-hidden"}">
+        <span>Custom cost text</span>
+        <input type="text" data-vendor-field="cost_custom" value="${escapeHtml(costCustom)}" placeholder="e.g. $1,200 firm; $400 + $50/sqft" />
+      </label>
+
+      <label>Your notes from the call
+        <textarea rows="3" data-vendor-field="notes" placeholder="Raw notes — what did they say? Anything specific to this home? AI uses this to write the homeowner-facing recommendation.">${escapeHtml(callData?.notes || "")}</textarea>
+      </label>
+
       <label class="admin-chez__vendor-rationale">
-        <span>Framing for homeowner — what to say in the proposal card
-          <button type="button" class="admin-chez__proposal-ai-suggest" data-vendor-suggest>✨ Suggest</button>
+        <span>Recommendation summary — homeowner sees this on the proposal card
+          <button type="button" class="admin-chez__proposal-ai-suggest" data-vendor-suggest>✨ Summarize from notes</button>
         </span>
-        <textarea rows="2" data-vendor-field="rationale" placeholder="Why this vendor fits this specific homeowner.">${escapeHtml(callData?.rationale || "")}</textarea>
+        <textarea rows="3" data-vendor-field="rationale" placeholder="Polished, professional 2-3 sentences. Click ✨ to auto-write from your notes above.">${escapeHtml(callData?.rationale || "")}</textarea>
       </label>
+
       <div class="admin-chez__vendor-call-actions">
         <label class="admin-chez__vendor-recommend">
           <input type="checkbox" data-vendor-field="recommended" ${recommended ? "checked" : ""} />
@@ -5521,10 +5558,17 @@ function renderProposalCardHtml(proposal) {
   let body = "";
   if (proposal.kind === "vendor" && proposal.vendor) {
     const v = proposal.vendor;
+    const slots = Array.isArray(v.availability_slots) ? v.availability_slots : null;
+    const slotsHtml = slots && slots.length > 0
+      ? `<div>Times offered:<ul style="margin:2px 0 0 16px;padding:0;">${slots.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`
+      : (v.estimated_window ? `<div>Earliest: ${escapeHtml(v.estimated_window)}</div>` : "");
+    const costStr = v.estimated_cost_range
+      ? escapeHtml(v.estimated_cost_range)
+      : (v.estimated_cost ? `$${escapeHtml(String(v.estimated_cost))}` : "");
     body = `
       <strong>${escapeHtml(v.name || "(unnamed vendor)")}</strong>
-      ${v.estimated_cost ? `<div>Estimated: $${escapeHtml(String(v.estimated_cost))}</div>` : ""}
-      ${v.estimated_window ? `<div>Earliest: ${escapeHtml(v.estimated_window)}</div>` : ""}
+      ${costStr ? `<div>Estimated: ${costStr}</div>` : ""}
+      ${slotsHtml}
       ${v.rationale ? `<div class="admin-muted">${escapeHtml(v.rationale)}</div>` : ""}
     `;
   } else if (proposal.kind === "date_slot" && proposal.date_slot) {
@@ -6052,8 +6096,57 @@ function attachChezPanelHandlers(req) {
         renderFocusedChezDetail(req);
       } else if (action === "package-send") {
         await packageAndSendRecommendedVendors(req);
+      } else if (action === "add-slot") {
+        const card = btn.closest("[data-vendor-key]");
+        if (!card) return;
+        const key = card.getAttribute("data-vendor-key");
+        state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+        state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+        const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+        const slots = Array.isArray(slot.availability_slots) ? slot.availability_slots : [];
+        // Snapshot any in-progress text inputs in case the user just typed
+        // and hasn't blurred yet — re-render would lose them otherwise.
+        card.querySelectorAll("[data-vendor-slot-input]").forEach((input) => {
+          const idx = Number(input.dataset.slotIndex);
+          if (Number.isFinite(idx) && slots[idx] !== undefined) slots[idx] = input.value;
+        });
+        slots.push("");
+        slot.availability_slots = slots;
+        renderFocusedChezDetail(req);
+      } else if (action === "remove-slot") {
+        const card = btn.closest("[data-vendor-key]");
+        if (!card) return;
+        const key = card.getAttribute("data-vendor-key");
+        const removeIdx = Number(btn.dataset.slotIndex);
+        const slot = state.chezVendorCallsByRequest?.[req.id]?.[key];
+        if (!slot || !Array.isArray(slot.availability_slots)) return;
+        // Snapshot in-progress text first.
+        card.querySelectorAll("[data-vendor-slot-input]").forEach((input) => {
+          const idx = Number(input.dataset.slotIndex);
+          if (Number.isFinite(idx) && slot.availability_slots[idx] !== undefined) slot.availability_slots[idx] = input.value;
+        });
+        slot.availability_slots.splice(removeIdx, 1);
+        renderFocusedChezDetail(req);
       }
     });
+  });
+
+  // Phase 81.2 — Slot inputs persist on every keystroke so AI suggest /
+  // package-send sees the current values without requiring a blur.
+  el.auditFocused.querySelectorAll("[data-vendor-slot-input]").forEach((input) => {
+    const handler = () => {
+      const card = input.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      const idx = Number(input.dataset.slotIndex);
+      state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+      state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+      const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+      slot.availability_slots = slot.availability_slots || [];
+      slot.availability_slots[idx] = input.value;
+    };
+    input.addEventListener("input", handler);
+    input.addEventListener("change", handler);
   });
 
   // Vendor call-form field bindings — write to in-memory state on
@@ -6062,7 +6155,7 @@ function attachChezPanelHandlers(req) {
   // "Package & send" (or could be persisted to local storage if
   // we want survive refresh; for now memory is enough).
   el.auditFocused.querySelectorAll("[data-vendor-field]").forEach((input) => {
-    input.addEventListener("change", () => {
+    const handler = () => {
       const card = input.closest("[data-vendor-key]");
       if (!card) return;
       const key = card.getAttribute("data-vendor-key");
@@ -6072,17 +6165,27 @@ function attachChezPanelHandlers(req) {
       const field = input.dataset.vendorField;
       if (input.type === "checkbox") slot[field] = input.checked;
       else slot[field] = input.value;
+      // Phase 81.2 — toggle the Custom cost row visibility without a
+      // full re-render so the user's typing focus survives.
+      if (field === "cost_range") {
+        const customRow = card.querySelector("[data-vendor-cost-custom-row]");
+        if (customRow) customRow.classList.toggle("is-hidden", input.value !== "custom");
+      }
       // Refresh just enough to update the recommended pill + count
       // without redrawing from scratch (keeps focus in the input).
-      const cardHeader = card.querySelector(".admin-chez__vendor-card-head");
-      if (field === "recommended" && cardHeader) {
-        // Re-render the whole panel to update Package & send count.
+      if (field === "recommended") {
         renderFocusedChezDetail(req);
       }
-    });
+    };
+    input.addEventListener("change", handler);
+    if (input.tagName === "TEXTAREA" || (input.tagName === "INPUT" && input.type !== "checkbox" && input.type !== "select-one")) {
+      input.addEventListener("input", handler);
+    }
   });
 
-  // "✨ Suggest" framing button per vendor card.
+  // "✨ Summarize from notes" button per vendor card. Pulls the
+  // current call data (raw notes, slots, cost range) into the AI
+  // prompt so the homeowner sees a polished recommendation summary.
   el.auditFocused.querySelectorAll("[data-vendor-suggest]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const card = btn.closest("[data-vendor-key]");
@@ -6096,7 +6199,7 @@ function attachChezPanelHandlers(req) {
       ];
       const v = allCandidates.find((cand) => vendorCandidateKey(cand) === key);
       if (!v) return;
-      btn.disabled = true; btn.textContent = "Thinking…";
+      btn.disabled = true; btn.textContent = "Writing…";
       try {
         const dossier = (state.chezDossiersByHousehold || {})[req.household_id] || {};
         const profile = dossier.profile || {};
@@ -6104,6 +6207,15 @@ function attachChezPanelHandlers(req) {
         const propertyContext = property
           ? `${property.year_built ? property.year_built + " " : ""}${property.property_type || "home"} in ${property.city || ""}, ${property.state || ""}`
           : "";
+        const callData = state.chezVendorCallsByRequest?.[req.id]?.[key] || {};
+        // Resolve cost range — prefer custom text when "custom" is selected.
+        const costRange = callData.cost_range === "custom"
+          ? (callData.cost_custom || "")
+          : (callData.cost_range || "");
+        // Snapshot in-progress slot inputs.
+        const slotInputs = Array.from(card.querySelectorAll("[data-vendor-slot-input]"))
+          .map((el) => el.value.trim())
+          .filter(Boolean);
         const result = await callChezConcierge({
           action: "suggest_vendor_framing",
           household_id: req.household_id,
@@ -6117,6 +6229,9 @@ function attachChezPanelHandlers(req) {
           },
           homeowner_about: profile.about_us,
           property_context: propertyContext,
+          call_notes: callData.notes || "",
+          availability_slots: slotInputs,
+          cost_range: costRange,
         });
         if (result.framing) {
           state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
@@ -6128,7 +6243,7 @@ function attachChezPanelHandlers(req) {
       } catch (err) {
         console.warn("[admin] suggest framing failed", err);
       } finally {
-        btn.disabled = false; btn.textContent = "✨ Suggest";
+        btn.disabled = false; btn.textContent = "✨ Summarize from notes";
       }
     });
   });
@@ -6168,6 +6283,23 @@ async function packageAndSendRecommendedVendors(req) {
   try {
     for (let i = 0; i < recommended.length; i++) {
       const { vendor, data } = recommended[i];
+      // Resolve cost range — when "custom" picked use the typed text;
+      // otherwise pass the picker label verbatim. We DO NOT stamp a
+      // numeric estimated_cost unless the admin typed a real number
+      // into the custom field — the iOS card renders cost as a string
+      // when it's a range like "$1,000–2,500".
+      const rawCost = data.cost_range === "custom" ? (data.cost_custom || "") : (data.cost_range || "");
+      const numericCost = Number(rawCost.replace(/[^0-9.]/g, ""));
+      const useNumeric = data.cost_range === "custom"
+        && Number.isFinite(numericCost)
+        && numericCost > 0
+        && /^\$?\s*[\d,]+\s*$/.test(rawCost);  // single number, not a range
+      // Resolve availability slots — array preferred. Fall back to
+      // legacy single-string field if the user came from an older
+      // version of the UI.
+      const slots = Array.isArray(data.availability_slots)
+        ? data.availability_slots.map((s) => String(s || "").trim()).filter(Boolean)
+        : (data.availability ? [String(data.availability).trim()] : []);
       const proposal = {
         kind: "vendor",
         vendor: {
@@ -6175,14 +6307,23 @@ async function packageAndSendRecommendedVendors(req) {
           phone: vendor.phone || vendor.formatted_phone_number,
           rating: vendor.rating,
           review_count: vendor.user_ratings_total || vendor.review_count,
-          estimated_cost: data.estimated_cost ? (Number.isFinite(Number(data.estimated_cost)) ? Number(data.estimated_cost) : undefined) : undefined,
-          estimated_window: data.availability,
+          // Numeric cost only when the admin clearly typed one.
+          estimated_cost: useNumeric ? numericCost : undefined,
+          // Range string preferred — homeowner sees "$1,000–2,500"
+          // verbatim instead of a fake-precise dollar amount.
+          estimated_cost_range: useNumeric ? undefined : (rawCost || undefined),
+          // Multi-slot availability if any; first slot also lands as
+          // estimated_window for legacy iOS clients that haven't
+          // updated to render the array.
+          availability_slots: slots.length > 0 ? slots : undefined,
+          estimated_window: slots[0],
           rationale: data.rationale,
         },
       };
       // Strip undefined / empty so the card renders cleanly.
       Object.keys(proposal.vendor).forEach((k) => {
-        if (proposal.vendor[k] === undefined || proposal.vendor[k] === "") delete proposal.vendor[k];
+        const val = proposal.vendor[k];
+        if (val === undefined || val === "" || (Array.isArray(val) && val.length === 0)) delete proposal.vendor[k];
       });
       await callChezConcierge({
         action: "propose",
