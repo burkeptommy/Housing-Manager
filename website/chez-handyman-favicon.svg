@@ -2,7 +2,9 @@
   <!-- Mirror of the iOS HavenFieldAppIcon.appiconset/AppIcon-1024.png design.
        Salmon rounded square, uppercase serif "C" centered slightly low,
        small indigo roof chevron above. -->
-  <rect width="100" height="100" rx="22" fill="#ED6955"/>
+  <!-- Full-edge salmon. No rounded corners — matches the iOS app icon
+       SOURCE PNG (Apple adds the rounded corner mask at display time). -->
+  <rect width="100" height="100" fill="#ED6955"/>
   <!-- Indigo chevron, same geometry as the homeowner mark, color flipped. -->
   <path d="M55 28 L66 18 L77 28"
         stroke="#453A70" stroke-width="4.5"
