@@ -37,9 +37,9 @@ interface SendInviteRequest {
   invitee_first_name?: string | null;
 }
 
-const FROM_EMAIL = "hello@havenhome.dev";
+const FROM_EMAIL = "hello@getchez.com";
 const FROM_NAME = "Chez";
-const REPLY_TO_EMAIL = "tom@havenhome.dev";
+const REPLY_TO_EMAIL = "tom@getchez.com";
 
 function escapeHtml(input: string): string {
   return input
@@ -135,7 +135,7 @@ function buildHtml(payload: SendInviteRequest): string {
             </tr>
             <tr>
               <td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">
-                Chez, havenhome.dev
+                Chez, getchez.com
               </td>
             </tr>
           </table>
@@ -173,7 +173,7 @@ function buildText(payload: SendInviteRequest): string {
   lines.push("");
   lines.push("This invite expires in 30 days. If you don't want to join, just ignore this email.");
   lines.push("");
-  lines.push("Chez, havenhome.dev");
+  lines.push("Chez, getchez.com");
   return lines.join("\n");
 }
 

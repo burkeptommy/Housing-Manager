@@ -6,14 +6,14 @@ import SwiftUI
 /// `contractorChipsManualNames`, `contractorChipsProviders`) so the picker
 /// doesn't have to know which source the prior pick came from. Optional
 /// fields are nil for manual / legacy catalog entries; only Places-sourced
-/// vendors carry rating + reviewCount + isHavenCertified.
+/// vendors carry rating + reviewCount + isTopRated.
 struct PreSelectedContractor {
     let name: String
     let rating: Double?
     let reviewCount: Int?
     let phone: String?
     let website: String?
-    let isHavenCertified: Bool
+    let isTopRated: Bool
 }
 
 /// Build 83 (Apr 7, 2026): Inline picker that fires from each Q15b contractor
@@ -24,7 +24,7 @@ struct PreSelectedContractor {
 /// Mirrors the `FindLocalVendorSheet` flow used by the post-quiz "Find a
 /// contractor" task path but lives inline so the user never leaves the quiz.
 /// Calls `HavenSupabase.findLocalVendors(town:state:category:)` on appear,
-/// renders up to 4 vendors ranked Haven Certified > Suggested > rating, and
+/// renders up to 4 vendors ranked Top-Rated > Suggested > rating, and
 /// always shows a manual "Didn't find yours? Add it" row at the bottom so
 /// users in low-coverage areas have a path forward.
 struct QuizLocalContractorPicker: View {
@@ -183,11 +183,11 @@ struct QuizLocalContractorPicker: View {
                 onDeselect?()
             } label: {
                 HStack(alignment: .top, spacing: HavenTheme.spacing12) {
-                    Image(systemName: pinned.isHavenCertified ? "checkmark.seal.fill" : "building.2.fill")
+                    Image(systemName: pinned.isTopRated ? "star.circle.fill" : "building.2.fill")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(pinned.isHavenCertified ? HavenColors.success : HavenColors.navy700)
+                        .foregroundStyle(pinned.isTopRated ? HavenColors.success : HavenColors.navy700)
                         .frame(width: 32, height: 32)
-                        .background(pinned.isHavenCertified ? HavenColors.success.opacity(0.12) : HavenColors.navy.opacity(0.06))
+                        .background(pinned.isTopRated ? HavenColors.success.opacity(0.12) : HavenColors.navy.opacity(0.06))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -210,8 +210,8 @@ struct QuizLocalContractorPicker: View {
                                         .font(HavenTypography.uiCaption)
                                         .foregroundStyle(HavenColors.textTertiary)
                                 }
-                                if pinned.isHavenCertified {
-                                    Text("\u{00B7} Chez Certified")
+                                if pinned.isTopRated {
+                                    Text("\u{00B7} Top-Rated")
                                         .font(HavenTypography.uiCaption.weight(.semibold))
                                         .foregroundStyle(HavenColors.success)
                                 }
@@ -367,7 +367,7 @@ struct QuizLocalContractorPicker: View {
             rating: nil,
             reviewCount: nil,
             googlePlaceId: "catalog_\(row.id.uuidString)",
-            isHavenCertified: false,
+            isTopRated: false,
             rankPosition: 999
         )
     }
@@ -384,7 +384,7 @@ struct QuizLocalContractorPicker: View {
             } else {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     ForEach(searchFilteredVendors) { vendor in
-                        vendorRow(vendor, certified: false)
+                        vendorRow(vendor)
                     }
                 }
             }
@@ -453,18 +453,36 @@ struct QuizLocalContractorPicker: View {
     // MARK: - Vendor list
 
     private var vendorList: some View {
-        let havenCertified = vendors.filter { $0.isHavenCertified }
-        let suggested = vendors.filter { !$0.isHavenCertified }
+        // Phase 72: three tiers. Chez Certified (real verification, navy
+        // badge) > Top-Rated (Google heuristic, green badge) > Suggested
+        // (everything else — also includes live_unverified applications,
+        // which display with no badge until certified).
+        let chezCertified = vendors.filter { $0.isChezCertified }
+        let topRated = vendors.filter { !$0.isChezCertified && $0.isTopRated }
+        let suggested = vendors.filter { !$0.isChezCertified && !$0.isTopRated }
 
         return VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-            if !havenCertified.isEmpty {
+            if !chezCertified.isEmpty {
                 Text("CHEZ CERTIFIED")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
-                    .foregroundStyle(HavenColors.success)
+                    .foregroundStyle(HavenColors.navy800)
                 VStack(spacing: HavenTheme.spacing8) {
-                    ForEach(havenCertified) { vendor in
-                        vendorRow(vendor, certified: true)
+                    ForEach(chezCertified) { vendor in
+                        vendorRow(vendor)
+                    }
+                }
+            }
+
+            if !topRated.isEmpty {
+                Text("TOP-RATED")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.2)
+                    .foregroundStyle(HavenColors.success)
+                    .padding(.top, chezCertified.isEmpty ? 0 : 4)
+                VStack(spacing: HavenTheme.spacing8) {
+                    ForEach(topRated) { vendor in
+                        vendorRow(vendor)
                     }
                 }
             }
@@ -474,17 +492,23 @@ struct QuizLocalContractorPicker: View {
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.textTertiary)
-                    .padding(.top, havenCertified.isEmpty ? 0 : 4)
+                    .padding(.top, (chezCertified.isEmpty && topRated.isEmpty) ? 0 : 4)
                 VStack(spacing: HavenTheme.spacing8) {
                     ForEach(suggested) { vendor in
-                        vendorRow(vendor, certified: false)
+                        vendorRow(vendor)
                     }
                 }
             }
         }
     }
 
-    private func vendorRow(_ vendor: HavenSupabase.LocalVendorResult, certified: Bool) -> some View {
+    private func vendorRow(_ vendor: HavenSupabase.LocalVendorResult) -> some View {
+        // Phase 72: derive the badge from the vendor itself rather than a
+        // boolean param, so the three tiers (chez_certified / top_rated /
+        // none) all render correctly through the same row.
+        let isChezCertified = vendor.isChezCertified
+        let isTopRated = vendor.isTopRated && !isChezCertified
+        let certified = isChezCertified || isTopRated
         // Build 86: visual feedback parity with `singleChoiceBody` and the
         // `UtilityProviderSearchPicker` row treatment. Once the user taps a
         // vendor row, this row turns navy + gains a checkmark, and the
@@ -502,11 +526,17 @@ struct QuizLocalContractorPicker: View {
             onSelect(vendor)
         } label: {
             HStack(alignment: .top, spacing: HavenTheme.spacing12) {
-                Image(systemName: certified ? "checkmark.seal.fill" : "building.2.fill")
+                Image(systemName: isChezCertified
+                    ? "checkmark.seal.fill"
+                    : (isTopRated ? "star.circle.fill" : "building.2.fill"))
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(certified ? HavenColors.success : HavenColors.navy700)
+                    .foregroundStyle(isChezCertified
+                        ? HavenColors.navy800
+                        : (isTopRated ? HavenColors.success : HavenColors.navy700))
                     .frame(width: 32, height: 32)
-                    .background(certified ? HavenColors.success.opacity(0.12) : HavenColors.navy.opacity(0.06))
+                    .background(isChezCertified
+                        ? HavenColors.navy800.opacity(0.12)
+                        : (isTopRated ? HavenColors.success.opacity(0.12) : HavenColors.navy.opacity(0.06)))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -528,8 +558,12 @@ struct QuizLocalContractorPicker: View {
                                     .font(HavenTypography.uiCaption)
                                     .foregroundStyle(HavenColors.textSecondary)
                             }
-                            if certified {
+                            if isChezCertified {
                                 Text("\u{00B7} Chez Certified")
+                                    .font(HavenTypography.uiCaption.weight(.semibold))
+                                    .foregroundStyle(HavenColors.navy800)
+                            } else if isTopRated {
+                                Text("\u{00B7} Top-Rated")
                                     .font(HavenTypography.uiCaption.weight(.semibold))
                                     .foregroundStyle(HavenColors.success)
                             }

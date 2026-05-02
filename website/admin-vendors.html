@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Admin · Vendor Applications · Chez</title>
+    <link rel="stylesheet" href="/chez.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        body { font-family: var(--sans); background: #FAFAFA; margin: 0; }
+        .admin-shell {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .admin-shell h1 {
+            font-family: var(--serif);
+            font-size: 24px;
+            color: var(--ink);
+            margin: 0 0 24px;
+        }
+        .auth-gate, .empty-state {
+            background: #fff;
+            border: 1px solid #E3D9C6;
+            border-radius: 12px;
+            padding: 48px 32px;
+            text-align: center;
+        }
+        .auth-gate input {
+            display: block;
+            width: 320px;
+            max-width: 100%;
+            margin: 16px auto;
+            padding: 12px 14px;
+            border: 1px solid #D8DADF;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+        .btn {
+            background: var(--action);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 12px 24px;
+            font-family: var(--sans);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: #fff;
+            color: var(--ink);
+            border: 1px solid #D8DADF;
+        }
+        .btn-success { background: #1B5E20; }
+        .btn-danger  { background: #8A2419; }
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .chip {
+            padding: 6px 14px;
+            border: 1px solid #D8DADF;
+            border-radius: 999px;
+            background: #fff;
+            color: var(--ink);
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .chip.active {
+            background: var(--ink);
+            color: #fff;
+            border-color: var(--ink);
+        }
+        .stats {
+            margin-left: auto;
+            font-size: 13px;
+            color: #6B6B7A;
+        }
+        .app-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #E3D9C6;
+        }
+        .app-table th {
+            text-align: left;
+            background: #FAF7F2;
+            padding: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--ink);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #E3D9C6;
+        }
+        .app-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #F0EAD9;
+            font-size: 14px;
+            color: var(--ink);
+            vertical-align: top;
+        }
+        .app-table tr:last-child td { border-bottom: none; }
+        .app-table tr:hover { background: #FAFAFA; }
+        .status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .status-pending { background: #FFF3E0; color: #E65100; }
+        .status-live    { background: #E3F2FD; color: #0D47A1; }
+        .status-cert    { background: #E8F5E9; color: #1B5E20; }
+        .status-rej     { background: #FBEAEA; color: #8A2419; }
+        .actions {
+            display: flex;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .actions button {
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .feedback {
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin: 16px 0;
+            display: none;
+        }
+        .feedback.show { display: block; }
+        .feedback.success { background: #E8F5E9; color: #1B5E20; }
+        .feedback.error   { background: #FBEAEA; color: #8A2419; }
+        .small { font-size: 12px; color: #6B6B7A; }
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .modal-bg.show { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 480px;
+            width: calc(100% - 48px);
+        }
+        .modal h3 { font-family: var(--serif); margin: 0 0 12px; font-size: 18px; color: var(--ink); }
+        .modal textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #D8DADF;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        .modal-footer { display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div class="admin-shell">
+        <h1>Vendor applications</h1>
+
+        <!-- Auth gate (magic-link / OTP) -->
+        <div class="auth-gate" id="auth-gate">
+            <p style="font-size:15px;">Sign in to manage vendor applications.</p>
+            <p class="small" style="margin:8px 0 16px;">We'll email you a one-time login link — no password needed.</p>
+            <input type="email" id="auth-email" placeholder="tom@getchez.com" autocomplete="username">
+            <button class="btn" id="signin-btn">Send login link</button>
+            <p class="small" id="auth-error" style="color:#8A2419;display:none;margin-top:12px;"></p>
+            <p class="small" id="auth-success" style="color:#1B5E20;display:none;margin-top:12px;font-weight:600;"></p>
+        </div>
+
+        <!-- Main view (hidden until authed) -->
+        <div id="admin-main" style="display:none;">
+            <div class="feedback" id="feedback"></div>
+
+            <div class="filter-bar">
+                <button class="chip active" data-status="all">All</button>
+                <button class="chip" data-status="pending_email_confirm">Pending email</button>
+                <button class="chip" data-status="live_unverified">Live (review me)</button>
+                <button class="chip" data-status="chez_certified">Certified</button>
+                <button class="chip" data-status="rejected">Rejected</button>
+                <button class="btn btn-secondary" id="refresh-btn">Refresh</button>
+                <span class="stats" id="stats"></span>
+            </div>
+
+            <table class="app-table">
+                <thead>
+                    <tr>
+                        <th>Business</th>
+                        <th>Contact</th>
+                        <th>Category</th>
+                        <th>States</th>
+                        <th>Status</th>
+                        <th>Submitted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="app-tbody">
+                    <tr><td colspan="7" style="text-align:center; padding:40px;">Loading…</td></tr>
+                </tbody>
+            </table>
+
+            <p class="small" style="margin-top:16px;">
+                Tip: live_unverified rows are visible in homeowner find-vendor results without a badge.
+                Certified rows float to the top with the Chez Certified badge.
+            </p>
+        </div>
+    </div>
+
+    <!-- Notes modal (used for both certify and reject flows) -->
+    <div class="modal-bg" id="modal-bg">
+        <div class="modal">
+            <h3 id="modal-title">Mark as…</h3>
+            <p class="small" id="modal-context"></p>
+            <p style="margin: 16px 0 8px; font-size: 13px; font-weight: 500;">Notes (optional, internal only)</p>
+            <textarea id="modal-notes" placeholder="e.g. Spoke with Joe, 15 yrs experience, COI on file"></textarea>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+                <button class="btn" id="modal-confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+        const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew";
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const authGate = document.getElementById("auth-gate");
+        const adminMain = document.getElementById("admin-main");
+        const tbody = document.getElementById("app-tbody");
+        const stats = document.getElementById("stats");
+        const feedback = document.getElementById("feedback");
+        const modalBg = document.getElementById("modal-bg");
+        const modalTitle = document.getElementById("modal-title");
+        const modalContext = document.getElementById("modal-context");
+        const modalNotes = document.getElementById("modal-notes");
+        const modalConfirm = document.getElementById("modal-confirm");
+
+        let currentFilter = "all";
+        let session = null;
+        let pendingAction = null; // { action: 'mark_certified'|'mark_rejected', applicationId, businessName }
+
+        function showFeedback(msg, kind) {
+            feedback.textContent = msg;
+            feedback.className = `feedback show ${kind}`;
+            setTimeout(() => { feedback.className = "feedback"; }, 4000);
+        }
+
+        async function callAdminFunction(action, payload = {}) {
+            if (!session) throw new Error("Not signed in");
+            const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-vendor-applications`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${session.access_token}`,
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ action, ...payload }),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+            return data;
+        }
+
+        function statusPill(status) {
+            const map = {
+                pending_email_confirm: ["status-pending", "Pending email"],
+                live_unverified: ["status-live", "Live · review"],
+                chez_certified: ["status-cert", "Chez Certified"],
+                rejected: ["status-rej", "Rejected"],
+            };
+            const [cls, label] = map[status] || ["status-pending", status];
+            return `<span class="status-pill ${cls}">${label}</span>`;
+        }
+
+        function actionsFor(app) {
+            const buttons = [];
+            if (app.status === "pending_email_confirm") {
+                buttons.push(`<button class="btn-secondary" data-action="resend_confirm" data-id="${app.id}">Resend email</button>`);
+            }
+            if (app.status === "live_unverified") {
+                buttons.push(`<button class="btn-success" style="color:#fff;border:none;" data-action="mark_certified" data-id="${app.id}" data-name="${escapeAttr(app.business_name)}">Certify</button>`);
+            }
+            if (app.status !== "rejected" && app.status !== "chez_certified") {
+                buttons.push(`<button class="btn-danger" style="color:#fff;border:none;" data-action="mark_rejected" data-id="${app.id}" data-name="${escapeAttr(app.business_name)}">Reject</button>`);
+            }
+            if (app.status === "chez_certified") {
+                buttons.push(`<button class="btn-danger" style="color:#fff;border:none;" data-action="mark_rejected" data-id="${app.id}" data-name="${escapeAttr(app.business_name)}">Revoke</button>`);
+            }
+            return `<div class="actions">${buttons.join("")}</div>`;
+        }
+
+        function escapeHtml(s) {
+            return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+            }[c]));
+        }
+        function escapeAttr(s) {
+            return escapeHtml(s).replace(/"/g, "&quot;");
+        }
+
+        function formatDate(iso) {
+            if (!iso) return "—";
+            const d = new Date(iso);
+            return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+        }
+
+        function renderRows(applications) {
+            if (applications.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:40px; color:#6B6B7A;">No applications match the current filter.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = applications.map((app) => `
+                <tr>
+                    <td>
+                        <strong>${escapeHtml(app.business_name)}</strong>
+                        ${app.website ? `<br><a href="${escapeAttr(app.website)}" target="_blank" rel="noopener" class="small">${escapeHtml(app.website)}</a>` : ""}
+                        ${app.linked_google_place_id ? `<br><span class="small">↪ linked to Google place</span>` : ""}
+                    </td>
+                    <td>
+                        ${escapeHtml(app.contact_name)}<br>
+                        <span class="small">${escapeHtml(app.email)}</span><br>
+                        <span class="small">${escapeHtml(app.phone)}</span>
+                    </td>
+                    <td>${escapeHtml(app.category)}</td>
+                    <td>${(app.service_area_states || []).join(", ")}</td>
+                    <td>${statusPill(app.status)}${app.verified_notes ? `<br><span class="small">${escapeHtml(app.verified_notes)}</span>` : ""}${app.rejection_notes ? `<br><span class="small">${escapeHtml(app.rejection_notes)}</span>` : ""}</td>
+                    <td><span class="small">${formatDate(app.created_at)}</span></td>
+                    <td>${actionsFor(app)}</td>
+                </tr>
+            `).join("");
+        }
+
+        async function loadApplications() {
+            try {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:40px;">Loading…</td></tr>`;
+                const payload = currentFilter === "all" ? {} : { status_filter: currentFilter };
+                const data = await callAdminFunction("list", { ...payload, limit: 100 });
+                renderRows(data.applications || []);
+                stats.textContent = `${data.applications?.length || 0} of ${data.total || 0} applications`;
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:40px; color:#8A2419;">Error: ${escapeHtml(err.message)}</td></tr>`;
+            }
+        }
+
+        // ----- Auth flow -----
+        async function refreshSession() {
+            const { data } = await supabase.auth.getSession();
+            session = data.session;
+            if (session) {
+                authGate.style.display = "none";
+                adminMain.style.display = "block";
+                await loadApplications();
+            } else {
+                authGate.style.display = "block";
+                adminMain.style.display = "none";
+            }
+        }
+
+        document.getElementById("signin-btn").addEventListener("click", async () => {
+            const email = document.getElementById("auth-email").value.trim().toLowerCase();
+            const errorEl = document.getElementById("auth-error");
+            const successEl = document.getElementById("auth-success");
+            errorEl.style.display = "none";
+            successEl.style.display = "none";
+            if (!email || !email.includes("@")) {
+                errorEl.textContent = "Please enter a valid email address.";
+                errorEl.style.display = "block";
+                return;
+            }
+            const btn = document.getElementById("signin-btn");
+            btn.disabled = true;
+            btn.textContent = "Sending…";
+            try {
+                const { error } = await supabase.auth.signInWithOtp({
+                    email,
+                    options: {
+                        // Send the magic link back to this page so the
+                        // automatic session pickup just works.
+                        emailRedirectTo: `${window.location.origin}/admin-vendors.html`,
+                        // Don't auto-create users — only existing admin emails
+                        // (added via Supabase Studio) should be able to sign in.
+                        shouldCreateUser: false,
+                    },
+                });
+                if (error) throw error;
+                successEl.textContent = `Check ${email} for a login link. It expires in 1 hour.`;
+                successEl.style.display = "block";
+                btn.textContent = "Link sent ✓";
+            } catch (err) {
+                errorEl.textContent = err.message || "Failed to send login link";
+                errorEl.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Send login link";
+            }
+        });
+
+        // ----- Filter chips -----
+        document.querySelectorAll(".chip").forEach((chip) => {
+            chip.addEventListener("click", async () => {
+                document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+                chip.classList.add("active");
+                currentFilter = chip.dataset.status;
+                await loadApplications();
+            });
+        });
+
+        document.getElementById("refresh-btn").addEventListener("click", loadApplications);
+
+        // ----- Action handler (certify/reject/resend) -----
+        tbody.addEventListener("click", async (e) => {
+            const btn = e.target.closest("button[data-action]");
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const applicationId = btn.dataset.id;
+            const businessName = btn.dataset.name || "";
+
+            if (action === "resend_confirm") {
+                btn.disabled = true;
+                try {
+                    await callAdminFunction("resend_confirm", { application_id: applicationId });
+                    showFeedback("Confirmation email re-sent.", "success");
+                    await loadApplications();
+                } catch (err) {
+                    showFeedback(`Resend failed: ${err.message}`, "error");
+                    btn.disabled = false;
+                }
+                return;
+            }
+
+            // certify or reject — open notes modal
+            pendingAction = { action, applicationId, businessName };
+            modalTitle.textContent = action === "mark_certified"
+                ? `Mark ${businessName} as Chez Certified?`
+                : `Reject ${businessName}?`;
+            modalContext.textContent = action === "mark_certified"
+                ? "Vendor will appear at the top of search results with the Chez Certified badge. They'll get a confirmation email."
+                : "Vendor will be removed from search results. No email is sent. They can re-apply with the same email after rejection.";
+            modalConfirm.className = action === "mark_certified" ? "btn btn-success" : "btn btn-danger";
+            modalConfirm.textContent = action === "mark_certified" ? "Certify" : "Reject";
+            modalConfirm.style.color = "#fff";
+            modalNotes.value = "";
+            modalBg.classList.add("show");
+        });
+
+        document.getElementById("modal-cancel").addEventListener("click", () => {
+            modalBg.classList.remove("show");
+            pendingAction = null;
+        });
+        modalBg.addEventListener("click", (e) => {
+            if (e.target === modalBg) {
+                modalBg.classList.remove("show");
+                pendingAction = null;
+            }
+        });
+
+        modalConfirm.addEventListener("click", async () => {
+            if (!pendingAction) return;
+            modalConfirm.disabled = true;
+            modalConfirm.textContent = "Working…";
+            try {
+                await callAdminFunction(pendingAction.action, {
+                    application_id: pendingAction.applicationId,
+                    notes: modalNotes.value.trim() || null,
+                });
+                showFeedback(
+                    pendingAction.action === "mark_certified"
+                        ? `${pendingAction.businessName} marked Chez Certified.`
+                        : `${pendingAction.businessName} rejected.`,
+                    "success",
+                );
+                modalBg.classList.remove("show");
+                pendingAction = null;
+                await loadApplications();
+            } catch (err) {
+                showFeedback(`Failed: ${err.message}`, "error");
+            } finally {
+                modalConfirm.disabled = false;
+                modalConfirm.textContent = pendingAction?.action === "mark_certified" ? "Certify" : "Reject";
+            }
+        });
+
+        // ----- Init -----
+        refreshSession();
+        supabase.auth.onAuthStateChange(() => refreshSession());
+    </script>
+</body>
+</html>

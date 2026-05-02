@@ -630,7 +630,7 @@ serve(async (req: Request) => {
           .from("household_email_addresses")
           .insert({
             household_id: targetId,
-            unique_address: targetId.substring(0, 8).toLowerCase() + "@alfred.havenhome.dev",
+            unique_address: targetId.substring(0, 8).toLowerCase() + "@alfred.getchez.com",
           });
       }
 
@@ -762,7 +762,7 @@ serve(async (req: Request) => {
           .from("household_email_addresses")
           .insert({
             household_id: targetId,
-            unique_address: targetId.substring(0, 8).toLowerCase() + "@alfred.havenhome.dev",
+            unique_address: targetId.substring(0, 8).toLowerCase() + "@alfred.getchez.com",
           });
       }
 

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="List your business on Chez — free directory for trusted home service vendors serving high-net-worth families.">
+    <meta property="og:title" content="List your business on Chez">
+    <meta property="og:description" content="Free directory listing for vetted vendors serving high-net-worth families.">
+    <meta property="og:url" content="https://getchez.com/vendor-apply.html">
+    <meta property="og:image" content="https://getchez.com/chez-logo.png">
+
+    <title>List your business on Chez</title>
+    <link rel="stylesheet" href="/chez.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        .vendor-apply-form {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 0 24px 64px;
+        }
+        .vendor-apply-form fieldset {
+            border: none;
+            margin: 0 0 20px;
+            padding: 0;
+        }
+        .vendor-apply-form label {
+            display: block;
+            font-family: var(--sans);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--ink);
+            margin-bottom: 6px;
+        }
+        .vendor-apply-form input[type="text"],
+        .vendor-apply-form input[type="email"],
+        .vendor-apply-form input[type="tel"],
+        .vendor-apply-form input[type="url"],
+        .vendor-apply-form select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #D8DADF;
+            border-radius: 8px;
+            font-family: var(--sans);
+            font-size: 15px;
+            color: var(--ink);
+            background: #fff;
+            box-sizing: border-box;
+        }
+        .vendor-apply-form input:focus,
+        .vendor-apply-form select:focus {
+            outline: none;
+            border-color: var(--ink);
+        }
+        .vendor-apply-form .helper {
+            font-family: var(--sans);
+            font-size: 12px;
+            color: #6B6B7A;
+            margin-top: 4px;
+        }
+        .state-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+            gap: 6px;
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 12px;
+            border: 1px solid #D8DADF;
+            border-radius: 8px;
+            background: #FAFAFA;
+        }
+        .state-grid label {
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            padding: 4px 6px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .state-grid label:hover { background: #fff; }
+        .state-grid input[type="checkbox"] { margin: 0; }
+        .state-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .state-actions button {
+            background: none;
+            border: none;
+            color: var(--ink);
+            font-family: var(--sans);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 4px 0;
+            text-decoration: underline;
+        }
+        .submit-btn {
+            background: var(--action);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 14px 28px;
+            font-family: var(--sans);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .feedback {
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-family: var(--sans);
+            font-size: 14px;
+            margin-top: 16px;
+            display: none;
+        }
+        .feedback.success {
+            background: #E8F5E9;
+            color: #1B5E20;
+            border: 1px solid #A5D6A7;
+        }
+        .feedback.error {
+            background: #FBEAEA;
+            color: #8A2419;
+            border: 1px solid #E5A8A0;
+        }
+        .feedback.show { display: block; }
+        .intro-card {
+            background: #FAF7F2;
+            border: 1px solid #E3D9C6;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin: 0 auto 32px;
+            max-width: 640px;
+        }
+        .intro-card h2 {
+            font-family: var(--serif);
+            font-size: 22px;
+            margin: 0 0 8px;
+            color: var(--ink);
+        }
+        .intro-card p {
+            font-family: var(--sans);
+            font-size: 14px;
+            color: var(--ink);
+            opacity: 0.8;
+            margin: 0;
+            line-height: 1.55;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="/" class="brand">
+                <img src="/chez-logo.png" alt="Chez" />
+            </a>
+            <nav>
+                <a href="/homeowners.html">For homeowners</a>
+                <a href="/handymen.html">For pros</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="vendor-apply-form" style="padding-top:48px">
+        <h1 style="font-family:var(--serif);font-size:32px;text-align:center;margin:0 0 12px;color:var(--ink);">
+            List your business on Chez
+        </h1>
+        <p style="font-family:var(--sans);font-size:15px;text-align:center;color:var(--ink);opacity:0.7;margin:0 0 32px;">
+            Free directory for vendors serving high-net-worth families.
+        </p>
+
+        <div class="intro-card">
+            <h2>How it works</h2>
+            <p>
+                Submit the form below. You'll get a confirmation email — click the link
+                and your business goes live in our find-vendor results immediately.
+                We'll call you within a few days to verify your business and award the
+                <strong>Chez Certified</strong> badge, which floats your listing to the
+                top of every match.
+            </p>
+        </div>
+
+        <form id="vendor-apply-form" novalidate>
+            <fieldset>
+                <label for="business_name">Business name</label>
+                <input type="text" id="business_name" name="business_name" required maxlength="200" autocomplete="organization">
+            </fieldset>
+
+            <fieldset>
+                <label for="contact_name">Your name</label>
+                <input type="text" id="contact_name" name="contact_name" required maxlength="100" autocomplete="name">
+            </fieldset>
+
+            <fieldset>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required maxlength="255" autocomplete="email">
+                <div class="helper">We'll send a confirmation link to this address.</div>
+            </fieldset>
+
+            <fieldset>
+                <label for="phone">Phone</label>
+                <input type="tel" id="phone" name="phone" required maxlength="30" autocomplete="tel">
+            </fieldset>
+
+            <fieldset>
+                <label for="website">Website (optional)</label>
+                <input type="url" id="website" name="website" maxlength="500" placeholder="https://yourcompany.com" autocomplete="url">
+            </fieldset>
+
+            <fieldset>
+                <label for="category">Service category</label>
+                <select id="category" name="category" required>
+                    <option value="">Loading categories…</option>
+                </select>
+                <!-- Categories are populated from /admin-data/vendor-categories.json
+                     on page load (see script below). Single source of truth shared
+                     with the submit-vendor-application edge function validator. -->
+            </fieldset>
+
+            <fieldset>
+                <label>States you serve</label>
+                <div class="state-actions">
+                    <button type="button" id="select-all-states">Select all</button>
+                    <button type="button" id="clear-all-states">Clear all</button>
+                </div>
+                <div class="state-grid" id="state-grid"></div>
+                <div class="helper">Pick every state you currently take work in.</div>
+            </fieldset>
+
+            <button type="submit" class="submit-btn" id="submit-btn">Submit application</button>
+
+            <div class="feedback" id="feedback"></div>
+        </form>
+    </main>
+
+    <footer style="text-align:center;padding:32px 24px;font-family:var(--sans);font-size:12px;color:var(--ink);opacity:0.5;">
+        <p style="margin-bottom:8px;">Already applied? <a href="/vendor-portal.html" style="color:inherit;font-weight:600;">Manage your listing →</a></p>
+        <p>&copy; 2026 Chez · <a href="/terms.html" style="color:inherit;">Terms</a> · <a href="/privacy.html" style="color:inherit;">Privacy</a> · <a href="mailto:tom@getchez.com" style="color:inherit;">Contact</a></p>
+    </footer>
+
+    <script>
+        const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew";
+
+        const STATES = [
+            "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
+            "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+            "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
+            "VA","WA","WV","WI","WY","DC"
+        ];
+
+        const stateGrid = document.getElementById("state-grid");
+        STATES.forEach((code) => {
+            const wrapper = document.createElement("label");
+            wrapper.innerHTML = `<input type="checkbox" name="state" value="${code}"> ${code}`;
+            stateGrid.appendChild(wrapper);
+        });
+
+        // Load categories from canonical JSON (single source of truth)
+        const categorySelect = document.getElementById("category");
+        fetch("/admin-data/vendor-categories.json")
+            .then((r) => r.json())
+            .then((data) => {
+                categorySelect.innerHTML = '<option value="">Select a category…</option>';
+                (data.groups || []).forEach((group) => {
+                    const og = document.createElement("optgroup");
+                    og.label = group.label;
+                    (group.categories || []).forEach((cat) => {
+                        const opt = document.createElement("option");
+                        opt.value = cat.key;
+                        opt.textContent = cat.label;
+                        og.appendChild(opt);
+                    });
+                    categorySelect.appendChild(og);
+                });
+            })
+            .catch((err) => {
+                console.error("Failed to load categories:", err);
+                categorySelect.innerHTML = '<option value="">Error loading categories — refresh the page</option>';
+            });
+
+        document.getElementById("select-all-states").addEventListener("click", () => {
+            stateGrid.querySelectorAll("input[type=checkbox]").forEach((cb) => cb.checked = true);
+        });
+        document.getElementById("clear-all-states").addEventListener("click", () => {
+            stateGrid.querySelectorAll("input[type=checkbox]").forEach((cb) => cb.checked = false);
+        });
+
+        const form = document.getElementById("vendor-apply-form");
+        const feedback = document.getElementById("feedback");
+        const submitBtn = document.getElementById("submit-btn");
+
+        function showFeedback(message, kind) {
+            feedback.textContent = message;
+            feedback.className = `feedback show ${kind}`;
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            feedback.className = "feedback";
+
+            const states = Array.from(
+                stateGrid.querySelectorAll("input[type=checkbox]:checked"),
+            ).map((cb) => cb.value);
+
+            if (states.length === 0) {
+                showFeedback("Please select at least one state you serve.", "error");
+                return;
+            }
+
+            const payload = {
+                business_name: document.getElementById("business_name").value.trim(),
+                contact_name: document.getElementById("contact_name").value.trim(),
+                email: document.getElementById("email").value.trim(),
+                phone: document.getElementById("phone").value.trim(),
+                website: document.getElementById("website").value.trim() || null,
+                category: document.getElementById("category").value,
+                service_area_states: states,
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting…";
+
+            try {
+                const resp = await fetch(
+                    `${SUPABASE_URL}/functions/v1/submit-vendor-application`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "apikey": SUPABASE_ANON_KEY,
+                            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                        },
+                        body: JSON.stringify(payload),
+                    },
+                );
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    showFeedback(data.error || "Something went wrong. Please try again.", "error");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Submit application";
+                    return;
+                }
+
+                showFeedback(
+                    "Thanks! Check your email for a confirmation link. Once you click it, your business goes live in our directory.",
+                    "success",
+                );
+                form.reset();
+                stateGrid.querySelectorAll("input[type=checkbox]").forEach((cb) => cb.checked = false);
+                submitBtn.textContent = "Submitted ✓";
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Submit another";
+                }, 2000);
+            } catch (err) {
+                console.error(err);
+                showFeedback("Network error. Please try again.", "error");
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Submit application";
+            }
+        });
+    </script>
+</body>
+</html>

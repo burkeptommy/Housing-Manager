@@ -8,6 +8,14 @@ import SwiftUI
 /// Tier 2 (conditional) systems are quiz-driven based on property type/location.
 /// Tier 3 (specialty) systems are user-discovered via the Browse sheet.
 /// Sub-system tier hides items from Vendor Coverage (they live under parents).
+///
+/// NOTE: a subset of these categoryKeys is also exposed to vendors via the
+/// public application form at getchez.com/vendor-apply.html. When you ADD or
+/// RENAME a category here, also update:
+///   1. website/admin-data/vendor-categories.json (form source of truth)
+///   2. supabase/functions/submit-vendor-application/index.ts (VALID_CATEGORIES Set)
+/// Otherwise vendors will be unable to submit, or worse, will submit values
+/// that don't match an in-app system.
 enum SystemTier: Int, Comparable {
     case universal = 1
     case conditional = 2

@@ -1046,7 +1046,7 @@ enum HavenSupabase {
 
     /// One vendor returned by `find-local-vendors`. The edge function caches
     /// these in `local_vendor_results` and refreshes via Google Places after
-    /// 60 days. Top 2 are flagged `isHavenCertified` (>= 4.7 stars, >= 25
+    /// 60 days. Top 2 are flagged `isTopRated` (>= 4.7 stars, >= 25
     /// reviews, no chain indicators); the next 2 are "Suggested".
     struct LocalVendorResult: Codable, Identifiable {
         let name: String
@@ -1056,10 +1056,46 @@ enum HavenSupabase {
         let rating: Double?
         let reviewCount: Int?
         let googlePlaceId: String
-        let isHavenCertified: Bool
+        let isTopRated: Bool
+        // Phase 72: real human-verified Chez Certified badge. True when this
+        // vendor has status='chez_certified' in vendor_applications. Defaults
+        // to false for backward compat with cached server responses that
+        // pre-date the field.
+        let isChezCertified: Bool
+
         let rankPosition: Int
 
         var id: String { googlePlaceId }
+
+        // Custom decoder gives the Phase 72 field a safe default so older
+        // edge function payloads still round-trip cleanly.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.name = try c.decode(String.self, forKey: .name)
+            self.address = try? c.decodeIfPresent(String.self, forKey: .address)
+            self.phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+            self.website = try? c.decodeIfPresent(String.self, forKey: .website)
+            self.rating = try? c.decodeIfPresent(Double.self, forKey: .rating)
+            self.reviewCount = try? c.decodeIfPresent(Int.self, forKey: .reviewCount)
+            self.googlePlaceId = (try? c.decode(String.self, forKey: .googlePlaceId)) ?? ""
+            self.isTopRated = (try? c.decode(Bool.self, forKey: .isTopRated)) ?? false
+            self.isChezCertified = (try? c.decode(Bool.self, forKey: .isChezCertified)) ?? false
+            self.rankPosition = (try? c.decode(Int.self, forKey: .rankPosition)) ?? 0
+        }
+
+        // Designated init for inline construction (e.g. quiz hydrate path).
+        init(name: String, address: String?, phone: String?, website: String?, rating: Double?, reviewCount: Int?, googlePlaceId: String, isTopRated: Bool, isChezCertified: Bool = false, rankPosition: Int) {
+            self.name = name
+            self.address = address
+            self.phone = phone
+            self.website = website
+            self.rating = rating
+            self.reviewCount = reviewCount
+            self.googlePlaceId = googlePlaceId
+            self.isTopRated = isTopRated
+            self.isChezCertified = isChezCertified
+            self.rankPosition = rankPosition
+        }
     }
 
     struct LocalVendorResponse: Codable {
@@ -1076,7 +1112,7 @@ enum HavenSupabase {
     /// Calls the `find-local-vendors` edge function. The function checks the
     /// cache first; on a miss it calls Google Places Text Search, ranks
     /// results, writes the cache, and returns up to 4 vendors total
-    /// (2 Haven Certified + 2 Suggested). Empty `vendors` is a valid result —
+    /// (2 Top-Rated + 2 Suggested). Empty `vendors` is a valid result —
     /// the iOS sheet renders an empty state in that case.
     static func findLocalVendors(
         town: String,

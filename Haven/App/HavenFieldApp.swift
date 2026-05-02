@@ -200,7 +200,7 @@ private struct HavenFieldWelcomeView: View {
                             onSignIn()
                         }
 
-                        Link(destination: URL(string: "https://havenhome.dev/handyman")!) {
+                        Link(destination: URL(string: "https://getchez.com/handyman")!) {
                             Text("Open desktop command center")
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)
@@ -390,7 +390,7 @@ private struct HavenFieldSignInView: View {
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.action)
 
-                        Link("Open desktop command center", destination: URL(string: "https://havenhome.dev/handyman")!)
+                        Link("Open desktop command center", destination: URL(string: "https://getchez.com/handyman")!)
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textPrimary)
                     }
@@ -548,7 +548,7 @@ private struct HavenFieldWorkspaceSetupView: View {
                         }
                         .disabled(isLoading)
 
-                        Link(destination: URL(string: "https://havenhome.dev/handyman")!) {
+                        Link(destination: URL(string: "https://getchez.com/handyman")!) {
                             Text("Open desktop command center")
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)

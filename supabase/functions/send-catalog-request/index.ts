@@ -1,5 +1,5 @@
 // Haven Edge Function: send-catalog-request
-// Sends an email to tom@havenhome.dev when a user can't find their equipment
+// Sends an email to tom@getchez.com when a user can't find their equipment
 // in the catalog, so the team can add it.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -81,8 +81,8 @@ Please add this to the equipment database so it's available next time.
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          personalizations: [{ to: [{ email: "tom@havenhome.dev" }] }],
-          from: { email: "alfred@havenhome.dev", name: "Chez Equipment Catalog" },
+          personalizations: [{ to: [{ email: "tom@getchez.com" }] }],
+          from: { email: "alfred@getchez.com", name: "Chez Equipment Catalog" },
           subject: `Equipment Request: ${brand} ${systemType}${modelNumber ? ` (${modelNumber})` : ""}`,
           content: [{ type: "text/plain", value: emailBody }],
         }),

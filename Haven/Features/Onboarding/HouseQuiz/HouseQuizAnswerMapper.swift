@@ -830,7 +830,7 @@ final class HouseQuizAnswerMapper {
                             // house_quiz_state.started_at.
                             insert.source = parsed.source
                             insert.website = parsed.website
-                            // Build 83: stash rating/reviews/Haven Certified
+                            // Build 83: stash rating/reviews/Top-Rated
                             // tag in `notes` so the contractor list can show
                             // attribution without a schema migration. The
                             // contractors table has no rating/review/certified
@@ -1676,17 +1676,19 @@ final class HouseQuizAnswerMapper {
         let reviewCount: Int?
         let phone: String?
         let website: String?
-        let isHavenCertified: Bool
+        let isTopRated: Bool
         let source: String
 
         /// Render a human caption for the contractor `notes` column so we can
-        /// surface "Chez Certified \u{2022} 4.7 \u{2022} 120 reviews" without
+        /// surface "Top-Rated \u{2022} 4.7 \u{2022} 120 reviews" without
         /// adding new columns. Returns nil when there's nothing to attribute
-        /// (e.g. a manual-add row with no rating).
+        /// (e.g. a manual-add row with no rating). The phrase "Chez Certified"
+        /// is intentionally reserved for the upcoming human-verified vendor
+        /// pipeline — never use it for the rating-derived heuristic.
         func attributionNotes() -> String? {
             var parts: [String] = []
-            if isHavenCertified {
-                parts.append("Chez Certified")
+            if isTopRated {
+                parts.append("Top-Rated")
             }
             if let rating {
                 parts.append(String(format: "%.1f stars", rating))
@@ -1727,7 +1729,10 @@ final class HouseQuizAnswerMapper {
                 let trimmed = parts[5].trimmingCharacters(in: .whitespacesAndNewlines)
                 return trimmed.isEmpty ? nil : trimmed
             }()
-            let certified = parts[6].trimmingCharacters(in: .whitespacesAndNewlines) == "haven_certified"
+            // Backward-compat: pre-Phase-71 entries serialized this slot as
+            // "haven_certified". New entries use "top_rated". Accept either.
+            let topRatedMarker = parts[6].trimmingCharacters(in: .whitespacesAndNewlines)
+            let certified = topRatedMarker == "top_rated" || topRatedMarker == "haven_certified"
             // 7-part entries are produced by QuizLocalContractorPicker's
             // Google Places adoption path. Tag them as find_vendor so the
             // contractors.source discriminator carries the provenance.
@@ -1738,7 +1743,7 @@ final class HouseQuizAnswerMapper {
                 reviewCount: reviews,
                 phone: phone,
                 website: website,
-                isHavenCertified: certified,
+                isTopRated: certified,
                 source: "find_vendor"
             )
         }
@@ -1754,7 +1759,7 @@ final class HouseQuizAnswerMapper {
             reviewCount: nil,
             phone: nil,
             website: nil,
-            isHavenCertified: false,
+            isTopRated: false,
             source: "quiz"
         )
     }

@@ -471,7 +471,7 @@ function buildScenarioPrompt(
 
   const hypotheticalBaselines = buildHypotheticalBaselines(documentsMissing);
 
-  const baseInstructions = `You are a financial and estate planning scenario simulator for Haven, a home management app. You have access to this family's document vault and financial picture. Generate a detailed scenario analysis.
+  const baseInstructions = `You are a financial and estate planning scenario simulator for Chez, a home management app. (The product is named Chez — never refer to it as Haven.) You have access to this family's document vault and financial picture. Generate a detailed scenario analysis.
 
 IMPORTANT RULES:
 1. Use the ACTUAL names, amounts, and details from the household data below when available. Never use generic placeholders if real data exists.
@@ -731,7 +731,7 @@ function buildCustomPrompt(
   const hasAnyDocs = documentsUsed.length > 0;
   const hypotheticalBaselines = buildHypotheticalBaselines(documentsMissing);
 
-  return `You are the "What If?" Scenario Simulator for Haven, a premium estate and home management platform. You have access to this family's financial picture.
+  return `You are the "What If?" Scenario Simulator for Chez, a premium estate and home management platform. (The product is named Chez — never refer to it as Haven.) You have access to this family's financial picture.
 
 ${hasAnyDocs
     ? "The user has uploaded documents. Analyze their question thoroughly using their actual data. Be specific — use real names, real dollar amounts, real policy numbers, real dates from their documents."

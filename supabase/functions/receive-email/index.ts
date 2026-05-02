@@ -361,8 +361,9 @@ serve(async (req: Request) => {
     console.log(`[receive-email] From: ${fromAddress}, To: ${toAddress}, Subject: ${subject}, Has attachment: ${!!attachmentBase64}`);
 
     // --- LOOK UP HOUSEHOLD ---
-    // Match both alfred.havenhome.dev (new) and projects.havenhome.dev (legacy)
-    const emailMatch = toAddress.match(/([a-z0-9]+)@(?:alfred|projects)\.havenhome\.dev/i);
+    // Match alfred.getchez.com (canonical) plus legacy alfred.havenhome.dev /
+    // projects.havenhome.dev so old forwards keep working post-cutover.
+    const emailMatch = toAddress.match(/([a-z0-9]+)@(?:alfred\.getchez\.com|(?:alfred|projects)\.havenhome\.dev)/i);
     if (!emailMatch) {
       console.log(`[receive-email] No matching haven address in: ${toAddress}`);
       return new Response(
@@ -371,9 +372,11 @@ serve(async (req: Request) => {
       );
     }
 
-    // Normalize to alfred domain for lookup, but also check projects domain for legacy
+    // Normalize to canonical getchez.com domain for DB lookup. The migration
+    // rewrites every existing household_email_addresses row, so legacy domains
+    // resolve to the same household via the same local part.
     const localPart = emailMatch[1].toLowerCase();
-    const uniqueAddress = `${localPart}@alfred.havenhome.dev`;
+    const uniqueAddress = `${localPart}@alfred.getchez.com`;
 
     const { data: emailRecord, error: lookupError } = await supabase
       .from("household_email_addresses")
@@ -484,7 +487,7 @@ serve(async (req: Request) => {
     }
 
     // --- CALENDAR INVITE DETECTION ---
-    // When someone adds alfred@havenhome.dev as a guest on a calendar event,
+    // When someone adds alfred@getchez.com as a guest on a calendar event,
     // the email contains inline text/calendar (iCal) data with VEVENT blocks.
     // Detect and parse these to create family_events directly.
     const allParsedAttachments = [
@@ -2123,9 +2126,9 @@ Respond with ONLY valid JSON:
           console.log("[receive-email] Updated placeholder to failure state");
         } else if (toAddress) {
           // No placeholder yet — try to create a failure inbox item
-          const match = toAddress.match(/([a-z0-9]+)@(?:alfred|projects)\.havenhome\.dev/i);
+          const match = toAddress.match(/([a-z0-9]+)@(?:alfred\.getchez\.com|(?:alfred|projects)\.havenhome\.dev)/i);
           if (match) {
-            const addr = `${match[1].toLowerCase()}@alfred.havenhome.dev`;
+            const addr = `${match[1].toLowerCase()}@alfred.getchez.com`;
             const { data: rec } = await svc
               .from("household_email_addresses")
               .select("household_id")

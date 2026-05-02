@@ -1,0 +1,61 @@
+{
+  "_comment": "Canonical vendor category list. SOURCE OF TRUTH for the vendor application form. Mirror of Tier 1 + Tier 2 + Specialty + Sub-System categories from Haven/Features/Property/Services/SystemCategoryRegistry.swift. When you add or rename a category in Swift, update this file AND the VALID_CATEGORIES Set in supabase/functions/submit-vendor-application/index.ts. Form fetches this file on load.",
+  "_version": "1",
+  "_updated_at": "2026-05-01",
+  "groups": [
+    {
+      "label": "Most common",
+      "categories": [
+        { "key": "HVAC", "label": "HVAC" },
+        { "key": "Plumbing", "label": "Plumbing" },
+        { "key": "Electrical", "label": "Electrical" },
+        { "key": "Roofing", "label": "Roofing" },
+        { "key": "Landscaping", "label": "Landscaping" },
+        { "key": "Cleaning Service", "label": "Cleaning Service" },
+        { "key": "Handyman", "label": "Handyman" },
+        { "key": "Pest Control", "label": "Pest Control" },
+        { "key": "Snow Removal", "label": "Snow Removal" },
+        { "key": "Tree Service", "label": "Tree Service" }
+      ]
+    },
+    {
+      "label": "Specialty trades",
+      "categories": [
+        { "key": "Water Heater", "label": "Water Heater" },
+        { "key": "Generator", "label": "Backup Generator" },
+        { "key": "Boiler", "label": "Boiler" },
+        { "key": "Chimney", "label": "Chimney" },
+        { "key": "Septic System", "label": "Septic System" },
+        { "key": "Well System", "label": "Well System" },
+        { "key": "Pool/Spa", "label": "Pool / Spa" },
+        { "key": "Hot Tub", "label": "Hot Tub" },
+        { "key": "Solar", "label": "Solar" },
+        { "key": "EV Charger", "label": "EV Charger" },
+        { "key": "Water Treatment", "label": "Water Treatment" },
+        { "key": "Painting", "label": "Painting" },
+        { "key": "Siding/Exterior", "label": "Siding / Exterior" },
+        { "key": "Window Cleaning", "label": "Window Cleaning" },
+        { "key": "Pressure Washing", "label": "Pressure Washing" },
+        { "key": "Driveway Sealcoating", "label": "Driveway Sealcoating" },
+        { "key": "Gutter Cleaning", "label": "Gutter Cleaning" },
+        { "key": "Mosquito & Tick", "label": "Mosquito & Tick" },
+        { "key": "Pet Waste", "label": "Pet Waste Removal" },
+        { "key": "Garage Door", "label": "Garage Door" },
+        { "key": "Sump Pump", "label": "Sump Pump" },
+        { "key": "Irrigation", "label": "Sprinkler / Irrigation" },
+        { "key": "Smart Home", "label": "Smart Home / Networking" },
+        { "key": "Security System", "label": "Security System" },
+        { "key": "Air Quality", "label": "Air Quality / Radon" },
+        { "key": "Appliance", "label": "Appliance Repair" },
+        { "key": "Deck/Outdoor", "label": "Deck / Outdoor" },
+        { "key": "Fire Protection", "label": "Fire Protection" },
+        { "key": "Crawl Space", "label": "Crawl Space" },
+        { "key": "Attic & Foundation", "label": "Attic & Foundation" },
+        { "key": "Elevator", "label": "Residential Elevator" },
+        { "key": "Wine Cellar", "label": "Wine Cellar" },
+        { "key": "Radiant Floor", "label": "Radiant Floor Heating" },
+        { "key": "Trash & Recycling", "label": "Trash & Recycling" }
+      ]
+    }
+  ]
+}

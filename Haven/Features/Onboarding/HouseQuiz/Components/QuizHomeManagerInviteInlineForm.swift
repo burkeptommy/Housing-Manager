@@ -250,7 +250,7 @@ struct QuizHomeManagerInviteInlineForm: View {
     private func presentShareSheet() {
         guard case .inviteSent(_, _, let code) = trustMoment else { return }
         let formatted = formatCode(code)
-        let text = "Hey \(firstName), here's your Chez home manager invite code: \(formatted). Use it to join my household: https://havenhome.dev/join/\(code)"
+        let text = "Hey \(firstName), here's your Chez home manager invite code: \(formatted). Use it to join my household: https://getchez.com/join/\(code)"
         let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
 
         // Find the topmost UIWindowScene to present from. iPad needs a popover.

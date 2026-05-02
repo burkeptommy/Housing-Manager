@@ -9,7 +9,7 @@ enum AppConfig {
     static var version: String { Bundle.main.appVersion }
 
     // MARK: - API URLs
-    static let supportEmail = "support@havenhome.dev"
+    static let supportEmail = "support@getchez.com"
 
     // MARK: - Supabase
     enum Supabase {

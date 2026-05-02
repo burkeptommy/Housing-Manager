@@ -182,7 +182,7 @@ The typicalItems list should focus on the DESIGN CHOICES and MATERIALS the homeo
       : "";
 
     // --- BUILD PROMPTS ---
-    const systemPrompt = `You are a home improvement cost estimator and project research assistant for Haven, a home management app. You MUST return ONLY valid JSON — no markdown code fences, no backticks, no explanation outside the JSON object. Start your response with { and end with }.
+    const systemPrompt = `You are a home improvement cost estimator and project research assistant for Chez, a home management app. You MUST return ONLY valid JSON — no markdown code fences, no backticks, no explanation outside the JSON object. Start your response with { and end with }.
 
 Your job is to provide realistic, detailed cost estimates for home improvement projects. Follow these rules:
 

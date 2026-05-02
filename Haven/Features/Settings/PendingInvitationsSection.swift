@@ -236,7 +236,7 @@ struct PendingInvitationsSection: View {
     private func presentShareSheet(for invitation: HouseholdInvitationRow) {
         let formatted = formattedCode(invitation.inviteCode)
         let name = displayName(forInvitationRow: invitation)
-        let text = "Hey \(name), here's your Chez invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(invitation.inviteCode)"
+        let text = "Hey \(name), here's your Chez invite code: \(formatted). Use it to join our household: https://getchez.com/join/\(invitation.inviteCode)"
         let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }

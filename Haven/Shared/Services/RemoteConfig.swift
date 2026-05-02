@@ -47,7 +47,7 @@ final class RemoteConfig {
     private(set) var vendorRouting: [String: String] = [:]
 
     private init(
-        baseURL: URL = URL(string: "https://havenhome.dev/admin-data")!,
+        baseURL: URL = URL(string: "https://getchez.com/admin-data")!,
         session: URLSession = .shared,
         defaults: UserDefaults = .standard
     ) {

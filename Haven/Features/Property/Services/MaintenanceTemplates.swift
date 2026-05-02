@@ -1551,7 +1551,7 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Appliance",
                 title: "Replace refrigerator water filter",
-                description: "Haven adds this to your handyman punch list every six months. Drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.",
+                description: "Chez adds this to your handyman punch list every six months. Drop a fresh filter on the counter and the swap takes 30 seconds. No handyman? Most fridge manufacturers offer a subscription that ships your filter at the right interval.",
                 frequency: "Semi-annually",
                 priority: "Medium",
                 estimatedCostRange: "$30–$60",

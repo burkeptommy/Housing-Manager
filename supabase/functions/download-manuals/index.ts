@@ -179,7 +179,7 @@ serve(async (req: Request) => {
           signal: AbortSignal.timeout(30000),
           headers: {
             "User-Agent":
-              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Haven/1.0",
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chez/1.0",
             Accept: "application/pdf,*/*",
           },
         });

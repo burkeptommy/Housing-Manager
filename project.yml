@@ -74,10 +74,13 @@ targets:
         # "production" gets injected automatically by the App Store distribution
         # provisioning profile when the app is exported for App Store release.
         aps-environment: development
-        # Universal links. Both domains are needed because havenhome.dev hosts
-        # the marketing site and api.havenhome.dev (when configured) hosts the
-        # webhook callback paths.
+        # Universal links. getchez.com is the new canonical domain; havenhome.dev
+        # entries are kept so invite links sent before the domain switch still
+        # open the app. api.* entries cover any future webhook callback paths.
         com.apple.developer.associated-domains:
+          - applinks:getchez.com
+          - applinks:www.getchez.com
+          - applinks:api.getchez.com
           - applinks:havenhome.dev
           - applinks:api.havenhome.dev
 

@@ -7,7 +7,7 @@
 //      the last 30 days (reuses the same cache table as find-local-vendors).
 //   2. On cache miss, call Google Places Text Search to find local
 //      professionals matching the advisor type near (town, state).
-//   3. Filter into "Haven Certified" (rating >= 4.8, >= 10 reviews, no
+//   3. Filter into "Top-Rated" (rating >= 4.8, >= 10 reviews, no
 //      chain indicators — top 2) and "Suggested" (rating >= 4.5, >= 5
 //      reviews — next 5). Softer thresholds than vendors because professional
 //      services typically have fewer reviews.
@@ -33,7 +33,7 @@ const corsHeaders = {
 
 const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 const CACHE_TTL_DAYS = 30;
-// Build 90: bumped from 4 to 7 so the sheet shows 2 Haven Certified + 5
+// Build 90: bumped from 4 to 7 so the sheet shows 2 Top-Rated + 5
 // Suggested, giving users a meaningful list of local options.
 const MAX_RESULTS = 7;
 
@@ -45,7 +45,7 @@ const ADVISOR_SEARCH_TERMS: Record<string, string> = {
   life_insurance: "life insurance agent",
 };
 
-// Chain indicators filtered out of "Haven Certified" tier for professional
+// Chain indicators filtered out of "Top-Rated" tier for professional
 // advisors. The goal is to surface local independents and boutique firms
 // over national chains. Chains can still appear in the "Suggested" tier.
 const CHAIN_INDICATORS = [
@@ -78,8 +78,69 @@ interface AdvisorCandidate {
   rating: number | null;
   reviewCount: number | null;
   googlePlaceId: string;
-  isHavenCertified: boolean;
+  isTopRated: boolean;
+  // Phase 72: real human-verified Chez Certified badge. Only true for rows
+  // sourced from vendor_applications.status='chez_certified'.
+  isChezCertified: boolean;
   rankPosition: number;
+}
+
+// Phase 72: pull active vendor applications matching the (state, category)
+// query and front-load them so chez_certified floats above Google results.
+async function mergeAdvisorApplications(
+  supabase: ReturnType<typeof createClient>,
+  googleAdvisors: AdvisorCandidate[],
+  state: string,
+  rawCategory: string,
+): Promise<AdvisorCandidate[]> {
+  try {
+    const { data: apps, error } = await supabase
+      .from("vendor_applications")
+      .select("id, business_name, phone, website, linked_google_place_id, status, verified_at")
+      .ilike("category", rawCategory)
+      .contains("service_area_states", [state.toUpperCase()])
+      .in("status", ["chez_certified", "live_unverified"])
+      .order("status", { ascending: true })
+      .order("verified_at", { ascending: false, nullsFirst: false })
+      .limit(20);
+
+    if (error || !apps || apps.length === 0) {
+      if (error) console.warn("[find-local-advisors] application merge query failed:", error);
+      return googleAdvisors;
+    }
+
+    const linkedGoogleIds = new Set<string>(
+      apps
+        .map((a) => a.linked_google_place_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    );
+    const filteredGoogle = googleAdvisors.filter(
+      (v) => !linkedGoogleIds.has(v.googlePlaceId),
+    );
+
+    const applicationAdvisors: AdvisorCandidate[] = apps.map((app) => ({
+      name: app.business_name,
+      address: null,
+      phone: app.phone ?? null,
+      website: app.website ?? null,
+      rating: null,
+      reviewCount: null,
+      googlePlaceId: app.linked_google_place_id ?? `app:${app.id}`,
+      isTopRated: false,
+      isChezCertified: app.status === "chez_certified",
+      rankPosition: 0,
+    }));
+
+    applicationAdvisors.sort((a, b) => {
+      if (a.isChezCertified !== b.isChezCertified) return a.isChezCertified ? -1 : 1;
+      return 0;
+    });
+
+    return [...applicationAdvisors, ...filteredGoogle].slice(0, 6);
+  } catch (err) {
+    console.warn("[find-local-advisors] application merge threw:", err);
+    return googleAdvisors;
+  }
 }
 
 serve(async (req: Request) => {
@@ -155,11 +216,13 @@ serve(async (req: Request) => {
         rating: row.rating != null ? Number(row.rating) : null,
         reviewCount: row.review_count,
         googlePlaceId: row.google_place_id,
-        isHavenCertified: !!row.is_haven_certified,
+        isTopRated: !!row.is_top_rated,
+        isChezCertified: false,
         rankPosition: row.rank_position ?? 0,
       }));
+      const merged = await mergeAdvisorApplications(supabase, vendors, state, rawAdvisorType);
       return new Response(
-        JSON.stringify({ vendors, cached: true }),
+        JSON.stringify({ vendors: merged, cached: true }),
         { status: 200, headers }
       );
     }
@@ -257,7 +320,7 @@ serve(async (req: Request) => {
       return CHAIN_INDICATORS.some((token) => lower.includes(token));
     }
 
-    // Haven Certified: 4.8+ stars, 10+ reviews, not a chain.
+    // Top-Rated: 4.8+ stars, 10+ reviews, not a chain.
     // Softer thresholds than vendors — professional services get fewer reviews.
     const havenCertified = normalized
       .filter((p) => p.rating >= 4.8 && p.reviewCount >= 10 && !isChain(p.name))
@@ -295,7 +358,8 @@ serve(async (req: Request) => {
         rating: p.rating,
         reviewCount: p.reviewCount,
         googlePlaceId: p.googlePlaceId,
-        isHavenCertified: true,
+        isTopRated: true,
+        isChezCertified: false,
         rankPosition: rank++,
       });
     }
@@ -308,7 +372,8 @@ serve(async (req: Request) => {
         rating: p.rating,
         reviewCount: p.reviewCount,
         googlePlaceId: p.googlePlaceId,
-        isHavenCertified: false,
+        isTopRated: false,
+        isChezCertified: false,
         rankPosition: rank++,
       });
     }
@@ -326,7 +391,7 @@ serve(async (req: Request) => {
         website: v.website,
         rating: v.rating,
         review_count: v.reviewCount,
-        is_haven_certified: v.isHavenCertified,
+        is_top_rated: v.isTopRated,
         rank_position: v.rankPosition,
       }));
       const { error: insertError } = await supabase
@@ -343,8 +408,9 @@ serve(async (req: Request) => {
       }
     }
 
+    const mergedFinal = await mergeAdvisorApplications(supabase, finalAdvisors, state, rawAdvisorType);
     return new Response(
-      JSON.stringify({ vendors: finalAdvisors, cached: false }),
+      JSON.stringify({ vendors: mergedFinal, cached: false }),
       { status: 200, headers }
     );
   } catch (error) {

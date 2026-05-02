@@ -8,7 +8,7 @@
 //   2. On cache miss, call Google Places Text Search to find local
 //      businesses matching the category near (town, state).
 //   3. Fetch Place Details (phone + website) for each candidate.
-//   4. Filter into "Haven Certified" (rating >= 4.7, >= 25 reviews, no
+//   4. Filter into "Top-Rated" (rating >= 4.7, >= 25 reviews, no
 //      chain indicators — top 2) and "Suggested" (rating >= 4.5, >= 15
 //      reviews — next 2).
 //   5. Cache the top 4 in local_vendor_results.
@@ -77,7 +77,7 @@ const CATEGORY_SEARCH_TERMS: Record<string, string> = {
   solar: "solar panel service repair",
 };
 
-// Common chain indicators we filter out of "Haven Certified". Heuristic — the
+// Common chain indicators we filter out of "Top-Rated". Heuristic — the
 // goal is to surface local independents, not nationals. The next tier
 // ("Suggested") is unfiltered so chains can still appear there.
 const CHAIN_INDICATORS = [
@@ -176,8 +176,79 @@ interface VendorCandidate {
   rating: number | null;
   reviewCount: number | null;
   googlePlaceId: string;
-  isHavenCertified: boolean;
+  isTopRated: boolean;
+  // Phase 72: real human-verified Chez Certified badge. Only true for rows
+  // sourced from vendor_applications.status='chez_certified'. Google-derived
+  // rows always carry isChezCertified=false.
+  isChezCertified: boolean;
   rankPosition: number;
+}
+
+// Phase 72: pull active vendor applications matching the (state, category)
+// query, dedup against Google results, and front-load them so chez_certified
+// floats to the top and live_unverified appears mixed in below the badge tier.
+async function mergeVendorApplications(
+  supabase: ReturnType<typeof createClient>,
+  googleVendors: VendorCandidate[],
+  state: string,
+  rawCategory: string,
+): Promise<VendorCandidate[]> {
+  try {
+    const { data: apps, error } = await supabase
+      .from("vendor_applications")
+      .select("id, business_name, phone, website, linked_google_place_id, status, verified_at")
+      .ilike("category", rawCategory)
+      .contains("service_area_states", [state.toUpperCase()])
+      .in("status", ["chez_certified", "live_unverified"])
+      .order("status", { ascending: true })
+      .order("verified_at", { ascending: false, nullsFirst: false })
+      .limit(20);
+
+    if (error || !apps || apps.length === 0) {
+      if (error) console.warn("[find-local-vendors] application merge query failed:", error);
+      return googleVendors;
+    }
+
+    const linkedGoogleIds = new Set<string>(
+      apps
+        .map((a) => a.linked_google_place_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    );
+    const filteredGoogle = googleVendors.filter(
+      (v) => !linkedGoogleIds.has(v.googlePlaceId),
+    );
+
+    const applicationVendors: VendorCandidate[] = apps.map((app) => ({
+      name: app.business_name,
+      address: null,
+      phone: app.phone ?? null,
+      website: app.website ?? null,
+      rating: null,
+      reviewCount: null,
+      // Use linked place_id when we have it (preserves any future Google
+      // metadata we want to surface) — otherwise synthesize from app uuid
+      // so iOS Identifiable conformance still works.
+      googlePlaceId: app.linked_google_place_id ?? `app:${app.id}`,
+      isTopRated: false,
+      isChezCertified: app.status === "chez_certified",
+      rankPosition: 0,
+    }));
+
+    // Sort: chez_certified > live_unverified, preserves the verified_at
+    // ordering from the SQL query inside each tier.
+    applicationVendors.sort((a, b) => {
+      if (a.isChezCertified !== b.isChezCertified) return a.isChezCertified ? -1 : 1;
+      return 0;
+    });
+
+    // Cap merged result at 6 — applications first, then Google fills in.
+    // Phase 72 review: 8 felt too long in the find-vendor sheet; 6 keeps the
+    // list scannable without scrolling on most devices.
+    return [...applicationVendors, ...filteredGoogle].slice(0, 6);
+  } catch (err) {
+    console.warn("[find-local-vendors] application merge threw:", err);
+    return googleVendors;
+  }
 }
 
 serve(async (req: Request) => {
@@ -257,11 +328,15 @@ serve(async (req: Request) => {
         rating: row.rating != null ? Number(row.rating) : null,
         reviewCount: row.review_count,
         googlePlaceId: row.google_place_id,
-        isHavenCertified: !!row.is_haven_certified,
+        isTopRated: !!row.is_top_rated,
+        // Cache only stores Google-derived rows. Real Chez Certified flag is
+        // overlaid from vendor_applications below.
+        isChezCertified: false,
         rankPosition: row.rank_position ?? 0,
       }));
+      const merged = await mergeVendorApplications(supabase, vendors, state, rawCategory);
       return new Response(
-        JSON.stringify({ vendors, cached: true }),
+        JSON.stringify({ vendors: merged, cached: true }),
         { status: 200, headers }
       );
     }
@@ -372,7 +447,7 @@ serve(async (req: Request) => {
     // Build 90: filter out obvious non-service businesses before ranking
     const serviceProviders = normalized.filter((p) => !isRetailer(p.name) && !isChain(p.name));
 
-    // Haven Certified candidates: 4.7+ stars, 25+ reviews, service providers only.
+    // Top-Rated candidates: 4.7+ stars, 25+ reviews, service providers only.
     // Take top 2 by rating then review count.
     const havenCertified = serviceProviders
       .filter((p) => p.rating >= 4.7 && p.reviewCount >= 25)
@@ -385,7 +460,7 @@ serve(async (req: Request) => {
     const havenCertifiedIds = new Set(havenCertified.map((p) => p.googlePlaceId));
 
     // Suggested candidates: 4.5+ stars, 15+ reviews, service providers only.
-    // Skip rows already selected as Haven Certified. Take next 2.
+    // Skip rows already selected as Top-Rated. Take next 2.
     const suggested = serviceProviders
       .filter(
         (p) =>
@@ -411,7 +486,8 @@ serve(async (req: Request) => {
         rating: p.rating,
         reviewCount: p.reviewCount,
         googlePlaceId: p.googlePlaceId,
-        isHavenCertified: true,
+        isTopRated: true,
+        isChezCertified: false,
         rankPosition: rank++,
       });
     }
@@ -424,7 +500,8 @@ serve(async (req: Request) => {
         rating: p.rating,
         reviewCount: p.reviewCount,
         googlePlaceId: p.googlePlaceId,
-        isHavenCertified: false,
+        isTopRated: false,
+        isChezCertified: false,
         rankPosition: rank++,
       });
     }
@@ -442,7 +519,7 @@ serve(async (req: Request) => {
         website: v.website,
         rating: v.rating,
         review_count: v.reviewCount,
-        is_haven_certified: v.isHavenCertified,
+        is_top_rated: v.isTopRated,
         rank_position: v.rankPosition,
       }));
       const { error: insertError } = await supabase
@@ -459,8 +536,9 @@ serve(async (req: Request) => {
       }
     }
 
+    const mergedFinal = await mergeVendorApplications(supabase, finalVendors, state, rawCategory);
     return new Response(
-      JSON.stringify({ vendors: finalVendors, cached: false }),
+      JSON.stringify({ vendors: mergedFinal, cached: false }),
       { status: 200, headers }
     );
   } catch (error) {

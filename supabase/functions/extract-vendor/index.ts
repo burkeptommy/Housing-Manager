@@ -33,7 +33,7 @@ serve(async (req: Request) => {
     try {
       const siteResponse = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; HavenBot/1.0; +https://havenhome.dev)",
+          "User-Agent": "Mozilla/5.0 (compatible; ChezBot/1.0; +https://getchez.com)",
           "Accept": "text/html,application/xhtml+xml",
         },
         signal: AbortSignal.timeout(15000),

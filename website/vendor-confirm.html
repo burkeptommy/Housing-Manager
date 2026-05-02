@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Confirm your Chez vendor application.">
+    <meta name="robots" content="noindex">
+
+    <title>Confirm your Chez vendor listing</title>
+    <link rel="stylesheet" href="/chez.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        .confirm-container {
+            max-width: 560px;
+            margin: 80px auto;
+            padding: 40px 32px;
+            text-align: center;
+            font-family: var(--sans);
+        }
+        .confirm-container h1 {
+            font-family: var(--serif);
+            font-size: 28px;
+            color: var(--ink);
+            margin: 0 0 16px;
+        }
+        .confirm-container p {
+            font-size: 15px;
+            color: var(--ink);
+            opacity: 0.8;
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+        .icon-circle {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        .icon-circle.success { background: #E8F5E9; color: #1B5E20; }
+        .icon-circle.error   { background: #FBEAEA; color: #8A2419; }
+        .icon-circle.info    { background: #FAF7F2; color: var(--ink); }
+        .cta {
+            display: inline-block;
+            background: var(--action);
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 15px;
+            margin-top: 16px;
+        }
+        .cta-secondary {
+            display: inline-block;
+            color: var(--ink);
+            text-decoration: underline;
+            font-size: 14px;
+            margin-top: 16px;
+        }
+        .loading-pulse {
+            font-size: 14px;
+            color: var(--ink);
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="/" class="brand">
+                <img src="/chez-logo.png" alt="Chez" />
+            </a>
+        </div>
+    </header>
+
+    <main class="confirm-container" id="confirm-container">
+        <p class="loading-pulse">Confirming your application…</p>
+    </main>
+
+    <footer style="text-align:center;padding:32px 24px;font-family:var(--sans);font-size:12px;color:var(--ink);opacity:0.5;">
+        <p>&copy; 2026 Chez · <a href="mailto:tom@getchez.com" style="color:inherit;">tom@getchez.com</a></p>
+    </footer>
+
+    <script>
+        const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew";
+
+        const container = document.getElementById("confirm-container");
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+
+        function render(html) {
+            container.innerHTML = html;
+        }
+
+        function renderSuccess(businessName, alreadyConfirmed) {
+            render(`
+                <div class="icon-circle success">✓</div>
+                <h1>You're listed${alreadyConfirmed ? "" : " on Chez"}.</h1>
+                <p>
+                    <strong>${businessName}</strong> is now visible to households
+                    searching for vendors in your service area.
+                </p>
+                <p>
+                    We'll reach out by phone over the next few days to verify your
+                    business and award the <strong>Chez Certified</strong> badge,
+                    which floats your listing to the top of every match.
+                </p>
+                <p>
+                    Questions? Email <a href="mailto:tom@getchez.com" style="color:var(--ink);">tom@getchez.com</a>.
+                </p>
+                <a href="/vendor-portal.html" class="cta">Manage your listing</a>
+                <p style="margin-top:16px;"><a href="/" class="cta-secondary">Back to Chez</a></p>
+            `);
+        }
+
+        function renderError(title, message, retry) {
+            render(`
+                <div class="icon-circle error">!</div>
+                <h1>${title}</h1>
+                <p>${message}</p>
+                ${retry ? `<a href="/vendor-apply.html" class="cta">Re-apply</a>` : `<a href="/" class="cta-secondary">Back to Chez</a>`}
+            `);
+        }
+
+        if (!token) {
+            renderError(
+                "Missing confirmation link",
+                "This page was opened without a confirmation token. Check the email link you clicked, or re-submit your application.",
+                true,
+            );
+        } else {
+            fetch(
+                `${SUPABASE_URL}/functions/v1/confirm-vendor-application?token=${encodeURIComponent(token)}`,
+                {
+                    method: "POST",
+                    headers: {
+                        "apikey": SUPABASE_ANON_KEY,
+                        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                    },
+                },
+            )
+                .then((r) => r.json().then((d) => ({ status: r.status, data: d })))
+                .then(({ status, data }) => {
+                    switch (data.status) {
+                        case "confirmed":
+                            renderSuccess(data.business_name, false);
+                            break;
+                        case "already_confirmed":
+                            renderSuccess(data.business_name, true);
+                            break;
+                        case "expired":
+                            renderError("Link expired", data.message, true);
+                            break;
+                        case "rejected":
+                            renderError("Application not active", data.message, false);
+                            break;
+                        case "not_found":
+                            renderError("Link not found", data.message, true);
+                            break;
+                        case "invalid":
+                            renderError("Invalid link", data.message, true);
+                            break;
+                        default:
+                            renderError(
+                                "Something went wrong",
+                                data.message || "Please try the link again, or contact tom@getchez.com.",
+                                false,
+                            );
+                    }
+                })
+                .catch((err) => {
+                    console.error(err);
+                    renderError(
+                        "Network error",
+                        "We couldn't reach Chez. Please check your connection and try the link again.",
+                        false,
+                    );
+                });
+        }
+    </script>
+</body>
+</html>

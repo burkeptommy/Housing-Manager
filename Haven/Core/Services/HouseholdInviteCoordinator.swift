@@ -648,7 +648,7 @@ actor HouseholdInviteCoordinator {
         let payload = HavenSupabase.SendHouseholdInviteRequest(
             to: inviteEmail,
             inviteCode: inviteCode,
-            inviteUrl: "https://havenhome.dev/join/\(inviteCode)",
+            inviteUrl: "https://getchez.com/join/\(inviteCode)",
             inviterName: inviterName,
             inviterAvatarUrl: nil,
             householdName: household?.name,

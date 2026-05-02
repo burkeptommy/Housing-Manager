@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Manage your Chez vendor listing.">
+    <meta name="robots" content="noindex">
+    <title>Manage your Chez listing</title>
+    <link rel="stylesheet" href="/chez.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        body { background: #FAFAFA; margin: 0; }
+        .portal-shell {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 32px 24px 64px;
+        }
+        .portal-shell h1 {
+            font-family: var(--serif);
+            font-size: 26px;
+            color: var(--ink);
+            margin: 0 0 16px;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #E3D9C6;
+            border-radius: 12px;
+            padding: 28px 32px;
+            margin-bottom: 16px;
+        }
+        .field {
+            margin-bottom: 16px;
+        }
+        .field label {
+            display: block;
+            font-family: var(--sans);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--ink);
+            margin-bottom: 6px;
+        }
+        .field input[type="text"],
+        .field input[type="email"],
+        .field input[type="tel"],
+        .field input[type="url"] {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid #D8DADF;
+            border-radius: 8px;
+            font-family: var(--sans);
+            font-size: 15px;
+            color: var(--ink);
+            background: #fff;
+            box-sizing: border-box;
+        }
+        .field input:disabled {
+            background: #F8F8F9;
+            color: #6B6B7A;
+        }
+        .field .helper {
+            font-family: var(--sans);
+            font-size: 12px;
+            color: #6B6B7A;
+            margin-top: 4px;
+        }
+        .state-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+            gap: 6px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 12px;
+            border: 1px solid #D8DADF;
+            border-radius: 8px;
+            background: #FAFAFA;
+        }
+        .state-grid label {
+            font-family: var(--sans);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            padding: 4px 6px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .state-grid label:hover { background: #fff; }
+        .btn {
+            background: var(--action);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 12px 24px;
+            font-family: var(--sans);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: #fff;
+            color: var(--ink);
+            border: 1px solid #D8DADF;
+        }
+        .btn-danger {
+            background: #fff;
+            color: #8A2419;
+            border: 1px solid #E5A8A0;
+        }
+        .feedback {
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-family: var(--sans);
+            font-size: 14px;
+            margin: 12px 0;
+            display: none;
+        }
+        .feedback.show { display: block; }
+        .feedback.success { background: #E8F5E9; color: #1B5E20; }
+        .feedback.error   { background: #FBEAEA; color: #8A2419; }
+        .feedback.info    { background: #FAF7F2; color: var(--ink); border: 1px solid #E3D9C6; }
+        .status-banner {
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        .status-pending { background: #FFF3E0; color: #E65100; }
+        .status-live    { background: #E3F2FD; color: #0D47A1; }
+        .status-cert    { background: #E8F5E9; color: #1B5E20; }
+        .status-rej     { background: #FBEAEA; color: #8A2419; }
+        .small { font-size: 12px; color: #6B6B7A; }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #F0EAD9;
+        }
+        .meta-row:last-child { border-bottom: none; }
+        .meta-row .label { color: #6B6B7A; }
+        .meta-row .value { font-weight: 500; color: var(--ink); }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="/" class="brand"><img src="/chez-logo.png" alt="Chez" /></a>
+        </div>
+    </header>
+
+    <main class="portal-shell">
+        <!-- Loading state -->
+        <div id="loading-state" class="card" style="text-align:center;padding:48px;">
+            <p class="small">Loading…</p>
+        </div>
+
+        <!-- Auth gate (magic link) -->
+        <div id="auth-gate" class="card" style="display:none;text-align:center;">
+            <h1>Manage your Chez listing</h1>
+            <p style="font-family:var(--sans);font-size:14px;color:#6B6B7A;margin:0 0 24px;">
+                Enter the email you used to apply. We'll send you a one-time login link — no password required.
+            </p>
+            <input type="email" id="auth-email" placeholder="you@yourcompany.com"
+                   style="display:block;width:320px;max-width:100%;margin:0 auto 16px;padding:12px 14px;border:1px solid #D8DADF;border-radius:8px;font-size:15px;font-family:inherit;"
+                   autocomplete="email">
+            <button class="btn" id="signin-btn">Send login link</button>
+            <p class="small" id="auth-error" style="color:#8A2419;display:none;margin-top:12px;"></p>
+            <p class="small" id="auth-success" style="color:#1B5E20;display:none;margin-top:12px;font-weight:600;"></p>
+            <p class="small" style="margin-top:24px;">
+                Don't have a listing yet? <a href="/vendor-apply.html" style="color:var(--ink);font-weight:600;">Apply here →</a>
+            </p>
+        </div>
+
+        <!-- Authed dashboard -->
+        <div id="dashboard" style="display:none;">
+            <h1>Manage your listing</h1>
+
+            <div id="status-banner" class="status-banner"></div>
+
+            <div class="card">
+                <div id="meta-readonly">
+                    <div class="meta-row"><span class="label">Email</span><span class="value" id="meta-email"></span></div>
+                    <div class="meta-row"><span class="label">Category</span><span class="value" id="meta-category"></span></div>
+                    <div class="meta-row"><span class="label">Submitted</span><span class="value" id="meta-created"></span></div>
+                    <div class="meta-row" id="meta-verified-row" style="display:none;">
+                        <span class="label">Chez Certified</span><span class="value" id="meta-verified"></span>
+                    </div>
+                </div>
+                <p class="small" style="margin-top:12px;">
+                    To change your email or service category, contact <a href="mailto:tom@getchez.com" style="color:var(--ink);">tom@getchez.com</a>.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2 style="font-family:var(--serif);font-size:18px;margin:0 0 16px;color:var(--ink);">Your listing details</h2>
+                <div class="feedback" id="feedback"></div>
+
+                <form id="update-form">
+                    <div class="field">
+                        <label for="business_name">Business name</label>
+                        <input type="text" id="business_name" maxlength="200" autocomplete="organization">
+                    </div>
+                    <div class="field">
+                        <label for="contact_name">Contact name</label>
+                        <input type="text" id="contact_name" maxlength="100" autocomplete="name">
+                    </div>
+                    <div class="field">
+                        <label for="phone">Phone</label>
+                        <input type="tel" id="phone" maxlength="30" autocomplete="tel">
+                    </div>
+                    <div class="field">
+                        <label for="website">Website</label>
+                        <input type="url" id="website" maxlength="500" placeholder="https://yourcompany.com" autocomplete="url">
+                    </div>
+                    <div class="field">
+                        <label>States you serve</label>
+                        <div class="state-grid" id="state-grid"></div>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px;">
+                        <button type="submit" class="btn" id="save-btn">Save changes</button>
+                        <button type="button" class="btn btn-secondary" id="signout-btn">Sign out</button>
+                        <button type="button" class="btn btn-danger" id="remove-btn" style="margin-left:auto;">Remove my listing</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer style="text-align:center;padding:32px 24px;font-family:var(--sans);font-size:12px;color:var(--ink);opacity:0.5;">
+        <p>&copy; 2026 Chez · <a href="/terms.html" style="color:inherit;">Terms</a> · <a href="mailto:tom@getchez.com" style="color:inherit;">Contact</a></p>
+    </footer>
+
+    <script type="module">
+        import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+        const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew";
+
+        const STATES = [
+            "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
+            "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+            "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
+            "VA","WA","WV","WI","WY","DC"
+        ];
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const loadingState = document.getElementById("loading-state");
+        const authGate = document.getElementById("auth-gate");
+        const dashboard = document.getElementById("dashboard");
+        const stateGrid = document.getElementById("state-grid");
+        const feedback = document.getElementById("feedback");
+        const statusBanner = document.getElementById("status-banner");
+
+        // Build state checkboxes
+        STATES.forEach((code) => {
+            const wrapper = document.createElement("label");
+            wrapper.innerHTML = `<input type="checkbox" value="${code}"> ${code}`;
+            stateGrid.appendChild(wrapper);
+        });
+
+        function showFeedback(msg, kind) {
+            feedback.textContent = msg;
+            feedback.className = `feedback show ${kind}`;
+            if (kind === "success") {
+                setTimeout(() => { feedback.className = "feedback"; }, 4000);
+            }
+        }
+
+        function statusBannerFor(status) {
+            const map = {
+                pending_email_confirm: ["status-pending", "Pending — confirm your email link to go live."],
+                live_unverified:       ["status-live",    "You're live. Tom will reach out within a few days to award the Chez Certified badge."],
+                chez_certified:        ["status-cert",    "Chez Certified — you appear at the top of homeowner search results."],
+                rejected:              ["status-rej",     "Your listing has been removed. Re-apply via getchez.com/vendor-apply.html."],
+            };
+            const [cls, label] = map[status] || ["status-pending", status];
+            return { cls, label };
+        }
+
+        async function callFunction(action, payload = {}) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData.session?.access_token;
+            if (!token) throw new Error("Not signed in");
+            const resp = await fetch(`${SUPABASE_URL}/functions/v1/vendor-self-service`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ action, ...payload }),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+            return data;
+        }
+
+        async function loadDashboard() {
+            try {
+                const { application } = await callFunction("get_my_listing");
+                document.getElementById("meta-email").textContent = application.email;
+                document.getElementById("meta-category").textContent = application.category;
+                document.getElementById("meta-created").textContent = new Date(application.created_at).toLocaleDateString();
+                if (application.verified_at) {
+                    document.getElementById("meta-verified-row").style.display = "flex";
+                    document.getElementById("meta-verified").textContent = new Date(application.verified_at).toLocaleDateString();
+                }
+
+                const { cls, label } = statusBannerFor(application.status);
+                statusBanner.className = `status-banner ${cls}`;
+                statusBanner.textContent = label;
+
+                document.getElementById("business_name").value = application.business_name || "";
+                document.getElementById("contact_name").value = application.contact_name || "";
+                document.getElementById("phone").value = application.phone || "";
+                document.getElementById("website").value = application.website || "";
+                const serving = new Set(application.service_area_states || []);
+                stateGrid.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+                    cb.checked = serving.has(cb.value);
+                });
+
+                // Disable form if rejected
+                const isRejected = application.status === "rejected";
+                document.querySelectorAll("#update-form input, #update-form button[type=submit], #remove-btn").forEach((el) => {
+                    el.disabled = isRejected;
+                });
+            } catch (err) {
+                showFeedback(`Could not load your listing: ${err.message}`, "error");
+            }
+        }
+
+        async function refreshSession() {
+            const { data } = await supabase.auth.getSession();
+            loadingState.style.display = "none";
+            if (data.session) {
+                authGate.style.display = "none";
+                dashboard.style.display = "block";
+                await loadDashboard();
+            } else {
+                authGate.style.display = "block";
+                dashboard.style.display = "none";
+            }
+        }
+
+        // ----- Sign in (magic link) -----
+        document.getElementById("signin-btn").addEventListener("click", async () => {
+            const email = document.getElementById("auth-email").value.trim().toLowerCase();
+            const errorEl = document.getElementById("auth-error");
+            const successEl = document.getElementById("auth-success");
+            errorEl.style.display = "none";
+            successEl.style.display = "none";
+            if (!email || !email.includes("@")) {
+                errorEl.textContent = "Please enter a valid email address.";
+                errorEl.style.display = "block";
+                return;
+            }
+            const btn = document.getElementById("signin-btn");
+            btn.disabled = true;
+            btn.textContent = "Sending…";
+            try {
+                const { error } = await supabase.auth.signInWithOtp({
+                    email,
+                    options: {
+                        emailRedirectTo: `${window.location.origin}/vendor-portal.html`,
+                        // Auto-create a Supabase auth user if none exists yet
+                        // (matches the magic-link flow to the vendor's
+                        // application email — the edge function checks the
+                        // email against vendor_applications.email).
+                        shouldCreateUser: true,
+                    },
+                });
+                if (error) throw error;
+                successEl.textContent = `Check ${email} for a login link.`;
+                successEl.style.display = "block";
+                btn.textContent = "Link sent ✓";
+            } catch (err) {
+                errorEl.textContent = err.message || "Failed to send login link";
+                errorEl.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Send login link";
+            }
+        });
+
+        // ----- Save changes -----
+        document.getElementById("update-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const states = Array.from(stateGrid.querySelectorAll("input:checked")).map((cb) => cb.value);
+            const payload = {
+                business_name: document.getElementById("business_name").value.trim(),
+                contact_name: document.getElementById("contact_name").value.trim(),
+                phone: document.getElementById("phone").value.trim(),
+                website: document.getElementById("website").value.trim() || null,
+                service_area_states: states,
+            };
+            const btn = document.getElementById("save-btn");
+            btn.disabled = true;
+            btn.textContent = "Saving…";
+            try {
+                await callFunction("update_my_listing", payload);
+                showFeedback("Saved.", "success");
+            } catch (err) {
+                showFeedback(`Could not save: ${err.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Save changes";
+            }
+        });
+
+        // ----- Remove listing -----
+        document.getElementById("remove-btn").addEventListener("click", async () => {
+            if (!confirm("Remove your listing from Chez? This will hide it from homeowner search results immediately. You can re-apply at any time.")) {
+                return;
+            }
+            const btn = document.getElementById("remove-btn");
+            btn.disabled = true;
+            btn.textContent = "Removing…";
+            try {
+                await callFunction("remove_my_listing");
+                showFeedback("Your listing has been removed. Sign out below or re-apply at vendor-apply.html.", "success");
+                await loadDashboard();
+            } catch (err) {
+                showFeedback(`Could not remove: ${err.message}`, "error");
+                btn.disabled = false;
+                btn.textContent = "Remove my listing";
+            }
+        });
+
+        // ----- Sign out -----
+        document.getElementById("signout-btn").addEventListener("click", async () => {
+            await supabase.auth.signOut();
+            await refreshSession();
+        });
+
+        // ----- Init -----
+        refreshSession();
+        supabase.auth.onAuthStateChange(() => refreshSession());
+    </script>
+</body>
+</html>

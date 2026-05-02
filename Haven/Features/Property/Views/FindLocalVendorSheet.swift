@@ -3,7 +3,7 @@ import SwiftUI
 /// Phase 19n: Local vendor picker that fires when the user taps a
 /// "Find a contractor for: X" task. Calls the `find-local-vendors` edge
 /// function with the task's town/state/category, displays up to 4 ranked
-/// businesses (2 Haven Certified + 2 Suggested), and lets the user adopt
+/// businesses (2 Top-Rated + 2 Suggested), and lets the user adopt
 /// one with a single tap. Adopting a vendor:
 ///
 ///   1. Creates a `contractors` row with `source: "find_vendor"` and the
@@ -74,6 +74,17 @@ struct FindLocalVendorSheet: View {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
                         header
 
+                        // Phase 72 reorder: Tom's UX vision is
+                        //   1. Do it for me  (concierge — top of sheet)
+                        //   2. Chez Certified
+                        //   3. Top-Rated nearby
+                        //   4. Add your own
+                        // Concierge moves above the vendor list so homeowners
+                        // who'd rather delegate see that path first. The
+                        // visual treatment is a navy-tinted card so it reads
+                        // as the premium option, not a fallback escape hatch.
+                        chezConciergeEntry
+
                         if isLoading {
                             loadingState
                         } else if let error = loadError {
@@ -110,15 +121,6 @@ struct FindLocalVendorSheet: View {
 
                         addMyOwnButton
                             .padding(.top, HavenTheme.spacing16)
-
-                        // Phase 80 — Chez Concierge escape hatch. After the
-                        // local-vendor search and the "Add my own" path, a
-                        // homeowner who still doesn't know who to call can
-                        // hand the work off to Tom. The composer pre-fills
-                        // category + town + state + display name so Tom has
-                        // full context the moment the request lands.
-                        chezConciergeEntry
-                            .padding(.top, HavenTheme.spacing12)
                     }
                     .padding(.horizontal, HavenTheme.pageMargin)
                     .padding(.top, HavenTheme.spacing16)
@@ -294,8 +296,13 @@ struct FindLocalVendorSheet: View {
     }
 
     private var vendorList: some View {
-        let havenCertified = vendors.filter { $0.isHavenCertified }
-        let suggested = vendors.filter { !$0.isHavenCertified }
+        // Phase 72: filter precedence — Chez Certified first (real human
+        // verification, navy badge), then Top-Rated (Google heuristic, green
+        // badge), then everything else (live_unverified applications +
+        // Google Suggested, no badge).
+        let chezCertified = vendors.filter { $0.isChezCertified }
+        let havenCertified = vendors.filter { !$0.isChezCertified && $0.isTopRated }
+        let suggested = vendors.filter { !$0.isChezCertified && !$0.isTopRated }
         let isHandyman = systemCategory.lowercased() == "handyman"
         let chezSectionVisible = isHandyman || !chezFieldProviders.isEmpty
 
@@ -342,12 +349,30 @@ struct FindLocalVendorSheet: View {
                 }
             }
 
-            if !havenCertified.isEmpty {
+            // Phase 72: real Chez Certified — vendors who applied + we
+            // personally verified. Highest-trust tier, navy badge.
+            if !chezCertified.isEmpty {
                 Text("CHEZ CERTIFIED")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
-                    .foregroundStyle(HavenColors.success)
+                    .foregroundStyle(HavenColors.navy800)
                     .padding(.top, chezSectionVisible ? HavenTheme.spacing8 : 0)
+                VStack(spacing: HavenTheme.spacing12) {
+                    ForEach(chezCertified) { vendor in
+                        vendorCard(vendor)
+                    }
+                }
+            }
+
+            // Top-Rated — Google review heuristic (4.7+, 25+ reviews, non-chain).
+            // Renamed from "Chez Certified" in Phase 71 because the heuristic
+            // isn't real verification.
+            if !havenCertified.isEmpty {
+                Text("TOP-RATED")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.2)
+                    .foregroundStyle(HavenColors.success)
+                    .padding(.top, (chezSectionVisible || !chezCertified.isEmpty) ? HavenTheme.spacing8 : 0)
                 VStack(spacing: HavenTheme.spacing12) {
                     ForEach(havenCertified) { vendor in
                         vendorCard(vendor)
@@ -360,7 +385,7 @@ struct FindLocalVendorSheet: View {
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.textTertiary)
-                    .padding(.top, havenCertified.isEmpty ? 0 : HavenTheme.spacing8)
+                    .padding(.top, (havenCertified.isEmpty && chezCertified.isEmpty && !chezSectionVisible) ? 0 : HavenTheme.spacing8)
                 VStack(spacing: HavenTheme.spacing12) {
                     ForEach(suggested) { vendor in
                         vendorCard(vendor)
@@ -615,11 +640,26 @@ struct FindLocalVendorSheet: View {
                         }
                     }
                     Spacer(minLength: 4)
-                    if vendor.isHavenCertified {
+                    // Phase 72: Chez Certified beats Top-Rated. Real human
+                    // verification gets the navy badge with checkmark seal.
+                    // The Top-Rated heuristic gets the muted star pill.
+                    if vendor.isChezCertified {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 10))
-                            Text("Certified")
+                            Text("Chez Certified")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(HavenColors.textOnNavy)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(HavenColors.navy800)
+                        .clipShape(Capsule())
+                    } else if vendor.isTopRated {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.circle.fill")
+                                .font(.system(size: 10))
+                            Text("Top-Rated")
                                 .font(.system(size: 10, weight: .semibold))
                         }
                         .foregroundStyle(HavenColors.success)
@@ -673,10 +713,12 @@ struct FindLocalVendorSheet: View {
             .overlay {
                 RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
                     .strokeBorder(
-                        vendor.isHavenCertified
-                            ? HavenColors.success.opacity(0.4)
-                            : HavenColors.beige200,
-                        lineWidth: vendor.isHavenCertified ? 1.5 : 1
+                        vendor.isChezCertified
+                            ? HavenColors.navy800.opacity(0.6)
+                            : (vendor.isTopRated
+                                ? HavenColors.success.opacity(0.4)
+                                : HavenColors.beige200),
+                        lineWidth: (vendor.isChezCertified || vendor.isTopRated) ? 1.5 : 1
                     )
             }
         }
@@ -723,12 +765,18 @@ struct FindLocalVendorSheet: View {
         // this sheet. Leaving FindLocalVendorSheet underneath is fine:
         // if the user cancels the composer they're back where they
         // started in vendor-browsing mode.
-        ChezEntryButton(
-            category: .findVendor,
-            label: "Have a Chez Home Manager find one for me",
-            caption: "Chez researches vetted local pros and replies within 1 business day.",
-            context: chezContext
-        )
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("DO IT FOR ME")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.2)
+                .foregroundStyle(HavenColors.action)
+            ChezEntryButton(
+                category: .findVendor,
+                label: "Have a Chez Home Manager find one for me",
+                caption: "Chez researches vetted local pros and replies within 1 business day.",
+                context: chezContext
+            )
+        }
     }
 
     private var chezContext: [String: String] {

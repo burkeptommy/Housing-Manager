@@ -134,7 +134,7 @@ struct InviteToHavenSheet: View {
         guard case .inviteSent(_, _, let code) = trustMoment else { return }
         let formatted = formatCode(code)
         let firstName = familyMember?.firstName ?? "there"
-        let text = "Hey \(firstName), here's your Chez invite code: \(formatted). Use it to join our household: https://havenhome.dev/join/\(code)"
+        let text = "Hey \(firstName), here's your Chez invite code: \(formatted). Use it to join our household: https://getchez.com/join/\(code)"
         let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }

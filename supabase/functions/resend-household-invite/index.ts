@@ -21,9 +21,9 @@ interface ResendRequest {
   invitation_id: string;
 }
 
-const FROM_EMAIL = "hello@havenhome.dev";
+const FROM_EMAIL = "hello@getchez.com";
 const FROM_NAME = "Chez";
-const REPLY_TO_EMAIL = "tom@havenhome.dev";
+const REPLY_TO_EMAIL = "tom@getchez.com";
 
 function escapeHtml(input: string): string {
   return input
@@ -90,7 +90,7 @@ function buildHtml(ctx: EmailContext): string {
             <tr><td style="padding:24px 32px 0 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:#1B2A4A;opacity:0.7;">Or enter this code in the app:</td></tr>
             <tr><td style="padding:8px 32px 0 32px;text-align:center;font-family:'SF Mono',Menlo,Monaco,monospace;font-size:24px;font-weight:bold;letter-spacing:4px;color:#1B2A4A;">${escapeHtml(code)}</td></tr>
             <tr><td style="padding:32px 32px 0 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#1B2A4A;opacity:0.6;text-align:center;">This invite expires in 30 days. If you don't want to join, just ignore this email.</td></tr>
-            <tr><td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">Chez, havenhome.dev</td></tr>
+            <tr><td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">Chez, getchez.com</td></tr>
           </table>
         </td>
       </tr>
@@ -127,7 +127,7 @@ function buildText(ctx: EmailContext): string {
   lines.push("");
   lines.push("This invite expires in 30 days. If you don't want to join, just ignore this email.");
   lines.push("");
-  lines.push("Chez, havenhome.dev");
+  lines.push("Chez, getchez.com");
   return lines.join("\n");
 }
 
@@ -176,7 +176,7 @@ async function loadInvitationContext(supabase: any, invitationId: string): Promi
   return {
     to: invitation.invited_email,
     inviteCode: invitation.invite_code,
-    inviteUrl: `https://havenhome.dev/join/${invitation.invite_code}`,
+    inviteUrl: `https://getchez.com/join/${invitation.invite_code}`,
     inviterName: inviter?.full_name ?? "Someone on Chez",
     householdName: household?.name ?? null,
     householdAddress: householdAddress,

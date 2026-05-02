@@ -8,6 +8,6 @@ enum Endpoints {
     case getProfile
 
     func urlRequest() throws -> URLRequest {
-        URLRequest(url: URL(string: "https://api.havenhome.dev/api")!)
+        URLRequest(url: URL(string: "https://api.getchez.com/api")!)
     }
 }

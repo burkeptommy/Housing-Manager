@@ -394,7 +394,7 @@ enum HandymanVisitService {
     // MARK: - Premier portal
 
     static func portalURL(for token: String, visitId: UUID? = nil) -> URL? {
-        var components = URLComponents(string: "https://havenhome.dev/handyman-visit")
+        var components = URLComponents(string: "https://getchez.com/handyman-visit")
         var queryItems = [URLQueryItem(name: "token", value: token)]
         if let visitId {
             queryItems.append(URLQueryItem(name: "visit", value: visitId.uuidString))
@@ -404,7 +404,7 @@ enum HandymanVisitService {
     }
 
     static func providerWorkspaceURL(for token: String) -> URL? {
-        var components = URLComponents(string: "https://havenhome.dev/handyman")
+        var components = URLComponents(string: "https://getchez.com/handyman")
         components?.queryItems = [URLQueryItem(name: "invite", value: token)]
         return components?.url
     }

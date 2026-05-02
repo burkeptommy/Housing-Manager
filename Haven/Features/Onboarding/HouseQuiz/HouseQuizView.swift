@@ -3317,7 +3317,7 @@ struct HouseQuizView: View {
     /// every chip and surfaced wrong-category results (tree services for
     /// plumbers). Selections now flow through three @State dictionaries:
     ///   - `contractorChipsVendors` for Places-sourced picks (carry rating,
-    ///      review count, phone, website, Haven Certified flag).
+    ///      review count, phone, website, Top-Rated flag).
     ///   - `contractorChipsManualNames` for "Didn't find yours? Add it".
     ///   - `contractorChipsProviders` for the legacy catalog flow (kept for
     ///      backwards compat with previously persisted answers; not produced
@@ -3371,9 +3371,10 @@ struct HouseQuizView: View {
     /// Build 83: serialize the per-chip selections into the pipe-delimited
     /// `customEntries` format the answer mapper expects. Three shapes:
     ///   - manual:    "chip|name"
-    ///   - vendor:    "chip|name|rating|reviews|phone|website|haven_certified"
-    ///                rating/reviews are floats/ints (or empty), the haven_certified
-    ///                slot is "haven_certified" or "" so the mapper can decide
+    ///   - vendor:    "chip|name|rating|reviews|phone|website|top_rated"
+    ///                rating/reviews are floats/ints (or empty), the top_rated
+    ///                slot is "top_rated" or "" so the mapper can decide
+    ///                (legacy "haven_certified" still parses for old answers)
     ///                whether to flag the contractor row.
     ///   - legacy:    "chip|name" (catalog UtilityProviderRow path — produced
     ///                by older builds, still understood for backwards compat).
@@ -3388,7 +3389,7 @@ struct HouseQuizView: View {
                 vendor.reviewCount.map { String($0) } ?? "",
                 vendor.phone ?? "",
                 vendor.website ?? "",
-                vendor.isHavenCertified ? "haven_certified" : "",
+                vendor.isTopRated ? "top_rated" : "",
             ]
             entries.append(parts.joined(separator: "|"))
         }
@@ -3535,7 +3536,7 @@ struct HouseQuizView: View {
             if let p = contractorChipsProviders[option.id] { return p.name }
             return nil
         }()
-        let isHavenCertified = contractorChipsVendors[option.id]?.isHavenCertified ?? false
+        let isTopRated = contractorChipsVendors[option.id]?.isTopRated ?? false
 
         return VStack(alignment: .leading, spacing: 0) {
             Button {
@@ -3577,7 +3578,7 @@ struct HouseQuizView: View {
                     Spacer()
                     if let name = attachedDisplayName {
                         HStack(spacing: 4) {
-                            if isHavenCertified {
+                            if isTopRated {
                                 Image(systemName: "checkmark.seal.fill")
                                     .font(.system(size: 10))
                                     .foregroundStyle(HavenColors.success)
@@ -3624,7 +3625,7 @@ struct HouseQuizView: View {
                             reviewCount: vendor.reviewCount,
                             phone: vendor.phone,
                             website: vendor.website,
-                            isHavenCertified: vendor.isHavenCertified
+                            isTopRated: vendor.isTopRated
                         )
                     }
                     if let manual = contractorChipsManualNames[option.id] {
@@ -3634,7 +3635,7 @@ struct HouseQuizView: View {
                             reviewCount: nil,
                             phone: nil,
                             website: nil,
-                            isHavenCertified: false
+                            isTopRated: false
                         )
                     }
                     if let provider = contractorChipsProviders[option.id] {
@@ -3644,7 +3645,7 @@ struct HouseQuizView: View {
                             reviewCount: nil,
                             phone: provider.phone,
                             website: provider.website,
-                            isHavenCertified: false
+                            isTopRated: false
                         )
                     }
                     return nil
@@ -3670,7 +3671,7 @@ struct HouseQuizView: View {
                         Analytics.track(.quizContractorAdopted, [
                             "chip_id": option.id,
                             "source": "find_local_vendors",
-                            "haven_certified": vendor.isHavenCertified,
+                            "top_rated": vendor.isTopRated,
                         ])
                     },
                     onManualAdd: { name in
@@ -3683,7 +3684,7 @@ struct HouseQuizView: View {
                         Analytics.track(.quizContractorAdopted, [
                             "chip_id": option.id,
                             "source": "manual",
-                            "haven_certified": false,
+                            "top_rated": false,
                         ])
                     },
                     // Build 85 polish: tap-the-pin path. Clears all three
@@ -5081,7 +5082,7 @@ struct HouseQuizView: View {
                             rating: parsed.rating,
                             reviewCount: parsed.reviewCount,
                             googlePlaceId: "",
-                            isHavenCertified: parsed.isHavenCertified,
+                            isTopRated: parsed.isTopRated,
                             rankPosition: 0
                         )
                     } else {

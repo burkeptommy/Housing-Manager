@@ -983,7 +983,7 @@ async function createCompletionWritebacks(
       priority: compactString(recommendation.priority) === "high" ? "High" : "Medium",
       assignment_type: "either",
       needs_vendor: false,
-      notes: `Created from Haven handyman recommendation for ${visitTitle}.`,
+      notes: `Created from Chez handyman recommendation for ${visitTitle}.`,
       assigned_route: "vendor",
       service_key: compactString(recommendation.category) || null,
     });
