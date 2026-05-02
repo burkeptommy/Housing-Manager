@@ -6011,14 +6011,11 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
         </label>
       </div>
 
-      <div class="cockpit-vendor__slots">
-        <div class="cockpit-vendor__slots-head">
-          <span>Times they offered</span>
-          <span class="cockpit-muted">Add as many as the vendor suggested — homeowner picks one.</span>
-        </div>
-        <div data-vendor-slots>${slotsHtml}</div>
-        <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-action="add-slot">+ Add a time</button>
-      </div>
+      <!-- Phase 83.4 — vendor proposals carry vendor + price only.
+           Date coordination happens AFTER the homeowner picks a vendor,
+           via the visit card's "Send dates to homeowner" CTA. This
+           split keeps the homeowner's choice purely about who they
+           trust, not about who happens to have the best Tuesday slot. -->
 
       <label>Your notes from the call
         <textarea rows="2" data-vendor-field="notes" placeholder="Raw notes — what did they say? Anything specific to this home? AI uses this to write the homeowner-facing recommendation.">${escapeHtml(callData?.notes || "")}</textarea>
@@ -7242,14 +7239,27 @@ async function handleConciergeAction(action, req, btn) {
       return;
     }
     case "propose-alternate-dates": {
-      // Phase 83.2 — One-click open the proposal builder in date_slot mode
-      // pre-loaded with the visit's vendor name so Tom can offer the
-      // homeowner alternative dates without retyping context.
+      // Phase 83.4 — Send the homeowner 2-3 confirmed dates after they've
+      // approved a vendor. The homeowner picks one, the Edge Function
+      // auto-flips the visit to scheduled with their chosen datetime.
+      // Pre-fills the proposal builder's message with the vendor's name
+      // so the operator doesn't retype context.
+      const card = btn.closest("[data-visit-id]");
+      const visitId = card?.getAttribute("data-visit-id");
+      const visit = (state.chezVisitsByRequest?.[req.id] || []).find((v) => v.id === visitId);
+      const vendorName = visit?.vendor_name || "the vendor";
       startProposalFlow(req);
-      // Try to flip to the date tab once the modal is up.
       requestAnimationFrame(() => {
-        const dateTabBtn = document.querySelector("[data-chez-proposal-modal] [data-proposal-tab='date']");
-        dateTabBtn?.click();
+        const modal = document.querySelector("[data-chez-proposal-modal]");
+        if (!modal) return;
+        // Switch to date_slot tab.
+        modal.querySelector("[data-proposal-tab='date']")?.click();
+        // Pre-fill the message body with a homeowner-facing template that
+        // names the vendor. The operator can edit before sending.
+        const messageInput = modal.querySelector("textarea[name='content']");
+        if (messageInput && !messageInput.value) {
+          messageInput.value = `${vendorName} can do any of these dates. Tap Approve on whichever fits — we'll lock it in with them.`;
+        }
       });
       return;
     }
@@ -8022,18 +8032,25 @@ function renderVisitCardHtml(req, visit, opts = {}) {
         ${phoneCleaned ? `<a class="admin-button admin-button--ghost admin-button--small" href="tel:${escapeHtml(phoneCleaned)}">📞 ${escapeHtml(phone)}</a>` : ""}
       </header>
 
+      ${visit.state === "awaiting_date" ? `
+        <div class="admin-chez__visit-coachmark">
+          <strong>Step 2 · Confirm a date</strong>
+          <span>Vendor's locked in. Send the homeowner 2-3 dates, or paste their pick into Confirmed date / time below.</span>
+        </div>
+      ` : ""}
+
       ${slots.length > 0 ? `
         <div class="admin-chez__visit-slots">
-          <span class="admin-muted">Times offered:</span>
+          <span class="admin-muted">Vendor offered:</span>
           ${slots.map((s) => {
-            // Phase 83.2 — slot CHIP shows the friendly homeowner-format
-            // version; the chip carries an ISO-friendly value in
-            // data-slot-iso so adopting it populates the datetime-local
-            // input (scheduled_for) cleanly. Falls back to plain text
-            // for legacy free-form slots.
+            // Phase 83.4 — vendor proposals no longer carry slots, but legacy
+            // visit rows may still have them. Render as adoption chips so
+            // Tom can drop them into the date_slot proposal flow if useful.
+            // Goes through formatSlotDisplay so mixed-format legacy data
+            // ("Thursday 6PM" / "5.24" / ISO) lands as one consistent label.
             const display = formatSlotDisplay(s);
             const iso = toLocalDateTimeInputValue(s);
-            return `<button type="button" class="admin-chez__visit-slot-chip" data-action="adopt-slot" data-slot-text="${escapeHtml(display)}" data-slot-iso="${escapeHtml(iso)}">${escapeHtml(display)}</button>`;
+            return `<button type="button" class="admin-chez__visit-slot-chip" data-cockpit-action="adopt-slot" data-slot-text="${escapeHtml(display)}" data-slot-iso="${escapeHtml(iso)}">${escapeHtml(display)}</button>`;
           }).join("")}
         </div>
       ` : ""}
@@ -8059,16 +8076,15 @@ function renderVisitCardHtml(req, visit, opts = {}) {
 
       <div class="admin-chez__visit-card-actions">
         ${visit.state === "awaiting_date" ? `
-          <button type="button" class="admin-button admin-button--primary admin-button--small" data-action="visit-mark-scheduled">📅 Confirm scheduled</button>
+          <button type="button" class="admin-button admin-button--primary admin-button--small" data-cockpit-action="propose-alternate-dates" title="Open the proposal builder in date-slot mode. Homeowner picks one — visit auto-confirms.">📨 Send dates to homeowner</button>
+          <button type="button" class="admin-button admin-button--secondary admin-button--small" data-cockpit-action="visit-mark-scheduled" title="If you've already confirmed a date with the homeowner over the phone, enter it above and click here.">📅 Confirm scheduled</button>
         ` : ""}
         ${isScheduled ? `
-          <button type="button" class="admin-button admin-button--primary admin-button--small" data-action="visit-mark-completed">✅ Mark completed</button>
+          <button type="button" class="admin-button admin-button--primary admin-button--small" data-cockpit-action="visit-mark-completed">✅ Mark completed</button>
+          <button type="button" class="admin-button admin-button--ghost admin-button--small" data-cockpit-action="propose-alternate-dates" title="Re-offer dates if the homeowner needs to reschedule.">📨 Reschedule</button>
         ` : ""}
-        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="visit-save-notes">💾 Save notes</button>
-        ${visit.state !== "completed" && visit.state !== "cancelled" ? `
-          <button type="button" class="admin-button admin-button--ghost admin-button--small" data-cockpit-action="propose-alternate-dates" title="Open the proposal builder in date-slot mode to offer the homeowner alternative dates / times.">📨 Propose alternate dates</button>
-        ` : ""}
-        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="visit-cancel">Cancel visit</button>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-cockpit-action="visit-save-notes">💾 Save notes</button>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-cockpit-action="visit-cancel">Cancel visit</button>
       </div>
     </article>
   `;
@@ -9272,17 +9288,10 @@ async function packageAndSendRecommendedVendors(req) {
         && Number.isFinite(numericCost)
         && numericCost > 0
         && /^\$?\s*[\d,]+\s*$/.test(rawCost);  // single number, not a range
-      // Resolve availability slots — array preferred. Fall back to
-      // legacy single-string field if the user came from an older
-      // version of the UI.
-      // Phase 83.2 — slots are now ISO-ish "YYYY-MM-DDTHH:mm" datetime-local
-      // values. We send them through `formatSlotDisplay` so the homeowner
-      // sees a consistent, friendly format ("Thu, May 8 at 6:00 PM"). Any
-      // legacy free-form strings already in state pass through untouched
-      // (the formatter falls back to the raw value when it can't parse).
-      const slots = Array.isArray(data.availability_slots)
-        ? data.availability_slots.map((s) => String(s || "").trim()).filter(Boolean).map(formatSlotDisplay)
-        : (data.availability ? [formatSlotDisplay(String(data.availability).trim())] : []);
+      // Phase 83.4 — vendor proposals NO LONGER carry availability slots.
+      // The homeowner picks based on vendor + price + fit; date
+      // coordination happens AFTER approval via the visit card's
+      // "Send dates to homeowner" date_slot proposal flow.
       const proposal = {
         kind: "vendor",
         vendor: {
@@ -9295,11 +9304,6 @@ async function packageAndSendRecommendedVendors(req) {
           // Range string preferred — homeowner sees "$1,000–2,500"
           // verbatim instead of a fake-precise dollar amount.
           estimated_cost_range: useNumeric ? undefined : (rawCost || undefined),
-          // Multi-slot availability if any; first slot also lands as
-          // estimated_window for legacy iOS clients that haven't
-          // updated to render the array.
-          availability_slots: slots.length > 0 ? slots : undefined,
-          estimated_window: slots[0],
           rationale: data.rationale,
         },
       };

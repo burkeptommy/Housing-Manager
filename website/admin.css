@@ -9561,3 +9561,25 @@ details.admin-chez__analysis-section pre {
   color: var(--success, #4A7C59);
   border-color: var(--success, #4A7C59);
 }
+
+/* Phase 83.4 — coachmark on awaiting_date visit cards explaining the
+   "vendor first, dates second" flow. Sits between the vendor header and
+   the date inputs. */
+.admin-chez__visit-coachmark {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--salmon-50, #FFF5F2);
+  border: 1px solid var(--salmon-pale, #FFE8E2);
+  border-radius: 10px;
+}
+.admin-chez__visit-coachmark strong {
+  font: 600 12px var(--sans);
+  color: var(--salmon-dark, #D14E3E);
+}
+.admin-chez__visit-coachmark span {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--text-muted, #6F6A88);
+}

@@ -1453,6 +1453,64 @@ async function handleDecideProposal(
           .is("contractor_id", null);
       }
     }
+
+    // Phase 83.4 — When the homeowner approves a date_slot proposal, find
+    // the most recent awaiting_date visit on this request and auto-flip
+    // it to scheduled with the picked datetime. This closes the loop on
+    // the new "vendor first, dates second" workflow: the homeowner's
+    // pick directly schedules the visit without operator intervention.
+    if (kind === "date_slot") {
+      const dateSlotBlob = (propBlob.date_slot as Record<string, unknown>) ?? {};
+      const options = Array.isArray(dateSlotBlob.options) ? dateSlotBlob.options as Array<Record<string, unknown>> : [];
+      // The homeowner approved the proposal as a whole (not a specific
+      // option in v1). For v1 we use the first option with a valid ISO
+      // as the picked datetime; the iOS picker UX surfaces only one
+      // primary "Approve" so this matches what the homeowner saw.
+      const pickedIso = options
+        .map((o) => (typeof o.iso === "string" ? o.iso : null))
+        .find((iso): iso is string => !!iso && !isNaN(new Date(iso).getTime())) ?? null;
+      const pickedLabel = options
+        .map((o) => (typeof o.label === "string" ? o.label : null))
+        .find((label): label is string => !!label) ?? null;
+
+      if (pickedIso) {
+        const { data: pendingVisit } = await service
+          .from("chez_visits")
+          .select("id, vendor_name, contractor_id")
+          .eq("request_id", request.id)
+          .eq("state", "awaiting_date")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (pendingVisit) {
+          const visit = pendingVisit as { id: string; vendor_name: string; contractor_id: string | null };
+          await service
+            .from("chez_visits")
+            .update({
+              state: "scheduled",
+              scheduled_for: pickedIso,
+              scheduled_window: pickedLabel,
+            })
+            .eq("id", visit.id);
+
+          // System message in the thread so the audit trail captures the
+          // auto-scheduling. Mirrors the approval system message that
+          // already fired above.
+          const friendly = pickedLabel || new Date(pickedIso).toLocaleString(undefined, {
+            weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit",
+          });
+          await service.from("concierge_messages").insert({
+            household_id: request.household_id,
+            user_id: request.user_id,
+            request_id: request.id,
+            role: "system",
+            content: `Visit with ${visit.vendor_name} scheduled for ${friendly}.`,
+            attachments: [],
+          });
+        }
+      }
+    }
   }
 
   // Push admin so they can act on the decision (book vendor, send next
