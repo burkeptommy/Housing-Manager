@@ -10,12 +10,12 @@
     />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#2A2252" />
-    <!-- Phase 5z+18 — Use the Haven app icon (matches the Xcode app)
-         instead of the legacy "chez" mark. Both PNG variants point to
-         AppIcon assets exported from Haven/Resources/Assets.xcassets. -->
-    <link rel="icon" type="image/png" sizes="180x180" href="/haven-favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/haven-favicon.png" />
+    <!-- Phase 72 — Use the canonical Chez app icon assets (matches the
+         iOS AppIcon.appiconset exports). chez-logo.png IS the iOS
+         app icon; favicon.svg mirrors its design as a vector. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/chez-logo.png" />
+    <link rel="icon" type="image/png" sizes="180x180" href="/chez-logo.png" />
     <link rel="stylesheet" href="/chez.css" />
     <link rel="stylesheet" href="/admin.css" />
   </head>
@@ -65,7 +65,7 @@
       <section class="admin-app is-hidden" data-app>
         <aside class="admin-sidebar">
           <a class="admin-sidebar__brand" href="/" aria-label="Haven home">
-            <img src="/haven-logo.png" alt="" />
+            <img src="/chez-logo.png" alt="" />
             <div>
               <strong>haven</strong>
               <span>admin</span>

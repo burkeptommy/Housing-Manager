@@ -1,99 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <!-- Cream background -->
-  <rect width="1200" height="630" fill="#F2EEE5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Open Graph / Twitter card image. Matches the iOS app icon
+       (indigo background, uppercase serif C, salmon roof chevron).
+       1200x630 = Facebook standard, also works for Twitter/Linked In. -->
 
-  <!-- Subtle decorative circle -->
-  <circle cx="950" cy="315" r="280" fill="#EDE9E0" opacity="0.6"/>
-  <circle cx="980" cy="290" r="200" fill="#E8E3D9" opacity="0.4"/>
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#453A70"/>
 
-  <!-- Left content area -->
-  <!-- Logo icon -->
-  <rect x="80" y="180" width="64" height="64" rx="16" fill="#1B2A4A"/>
-  <text x="112" y="224" font-family="Georgia,serif" font-size="40" font-weight="bold" fill="#E8E4DB" text-anchor="middle">H</text>
-
-  <!-- Haven text next to logo -->
-  <text x="160" y="224" font-family="Georgia,serif" font-size="36" font-weight="700" fill="#1B2A4A">Haven</text>
-
-  <!-- Main tagline -->
-  <text x="80" y="310" font-family="Georgia,serif" font-size="42" font-weight="700" fill="#1B2A4A">Your home, your estate, and</text>
-  <text x="80" y="362" font-family="Georgia,serif" font-size="42" font-weight="700" fill="#1B2A4A">your family's future.</text>
-
-  <!-- Subtitle -->
-  <text x="80" y="420" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="20" fill="#5A6A7A">One app for home management, estate planning,</text>
-  <text x="80" y="448" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="20" fill="#5A6A7A">and AI-powered family guidance.</text>
-
-  <!-- CTA badge -->
-  <rect x="80" y="480" width="220" height="44" rx="22" fill="#1B2A4A"/>
-  <text x="190" y="508" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#FAF7F2" text-anchor="middle">Download on TestFlight</text>
-
-  <!-- Right side: mini phone mockup -->
-  <g transform="translate(780, 80)">
-    <!-- Phone frame -->
-    <rect width="200" height="420" rx="28" fill="#0F1A2E"/>
-    <rect x="8" y="8" width="184" height="404" rx="22" fill="#F2EEE5"/>
-
-    <!-- Notch -->
-    <rect x="60" y="8" width="80" height="20" rx="10" fill="#0F1A2E"/>
-
-    <!-- Screen content -->
-    <!-- Nav -->
-    <text x="100" y="52" font-family="Georgia,serif" font-size="14" font-weight="700" fill="#1B2A4A" text-anchor="middle">Haven</text>
-    <text x="100" y="68" font-family="-apple-system,sans-serif" font-size="10" fill="#8A9AAA" text-anchor="middle">Good morning, Tom</text>
-
-    <!-- Maintenance card -->
-    <rect x="16" y="80" width="168" height="92" rx="12" fill="#486C5A"/>
-    <!-- Decorative circle -->
-    <circle cx="168" cy="88" r="32" fill="rgba(255,255,255,0.06)"/>
-    <text x="28" y="98" font-family="-apple-system,sans-serif" font-size="7" font-weight="600" fill="rgba(255,255,255,0.45)" letter-spacing="0.8">PROPERTY</text>
-    <text x="28" y="114" font-family="Georgia,serif" font-size="13" font-weight="700" fill="rgba(255,255,255,0.85)">To Do</text>
-    <text x="62" y="114" font-family="Georgia,serif" font-size="13" font-weight="700" fill="white">7</text>
-    <rect x="28" y="122" width="52" height="14" rx="7" fill="rgba(232,93,93,0.9)"/>
-    <text x="54" y="132" font-family="-apple-system,sans-serif" font-size="7" font-weight="600" fill="white" text-anchor="middle">2 Overdue</text>
-    <rect x="86" y="122" width="64" height="14" rx="7" fill="rgba(255,255,255,0.18)"/>
-    <text x="118" y="132" font-family="-apple-system,sans-serif" font-size="7" font-weight="600" fill="rgba(255,255,255,0.85)" text-anchor="middle">5 This Month</text>
-    <line x1="28" y1="142" x2="172" y2="142" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
-    <text x="28" y="155" font-family="-apple-system,sans-serif" font-size="7.5" fill="rgba(255,255,255,0.55)">Next: Replace HVAC filter</text>
-    <text x="156" y="155" font-family="-apple-system,sans-serif" font-size="7.5" font-weight="600" fill="rgba(255,255,255,0.7)">Mar 28</text>
-
-    <!-- Estate card -->
-    <rect x="16" y="182" width="168" height="82" rx="12" fill="#1B2A4A"/>
-    <!-- Top row: label + badge -->
-    <text x="28" y="198" font-family="-apple-system,sans-serif" font-size="6.5" font-weight="600" fill="rgba(255,255,255,0.35)" letter-spacing="0.8">ESTATE READINESS</text>
-    <rect x="138" y="189" width="34" height="14" rx="5" fill="rgba(192,192,192,0.25)"/>
-    <text x="155" y="200" font-family="-apple-system,sans-serif" font-size="7" font-weight="600" fill="white" text-anchor="middle">Silver</text>
-    <!-- Score row: big number + bar -->
-    <text x="28" y="226" font-family="Georgia,serif" font-size="20" font-weight="700" fill="white">67%</text>
-    <!-- Progress bar -->
-    <rect x="62" y="216" width="90" height="4" rx="2" fill="rgba(255,255,255,0.12)"/>
-    <rect x="62" y="216" width="60" height="4" rx="2" fill="#5DCAA5"/>
-    <!-- Gold badge -->
-    <rect x="156" y="212" width="22" height="12" rx="4" fill="#D4BA91"/>
-    <text x="167" y="221" font-family="-apple-system,sans-serif" font-size="6" font-weight="600" fill="#1B2A4A" text-anchor="middle">Gold</text>
-    <text x="62" y="230" font-family="-apple-system,sans-serif" font-size="7" fill="#D4C5A9">12 of 18 documents</text>
-    <!-- Category chips -->
-    <rect x="28" y="239" width="28" height="12" rx="4" fill="rgba(93,202,165,0.2)"/>
-    <text x="42" y="248" font-family="-apple-system,sans-serif" font-size="6" font-weight="500" fill="#5DCAA5" text-anchor="middle">Will</text>
-    <rect x="60" y="239" width="30" height="12" rx="4" fill="rgba(93,202,165,0.2)"/>
-    <text x="75" y="248" font-family="-apple-system,sans-serif" font-size="6" font-weight="500" fill="#5DCAA5" text-anchor="middle">Trust</text>
-    <rect x="94" y="239" width="46" height="12" rx="4" fill="rgba(93,202,165,0.2)"/>
-    <text x="117" y="248" font-family="-apple-system,sans-serif" font-size="6" font-weight="500" fill="#5DCAA5" text-anchor="middle">Insurance</text>
-
-    <!-- Attention card -->
-    <rect x="16" y="274" width="168" height="46" rx="12" fill="white" stroke="#E3D9C6" stroke-width="1"/>
-    <text x="28" y="290" font-family="-apple-system,sans-serif" font-size="6.5" font-weight="600" fill="#8A9AAA" letter-spacing="0.8">REQUIRES ATTENTION</text>
-    <circle cx="28" cy="303" r="3.5" fill="#E85D5D"/>
-    <text x="36" y="306" font-family="-apple-system,sans-serif" font-size="8" fill="#5A6A7A">Life insurance expires in 12d</text>
-    <circle cx="28" cy="315" r="3.5" fill="#EF9F27"/>
-    <text x="36" y="318" font-family="-apple-system,sans-serif" font-size="8" fill="#5A6A7A">HVAC filter overdue</text>
-
-    <!-- Tab bar -->
-    <rect x="8" y="376" width="184" height="36" rx="0" fill="white"/>
-    <line x1="8" y1="376" x2="192" y2="376" stroke="#E3D9C6" stroke-width="1"/>
-    <text x="50" y="398" font-family="-apple-system,sans-serif" font-size="8" font-weight="600" fill="#1B2A4A" text-anchor="middle">Home</text>
-    <text x="100" y="398" font-family="-apple-system,sans-serif" font-size="8" fill="#8A9AAA" text-anchor="middle">Property</text>
-    <text x="150" y="398" font-family="-apple-system,sans-serif" font-size="8" fill="#8A9AAA" text-anchor="middle">Life</text>
+  <!-- Left side: app icon (C + chevron) inside a rounded square card -->
+  <g transform="translate(100, 145)">
+    <rect width="340" height="340" rx="68" fill="#3B3162"/>
+    <!-- Salmon chevron over the C -->
+    <path d="M205 60 L255 95 L305 60"
+          stroke="#ED6955" stroke-width="22" stroke-linecap="round"
+          stroke-linejoin="round" fill="none"/>
+    <!-- Uppercase serif C -->
+    <text x="170" y="290"
+          font-family="ui-serif, 'New York', Georgia, 'Times New Roman', serif"
+          font-size="320"
+          font-weight="500"
+          fill="#FFFFFF"
+          text-anchor="middle">C</text>
   </g>
 
-  <!-- Bottom accent line -->
-  <rect x="0" y="620" width="1200" height="10" fill="#1B2A4A"/>
+  <!-- Right side: Chez wordmark + tagline -->
+  <g transform="translate(540, 0)">
+    <text x="0" y="290"
+          font-family="ui-serif, 'New York', Georgia, 'Times New Roman', serif"
+          font-size="120"
+          font-weight="600"
+          fill="#FFFFFF">Chez</text>
+    <text x="0" y="365"
+          font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+          font-size="34"
+          font-weight="500"
+          fill="#FFFFFF"
+          opacity="0.85">Your home, organized.</text>
+    <text x="0" y="430"
+          font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+          font-size="22"
+          font-weight="400"
+          fill="#FFFFFF"
+          opacity="0.7">Estate intelligence + home management,</text>
+    <text x="0" y="460"
+          font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+          font-size="22"
+          font-weight="400"
+          fill="#FFFFFF"
+          opacity="0.7">designed for the families who run their own.</text>
+  </g>
+
+  <!-- Footer URL -->
+  <text x="600" y="585"
+        font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+        font-size="20"
+        font-weight="500"
+        fill="#FFFFFF"
+        opacity="0.6"
+        text-anchor="middle">getchez.com</text>
 </svg>
