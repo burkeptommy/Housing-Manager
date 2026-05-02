@@ -1340,6 +1340,36 @@ async function handleDecideProposal(
     })
     .eq("id", request.id);
 
+  // Phase 82 — When a vendor proposal is approved, auto-create a
+  // chez_visits row so the case shifts from "research" to "track this
+  // visit through completion." Defensive: only create if one doesn't
+  // already exist for this proposal message (idempotent).
+  if (decision === "approved") {
+    const propBlob = (message.proposal as Record<string, unknown>) ?? {};
+    const kind = String(propBlob.kind ?? "");
+    if (kind === "vendor") {
+      const vendorBlob = (propBlob.vendor as Record<string, unknown>) ?? {};
+      const vendorName = String(vendorBlob.name ?? "").trim() || "(unnamed vendor)";
+      const vendorPhone = vendorBlob.phone ? String(vendorBlob.phone) : null;
+      const { data: existingVisit } = await service
+        .from("chez_visits")
+        .select("id")
+        .eq("proposal_message_id", messageId)
+        .maybeSingle();
+      if (!existingVisit) {
+        await service.from("chez_visits").insert({
+          household_id: request.household_id,
+          request_id: request.id,
+          proposal_message_id: messageId,
+          vendor_name: vendorName,
+          vendor_phone: vendorPhone,
+          vendor_payload: vendorBlob,
+          state: "awaiting_date",
+        });
+      }
+    }
+  }
+
   // Push admin so they can act on the decision (book vendor, send next
   // proposal, etc.).
   const summary = decision === "approved"
@@ -1781,6 +1811,220 @@ interface AnalysisResult {
 }
 
 // ============================================================================
+// Phase 82 — Visit tracking
+// ============================================================================
+// Each approved vendor proposal becomes a chez_visits row that the
+// admin walks through awaiting_date → scheduled → completed. The
+// fetch action reconciles any historical approvals that predate this
+// migration so old requests light up cleanly the first time Tom opens
+// them after the deploy.
+
+interface FetchVisitsPayload {
+  request_id: string;
+}
+
+interface UpdateVisitPayload {
+  visit_id: string;
+  state?: "awaiting_date" | "scheduled" | "completed" | "cancelled";
+  scheduled_for?: string | null;
+  scheduled_window?: string | null;
+  notes?: string | null;
+  outcome?: string | null;
+  /// Optional reply text that lands as a normal homeowner message in
+  /// the parent thread alongside the state change. Lets Tom say
+  /// "Booked Smith Plumbing for Tue 2pm — see you then" without
+  /// switching to the reply composer.
+  send_reply?: string;
+  acknowledgement_required?: boolean;
+}
+
+async function handleFetchVisits(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchVisitsPayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+
+  const { data: req, error: reqErr } = await service
+    .from("chez_requests")
+    .select("id, household_id, user_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !req) return json({ error: "request not found" }, 404);
+  const isAdmin = isAdminUser(user);
+  const isOwner = user.id === (req as { user_id: string }).user_id;
+  if (!isAdmin && !isOwner) return json({ error: "not authorized" }, 403);
+
+  // Self-healing reconciliation: any approved vendor proposal in this
+  // thread that doesn't yet have a corresponding chez_visits row gets
+  // one created. Idempotent — won't duplicate if visits already exist.
+  // Catches approvals that happened before the 20261204 migration.
+  const { data: approvedProposals } = await service
+    .from("concierge_messages")
+    .select("id, proposal")
+    .eq("request_id", requestId)
+    .eq("proposal_kind", "vendor");
+  const proposals = (approvedProposals ?? []) as Array<{
+    id: string;
+    proposal: Record<string, unknown> | null;
+  }>;
+  const approvedVendorMessages = proposals.filter((m) => {
+    const p = m.proposal as Record<string, unknown> | null;
+    return p && p.status === "approved" && p.kind === "vendor";
+  });
+  if (approvedVendorMessages.length > 0) {
+    const { data: existingVisits } = await service
+      .from("chez_visits")
+      .select("proposal_message_id")
+      .eq("request_id", requestId);
+    const existingIds = new Set(
+      ((existingVisits ?? []) as Array<{ proposal_message_id: string | null }>)
+        .map((v) => v.proposal_message_id)
+        .filter((id): id is string => !!id)
+    );
+    const toCreate = approvedVendorMessages.filter((m) => !existingIds.has(m.id));
+    for (const m of toCreate) {
+      const vendorBlob = (m.proposal as Record<string, unknown>).vendor as Record<string, unknown> ?? {};
+      await service.from("chez_visits").insert({
+        household_id: (req as { household_id: string }).household_id,
+        request_id: requestId,
+        proposal_message_id: m.id,
+        vendor_name: String(vendorBlob.name ?? "").trim() || "(unnamed vendor)",
+        vendor_phone: vendorBlob.phone ? String(vendorBlob.phone) : null,
+        vendor_payload: vendorBlob,
+        state: "awaiting_date",
+      });
+    }
+  }
+
+  const { data: visits, error: visitsErr } = await service
+    .from("chez_visits")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("created_at", { ascending: true });
+  if (visitsErr) return json({ error: visitsErr.message }, 500);
+
+  return json({ visits: visits ?? [] });
+}
+
+async function handleUpdateVisit(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: UpdateVisitPayload
+) {
+  if (!user || !isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const visitId = compactString(payload.visit_id);
+  if (!visitId) return json({ error: "visit_id required" }, 400);
+
+  const { data: visitRow, error: lookupErr } = await service
+    .from("chez_visits")
+    .select("*")
+    .eq("id", visitId)
+    .maybeSingle();
+  if (lookupErr || !visitRow) return json({ error: "visit not found" }, 404);
+  const visit = visitRow as {
+    id: string;
+    request_id: string;
+    household_id: string;
+    state: string;
+    vendor_name: string;
+  };
+
+  const update: Record<string, unknown> = {};
+  if (payload.state) update.state = payload.state;
+  if (payload.scheduled_for !== undefined) update.scheduled_for = payload.scheduled_for;
+  if (payload.scheduled_window !== undefined) update.scheduled_window = payload.scheduled_window;
+  if (payload.notes !== undefined) update.notes = payload.notes;
+  if (payload.outcome !== undefined) update.outcome = payload.outcome;
+  if (payload.state === "completed") update.completed_at = new Date().toISOString();
+
+  if (Object.keys(update).length > 0) {
+    const { error: updateErr } = await service
+      .from("chez_visits")
+      .update(update)
+      .eq("id", visitId);
+    if (updateErr) return json({ error: updateErr.message }, 500);
+  }
+
+  // Fetch the parent request once — both the optional reply and the
+  // state-change system message need request.user_id as the
+  // concierge_messages.user_id anchor (visits don't carry user_id
+  // themselves; that lives on the request).
+  const stateChanged = !!payload.state && payload.state !== visit.state;
+  const willSendReply = !!(payload.send_reply && payload.send_reply.trim().length > 0);
+  if (stateChanged || willSendReply) {
+    const { data: requestRow } = await service
+      .from("chez_requests")
+      .select("*")
+      .eq("id", visit.request_id)
+      .maybeSingle();
+    if (requestRow) {
+      const request = requestRow as ConciergeRequestRow;
+      const now = new Date().toISOString();
+
+      if (willSendReply) {
+        const ackRequired = !!payload.acknowledgement_required;
+        const content = payload.send_reply!.trim();
+        await service.from("concierge_messages").insert({
+          household_id: request.household_id,
+          user_id: request.user_id,
+          request_id: request.id,
+          role: "concierge",
+          content,
+          attachments: [],
+        });
+        await service
+          .from("chez_requests")
+          .update({
+            last_message_at: now,
+            unread_for_user: true,
+          })
+          .eq("id", request.id);
+        const inboxType = ackRequired ? "chez_reply_action_needed" : "chez_reply_informational";
+        const inboxTitle = ackRequired
+          ? `Chez needs your answer: ${request.summary}`
+          : `Chez replied: ${request.summary}`;
+        await service.from("inbox_items").insert({
+          household_id: request.household_id,
+          type: inboxType,
+          title: inboxTitle,
+          summary: content.slice(0, 280),
+          seen: false,
+          needs_action: ackRequired,
+          action_type: ackRequired ? "chez_reply_action_needed" : null,
+          action_completed: false,
+          metadata: { chez_request_id: request.id, category: request.category },
+          related_chez_request_id: request.id,
+        });
+      }
+
+      if (stateChanged) {
+        let body = "";
+        if (payload.state === "scheduled") body = `Visit with ${visit.vendor_name} is on the calendar.`;
+        else if (payload.state === "completed") body = `Visit with ${visit.vendor_name} completed.`;
+        else if (payload.state === "cancelled") body = `Visit with ${visit.vendor_name} was cancelled.`;
+        if (body) {
+          await service.from("concierge_messages").insert({
+            household_id: request.household_id,
+            user_id: request.user_id,
+            request_id: request.id,
+            role: "system",
+            content: body,
+            attachments: [],
+          });
+        }
+      }
+    }
+  }
+
+  return json({ ok: true });
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -1939,6 +2183,21 @@ serve(async (req: Request) => {
           user,
           body as unknown as AnalyzeRequestPayload,
           supabaseUrl
+        );
+
+      // Phase 82 — visit tracking. Once a vendor proposal is approved,
+      // the case shifts to coordinating that visit through completion.
+      case "fetch_visits":
+        return handleFetchVisits(
+          service,
+          user,
+          body as unknown as FetchVisitsPayload
+        );
+      case "update_visit":
+        return handleUpdateVisit(
+          service,
+          user,
+          body as unknown as UpdateVisitPayload
         );
 
       default:

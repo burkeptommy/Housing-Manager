@@ -1530,6 +1530,10 @@ async function loadChezMessages(requestId) {
       .order("created_at", { ascending: true });
     if (error) throw error;
     state.chezMessages[requestId] = data ?? [];
+    // Phase 82 — Invalidate the visits cache whenever messages reload.
+    // New approvals create new visits server-side; the next render
+    // pulls them. Cheap fetch, keeps the panel honest.
+    if (state.chezVisitsByRequest) delete state.chezVisitsByRequest[requestId];
     return state.chezMessages[requestId];
   } catch (error) {
     console.warn("[admin] chez messages fetch failed", error);
@@ -4926,10 +4930,28 @@ function renderFocusedChezPanelHtml(req) {
   // need to scroll past 8 cards to get to the conversation.
   const headerLineHtml = renderCompactHeaderLineHtml(req);
 
-  // Phase 81.1 — AI analysis panel. Auto-runs on request open;
-  // shows pre-researched vendors + call script + key questions
-  // so Tom's job is "make the calls + click send" not "research".
-  const analysisHtml = renderChezAnalysisPanelHtml(req);
+  // Phase 82 — Stage tracker shows where this case is in its lifecycle
+  // (Submitted → Research → Sent → Picked → Booked → Visit → Done).
+  // Computed from existing signals + visits cache.
+  const visits = (state.chezVisitsByRequest || {})[req.id];
+  const stageTrackerHtml = renderStageTrackerHtml(req, messages, visits);
+
+  // Phase 82 — Active visits section. When the homeowner has approved
+  // ≥1 vendor, this is the primary surface — the case has shifted from
+  // "research and propose" to "track these visits through completion".
+  const visitsHtml = renderVisitsPanelHtml(req, visits);
+  const hasActiveVisits = Array.isArray(visits) && visits.some((v) =>
+    v.state === "awaiting_date" || v.state === "scheduled"
+  );
+
+  // Phase 82 — When active visits exist, collapse the analysis panel
+  // by default. Tom's done with research; he's tracking visits now.
+  // The panel stays in the DOM (one click expands) so he can re-call
+  // a vendor or send another proposal if needed.
+  const analysisExpanded = !!(state.chezAnalysisExpandedByRequest && state.chezAnalysisExpandedByRequest[req.id]);
+  const analysisHtml = renderChezAnalysisPanelHtml(req, {
+    collapsed: hasActiveVisits && !analysisExpanded,
+  });
 
   const statusOptions = ["open", "waiting_customer", "resolved"]
     .map((s) => `<option value="${s}" ${s === req.status ? "selected" : ""}>${CHEZ_STATUS_LABELS[s]}</option>`)
@@ -4977,6 +4999,10 @@ function renderFocusedChezPanelHtml(req) {
       </header>
 
       ${headerLineHtml}
+
+      ${stageTrackerHtml}
+
+      ${visitsHtml}
 
       ${analysisHtml}
 
@@ -5059,7 +5085,7 @@ function renderCompactHeaderLineHtml(req) {
 // Phase 81.1 — AI analysis panel state. Cached per request so we
 // don't re-run Claude on every panel re-render. Re-runs only when
 // the user explicitly clicks "Re-analyze".
-function renderChezAnalysisPanelHtml(req) {
+function renderChezAnalysisPanelHtml(req, opts = {}) {
   state.chezAnalysisByRequest = state.chezAnalysisByRequest || {};
   const cached = state.chezAnalysisByRequest[req.id];
 
@@ -5098,6 +5124,20 @@ function renderChezAnalysisPanelHtml(req) {
 
   const callState = (state.chezVendorCallsByRequest && state.chezVendorCallsByRequest[req.id]) || {};
   const recommendedCount = Object.values(callState).filter((s) => s && s.recommended).length;
+
+  // Phase 82 — When active visits exist, the analysis panel
+  // collapses to a one-liner so the visits section becomes the
+  // primary focus. Tom can click the toolbar button to re-research
+  // or expand back to the full pre-call workflow.
+  if (opts.collapsed) {
+    return `
+      <section class="admin-chez__analysis admin-chez__analysis--collapsed-line">
+        <span>✨ Chez analysis</span>
+        <span class="admin-muted">${allCandidates.length} vendor${allCandidates.length === 1 ? "" : "s"} researched · ${recommendedCount} sent</span>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="expand-analysis">Re-open research</button>
+      </section>
+    `;
+  }
 
   return `
     <section class="admin-chez__analysis">
@@ -5293,6 +5333,237 @@ async function runChezAnalysis(requestId, force = false) {
   if (state.selectedChezRequest && state.selectedChezRequest.id === requestId) {
     renderFocusedChezDetail(state.selectedChezRequest);
   }
+}
+
+// ============================================================================
+// Phase 82 — Stage tracker + visit cards
+// ============================================================================
+// Tom asked for "a tracker up top" so he can see where each case is in
+// its lifecycle at a glance. Once a vendor proposal is approved the
+// case turns into tracking the resulting visits, so we surface those
+// as a dedicated section between the header and the (now-collapsed)
+// analysis panel.
+
+const CHEZ_STAGES = [
+  { id: "submitted", label: "Submitted" },
+  { id: "research", label: "Research" },
+  { id: "sent", label: "Sent" },
+  { id: "picked", label: "Picked" },
+  { id: "booked", label: "Booked" },
+  { id: "visit", label: "Visit" },
+  { id: "done", label: "Done" },
+];
+
+function renderStageTrackerHtml(req, messages, visits) {
+  const proposals = (messages || []).filter((m) => m.proposal && m.proposal.kind === "vendor");
+  const anyProposal = proposals.length > 0;
+  const anyApproved = proposals.some((m) => m.proposal.status === "approved");
+  const visitsArr = Array.isArray(visits) ? visits : [];
+  const livingVisits = visitsArr.filter((v) => v.state !== "cancelled");
+  const allBooked = livingVisits.length > 0 && livingVisits.every((v) => v.state === "scheduled" || v.state === "completed");
+  const allCompleted = livingVisits.length > 0 && livingVisits.every((v) => v.state === "completed");
+  const hasAnalysis = !!(state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id] && state.chezAnalysisByRequest[req.id] !== null);
+
+  const done = {
+    submitted: !!req.created_at,
+    research: hasAnalysis,
+    sent: anyProposal,
+    picked: anyApproved,
+    booked: allBooked,
+    visit: allCompleted,
+    done: req.status === "resolved",
+  };
+
+  // The first non-done stage becomes "current". Everything after stays
+  // pending. The dot-by-dot cadence makes "where are we" obvious.
+  const stages = CHEZ_STAGES.map((s) => ({ ...s, done: !!done[s.id], current: false }));
+  let currentSet = false;
+  for (const s of stages) {
+    if (!s.done && !currentSet) { s.current = true; currentSet = true; }
+  }
+  // If everything's done, mark the last as current.
+  if (!currentSet && stages.length > 0) stages[stages.length - 1].current = true;
+
+  return `
+    <nav class="admin-chez__stage-tracker" aria-label="Case stage">
+      ${stages.map((s, i) => `
+        <div class="admin-chez__stage ${s.done ? "is-done" : ""} ${s.current ? "is-current" : ""}">
+          <div class="admin-chez__stage-dot">${s.done ? "✓" : (s.current ? "●" : "")}</div>
+          <div class="admin-chez__stage-label">${escapeHtml(s.label)}</div>
+          ${i < stages.length - 1 ? `<div class="admin-chez__stage-rail ${s.done ? "is-done" : ""}"></div>` : ""}
+        </div>
+      `).join("")}
+    </nav>
+  `;
+}
+
+function renderVisitsPanelHtml(req, visits) {
+  // Lazy-fetch visits once per request open, caching the result.
+  if (visits === undefined) {
+    fetchChezVisits(req.id);
+    return ""; // wait for fetch to populate cache
+  }
+  const visitsArr = Array.isArray(visits) ? visits : [];
+  if (visitsArr.length === 0) return ""; // no approvals yet → no panel
+
+  // Active = anything not cancelled. Completed shown collapsed at the
+  // bottom so Tom keeps the audit trail without taking up real estate.
+  const active = visitsArr.filter((v) => v.state !== "cancelled" && v.state !== "completed");
+  const completed = visitsArr.filter((v) => v.state === "completed");
+  const cancelled = visitsArr.filter((v) => v.state === "cancelled");
+
+  const headerSubtitle = active.length > 0
+    ? `${active.length} active${completed.length ? ` · ${completed.length} completed` : ""}`
+    : completed.length > 0
+    ? `All ${completed.length} visit${completed.length === 1 ? "" : "s"} completed`
+    : "No active visits";
+
+  return `
+    <section class="admin-chez__visits">
+      <header>
+        <div>
+          <h3>Active visits</h3>
+          <span class="admin-muted">${headerSubtitle}</span>
+        </div>
+        ${active.length === 0 && completed.length > 0 && req.status !== "resolved" ? `
+          <button type="button" class="admin-button admin-button--primary admin-button--small" data-action="mark-resolved-from-visits">Mark case resolved</button>
+        ` : ""}
+      </header>
+      ${active.map((v) => renderVisitCardHtml(req, v)).join("")}
+      ${completed.length > 0 ? `
+        <details class="admin-chez__visits-completed">
+          <summary>Completed (${completed.length})</summary>
+          ${completed.map((v) => renderVisitCardHtml(req, v, { compact: true })).join("")}
+        </details>
+      ` : ""}
+      ${cancelled.length > 0 ? `
+        <details class="admin-chez__visits-cancelled">
+          <summary>Cancelled (${cancelled.length})</summary>
+          ${cancelled.map((v) => renderVisitCardHtml(req, v, { compact: true })).join("")}
+        </details>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderVisitCardHtml(req, visit, opts = {}) {
+  const stateLabel = {
+    awaiting_date: "Awaiting date",
+    scheduled: "Scheduled",
+    completed: "Completed",
+    cancelled: "Cancelled",
+  }[visit.state] || visit.state;
+  const stateTone = {
+    awaiting_date: "amber",
+    scheduled: "green",
+    completed: "muted",
+    cancelled: "muted",
+  }[visit.state] || "muted";
+  const phone = visit.vendor_phone || (visit.vendor_payload && visit.vendor_payload.phone) || "";
+  const phoneCleaned = String(phone).replace(/[^0-9+]/g, "");
+  const slots = (visit.vendor_payload && Array.isArray(visit.vendor_payload.availability_slots))
+    ? visit.vendor_payload.availability_slots : [];
+  const scheduledFor = visit.scheduled_for ? formatDateTimeShort(visit.scheduled_for) : "";
+
+  if (opts.compact) {
+    return `
+      <div class="admin-chez__visit-card admin-chez__visit-card--compact" data-visit-id="${escapeHtml(visit.id)}">
+        <span class="admin-pill" data-tone="${stateTone}">${escapeHtml(stateLabel)}</span>
+        <strong>${escapeHtml(visit.vendor_name || "")}</strong>
+        ${scheduledFor ? `<span class="admin-muted">${escapeHtml(scheduledFor)}</span>` : ""}
+        ${visit.outcome ? `<span class="admin-muted">— ${escapeHtml(visit.outcome)}</span>` : ""}
+      </div>
+    `;
+  }
+
+  // Active card — full controls.
+  const isScheduled = visit.state === "scheduled";
+  const dateValue = visit.scheduled_for ? new Date(visit.scheduled_for).toISOString().slice(0, 16) : "";
+
+  return `
+    <article class="admin-chez__visit-card" data-visit-id="${escapeHtml(visit.id)}">
+      <header>
+        <div class="admin-chez__visit-card-title">
+          <strong>${escapeHtml(visit.vendor_name || "")}</strong>
+          <span class="admin-pill" data-tone="${stateTone}">${escapeHtml(stateLabel)}</span>
+        </div>
+        ${phoneCleaned ? `<a class="admin-button admin-button--ghost admin-button--small" href="tel:${escapeHtml(phoneCleaned)}">📞 ${escapeHtml(phone)}</a>` : ""}
+      </header>
+
+      ${slots.length > 0 ? `
+        <div class="admin-chez__visit-slots">
+          <span class="admin-muted">Times offered:</span>
+          ${slots.map((s) => `<button type="button" class="admin-chez__visit-slot-chip" data-action="adopt-slot" data-slot-text="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}
+        </div>
+      ` : ""}
+
+      <div class="admin-chez__visit-grid">
+        <label>Confirmed date / time
+          <input type="datetime-local" data-visit-field="scheduled_for" value="${escapeHtml(dateValue)}" />
+        </label>
+        <label>Window note (optional)
+          <input type="text" data-visit-field="scheduled_window" value="${escapeHtml(visit.scheduled_window || "")}" placeholder="e.g. arrives 2-4pm" />
+        </label>
+      </div>
+
+      <label>Notes
+        <textarea rows="2" data-visit-field="notes" placeholder="Running notes — what's been confirmed, follow-ups, anything quirky.">${escapeHtml(visit.notes || "")}</textarea>
+      </label>
+
+      ${isScheduled ? `
+        <label>Outcome (when complete)
+          <input type="text" data-visit-field="outcome" value="${escapeHtml(visit.outcome || "")}" placeholder="e.g. Completed cleanly. Quoted $1,800 for follow-up." />
+        </label>
+      ` : ""}
+
+      <div class="admin-chez__visit-card-actions">
+        ${visit.state === "awaiting_date" ? `
+          <button type="button" class="admin-button admin-button--primary admin-button--small" data-action="visit-mark-scheduled">📅 Confirm scheduled</button>
+        ` : ""}
+        ${isScheduled ? `
+          <button type="button" class="admin-button admin-button--primary admin-button--small" data-action="visit-mark-completed">✅ Mark completed</button>
+        ` : ""}
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="visit-save-notes">💾 Save notes</button>
+        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="visit-cancel">Cancel visit</button>
+      </div>
+    </article>
+  `;
+}
+
+async function fetchChezVisits(requestId) {
+  state.chezVisitsByRequest = state.chezVisitsByRequest || {};
+  state.chezVisitsInFlight = state.chezVisitsInFlight || new Set();
+  if (state.chezVisitsInFlight.has(requestId)) return;
+  if (state.chezVisitsByRequest[requestId] !== undefined) return;
+  state.chezVisitsInFlight.add(requestId);
+  try {
+    const result = await callChezConcierge({
+      action: "fetch_visits",
+      request_id: requestId,
+    });
+    state.chezVisitsByRequest[requestId] = result.visits || [];
+  } catch (e) {
+    console.warn("[admin] fetch_visits failed", e);
+    state.chezVisitsByRequest[requestId] = [];
+  } finally {
+    state.chezVisitsInFlight.delete(requestId);
+  }
+  if (state.selectedChezRequest && state.selectedChezRequest.id === requestId) {
+    renderFocusedChezDetail(state.selectedChezRequest);
+  }
+}
+
+function formatDateTimeShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 // Phase 80.1 — Profile summary shown at the top of every focused chez
@@ -6127,6 +6398,35 @@ function attachChezPanelHandlers(req) {
         });
         slot.availability_slots.splice(removeIdx, 1);
         renderFocusedChezDetail(req);
+      } else if (action === "expand-analysis") {
+        // Phase 82 — Re-open the analysis panel from the collapsed
+        // line so Tom can re-research vendors mid-case.
+        state.chezAnalysisExpandedByRequest = state.chezAnalysisExpandedByRequest || {};
+        state.chezAnalysisExpandedByRequest[req.id] = true;
+        renderFocusedChezDetail(req);
+      } else if (action === "mark-resolved-from-visits") {
+        await performChezTransition(req, "resolved");
+      } else if (action === "adopt-slot") {
+        // Phase 82 — Click a "Times offered" chip on a visit card to
+        // copy that slot's text into the datetime field. Tom still
+        // confirms (since chips are free-form text, not parseable
+        // dates), but the UX bypasses re-typing.
+        const card = btn.closest("[data-visit-id]");
+        if (!card) return;
+        const slotText = btn.dataset.slotText || "";
+        const noteInput = card.querySelector("[data-visit-field='scheduled_window']");
+        if (noteInput) {
+          noteInput.value = slotText;
+          noteInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      } else if (action === "visit-mark-scheduled") {
+        await visitMarkAction(req, btn, "scheduled");
+      } else if (action === "visit-mark-completed") {
+        await visitMarkAction(req, btn, "completed");
+      } else if (action === "visit-cancel") {
+        await visitMarkAction(req, btn, "cancelled");
+      } else if (action === "visit-save-notes") {
+        await visitSaveAction(req, btn);
       }
     });
   });
@@ -6247,6 +6547,128 @@ function attachChezPanelHandlers(req) {
       }
     });
   });
+
+  // Phase 82 — Visit-card field bindings. Same pattern as the vendor
+  // call form: write to in-memory cache on every input so save / state
+  // changes pick up the latest values without requiring blur.
+  el.auditFocused.querySelectorAll("[data-visit-field]").forEach((input) => {
+    const handler = () => {
+      const card = input.closest("[data-visit-id]");
+      if (!card) return;
+      const visitId = card.getAttribute("data-visit-id");
+      const visit = (state.chezVisitsByRequest?.[req.id] || []).find((v) => v.id === visitId);
+      if (!visit) return;
+      const field = input.dataset.visitField;
+      // Stash on the cached visit so re-renders see the latest text
+      // without round-tripping. The persist call sends to the server.
+      visit[field] = input.value;
+    };
+    input.addEventListener("change", handler);
+    if (input.tagName === "TEXTAREA" || (input.tagName === "INPUT" && input.type !== "checkbox")) {
+      input.addEventListener("input", handler);
+    }
+  });
+}
+
+// Phase 82 — Visit state-transition button handler. "Confirm scheduled",
+// "Mark completed", "Cancel visit" all flow through here. Sends the
+// current form values + the new state to the Edge Function, which
+// persists, posts a system message in the thread, and (if the admin
+// added a reply note) sends it as a normal homeowner reply too.
+async function visitMarkAction(req, btn, newState) {
+  const card = btn.closest("[data-visit-id]");
+  if (!card) return;
+  const visitId = card.getAttribute("data-visit-id");
+  const visit = (state.chezVisitsByRequest?.[req.id] || []).find((v) => v.id === visitId);
+  if (!visit) return;
+
+  // Validation: scheduling requires a date.
+  const dateInput = card.querySelector("[data-visit-field='scheduled_for']");
+  if (newState === "scheduled" && (!dateInput || !dateInput.value)) {
+    alert("Pick a date and time before marking scheduled.");
+    return;
+  }
+  // Validation: cancellation prompts for a reason.
+  let reason = "";
+  if (newState === "cancelled") {
+    reason = window.prompt("Why is this visit cancelled? (optional, lands in the homeowner thread)", "") || "";
+  }
+
+  // Optional one-line reply to lend the homeowner a heads-up. The
+  // Edge Function only sends if non-empty.
+  let sendReply = "";
+  if (newState === "scheduled") {
+    const when = dateInput?.value ? new Date(dateInput.value).toLocaleString(undefined, {
+      weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit",
+    }) : "the confirmed time";
+    const proposed = window.prompt(
+      `Reply to homeowner? (leave blank to skip)`,
+      `Booked ${visit.vendor_name} for ${when}. We'll be in touch as the date approaches.`
+    );
+    if (proposed && proposed.trim()) sendReply = proposed.trim();
+  } else if (newState === "completed") {
+    const proposed = window.prompt(
+      `Reply to homeowner? (leave blank to skip)`,
+      `${visit.vendor_name} just finished — work complete. Anything you want me to follow up on?`
+    );
+    if (proposed && proposed.trim()) sendReply = proposed.trim();
+  } else if (newState === "cancelled" && reason.trim()) {
+    sendReply = `Heads up — the visit with ${visit.vendor_name} was cancelled. ${reason.trim()}`;
+  }
+
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Saving…";
+  try {
+    await callChezConcierge({
+      action: "update_visit",
+      visit_id: visitId,
+      state: newState,
+      scheduled_for: dateInput?.value ? new Date(dateInput.value).toISOString() : undefined,
+      scheduled_window: card.querySelector("[data-visit-field='scheduled_window']")?.value || undefined,
+      notes: card.querySelector("[data-visit-field='notes']")?.value || undefined,
+      outcome: card.querySelector("[data-visit-field='outcome']")?.value || (newState === "cancelled" ? reason : undefined),
+      send_reply: sendReply || undefined,
+      acknowledgement_required: false,
+    });
+    // Invalidate the visits cache so the next render fetches fresh.
+    if (state.chezVisitsByRequest) delete state.chezVisitsByRequest[req.id];
+    await loadChezMessages(req.id);
+    renderFocusedChezDetail(req);
+  } catch (err) {
+    console.warn("[admin] update_visit failed", err);
+    alert(`Save failed: ${err.message || err}`);
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+async function visitSaveAction(req, btn) {
+  const card = btn.closest("[data-visit-id]");
+  if (!card) return;
+  const visitId = card.getAttribute("data-visit-id");
+  const dateInput = card.querySelector("[data-visit-field='scheduled_for']");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Saving…";
+  try {
+    await callChezConcierge({
+      action: "update_visit",
+      visit_id: visitId,
+      scheduled_for: dateInput?.value ? new Date(dateInput.value).toISOString() : null,
+      scheduled_window: card.querySelector("[data-visit-field='scheduled_window']")?.value || null,
+      notes: card.querySelector("[data-visit-field='notes']")?.value || null,
+      outcome: card.querySelector("[data-visit-field='outcome']")?.value || null,
+    });
+    if (state.chezVisitsByRequest) delete state.chezVisitsByRequest[req.id];
+    renderFocusedChezDetail(req);
+  } catch (err) {
+    console.warn("[admin] save visit failed", err);
+    alert(`Save failed: ${err.message || err}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 // Phase 81.1 — Package recommended vendors and send each as a
