@@ -6,6 +6,56 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 83: Concierge Cockpit — 4-pane customer service desktop (2026-05-01)
+
+Tom asked us to turn the "Chez Requests" admin tab into a real customer-service cockpit per a fresh design handoff. The deliverable: not just UI — every button, click, and step has to be wired end-to-end.
+
+The replacement is a fixed-viewport desktop workspace:
+
+```
+┌─ TopBar (52px) — brand wordmark · search · vendor + Alfred toggles · agent
+├─ Queue (304px) — tabs (All/Mine/Urgent), 4 stat tiles, case list w/ SLA pills, Alfred queue tip
+├─ Homeowner (320px) — profile card, family, systems w/ active-case highlight, vendors, routines, notes
+├─ Case workspace (flex:1) — case header, AI brief (5 tabs in indigo gradient hero), stage tracker, active visits, vendor sheet, conversation, composer
+└─ Alfred sidebar (360px) — 3 tabs (Suggested actions / Ask Alfred / Similar cases), pill composer
+```
+
+**Tab rename:** "Chez Requests" → **"Concierge"** in the sidebar. Internal route id stays `"chez"` (referenced in dozens of places), so legacy callers keep working.
+
+**Reactive shell:** legacy `renderChezRequestsView` and `renderFocusedChezDetail` are now thin shims that delegate to `renderConciergeCockpit`. Every existing callback (proposal builder, analysis cache, visits cache, dossier drawer, package & send, status transitions) keeps working without modification — they all end up triggering a re-render of the cockpit, which idempotently re-paints the entire 4-pane shell.
+
+**State:** `state.concierge.{ ui, queueFilter, searchQuery, briefTab, composer, alfred }`. Alfred on/off + density persist to localStorage; everything per-case is keyed by `request_id` so switching between cases preserves the operator's draft + sidebar tab + brief tab.
+
+**Wiring (every button has real plumbing):**
+- Top bar — search filters queue live, vendor/Alfred toggles persist, refresh re-runs `loadAdminData`
+- Queue — All/Mine/Urgent tabs, case row click loads thread + visits, queue tip click swaps active case
+- Homeowner panel — profile chips and dossier rows route through the existing `openDossierDrawer`
+- Case header — Reassign (single-agent v1, alerts), Snooze (prompts hours, transitions to waiting_customer with system message), Mark resolved / Reopen (existing transition)
+- AI brief — 5 tabs (Analysis / Considerations / Recommended approach / Questions / Call script), Re-run forces fresh analysis
+- Vendor sheet — expandable call forms, slot inputs, cost combobox + custom row, ✨ Summarize from notes (existing `suggest_vendor_framing`), Recommend toggle drives the proposal preview, "Send to homeowner" → `packageAndSendRecommendedVendors`, Find more → `find-local-vendors` merged into cache
+- Conversation — Summarize thread → `analyze_request`, composer Draft from brief seeds tone-aware template, tone toggle (warm/direct/formal) re-renders critique + draft, Send · keep open / Send · waiting on customer use the existing reply path with optional `to_status`
+- Quick actions row — Manual proposal opens the existing builder, status transitions are direct
+- Alfred sidebar — Resolve this case (adapts plan to case state: open builder if recommendations exist, expand top vendor's call form if candidates exist, run analysis if not), Quick Actions list, Context I'm using card; Ask Alfred chat backed by new `ask_alfred` Edge Function action; Similar cases uses `past_requests` from the dossier with a pattern card; suggested prompts set the input and immediately send
+- Visit cards — carry over from Phase 82, Confirm scheduled / Mark completed / Cancel, slot adoption chips, optional reply text
+
+**New Edge Function action:** `ask_alfred` (Phase 83). Single-shot, case-scoped Q&A. Loads request + dossier + thread + recent messages + past requests on the server, asks Claude sonnet 4.6 with a system prompt that constrains voice and rules (concise, reference specific facts, defer to licensed pros on legal/code/insurance, never invent data). Multi-turn deferred until usage shows the shape of useful follow-ups.
+
+**Deterministic AI fit score** (no extra Claude call): `computeChezVendorFit(v)` combines existing-network bonus (+25), top-rated badge (+18), 4.8★+ (+18), 4.5★+ (+12), 4.0★+ (+6), review volume tiers, phone availability — capped 15-99. Rendered as the meter + reasoning sentence on every vendor row.
+
+**Tone QA** is heuristic, not AI: `assessConciergeReplyTone(draft, tone)` checks for warm cues / direct verbs / formal salutations + length sanity, hints inline below the textarea. No round-trip latency.
+
+**Voice capture** is rendered but disabled with a tooltip explaining the single-state CT consent requirement called out in the design handoff. Type-into-form path works fully; the ✨ Summarize button polishes raw notes into homeowner-facing copy.
+
+**Responsive:** desktop-first per the spec. <1280px collapses the Alfred sidebar; <1024px collapses the homeowner panel. Minimum useful viewport is 1280×800.
+
+**CSS:** ~1900 lines of cockpit-scoped styles in `admin.css` using the existing tokens (Cosmic Indigo / Deepened Salmon / Pearl White). Indigo-gradient AI brief hero, salmon CTAs only (per the spec's strict salmon usage rule), indigo-tinted shadows, soft mesh-gradient overlay on the brief + Alfred header.
+
+**Files:** `website/admin.html` (host element), `website/admin.js` (~2300 lines added — cockpit shell + 4-pane renderers + handler attachment + 3 helper passes), `website/admin.css` (~1900 lines), `supabase/functions/chez-concierge/index.ts` (+ `ask_alfred` action ~170 lines).
+
+**Verification:** `node --check website/admin.js` clean; chez-concierge function deployed; admin.html boot in preview shows zero console errors, host element present + correctly hidden until login.
+
+---
+
 ## Phase 82: Case lifecycle tracking — stage tracker + active visits panel (2026-05-01)
 
 Every prior Chez phase made it easier to TAKE a request. Phase 82 makes it easier to FINISH one. Once the homeowner approves a vendor proposal, the case stops being "research and propose" and becomes "coordinate this visit through completion." Tom flagged this exactly: "I sent 2 recommendations to the homeowner and they accepted 2, so this case should just turn into tracking those 2 new visits right throughout the duration of this case."
