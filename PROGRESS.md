@@ -6,6 +6,34 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 82: Case lifecycle tracking — stage tracker + active visits panel (2026-05-01)
+
+Every prior Chez phase made it easier to TAKE a request. Phase 82 makes it easier to FINISH one. Once the homeowner approves a vendor proposal, the case stops being "research and propose" and becomes "coordinate this visit through completion." Tom flagged this exactly: "I sent 2 recommendations to the homeowner and they accepted 2, so this case should just turn into tracking those 2 new visits right throughout the duration of this case."
+
+**Schema (`20261204_chez_visits.sql`):**
+- `chez_visits` table — one row per approved vendor with state machine `awaiting_date` → `scheduled` → `completed` (plus `cancelled` escape)
+- Snapshots vendor identity at approval time (`vendor_name`, `vendor_phone`, `vendor_payload JSONB`) so future proposal edits don't drift the visit row
+- `proposal_message_id` FK back to the originating proposal so the visit card can deep-link to the conversation
+- `scheduled_for` / `scheduled_window` / `notes` / `outcome` cover everything Tom needs to write down across calls
+- Partial index on `(household_id, state)` for active-visit queries; full index on `(request_id, created_at)` for thread rendering
+- RLS mirrors `chez_requests` (household members read; admin reads + updates everything)
+
+**Edge Function:**
+- `handleDecideProposal` extended — when the decision is `approved` AND the proposal kind is `vendor`, idempotent insert into `chez_visits` keyed by `proposal_message_id` so re-approvals don't duplicate
+- `handleFetchVisits` action — returns active + completed visits AND self-heals: scans approved vendor proposals on the request, creates a visit row for any without one. Catches every pre-Phase-82 approval that already happened in production
+- `handleUpdateVisit` action — transitions state, optionally fires a homeowner reply in the same call (creates a `concierge_messages` + `inbox_items` row via the existing reply path), and writes a system-message audit trail describing the transition. Visits don't carry a `user_id`, so the system message uses `request.user_id` from the parent.
+
+**Admin portal (`website/admin.js`):**
+- `renderStageTrackerHtml` — 7-stage horizontal pill rail at the top of the focused panel: Submitted → Research → Sent → Picked → Booked → Visit → Done. Computed from existing signals (`chez_messages` proposal kinds + statuses + `chez_visits` state + `request.status`). Done states are green; current is salmon-filled; future is muted. No new schema needed for the computation — it's a pure derivation.
+- `renderVisitsPanelHtml` + `renderVisitCardHtml` — Active Visits panel between the tracker and the analysis panel. Each card has phone tap-to-call, slot-adoption chips that copy the vendor's offered times into the `scheduled_window` field with one click, datetime-local picker, notes textarea, and three transition buttons (Mark scheduled / Mark completed / Cancel) each with optional reply text.
+- `renderChezAnalysisPanelHtml` gains an `opts.collapsed` mode — when there are active visits, the analysis collapses to a one-line summary with an "Expand" button. Shifts Tom's attention to the coordination work without losing access to the research.
+- New action handlers: `expand-analysis`, `mark-resolved-from-visits`, `adopt-slot`, `visit-mark-scheduled`, `visit-mark-completed`, `visit-cancel`, `visit-save-notes`. State caches: `state.chezVisitsByRequest` + in-flight Set guard `state.chezVisitsInFlight`.
+- `loadChezMessages` invalidates the visits cache on every reload so newly approved proposals trigger the self-heal on next render.
+
+**Verification:** Migration applied to remote (`20261204_chez_visits.sql`); chez-concierge Edge Function v5 deployed; `node --check website/admin.js` clean; `xcodebuild BUILD SUCCEEDED` on Chez scheme. The two visits Tom flagged ("I sent 2 recommendations and they accepted 2") will materialize on the next admin portal hard-refresh — `fetch_visits` will see the approved proposals without visit rows and create them in line.
+
+---
+
 ## Phase 80.2: Per-task Chez delegation (2026-05-01)
 
 Closed the obvious gap in 80.1 — the homeowner could delegate routines + contractors but not individual tasks. Most "I want help with this" moments are a single specific task without a vendor, so the per-task layer is where the offload-feeling actually lands.
