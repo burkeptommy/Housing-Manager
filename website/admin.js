@@ -4999,73 +4999,243 @@ function renderFocusedChezPanelHtml(req) {
 // panel. Lazy-loaded once per request open; cached on
 // `state.chezProfilesByHousehold` keyed by household_id so subsequent
 // opens within the session don't re-fetch.
+// Phase 81 — Customer dossier renderer. Replaces the Phase 80.1
+// profile-only summary with the full household snapshot (property,
+// family, systems, contractors, tasks, vehicles, recent activity).
+// Tom now has every signal he needs to respond to a Chez request
+// without leaving the focused panel. Click any chip to drill into
+// detail — the chez-dossier-drawer slides in with the entity's
+// full record.
 function renderChezProfileSummaryHtml(req) {
   const householdId = req.household_id;
   if (!householdId) return "";
-  state.chezProfilesByHousehold = state.chezProfilesByHousehold || {};
-  const profile = state.chezProfilesByHousehold[householdId];
-  if (profile === undefined) {
-    // Kick off lazy fetch; re-render when it resolves.
-    fetchChezHouseholdProfile(householdId);
+  state.chezDossiersByHousehold = state.chezDossiersByHousehold || {};
+  const dossier = state.chezDossiersByHousehold[householdId];
+  if (dossier === undefined) {
+    fetchChezHouseholdDossier(householdId);
     return `
-      <section class="admin-chez__profile">
-        <h3>Customer profile</h3>
-        <p class="admin-muted">Loading standing instructions…</p>
+      <section class="admin-chez__dossier">
+        <h3>Household dossier</h3>
+        <p class="admin-muted">Loading homeowner context…</p>
       </section>
     `;
   }
-  if (!profile || Object.keys(profile).length === 0) {
+  if (!dossier) {
     return `
-      <section class="admin-chez__profile admin-chez__profile--empty">
-        <h3>Customer profile</h3>
-        <p class="admin-muted">No standing instructions on file. Customer hasn't filled their Chez profile yet.</p>
+      <section class="admin-chez__dossier admin-chez__dossier--empty">
+        <h3>Household dossier</h3>
+        <p class="admin-muted">Couldn't load the homeowner's data. Tap the request again to retry.</p>
       </section>
     `;
   }
-  const tiers = profile.spending_tiers || {};
+  return renderHouseholdDossierHtml(dossier);
+}
+
+function renderHouseholdDossierHtml(d) {
+  const property = (d.properties && d.properties[0]) || null;
+  const homeowner = primaryHomeownerLabel(d);
+  const tiers = d.profile?.spending_tiers || {};
   const tierLine = (tiers.auto_approve_under !== undefined)
     ? `Auto-approve &lt; $${tiers.auto_approve_under} · Ping &lt; $${tiers.ping_under} · Always ask &gt; $${tiers.explicit_above}`
-    : "Spending tiers not set — defaults apply.";
-  const aboutUs = profile.about_us || "";
-  const comm = profile.communication || {};
-  const vendor = profile.vendor_preferences || {};
-  const log = profile.logistics || {};
-  const lines = [];
-  if (aboutUs) lines.push(`<div><strong>About us:</strong> ${escapeHtml(aboutUs)}</div>`);
-  if (vendor.budget_orientation) lines.push(`<div><strong>Budget orientation:</strong> ${escapeHtml(vendor.budget_orientation)}</div>`);
-  if (vendor.notes) lines.push(`<div><strong>Vendor notes:</strong> ${escapeHtml(vendor.notes)}</div>`);
-  if (comm.vacation_mode) lines.push(`<div><strong>Vacation mode ON.</strong> ${escapeHtml(comm.vacation_notes || "")}</div>`);
-  if (log.has_pets && log.pet_notes) lines.push(`<div><strong>Pets:</strong> ${escapeHtml(log.pet_notes)}</div>`);
-  if (log.entry_instructions) lines.push(`<div><strong>Entry:</strong> ${escapeHtml(log.entry_instructions)}</div>`);
+    : "Spending tiers not set — defaults (200 / 500 / 500) apply.";
+  const profile = d.profile || {};
+  const profileLines = [];
+  if (profile.about_us) profileLines.push({ label: "About", value: profile.about_us });
+  if (profile.vendor_preferences?.budget_orientation) profileLines.push({ label: "Budget", value: profile.vendor_preferences.budget_orientation });
+  if (profile.vendor_preferences?.notes) profileLines.push({ label: "Vendor notes", value: profile.vendor_preferences.notes });
+  if (profile.communication?.vacation_mode) profileLines.push({ label: "Vacation mode", value: profile.communication.vacation_notes || "ON" });
+  if (profile.logistics?.has_pets && profile.logistics?.pet_notes) profileLines.push({ label: "Pets", value: profile.logistics.pet_notes });
+  if (profile.logistics?.entry_instructions) profileLines.push({ label: "Entry", value: profile.logistics.entry_instructions });
+
+  const propBlock = property ? `
+    <div class="admin-chez__dossier-card" data-dossier-entity="property" data-dossier-id="${escapeHtml(property.id)}">
+      <div class="admin-chez__dossier-card-head">🏠 Property</div>
+      <div class="admin-chez__dossier-card-body">
+        <strong>${escapeHtml(formatAddress(property))}</strong>
+        <div class="admin-chez__dossier-meta">
+          ${property.year_built ? `Built ${escapeHtml(String(property.year_built))} · ` : ""}
+          ${property.square_footage ? `${escapeHtml(String(property.square_footage))} sq ft · ` : ""}
+          ${property.property_type ? `${escapeHtml(property.property_type)}` : ""}
+        </div>
+        ${property.current_estimated_value ? `<div class="admin-chez__dossier-meta">Estimated value: <strong>$${formatCompact(property.current_estimated_value)}</strong></div>` : ""}
+      </div>
+    </div>
+  ` : "";
+
+  const systemCount = (d.home_systems || []).length;
+  const systemsList = (d.home_systems || []).slice(0, 12).map((s) => `
+    <button type="button" class="admin-chez__dossier-chip" data-dossier-entity="home_system" data-dossier-id="${escapeHtml(s.id)}">
+      <span class="admin-chez__dossier-chip-title">${escapeHtml(s.name || s.category || "(unnamed)")}</span>
+      ${s.category ? `<span class="admin-chez__dossier-chip-sub">${escapeHtml(s.category)}</span>` : ""}
+    </button>
+  `).join("");
+
+  const contractorCount = (d.contractors || []).length;
+  const handyman = (d.contractors || []).find((c) => (c.category || "").toLowerCase().includes("handyman"));
+  const contractorsList = (d.contractors || []).slice(0, 12).map((c) => `
+    <button type="button" class="admin-chez__dossier-chip" data-dossier-entity="contractor" data-dossier-id="${escapeHtml(c.id)}">
+      <span class="admin-chez__dossier-chip-title">${escapeHtml(c.company_name || "(unnamed)")}</span>
+      ${c.category ? `<span class="admin-chez__dossier-chip-sub">${escapeHtml(c.category)}</span>` : ""}
+      ${c.chez_owned ? `<span class="admin-chez__dossier-chip-badge">Chez</span>` : ""}
+    </button>
+  `).join("");
+
+  const activeTasks = (d.tasks || []).filter((t) => !t.is_archived);
+  const overdueCount = activeTasks.filter((t) => t.next_due_date && new Date(t.next_due_date) < new Date()).length;
+  const tasksList = activeTasks.slice(0, 8).map((t) => `
+    <button type="button" class="admin-chez__dossier-row" data-dossier-entity="task" data-dossier-id="${escapeHtml(t.id)}">
+      <span class="admin-chez__dossier-row-title">${escapeHtml(t.title)}</span>
+      <span class="admin-chez__dossier-row-meta">
+        ${t.next_due_date ? escapeHtml(formatDateOnly(t.next_due_date)) : ""}
+        ${t.assignment_type ? ` · ${escapeHtml(t.assignment_type)}` : ""}
+        ${t.chez_owned ? ` · <span class="admin-chez__chez-badge">Chez</span>` : ""}
+      </span>
+    </button>
+  `).join("");
+
+  const vehicleCount = (d.vehicles || []).length;
+  const vehiclesList = (d.vehicles || []).slice(0, 6).map((v) => `
+    <button type="button" class="admin-chez__dossier-chip" data-dossier-entity="vehicle" data-dossier-id="${escapeHtml(v.id)}">
+      <span class="admin-chez__dossier-chip-title">${escapeHtml((v.year ? v.year + " " : "") + (v.make || "") + " " + (v.model || ""))}</span>
+      ${v.license_plate ? `<span class="admin-chez__dossier-chip-sub">${escapeHtml(v.license_plate)}</span>` : ""}
+    </button>
+  `).join("");
+
+  const pastReqCount = (d.past_requests || []).filter((r) => r.id !== state.selectedChezRequest?.id).length;
+  const familyCount = (d.family_members || []).length + (d.users || []).length;
+  const routineCount = (d.routines || []).length;
+
   return `
-    <section class="admin-chez__profile">
-      <h3>Customer profile</h3>
-      <div class="admin-chez__profile-tier" data-tone="amber">${tierLine}</div>
-      ${lines.length ? `<div class="admin-chez__profile-lines">${lines.join("")}</div>` : ""}
+    <section class="admin-chez__dossier">
+      <header class="admin-chez__dossier-head">
+        <div>
+          <h3>${escapeHtml(homeowner)}</h3>
+          ${property ? `<div class="admin-muted">${escapeHtml(formatAddress(property))}</div>` : ""}
+        </div>
+        <div class="admin-chez__dossier-tier" data-tone="amber">${tierLine}</div>
+      </header>
+
+      ${profileLines.length ? `
+        <details class="admin-chez__dossier-profile" open>
+          <summary>Standing instructions (${profileLines.length})</summary>
+          <div class="admin-chez__dossier-profile-lines">
+            ${profileLines.map((l) => `<div><strong>${escapeHtml(l.label)}:</strong> ${escapeHtml(l.value)}</div>`).join("")}
+          </div>
+        </details>
+      ` : `<p class="admin-muted">No standing instructions on file yet.</p>`}
+
+      <div class="admin-chez__dossier-grid">
+        ${propBlock}
+
+        <div class="admin-chez__dossier-card">
+          <div class="admin-chez__dossier-card-head">👨‍👩‍👧 Household · ${familyCount}</div>
+          <div class="admin-chez__dossier-card-body">
+            ${(d.users || []).map((u) => `<div>${escapeHtml(u.full_name || u.email || "—")} <span class="admin-muted">(${escapeHtml(u.role || "member")})</span></div>`).join("")}
+            ${(d.family_members || []).map((m) => `<div>${escapeHtml((m.first_name || "") + " " + (m.last_name || ""))} <span class="admin-muted">(${escapeHtml(m.relationship || "family")})</span></div>`).join("")}
+          </div>
+        </div>
+
+        <div class="admin-chez__dossier-card">
+          <div class="admin-chez__dossier-card-head">⚙️ Home systems · ${systemCount}</div>
+          <div class="admin-chez__dossier-card-body admin-chez__dossier-chips">
+            ${systemsList || `<p class="admin-muted">No systems on file.</p>`}
+          </div>
+        </div>
+
+        <div class="admin-chez__dossier-card">
+          <div class="admin-chez__dossier-card-head">🔧 Vendors · ${contractorCount}${handyman ? ` · 🛠️ ${escapeHtml(handyman.company_name)}` : ""}</div>
+          <div class="admin-chez__dossier-card-body admin-chez__dossier-chips">
+            ${contractorsList || `<p class="admin-muted">No vendors on file.</p>`}
+          </div>
+        </div>
+
+        <div class="admin-chez__dossier-card">
+          <div class="admin-chez__dossier-card-head">📋 Active tasks · ${activeTasks.length}${overdueCount ? ` · <span class="admin-pill" data-tone="red">${overdueCount} overdue</span>` : ""}</div>
+          <div class="admin-chez__dossier-card-body">
+            ${tasksList || `<p class="admin-muted">No active tasks.</p>`}
+          </div>
+        </div>
+
+        ${vehicleCount > 0 ? `
+          <div class="admin-chez__dossier-card">
+            <div class="admin-chez__dossier-card-head">🚗 Vehicles · ${vehicleCount}</div>
+            <div class="admin-chez__dossier-card-body admin-chez__dossier-chips">${vehiclesList}</div>
+          </div>
+        ` : ""}
+
+        ${routineCount > 0 ? `
+          <div class="admin-chez__dossier-card">
+            <div class="admin-chez__dossier-card-head">🔁 Recurring routines · ${routineCount}</div>
+            <div class="admin-chez__dossier-card-body">
+              ${(d.routines || []).slice(0, 6).map((r) => `<div>${escapeHtml(r.label || r.routine_kind || "—")}${r.chez_owned ? ` <span class="admin-chez__chez-badge">Chez</span>` : ""}</div>`).join("")}
+            </div>
+          </div>
+        ` : ""}
+
+        ${pastReqCount > 0 ? `
+          <div class="admin-chez__dossier-card">
+            <div class="admin-chez__dossier-card-head">📜 Past Chez requests · ${pastReqCount}</div>
+            <div class="admin-chez__dossier-card-body">
+              ${(d.past_requests || []).filter((r) => r.id !== state.selectedChezRequest?.id).slice(0, 5).map((r) => `
+                <div>${escapeHtml(r.summary || "—")} <span class="admin-muted">(${escapeHtml(r.status)})</span></div>
+              `).join("")}
+            </div>
+          </div>
+        ` : ""}
+      </div>
     </section>
   `;
 }
 
-async function fetchChezHouseholdProfile(householdId) {
-  state.chezProfilesByHousehold = state.chezProfilesByHousehold || {};
-  if (state.chezProfilesByHousehold[householdId] !== undefined) return;
-  // Optimistic null marker to prevent duplicate fetches.
-  state.chezProfilesByHousehold[householdId] = null;
+function primaryHomeownerLabel(d) {
+  const u = (d.users || [])[0];
+  if (u && (u.full_name || u.email)) return u.full_name || u.email;
+  const f = (d.family_members || [])[0];
+  if (f) return ((f.first_name || "") + " " + (f.last_name || "")).trim() || "Homeowner";
+  return d.household?.name || "Homeowner";
+}
+
+function formatAddress(p) {
+  if (!p) return "";
+  const parts = [p.street, p.city, p.state, p.zip].filter(Boolean);
+  return parts.join(", ");
+}
+
+function formatDateOnly(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatCompact(n) {
+  const num = Number(n);
+  if (!isFinite(num) || num === 0) return "0";
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
+  return String(Math.round(num));
+}
+
+async function fetchChezHouseholdDossier(householdId) {
+  state.chezDossiersByHousehold = state.chezDossiersByHousehold || {};
+  if (state.chezDossiersByHousehold[householdId] !== undefined) return;
+  state.chezDossiersByHousehold[householdId] = null;
   try {
-    const { data, error } = await supabase
-      .from("households")
-      .select("chez_profile")
-      .eq("id", householdId)
-      .maybeSingle();
-    if (error) throw error;
-    state.chezProfilesByHousehold[householdId] = data?.chez_profile ?? {};
-    // Re-render the panel if it's still showing this request.
+    const dossier = await callChezConcierge({
+      action: "fetch_dossier",
+      household_id: householdId,
+    });
+    // Add the profile blob from households.chez_profile so the
+    // existing standing-instructions UI renders cleanly.
+    dossier.profile = (dossier.household && dossier.household.chez_profile) || {};
+    state.chezDossiersByHousehold[householdId] = dossier;
     if (state.selectedChezRequest) {
       renderFocusedChezDetail(state.selectedChezRequest);
     }
   } catch (e) {
-    console.warn("[admin] chez profile fetch failed", e);
-    state.chezProfilesByHousehold[householdId] = {};
+    console.warn("[admin] chez dossier fetch failed", e);
+    // Keep null so the empty-state renders rather than re-fetching forever.
+    state.chezDossiersByHousehold[householdId] = null;
   }
 }
 
@@ -5124,83 +5294,403 @@ function renderProposalCardHtml(proposal) {
 // minimal prompt-driven flow rather than a full modal — keeps the
 // admin surface small while still letting Tom send structured
 // proposals one click after typing.
+// Phase 81 — Proposal builder modal. Replaces the prompt-driven Phase
+// 80.1 flow with a proper form + multi-vendor support + research pane.
+// One Send action packages 1-3 separate proposal messages so the
+// homeowner sees clean Approve/Counter/Decline cards in their thread.
+
 async function startProposalFlow(req) {
-  const kind = window.prompt("What kind of proposal? Type one of: vendor / date / cost / quote", "vendor");
-  if (!kind) return;
-  const k = kind.trim().toLowerCase();
-  if (!["vendor", "date", "cost", "quote"].includes(k)) {
-    alert("Pick one of: vendor / date / cost / quote");
-    return;
-  }
-  const content = window.prompt("Optional message to attach to the proposal (one line):", "");
-  let proposal = null;
-  if (k === "vendor") {
-    const name = window.prompt("Vendor name:", "");
-    if (!name) return;
-    const cost = window.prompt("Estimated cost (number, optional):", "");
-    const slot = window.prompt("Earliest available window (e.g. 'Tue 2pm'):", "");
-    const rationale = window.prompt("Why this vendor (optional):", "");
-    proposal = {
-      kind: "vendor",
-      vendor: {
-        name: name.trim(),
-        estimated_cost: cost ? Number(cost) : undefined,
-        estimated_window: slot || undefined,
-        rationale: rationale || undefined,
-      },
-    };
-  } else if (k === "date") {
-    const opts = window.prompt("Date options, comma-separated labels (e.g. 'Tue 2pm, Wed 9am'):", "");
-    if (!opts) return;
-    proposal = {
-      kind: "date_slot",
-      date_slot: {
-        options: opts.split(",").map((s) => ({ label: s.trim(), iso: null })),
-      },
-    };
-  } else if (k === "cost") {
-    const amount = window.prompt("Cost amount in USD (number):", "");
-    if (!amount) return;
-    const scope = window.prompt("Scope (one line):", "");
-    const vendor = window.prompt("Vendor name (optional):", "");
-    proposal = {
-      kind: "cost",
-      cost: {
-        amount: Number(amount),
-        scope: scope || undefined,
-        vendor_name: vendor || undefined,
-        currency: "USD",
-      },
-    };
-  } else if (k === "quote") {
-    const vendor = window.prompt("Vendor name:", "");
-    if (!vendor) return;
-    const total = window.prompt("Quote total in USD:", "");
-    proposal = {
-      kind: "quote",
-      quote: {
-        vendor_name: vendor.trim(),
-        total: total ? Number(total) : undefined,
-      },
-    };
-  }
-  if (!proposal) return;
-  try {
-    await callChezConcierge({
-      action: "propose",
-      request_id: req.id,
-      proposal,
-      content: content || "",
+  openProposalBuilder(req);
+}
+
+function openProposalBuilder(req) {
+  // Tear down any existing modal first.
+  document.querySelector("[data-chez-proposal-modal]")?.remove();
+
+  const dossier = (state.chezDossiersByHousehold || {})[req.household_id] || null;
+  const homeAddress = dossier?.properties?.[0] ? formatAddress(dossier.properties[0]) : "";
+  const town = dossier?.properties?.[0]?.city || "";
+  const stateCode = dossier?.properties?.[0]?.state || "";
+  const existingVendors = dossier?.contractors || [];
+
+  const modal = document.createElement("div");
+  modal.className = "admin-modal admin-chez__proposal-modal";
+  modal.setAttribute("data-chez-proposal-modal", "");
+  modal.innerHTML = `
+    <div class="admin-modal__backdrop" data-modal-close></div>
+    <div class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <div>
+          <h2>Send proposal</h2>
+          <p class="admin-muted">${escapeHtml(homeAddress || "Homeowner")} · ${escapeHtml(req.summary || "")}</p>
+        </div>
+        <button type="button" class="admin-modal__close" data-modal-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-modal__body">
+        <nav class="admin-chez__proposal-tabs" role="tablist">
+          <button type="button" data-proposal-tab="vendor" class="is-active">Vendors (1-3)</button>
+          <button type="button" data-proposal-tab="date">Dates</button>
+          <button type="button" data-proposal-tab="cost">Cost</button>
+          <button type="button" data-proposal-tab="quote">Quote</button>
+        </nav>
+
+        <section class="admin-chez__proposal-tab-pane" data-proposal-pane="vendor">
+          <div class="admin-chez__proposal-intro">
+            <p>Add up to 3 vendors. The homeowner will see each as a clickable card with Approve / Counter / Decline.</p>
+            <button type="button" class="admin-button admin-button--ghost" data-proposal-action="research-vendors">🔍 Research local vendors</button>
+          </div>
+          ${existingVendors.length ? `
+            <div class="admin-chez__proposal-existing">
+              <h4>Existing vendors on file</h4>
+              <p class="admin-muted">Already in their household — could any of these handle this request?</p>
+              <div class="admin-chez__proposal-existing-chips">
+                ${existingVendors.slice(0, 12).map((v) => `
+                  <button type="button" class="admin-chez__proposal-existing-chip" data-existing-vendor='${escapeHtml(JSON.stringify({ name: v.company_name, category: v.category, phone: v.phone }))}'>
+                    + ${escapeHtml(v.company_name)}${v.category ? ` <span class="admin-muted">(${escapeHtml(v.category)})</span>` : ""}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+          ` : ""}
+          <div data-vendor-rows></div>
+          <button type="button" class="admin-button admin-button--ghost" data-proposal-action="add-vendor-row">+ Add another vendor</button>
+        </section>
+
+        <section class="admin-chez__proposal-tab-pane is-hidden" data-proposal-pane="date">
+          <p class="admin-muted">List 2-4 date options the homeowner can pick from.</p>
+          <div data-date-rows></div>
+          <button type="button" class="admin-button admin-button--ghost" data-proposal-action="add-date-row">+ Add another date</button>
+        </section>
+
+        <section class="admin-chez__proposal-tab-pane is-hidden" data-proposal-pane="cost">
+          <label>Amount (USD)<input type="number" step="1" name="cost-amount" /></label>
+          <label>Scope (one line)<input type="text" name="cost-scope" /></label>
+          <label>Vendor name (optional)<input type="text" name="cost-vendor" /></label>
+        </section>
+
+        <section class="admin-chez__proposal-tab-pane is-hidden" data-proposal-pane="quote">
+          <label>Vendor name<input type="text" name="quote-vendor" /></label>
+          <label>Total (USD)<input type="number" step="1" name="quote-total" /></label>
+          <label>Valid until<input type="text" name="quote-valid" placeholder="e.g. May 15" /></label>
+        </section>
+
+        <label class="admin-chez__proposal-message">
+          <span>Message to send with the proposal (optional)</span>
+          <textarea name="content" rows="3" placeholder="One-line context the homeowner sees above the cards…"></textarea>
+        </label>
+      </div>
+      <footer class="admin-modal__foot">
+        <button type="button" class="admin-button admin-button--ghost" data-modal-close>Cancel</button>
+        <button type="button" class="admin-button admin-button--primary" data-proposal-action="send">Send proposal</button>
+      </footer>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  attachProposalBuilderHandlers(modal, req, { town, stateCode, existingVendors });
+  // Seed one vendor row + two date rows by default.
+  modal.querySelector("[data-proposal-action='add-vendor-row']").click();
+  modal.querySelector("[data-proposal-action='add-date-row']").click();
+  modal.querySelector("[data-proposal-action='add-date-row']").click();
+}
+
+function attachProposalBuilderHandlers(modal, req, ctx) {
+  const close = () => modal.remove();
+  modal.querySelectorAll("[data-modal-close]").forEach((btn) => btn.addEventListener("click", close));
+
+  // Tab switching.
+  modal.querySelectorAll("[data-proposal-tab]").forEach((tabBtn) => {
+    tabBtn.addEventListener("click", () => {
+      modal.querySelectorAll("[data-proposal-tab]").forEach((b) => b.classList.toggle("is-active", b === tabBtn));
+      modal.querySelectorAll("[data-proposal-pane]").forEach((pane) => {
+        pane.classList.toggle("is-hidden", pane.getAttribute("data-proposal-pane") !== tabBtn.dataset.proposalTab);
+      });
     });
-    await loadAdminData();
-    await loadChezMessages(req.id);
-    const refreshed = state.chezRequests.find((r) => r.id === req.id);
-    if (refreshed) state.selectedChezRequest = refreshed;
-    renderChezRequestsView();
-  } catch (err) {
-    console.error("[admin] propose failed", err);
-    alert(`Couldn't send proposal: ${err.message || err}`);
-  }
+  });
+
+  const vendorRowsContainer = modal.querySelector("[data-vendor-rows]");
+  const dateRowsContainer = modal.querySelector("[data-date-rows]");
+
+  const addVendorRow = (preset = {}) => {
+    if (vendorRowsContainer.children.length >= 3) {
+      alert("Max 3 vendors per proposal.");
+      return;
+    }
+    const row = document.createElement("div");
+    row.className = "admin-chez__proposal-vendor-row";
+    row.innerHTML = `
+      <div class="admin-chez__proposal-vendor-head">
+        <strong>Vendor ${vendorRowsContainer.children.length + 1}</strong>
+        <button type="button" class="admin-chez__proposal-row-remove" data-remove>×</button>
+      </div>
+      <label>Name<input type="text" name="v-name" value="${escapeHtml(preset.name || "")}" /></label>
+      <label>Category<input type="text" name="v-category" value="${escapeHtml(preset.category || "")}" placeholder="e.g. Roofing" /></label>
+      <div class="admin-chez__proposal-grid-2">
+        <label>Estimated cost ($)<input type="number" step="1" name="v-cost" value="${preset.estimated_cost || ""}" /></label>
+        <label>Earliest window<input type="text" name="v-window" value="${escapeHtml(preset.estimated_window || "")}" placeholder="e.g. Tue 2pm" /></label>
+      </div>
+      <div class="admin-chez__proposal-grid-2">
+        <label>Rating (0-5)<input type="number" step="0.1" min="0" max="5" name="v-rating" value="${preset.rating || ""}" /></label>
+        <label>Reviews<input type="number" step="1" name="v-reviews" value="${preset.review_count || ""}" /></label>
+      </div>
+      <label>Phone<input type="text" name="v-phone" value="${escapeHtml(preset.phone || "")}" /></label>
+      <label class="admin-chez__proposal-rationale">
+        <span>Why this fits — homeowner sees this on their card
+          <button type="button" class="admin-chez__proposal-ai-suggest" data-ai-suggest>✨ Suggest framing</button>
+        </span>
+        <textarea name="v-rationale" rows="2" placeholder="Tailored to their home + your context. e.g. Specializes in old colonials; A+ BBB, no chain.">${escapeHtml(preset.rationale || "")}</textarea>
+      </label>
+    `;
+    vendorRowsContainer.appendChild(row);
+    row.querySelector("[data-remove]").addEventListener("click", () => row.remove());
+    row.querySelector("[data-ai-suggest]").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const nameInput = row.querySelector("[name='v-name']");
+      const categoryInput = row.querySelector("[name='v-category']");
+      const ratingInput = row.querySelector("[name='v-rating']");
+      const reviewsInput = row.querySelector("[name='v-reviews']");
+      const rationaleField = row.querySelector("[name='v-rationale']");
+      if (!nameInput.value.trim()) {
+        alert("Add a vendor name first so AI has something to work with.");
+        return;
+      }
+      btn.disabled = true; btn.textContent = "Thinking…";
+      try {
+        const dossier = (state.chezDossiersByHousehold || {})[req.household_id] || {};
+        const profile = dossier.profile || {};
+        const property = (dossier.properties || [])[0];
+        const propertyContext = property
+          ? `${property.year_built ? property.year_built + " " : ""}${property.property_type || "home"} in ${property.city || ""}, ${property.state || ""}`
+          : "";
+        const result = await callChezConcierge({
+          action: "suggest_vendor_framing",
+          household_id: req.household_id,
+          request_summary: req.summary,
+          request_category: req.category,
+          vendor: {
+            name: nameInput.value.trim(),
+            category: categoryInput.value.trim() || undefined,
+            rating: ratingInput.value ? Number(ratingInput.value) : undefined,
+            review_count: reviewsInput.value ? Number(reviewsInput.value) : undefined,
+          },
+          homeowner_about: profile.about_us,
+          property_context: propertyContext,
+        });
+        if (result.framing) rationaleField.value = result.framing;
+      } catch (err) {
+        console.warn("[admin] suggest framing failed", err);
+      } finally {
+        btn.disabled = false; btn.textContent = "✨ Suggest framing";
+      }
+    });
+  };
+
+  const addDateRow = (label = "") => {
+    const row = document.createElement("div");
+    row.className = "admin-chez__proposal-date-row";
+    row.innerHTML = `
+      <input type="text" name="d-label" value="${escapeHtml(label)}" placeholder="e.g. Tue, May 12 at 2pm" />
+      <button type="button" class="admin-chez__proposal-row-remove" data-remove>×</button>
+    `;
+    dateRowsContainer.appendChild(row);
+    row.querySelector("[data-remove]").addEventListener("click", () => row.remove());
+  };
+
+  // Existing-vendor chip → seeds a new vendor row.
+  modal.querySelectorAll("[data-existing-vendor]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      try { addVendorRow(JSON.parse(btn.getAttribute("data-existing-vendor"))); }
+      catch (e) { /* ignore parse failure */ }
+    });
+  });
+
+  // Local vendor research — calls find-local-vendors and seeds rows.
+  modal.querySelector("[data-proposal-action='research-vendors']")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const category = window.prompt(
+      `Search for vendors near ${ctx.town}, ${ctx.stateCode}. What category? (e.g. roofing, plumbing, hvac)`,
+      req.category === "find_handyman" ? "handyman" : ""
+    );
+    if (!category) return;
+    btn.disabled = true; btn.textContent = "Searching…";
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/find-local-vendors`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          town: ctx.town,
+          state: ctx.stateCode,
+          category: category.trim(),
+        }),
+      });
+      const data = await resp.json();
+      const vendors = data.vendors || [];
+      if (vendors.length === 0) {
+        alert("No vendors returned. Try a different category or add manually.");
+        return;
+      }
+      // Show a sub-picker so Tom can choose which to seed.
+      showVendorPickerOverlay(modal, vendors, addVendorRow);
+    } catch (err) {
+      console.warn("[admin] vendor research failed", err);
+      alert(`Vendor research failed: ${err.message || err}`);
+    } finally {
+      btn.disabled = false; btn.textContent = "🔍 Research local vendors";
+    }
+  });
+
+  // Add-row buttons.
+  modal.querySelector("[data-proposal-action='add-vendor-row']").addEventListener("click", () => addVendorRow());
+  modal.querySelector("[data-proposal-action='add-date-row']").addEventListener("click", () => addDateRow());
+
+  // Send button.
+  modal.querySelector("[data-proposal-action='send']").addEventListener("click", async () => {
+    const activeTab = modal.querySelector("[data-proposal-tab].is-active")?.dataset.proposalTab;
+    const content = modal.querySelector("[name='content']").value.trim();
+    const sendBtn = modal.querySelector("[data-proposal-action='send']");
+    sendBtn.disabled = true; sendBtn.textContent = "Sending…";
+    try {
+      if (activeTab === "vendor") {
+        const rows = Array.from(vendorRowsContainer.querySelectorAll(".admin-chez__proposal-vendor-row"));
+        const vendors = rows.map((r) => ({
+          name: r.querySelector("[name='v-name']").value.trim(),
+          category: r.querySelector("[name='v-category']").value.trim() || undefined,
+          phone: r.querySelector("[name='v-phone']").value.trim() || undefined,
+          estimated_cost: r.querySelector("[name='v-cost']").value ? Number(r.querySelector("[name='v-cost']").value) : undefined,
+          estimated_window: r.querySelector("[name='v-window']").value.trim() || undefined,
+          rating: r.querySelector("[name='v-rating']").value ? Number(r.querySelector("[name='v-rating']").value) : undefined,
+          review_count: r.querySelector("[name='v-reviews']").value ? Number(r.querySelector("[name='v-reviews']").value) : undefined,
+          rationale: r.querySelector("[name='v-rationale']").value.trim() || undefined,
+        })).filter((v) => v.name);
+        if (vendors.length === 0) {
+          alert("Add at least one vendor.");
+          return;
+        }
+        // Send vendors as separate proposal messages so each renders as
+        // an individual Approve/Counter/Decline card. The intro message
+        // (only on the first one) carries the framing context.
+        for (let i = 0; i < vendors.length; i++) {
+          const v = vendors[i];
+          const intro = i === 0
+            ? (content || (vendors.length > 1 ? `Here are ${vendors.length} options for you. Tap Approve on whichever fits.` : ""))
+            : "";
+          await callChezConcierge({
+            action: "propose",
+            request_id: req.id,
+            proposal: { kind: "vendor", vendor: v },
+            content: intro,
+          });
+        }
+      } else if (activeTab === "date") {
+        const rows = Array.from(dateRowsContainer.querySelectorAll(".admin-chez__proposal-date-row"));
+        const options = rows
+          .map((r) => r.querySelector("[name='d-label']").value.trim())
+          .filter(Boolean)
+          .map((label) => ({ label, iso: null }));
+        if (options.length === 0) {
+          alert("Add at least one date option.");
+          return;
+        }
+        await callChezConcierge({
+          action: "propose",
+          request_id: req.id,
+          proposal: { kind: "date_slot", date_slot: { options } },
+          content,
+        });
+      } else if (activeTab === "cost") {
+        const amount = Number(modal.querySelector("[name='cost-amount']").value);
+        if (!amount) { alert("Enter a cost amount."); return; }
+        await callChezConcierge({
+          action: "propose",
+          request_id: req.id,
+          proposal: {
+            kind: "cost",
+            cost: {
+              amount,
+              currency: "USD",
+              scope: modal.querySelector("[name='cost-scope']").value.trim() || undefined,
+              vendor_name: modal.querySelector("[name='cost-vendor']").value.trim() || undefined,
+            },
+          },
+          content,
+        });
+      } else if (activeTab === "quote") {
+        const vendor = modal.querySelector("[name='quote-vendor']").value.trim();
+        if (!vendor) { alert("Enter a vendor name."); return; }
+        const total = Number(modal.querySelector("[name='quote-total']").value);
+        await callChezConcierge({
+          action: "propose",
+          request_id: req.id,
+          proposal: {
+            kind: "quote",
+            quote: {
+              vendor_name: vendor,
+              total: total || undefined,
+              valid_until: modal.querySelector("[name='quote-valid']").value.trim() || undefined,
+            },
+          },
+          content,
+        });
+      }
+      close();
+      await loadAdminData();
+      await loadChezMessages(req.id);
+      const refreshed = state.chezRequests.find((r) => r.id === req.id);
+      if (refreshed) state.selectedChezRequest = refreshed;
+      renderChezRequestsView();
+    } catch (err) {
+      console.warn("[admin] send proposal failed", err);
+      alert(`Send failed: ${err.message || err}`);
+    } finally {
+      sendBtn.disabled = false; sendBtn.textContent = "Send proposal";
+    }
+  });
+}
+
+function showVendorPickerOverlay(parentModal, vendors, addVendorRow) {
+  const overlay = document.createElement("div");
+  overlay.className = "admin-chez__vendor-picker-overlay";
+  overlay.innerHTML = `
+    <div class="admin-chez__vendor-picker">
+      <header>
+        <h3>Pick vendors to propose</h3>
+        <button type="button" data-close>×</button>
+      </header>
+      <div class="admin-chez__vendor-picker-list">
+        ${vendors.map((v, i) => `
+          <button type="button" class="admin-chez__vendor-picker-row" data-pick="${i}">
+            <div>
+              <strong>${escapeHtml(v.name || "(unnamed)")}</strong>
+              <div class="admin-muted">${escapeHtml(v.address || "")}</div>
+            </div>
+            <div class="admin-chez__vendor-picker-meta">
+              ${v.rating ? `${escapeHtml(String(v.rating))}★` : ""}
+              ${v.user_ratings_total ? ` (${escapeHtml(String(v.user_ratings_total))})` : ""}
+              ${v.is_haven_certified || v.is_top_rated ? ` <span class="admin-pill" data-tone="green">Top-rated</span>` : ""}
+            </div>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+  parentModal.appendChild(overlay);
+  overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove());
+  overlay.querySelectorAll("[data-pick]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const v = vendors[Number(btn.dataset.pick)];
+      addVendorRow({
+        name: v.name,
+        phone: v.phone || v.formatted_phone_number,
+        rating: v.rating,
+        review_count: v.user_ratings_total,
+      });
+      btn.classList.add("is-picked");
+    });
+  });
 }
 
 function attachChezPanelHandlers(req) {
@@ -5269,6 +5759,165 @@ function attachChezPanelHandlers(req) {
       }
     });
   });
+
+  // Phase 81 — dossier entity drilldown. Click any chip / row in the
+  // dossier to open a slide-in drawer with the full entity record.
+  el.auditFocused.querySelectorAll("[data-dossier-entity]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const entity = btn.dataset.dossierEntity;
+      const id = btn.dataset.dossierId;
+      openDossierDrawer(req.household_id, entity, id);
+    });
+  });
+}
+
+// Phase 81 — Sliding drawer that shows the full record for an entity
+// the admin clicked from the dossier. Renders read-only — pure context
+// surface so Tom can navigate around without leaving the request.
+function openDossierDrawer(householdId, entity, id) {
+  document.querySelector("[data-chez-dossier-drawer]")?.remove();
+  const dossier = (state.chezDossiersByHousehold || {})[householdId];
+  if (!dossier) return;
+
+  let row = null;
+  let title = "";
+  let bodyHtml = "";
+
+  if (entity === "property") {
+    row = (dossier.properties || []).find((p) => p.id === id);
+    if (row) {
+      title = formatAddress(row);
+      bodyHtml = renderEntityKVList([
+        ["Type", row.property_type],
+        ["Year built", row.year_built],
+        ["Square footage", row.square_footage],
+        ["Bedrooms", row.bedrooms],
+        ["Bathrooms", row.bathrooms],
+        ["Lot size", row.lot_size],
+        ["Estimated value", row.current_estimated_value ? `$${formatCompact(row.current_estimated_value)}` : null],
+        ["Estimated value range", (row.current_estimated_value_low && row.current_estimated_value_high) ? `$${formatCompact(row.current_estimated_value_low)} – $${formatCompact(row.current_estimated_value_high)}` : null],
+        ["Purchase price", row.purchase_price ? `$${formatCompact(row.purchase_price)}` : null],
+        ["Purchase date", row.purchase_date],
+      ]);
+    }
+  } else if (entity === "home_system") {
+    row = (dossier.home_systems || []).find((s) => s.id === id);
+    if (row) {
+      title = row.name || row.category || "System";
+      bodyHtml = renderEntityKVList([
+        ["Category", row.category],
+        ["Subtype", row.subtype],
+        ["Manufacturer", row.manufacturer],
+        ["Model", row.model],
+        ["Serial #", row.serial_number],
+        ["Install date", row.install_date],
+        ["Last service", row.last_service_date],
+        ["Service interval (days)", row.service_interval_days],
+        ["Service vendor", row.service_vendor],
+        ["Notes", row.notes],
+      ]);
+      // Linked tasks for this system
+      const linkedTasks = (dossier.tasks || []).filter((t) => t.system_id === id && !t.is_archived);
+      if (linkedTasks.length) {
+        bodyHtml += `
+          <h4>Linked tasks · ${linkedTasks.length}</h4>
+          ${linkedTasks.slice(0, 8).map((t) => `<div>${escapeHtml(t.title)} — <span class="admin-muted">${escapeHtml(formatDateOnly(t.next_due_date))}</span></div>`).join("")}
+        `;
+      }
+    }
+  } else if (entity === "contractor") {
+    row = (dossier.contractors || []).find((c) => c.id === id);
+    if (row) {
+      title = row.company_name;
+      bodyHtml = renderEntityKVList([
+        ["Category", row.category],
+        ["Specialties", (row.specialties || []).join(", ")],
+        ["Contact", row.contact_name],
+        ["Phone", row.phone],
+        ["Email", row.email],
+        ["Address", row.address],
+        ["Website", row.website ? `<a href="${escapeHtml(row.website)}" target="_blank">${escapeHtml(row.website)}</a>` : null],
+        ["Source", row.source],
+        ["Chez owns", row.chez_owned ? "✅ yes" : null],
+        ["Notes", row.notes],
+      ]);
+      const linkedTasks = (dossier.tasks || []).filter((t) => t.assigned_contractor_id === id && !t.is_archived);
+      if (linkedTasks.length) {
+        bodyHtml += `
+          <h4>Active tasks for this vendor · ${linkedTasks.length}</h4>
+          ${linkedTasks.slice(0, 8).map((t) => `<div>${escapeHtml(t.title)} — <span class="admin-muted">${escapeHtml(formatDateOnly(t.next_due_date))}</span></div>`).join("")}
+        `;
+      }
+    }
+  } else if (entity === "task") {
+    row = (dossier.tasks || []).find((t) => t.id === id);
+    if (row) {
+      title = row.title;
+      const sys = (dossier.home_systems || []).find((s) => s.id === row.system_id);
+      const con = (dossier.contractors || []).find((c) => c.id === row.assigned_contractor_id);
+      bodyHtml = renderEntityKVList([
+        ["Description", row.description],
+        ["System", sys ? sys.name || sys.category : null],
+        ["Vendor", con ? con.company_name : null],
+        ["Frequency", row.frequency],
+        ["Next due", formatDateOnly(row.next_due_date)],
+        ["Last completed", formatDateOnly(row.last_completed_date)],
+        ["Priority", row.priority],
+        ["Assignment type", row.assignment_type],
+        ["Needs vendor", row.needs_vendor ? "yes" : null],
+        ["Chez owns", row.chez_owned ? "✅ yes" : null],
+        ["Estimated cost", row.estimated_cost ? `$${formatCompact(row.estimated_cost)}` : null],
+        ["Notes", row.notes],
+      ]);
+    }
+  } else if (entity === "vehicle") {
+    row = (dossier.vehicles || []).find((v) => v.id === id);
+    if (row) {
+      title = `${row.year || ""} ${row.make || ""} ${row.model || ""}`.trim();
+      bodyHtml = renderEntityKVList([
+        ["Trim", row.trim],
+        ["VIN", row.vin],
+        ["License plate", row.license_plate],
+        ["Mileage", row.current_mileage],
+        ["Color", row.color],
+        ["Ownership", row.ownership],
+        ["Mechanic", row.preferred_service_shop],
+        ["Registration expiry", row.registration_expiry],
+        ["Insurance expiry", row.insurance_expiry],
+      ]);
+    }
+  }
+
+  if (!row) {
+    console.warn("[admin] dossier drawer: entity not found", entity, id);
+    return;
+  }
+
+  const drawer = document.createElement("div");
+  drawer.className = "admin-chez__dossier-drawer";
+  drawer.setAttribute("data-chez-dossier-drawer", "");
+  drawer.innerHTML = `
+    <div class="admin-chez__dossier-drawer-backdrop" data-drawer-close></div>
+    <aside class="admin-chez__dossier-drawer-panel">
+      <header>
+        <div>
+          <span class="admin-muted">${escapeHtml(entity.replace(/_/g, " "))}</span>
+          <h2>${escapeHtml(title)}</h2>
+        </div>
+        <button type="button" data-drawer-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-chez__dossier-drawer-body">${bodyHtml}</div>
+    </aside>
+  `;
+  document.body.appendChild(drawer);
+  drawer.querySelectorAll("[data-drawer-close]").forEach((b) => b.addEventListener("click", () => drawer.remove()));
+}
+
+function renderEntityKVList(pairs) {
+  const lines = pairs
+    .filter(([_, v]) => v !== null && v !== undefined && v !== "")
+    .map(([k, v]) => `<div class="admin-chez__dossier-drawer-kv"><span>${escapeHtml(k)}</span><strong>${typeof v === "string" && v.startsWith("<a ") ? v : escapeHtml(String(v))}</strong></div>`);
+  return lines.length ? lines.join("") : `<p class="admin-muted">No additional details on file.</p>`;
 }
 
 async function performChezTransition(req, toStatus) {

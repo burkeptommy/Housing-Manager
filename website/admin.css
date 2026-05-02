@@ -6291,3 +6291,512 @@
 .admin-chez__proposal-body div {
   margin-top: 2px;
 }
+
+/* ================================================================
+   Phase 81 — Customer dossier + drilldown drawer + proposal modal
+   ================================================================ */
+
+/* Dossier */
+
+.admin-chez__dossier {
+  background: rgba(245, 224, 217, 0.35);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.admin-chez__dossier h3 {
+  font: 700 18px var(--serif, "New York", Georgia, serif);
+  margin: 0;
+}
+.admin-chez__dossier--empty {
+  background: rgba(100, 116, 139, 0.06);
+}
+.admin-chez__dossier-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.admin-chez__dossier-tier {
+  background: rgba(234, 179, 8, 0.16);
+  border-radius: 8px;
+  color: rgb(161, 98, 7);
+  font: 600 12px var(--sans);
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.admin-chez__dossier-profile {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+.admin-chez__dossier-profile summary {
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-chez__dossier-profile-lines {
+  display: grid;
+  font: 400 13px var(--sans);
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.admin-chez__dossier-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.admin-chez__dossier-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.admin-chez__dossier-card-head {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.admin-chez__dossier-card-body {
+  display: grid;
+  font: 400 13px var(--sans);
+  gap: 4px;
+}
+.admin-chez__dossier-card-body .admin-chez__dossier-meta {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.admin-chez__dossier-chips {
+  flex-wrap: wrap;
+  display: flex !important;
+  gap: 6px;
+}
+.admin-chez__dossier-chip {
+  align-items: center;
+  background: var(--bg, #f8f9fa);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font: 500 12px var(--sans);
+  gap: 6px;
+  padding: 4px 10px;
+  transition: background-color 100ms ease;
+}
+.admin-chez__dossier-chip:hover {
+  background: rgba(237, 105, 85, 0.08);
+}
+.admin-chez__dossier-chip-title {
+  font-weight: 600;
+}
+.admin-chez__dossier-chip-sub {
+  color: var(--text-soft);
+}
+.admin-chez__dossier-chip-badge {
+  background: rgba(237, 105, 85, 0.18);
+  border-radius: 999px;
+  color: rgb(196, 60, 40);
+  font: 700 9px var(--sans);
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+.admin-chez__chez-badge {
+  background: rgba(237, 105, 85, 0.18);
+  border-radius: 999px;
+  color: rgb(196, 60, 40);
+  font: 700 9px var(--sans);
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+.admin-chez__dossier-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  font: 400 13px var(--sans);
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 4px;
+  text-align: left;
+  width: 100%;
+}
+.admin-chez__dossier-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.admin-chez__dossier-row-title {
+  flex: 1;
+  font-weight: 500;
+}
+.admin-chez__dossier-row-meta {
+  color: var(--text-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Dossier drilldown drawer */
+
+.admin-chez__dossier-drawer {
+  bottom: 0; left: 0; position: fixed; right: 0; top: 0;
+  z-index: 9000;
+}
+.admin-chez__dossier-drawer-backdrop {
+  background: rgba(0, 0, 0, 0.3);
+  bottom: 0; left: 0; position: absolute; right: 0; top: 0;
+}
+.admin-chez__dossier-drawer-panel {
+  background: var(--surface, #fff);
+  bottom: 0;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 100%;
+}
+.admin-chez__dossier-drawer-panel header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border, #edeef0);
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+.admin-chez__dossier-drawer-panel header h2 {
+  font: 700 20px var(--serif, "New York", Georgia, serif);
+  margin: 4px 0 0;
+}
+.admin-chez__dossier-drawer-panel header span {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.admin-chez__dossier-drawer-panel header button {
+  background: transparent;
+  border: 0;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+.admin-chez__dossier-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.admin-chez__dossier-drawer-body h4 {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.06em;
+  margin: 16px 0 6px;
+  text-transform: uppercase;
+}
+.admin-chez__dossier-drawer-kv {
+  align-items: baseline;
+  display: grid;
+  font: 400 13px var(--sans);
+  gap: 4px;
+  grid-template-columns: 130px 1fr;
+  margin-bottom: 6px;
+}
+.admin-chez__dossier-drawer-kv span {
+  color: var(--text-soft);
+}
+
+/* Modal infrastructure */
+
+.admin-modal {
+  align-items: center;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 8500;
+}
+.admin-modal__backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.admin-modal__panel {
+  background: var(--surface, #fff);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  max-width: 720px;
+  position: relative;
+  width: 90vw;
+}
+.admin-modal__head {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border, #edeef0);
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 22px;
+}
+.admin-modal__head h2 {
+  font: 700 22px var(--serif, "New York", Georgia, serif);
+  margin: 0 0 4px;
+}
+.admin-modal__close {
+  background: transparent;
+  border: 0;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+.admin-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px;
+}
+.admin-modal__foot {
+  border-top: 1px solid var(--border, #edeef0);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 22px;
+}
+
+/* Proposal builder modal */
+
+.admin-chez__proposal-tabs {
+  background: var(--bg, #f8f9fa);
+  border-radius: 10px;
+  display: flex;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 4px;
+}
+.admin-chez__proposal-tabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: 1;
+  font: 600 13px var(--sans);
+  padding: 8px 12px;
+}
+.admin-chez__proposal-tabs button.is-active {
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  color: rgb(196, 60, 40);
+}
+.admin-chez__proposal-tab-pane.is-hidden { display: none; }
+.admin-chez__proposal-tab-pane label {
+  display: block;
+  font: 600 12px var(--sans);
+  margin-bottom: 10px;
+}
+.admin-chez__proposal-tab-pane label > span {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.admin-chez__proposal-tab-pane input,
+.admin-chez__proposal-tab-pane textarea {
+  background: var(--bg, #f8f9fa);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 8px;
+  font: 400 14px var(--sans);
+  padding: 8px 10px;
+  width: 100%;
+}
+.admin-chez__proposal-tab-pane textarea {
+  resize: vertical;
+}
+.admin-chez__proposal-grid-2 {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+.admin-chez__proposal-intro {
+  align-items: center;
+  background: rgba(245, 224, 217, 0.4);
+  border-radius: 10px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+}
+.admin-chez__proposal-intro p {
+  font: 400 13px var(--sans);
+  margin: 0;
+}
+.admin-chez__proposal-existing {
+  background: var(--bg, #f8f9fa);
+  border-radius: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+}
+.admin-chez__proposal-existing h4 {
+  font: 600 12px var(--sans);
+  margin: 0 0 4px;
+}
+.admin-chez__proposal-existing p {
+  color: var(--text-soft);
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.admin-chez__proposal-existing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.admin-chez__proposal-existing-chip {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 999px;
+  cursor: pointer;
+  font: 500 12px var(--sans);
+  padding: 4px 10px;
+}
+.admin-chez__proposal-existing-chip:hover {
+  background: rgba(237, 105, 85, 0.08);
+}
+.admin-chez__proposal-vendor-row {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+}
+.admin-chez__proposal-vendor-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.admin-chez__proposal-vendor-head strong {
+  font: 700 13px var(--sans);
+}
+.admin-chez__proposal-row-remove {
+  background: transparent;
+  border: 0;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.admin-chez__proposal-row-remove:hover { color: rgb(185, 28, 28); }
+.admin-chez__proposal-rationale span {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+.admin-chez__proposal-ai-suggest {
+  background: rgba(237, 105, 85, 0.12);
+  border: 0;
+  border-radius: 999px;
+  color: rgb(196, 60, 40);
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  padding: 3px 10px;
+}
+.admin-chez__proposal-ai-suggest:hover {
+  background: rgba(237, 105, 85, 0.22);
+}
+.admin-chez__proposal-ai-suggest:disabled {
+  opacity: 0.6;
+}
+.admin-chez__proposal-date-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.admin-chez__proposal-date-row input {
+  flex: 1;
+}
+.admin-chez__proposal-message {
+  margin-top: 14px;
+}
+
+/* Vendor picker overlay (inside proposal modal) */
+
+.admin-chez__vendor-picker-overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 100;
+}
+.admin-chez__vendor-picker {
+  background: var(--surface, #fff);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  max-width: 540px;
+  width: 90%;
+}
+.admin-chez__vendor-picker header {
+  align-items: center;
+  border-bottom: 1px solid var(--border, #edeef0);
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+.admin-chez__vendor-picker header h3 {
+  font: 700 16px var(--sans);
+  margin: 0;
+}
+.admin-chez__vendor-picker header button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 22px;
+}
+.admin-chez__vendor-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+.admin-chez__vendor-picker-row {
+  align-items: center;
+  background: var(--bg, #f8f9fa);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  font: 400 13px var(--sans);
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  width: 100%;
+}
+.admin-chez__vendor-picker-row:hover {
+  background: rgba(237, 105, 85, 0.08);
+}
+.admin-chez__vendor-picker-row.is-picked {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+.admin-chez__vendor-picker-meta {
+  color: var(--text-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}

@@ -1373,6 +1373,179 @@ async function handleDecideProposal(
 }
 
 // ============================================================================
+// Phase 81 — Admin context dossier
+// ============================================================================
+// When Tom opens a Chez request, he should see the homeowner's full
+// household context — property, family, systems, contractors, active
+// tasks, vehicles, recent activity. Admin-side reads hit RLS-blocked
+// tables (Tom isn't a member of the homeowner's household), so the
+// fetch goes through the service role here.
+
+interface FetchDossierPayload {
+  household_id: string;
+}
+
+async function handleFetchDossier(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchDossierPayload
+) {
+  if (!user || !isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const householdId = compactString(payload.household_id);
+  if (!householdId) return json({ error: "household_id required" }, 400);
+
+  // Fetch everything in parallel. Each promise is wrapped so a
+  // missing column / RLS surprise on one table doesn't kill the rest.
+  const safe = async <T>(promise: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await promise; }
+    catch (e) { console.warn(`[dossier] ${label} failed:`, e); return null; }
+  };
+
+  const [
+    householdRes,
+    propertiesRes,
+    familyRes,
+    usersRes,
+    homeSystemsRes,
+    contractorsRes,
+    tasksRes,
+    vehiclesRes,
+    routinesRes,
+    pastRequestsRes,
+  ] = await Promise.all([
+    safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
+    safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
+    safe(service.from("family_members").select("*").eq("household_id", householdId), "family_members"),
+    safe(service.from("users").select("id, email, full_name, role").eq("household_id", householdId), "users"),
+    safe(service.from("home_systems").select("*").eq("household_id", householdId).is("archived_at", null), "home_systems"),
+    safe(service.from("contractors").select("*").eq("household_id", householdId), "contractors"),
+    safe(
+      service.from("maintenance_tasks").select("*")
+        .eq("household_id", householdId)
+        .neq("is_archived", true)
+        .order("next_due_date", { ascending: true })
+        .limit(50),
+      "maintenance_tasks"
+    ),
+    safe(service.from("vehicles").select("*").eq("household_id", householdId), "vehicles"),
+    safe(service.from("routines").select("*").eq("household_id", householdId).is("archived_at", null), "routines"),
+    safe(
+      service.from("chez_requests").select("id, category, summary, status, created_at, resolved_at")
+        .eq("household_id", householdId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      "past_requests"
+    ),
+  ]);
+
+  return json({
+    household: (householdRes as { data?: unknown })?.data ?? null,
+    properties: (propertiesRes as { data?: unknown[] })?.data ?? [],
+    family_members: (familyRes as { data?: unknown[] })?.data ?? [],
+    users: (usersRes as { data?: unknown[] })?.data ?? [],
+    home_systems: (homeSystemsRes as { data?: unknown[] })?.data ?? [],
+    contractors: (contractorsRes as { data?: unknown[] })?.data ?? [],
+    tasks: (tasksRes as { data?: unknown[] })?.data ?? [],
+    vehicles: (vehiclesRes as { data?: unknown[] })?.data ?? [],
+    routines: (routinesRes as { data?: unknown[] })?.data ?? [],
+    past_requests: (pastRequestsRes as { data?: unknown[] })?.data ?? [],
+  });
+}
+
+// ============================================================================
+// Phase 81 — AI framing helper for vendor proposals
+// ============================================================================
+// When Tom is proposing a vendor, he wants context-tailored framing —
+// "this vendor is known for X, fits your old colonial home, etc." This
+// action takes the homeowner's full context + a vendor candidate and
+// asks Claude for 1-2 sentences of "why this fits." Tom can use the
+// suggestion verbatim, edit, or write his own.
+
+interface SuggestVendorFramingPayload {
+  household_id: string;
+  request_summary: string;
+  request_category: string;
+  vendor: {
+    name: string;
+    category?: string;
+    rating?: number;
+    review_count?: number;
+    notes?: string;
+  };
+  homeowner_about?: string;
+  property_context?: string;
+}
+
+async function handleSuggestVendorFraming(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: SuggestVendorFramingPayload
+) {
+  if (!user || !isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) {
+    return json({ framing: "" });  // graceful no-op when AI isn't configured
+  }
+  const v = payload.vendor;
+  const ratingLine = v.rating
+    ? `${v.rating}★ across ${v.review_count ?? "?"} reviews`
+    : "rating unknown";
+  const homeownerLine = payload.homeowner_about
+    ? `Homeowner profile: ${payload.homeowner_about.slice(0, 400)}`
+    : "";
+  const propertyLine = payload.property_context
+    ? `Property: ${payload.property_context.slice(0, 200)}`
+    : "";
+
+  const userPrompt = `You are helping a Chez Concierge admin draft a 1-2 sentence "why this vendor fits" line for a homeowner. Be specific to the homeowner's context. No marketing fluff. Concise + concrete.
+
+Request: ${payload.request_summary}
+Category: ${payload.request_category}
+
+Vendor candidate:
+- Name: ${v.name}
+- Category: ${v.category ?? "unspecified"}
+- Reputation: ${ratingLine}
+${v.notes ? `- Notes: ${v.notes}` : ""}
+
+${homeownerLine}
+${propertyLine}
+
+Write 1-2 sentences (max ~250 characters total) the admin can paste into a proposal card. Reference the homeowner's specific situation when possible. No preamble. Plain text only.`;
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 200,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.warn("[suggest_vendor_framing] Claude error:", resp.status, text.slice(0, 300));
+      return json({ framing: "" });
+    }
+    const data = await resp.json() as { content?: Array<{ text?: string }> };
+    const framing = data.content?.[0]?.text?.trim() ?? "";
+    return json({ framing });
+  } catch (e) {
+    console.warn("[suggest_vendor_framing] exception:", e);
+    return json({ framing: "" });
+  }
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -1505,6 +1678,20 @@ serve(async (req: Request) => {
           body as unknown as DecideProposalPayload,
           supabaseUrl,
           serviceRoleKey
+        );
+
+      // Phase 81 — admin context dossier + AI framing helper
+      case "fetch_dossier":
+        return handleFetchDossier(
+          service,
+          user,
+          body as unknown as FetchDossierPayload
+        );
+      case "suggest_vendor_framing":
+        return handleSuggestVendorFraming(
+          service,
+          user,
+          body as unknown as SuggestVendorFramingPayload
         );
 
       default:
