@@ -7134,28 +7134,30 @@ details.admin-chez__analysis-section pre {
    Phase 82 — Stage tracker + visit cards
    ================================================================ */
 
-/* Stage tracker — horizontal stepper across the top of the panel */
+/* Stage tracker — vertical (dot-above-label) stepper. Dot-above-label
+   instead of dot-beside-label means the labels never crash into adjacent
+   dots at narrow workspace widths, and 7 stages fit in any column width
+   ≥420px. Rails connect dots horizontally between stage columns.
+   Phase 83.2 rewrote this from the original horizontal layout. */
 
 .admin-chez__stage-tracker {
-  align-items: center;
   background: var(--surface, #fff);
   border: 1px solid var(--border, #edeef0);
   border-radius: 12px;
   display: flex;
-  gap: 0;
-  margin: 4px 0;
-  overflow-x: auto;
-  padding: 12px 16px;
-}
-.admin-chez__stage {
-  align-items: center;
-  display: flex;
-  flex: 1 1 0;
-  gap: 0;
-  min-width: 80px;
+  align-items: flex-start;
+  margin: 16px 24px 0;
+  padding: 14px 12px 12px;
   position: relative;
 }
-.admin-chez__stage:last-child { flex: 0 0 auto; }
+.admin-chez__stage {
+  flex: 1 1 0;
+  min-width: 0;             /* let labels narrow + truncate */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
 .admin-chez__stage-dot {
   align-items: center;
   background: var(--bg, #f0f1f3);
@@ -7164,25 +7166,34 @@ details.admin-chez__analysis-section pre {
   color: var(--text-soft);
   display: flex;
   flex-shrink: 0;
-  font: 700 11px var(--sans);
-  height: 24px;
+  font: 700 10px var(--sans);
+  height: 22px;
   justify-content: center;
-  width: 24px;
-  z-index: 1;
+  width: 22px;
+  position: relative;
+  z-index: 2;
 }
 .admin-chez__stage-label {
-  font: 600 11px var(--sans);
-  letter-spacing: 0.04em;
-  margin-left: 8px;
+  font: 600 9.5px var(--sans);
+  letter-spacing: 0.08em;
+  margin-top: 6px;
   text-transform: uppercase;
+  color: var(--text-soft);
+  text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .admin-chez__stage-rail {
   background: var(--border, #edeef0);
-  flex: 1;
+  position: absolute;
+  top: 11px;                /* center on dot (22px / 2) */
+  left: 50%;
+  right: -50%;
   height: 2px;
-  margin: 0 10px;
-  min-width: 12px;
+  z-index: 1;
+  pointer-events: none;
 }
 .admin-chez__stage.is-done .admin-chez__stage-dot {
   background: rgb(34, 197, 94);
@@ -7203,6 +7214,12 @@ details.admin-chez__analysis-section pre {
 }
 .admin-chez__stage-rail.is-done {
   background: rgb(34, 197, 94);
+}
+
+/* At very narrow widths (workspace <420px), let the dots survive even
+   if labels truncate to 1-2 chars. */
+@media (max-width: 1099px) {
+  .admin-chez__stage-label { font-size: 9px; letter-spacing: 0.04em; }
 }
 
 /* Visits panel */
@@ -7820,6 +7837,13 @@ details.admin-chez__analysis-section pre {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.18s ease-out;
+}
+/* Phase 83.1 — chat-mode queue rail (master-detail). Wider so the
+   conversation thread reads comfortably. */
+.cockpit-queue--chat {
+  width: 384px;
+  background: #fff;
 }
 .cockpit-queue__head { padding: 14px 14px 10px; }
 .cockpit-queue__head-row {
@@ -8172,21 +8196,25 @@ details.admin-chez__analysis-section pre {
   margin: 16px 24px 0;
   border-radius: 16px;
   overflow: hidden;
-  background: var(--indigo, #453A70);
+  /* Phase 83.2 — deeper indigo background so the body text reads at full
+     contrast. The previous --indigo (#453A70) plus low-opacity white text
+     looked grey-on-purple; bumping to indigo-900 fixes that. */
+  background: var(--indigo-900, #2A2252);
   color: #fff;
   box-shadow: 0 8px 24px rgba(42, 34, 82, 0.18);
 }
 .cockpit-brief--loading,
 .cockpit-brief--empty {
-  background: var(--indigo-700, #524580);
+  background: var(--indigo-800, #332860);
 }
 .cockpit-brief__overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Phase 83.2 — softer mesh so it doesn't fight the body text. */
   background:
-    radial-gradient(60% 80% at 100% 0%, rgba(237, 105, 85, 0.32), transparent 60%),
-    radial-gradient(70% 90% at 0% 100%, rgba(139, 125, 186, 0.36), transparent 60%);
+    radial-gradient(60% 80% at 100% 0%, rgba(237, 105, 85, 0.20), transparent 60%),
+    radial-gradient(70% 90% at 0% 100%, rgba(139, 125, 186, 0.22), transparent 60%);
 }
 .cockpit-brief__inner {
   position: relative;
@@ -8207,7 +8235,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-brief__refreshed {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.72);
   font-weight: 500;
   flex: 1;
 }
@@ -8228,7 +8256,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-brief__loading-text {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.92);
   margin: 0;
   line-height: 1.55;
 }
@@ -8270,19 +8298,23 @@ details.admin-chez__analysis-section pre {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.74);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   white-space: nowrap;
 }
+.cockpit-brief__tab:hover { color: rgba(255, 255, 255, 0.92); }
 .cockpit-brief__tab.is-active {
   color: #fff;
   border-bottom-color: var(--salmon, #ED6955);
 }
 .cockpit-brief__body {
-  font-size: 13px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.86);
+  /* Phase 83.2 — bumped from .86 to .96 so the body text reads at full
+     legibility on the indigo-900 background. The previous opacity was
+     reading as grey-on-purple. */
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.96);
   text-wrap: pretty;
 }
 .cockpit-brief__body p { margin: 0; }
@@ -8939,7 +8971,7 @@ details.admin-chez__analysis-section pre {
   letter-spacing: -0.012em;
   text-wrap: pretty;
 }
-.cockpit-alfred__head-soft { color: rgba(255, 255, 255, 0.7); }
+.cockpit-alfred__head-soft { color: rgba(255, 255, 255, 0.82); }
 
 .cockpit-alfred__tabs {
   display: flex;
@@ -9330,4 +9362,171 @@ details.admin-chez__analysis-section pre {
 
 @media (max-width: 899px) {
   .cockpit-queue { width: 260px; }
+}
+
+/* =============================================================================
+ * Phase 83.1 — Chat panel (master-detail mode). When the operator clicks a
+ * case from the queue rail, the rail morphs into this chat-focused panel.
+ * The queue list is reachable via the back-arrow button at the top.
+ * ============================================================================= */
+
+.cockpit-chatpanel__head {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--neutral-200, #EDEEF0);
+  background: #fff;
+  flex: none;
+}
+.cockpit-chatpanel__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 6px;
+  margin-bottom: 8px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--indigo-500, #6B5AA0);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+.cockpit-chatpanel__back:hover {
+  background: var(--indigo-50, #F2EFF8);
+  color: var(--indigo, #453A70);
+}
+.cockpit-chatpanel__head-meta {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.cockpit-chatpanel__title {
+  font-family: var(--serif, Georgia);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--text, #2A2252);
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  margin-bottom: 2px;
+}
+.cockpit-chatpanel__sub {
+  font-size: 11px;
+  color: var(--text-muted, #6F6A88);
+  font-weight: 500;
+}
+
+/* Thread — vertical list of bubbles, scrollable. Takes the remaining space
+   between the head and the composer. */
+.cockpit-chatpanel__thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--pearl, #F8F9FA);
+}
+.cockpit-chatpanel__empty {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.cockpit-chatpanel__msg {
+  display: flex;
+  gap: 10px;
+}
+.cockpit-chatpanel__msg-main {
+  flex: 1;
+  min-width: 0;
+}
+.cockpit-chatpanel__msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+.cockpit-chatpanel__msg-head strong {
+  font-size: 12px;
+  color: var(--text, #2A2252);
+  font-weight: 600;
+}
+.cockpit-chatpanel__msg-bubble {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text, #2A2252);
+  line-height: 1.55;
+  text-wrap: pretty;
+  white-space: pre-wrap;
+}
+.cockpit-chatpanel__msg--admin .cockpit-chatpanel__msg-bubble {
+  background: var(--indigo-50, #F2EFF8);
+  border-color: var(--indigo-100, #E8E4F2);
+}
+.cockpit-chatpanel__system {
+  align-self: center;
+  padding: 4px 10px;
+  background: var(--indigo-50, #F2EFF8);
+  border-radius: 999px;
+  font-size: 10.5px;
+  color: var(--indigo-500, #6B5AA0);
+  display: inline-flex;
+  gap: 8px;
+  text-align: center;
+  max-width: 100%;
+}
+
+/* Composer — sticky at the bottom of the chat panel. Compact 3-row form
+   with tone toggle, ack checkbox, and three send variants. */
+.cockpit-chatpanel__composer {
+  flex: none;
+  padding: 12px 14px;
+  border-top: 1px solid var(--neutral-200, #EDEEF0);
+  background: #fff;
+}
+.cockpit-chatpanel__composer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.cockpit-chatpanel__composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text, #2A2252);
+  line-height: 1.5;
+  outline: none;
+  background: var(--pearl, #F8F9FA);
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cockpit-chatpanel__composer textarea:focus {
+  border-color: var(--indigo, #453A70);
+  box-shadow: 0 0 0 3px rgba(69, 58, 112, 0.08);
+  background: #fff;
+}
+.cockpit-chatpanel__composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cockpit-chatpanel__composer-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }

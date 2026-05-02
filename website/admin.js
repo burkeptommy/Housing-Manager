@@ -579,6 +579,7 @@ const state = {
     },
     queueFilter: "all",       // all | mine | urgent
     searchQuery: "",
+    queueMode: "list",        // list | case (master-detail; case = chat takes the queue rail)
     briefTab: {},             // { [requestId]: 'analysis' | 'considerations' | ... }
     composer: {},             // { [requestId]: { draft: string, tone: 'warm' | 'direct' | 'formal' } }
     alfred: {
@@ -4855,6 +4856,60 @@ function chezVendorReasoning(v, fit) {
 }
 
 // =============================================================================
+// Phase 83.2 — Date/time formatting helpers.
+// =============================================================================
+// Every slot input across the cockpit (vendor call form, proposal builder
+// date_slot rows, visit cards) uses `<input type="datetime-local">`, whose
+// value is "YYYY-MM-DDTHH:mm" — local time, no timezone. Helpers below
+// translate between that input value, ISO strings (for storage / wire
+// format), and friendly homeowner-facing labels ("Thu, May 8 at 6:00 PM").
+//
+// Forces a single canonical format across every surface — no more
+// "May 3 / Thursday 6PM / 5.24" three-way bug.
+
+// Convert an arbitrary string to the "YYYY-MM-DDTHH:mm" form expected by
+// `<input type="datetime-local">`. Returns "" for unparseable input so
+// the picker renders empty (rather than NaN/garbage). Used both at render
+// time (to seed pickers from cached values) and when migrating legacy
+// free-form slot text.
+function toLocalDateTimeInputValue(s) {
+  if (!s) return "";
+  const trimmed = String(s).trim();
+  if (!trimmed) return "";
+  // Already in the right shape? (YYYY-MM-DDTHH:mm)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) return trimmed.slice(0, 16);
+  const date = new Date(trimmed);
+  if (isNaN(date.getTime())) return "";
+  // Build local YYYY-MM-DDTHH:mm (NOT UTC). datetime-local input doesn't
+  // accept timezone suffixes, so we must format in local time.
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mn = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${mn}`;
+}
+
+// Format an ISO-ish datetime string into a homeowner-facing display label.
+// Used when shipping slots to the iOS proposal card via `availability_slots`.
+// Falls back to the raw string when input is unparseable, so legacy
+// free-form strings ("Thursday 6PM") still pass through gracefully.
+function formatSlotDisplay(s) {
+  if (!s) return "";
+  const trimmed = String(s).trim();
+  if (!trimmed) return "";
+  const date = new Date(trimmed);
+  if (isNaN(date.getTime())) return trimmed;
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+// =============================================================================
 // COCKPIT — main entry point. Idempotent: safe to call after every state
 // mutation. Renders the entire 4-pane shell into [data-concierge-host].
 // =============================================================================
@@ -5042,6 +5097,17 @@ function renderConciergeQueueRailHtml(filtered, allRequests, activeReq) {
   // Last refresh indicator.
   const refreshAgo = state.lastDataLoadAt ? relativeTimeString(state.lastDataLoadAt) : "—";
 
+  // Phase 83.1 — Master-detail navigation. When a case is selected and
+  // queueMode === "case", the queue rail morphs into a chat-focused panel
+  // (back arrow + case identity + thread + composer). The list mode is
+  // reached via the back button. This reclaims ~340px of empty queue
+  // whitespace for the active conversation.
+  const isCaseMode = state.concierge.queueMode === "case" && activeReq;
+
+  if (isCaseMode) {
+    return renderConciergeChatPanelHtml(activeReq);
+  }
+
   return `
     <aside class="cockpit-queue">
       <div class="cockpit-queue__head">
@@ -5069,6 +5135,130 @@ function renderConciergeQueueRailHtml(filtered, allRequests, activeReq) {
           : filtered.map((req) => renderConciergeQueueCaseHtml(req, activeReq?.id === req.id)).join("")}
         ${tipHtml}
       </div>
+    </aside>
+  `;
+}
+
+// Master-detail chat mode: the queue rail becomes a chat panel for the
+// active case. Header shows a back arrow + the case summary + status pill;
+// body is the conversation thread; footer is the composer with tone
+// controls. The case workspace center skips the conversation pane while
+// this mode is active so the chat doesn't appear twice.
+function renderConciergeChatPanelHtml(req) {
+  const messages = state.chezMessages[req.id] || [];
+  if (state.chezMessages[req.id] === undefined) {
+    loadChezMessages(req.id);
+  }
+  const composer = (state.concierge.composer && state.concierge.composer[req.id]) || { draft: "", tone: "warm" };
+  const tone = composer.tone || "warm";
+  const draft = composer.draft || "";
+  const sla = chezSlaPill(req);
+  const slaTone = sla ? (sla.tone === "red" ? "critical" : sla.tone === "amber" ? "warning" : sla.tone === "green" ? "success" : "neutral") : "neutral";
+  const slaLabel = sla ? `SLA ${sla.label.replace(/^SLA: /, "")}` : (req.status === "resolved" ? "Resolved" : "—");
+  const composerLocked = req.status === "resolved";
+
+  const threadHtml = messages.map((m) => {
+    const role = m.role || "user";
+    if (role === "system") {
+      return `
+        <div class="cockpit-chatpanel__system">
+          <span>${escapeHtml(m.content || "")}</span>
+          <span class="cockpit-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
+        </div>
+      `;
+    }
+    const isAdmin = role === "concierge";
+    const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+    const initials = isAdmin ? "CZ" : (() => {
+      const name = dossier ? primaryHomeownerLabel(dossier) : "Homeowner";
+      return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+    })();
+    const senderLabel = isAdmin ? "Chez (you)" : (dossier ? primaryHomeownerLabel(dossier) : "Homeowner");
+    const proposalHtml = m.proposal ? renderProposalCardHtml(m.proposal) : "";
+    const attachmentsHtml = (m.attachments || []).map((att) => `
+      <div class="cockpit-msg__attach">
+        <span>📎 ${escapeHtml(att.filename || "(file)")}</span>
+        <span class="cockpit-muted">${escapeHtml(att.mime_type || "")}</span>
+      </div>
+    `).join("");
+    return `
+      <div class="cockpit-chatpanel__msg ${isAdmin ? "cockpit-chatpanel__msg--admin" : "cockpit-chatpanel__msg--user"}">
+        <span class="cockpit-avatar cockpit-avatar--md ${isAdmin ? "cockpit-avatar--indigo" : "cockpit-avatar--soft"}">${escapeHtml(initials)}</span>
+        <div class="cockpit-chatpanel__msg-main">
+          <div class="cockpit-chatpanel__msg-head">
+            <strong>${escapeHtml(senderLabel)}</strong>
+            <span class="cockpit-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
+          </div>
+          ${m.content ? `<div class="cockpit-chatpanel__msg-bubble">${escapeHtml(m.content)}</div>` : ""}
+          ${proposalHtml}
+          ${attachmentsHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const critique = composer.critique || (draft ? assessConciergeReplyTone(draft, tone) : null);
+
+  return `
+    <aside class="cockpit-queue cockpit-queue--chat">
+      <div class="cockpit-chatpanel__head">
+        <button type="button" class="cockpit-chatpanel__back" data-cockpit-action="back-to-queue" aria-label="Back to queue">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          <span>Queue</span>
+        </button>
+        <div class="cockpit-chatpanel__head-meta">
+          <span class="cockpit-pill cockpit-pill--${escapeHtml(slaTone)} cockpit-pill--xs">${escapeHtml(slaLabel)}</span>
+          <span class="cockpit-pill cockpit-pill--indigo cockpit-pill--xs">${escapeHtml(req.id.slice(0, 8))}</span>
+        </div>
+        <div class="cockpit-chatpanel__title">${escapeHtml(req.summary || "(no summary)")}</div>
+        <div class="cockpit-chatpanel__sub">${CHEZ_CATEGORY_ICONS[req.category] || "💬"} ${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || "Request")}</div>
+      </div>
+      <div class="cockpit-chatpanel__thread">
+        ${threadHtml || `<p class="cockpit-muted cockpit-chatpanel__empty">No messages yet. Send the first reply below.</p>`}
+      </div>
+      ${composerLocked ? `
+        <div class="cockpit-chatpanel__composer">
+          <div class="cockpit-resolved-bar">
+            <span>This case is resolved.</span>
+            <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="reopen">Reopen</button>
+          </div>
+        </div>
+      ` : `
+        <form class="cockpit-chatpanel__composer" data-cockpit-reply-form>
+          <div class="cockpit-chatpanel__composer-head">
+            <span class="cockpit-eyebrow cockpit-eyebrow--inline">Reply</span>
+            <div class="cockpit-tone">
+              ${["warm", "direct", "formal"].map((t) => `
+                <button type="button" class="cockpit-tone__opt ${tone === t ? "is-active" : ""}" data-cockpit-tone="${t}">${t}</button>
+              `).join("")}
+            </div>
+          </div>
+          <textarea
+            name="content"
+            rows="3"
+            placeholder="Tell the homeowner what's next…"
+            data-cockpit-reply-input
+          >${escapeHtml(draft)}</textarea>
+          ${critique ? `
+            <div class="cockpit-critique">
+              <span class="cockpit-spark cockpit-spark--sm">✦</span>
+              <span><b>Alfred:</b> ${escapeHtml(critique)}</span>
+            </div>
+          ` : ""}
+          <div class="cockpit-chatpanel__composer-foot">
+            <label class="cockpit-ack">
+              <input type="checkbox" name="acknowledgement_required" />
+              <span>Ack required</span>
+            </label>
+            <div class="cockpit-chatpanel__composer-buttons">
+              <button type="button" class="cockpit-btn cockpit-btn--ai cockpit-btn--sm" data-cockpit-action="draft-from-brief" title="Draft from brief"><span class="cockpit-spark cockpit-spark--sm">✦</span> Draft</button>
+              <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="send-keep-open">Send · keep open</button>
+              <button type="submit" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm">Send · waiting</button>
+            </div>
+          </div>
+          <p class="cockpit-muted cockpit-composer__feedback" data-cockpit-feedback></p>
+        </form>
+      `}
     </aside>
   `;
 }
@@ -5451,7 +5641,11 @@ function renderConciergeCaseWorkspaceHtml(req) {
     : "";
   const stageTrackerHtml = renderStageTrackerHtml(req, messages, visits);
   const visitsHtml = renderVisitsPanelHtml(req, visits);
-  const conversationHtml = renderConciergeConversationHtml(req, messages);
+  // Phase 83.1 — When the queue rail is in chat mode, the conversation
+  // already renders there. Skip it in the workspace to avoid duplication
+  // and free the operator's center column for AI brief + vendor sheet.
+  const showConversationInWorkspace = state.concierge.queueMode !== "case";
+  const conversationHtml = showConversationInWorkspace ? renderConciergeConversationHtml(req, messages) : "";
 
   return `
     ${headerHtml}
@@ -5740,12 +5934,20 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
   const costCustom = callData?.cost_custom || "";
   const showCustomCost = costRange === "custom" || (costCustom && !costRange);
 
-  const slotsHtml = slots.map((s, slotIdx) => `
-    <div class="cockpit-slot-row">
-      <input type="text" data-vendor-slot-input data-slot-index="${slotIdx}" value="${escapeHtml(s)}" placeholder="e.g. Tue May 12 (PM)" />
-      <button type="button" class="cockpit-slot-remove" data-action="remove-slot" data-slot-index="${slotIdx}" aria-label="Remove">×</button>
-    </div>
-  `).join("");
+  // Phase 83.2 — slot inputs are now `datetime-local` so every vendor's
+  // offered window lands as a real ISO datetime. The vendor may say
+  // "Thursday 6PM"; Tom converts that to "2026-05-08T18:00" when logging
+  // the call. Existing free-form strings parse if possible; otherwise
+  // they fall through to an empty input.
+  const slotsHtml = slots.map((s, slotIdx) => {
+    const localIso = toLocalDateTimeInputValue(s);
+    return `
+      <div class="cockpit-slot-row">
+        <input type="datetime-local" data-vendor-slot-input data-slot-index="${slotIdx}" value="${escapeHtml(localIso)}" />
+        <button type="button" class="cockpit-slot-remove" data-action="remove-slot" data-slot-index="${slotIdx}" aria-label="Remove">×</button>
+      </div>
+    `;
+  }).join("");
 
   const answeredPill = callData?.outcome === "answered" ? `<span class="cockpit-pill cockpit-pill--success cockpit-pill--xs">Answered</span>` : "";
   const recommendedPill = recommended ? `<span class="cockpit-pill cockpit-pill--success cockpit-pill--xs">Recommended</span>` : "";
@@ -6358,7 +6560,11 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
       // Reset the per-case Alfred sidebar tab to the actions view so the
       // copilot starts fresh for each case.
       state.concierge.alfred.tab = "actions";
-      // Pre-load thread before render so the workspace doesn't flash empty.
+      // Phase 83.1 — Master-detail nav. Selecting a case morphs the queue
+      // rail into the chat panel so the operator works in the active
+      // conversation, not against a list of one highlighted item.
+      state.concierge.queueMode = "case";
+      // Pre-load thread before render so the chat panel doesn't flash empty.
       await loadChezMessages(id);
       renderConciergeCockpit();
     });
@@ -6369,6 +6575,7 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
     const req = (state.chezRequests || []).find((r) => r.id === id);
     if (!req) return;
     state.selectedChezRequest = req;
+    state.concierge.queueMode = "case";
     await loadChezMessages(id);
     renderConciergeCockpit();
   });
@@ -6566,6 +6773,14 @@ window.addEventListener("resize", () => {
 
 async function handleConciergeAction(action, req, btn) {
   switch (action) {
+    case "back-to-queue":
+      // Phase 83.1 — Flip the queue rail back from chat-panel mode to the
+      // case list. The selected case stays in state so the workspace
+      // doesn't lose its data; only the rail's render mode changes.
+      state.concierge.queueMode = "list";
+      renderConciergeCockpit();
+      return;
+
     case "reassign":
       // Single-agent for v1. The button is rendered enabled with a tooltip
       // explaining the constraint, so clicking it lands a clear toast
@@ -6768,14 +6983,38 @@ async function handleConciergeAction(action, req, btn) {
 
     // ---- Visit-card actions (legacy handler ports) ------------------
     case "adopt-slot": {
+      // Phase 83.2 — Adopting a vendor-offered slot populates the canonical
+      // `scheduled_for` datetime when the slot has a parseable ISO; falls
+      // back to the freeform `scheduled_window` note when it doesn't.
       const card = btn.closest("[data-visit-id]");
       if (!card) return;
+      const slotIso = btn.dataset.slotIso || "";
       const slotText = btn.dataset.slotText || "";
-      const noteInput = card.querySelector("[data-visit-field='scheduled_window']");
-      if (noteInput) {
-        noteInput.value = slotText;
-        noteInput.dispatchEvent(new Event("change", { bubbles: true }));
+      if (slotIso) {
+        const dtInput = card.querySelector("[data-visit-field='scheduled_for']");
+        if (dtInput) {
+          dtInput.value = slotIso;
+          dtInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      } else {
+        const noteInput = card.querySelector("[data-visit-field='scheduled_window']");
+        if (noteInput) {
+          noteInput.value = slotText;
+          noteInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       }
+      return;
+    }
+    case "propose-alternate-dates": {
+      // Phase 83.2 — One-click open the proposal builder in date_slot mode
+      // pre-loaded with the visit's vendor name so Tom can offer the
+      // homeowner alternative dates without retyping context.
+      startProposalFlow(req);
+      // Try to flip to the date tab once the modal is up.
+      requestAnimationFrame(() => {
+        const dateTabBtn = document.querySelector("[data-chez-proposal-modal] [data-proposal-tab='date']");
+        dateTabBtn?.click();
+      });
       return;
     }
     case "visit-mark-scheduled":
@@ -7550,7 +7789,16 @@ function renderVisitCardHtml(req, visit, opts = {}) {
       ${slots.length > 0 ? `
         <div class="admin-chez__visit-slots">
           <span class="admin-muted">Times offered:</span>
-          ${slots.map((s) => `<button type="button" class="admin-chez__visit-slot-chip" data-action="adopt-slot" data-slot-text="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}
+          ${slots.map((s) => {
+            // Phase 83.2 — slot CHIP shows the friendly homeowner-format
+            // version; the chip carries an ISO-friendly value in
+            // data-slot-iso so adopting it populates the datetime-local
+            // input (scheduled_for) cleanly. Falls back to plain text
+            // for legacy free-form slots.
+            const display = formatSlotDisplay(s);
+            const iso = toLocalDateTimeInputValue(s);
+            return `<button type="button" class="admin-chez__visit-slot-chip" data-action="adopt-slot" data-slot-text="${escapeHtml(display)}" data-slot-iso="${escapeHtml(iso)}">${escapeHtml(display)}</button>`;
+          }).join("")}
         </div>
       ` : ""}
 
@@ -7581,6 +7829,9 @@ function renderVisitCardHtml(req, visit, opts = {}) {
           <button type="button" class="admin-button admin-button--primary admin-button--small" data-action="visit-mark-completed">✅ Mark completed</button>
         ` : ""}
         <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="visit-save-notes">💾 Save notes</button>
+        ${visit.state !== "completed" && visit.state !== "cancelled" ? `
+          <button type="button" class="admin-button admin-button--ghost admin-button--small" data-cockpit-action="propose-alternate-dates" title="Open the proposal builder in date-slot mode to offer the homeowner alternative dates / times.">📨 Propose alternate dates</button>
+        ` : ""}
         <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="visit-cancel">Cancel visit</button>
       </div>
     </article>
@@ -8119,11 +8370,15 @@ function attachProposalBuilderHandlers(modal, req, ctx) {
     });
   };
 
+  // Phase 83.2 — date_slot rows in the proposal builder now use a
+  // datetime-local picker so every option the homeowner sees is rendered
+  // from a single canonical ISO datetime (formatted via formatSlotDisplay
+  // before send). Forces consistent format across every proposal we ship.
   const addDateRow = (label = "") => {
     const row = document.createElement("div");
     row.className = "admin-chez__proposal-date-row";
     row.innerHTML = `
-      <input type="text" name="d-label" value="${escapeHtml(label)}" placeholder="e.g. Tue, May 12 at 2pm" />
+      <input type="datetime-local" name="d-iso" value="${escapeHtml(toLocalDateTimeInputValue(label))}" />
       <button type="button" class="admin-chez__proposal-row-remove" data-remove>×</button>
     `;
     dateRowsContainer.appendChild(row);
@@ -8221,13 +8476,21 @@ function attachProposalBuilderHandlers(modal, req, ctx) {
           });
         }
       } else if (activeTab === "date") {
+        // Phase 83.2 — the input is now `datetime-local`; values arrive
+        // as "YYYY-MM-DDTHH:mm". We send both an ISO string (for clients
+        // that can format) and a friendly label (homeowner-facing copy).
         const rows = Array.from(dateRowsContainer.querySelectorAll(".admin-chez__proposal-date-row"));
         const options = rows
-          .map((r) => r.querySelector("[name='d-label']").value.trim())
+          .map((r) => r.querySelector("[name='d-iso']").value.trim())
           .filter(Boolean)
-          .map((label) => ({ label, iso: null }));
+          .map((localValue) => {
+            const date = new Date(localValue);
+            const iso = isNaN(date.getTime()) ? null : date.toISOString();
+            const label = formatSlotDisplay(localValue);
+            return { label, iso };
+          });
         if (options.length === 0) {
-          alert("Add at least one date option.");
+          alert("Pick at least one date / time option.");
           return;
         }
         await callChezConcierge({
@@ -8776,9 +9039,14 @@ async function packageAndSendRecommendedVendors(req) {
       // Resolve availability slots — array preferred. Fall back to
       // legacy single-string field if the user came from an older
       // version of the UI.
+      // Phase 83.2 — slots are now ISO-ish "YYYY-MM-DDTHH:mm" datetime-local
+      // values. We send them through `formatSlotDisplay` so the homeowner
+      // sees a consistent, friendly format ("Thu, May 8 at 6:00 PM"). Any
+      // legacy free-form strings already in state pass through untouched
+      // (the formatter falls back to the raw value when it can't parse).
       const slots = Array.isArray(data.availability_slots)
-        ? data.availability_slots.map((s) => String(s || "").trim()).filter(Boolean)
-        : (data.availability ? [String(data.availability).trim()] : []);
+        ? data.availability_slots.map((s) => String(s || "").trim()).filter(Boolean).map(formatSlotDisplay)
+        : (data.availability ? [formatSlotDisplay(String(data.availability).trim())] : []);
       const proposal = {
         kind: "vendor",
         vendor: {
