@@ -61,13 +61,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 //   tools      — sandboxes + reference docs (Simulate, Architecture, Claude file)
 const VIEWS = [
   {
+    // Phase 83 — Customer service cockpit. Internal route id stays "chez"
+    // (referenced in dozens of places); user-facing label is "Concierge".
     id: "chez",
-    label: "Chez Requests",
+    label: "Concierge",
     type: "chez_request",
     group: "action",
-    title: "Chez Concierge",
-    eyebrow: "Open homeowner requests, replies, and SLAs",
-    subtitle: "Every request that's come in from a homeowner. Reply, ask follow-ups, propose vendors / dates / quotes — all from one panel. 24-hour business-day SLA on every open request.",
+    title: "Concierge",
+    eyebrow: "Customer service cockpit",
+    subtitle: "Every homeowner request, in one cockpit. Queue on the left, full homeowner context, AI brief, vendor sourcing, conversation, and Alfred co-pilot — all on one screen.",
   },
   {
     id: "audit",
@@ -565,6 +567,26 @@ const state = {
   chezReplyDraft: "",
   chezReplyAcknowledgement: false,
   chezReplyStatus: null, // optional status transition
+  // Phase 83 — Concierge cockpit local UI state. Persisted to localStorage
+  // for things the agent expects to remember across sessions (Alfred on/off,
+  // density). Per-case scratchpads (briefTab, composer.draft, alfred chat)
+  // are keyed by request id so switching between cases preserves work.
+  concierge: {
+    ui: {
+      aiOpen: true,           // Alfred sidebar visible
+      vendorOpen: true,       // vendor call sheet visible inside the workspace
+      density: "comfortable",
+    },
+    queueFilter: "all",       // all | mine | urgent
+    searchQuery: "",
+    briefTab: {},             // { [requestId]: 'analysis' | 'considerations' | ... }
+    composer: {},             // { [requestId]: { draft: string, tone: 'warm' | 'direct' | 'formal' } }
+    alfred: {
+      tab: "actions",         // actions | chat | similar
+      chat: {},               // { [requestId]: [{ from: 'alfred'|'user', text }] }
+      input: {},              // { [requestId]: '' }
+    },
+  },
 };
 
 function structuredCloneSafePure(value) {
@@ -655,6 +677,12 @@ const el = {
   // takes over without competing for visual real estate.
   notesBox: document.querySelector("[data-notes-box]"),
   detailActionsRow: document.querySelector("[data-detail-actions]"),
+  // Phase 83 — Concierge cockpit host. The cockpit takes over the entire
+  // .admin-main viewport when state.view === "chez", with the legacy
+  // .admin-layout + .admin-topbar hidden by class.
+  conciergeHost: document.querySelector("[data-concierge-host]"),
+  adminLayout: document.querySelector(".admin-layout"),
+  adminTopbar: document.querySelector(".admin-topbar"),
 };
 
 const paletteState = { open: false, results: [], activeIndex: 0 };
@@ -676,6 +704,9 @@ init();
 
 async function init() {
   wireEvents();
+  // Phase 83 — restore Alfred on/off + density preferences from local storage
+  // so the operator's choices survive reload.
+  restoreConciergeUI();
   await restoreSession();
 }
 
@@ -1728,8 +1759,19 @@ function render() {
     else el.previewQuiz.classList.add("is-hidden");
   }
 
+  // Phase 83 — Concierge cockpit takes over the entire admin-main viewport.
+  // Hide the legacy topbar + admin-layout when on the Concierge view; show
+  // the cockpit host. Restore them on every other view.
+  const isConcierge = state.view === "chez";
+  if (el.conciergeHost && el.adminLayout && el.adminTopbar) {
+    el.conciergeHost.classList.toggle("is-hidden", !isConcierge);
+    el.adminLayout.classList.toggle("is-hidden", isConcierge);
+    el.adminTopbar.classList.toggle("is-hidden", isConcierge);
+    document.querySelector("[data-storage-warning]")?.classList.toggle("is-hidden-by-concierge", isConcierge);
+  }
+
   if (state.view === "chez") {
-    renderChezRequestsView();
+    renderConciergeCockpit();
   } else if (state.view === "audit") {
     renderAuditView();
   } else if (state.view === "notes") {
@@ -4714,28 +4756,123 @@ function chezStatRow(label, value) {
   return `<div class="admin-stat"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`;
 }
 
+// Phase 83 — Both legacy entry points now delegate to the cockpit. Every
+// existing callback (proposal builder, analysis cache, visits cache,
+// dossier drawer) calls one or the other after mutating state, so this
+// shim is what makes the cockpit feel reactive without any of the
+// existing call sites needing updates.
 function renderChezRequestsView() {
-  const requests = (state.chezRequests ?? []).slice();
-  el.search.value = state.search || "";
+  renderConciergeCockpit();
+}
 
-  // Stats: total open · awaiting reply (admin unread or no admin reply yet)
-  // · waiting on customer · resolved this week.
-  const open = requests.filter((r) => r.status === "open").length;
-  const awaitingReply = requests.filter((r) => r.status === "open" && r.unread_for_admin).length;
-  const waiting = requests.filter((r) => r.status === "waiting_customer").length;
-  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const resolvedThisWeek = requests.filter(
-    (r) => r.status === "resolved" && r.resolved_at && new Date(r.resolved_at).getTime() >= oneWeekAgo
-  ).length;
-  el.stats.innerHTML = [
-    chezStatRow("Total open", open),
-    chezStatRow("Awaiting your reply", awaitingReply),
-    chezStatRow("Waiting on customer", waiting),
-    chezStatRow("Resolved this week", resolvedThisWeek),
-  ].join("");
+function renderFocusedChezDetail(req) {
+  if (req) state.selectedChezRequest = req;
+  renderConciergeCockpit();
+}
 
-  // Sort: overdue first, then unread-for-admin, then most-recent activity.
-  const sorted = requests.sort((a, b) => {
+// =============================================================================
+// Phase 83 — CONCIERGE COCKPIT
+// =============================================================================
+//
+// Customer service cockpit. Replaces the legacy single-column "Chez Requests"
+// admin form with a 4-pane desktop workspace per the design handoff:
+//
+//   ┌─────────────────────────────────────────────────────────────────────┐
+//   │  TopBar (52px)                                                       │
+//   ├──────────┬───────────┬──────────────────────────────┬─────────────┤
+//   │  Queue   │ Homeowner │ Case workspace               │ Alfred      │
+//   │  rail    │ panel     │  (header + AI brief + body + │ sidebar     │
+//   │  304px   │ 320px     │   vendor sheet + thread +    │ 360px       │
+//   │  fixed   │ fixed     │   composer)  flex:1, scrolls │ togglable   │
+//   └──────────┴───────────┴───────────────────────────────┴─────────────┘
+//
+// The cockpit is fully reactive: queue selection, vendor-sheet toggle, Alfred
+// toggle, AI brief tab, composer tone, Alfred sidebar tab, search filter, and
+// queue filter are local state (`state.concierge.*`); everything else is the
+// existing chez state machine (`state.chezRequests`, `state.chezMessages`,
+// `state.chezVisitsByRequest`, `state.chezAnalysisByRequest`,
+// `state.chezDossiersByHousehold`, `state.chezVendorCallsByRequest`).
+//
+// Every button in the cockpit is wired to a real action — reply via Edge
+// Function, propose via Edge Function, decide via the existing flow, visit
+// state transitions via update_visit, package & send via the existing
+// helper, dossier chips via the existing drawer. The Alfred chat tab is
+// wired to a new `ask_alfred` Edge Function action that's case-scoped.
+
+const CHEZ_BRIEF_TABS = [
+  { id: "analysis", label: "Analysis" },
+  { id: "considerations", label: "Key considerations" },
+  { id: "approach", label: "Recommended approach" },
+  { id: "questions", label: "Questions to ask" },
+  { id: "script", label: "Call script" },
+];
+
+const CHEZ_TONE_TEMPLATES = {
+  warm: "Hi {first_name} — quick update from Chez. {body} Let me know what works for you.",
+  direct: "{first_name} — {body} Reply with a yes/no and we'll move forward.",
+  formal: "Hello {first_name}, thank you for the request. {body} We'll await your guidance.",
+};
+
+const CHEZ_QUEUE_FILTER_LABELS = {
+  all: "All",
+  mine: "Mine",
+  urgent: "Urgent",
+};
+
+// Compute deterministic AI fit score for a vendor candidate.
+// Mirror of the design's "AI fit 92" pill — drives ordering + the meter.
+function computeChezVendorFit(v) {
+  let score = 50; // baseline
+  if (v._source === "existing") score += 25;       // already in network
+  if (v.is_haven_certified || v.is_top_rated) score += 18;
+  const rating = Number(v.rating || 0);
+  if (rating >= 4.8) score += 18;
+  else if (rating >= 4.5) score += 12;
+  else if (rating >= 4.0) score += 6;
+  const reviews = Number(v.user_ratings_total || v.review_count || 0);
+  if (reviews >= 100) score += 10;
+  else if (reviews >= 25) score += 6;
+  else if (reviews >= 5) score += 2;
+  if (v.formatted_phone_number || v.phone) score += 4;
+  return Math.min(99, Math.max(15, Math.round(score)));
+}
+
+// Rank-1 fit-score reasoning sentence for the inline "Alfred:" note on each
+// vendor row. Composed deterministically from the candidate's signals so
+// every vendor gets a useful one-liner without an extra Claude call.
+function chezVendorReasoning(v, fit) {
+  const bits = [];
+  if (v._source === "existing") bits.push("Already in their household network — relationship history matters here.");
+  else if (v.is_haven_certified || v.is_top_rated) bits.push("Top-rated locally with strong volume.");
+  else if (Number(v.rating || 0) >= 4.7 && Number(v.user_ratings_total || v.review_count || 0) >= 25) {
+    bits.push("Strong reviews + enough volume to be reliable.");
+  }
+  if (v.distance_miles) bits.push(`${v.distance_miles}mi away — proximity is a plus.`);
+  if (fit >= 85) bits.push("Best fit for this homeowner's profile.");
+  else if (fit >= 70) bits.push("Solid candidate worth a call.");
+  else bits.push("Fit is moderate — call for a benchmark quote.");
+  return bits.slice(0, 2).join(" ");
+}
+
+// =============================================================================
+// COCKPIT — main entry point. Idempotent: safe to call after every state
+// mutation. Renders the entire 4-pane shell into [data-concierge-host].
+// =============================================================================
+
+function renderConciergeCockpit() {
+  const host = el.conciergeHost;
+  if (!host) {
+    console.warn("[admin] concierge host missing — cockpit can't render");
+    return;
+  }
+  // Refuse to write if we're not actually on the concierge view (defensive
+  // guard against stale callbacks firing after the user switches away).
+  if (state.view !== "chez") return;
+
+  // Sort + filter the case list. Reuses the legacy logic so the queue
+  // ordering Tom is used to (overdue first, then unread, then most recent)
+  // stays consistent.
+  const requests = (state.chezRequests ?? []).slice().sort((a, b) => {
     const aSla = chezSlaPill(a);
     const bSla = chezSlaPill(b);
     const aOver = aSla?.overdue ? 1 : 0;
@@ -4749,337 +4886,2208 @@ function renderChezRequestsView() {
     return bTime - aTime;
   });
 
-  // Optional search filter (over summary, category label, household id).
-  const query = (state.search || "").toLowerCase().trim();
-  const filtered = query
-    ? sorted.filter((r) => {
-        const summary = (r.summary || "").toLowerCase();
-        const cat = (CHEZ_CATEGORY_LABELS[r.category] || "").toLowerCase();
-        return summary.includes(query) || cat.includes(query) || (r.household_id || "").toLowerCase().includes(query);
-      })
-    : sorted;
+  const search = (state.concierge.searchQuery || "").toLowerCase().trim();
+  const filterMode = state.concierge.queueFilter || "all";
+  const filtered = requests.filter((r) => {
+    if (filterMode === "urgent") {
+      const sla = chezSlaPill(r);
+      if (!sla || (sla.tone !== "red" && sla.tone !== "amber")) return false;
+    }
+    if (filterMode === "mine") {
+      // Single-agent system for v1 — every open case is "mine". Filter to
+      // active so the bucket label still feels useful.
+      if (r.status === "resolved") return false;
+    }
+    if (search) {
+      const summary = (r.summary || "").toLowerCase();
+      const cat = (CHEZ_CATEGORY_LABELS[r.category] || "").toLowerCase();
+      const hh = (r.household_id || "").toLowerCase();
+      if (!summary.includes(search) && !cat.includes(search) && !hh.includes(search)) return false;
+    }
+    return true;
+  });
 
-  const renderRow = (req) => {
-    const isActive = state.selectedChezRequest?.id === req.id;
-    const sla = chezSlaPill(req);
-    const slaHtml = sla
-      ? `<span class="admin-pill" data-tone="${escapeHtml(sla.tone)}">${escapeHtml(sla.label)}</span>`
-      : "";
-    const unreadDot = req.unread_for_admin
-      ? `<span class="admin-chez__unread-dot" title="New activity"></span>`
-      : "";
-    const cat = CHEZ_CATEGORY_ICONS[req.category] || "💬";
-    return `
-      <button type="button" class="admin-audit__row admin-chez__row ${isActive ? "is-active" : ""}" data-chez-id="${escapeHtml(req.id)}">
-        <div class="admin-audit__row-top">
-          <strong>${cat} ${escapeHtml(req.summary || "(no summary)")}</strong>
-          ${slaHtml}
-        </div>
-        <p class="admin-audit__row-reason">
-          ${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || "Request")}
-          · ${escapeHtml(CHEZ_STATUS_LABELS[req.status] || req.status)}
-          ${unreadDot}
-        </p>
-      </button>
-    `;
-  };
+  // Auto-pick the first case if nothing's selected, so the cockpit never
+  // renders with an empty workspace.
+  if (!state.selectedChezRequest && filtered.length > 0) {
+    state.selectedChezRequest = filtered[0];
+    // Pre-load thread for the auto-picked case (fire-and-forget; the cockpit
+    // will re-render once messages arrive).
+    loadChezMessages(filtered[0].id).then(() => renderConciergeCockpit());
+  }
 
-  const empty = filtered.length === 0
-    ? `<p class="admin-audit__empty admin-muted">No requests yet. The first homeowner ask will land here.</p>`
-    : "";
+  // If the selected case got filtered out, refresh from the live list.
+  if (state.selectedChezRequest) {
+    const fresh = state.chezRequests.find((r) => r.id === state.selectedChezRequest.id);
+    if (fresh) state.selectedChezRequest = fresh;
+  }
 
-  el.list.innerHTML = `
-    <div class="admin-audit admin-chez">
-      <p class="admin-audit__intro">
-        Every Chez Concierge request, ranked by urgency. <strong>Click a row</strong> to open the focused panel: full context, conversation thread, attachment downloads, reply composer, and status controls.
-      </p>
-      ${empty}
-      ${filtered.map(renderRow).join("")}
+  const activeReq = state.selectedChezRequest;
+  const ui = state.concierge.ui;
+
+  host.innerHTML = `
+    <div class="cockpit-shell" data-density="${escapeHtml(ui.density)}">
+      ${renderConciergeTopBarHtml(activeReq)}
+      <div class="cockpit-body">
+        ${renderConciergeQueueRailHtml(filtered, requests, activeReq)}
+        ${activeReq ? renderConciergeHomeownerPanelHtml(activeReq) : ""}
+        ${activeReq ? `
+          <div class="cockpit-workspace" data-cockpit-workspace>
+            ${renderConciergeCaseWorkspaceHtml(activeReq)}
+          </div>
+        ` : `
+          <div class="cockpit-workspace cockpit-workspace--empty">
+            <div class="cockpit-empty">
+              <h3>Pick a case from the queue</h3>
+              <p>Every active homeowner request lands here. The cockpit gives you their full context, AI brief, vendor sourcing, conversation, and Alfred co-pilot — all on one screen.</p>
+            </div>
+          </div>
+        `}
+        ${ui.aiOpen && activeReq ? renderConciergeAlfredSidebarHtml(activeReq) : ""}
+      </div>
     </div>
   `;
 
-  el.list.querySelectorAll("[data-chez-id]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.chezId;
-      const req = filtered.find((r) => r.id === id);
-      if (!req) return;
-      state.selectedChezRequest = req;
-      // Pre-load thread before render so the panel doesn't flash empty.
-      await loadChezMessages(id);
-      renderFocusedChezDetail(req);
-      renderChezRequestsView();
-    });
-  });
-
-  // Restore focus or render empty.
-  const stillSelected = state.selectedChezRequest && filtered.some((r) => r.id === state.selectedChezRequest.id);
-  if (stillSelected) {
-    const fresh = filtered.find((r) => r.id === state.selectedChezRequest.id);
-    state.selectedChezRequest = fresh;
-    renderFocusedChezDetail(fresh);
-  } else {
-    state.selectedChezRequest = null;
-    el.auditFocused?.classList.add("is-hidden");
-    el.noteFocused?.classList.add("is-hidden");
-    el.decisionFocused?.classList.add("is-hidden");
-    el.emptyDetail?.classList.remove("is-hidden");
-    el.detail?.classList.add("is-hidden");
-    if (el.emptyDetail) {
-      el.emptyDetail.querySelector("h3").textContent = filtered.length
-        ? "Click a request to open its conversation"
-        : "No requests yet";
-      el.emptyDetail.querySelector("p").textContent = filtered.length
-        ? "The focused panel shows full context, attachments, the message thread, and a reply composer with status controls."
-        : "When a homeowner asks Chez for help — finding a vendor, getting a quote, scheduling a visit — the request lands here.";
-    }
-  }
+  // Wire every interactive element after innerHTML write.
+  attachConciergeCockpitHandlers(activeReq, filtered);
 }
 
-function renderFocusedChezDetail(req) {
-  if (!req) return;
-  el.emptyDetail?.classList.add("is-hidden");
-  el.detail?.classList.remove("is-hidden");
-  el.detailTabs?.classList.add("is-hidden");
-  el.curatedForm?.classList.add("is-hidden");
-  if (el.formHost) el.formHost.innerHTML = "";
-  if (el.diffHost) el.diffHost.innerHTML = "";
-  document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
-  el.noteFocused?.classList.add("is-hidden");
-  el.decisionFocused?.classList.add("is-hidden");
-  el.detailActionsRow?.classList.add("is-hidden");
-  el.notesBox?.classList.add("is-hidden");
-  el.promoteItem.disabled = true;
-  el.duplicateItem.disabled = true;
-  el.deleteItem.disabled = true;
-  el.saveItem.textContent = "Save";
-  el.saveItem.disabled = true;
+// =============================================================================
+// TOP BAR
+// =============================================================================
 
-  // The focused panel reuses the audit panel container so we get the
-  // same right-rail layout for free.
-  if (!el.auditFocused) {
-    console.warn("[admin] auditFocused element missing — Chez panel can't render");
-    return;
-  }
-  el.auditFocused.classList.remove("is-hidden");
-  el.auditFocused.innerHTML = renderFocusedChezPanelHtml(req);
-
-  // Wire the reply form + status pickers + quick actions.
-  attachChezPanelHandlers(req);
-}
-
-function renderFocusedChezPanelHtml(req) {
-  const sla = chezSlaPill(req);
-  const slaPill = sla
-    ? `<span class="admin-pill" data-tone="${escapeHtml(sla.tone)}">${escapeHtml(sla.label)}</span>`
-    : "";
-  const messages = state.chezMessages[req.id] || [];
-
-  // Pretty-print context dict.
-  const contextLines = req.context && typeof req.context === "object"
-    ? Object.entries(req.context)
-        .filter(([k]) => !k.startsWith("_"))
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => `<div class="admin-chez__ctx-row"><span>${escapeHtml(k.replace(/_/g, " "))}</span><strong>${escapeHtml(String(v))}</strong></div>`)
-        .join("")
-    : "";
-
-  const threadHtml = messages.map((m) => {
-    const role = m.role || "user";
-    if (role === "system") {
-      return `
-        <div class="admin-chez__system">
-          <span>${escapeHtml(m.content || "")}</span>
-          <span class="admin-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
-        </div>
-      `;
-    }
-    const isAdmin = role === "concierge";
-    const sideClass = isAdmin ? "admin-chez__msg--admin" : "admin-chez__msg--user";
-    // Internal-only label so Tom remembers which side is which when
-    // operating the portal. The homeowner only ever sees "Chez" in the
-    // iOS app — this label never leaves the admin surface.
-    const senderLabel = isAdmin ? "Chez (you)" : "Homeowner";
-    const attachmentsHtml = (m.attachments || []).map((att) => {
-      return `
-        <div class="admin-chez__attach">
-          <span>📎 ${escapeHtml(att.filename || "(file)")}</span>
-          <span class="admin-muted">${escapeHtml(att.mime_type || "")}</span>
-        </div>
-      `;
-    }).join("");
-    // Phase 80.1 — Render structured proposals as a colored card with
-    // status pill so Tom can see at a glance which proposals are still
-    // pending the homeowner's decision.
-    const proposalHtml = m.proposal ? renderProposalCardHtml(m.proposal) : "";
-    return `
-      <div class="admin-chez__msg ${sideClass}">
-        <div class="admin-chez__msg-head">
-          <strong>${senderLabel}</strong>
-          <span class="admin-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
-        </div>
-        ${m.content ? `<p>${escapeHtml(m.content)}</p>` : ""}
-        ${proposalHtml}
-        ${attachmentsHtml}
-      </div>
-    `;
-  }).join("");
-
-  // Phase 81.1 — Compact header line replaces the Phase 81 inline
-  // dossier flood. One row of identity + a "View profile →" button
-  // that opens the full dossier as a slide-in drawer. Tom shouldn't
-  // need to scroll past 8 cards to get to the conversation.
-  const headerLineHtml = renderCompactHeaderLineHtml(req);
-
-  // Phase 82 — Stage tracker shows where this case is in its lifecycle
-  // (Submitted → Research → Sent → Picked → Booked → Visit → Done).
-  // Computed from existing signals + visits cache.
-  const visits = (state.chezVisitsByRequest || {})[req.id];
-  const stageTrackerHtml = renderStageTrackerHtml(req, messages, visits);
-
-  // Phase 82 — Active visits section. When the homeowner has approved
-  // ≥1 vendor, this is the primary surface — the case has shifted from
-  // "research and propose" to "track these visits through completion".
-  const visitsHtml = renderVisitsPanelHtml(req, visits);
-  const hasActiveVisits = Array.isArray(visits) && visits.some((v) =>
-    v.state === "awaiting_date" || v.state === "scheduled"
-  );
-
-  // Phase 82 — When active visits exist, collapse the analysis panel
-  // by default. Tom's done with research; he's tracking visits now.
-  // The panel stays in the DOM (one click expands) so he can re-call
-  // a vendor or send another proposal if needed.
-  const analysisExpanded = !!(state.chezAnalysisExpandedByRequest && state.chezAnalysisExpandedByRequest[req.id]);
-  const analysisHtml = renderChezAnalysisPanelHtml(req, {
-    collapsed: hasActiveVisits && !analysisExpanded,
-  });
-
-  const statusOptions = ["open", "waiting_customer", "resolved"]
-    .map((s) => `<option value="${s}" ${s === req.status ? "selected" : ""}>${CHEZ_STATUS_LABELS[s]}</option>`)
-    .join("");
-
-  const showReopen = req.status === "resolved";
-  const composerHtml = showReopen
-    ? `
-      <div class="admin-chez__resolved-bar">
-        <span>This request is resolved. Reopen if the homeowner needs more help.</span>
-        <button type="button" class="admin-button" data-chez-action="reopen">Reopen</button>
-      </div>
-    `
-    : `
-      <form data-chez-reply-form class="admin-chez__composer">
-        <label class="admin-chez__composer-label">Reply to homeowner</label>
-        <textarea name="content" rows="3" placeholder="Tell the homeowner what's next…" required></textarea>
-        <label class="admin-chez__ack">
-          <input type="checkbox" name="acknowledgement_required" />
-          <span><strong>Acknowledgement required.</strong> Lands in their Needs Action tab.</span>
-        </label>
-        <div class="admin-chez__composer-row">
-          <select name="to_status">
-            <option value="">Keep status: ${CHEZ_STATUS_LABELS[req.status]}</option>
-            ${["open", "waiting_customer", "resolved"]
-              .filter((s) => s !== req.status)
-              .map((s) => `<option value="${s}">Set: ${CHEZ_STATUS_LABELS[s]}</option>`)
-              .join("")}
-          </select>
-          <button type="submit" class="admin-button admin-button--primary">Send reply</button>
-        </div>
-        <p class="admin-chez__composer-feedback admin-muted" data-chez-feedback></p>
-      </form>
-    `;
+function renderConciergeTopBarHtml(activeReq) {
+  const ui = state.concierge.ui;
+  const agentEmail = state.session?.user?.email || "tom@getchez.com";
+  const initials = agentEmail.slice(0, 2).toUpperCase();
+  const agentName = agentEmail.split("@")[0].replace(/\./g, " ");
 
   return `
-    <section class="admin-focused admin-chez__focused">
-      <header class="admin-focused__head">
-        <h2>${escapeHtml(req.summary || "(no summary)")}</h2>
-        <div class="admin-focused__meta">
-          <span class="admin-pill admin-pill--note">${CHEZ_CATEGORY_ICONS[req.category] || "💬"} ${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || "Request")}</span>
-          <select data-chez-status>${statusOptions}</select>
-          ${slaPill}
-        </div>
-      </header>
-
-      ${headerLineHtml}
-
-      ${stageTrackerHtml}
-
-      ${visitsHtml}
-
-      ${analysisHtml}
-
-      ${contextLines ? `
-        <details class="admin-chez__context-collapsible">
-          <summary>Original request details</summary>
-          <div class="admin-chez__ctx-grid">${contextLines}</div>
-        </details>
-      ` : ""}
-
-      <details class="admin-chez__thread-collapsible" ${(messages || []).length > 0 ? "open" : ""}>
-        <summary>Conversation${(messages || []).length ? ` · ${(messages || []).length}` : ""}</summary>
-        <div class="admin-chez__thread">
-          ${threadHtml || `<p class="admin-muted">No messages yet.</p>`}
-        </div>
-      </details>
-
-      ${composerHtml}
-
-      <section class="admin-chez__quick-actions">
-        <button type="button" class="admin-button admin-button--ghost" data-chez-action="propose">Manual proposal</button>
-        <button type="button" class="admin-button admin-button--ghost" data-chez-action="waiting">Waiting on customer</button>
-        <button type="button" class="admin-button admin-button--ghost" data-chez-action="resolved">Mark resolved</button>
-      </section>
-    </section>
+    <header class="cockpit-topbar">
+      <div class="cockpit-topbar__brand">
+        <div class="cockpit-topbar__mark">c</div>
+        <span class="cockpit-topbar__wordmark">Concierge</span>
+        <span class="cockpit-topbar__eyebrow">Customer service cockpit</span>
+      </div>
+      <div class="cockpit-topbar__right">
+        <label class="cockpit-search">
+          <span class="cockpit-search__icon" aria-hidden="true">⌕</span>
+          <input
+            type="text"
+            value="${escapeHtml(state.concierge.searchQuery || "")}"
+            placeholder="Search cases, homeowners, vendors…"
+            data-cockpit-search
+          />
+          <span class="cockpit-search__hint">⌘K</span>
+        </label>
+        <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-toggle-vendor title="Toggle vendor sourcing pane">
+          ${ui.vendorOpen ? "✓ " : ""}Vendor sheet
+        </button>
+        <button type="button" class="cockpit-btn cockpit-btn--${ui.aiOpen ? "indigo" : "ai"} cockpit-btn--sm" data-cockpit-toggle-ai>
+          <span class="cockpit-spark" aria-hidden="true">✦</span>
+          Alfred ${ui.aiOpen ? "on" : "off"}
+        </button>
+        <span class="cockpit-topbar__divider"></span>
+        <span class="cockpit-avatar cockpit-avatar--sm">${escapeHtml(initials)}</span>
+        <span class="cockpit-topbar__agent">${escapeHtml(agentName)}</span>
+      </div>
+    </header>
   `;
 }
 
-// Phase 81.1 — Compact one-line header that replaces the inline
-// dossier. Tom sees identity + house at a glance, clicks "View
-// profile" to slide in the full drawer (which contains everything
-// the Phase 81 dossier had).
-function renderCompactHeaderLineHtml(req) {
+// =============================================================================
+// QUEUE RAIL (304px)
+// =============================================================================
+
+function renderConciergeQueueRailHtml(filtered, allRequests, activeReq) {
+  const filterMode = state.concierge.queueFilter || "all";
+  const tabs = [
+    { id: "all", label: "All", count: allRequests.length },
+    { id: "mine", label: "Mine", count: allRequests.filter((r) => r.status !== "resolved").length },
+    { id: "urgent", label: "Urgent", count: allRequests.filter((r) => {
+        const s = chezSlaPill(r);
+        return s && (s.tone === "red" || s.tone === "amber");
+      }).length },
+  ];
+
+  // Stat tiles.
+  const open = allRequests.filter((r) => r.status === "open").length;
+  const awaiting = allRequests.filter((r) => r.status === "open" && r.unread_for_admin).length;
+  const critical = allRequests.filter((r) => {
+    const s = chezSlaPill(r);
+    return s && s.tone === "red";
+  }).length;
+
+  // Compute a real "Avg response" stat from the conversation cache when we
+  // have it. Average admin reply latency for resolved/replied cases this
+  // week. Fallback "—" when we don't have enough data.
+  const avgResponse = computeAvgChezResponseTime();
+
+  // Cross-case AI tip: spotlight overdue or critical-SLA cases as a
+  // "queue tip" the agent should attend to first.
+  const tipCase = allRequests.find((r) => {
+    const s = chezSlaPill(r);
+    return s && s.overdue;
+  }) || allRequests.find((r) => r.status === "open" && r.unread_for_admin);
+  const tipHtml = tipCase ? renderConciergeQueueTipHtml(tipCase, activeReq) : "";
+
+  // Last refresh indicator.
+  const refreshAgo = state.lastDataLoadAt ? relativeTimeString(state.lastDataLoadAt) : "—";
+
+  return `
+    <aside class="cockpit-queue">
+      <div class="cockpit-queue__head">
+        <div class="cockpit-queue__head-row">
+          <h2>Queue</h2>
+          <button type="button" class="cockpit-queue__refresh" data-cockpit-refresh title="Pull latest cases">↻ ${escapeHtml(refreshAgo)}</button>
+        </div>
+        <div class="cockpit-tabs cockpit-tabs--filled" role="tablist">
+          ${tabs.map((t) => `
+            <button type="button" class="cockpit-tab ${filterMode === t.id ? "is-active" : ""}" data-cockpit-queue-filter="${escapeHtml(t.id)}">
+              ${escapeHtml(t.label)}<span class="cockpit-tab__count">${t.count}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      <div class="cockpit-queue__stats">
+        ${renderConciergeStatTile("Open", open, "indigo")}
+        ${renderConciergeStatTile("Awaiting you", awaiting, "salmon")}
+        ${renderConciergeStatTile("Critical SLA", critical, "critical")}
+        ${renderConciergeStatTile("Avg response", avgResponse, "indigo")}
+      </div>
+      <div class="cockpit-queue__list">
+        ${filtered.length === 0
+          ? `<div class="cockpit-queue__empty">No cases match this filter.</div>`
+          : filtered.map((req) => renderConciergeQueueCaseHtml(req, activeReq?.id === req.id)).join("")}
+        ${tipHtml}
+      </div>
+    </aside>
+  `;
+}
+
+function renderConciergeStatTile(label, value, tone) {
+  return `
+    <div class="cockpit-stat" data-tone="${escapeHtml(tone)}">
+      <div class="cockpit-stat__num">${escapeHtml(String(value))}</div>
+      <div class="cockpit-stat__label">${escapeHtml(label)}</div>
+    </div>
+  `;
+}
+
+function renderConciergeQueueCaseHtml(req, isActive) {
+  const sla = chezSlaPill(req);
+  const slaTone = sla ? (sla.tone === "red" ? "critical" : sla.tone === "amber" ? "warning" : sla.tone === "green" ? "success" : "neutral") : "neutral";
+  const slaLabel = sla ? `SLA ${sla.label.replace(/^SLA: /, "")}` : (req.status === "resolved" ? "Resolved" : "—");
+  const cat = req.category || "general";
+  const catLabel = CHEZ_CATEGORY_LABELS[cat] || "Request";
+  const awaiting = req.status === "waiting_customer"
+    ? "⌛ waiting on customer"
+    : req.unread_for_admin
+    ? "↩ awaiting your reply"
+    : "· no new replies";
+
+  return `
+    <button type="button" class="cockpit-queue__case ${isActive ? "is-active" : ""}" data-cockpit-case-id="${escapeHtml(req.id)}">
+      ${isActive ? `<span class="cockpit-queue__case-accent"></span>` : ""}
+      <div class="cockpit-queue__case-top">
+        <span class="cockpit-queue__case-icon">${CHEZ_CATEGORY_ICONS[cat] || "💬"}</span>
+        <span class="cockpit-queue__case-type">${escapeHtml(catLabel)}</span>
+        <span class="cockpit-queue__case-id">${escapeHtml(req.id.slice(0, 8))}</span>
+      </div>
+      <div class="cockpit-queue__case-title">${escapeHtml(req.summary || "(no summary)")}</div>
+      <div class="cockpit-queue__case-foot">
+        <span class="cockpit-pill cockpit-pill--${escapeHtml(slaTone)}">${escapeHtml(slaLabel)}</span>
+        <span class="cockpit-queue__case-awaiting">${escapeHtml(awaiting)}</span>
+      </div>
+    </button>
+  `;
+}
+
+function renderConciergeQueueTipHtml(tipCase, activeReq) {
+  if (!tipCase || tipCase.id === activeReq?.id) return "";
+  const sla = chezSlaPill(tipCase);
+  const verb = sla?.overdue ? "is overdue" : "is awaiting your reply";
+  const tail = sla?.overdue ? "Reorder above the current case?" : "Want to switch?";
+  return `
+    <div class="cockpit-tip" data-cockpit-tip-case="${escapeHtml(tipCase.id)}">
+      <div class="cockpit-tip__head">
+        <span class="cockpit-spark">✦</span>
+        <span class="cockpit-tip__eyebrow">Alfred · queue tip</span>
+      </div>
+      <div class="cockpit-tip__body">
+        <strong>${escapeHtml(tipCase.id.slice(0, 8))}</strong> (${escapeHtml(tipCase.summary || "request")}) ${verb}. ${tail}
+      </div>
+    </div>
+  `;
+}
+
+function computeAvgChezResponseTime() {
+  // Median time from homeowner message to first concierge reply across the
+  // last 7 days. Computed from the cached `state.chezMessages`. When we don't
+  // have enough threads loaded, fall back to "—" rather than fabricate.
+  const cache = state.chezMessages || {};
+  const lags = [];
+  Object.values(cache).forEach((msgs) => {
+    if (!Array.isArray(msgs)) return;
+    let lastUser = null;
+    for (const m of msgs) {
+      if (m.role === "user") lastUser = m.created_at;
+      else if (m.role === "concierge" && lastUser) {
+        const lagMs = new Date(m.created_at).getTime() - new Date(lastUser).getTime();
+        if (lagMs > 0 && lagMs < 7 * 24 * 3600 * 1000) lags.push(lagMs);
+        lastUser = null;
+      }
+    }
+  });
+  if (lags.length === 0) return "—";
+  lags.sort((a, b) => a - b);
+  const median = lags[Math.floor(lags.length / 2)];
+  const hours = median / 3600000;
+  if (hours < 1) return `${Math.round(hours * 60)}m`;
+  if (hours < 24) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+// =============================================================================
+// HOMEOWNER PANEL (320px) — profile, family, systems, vendors, routines, notes
+// =============================================================================
+
+function renderConciergeHomeownerPanelHtml(req) {
   const householdId = req.household_id;
-  if (!householdId) return "";
-  state.chezDossiersByHousehold = state.chezDossiersByHousehold || {};
-  const dossier = state.chezDossiersByHousehold[householdId];
+  const dossier = (state.chezDossiersByHousehold || {})[householdId];
+
+  // Lazy-load the dossier; the cockpit re-renders once the fetch completes.
   if (dossier === undefined) {
     fetchChezHouseholdDossier(householdId);
     return `
-      <div class="admin-chez__hdr-line">
-        <span class="admin-muted">Loading homeowner context…</span>
-      </div>
+      <aside class="cockpit-homeowner">
+        <div class="cockpit-homeowner__loading">Loading homeowner context…</div>
+      </aside>
     `;
   }
   if (!dossier) {
     return `
-      <div class="admin-chez__hdr-line">
-        <span class="admin-muted">Homeowner data unavailable.</span>
-      </div>
+      <aside class="cockpit-homeowner">
+        <div class="cockpit-homeowner__loading">Couldn't load homeowner data. Click another case and back.</div>
+      </aside>
     `;
   }
+
   const name = primaryHomeownerLabel(dossier);
   const property = (dossier.properties && dossier.properties[0]) || null;
-  const tiers = dossier.profile?.spending_tiers || {};
-  const tierLine = (tiers.auto_approve_under !== undefined)
-    ? `Auto $${tiers.auto_approve_under} · Ping $${tiers.ping_under} · Ask &gt;$${tiers.explicit_above}`
-    : `Default tiers (200/500/500)`;
   const profile = dossier.profile || {};
-  const flags = [];
-  if (profile.communication?.vacation_mode) flags.push("🏖️ Vacation");
-  if (profile.logistics?.has_pets) flags.push("🐾 Pets");
-  if (profile.vendor_preferences?.budget_orientation) flags.push(`💰 ${profile.vendor_preferences.budget_orientation}`);
-  if (profile.vendor_preferences?.prefer_local_owned) flags.push("Local-owned");
+
+  const familyHtml = renderConciergeFamilyListHtml(dossier);
+  const systemsHtml = renderConciergeSystemsListHtml(dossier, req);
+  const vendorsHtml = renderConciergeVendorsListHtml(dossier);
+  const routinesHtml = renderConciergeRoutinesListHtml(dossier);
+  const notesHtml = renderConciergeNotesListHtml(dossier);
+
+  // Compute coverage: covered systems / total. A "covered" system has at
+  // least one matching contractor in the household network (rough heuristic
+  // matching the iOS VendorCoverageSheet logic).
+  const systems = dossier.home_systems || [];
+  const covered = systems.filter((s) => systemHasVendor(s, dossier.contractors || [])).length;
+
+  // Estate value from primary property.
+  const estateValue = property?.current_estimated_value
+    ? `$${formatCompact(property.current_estimated_value)}`
+    : "—";
+
+  // First-letter avatar color is deterministic by household id so the
+  // homeowner always renders with the same indigo shade.
+  const avatarInitials = (name.split(" ").map((p) => p[0]).join("") || "?").slice(0, 2).toUpperCase();
+
+  // Standing-instruction flags surfaced on the profile card.
+  const tier = profile.spending_tiers || {};
+  const tierLine = tier.auto_approve_under !== undefined
+    ? `Auto $${tier.auto_approve_under} · Ping $${tier.ping_under} · Ask &gt; $${tier.explicit_above}`
+    : "Default tiers (200/500/500)";
+
   return `
-    <div class="admin-chez__hdr-line">
-      <div class="admin-chez__hdr-line-main">
-        <strong>${escapeHtml(name)}</strong>
-        ${property ? `<span class="admin-muted">· ${escapeHtml(formatAddress(property))}${property.year_built ? ` · ${escapeHtml(String(property.year_built))} ${escapeHtml(property.property_type || "home")}` : ""}</span>` : ""}
-        ${flags.length ? `<span class="admin-chez__hdr-flags">${flags.map((f) => `<span>${f}</span>`).join("")}</span>` : ""}
+    <aside class="cockpit-homeowner">
+      <div class="cockpit-homeowner__profile">
+        <div class="cockpit-homeowner__profile-top">
+          <div class="cockpit-avatar cockpit-avatar--lg">${escapeHtml(avatarInitials)}</div>
+          <div class="cockpit-homeowner__profile-id">
+            <div class="cockpit-homeowner__name">${escapeHtml(name)}</div>
+            <div class="cockpit-homeowner__sub">${escapeHtml(profile.about_us ? profile.about_us.slice(0, 64) : "Homeowner")}</div>
+          </div>
+        </div>
+        <div class="cockpit-homeowner__kv">
+          ${property ? `
+            <div><span>Address</span><strong>${escapeHtml(formatAddress(property))}</strong></div>
+            <div><span>Built</span><strong>${escapeHtml(String(property.year_built || "—"))}${property.square_footage ? ` · ${formatCompact(property.square_footage)} sq ft` : ""}</strong></div>
+            <div><span>Region</span><strong>${escapeHtml((property.city ? property.city + ", " : "") + (property.state || "—"))}</strong></div>
+          ` : ""}
+          ${profile.communication?.preferred_channel ? `
+            <div><span>Prefers</span><strong>${escapeHtml(profile.communication.preferred_channel)}</strong></div>
+          ` : ""}
+        </div>
+        <div class="cockpit-homeowner__strip">
+          <div>
+            <div class="cockpit-homeowner__strip-label">Estate value</div>
+            <div class="cockpit-homeowner__strip-num">${estateValue}</div>
+          </div>
+          <div>
+            <div class="cockpit-homeowner__strip-label">Coverage</div>
+            <div class="cockpit-homeowner__strip-num">${covered} / ${systems.length || "—"}</div>
+          </div>
+        </div>
+        <div class="cockpit-homeowner__tier" title="Spending tier policy from chez_profile">
+          ${tierLine}
+        </div>
+        <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm cockpit-homeowner__profile-cta" data-cockpit-action="open-profile">
+          View full profile →
+        </button>
       </div>
-      <div class="admin-chez__hdr-line-meta">
-        <span class="admin-chez__hdr-tier" data-tone="amber">${tierLine}</span>
-        <button type="button" class="admin-button admin-button--ghost admin-button--small" data-action="open-profile-drawer">View profile →</button>
+
+      ${(dossier.users?.length || dossier.family_members?.length) ? `
+        <div class="cockpit-eyebrow">Family &amp; access<span class="cockpit-eyebrow__count">${(dossier.users?.length || 0) + (dossier.family_members?.length || 0)}</span></div>
+        <div class="cockpit-card">${familyHtml}</div>
+      ` : ""}
+
+      ${systems.length ? `
+        <div class="cockpit-eyebrow">Systems<span class="cockpit-eyebrow__count">${covered} / ${systems.length}</span></div>
+        <div class="cockpit-card">${systemsHtml}</div>
+      ` : ""}
+
+      ${(dossier.contractors?.length) ? `
+        <div class="cockpit-eyebrow">Existing vendors<span class="cockpit-eyebrow__count">${dossier.contractors.length}</span></div>
+        <div class="cockpit-card">${vendorsHtml}</div>
+      ` : ""}
+
+      ${(dossier.routines?.length) ? `
+        <div class="cockpit-eyebrow">Active routines<span class="cockpit-eyebrow__count">${dossier.routines.length}</span></div>
+        <div class="cockpit-card">${routinesHtml}</div>
+      ` : ""}
+
+      ${notesHtml ? `
+        <div class="cockpit-eyebrow">Notes &amp; history</div>
+        <div class="cockpit-card">${notesHtml}</div>
+      ` : ""}
+    </aside>
+  `;
+}
+
+function renderConciergeFamilyListHtml(dossier) {
+  const rows = [];
+  for (const u of (dossier.users || [])) {
+    const initials = (u.full_name || u.email || "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+    rows.push(`
+      <div class="cockpit-row">
+        <span class="cockpit-avatar cockpit-avatar--md cockpit-avatar--indigo">${escapeHtml(initials)}</span>
+        <div class="cockpit-row__main">
+          <div class="cockpit-row__title">${escapeHtml(u.full_name || u.email || "—")}</div>
+          <div class="cockpit-row__sub">${escapeHtml(u.role || "owner")}</div>
+        </div>
+      </div>
+    `);
+  }
+  for (const m of (dossier.family_members || [])) {
+    const fullName = `${m.first_name || ""} ${m.last_name || ""}`.trim() || "Family member";
+    const initials = fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+    rows.push(`
+      <div class="cockpit-row">
+        <span class="cockpit-avatar cockpit-avatar--md cockpit-avatar--soft">${escapeHtml(initials)}</span>
+        <div class="cockpit-row__main">
+          <div class="cockpit-row__title">${escapeHtml(fullName)}</div>
+          <div class="cockpit-row__sub">${escapeHtml(m.relationship || m.member_type || "family")}</div>
+        </div>
+      </div>
+    `);
+  }
+  return rows.join("");
+}
+
+// Heuristic: a system is "covered" if it has a service_vendor string OR a
+// contractor whose category contains the system's category as a substring.
+function systemHasVendor(system, contractors) {
+  if (system.service_vendor) return true;
+  const sysCat = String(system.category || "").toLowerCase();
+  if (!sysCat) return false;
+  return contractors.some((c) => {
+    const cat = String(c.category || "").toLowerCase();
+    if (!cat) return false;
+    return cat.includes(sysCat) || sysCat.includes(cat);
+  });
+}
+
+function renderConciergeSystemsListHtml(dossier, activeReq) {
+  // Highlight the system the active case is asking about, when we can
+  // figure it out from the request context. Heuristic: case category
+  // (find_vendor / get_quote / coordinate_task) mapped to the request's
+  // contractor_category or system_id in `req.context`.
+  const ctx = activeReq.context || {};
+  const highlightSystemId = ctx.system_id || null;
+  const highlightCategory = (ctx.contractor_category || ctx.category || "").toLowerCase();
+
+  return (dossier.home_systems || []).slice(0, 12).map((s) => {
+    const isHighlight = (highlightSystemId && s.id === highlightSystemId) ||
+      (highlightCategory && String(s.category || "").toLowerCase().includes(highlightCategory));
+    const hasVendor = systemHasVendor(s, dossier.contractors || []);
+    const coverage = hasVendor ? 3 : 0;
+    return `
+      <button type="button" class="cockpit-row cockpit-row--clickable ${isHighlight ? "is-highlight" : ""}" data-cockpit-dossier-entity="home_system" data-cockpit-dossier-id="${escapeHtml(s.id)}">
+        ${isHighlight ? `<span class="cockpit-row__accent"></span>` : ""}
+        <span class="cockpit-icon-tile">${chezSystemEmoji(s.category)}</span>
+        <div class="cockpit-row__main">
+          <div class="cockpit-row__title">
+            ${escapeHtml(s.name || s.category || "(unnamed)")}
+            ${hasVendor ? "" : `<span class="cockpit-pill cockpit-pill--salmon cockpit-pill--xs">No vendor</span>`}
+          </div>
+          <div class="cockpit-row__sub">${escapeHtml((s.manufacturer ? s.manufacturer + " · " : "") + (s.category || ""))}</div>
+        </div>
+        <div class="cockpit-coverage" title="${hasVendor ? "Vendor on file" : "No vendor"}">
+          <span class="cockpit-coverage__seg ${coverage >= 1 ? "is-on" : ""}"></span>
+          <span class="cockpit-coverage__seg ${coverage >= 2 ? "is-on" : ""}"></span>
+          <span class="cockpit-coverage__seg ${coverage >= 3 ? "is-on" : ""}"></span>
+        </div>
+      </button>
+    `;
+  }).join("");
+}
+
+function chezSystemEmoji(cat) {
+  const c = String(cat || "").toLowerCase();
+  if (c.includes("hvac") || c.includes("furnace") || c.includes("boiler")) return "🌡️";
+  if (c.includes("plumb") || c.includes("water")) return "🚰";
+  if (c.includes("electric")) return "⚡";
+  if (c.includes("roof")) return "🏠";
+  if (c.includes("pool") || c.includes("spa")) return "🏊";
+  if (c.includes("septic") || c.includes("well")) return "💧";
+  if (c.includes("landscap") || c.includes("lawn") || c.includes("tree")) return "🌳";
+  if (c.includes("solar")) return "☀️";
+  if (c.includes("generator")) return "🔋";
+  if (c.includes("chimney") || c.includes("fireplace")) return "🔥";
+  if (c.includes("crawl")) return "🛖";
+  return "⚙️";
+}
+
+function renderConciergeVendorsListHtml(dossier) {
+  return (dossier.contractors || []).slice(0, 8).map((c) => {
+    const initials = (c.company_name || "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+    const rating = c.rating ? `★ ${Number(c.rating).toFixed(1)}` : "";
+    return `
+      <button type="button" class="cockpit-row cockpit-row--clickable" data-cockpit-dossier-entity="contractor" data-cockpit-dossier-id="${escapeHtml(c.id)}">
+        <span class="cockpit-avatar cockpit-avatar--md cockpit-avatar--vendor">${escapeHtml(initials)}</span>
+        <div class="cockpit-row__main">
+          <div class="cockpit-row__title">${escapeHtml(c.company_name || "(unnamed)")}</div>
+          <div class="cockpit-row__sub">${escapeHtml((c.category || "—") + (c.last_engaged ? " · " + relativeTimeString(c.last_engaged) : ""))}</div>
+        </div>
+        ${rating ? `<span class="cockpit-row__meta">${escapeHtml(rating)}</span>` : ""}
+      </button>
+    `;
+  }).join("");
+}
+
+function renderConciergeRoutinesListHtml(dossier) {
+  return (dossier.routines || []).slice(0, 8).map((r) => {
+    const next = r.next_visit_date ? formatDateOnly(r.next_visit_date) : (r.cadence_label || "");
+    return `
+      <div class="cockpit-row">
+        <span class="cockpit-icon-tile">🔁</span>
+        <div class="cockpit-row__main">
+          <div class="cockpit-row__title">${escapeHtml(r.label || r.routine_kind || "—")}</div>
+          <div class="cockpit-row__sub">${escapeHtml((r.cadence_type || "—") + (r.vendor_name ? " · " + r.vendor_name : ""))}</div>
+        </div>
+        ${next ? `<span class="cockpit-row__meta">${escapeHtml(next)}</span>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+function renderConciergeNotesListHtml(dossier) {
+  // Past Chez requests serve as a chronological "notes & history" surface.
+  // Each is a known event the operator might want to reference.
+  const past = (dossier.past_requests || []).slice(0, 4);
+  if (past.length === 0) return "";
+  return past.map((r) => `
+    <div class="cockpit-row cockpit-row--note">
+      <div class="cockpit-row__main">
+        <div class="cockpit-row__note-author">
+          <span>Chez</span>
+          <span class="cockpit-row__note-time">${escapeHtml(r.created_at ? formatDateOnly(r.created_at) : "")}</span>
+        </div>
+        <div class="cockpit-row__note-text">${escapeHtml(r.summary || "—")} <span class="cockpit-muted">(${escapeHtml(r.status || "—")})</span></div>
+      </div>
+    </div>
+  `).join("");
+}
+
+// =============================================================================
+// CASE WORKSPACE — header + AI brief + conditional body + conversation
+// =============================================================================
+
+function renderConciergeCaseWorkspaceHtml(req) {
+  const messages = state.chezMessages[req.id] || [];
+  const visits = (state.chezVisitsByRequest || {})[req.id];
+
+  // Lazy-load thread + visits if we don't have them.
+  if (state.chezMessages[req.id] === undefined) {
+    loadChezMessages(req.id);
+  }
+  if (visits === undefined) {
+    fetchChezVisits(req.id);
+  }
+
+  const headerHtml = renderConciergeCaseHeaderHtml(req);
+  const briefHtml = renderConciergeAIBriefHtml(req);
+  const isVendorCase = req.category === "find_vendor" || req.category === "find_handyman" || req.category === "get_quote";
+  const ui = state.concierge.ui;
+  const vendorSheetHtml = (ui.vendorOpen && isVendorCase)
+    ? renderConciergeVendorSheetHtml(req)
+    : "";
+  const nonVendorBodyHtml = !isVendorCase
+    ? renderConciergeNonVendorBodyHtml(req)
+    : "";
+  const stageTrackerHtml = renderStageTrackerHtml(req, messages, visits);
+  const visitsHtml = renderVisitsPanelHtml(req, visits);
+  const conversationHtml = renderConciergeConversationHtml(req, messages);
+
+  return `
+    ${headerHtml}
+    <div class="cockpit-workspace__scroll" data-cockpit-workspace-scroll>
+      <div class="cockpit-workspace__inner">
+        ${stageTrackerHtml}
+        ${briefHtml}
+        ${nonVendorBodyHtml}
+        ${visitsHtml}
+        ${vendorSheetHtml}
+        ${conversationHtml}
       </div>
     </div>
   `;
+}
+
+// -- Header ---------------------------------------------------------------
+
+function renderConciergeCaseHeaderHtml(req) {
+  const sla = chezSlaPill(req);
+  const slaTone = sla ? (sla.tone === "red" ? "critical" : sla.tone === "amber" ? "warning" : "success") : "neutral";
+  const slaLabel = sla ? `SLA ${sla.label.replace(/^SLA: /, "")} left` : (req.status === "resolved" ? "Resolved" : "—");
+  const cat = req.category || "general";
+  const opened = req.created_at
+    ? `Opened ${formatDateOnly(req.created_at)}`
+    : "";
+
+  return `
+    <div class="cockpit-case-header">
+      <div class="cockpit-case-header__chips">
+        <span class="cockpit-pill cockpit-pill--solid-salmon">${escapeHtml(CHEZ_CATEGORY_LABELS[cat] || "Request")}</span>
+        <span class="cockpit-pill cockpit-pill--${escapeHtml(slaTone)}">${escapeHtml(slaLabel)}</span>
+        <span class="cockpit-pill cockpit-pill--indigo">${escapeHtml(CHEZ_STATUS_LABELS[req.status] || req.status)} · ${escapeHtml(req.id.slice(0, 8))}</span>
+        ${opened ? `<span class="cockpit-case-header__opened">${escapeHtml(opened)}</span>` : ""}
+      </div>
+      <h2 class="cockpit-case-header__title">${escapeHtml(req.summary || "(no summary)")}</h2>
+      <div class="cockpit-case-header__actions">
+        <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="reassign" title="Single-agent setup — reassignment will be enabled when additional Chez operators come online.">
+          Reassign
+        </button>
+        <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="snooze">
+          Snooze
+        </button>
+        ${req.status === "resolved"
+          ? `<button type="button" class="cockpit-btn cockpit-btn--indigo cockpit-btn--sm" data-cockpit-action="reopen">Reopen</button>`
+          : `<button type="button" class="cockpit-btn cockpit-btn--indigo cockpit-btn--sm" data-cockpit-action="resolved">Mark resolved</button>`}
+      </div>
+    </div>
+  `;
+}
+
+// -- AI brief -------------------------------------------------------------
+
+function renderConciergeAIBriefHtml(req) {
+  state.chezAnalysisByRequest = state.chezAnalysisByRequest || {};
+  const cached = state.chezAnalysisByRequest[req.id];
+
+  if (cached === undefined) {
+    runChezAnalysis(req.id);
+    return `
+      <section class="cockpit-brief cockpit-brief--loading">
+        <div class="cockpit-brief__overlay"></div>
+        <div class="cockpit-brief__inner">
+          <div class="cockpit-brief__head">
+            <span class="cockpit-spark cockpit-spark--light">✦</span>
+            <span class="cockpit-brief__eyebrow">Alfred · case brief</span>
+            <span class="cockpit-brief__refreshed">· researching…</span>
+          </div>
+          <p class="cockpit-brief__loading-text">Reading the request, matching existing vendors, drafting your call script.</p>
+        </div>
+      </section>
+    `;
+  }
+  if (cached === null) {
+    return `
+      <section class="cockpit-brief cockpit-brief--empty">
+        <div class="cockpit-brief__overlay"></div>
+        <div class="cockpit-brief__inner">
+          <div class="cockpit-brief__head">
+            <span class="cockpit-spark cockpit-spark--light">✦</span>
+            <span class="cockpit-brief__eyebrow">Alfred · case brief</span>
+            <button type="button" class="cockpit-brief__rerun" data-cockpit-action="rerun-analysis">↻ Re-run</button>
+          </div>
+          <p class="cockpit-brief__loading-text">Analysis didn't return. Click Re-run.</p>
+        </div>
+      </section>
+    `;
+  }
+
+  const a = cached.analysis || {};
+  const tab = (state.concierge.briefTab && state.concierge.briefTab[req.id]) || "analysis";
+  const refreshedAt = cached._fetched_at ? relativeTimeString(cached._fetched_at) : "moments ago";
+  const sourceCount = (cached.existing_vendors?.length || 0) + (cached.places_candidates?.length || 0) + 5; // rough source count
+
+  // Per-tab body. Each tab uses real cached fields when present; falls back
+  // to a coachable empty-state line so Tom is never stranded.
+  let bodyHtml = "";
+  if (tab === "analysis") {
+    bodyHtml = a.summary
+      ? `<p>${escapeHtml(a.summary)}${a.key_considerations ? ` <span class="cockpit-brief__cite">¹</span>` : ""}</p>`
+      : `<p class="cockpit-brief__empty">Analysis didn't include a summary. Try Re-run.</p>`;
+  } else if (tab === "considerations") {
+    bodyHtml = a.key_considerations
+      ? `<p>${escapeHtml(a.key_considerations)}</p>`
+      : `<p class="cockpit-brief__empty">No specific considerations were flagged.</p>`;
+  } else if (tab === "approach") {
+    bodyHtml = a.recommended_approach
+      ? `<p>${escapeHtml(a.recommended_approach)}</p>`
+      : `<p class="cockpit-brief__empty">No approach written. Re-run analysis with the latest context.</p>`;
+  } else if (tab === "questions") {
+    const qs = a.questions_to_ask || [];
+    bodyHtml = qs.length
+      ? `<ol class="cockpit-brief__list">${qs.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ol>`
+      : `<p class="cockpit-brief__empty">No vendor-screening questions written.</p>`;
+  } else if (tab === "script") {
+    bodyHtml = a.call_script
+      ? `<div class="cockpit-brief__script">${escapeHtml(a.call_script)}</div>`
+      : `<p class="cockpit-brief__empty">No call script drafted.</p>`;
+  }
+
+  return `
+    <section class="cockpit-brief">
+      <div class="cockpit-brief__overlay"></div>
+      <div class="cockpit-brief__inner">
+        <div class="cockpit-brief__head">
+          <span class="cockpit-spark cockpit-spark--light">✦</span>
+          <span class="cockpit-brief__eyebrow">Alfred · case brief</span>
+          <span class="cockpit-brief__refreshed">· refreshed ${escapeHtml(refreshedAt)} · used ${sourceCount} context sources</span>
+          <button type="button" class="cockpit-brief__rerun" data-cockpit-action="rerun-analysis">↻ Re-run</button>
+        </div>
+        <div class="cockpit-brief__headline">
+          ${escapeHtml(a.summary ? a.summary.split(".")[0] + "." : (req.summary || "Working this case…"))}
+        </div>
+        <div class="cockpit-brief__tabs" role="tablist">
+          ${CHEZ_BRIEF_TABS.map((t) => `
+            <button type="button" class="cockpit-brief__tab ${tab === t.id ? "is-active" : ""}" data-cockpit-brief-tab="${escapeHtml(t.id)}">
+              ${escapeHtml(t.label)}
+            </button>
+          `).join("")}
+        </div>
+        <div class="cockpit-brief__body">${bodyHtml}</div>
+      </div>
+    </section>
+  `;
+}
+
+// -- Non-vendor body ------------------------------------------------------
+
+function renderConciergeNonVendorBodyHtml(req) {
+  // Per-category summary card. Maps the homeowner's request category to a
+  // concise eyebrow + headline + bullet breakdown + primary CTA. The CTA
+  // wires to a real action on every variant.
+  const variants = {
+    schedule_visit: {
+      eyebrow: "Coordinate visit",
+      headline: "Pin down the date and confirm with the homeowner.",
+      bullets: [
+        "Reach the vendor and lock the slot.",
+        "Reply to the homeowner with the proposed window.",
+        "Stamp the visit row when confirmed.",
+      ],
+      cta: "Send proposed dates",
+      ctaAction: "open-proposal-builder",
+    },
+    coordinate_task: {
+      eyebrow: "Coordinate task",
+      headline: "Owns the back-and-forth so the homeowner doesn't have to.",
+      bullets: [
+        "Identify the right vendor on file or source one.",
+        "Schedule + confirm window with the homeowner.",
+        "Track follow-up through completion.",
+      ],
+      cta: "Propose vendor + dates",
+      ctaAction: "open-proposal-builder",
+    },
+    general: {
+      eyebrow: "Account question",
+      headline: "Answer the homeowner directly with the right context.",
+      bullets: [
+        "Use the conversation thread below to reply.",
+        "Promote to a structured proposal if vendor / dates / cost involved.",
+      ],
+      cta: "Reply now",
+      ctaAction: "focus-composer",
+    },
+  };
+  const v = variants[req.category];
+  if (!v) return "";
+  return `
+    <section class="cockpit-nonvendor">
+      <div class="cockpit-nonvendor__head">
+        <span class="cockpit-eyebrow cockpit-eyebrow--inline">${escapeHtml(v.eyebrow)}</span>
+        <span class="cockpit-aichip"><span class="cockpit-spark cockpit-spark--sm">✦</span>AI</span>
+      </div>
+      <h3 class="cockpit-nonvendor__headline">${escapeHtml(v.headline)}</h3>
+      <ul class="cockpit-nonvendor__bullets">
+        ${v.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+      </ul>
+      <div class="cockpit-nonvendor__actions">
+        <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm" data-cockpit-action="${escapeHtml(v.ctaAction)}">${escapeHtml(v.cta)}</button>
+      </div>
+    </section>
+  `;
+}
+
+// -- Vendor sheet ---------------------------------------------------------
+
+function renderConciergeVendorSheetHtml(req) {
+  const cached = state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id];
+  if (!cached || cached === null) {
+    // No analysis cached yet — vendor sheet shows a research CTA so the
+    // operator can kick off the pre-research flow on demand.
+    return `
+      <section class="cockpit-vendors">
+        <div class="cockpit-vendors__head">
+          <div>
+            <h3>Vendors to call</h3>
+            <p class="cockpit-muted">Run analysis to pull existing-network matches + local Places candidates.</p>
+          </div>
+          <div class="cockpit-vendors__head-actions">
+            <button type="button" class="cockpit-btn cockpit-btn--ai cockpit-btn--sm" data-cockpit-action="rerun-analysis">
+              <span class="cockpit-spark cockpit-spark--sm">✦</span>Run vendor research
+            </button>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  const existing = cached.existing_vendors || [];
+  const places = cached.places_candidates || [];
+  const candidates = [
+    ...existing.map((v) => ({ ...v, _source: "existing" })),
+    ...places.map((v) => ({ ...v, _source: "places" })),
+  ].map((v) => ({ ...v, _fit: computeChezVendorFit(v) }))
+    .sort((a, b) => b._fit - a._fit);
+
+  const callState = (state.chezVendorCallsByRequest && state.chezVendorCallsByRequest[req.id]) || {};
+  const recommendedCount = Object.values(callState).filter((s) => s && s.recommended).length;
+  const answeredCount = Object.values(callState).filter((s) => s && s.outcome === "answered").length;
+
+  const previewHtml = recommendedCount > 0 ? renderConciergeProposalPreviewHtml(req, candidates, callState) : "";
+
+  return `
+    <section class="cockpit-vendors">
+      <div class="cockpit-vendors__head">
+        <div>
+          <h3>Vendors to call</h3>
+          <p class="cockpit-muted">
+            <span class="cockpit-aichip"><span class="cockpit-spark cockpit-spark--sm">✦</span>AI</span>
+            Ranked by fit to <b>this</b> homeowner. ${candidates.length} candidates · ${answeredCount} answered · ${recommendedCount} recommended.
+          </p>
+        </div>
+        <div class="cockpit-vendors__head-actions">
+          <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="add-vendor-manual">+ Add vendor</button>
+          <button type="button" class="cockpit-btn cockpit-btn--ai cockpit-btn--sm" data-cockpit-action="find-more-vendors">
+            <span class="cockpit-spark cockpit-spark--sm">✦</span>Find more
+          </button>
+        </div>
+      </div>
+      ${candidates.length === 0
+        ? `<p class="cockpit-muted cockpit-vendors__empty">No vendor candidates yet. Click "Find more" to run a local Places search.</p>`
+        : candidates.map((v, i) => renderConciergeVendorRowHtml(req, v, i, callState[vendorCandidateKey(v)] || null)).join("")}
+      ${previewHtml}
+    </section>
+  `;
+}
+
+function renderConciergeVendorRowHtml(req, v, idx, callData) {
+  const key = vendorCandidateKey(v);
+  const isExpanded = state.chezExpandedVendorKeys?.[req.id]?.[key];
+  const isExisting = v._source === "existing";
+  const name = v.company_name || v.name || "(unnamed)";
+  const phone = v.phone || v.formatted_phone_number || "";
+  const cleanedPhone = String(phone).replace(/[^0-9+]/g, "");
+  const recommended = !!callData?.recommended;
+  const noAnswer = callData?.outcome === "no_answer";
+  const fit = v._fit || computeChezVendorFit(v);
+  const fitTone = fit >= 85 ? "success" : fit >= 70 ? "warning" : "muted";
+  const reasoning = chezVendorReasoning(v, fit);
+
+  const slots = Array.isArray(callData?.availability_slots)
+    ? callData.availability_slots
+    : (callData?.availability ? [callData.availability] : []);
+  const costRange = callData?.cost_range || "";
+  const costCustom = callData?.cost_custom || "";
+  const showCustomCost = costRange === "custom" || (costCustom && !costRange);
+
+  const slotsHtml = slots.map((s, slotIdx) => `
+    <div class="cockpit-slot-row">
+      <input type="text" data-vendor-slot-input data-slot-index="${slotIdx}" value="${escapeHtml(s)}" placeholder="e.g. Tue May 12 (PM)" />
+      <button type="button" class="cockpit-slot-remove" data-action="remove-slot" data-slot-index="${slotIdx}" aria-label="Remove">×</button>
+    </div>
+  `).join("");
+
+  const answeredPill = callData?.outcome === "answered" ? `<span class="cockpit-pill cockpit-pill--success cockpit-pill--xs">Answered</span>` : "";
+  const recommendedPill = recommended ? `<span class="cockpit-pill cockpit-pill--success cockpit-pill--xs">Recommended</span>` : "";
+  const noAnswerPill = noAnswer ? `<span class="cockpit-pill cockpit-pill--warning cockpit-pill--xs">No answer</span>` : "";
+  const networkPill = isExisting ? `<span class="cockpit-pill cockpit-pill--indigo cockpit-pill--xs">In network</span>` : "";
+
+  const callForm = isExpanded ? `
+    <div class="cockpit-vendor__form">
+      <div class="cockpit-voice-banner ${callData?._listening ? "is-listening" : ""}" data-vendor-voice>
+        <button type="button" class="cockpit-voice-btn" data-action="voice-toggle" disabled title="Voice capture requires legal sign-off (single-state CT consent). Type into the form below for now.">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <div class="cockpit-voice-text">
+          <strong>Voice the call — Alfred fills the form</strong>
+          <span class="cockpit-muted">Voice capture coming soon. Type your raw notes below; ✨ Summarize will polish for the homeowner.</span>
+        </div>
+        <span class="cockpit-aichip"><span class="cockpit-spark cockpit-spark--sm">✦</span>AI</span>
+      </div>
+
+      <div class="cockpit-vendor__grid-3">
+        <label>Outcome
+          <select data-vendor-field="outcome">
+            <option value="">— select —</option>
+            <option value="answered" ${callData?.outcome === "answered" ? "selected" : ""}>Answered</option>
+            <option value="no_answer" ${callData?.outcome === "no_answer" ? "selected" : ""}>No answer / VM</option>
+            <option value="not_a_fit" ${callData?.outcome === "not_a_fit" ? "selected" : ""}>Not a fit</option>
+          </select>
+        </label>
+        <label>Cost (range or custom)
+          <select data-vendor-field="cost_range">
+            <option value="" ${!costRange ? "selected" : ""}>— Will know after site visit —</option>
+            <option value="Will quote on site visit" ${costRange === "Will quote on site visit" ? "selected" : ""}>Will quote on site visit</option>
+            <option value="$100–500" ${costRange === "$100–500" ? "selected" : ""}>$100 – $500</option>
+            <option value="$500–1,000" ${costRange === "$500–1,000" ? "selected" : ""}>$500 – $1,000</option>
+            <option value="$1,000–2,500" ${costRange === "$1,000–2,500" ? "selected" : ""}>$1,000 – $2,500</option>
+            <option value="$2,500–5,000" ${costRange === "$2,500–5,000" ? "selected" : ""}>$2,500 – $5,000</option>
+            <option value="$5,000–10,000" ${costRange === "$5,000–10,000" ? "selected" : ""}>$5,000 – $10,000</option>
+            <option value="$10,000+" ${costRange === "$10,000+" ? "selected" : ""}>$10,000+</option>
+            <option value="custom" ${costRange === "custom" ? "selected" : ""}>Custom — type below</option>
+          </select>
+        </label>
+        <label data-vendor-cost-custom-row class="${showCustomCost ? "" : "is-hidden"}">
+          Custom cost
+          <input type="text" data-vendor-field="cost_custom" value="${escapeHtml(costCustom)}" placeholder="$1,200 firm" />
+        </label>
+      </div>
+
+      <div class="cockpit-vendor__slots">
+        <div class="cockpit-vendor__slots-head">
+          <span>Times they offered</span>
+          <span class="cockpit-muted">Add as many as the vendor suggested — homeowner picks one.</span>
+        </div>
+        <div data-vendor-slots>${slotsHtml}</div>
+        <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-action="add-slot">+ Add a time</button>
+      </div>
+
+      <label>Your notes from the call
+        <textarea rows="2" data-vendor-field="notes" placeholder="Raw notes — what did they say? Anything specific to this home? AI uses this to write the homeowner-facing recommendation.">${escapeHtml(callData?.notes || "")}</textarea>
+      </label>
+
+      <label class="cockpit-vendor__rationale">
+        <span>
+          Framing for homeowner — what shows on the proposal card
+          <button type="button" class="cockpit-suggest-btn" data-vendor-suggest>
+            <span class="cockpit-spark cockpit-spark--sm">✦</span>Summarize from notes
+          </button>
+        </span>
+        <textarea rows="2" data-vendor-field="rationale" placeholder="Polished, professional 2-3 sentences. Click ✨ to auto-write from your notes above.">${escapeHtml(callData?.rationale || "")}</textarea>
+      </label>
+
+      <div class="cockpit-vendor__form-actions">
+        <label class="cockpit-vendor__recommend">
+          <input type="checkbox" data-vendor-field="recommended" ${recommended ? "checked" : ""} />
+          <span>Add to homeowner proposal</span>
+        </label>
+        <div>
+          <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-action="collapse-vendor">Done editing</button>
+        </div>
+      </div>
+    </div>
+  ` : "";
+
+  return `
+    <article class="cockpit-vendor ${recommended ? "is-recommended" : ""} ${noAnswer ? "is-noanswer" : ""}" data-vendor-key="${escapeHtml(key)}">
+      <div class="cockpit-vendor__head" data-action="${isExpanded ? "collapse-vendor" : "expand-vendor"}">
+        <div class="cockpit-vendor__rank">${idx + 1}</div>
+        <div class="cockpit-vendor__title">
+          <div class="cockpit-vendor__name">
+            <strong>${escapeHtml(name)}</strong>
+            ${v.rating ? `<span class="cockpit-stars">★ ${Number(v.rating).toFixed(1)}</span>` : ""}
+            ${v.user_ratings_total || v.review_count ? `<span class="cockpit-muted cockpit-vendor__reviews">(${escapeHtml(String(v.user_ratings_total || v.review_count))})</span>` : ""}
+            ${networkPill} ${answeredPill} ${recommendedPill} ${noAnswerPill}
+          </div>
+          <div class="cockpit-vendor__meta">
+            ${v.address || v.formatted_address || v.city ? `<span>📍 ${escapeHtml(v.address || v.formatted_address || v.city)}</span>` : ""}
+            ${v.distance_miles ? `<span>·</span><span>${escapeHtml(String(v.distance_miles))} mi</span>` : ""}
+            ${v.eta ? `<span>·</span><span>${escapeHtml(v.eta)}</span>` : ""}
+          </div>
+        </div>
+        <div class="cockpit-vendor__fit">
+          <span class="cockpit-vendor__fit-label" data-tone="${fitTone}">AI fit ${fit}</span>
+          <div class="cockpit-fit-meter">
+            <div class="cockpit-fit-meter__fill" style="width:${fit}%;" data-tone="${fitTone}"></div>
+          </div>
+        </div>
+        <div class="cockpit-vendor__cta">
+          ${cleanedPhone ? `<a class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" href="tel:${escapeHtml(cleanedPhone)}" onclick="event.stopPropagation();">📞 Call</a>` : ""}
+          <button type="button" class="cockpit-btn cockpit-btn--${isExpanded ? "secondary" : "primary"} cockpit-btn--sm" data-action="${isExpanded ? "collapse-vendor" : "expand-vendor"}" onclick="event.stopPropagation();">
+            ${isExpanded ? "Hide form" : (callData ? "Edit notes" : "Log this call")}
+          </button>
+        </div>
+      </div>
+      <div class="cockpit-vendor__reasoning">
+        <span class="cockpit-spark cockpit-spark--sm">✦</span>
+        <span><b>Alfred:</b> ${escapeHtml(reasoning)}</span>
+      </div>
+      ${callForm}
+    </article>
+  `;
+}
+
+function renderConciergeProposalPreviewHtml(req, candidates, callState) {
+  const recommended = candidates.filter((v) => callState[vendorCandidateKey(v)]?.recommended);
+  if (recommended.length === 0) return "";
+  const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+  const homeownerName = dossier ? primaryHomeownerLabel(dossier) : "the homeowner";
+  return `
+    <div class="cockpit-preview">
+      <div class="cockpit-preview__head">
+        <div>
+          <span class="cockpit-eyebrow cockpit-eyebrow--inline">Proposal preview</span>
+          <span class="cockpit-aichip"><span class="cockpit-spark cockpit-spark--sm">✦</span>Drafted</span>
+        </div>
+        <button type="button" class="cockpit-btn cockpit-btn--indigo cockpit-btn--sm" data-cockpit-action="package-send">
+          Send ${recommended.length === 1 ? "vendor" : `${recommended.length} options`} to ${escapeHtml(homeownerName.split(" ")[0])}
+        </button>
+      </div>
+      <p class="cockpit-preview__lead">
+        ${recommended.length === 1
+          ? `One vendor recommended. Approve / Counter / Decline lands in their Inbox.`
+          : `${recommended.length} options ranked. Each renders as its own Approve/Counter/Decline card so the homeowner can pick.`}
+      </p>
+      <div class="cockpit-preview__grid">
+        ${recommended.map((v) => {
+          const data = callState[vendorCandidateKey(v)] || {};
+          const cost = data.cost_range === "custom" ? data.cost_custom : data.cost_range;
+          const slots = Array.isArray(data.availability_slots) ? data.availability_slots.filter(Boolean) : [];
+          return `
+            <div class="cockpit-preview__card">
+              <strong>${escapeHtml(v.company_name || v.name || "—")}</strong>
+              <div class="cockpit-muted">${[cost, slots[0]].filter(Boolean).map(escapeHtml).join(" · ") || "—"}</div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// -- Conversation + composer ---------------------------------------------
+
+function renderConciergeConversationHtml(req, messages) {
+  const composer = (state.concierge.composer && state.concierge.composer[req.id]) || { draft: "", tone: "warm" };
+  const tone = composer.tone || "warm";
+  const draft = composer.draft || "";
+
+  const threadHtml = (messages || []).map((m) => {
+    const role = m.role || "user";
+    if (role === "system") {
+      return `
+        <div class="cockpit-msg cockpit-msg--system">
+          <span>${escapeHtml(m.content || "")}</span>
+          <span class="cockpit-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
+        </div>
+      `;
+    }
+    const isAdmin = role === "concierge";
+    const initials = isAdmin ? "CZ" : (() => {
+      const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+      const name = dossier ? primaryHomeownerLabel(dossier) : "Homeowner";
+      return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+    })();
+    const senderLabel = isAdmin ? "Chez (you)" : (() => {
+      const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+      return dossier ? primaryHomeownerLabel(dossier) : "Homeowner";
+    })();
+    const proposalHtml = m.proposal ? renderProposalCardHtml(m.proposal) : "";
+    const attachmentsHtml = (m.attachments || []).map((att) => `
+      <div class="cockpit-msg__attach">
+        <span>📎 ${escapeHtml(att.filename || "(file)")}</span>
+        <span class="cockpit-muted">${escapeHtml(att.mime_type || "")}</span>
+      </div>
+    `).join("");
+    return `
+      <div class="cockpit-msg ${isAdmin ? "cockpit-msg--admin" : "cockpit-msg--user"}">
+        <span class="cockpit-avatar cockpit-avatar--md ${isAdmin ? "cockpit-avatar--indigo" : "cockpit-avatar--soft"}">${escapeHtml(initials)}</span>
+        <div class="cockpit-msg__main">
+          <div class="cockpit-msg__head">
+            <strong>${escapeHtml(senderLabel)}</strong>
+            <span class="cockpit-muted">${escapeHtml(formatDateTime(m.created_at))}</span>
+          </div>
+          ${m.content ? `<div class="cockpit-msg__bubble">${escapeHtml(m.content)}</div>` : ""}
+          ${proposalHtml}
+          ${attachmentsHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // Quick reply assessment — checked on every keystroke (debounced via the
+  // input handler). Heuristic-only; no AI round-trip.
+  const critique = composer.critique || (draft ? assessConciergeReplyTone(draft, tone) : null);
+
+  const composerLocked = req.status === "resolved";
+
+  return `
+    <section class="cockpit-conversation">
+      <div class="cockpit-conversation__head">
+        <h3>Conversation</h3>
+        <button type="button" class="cockpit-btn cockpit-btn--ai cockpit-btn--sm" data-cockpit-action="summarize-thread">
+          <span class="cockpit-spark cockpit-spark--sm">✦</span>Summarize thread
+        </button>
+      </div>
+      ${threadHtml || `<p class="cockpit-muted">No messages yet. Send the first reply below.</p>`}
+
+      ${composerLocked ? `
+        <div class="cockpit-resolved-bar">
+          <span>This case is resolved. Reopen it to continue the thread.</span>
+          <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="reopen">Reopen</button>
+        </div>
+      ` : `
+        <form class="cockpit-composer" data-cockpit-reply-form>
+          <div class="cockpit-composer__head">
+            <span class="cockpit-eyebrow cockpit-eyebrow--inline">Reply to homeowner</span>
+            <div class="cockpit-composer__head-actions">
+              <button type="button" class="cockpit-btn cockpit-btn--ai cockpit-btn--sm" data-cockpit-action="draft-from-brief">
+                <span class="cockpit-spark cockpit-spark--sm">✦</span>Draft from brief
+              </button>
+              <div class="cockpit-tone">
+                ${["warm", "direct", "formal"].map((t) => `
+                  <button type="button" class="cockpit-tone__opt ${tone === t ? "is-active" : ""}" data-cockpit-tone="${t}">${t}</button>
+                `).join("")}
+              </div>
+            </div>
+          </div>
+          <textarea
+            name="content"
+            rows="4"
+            placeholder="Tell the homeowner what's next…"
+            data-cockpit-reply-input
+          >${escapeHtml(draft)}</textarea>
+          ${critique ? `
+            <div class="cockpit-critique">
+              <span class="cockpit-spark cockpit-spark--sm">✦</span>
+              <span><b>Alfred:</b> ${escapeHtml(critique)}</span>
+              <span class="cockpit-critique__tone">Tone: ${escapeHtml(tone)}</span>
+            </div>
+          ` : ""}
+          <div class="cockpit-composer__foot">
+            <div class="cockpit-composer__pills">
+              <label class="cockpit-ack">
+                <input type="checkbox" name="acknowledgement_required" />
+                <span>Acknowledgement required</span>
+              </label>
+            </div>
+            <div class="cockpit-composer__buttons">
+              <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="save-draft">Save draft</button>
+              <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="send-keep-open">Send · keep open</button>
+              <button type="submit" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm">Send · waiting on customer</button>
+            </div>
+          </div>
+          <p class="cockpit-muted cockpit-composer__feedback" data-cockpit-feedback></p>
+        </form>
+      `}
+
+      <div class="cockpit-quickactions">
+        <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="open-proposal-builder">Manual proposal</button>
+        <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="waiting">Mark waiting on customer</button>
+        ${req.status !== "resolved"
+          ? `<button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="resolved">Mark resolved</button>`
+          : `<button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="reopen">Reopen</button>`}
+      </div>
+    </section>
+  `;
+}
+
+// Heuristic tone-assessment (no AI round trip). Looks for warmth tokens,
+// direct verbs, formal salutations + a length sanity check, and hints if
+// the message reads off-tone for the requested setting.
+function assessConciergeReplyTone(draft, tone) {
+  const text = draft.trim();
+  if (!text) return null;
+  if (text.length < 20) return "Reply is a bit short — add a clear next step + a timeline.";
+  const lower = text.toLowerCase();
+  const warmCues = ["thanks", "appreciate", "great", "happy to", "sounds good", "let me know", "got it"];
+  const directCues = ["here", "next step", "send", "confirm", "approve", "by friday", "tomorrow"];
+  const formalCues = ["please", "kindly", "we will", "we have", "regarding", "thank you"];
+  const hasWarm = warmCues.some((c) => lower.includes(c));
+  const hasDirect = directCues.some((c) => lower.includes(c));
+  const hasFormal = formalCues.some((c) => lower.includes(c));
+  if (tone === "warm" && !hasWarm) return "Consider opening with a warm acknowledgement before the next step.";
+  if (tone === "direct" && !hasDirect) return "Add a clear directive — what should they do, by when?";
+  if (tone === "formal" && !hasFormal) return "A 'Please' or 'Thank you' would lift this to formal.";
+  if (text.length > 600) return "Reads long — homeowners scan. Tighten to 3 sentences.";
+  return "Reads on-tone, mentions a next step, and respects their time. ✓";
+}
+
+// =============================================================================
+// ALFRED SIDEBAR (360px)
+// =============================================================================
+
+function renderConciergeAlfredSidebarHtml(req) {
+  const tab = state.concierge.alfred.tab || "actions";
+  const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+  const homeownerName = dossier ? primaryHomeownerLabel(dossier).split(" ").slice(-1)[0] : "homeowner";
+
+  let bodyHtml = "";
+  if (tab === "actions") bodyHtml = renderConciergeAlfredActionsHtml(req, dossier);
+  else if (tab === "chat") bodyHtml = renderConciergeAlfredChatHtml(req, dossier);
+  else if (tab === "similar") bodyHtml = renderConciergeAlfredSimilarHtml(req, dossier);
+
+  return `
+    <aside class="cockpit-alfred">
+      <div class="cockpit-alfred__head">
+        <div class="cockpit-alfred__head-overlay"></div>
+        <div class="cockpit-alfred__head-row">
+          <span class="cockpit-spark cockpit-spark--light">✦</span>
+          <span class="cockpit-alfred__eyebrow">Alfred · case copilot</span>
+          <span class="cockpit-alfred__model">Claude · sonnet 4.6</span>
+        </div>
+        <div class="cockpit-alfred__headline">
+          On <b>${escapeHtml(req.id.slice(0, 8))}</b> · ${escapeHtml(homeownerName)} · ${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || "request")}.
+          <span class="cockpit-alfred__head-soft">Reading ${[
+            (state.chezMessages[req.id] || []).length ? "thread" : null,
+            dossier?.profile ? "profile" : null,
+            (dossier?.home_systems?.length) ? "systems" : null,
+            (dossier?.contractors?.length) ? "vendors" : null,
+            (dossier?.routines?.length) ? "routines" : null,
+          ].filter(Boolean).length} sources for context.</span>
+        </div>
+      </div>
+      <div class="cockpit-alfred__tabs">
+        ${[
+          { id: "actions", label: "Suggested actions" },
+          { id: "chat", label: "Ask Alfred" },
+          { id: "similar", label: "Similar cases" },
+        ].map((t) => `
+          <button type="button" class="cockpit-alfred__tab ${tab === t.id ? "is-active" : ""}" data-cockpit-alfred-tab="${escapeHtml(t.id)}">${escapeHtml(t.label)}</button>
+        `).join("")}
+      </div>
+      <div class="cockpit-alfred__body">${bodyHtml}</div>
+      <div class="cockpit-alfred__composer">
+        <div class="cockpit-alfred__composer-pill">
+          <input
+            type="text"
+            placeholder="Ask Alfred about this case…"
+            value="${escapeHtml((state.concierge.alfred.input || {})[req.id] || "")}"
+            data-cockpit-alfred-input
+          />
+          <button type="button" class="cockpit-alfred__send" data-cockpit-action="alfred-send" aria-label="Send">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+  `;
+}
+
+function renderConciergeAlfredActionsHtml(req, dossier) {
+  const cached = state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id];
+  const candidates = cached ? [
+    ...((cached.existing_vendors || []).map((v) => ({ ...v, _source: "existing" }))),
+    ...((cached.places_candidates || []).map((v) => ({ ...v, _source: "places" }))),
+  ].map((v) => ({ ...v, _fit: computeChezVendorFit(v) }))
+    .sort((a, b) => b._fit - a._fit) : [];
+  const top3 = candidates.slice(0, 3);
+  const callState = (state.chezVendorCallsByRequest && state.chezVendorCallsByRequest[req.id]) || {};
+  const recommendedCount = Object.values(callState).filter((s) => s && s.recommended).length;
+  const sourcesUsed = [
+    "request thread",
+    "homeowner profile",
+    `${dossier?.home_systems?.length || 0} systems`,
+    `${dossier?.contractors?.length || 0} vendors`,
+    `${dossier?.routines?.length || 0} routines`,
+    candidates.length ? `${candidates.length} vendor candidates` : null,
+  ].filter(Boolean).join(" · ");
+
+  // The one-shot card adapts its plan to the current case state. If we have
+  // candidates but no recommendations, the plan prepares them. If we have
+  // recommendations, the plan sends them.
+  const planSteps = recommendedCount > 0 ? [
+    `Open the proposal builder with your ${recommendedCount} recommended vendor${recommendedCount === 1 ? "" : "s"}.`,
+    "Send the proposal — homeowner gets Approve/Counter/Decline cards.",
+    "Set status to waiting on customer.",
+    "Watch for the homeowner's pick — Visits panel auto-creates on approve.",
+  ] : top3.length > 0 ? [
+    `Pull up vendor #1 (${top3[0]?.company_name || top3[0]?.name || "top match"}) — log the call.`,
+    "Mark as Recommended once you've spoken to them.",
+    "Repeat for #2 and #3 to give the homeowner choices.",
+    "Click Send proposal — homeowner sees side-by-side cards.",
+  ] : [
+    "Run vendor research to pull existing-network + local Places candidates.",
+    "Call the top 2-3 by AI fit — log notes in their call form.",
+    "Mark the strongest as Recommended.",
+    "Send the proposal to the homeowner.",
+  ];
+
+  const oneShotCta = recommendedCount > 0 ? "Open proposal builder" : top3.length > 0 ? "Open call form for #1" : "Run vendor research";
+  const oneShotAction = recommendedCount > 0 ? "alfred-resolve-with-proposal"
+    : top3.length > 0 ? "alfred-resolve-open-top"
+    : "rerun-analysis";
+
+  return `
+    <div class="cockpit-resolve">
+      <div class="cockpit-resolve__head">
+        <span class="cockpit-spark cockpit-spark--sm">✦</span>
+        <span class="cockpit-resolve__eyebrow">Resolve this case</span>
+      </div>
+      <div class="cockpit-resolve__headline">
+        ${recommendedCount > 0
+          ? `${recommendedCount} vendor${recommendedCount === 1 ? " is" : "s are"} ready to send. <span class="cockpit-muted">One click drafts the proposal and queues your approval.</span>`
+          : `Coordinate this end-to-end. <span class="cockpit-muted">Call the best-fit vendors, log outcomes, draft the proposal, queue your approval.</span>`}
+      </div>
+      <div class="cockpit-resolve__steps">
+        ${planSteps.map((s, i) => `
+          <div class="cockpit-resolve__step">
+            <span class="cockpit-resolve__step-num">${i + 1}</span>
+            <span class="cockpit-resolve__step-text">${escapeHtml(s)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--full" data-cockpit-action="${escapeHtml(oneShotAction)}">
+        <span class="cockpit-spark cockpit-spark--sm" style="color:#fff;">✦</span>${escapeHtml(oneShotCta)}
+      </button>
+    </div>
+
+    <div class="cockpit-eyebrow cockpit-eyebrow--space">Quick actions</div>
+    <div class="cockpit-actions">
+      ${renderConciergeActionRow("Draft a warm reply", "Pre-fills the composer + shows tone QA", "draft-from-brief")}
+      ${renderConciergeActionRow("Open proposal builder", "Multi-vendor + dates + cost in one form", "open-proposal-builder")}
+      ${renderConciergeActionRow("Mark waiting on customer", "Pause SLA until they reply", "waiting")}
+      ${renderConciergeActionRow("Snooze this case", "Resurface later — tracked as a system note", "snooze")}
+      ${renderConciergeActionRow("Re-run AI analysis", "Refresh case brief + vendor candidates", "rerun-analysis")}
+    </div>
+
+    <div class="cockpit-context-box">
+      <div class="cockpit-context-box__eyebrow">Context I'm using</div>
+      <div class="cockpit-context-box__body">${escapeHtml(sourcesUsed || "loading…")}</div>
+    </div>
+  `;
+}
+
+function renderConciergeActionRow(label, sub, action) {
+  return `
+    <button type="button" class="cockpit-action" data-cockpit-action="${escapeHtml(action)}">
+      <span class="cockpit-action__icon"><span class="cockpit-spark cockpit-spark--sm">✦</span></span>
+      <div class="cockpit-action__main">
+        <div class="cockpit-action__label">${escapeHtml(label)}</div>
+        <div class="cockpit-action__sub">${escapeHtml(sub)}</div>
+      </div>
+      <span class="cockpit-action__arrow">→</span>
+    </button>
+  `;
+}
+
+function renderConciergeAlfredChatHtml(req, dossier) {
+  state.concierge.alfred.chat[req.id] = state.concierge.alfred.chat[req.id] || [{
+    from: "alfred",
+    text: `I read this case and the homeowner's full profile. ${dossier?.profile?.about_us ? "Their standing instructions are loaded too. " : ""}Ask me anything about precedent, vendors on file, or how to frame the next reply.`,
+  }];
+  const chat = state.concierge.alfred.chat[req.id];
+
+  const suggestedPrompts = [
+    "What's the cheapest path to resolve this?",
+    `Show me ${dossier ? primaryHomeownerLabel(dossier).split(" ").slice(-1)[0] + "'s" : "the homeowner's"} last 3 vendor decisions`,
+    "Is there a similar past case I should study?",
+    "What questions am I forgetting to ask the vendor?",
+  ];
+
+  return `
+    <div class="cockpit-chat">
+      ${chat.map((m) => m.from === "alfred" ? `
+        <div class="cockpit-chat__msg cockpit-chat__msg--alfred">
+          <div class="cockpit-chat__avatar"><span class="cockpit-spark cockpit-spark--sm" style="color:#fff;">✦</span></div>
+          <div class="cockpit-chat__bubble">${escapeHtml(m.text)}</div>
+        </div>
+      ` : `
+        <div class="cockpit-chat__msg cockpit-chat__msg--user">
+          <div class="cockpit-chat__bubble cockpit-chat__bubble--user">${escapeHtml(m.text)}</div>
+        </div>
+      `).join("")}
+      ${chat[chat.length - 1]?._loading ? `<div class="cockpit-chat__typing">Alfred is reading the case…</div>` : ""}
+    </div>
+    <div class="cockpit-chat__prompts">
+      ${suggestedPrompts.map((p) => `
+        <button type="button" class="cockpit-chat__prompt" data-cockpit-action="alfred-prompt" data-prompt="${escapeHtml(p)}">${escapeHtml(p)}</button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderConciergeAlfredSimilarHtml(req, dossier) {
+  // Use past_requests as similar-case precedent. Filtered to exclude the
+  // current case and only show resolved or replied-to cases (gives the
+  // operator a reference for what's worked before).
+  const past = (dossier?.past_requests || []).filter((r) => r.id !== req.id).slice(0, 4);
+  if (past.length === 0) {
+    return `<p class="cockpit-muted cockpit-alfred__empty">No prior cases for this homeowner. They're new to Chez.</p>`;
+  }
+
+  const patternCard = past.length >= 2
+    ? `
+      <div class="cockpit-pattern">
+        <div class="cockpit-pattern__head">
+          <span class="cockpit-spark cockpit-spark--sm">✦</span>
+          <span class="cockpit-pattern__eyebrow">Pattern</span>
+        </div>
+        <div class="cockpit-pattern__body">
+          ${past.length} prior cases for this homeowner${past.filter((p) => p.status === "resolved").length === past.length ? " — all resolved" : ""}.
+          ${past.filter((p) => p.category === req.category).length > 0
+            ? `${past.filter((p) => p.category === req.category).length} were also <b>${escapeHtml(CHEZ_CATEGORY_LABELS[req.category] || req.category)}</b> requests.`
+            : "Different category from this one — fewer precedents to lean on."}
+        </div>
+      </div>
+    `
+    : "";
+
+  return `
+    <div class="cockpit-similar">
+      ${past.map((c) => `
+        <button type="button" class="cockpit-similar__card" data-cockpit-action="open-past-case" data-past-id="${escapeHtml(c.id)}">
+          <div class="cockpit-similar__head">
+            <span class="cockpit-similar__id">${escapeHtml(c.id.slice(0, 8))}</span>
+            <span class="cockpit-muted">${escapeHtml(c.created_at ? formatDateOnly(c.created_at) : "")}</span>
+          </div>
+          <div class="cockpit-similar__title">${escapeHtml(c.summary || "—")}</div>
+          <div class="cockpit-similar__sub">${escapeHtml(CHEZ_CATEGORY_LABELS[c.category] || "request")}</div>
+          <div class="cockpit-similar__outcome">→ ${escapeHtml(CHEZ_STATUS_LABELS[c.status] || c.status)}</div>
+        </button>
+      `).join("")}
+    </div>
+    ${patternCard}
+  `;
+}
+
+// =============================================================================
+// COCKPIT — handler attachment. Single delegation entry point that wires every
+// interactive element after each render. Idempotent — every render replaces
+// the cockpit DOM, so listeners only ever bind to the freshly-rendered nodes.
+// =============================================================================
+
+function attachConciergeCockpitHandlers(activeReq, filteredCases) {
+  const host = el.conciergeHost;
+  if (!host) return;
+
+  // ---- Top bar -----------------------------------------------------------
+
+  const searchInput = host.querySelector("[data-cockpit-search]");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      state.concierge.searchQuery = e.target.value;
+      renderConciergeCockpit();
+      // Restore focus after re-render so typing isn't interrupted.
+      const fresh = host.querySelector("[data-cockpit-search]");
+      if (fresh) {
+        fresh.focus();
+        fresh.setSelectionRange(fresh.value.length, fresh.value.length);
+      }
+    });
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        state.concierge.searchQuery = "";
+        renderConciergeCockpit();
+      }
+    });
+  }
+
+  host.querySelector("[data-cockpit-toggle-vendor]")?.addEventListener("click", () => {
+    state.concierge.ui.vendorOpen = !state.concierge.ui.vendorOpen;
+    persistConciergeUI();
+    renderConciergeCockpit();
+  });
+
+  host.querySelector("[data-cockpit-toggle-ai]")?.addEventListener("click", () => {
+    state.concierge.ui.aiOpen = !state.concierge.ui.aiOpen;
+    persistConciergeUI();
+    renderConciergeCockpit();
+  });
+
+  host.querySelector("[data-cockpit-refresh]")?.addEventListener("click", async () => {
+    try { await loadAdminData(); } catch (e) { console.warn("[concierge] refresh failed", e); }
+    renderConciergeCockpit();
+  });
+
+  // ---- Queue rail --------------------------------------------------------
+
+  host.querySelectorAll("[data-cockpit-queue-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.concierge.queueFilter = btn.dataset.cockpitQueueFilter;
+      renderConciergeCockpit();
+    });
+  });
+
+  host.querySelectorAll("[data-cockpit-case-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.cockpitCaseId;
+      const req = (state.chezRequests || []).find((r) => r.id === id);
+      if (!req) return;
+      state.selectedChezRequest = req;
+      // Reset the per-case Alfred sidebar tab to the actions view so the
+      // copilot starts fresh for each case.
+      state.concierge.alfred.tab = "actions";
+      // Pre-load thread before render so the workspace doesn't flash empty.
+      await loadChezMessages(id);
+      renderConciergeCockpit();
+    });
+  });
+
+  host.querySelector("[data-cockpit-tip-case]")?.addEventListener("click", async (e) => {
+    const id = e.currentTarget.dataset.cockpitTipCase;
+    const req = (state.chezRequests || []).find((r) => r.id === id);
+    if (!req) return;
+    state.selectedChezRequest = req;
+    await loadChezMessages(id);
+    renderConciergeCockpit();
+  });
+
+  if (!activeReq) return;
+
+  // ---- Homeowner panel — dossier chip drilldowns -----------------------
+
+  host.querySelectorAll("[data-cockpit-dossier-entity]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const entity = btn.dataset.cockpitDossierEntity;
+      const id = btn.dataset.cockpitDossierId;
+      openDossierDrawer(activeReq.household_id, entity, id);
+    });
+  });
+
+  // ---- AI brief tabs -----------------------------------------------------
+
+  host.querySelectorAll("[data-cockpit-brief-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.cockpitBriefTab;
+      state.concierge.briefTab = state.concierge.briefTab || {};
+      state.concierge.briefTab[activeReq.id] = tab;
+      renderConciergeCockpit();
+    });
+  });
+
+  // ---- Alfred sidebar tabs ----------------------------------------------
+
+  host.querySelectorAll("[data-cockpit-alfred-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.concierge.alfred.tab = btn.dataset.cockpitAlfredTab;
+      renderConciergeCockpit();
+    });
+  });
+
+  // ---- Alfred composer ---------------------------------------------------
+
+  const alfredInput = host.querySelector("[data-cockpit-alfred-input]");
+  if (alfredInput) {
+    alfredInput.addEventListener("input", (e) => {
+      state.concierge.alfred.input = state.concierge.alfred.input || {};
+      state.concierge.alfred.input[activeReq.id] = e.target.value;
+    });
+    alfredInput.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        await sendConciergeAlfredMessage(activeReq);
+      }
+    });
+  }
+
+  // ---- Composer (reply form) ---------------------------------------------
+
+  const composerInput = host.querySelector("[data-cockpit-reply-input]");
+  if (composerInput) {
+    composerInput.addEventListener("input", (e) => {
+      state.concierge.composer = state.concierge.composer || {};
+      const slot = state.concierge.composer[activeReq.id] = state.concierge.composer[activeReq.id] || { tone: "warm" };
+      slot.draft = e.target.value;
+      // Re-compute critique on debounce — but DON'T re-render the whole
+      // cockpit on every keystroke (would lose focus). Update the critique
+      // node in place.
+      const critique = slot.draft ? assessConciergeReplyTone(slot.draft, slot.tone) : null;
+      slot.critique = critique;
+      const critiqueNode = host.querySelector(".cockpit-critique");
+      const composerNode = host.querySelector(".cockpit-composer");
+      if (critique) {
+        if (critiqueNode) {
+          critiqueNode.querySelector("span:nth-of-type(2)").innerHTML = `<b>Alfred:</b> ${escapeHtml(critique)}`;
+        } else if (composerNode) {
+          // Inject a critique row.
+          const after = composerInput;
+          const div = document.createElement("div");
+          div.className = "cockpit-critique";
+          div.innerHTML = `
+            <span class="cockpit-spark cockpit-spark--sm">✦</span>
+            <span><b>Alfred:</b> ${escapeHtml(critique)}</span>
+            <span class="cockpit-critique__tone">Tone: ${escapeHtml(slot.tone)}</span>
+          `;
+          after.parentNode.insertBefore(div, after.nextSibling);
+        }
+      } else if (critiqueNode) {
+        critiqueNode.remove();
+      }
+    });
+  }
+
+  host.querySelectorAll("[data-cockpit-tone]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.concierge.composer = state.concierge.composer || {};
+      const slot = state.concierge.composer[activeReq.id] = state.concierge.composer[activeReq.id] || { draft: "" };
+      slot.tone = btn.dataset.cockpitTone;
+      renderConciergeCockpit();
+    });
+  });
+
+  // ---- Reply form submit + send variants ---------------------------------
+
+  const replyForm = host.querySelector("[data-cockpit-reply-form]");
+  if (replyForm) {
+    replyForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      // Default submit = "Send · waiting on customer"
+      await submitConciergeReply(activeReq, replyForm, "waiting_customer");
+    });
+  }
+
+  // ---- Cockpit-wide [data-cockpit-action] delegation --------------------
+
+  host.querySelectorAll("[data-cockpit-action]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      const action = btn.dataset.cockpitAction;
+      if (!action) return;
+      e.stopPropagation();
+      await handleConciergeAction(action, activeReq, btn);
+    });
+  });
+
+  // ---- Vendor sheet — reuse legacy handlers --------------------------
+  // The vendor cards use the same data attributes (`[data-vendor-key]`,
+  // `[data-vendor-field]`, etc.) the legacy attachChezPanelHandlers wires,
+  // but scoped to the cockpit host. Run that handler attachment now so
+  // every vendor row, slot input, recommend toggle, and ✨ Summarize button
+  // wires up against the live state cache.
+  attachConciergeVendorHandlers(host, activeReq);
+
+  // ---- Visit cards — same pattern ---------------------------------------
+  attachConciergeVisitHandlers(host, activeReq);
+}
+
+// Persist Alfred on/off + density to localStorage so the operator's choice
+// survives reload.
+function persistConciergeUI() {
+  try {
+    localStorage.setItem("chez-cockpit-ui-v1", JSON.stringify(state.concierge.ui));
+  } catch (e) { /* localStorage unavailable */ }
+}
+function restoreConciergeUI() {
+  try {
+    const raw = localStorage.getItem("chez-cockpit-ui-v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state.concierge.ui = { ...state.concierge.ui, ...parsed };
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// =============================================================================
+// COCKPIT — primary action dispatcher. Every button that mutates state goes
+// through here. Each branch wires to a real Edge Function action or a local
+// state mutation that ultimately re-renders.
+// =============================================================================
+
+async function handleConciergeAction(action, req, btn) {
+  switch (action) {
+    case "reassign":
+      // Single-agent for v1. The button is rendered enabled with a tooltip
+      // explaining the constraint, so clicking it lands a clear toast
+      // rather than silently doing nothing.
+      alert("Single-agent setup — reassignment will be enabled when additional Chez operators come online.");
+      return;
+
+    case "snooze":
+      await snoozeConciergeCase(req);
+      return;
+
+    case "resolved":
+      await performChezTransition(req, "resolved");
+      return;
+    case "waiting":
+      await performChezTransition(req, "waiting_customer");
+      return;
+    case "reopen":
+      await performChezTransition(req, "open");
+      return;
+
+    case "rerun-analysis":
+      runChezAnalysis(req.id, true);
+      renderConciergeCockpit();
+      return;
+
+    case "expand-vendor":
+    case "collapse-vendor": {
+      const card = btn.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      state.chezExpandedVendorKeys = state.chezExpandedVendorKeys || {};
+      state.chezExpandedVendorKeys[req.id] = state.chezExpandedVendorKeys[req.id] || {};
+      state.chezExpandedVendorKeys[req.id][key] = action === "expand-vendor";
+      renderConciergeCockpit();
+      return;
+    }
+
+    case "add-vendor-manual":
+      // Open the proposal builder with a single empty vendor row so the
+      // operator can add a candidate by hand.
+      startProposalFlow(req);
+      return;
+
+    case "find-more-vendors": {
+      // Inline prompt for category — the proposal builder has the full
+      // search flow (with location pre-fill from the dossier).
+      const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+      const property = dossier?.properties?.[0];
+      const town = property?.city || "";
+      const stateCode = property?.state || "";
+      const cached = state.chezAnalysisByRequest?.[req.id];
+      const inferred = cached?.analysis?.inferred_category || "";
+      const category = window.prompt(`Search local vendors near ${town || "the homeowner"}, ${stateCode || ""}. Category?`, inferred || (req.category === "find_handyman" ? "handyman" : ""));
+      if (!category || !category.trim()) return;
+      try {
+        btn.disabled = true;
+        const orig = btn.textContent;
+        btn.textContent = "Searching…";
+        const session = (await supabase.auth.getSession()).data.session;
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/find-local-vendors`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ town, state: stateCode, category: category.trim() }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const newPlaces = (data.vendors || []).map((v) => ({ ...v, _source: "places" }));
+          // Merge into the analysis cache so the vendor sheet picks them up.
+          state.chezAnalysisByRequest[req.id] = state.chezAnalysisByRequest[req.id] || { analysis: {}, existing_vendors: [], places_candidates: [] };
+          const existing = new Set((state.chezAnalysisByRequest[req.id].places_candidates || []).map((v) => v.name));
+          const merged = (state.chezAnalysisByRequest[req.id].places_candidates || []).concat(newPlaces.filter((v) => !existing.has(v.name)));
+          state.chezAnalysisByRequest[req.id].places_candidates = merged;
+        }
+        btn.disabled = false;
+        btn.textContent = orig;
+        renderConciergeCockpit();
+      } catch (err) {
+        btn.disabled = false;
+        alert(`Vendor search failed: ${err.message || err}`);
+      }
+      return;
+    }
+
+    case "package-send":
+      await packageAndSendRecommendedVendors(req);
+      return;
+
+    case "open-proposal-builder":
+      startProposalFlow(req);
+      return;
+
+    case "alfred-resolve-with-proposal":
+      // One-click: open the proposal builder pre-loaded with the
+      // recommended vendors (the underlying packageAndSendRecommendedVendors
+      // is the action proper — but it goes straight to send, no preview).
+      // For "with my approval", show a confirm first.
+      if (confirm("Send all recommended vendors to the homeowner? They'll get Approve/Counter/Decline cards in their thread.")) {
+        await packageAndSendRecommendedVendors(req);
+      }
+      return;
+
+    case "alfred-resolve-open-top": {
+      // Expand the top-fit vendor's call form so the operator can start
+      // logging the call.
+      const cached = state.chezAnalysisByRequest?.[req.id];
+      if (!cached) return;
+      const candidates = [
+        ...((cached.existing_vendors || []).map((v) => ({ ...v, _source: "existing" }))),
+        ...((cached.places_candidates || []).map((v) => ({ ...v, _source: "places" }))),
+      ].map((v) => ({ ...v, _fit: computeChezVendorFit(v) }))
+        .sort((a, b) => b._fit - a._fit);
+      if (candidates.length === 0) return;
+      const top = candidates[0];
+      const key = vendorCandidateKey(top);
+      state.chezExpandedVendorKeys = state.chezExpandedVendorKeys || {};
+      state.chezExpandedVendorKeys[req.id] = state.chezExpandedVendorKeys[req.id] || {};
+      state.chezExpandedVendorKeys[req.id][key] = true;
+      // Make sure vendor sheet is open so the form is visible.
+      state.concierge.ui.vendorOpen = true;
+      persistConciergeUI();
+      renderConciergeCockpit();
+      // Scroll the workspace down to the vendor row.
+      requestAnimationFrame(() => {
+        const card = el.conciergeHost?.querySelector(`[data-vendor-key="${key}"]`);
+        card?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      return;
+    }
+
+    case "summarize-thread":
+      await summarizeConciergeThread(req, btn);
+      return;
+
+    case "draft-from-brief":
+      await draftConciergeReplyFromBrief(req);
+      return;
+
+    case "save-draft": {
+      // Local state already tracks the draft as the user types; this just
+      // confirms with a transient feedback line so the operator knows it
+      // was captured.
+      const fb = el.conciergeHost?.querySelector("[data-cockpit-feedback]");
+      if (fb) {
+        fb.textContent = "Draft saved locally — survives within this session.";
+        setTimeout(() => { if (fb) fb.textContent = ""; }, 2400);
+      }
+      return;
+    }
+
+    case "send-keep-open": {
+      const form = el.conciergeHost?.querySelector("[data-cockpit-reply-form]");
+      if (form) await submitConciergeReply(req, form, null);
+      return;
+    }
+
+    case "focus-composer": {
+      const input = el.conciergeHost?.querySelector("[data-cockpit-reply-input]");
+      input?.focus();
+      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    case "alfred-prompt": {
+      // Click a suggested-prompt button → set the Alfred input to that
+      // prompt and immediately send it (saves the operator a click).
+      const prompt = btn.dataset.prompt;
+      if (!prompt) return;
+      state.concierge.alfred.input = state.concierge.alfred.input || {};
+      state.concierge.alfred.input[req.id] = prompt;
+      await sendConciergeAlfredMessage(req);
+      return;
+    }
+
+    case "alfred-send":
+      await sendConciergeAlfredMessage(req);
+      return;
+
+    case "open-past-case": {
+      const id = btn.dataset.pastId;
+      const past = (state.chezRequests || []).find((r) => r.id === id);
+      if (past) {
+        state.selectedChezRequest = past;
+        state.concierge.alfred.tab = "actions";
+        await loadChezMessages(id);
+        renderConciergeCockpit();
+      } else {
+        alert("That past case isn't loaded — refresh and try again.");
+      }
+      return;
+    }
+
+    case "open-profile":
+      openHouseholdProfileDrawer(req.household_id);
+      return;
+
+    // ---- Visit-card actions (legacy handler ports) ------------------
+    case "adopt-slot": {
+      const card = btn.closest("[data-visit-id]");
+      if (!card) return;
+      const slotText = btn.dataset.slotText || "";
+      const noteInput = card.querySelector("[data-visit-field='scheduled_window']");
+      if (noteInput) {
+        noteInput.value = slotText;
+        noteInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      return;
+    }
+    case "visit-mark-scheduled":
+      await visitMarkAction(req, btn, "scheduled");
+      return;
+    case "visit-mark-completed":
+      await visitMarkAction(req, btn, "completed");
+      return;
+    case "visit-cancel":
+      await visitMarkAction(req, btn, "cancelled");
+      return;
+    case "visit-save-notes":
+      await visitSaveAction(req, btn);
+      return;
+    case "mark-resolved-from-visits":
+      await performChezTransition(req, "resolved");
+      return;
+    case "expand-analysis":
+      state.chezAnalysisExpandedByRequest = state.chezAnalysisExpandedByRequest || {};
+      state.chezAnalysisExpandedByRequest[req.id] = true;
+      renderConciergeCockpit();
+      return;
+
+    default:
+      console.warn("[concierge] unhandled action:", action);
+  }
+}
+
+// Snooze: writes a system-only audit message + transitions status to
+// waiting_customer so the case stops counting against SLA. The next time
+// the homeowner replies (or the operator manually reopens), it surfaces
+// again.
+async function snoozeConciergeCase(req) {
+  const hours = window.prompt("Snooze for how many hours? (1-72)", "24");
+  if (!hours) return;
+  const n = Number(hours);
+  if (!Number.isFinite(n) || n < 1 || n > 72) {
+    alert("Enter a number between 1 and 72.");
+    return;
+  }
+  const until = new Date(Date.now() + n * 3600 * 1000);
+  const note = `Snoozed by Chez until ${until.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+  try {
+    // 1. Log the snooze as a thread system message via the reply path
+    //    (acknowledgement_required false; the homeowner doesn't see it
+    //    flagged as actionable).
+    await callChezConcierge({
+      action: "transition_status",
+      request_id: req.id,
+      to_status: "waiting_customer",
+      note,
+    });
+    await loadChezMessages(req.id);
+    await loadAdminData();
+    renderConciergeCockpit();
+  } catch (err) {
+    alert(`Snooze failed: ${err.message || err}`);
+  }
+}
+
+// Submit the reply form. `toStatus` controls what the case transitions to:
+// "waiting_customer" for the primary submit, null for "Send · keep open".
+async function submitConciergeReply(req, form, toStatus) {
+  const content = (form.elements.content?.value || "").trim();
+  if (!content) {
+    alert("Type a reply first.");
+    return;
+  }
+  const ack = form.elements.acknowledgement_required?.checked || false;
+  const feedback = el.conciergeHost?.querySelector("[data-cockpit-feedback]");
+  const submitBtn = form.querySelector("button[type='submit']");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending…";
+  }
+  try {
+    await callChezConcierge({
+      action: "reply",
+      request_id: req.id,
+      content,
+      acknowledgement_required: ack,
+      to_status: toStatus,
+    });
+    // Clear the local draft cache so the next render shows an empty composer.
+    if (state.concierge.composer && state.concierge.composer[req.id]) {
+      state.concierge.composer[req.id] = { draft: "", tone: state.concierge.composer[req.id].tone || "warm" };
+    }
+    if (feedback) feedback.textContent = "Sent.";
+    await loadAdminData();
+    await loadChezMessages(req.id);
+    renderConciergeCockpit();
+  } catch (err) {
+    console.warn("[concierge] reply failed", err);
+    if (feedback) feedback.textContent = `Failed: ${err.message || err}`;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send · waiting on customer";
+    }
+  }
+}
+
+// "Draft from brief" — populates the composer with a tone-aware template
+// that pulls in the cached AI brief summary so the operator gets a sane
+// starting point.
+async function draftConciergeReplyFromBrief(req) {
+  const cached = state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id];
+  const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+  const homeownerFirst = dossier
+    ? primaryHomeownerLabel(dossier).split(" ")[0]
+    : "there";
+  const tone = state.concierge.composer?.[req.id]?.tone || "warm";
+  const summary = cached?.analysis?.summary || "Working on it.";
+  const approach = cached?.analysis?.recommended_approach || "";
+  // Compose a body that (1) acknowledges the homeowner, (2) notes what we
+  // know from the brief, (3) commits to a next step + timeframe.
+  const body = approach
+    ? `Quick update on ${escapeForDraft(req.summary || "your request")} — ${escapeForDraft(approach.split(".")[0])}.`
+    : `Quick update on ${escapeForDraft(req.summary || "your request")} — ${escapeForDraft(summary.split(".")[0])}.`;
+  const next = "I'll have an update or proposal ready for you in the next 24 hours.";
+  const greetings = {
+    warm: `Hi ${homeownerFirst} — ${body} ${next} Let me know if there's anything specific you'd like me to weigh.`,
+    direct: `${homeownerFirst} — ${body} ${next}`,
+    formal: `Hello ${homeownerFirst}, ${body} ${next} I will await your guidance.`,
+  };
+  const draft = greetings[tone] || greetings.warm;
+  state.concierge.composer = state.concierge.composer || {};
+  state.concierge.composer[req.id] = { draft, tone, critique: assessConciergeReplyTone(draft, tone) };
+  renderConciergeCockpit();
+}
+
+function escapeForDraft(s) {
+  // Lower the first letter for in-sentence flow; preserve everything else.
+  if (!s) return s;
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+// "Summarize thread" — runs the existing analyze_request action when no
+// summary is cached. When a summary exists, just shows it in an alert
+// (lightweight UX; the full brief tab already carries it).
+async function summarizeConciergeThread(req, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Summarizing…";
+  }
+  try {
+    const cached = state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id];
+    if (cached?.analysis?.summary) {
+      alert(`Thread summary:\n\n${cached.analysis.summary}\n\n${cached.analysis.recommended_approach || ""}`);
+    } else {
+      runChezAnalysis(req.id, true);
+      alert("Refreshing analysis — the case brief above will update with a fresh summary in a few seconds.");
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span class="cockpit-spark cockpit-spark--sm">✦</span>Summarize thread`;
+    }
+  }
+}
+
+// Alfred case-scoped chat. Posts to the Edge Function's `ask_alfred` action
+// (added in Phase 83) which builds case context server-side and streams
+// back a single-shot reply.
+async function sendConciergeAlfredMessage(req) {
+  const inputMap = state.concierge.alfred.input || {};
+  const text = (inputMap[req.id] || "").trim();
+  if (!text) return;
+  state.concierge.alfred.chat[req.id] = state.concierge.alfred.chat[req.id] || [];
+  // Push user message + a loading placeholder, switch to chat tab so the
+  // exchange is visible.
+  state.concierge.alfred.chat[req.id].push({ from: "user", text });
+  state.concierge.alfred.chat[req.id].push({ from: "alfred", text: "Thinking…", _loading: true });
+  state.concierge.alfred.input[req.id] = "";
+  state.concierge.alfred.tab = "chat";
+  renderConciergeCockpit();
+
+  try {
+    const result = await callChezConcierge({
+      action: "ask_alfred",
+      request_id: req.id,
+      question: text,
+    });
+    // Replace the loading placeholder with the real answer.
+    const arr = state.concierge.alfred.chat[req.id];
+    const lastIdx = arr.length - 1;
+    if (arr[lastIdx]?._loading) {
+      arr[lastIdx] = { from: "alfred", text: result.answer || "(empty response)" };
+    } else {
+      arr.push({ from: "alfred", text: result.answer || "(empty response)" });
+    }
+  } catch (err) {
+    const arr = state.concierge.alfred.chat[req.id];
+    const lastIdx = arr.length - 1;
+    if (arr[lastIdx]?._loading) {
+      arr[lastIdx] = { from: "alfred", text: `(I couldn't reach the server — ${err.message || "try again"}.)` };
+    }
+  }
+  renderConciergeCockpit();
+}
+
+// Vendor-card handler attachment — wires expand/collapse, slot management,
+// per-field input, ✨ Summarize, recommend toggle. Lifted from the legacy
+// attachChezPanelHandlers but scoped to the cockpit host so the cockpit's
+// vendor sheet works without depending on el.auditFocused.
+function attachConciergeVendorHandlers(host, req) {
+  // Slot inputs persist on every keystroke.
+  host.querySelectorAll("[data-vendor-slot-input]").forEach((input) => {
+    const handler = () => {
+      const card = input.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      const idx = Number(input.dataset.slotIndex);
+      state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+      state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+      const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+      slot.availability_slots = slot.availability_slots || [];
+      slot.availability_slots[idx] = input.value;
+    };
+    input.addEventListener("input", handler);
+    input.addEventListener("change", handler);
+  });
+
+  // Slot add/remove buttons (rendered with data-action="add-slot" /
+  // "remove-slot" — these are scoped INSIDE [data-vendor-key], not the
+  // cockpit-action delegation, so they need their own listener).
+  host.querySelectorAll("[data-action='add-slot'], [data-action='remove-slot']").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const card = btn.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+      state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+      const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+      const slots = Array.isArray(slot.availability_slots) ? slot.availability_slots : [];
+      // Snapshot in-progress text inputs first.
+      card.querySelectorAll("[data-vendor-slot-input]").forEach((input) => {
+        const idx = Number(input.dataset.slotIndex);
+        if (Number.isFinite(idx) && slots[idx] !== undefined) slots[idx] = input.value;
+      });
+      if (btn.dataset.action === "add-slot") {
+        slots.push("");
+      } else {
+        const removeIdx = Number(btn.dataset.slotIndex);
+        slots.splice(removeIdx, 1);
+      }
+      slot.availability_slots = slots;
+      renderConciergeCockpit();
+    });
+  });
+
+  // Per-field input bindings.
+  host.querySelectorAll("[data-vendor-field]").forEach((input) => {
+    const handler = () => {
+      const card = input.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+      state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+      const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+      const field = input.dataset.vendorField;
+      if (input.type === "checkbox") slot[field] = input.checked;
+      else slot[field] = input.value;
+      // cost_range "custom" toggles the custom-text row inline.
+      if (field === "cost_range") {
+        const customRow = card.querySelector("[data-vendor-cost-custom-row]");
+        if (customRow) customRow.classList.toggle("is-hidden", input.value !== "custom");
+      }
+      // Recommend toggles trigger a re-render so the proposal preview +
+      // recommended count update.
+      if (field === "recommended") {
+        renderConciergeCockpit();
+      }
+    };
+    input.addEventListener("change", handler);
+    if (input.tagName === "TEXTAREA" || (input.tagName === "INPUT" && input.type !== "checkbox" && input.type !== "select-one")) {
+      input.addEventListener("input", handler);
+    }
+  });
+
+  // ✨ Summarize buttons (per vendor card).
+  host.querySelectorAll("[data-vendor-suggest]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const card = btn.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      const cached = state.chezAnalysisByRequest?.[req.id];
+      if (!cached) return;
+      const allCandidates = [
+        ...(cached.existing_vendors || []).map((v) => ({ ...v, _source: "existing" })),
+        ...(cached.places_candidates || []).map((v) => ({ ...v, _source: "places" })),
+      ];
+      const v = allCandidates.find((cand) => vendorCandidateKey(cand) === key);
+      if (!v) return;
+      btn.disabled = true; btn.textContent = "Writing…";
+      try {
+        const dossier = (state.chezDossiersByHousehold || {})[req.household_id] || {};
+        const profile = dossier.profile || {};
+        const property = (dossier.properties || [])[0];
+        const propertyContext = property
+          ? `${property.year_built ? property.year_built + " " : ""}${property.property_type || "home"} in ${property.city || ""}, ${property.state || ""}`
+          : "";
+        const callData = state.chezVendorCallsByRequest?.[req.id]?.[key] || {};
+        const costRange = callData.cost_range === "custom"
+          ? (callData.cost_custom || "")
+          : (callData.cost_range || "");
+        const slotInputs = Array.from(card.querySelectorAll("[data-vendor-slot-input]"))
+          .map((el) => el.value.trim())
+          .filter(Boolean);
+        const result = await callChezConcierge({
+          action: "suggest_vendor_framing",
+          household_id: req.household_id,
+          request_summary: req.summary,
+          request_category: req.category,
+          vendor: {
+            name: v.company_name || v.name,
+            category: v.category,
+            rating: v.rating,
+            review_count: v.user_ratings_total || v.review_count,
+          },
+          homeowner_about: profile.about_us,
+          property_context: propertyContext,
+          call_notes: callData.notes || "",
+          availability_slots: slotInputs,
+          cost_range: costRange,
+        });
+        if (result.framing) {
+          state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+          state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
+          const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
+          slot.rationale = result.framing;
+          renderConciergeCockpit();
+        }
+      } catch (err) {
+        console.warn("[concierge] suggest framing failed", err);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="cockpit-spark cockpit-spark--sm">✦</span>Summarize from notes`;
+      }
+    });
+  });
+}
+
+// Visit-card field bindings — same approach as vendor cards. Snapshots
+// in-progress text into the cached visit object so subsequent state
+// transitions pick up the latest values.
+function attachConciergeVisitHandlers(host, req) {
+  host.querySelectorAll("[data-visit-field]").forEach((input) => {
+    const handler = () => {
+      const card = input.closest("[data-visit-id]");
+      if (!card) return;
+      const visitId = card.getAttribute("data-visit-id");
+      const visit = (state.chezVisitsByRequest?.[req.id] || []).find((v) => v.id === visitId);
+      if (!visit) return;
+      const field = input.dataset.visitField;
+      visit[field] = input.value;
+    };
+    input.addEventListener("change", handler);
+    if (input.tagName === "TEXTAREA" || (input.tagName === "INPUT" && input.type !== "checkbox")) {
+      input.addEventListener("input", handler);
+    }
+  });
 }
 
 // Phase 81.1 — AI analysis panel state. Cached per request so we

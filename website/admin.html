@@ -122,6 +122,12 @@
             this browser only. Apply the migration to make this durable.
           </section>
 
+          <!-- Phase 83 — Concierge cockpit. Replaces the legacy single-column
+               "Chez Requests" form with a 4-pane customer service cockpit.
+               Hidden by default; shown only when state.view === "chez". The
+               legacy .admin-layout below still renders for every other view. -->
+          <section class="admin-concierge-host is-hidden" data-concierge-host></section>
+
           <section class="admin-layout">
             <div class="admin-list-panel">
               <div class="admin-list-tools">

@@ -2025,6 +2025,172 @@ async function handleUpdateVisit(
 }
 
 // ============================================================================
+// Phase 83 — Ask Alfred: case-scoped chat for the cockpit copilot
+// ============================================================================
+// The cockpit's right sidebar lets the operator have a free-form
+// conversation with Alfred about the active case. This action loads
+// case context (request + dossier + thread + cached analysis) and
+// asks Claude to answer. Single-shot for now; multi-turn comes once
+// the operator has been using the surface long enough to know the
+// shape of useful follow-ups.
+interface AskAlfredPayload {
+  request_id: string;
+  question: string;
+}
+
+async function handleAskAlfred(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: AskAlfredPayload
+) {
+  if (!user || !isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const requestId = compactString(payload.request_id);
+  const question = compactString(payload.question || "");
+  if (!requestId || !question) {
+    return json({ error: "request_id + question required" }, 400);
+  }
+
+  // 1. Load the case + everything Alfred can use for context.
+  const { data: requestRow, error: reqErr } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+  const request = requestRow as ConciergeRequestRow;
+
+  const safe = async <T>(promise: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await promise; }
+    catch (e) { console.warn(`[ask_alfred] ${label} failed:`, e); return null; }
+  };
+  const [householdRes, propertiesRes, contractorsRes, systemsRes, routinesRes, messagesRes, pastReqRes] = await Promise.all([
+    safe(service.from("households").select("chez_profile, name").eq("id", request.household_id).maybeSingle(), "household"),
+    safe(service.from("properties").select("*").eq("household_id", request.household_id), "properties"),
+    safe(service.from("contractors").select("id, company_name, category, rating").eq("household_id", request.household_id), "contractors"),
+    safe(service.from("home_systems").select("id, name, category, manufacturer, install_date, last_service_date").eq("household_id", request.household_id), "systems"),
+    safe(service.from("routines").select("id, label, routine_kind, cadence_type, vendor_id").eq("household_id", request.household_id).is("archived_at", null), "routines"),
+    safe(service.from("concierge_messages").select("role, content, proposal, created_at").eq("request_id", requestId).order("created_at", { ascending: true }), "messages"),
+    safe(service.from("chez_requests").select("id, summary, category, status, created_at, resolved_at").eq("household_id", request.household_id).neq("id", requestId).order("created_at", { ascending: false }).limit(8), "past_requests"),
+  ]);
+  const household = (householdRes as { data?: { chez_profile?: Record<string, unknown>; name?: string } } | null)?.data ?? {};
+  const properties = (propertiesRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const contractors = (contractorsRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const systems = (systemsRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const routines = (routinesRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const messages = (messagesRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+  const pastRequests = (pastReqRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? [];
+
+  const property = properties[0] || {};
+  const profile = household.chez_profile || {};
+
+  // 2. Build a compact context block. Caps each section so the prompt
+  //    stays under ~6k tokens; Alfred is a single-shot responder.
+  const propertyLine = property.year_built || property.city
+    ? `${property.year_built ?? "?"} ${property.property_type ?? "home"} in ${property.city ?? ""}, ${property.state ?? ""} (${property.square_footage ?? "?"} sq ft)`
+    : "Property details on file are sparse.";
+
+  const profileBlob = JSON.stringify({
+    about_us: (profile as Record<string, unknown>).about_us,
+    vendor_preferences: (profile as Record<string, unknown>).vendor_preferences,
+    logistics: (profile as Record<string, unknown>).logistics,
+    spending_tiers: (profile as Record<string, unknown>).spending_tiers,
+    communication: (profile as Record<string, unknown>).communication,
+  }, null, 2);
+
+  const systemsLines = systems.slice(0, 14).map((s) => `- ${s.name || s.category} (${s.category || "—"}${s.manufacturer ? `, ${s.manufacturer}` : ""}${s.last_service_date ? `, last ${s.last_service_date}` : ""})`).join("\n");
+  const contractorsLines = contractors.slice(0, 14).map((c) => `- ${c.company_name} (${c.category || "—"}${c.rating ? `, ★ ${c.rating}` : ""})`).join("\n");
+  const routinesLines = routines.slice(0, 8).map((r) => `- ${r.label || r.routine_kind} (${r.cadence_type || "—"})`).join("\n");
+
+  const threadLines = messages.slice(-12).map((m) => {
+    const who = m.role === "concierge" ? "Chez" : m.role === "user" ? "Homeowner" : "system";
+    const text = (typeof m.content === "string" ? m.content : "") || (m.proposal ? `[${(m.proposal as Record<string, unknown>).kind ?? "proposal"} proposal]` : "");
+    return `[${who}] ${String(text).slice(0, 280)}`;
+  }).join("\n");
+
+  const pastRequestLines = pastRequests.slice(0, 6).map((r) => `- ${r.id} (${r.category}, ${r.status}): ${r.summary}`).join("\n");
+
+  // Optional: if there's a cached AI brief for this case in the runtime
+  // memory of the Edge Function, we'd include it. We don't persist it
+  // server-side, so we ask the question with whatever's on the row.
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return json({ answer: "Alfred is offline (no API key configured). Try again in a moment." });
+
+  const systemPrompt = `You are Alfred, the case-scoped AI co-pilot for Chez Concierge agents. You have full context on a homeowner case and answer the agent's questions directly. You're talking to a human operator (an experienced agent), not the homeowner.
+
+Voice rules:
+- Concise, professional, no fluff. 1-3 sentences when the question is direct; up to 5-6 when the question needs reasoning.
+- Reference SPECIFIC facts from the case context when they're relevant (year of home, vendor names, past cases, profile preferences). Don't invent.
+- If the agent asks about cost, vendor selection, or precedent, look at PAST CASES + EXISTING VENDORS first before generalizing.
+- Never give legal / regulatory advice — defer to "verify with a licensed pro" when the question touches code, permits, or insurance.
+- If the answer requires data you don't have, say so plainly + suggest where the agent could find it (the homeowner profile, the past-case archive, etc.).
+
+The agent's question is below. Return ONLY the answer text — no preamble, no markdown headers, no quotes.`;
+
+  const userPrompt = `# CASE CONTEXT
+
+## Active request
+ID: ${request.id}
+Category: ${request.category}
+Status: ${request.status}
+Summary: ${request.summary}
+Opened: ${request.created_at}
+
+## Property
+${propertyLine}
+
+## Customer profile
+${profileBlob}
+
+## Existing systems (${systems.length})
+${systemsLines || "(none)"}
+
+## Existing vendors (${contractors.length})
+${contractorsLines || "(none)"}
+
+## Active routines (${routines.length})
+${routinesLines || "(none)"}
+
+## Recent thread (most recent ${Math.min(messages.length, 12)} messages)
+${threadLines || "(no messages yet)"}
+
+## Past Chez cases for this homeowner
+${pastRequestLines || "(none)"}
+
+# AGENT QUESTION
+${question}`;
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 600,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.warn("[ask_alfred] Claude error:", resp.status, text.slice(0, 300));
+      return json({ answer: "Alfred had trouble reaching the model. Try once more in a moment." });
+    }
+    const data = await resp.json() as { content?: Array<{ text?: string }> };
+    const answer = data.content?.[0]?.text?.trim() ?? "(empty response)";
+    return json({ answer });
+  } catch (e) {
+    console.warn("[ask_alfred] exception:", e);
+    return json({ answer: "I couldn't reach the model. The case context is loaded; try once more." });
+  }
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -2198,6 +2364,14 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as UpdateVisitPayload
+        );
+
+      // Phase 83 — Cockpit Alfred chat. Single-shot, case-scoped Q&A.
+      case "ask_alfred":
+        return handleAskAlfred(
+          service,
+          user,
+          body as unknown as AskAlfredPayload
         );
 
       default:
