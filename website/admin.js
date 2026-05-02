@@ -4925,8 +4925,16 @@ function renderConciergeCockpit() {
   const activeReq = state.selectedChezRequest;
   const ui = state.concierge.ui;
 
+  // When the viewport can't fit all 4 panes side-by-side AND the user has
+  // Alfred toggled on, render Alfred as an absolute-positioned overlay so
+  // it doesn't crush the workspace. The overlay slides in from the right
+  // and clicks on the topbar's Alfred toggle close it cleanly.
+  const alfredOverlayMode = !!(ui.aiOpen && activeReq && isConciergeNarrow());
+  const shellClasses = ["cockpit-shell"];
+  if (alfredOverlayMode) shellClasses.push("cockpit-shell--alfred-overlay");
+
   host.innerHTML = `
-    <div class="cockpit-shell" data-density="${escapeHtml(ui.density)}">
+    <div class="${shellClasses.join(" ")}" data-density="${escapeHtml(ui.density)}">
       ${renderConciergeTopBarHtml(activeReq)}
       <div class="cockpit-body">
         ${renderConciergeQueueRailHtml(filtered, requests, activeReq)}
@@ -6508,6 +6516,47 @@ function restoreConciergeUI() {
     }
   } catch (e) { /* ignore */ }
 }
+
+// Available cockpit width = 100vw - 260 (admin nav). 4-pane mode (queue +
+// homeowner + workspace + Alfred) needs ~1640px viewport to leave the
+// workspace ≥400px wide. Below that, Alfred coexists awkwardly. We:
+//   1) on first load, auto-collapse Alfred at <1640px (sane default)
+//   2) when the user explicitly toggles Alfred on at narrow widths,
+//      render it as an absolute-positioned overlay instead of a column
+//      so the workspace stays usable underneath.
+function isConciergeNarrow() {
+  // 1100 = drop homeowner threshold; 1640 = drop Alfred threshold.
+  // Detect using window.innerWidth so it tracks live resizes.
+  return (window.innerWidth || 1280) < 1640;
+}
+function applyConciergeNarrowDefaults() {
+  // First-load only — once the user has touched the toggle (persisted
+  // value exists), respect their choice.
+  let persisted = null;
+  try { persisted = localStorage.getItem("chez-cockpit-ui-v1"); } catch (e) {}
+  if (!persisted && isConciergeNarrow()) {
+    state.concierge.ui.aiOpen = false;
+  }
+}
+// Fire once at boot (after restoreConciergeUI sets persisted values).
+applyConciergeNarrowDefaults();
+
+// Re-render the cockpit when the viewport crosses the narrow/wide breakpoint
+// so Alfred swaps between column and overlay mode cleanly. Debounced so a
+// continuous drag-resize doesn't thrash innerHTML 60 times a second.
+let __conciergeResizeTimer = null;
+let __conciergeLastNarrow = isConciergeNarrow();
+window.addEventListener("resize", () => {
+  if (state.view !== "chez") return;
+  if (__conciergeResizeTimer) clearTimeout(__conciergeResizeTimer);
+  __conciergeResizeTimer = setTimeout(() => {
+    const narrowNow = isConciergeNarrow();
+    if (narrowNow !== __conciergeLastNarrow) {
+      __conciergeLastNarrow = narrowNow;
+      renderConciergeCockpit();
+    }
+  }, 180);
+});
 
 // =============================================================================
 // COCKPIT — primary action dispatcher. Every button that mutates state goes

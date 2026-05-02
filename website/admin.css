@@ -7379,8 +7379,17 @@ details.admin-chez__analysis-section pre {
   display: block;
   min-height: 0;
   /* Spans every row of admin-main's grid (auto auto 1fr) so the cockpit
-     fills the full viewport when the legacy chrome is hidden. */
+     fills the full viewport when the legacy chrome is hidden. The
+     `min-width: 0` + `overflow: hidden` are critical: without them, the
+     grid item sizes to its children's min-content (queue 304 + homeowner
+     320 + workspace minimum + Alfred 360) which pushes past the parent.
+     Constraining the host to the grid cell width forces the cockpit-body
+     flex children to shrink (workspace via min-width:0, others clipped). */
   grid-row: 1 / -1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 .admin-concierge-host.is-hidden { display: none !important; }
 .admin-layout.is-hidden { display: none !important; }
@@ -7390,6 +7399,8 @@ details.admin-chez__analysis-section pre {
 .admin-concierge-host > .cockpit-shell {
   height: 100vh;
   max-height: 100vh;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Shell — fills the remaining admin-main viewport. The sidebar nav stays
@@ -7397,8 +7408,11 @@ details.admin-chez__analysis-section pre {
 .cockpit-shell {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 0px);
+  height: 100vh;
+  max-height: 100vh;
   min-height: 720px;
+  width: 100%;
+  max-width: 100%;
   background: var(--pearl, #F8F9FA);
   font-family: var(--sans, system-ui);
   color: var(--text, #2A2252);
@@ -7408,6 +7422,11 @@ details.admin-chez__analysis-section pre {
   flex: 1;
   display: flex;
   min-height: 0;
+  /* Defensive: when the viewport is narrower than the sum of fixed columns,
+     the body clips its trailing children rather than letting them push past
+     the right edge. Combined with the responsive breakpoints below, this
+     guarantees the rightmost visible pane is always reachable. */
+  overflow: hidden;
 }
 
 /* ===== Top bar (52px) ====================================================== */
@@ -9273,16 +9292,42 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-alfred__send:hover { background: var(--salmon-dark, #D14E3E); }
 
-/* ===== Tablet collapse (768-1279px) ======================================== */
+/* ===== Responsive sizing =================================================
+ *
+ * Available cockpit width = 100vw - 260px (admin nav sidebar). Fixed columns:
+ * queue rail (304px) + homeowner panel (320px) + Alfred sidebar (360px) =
+ * 984px. The workspace needs ≥400px to be usable, so 4-pane mode requires
+ * ~1640px viewport.
+ *
+ * Visibility is JS-controlled (state.concierge.ui.aiOpen / vendorOpen) so
+ * the topbar toggles always work. At narrow widths the JS defaults
+ * `aiOpen=false` on first load — the operator can still toggle Alfred on,
+ * which positions it as an absolute overlay so it doesn't push the
+ * workspace off-screen.
+ * ============================================================================ */
 
-@media (max-width: 1279px) {
-  .cockpit-alfred { display: none; }
+/* When viewport is too narrow for Alfred to coexist with the other panes,
+   the JS sets `cockpit-shell--alfred-overlay`. Alfred slides in from the
+   right as a positioned overlay rather than a flex column. */
+.cockpit-shell--alfred-overlay .cockpit-alfred {
+  position: absolute;
+  top: 52px; /* topbar height */
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  z-index: 6;
+  box-shadow: -12px 0 32px rgba(42, 34, 82, 0.18);
+}
+.cockpit-shell--alfred-overlay { position: relative; }
+
+@media (max-width: 1099px) {
+  .cockpit-homeowner { display: none; }
+  .cockpit-brief,
+  .cockpit-nonvendor { margin-left: 16px; margin-right: 16px; }
+  .cockpit-vendors,
+  .cockpit-conversation { padding-left: 16px; padding-right: 16px; }
 }
 
-@media (max-width: 1023px) {
-  .cockpit-homeowner { display: none; }
-  .cockpit-vendors,
-  .cockpit-conversation,
-  .cockpit-nonvendor,
-  .cockpit-brief { margin-left: 16px; margin-right: 16px; padding-left: 16px; padding-right: 16px; }
+@media (max-width: 899px) {
+  .cockpit-queue { width: 260px; }
 }
