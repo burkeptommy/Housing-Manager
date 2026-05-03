@@ -18,6 +18,19 @@ struct ChezOwnsToggle: View {
         /// tasks with a vendor frame it as "Chez coordinates with
         /// your vendor."
         case task(id: UUID, title: String, hasVendor: Bool)
+
+        // Phase 84 — Universal entity-level delegation. Each new case
+        // hands one entity off via the generic `delegate_entity` Edge
+        // Function action. Copy adapts per type below.
+        case system(id: UUID, name: String)
+        case project(id: UUID, name: String)
+        case document(id: UUID, filename: String)
+        case utility(id: UUID, providerName: String)
+        case vehicle(id: UUID, label: String)
+        /// Phase 84 — Insurance lives as JSONB on `properties`, not its
+        /// own table. The id is the policy key (e.g. "homeowners" or
+        /// "auto_<vehicle_id>"); propertyId is the parent property.
+        case insurance(propertyId: UUID, policyKey: String, label: String)
     }
 
     let target: Target
@@ -37,6 +50,12 @@ struct ChezOwnsToggle: View {
         case .contractor: return "Make Chez point of contact"
         case .task(_, _, let hasVendor):
             return hasVendor ? "Have Chez handle this task" : "Have Chez source a vendor"
+        case .system: return "Have Chez manage this system"
+        case .project: return "Have Chez manage this project"
+        case .document: return "Have Chez file & manage this"
+        case .utility: return "Have Chez manage this account"
+        case .vehicle: return "Have Chez manage this vehicle"
+        case .insurance: return "Have Chez manage this policy"
         }
     }
 
@@ -49,6 +68,18 @@ struct ChezOwnsToggle: View {
                 return "Chez handles scheduling and follow-ups with \(name) directly."
             case .task(_, let title, _):
                 return "Chez owns coordination for \(title). You'll see updates inside the request thread."
+            case .system(_, let name):
+                return "Chez owns \(name) end-to-end — service scheduling, warranty, parts, history."
+            case .project(_, let name):
+                return "Chez is running \(name): vendor sourcing, negotiation, budget, timeline."
+            case .document(_, let filename):
+                return "Chez has \(filename) on file. They'll share it with vendors when needed."
+            case .utility(_, let providerName):
+                return "Chez audits your \(providerName) bills and shops better rates when they appear."
+            case .vehicle(_, let label):
+                return "Chez owns \(label) — service scheduling, recalls, registration, insurance claims."
+            case .insurance(_, _, let label):
+                return "Chez handles your \(label) — claims, coverage audits, renewal shopping."
             }
         }
         switch target {
@@ -60,6 +91,18 @@ struct ChezOwnsToggle: View {
             return hasVendor
                 ? "Chez coordinates with your vendor, schedules, and follows up so you don't have to."
                 : "Chez finds a vetted local pro, proposes them, and handles scheduling once you approve."
+        case .system:
+            return "Chez schedules maintenance, tracks warranty, orders parts, logs service so you don't think about it."
+        case .project:
+            return "Chez runs the project end-to-end — sources vendors, negotiates pricing, tracks budget + timeline."
+        case .document:
+            return "Chez files this for you, organizes it, and shares with vendors when relevant."
+        case .utility:
+            return "Chez audits bills for errors, negotiates rates, and switches providers if a better deal appears."
+        case .vehicle:
+            return "Chez owns the whole vehicle — service, recalls, registration, insurance — you just drive it."
+        case .insurance:
+            return "Chez files claims, audits coverage against your home value, and shops renewals."
         }
     }
 
@@ -139,6 +182,18 @@ struct ChezOwnsToggle: View {
                 } else {
                     Text("Chez will find a vetted vendor for this task and own coordination: \(title).")
                 }
+            case .system(_, let name):
+                Text("Chez will own end-to-end management of \(name).")
+            case .project(_, let name):
+                Text("Chez will run the project: \(name). Vendor sourcing, negotiation, budget, timeline.")
+            case .document(_, let filename):
+                Text("Chez will file and manage this document: \(filename).")
+            case .utility(_, let providerName):
+                Text("Chez will audit \(providerName) bills, negotiate rates, and switch providers if better deals come up.")
+            case .vehicle(_, let label):
+                Text("Chez will own the whole vehicle (\(label)) — service, recalls, registration, insurance.")
+            case .insurance(_, _, let label):
+                Text("Chez will manage your \(label) — claims, coverage audits, renewal shopping.")
             }
         }
     }
@@ -163,6 +218,31 @@ struct ChezOwnsToggle: View {
                 try await HavenSupabase.delegateTaskToChez(
                     taskId: id, delegated: delegated, notes: trimmedNotes
                 )
+            case .system(let id, _):
+                try await HavenSupabase.delegateEntityToChez(
+                    entityType: "system", entityId: id.uuidString, delegated: delegated, notes: trimmedNotes
+                )
+            case .project(let id, _):
+                try await HavenSupabase.delegateEntityToChez(
+                    entityType: "project", entityId: id.uuidString, delegated: delegated, notes: trimmedNotes
+                )
+            case .document(let id, _):
+                try await HavenSupabase.delegateEntityToChez(
+                    entityType: "document", entityId: id.uuidString, delegated: delegated, notes: trimmedNotes
+                )
+            case .utility(let id, _):
+                try await HavenSupabase.delegateEntityToChez(
+                    entityType: "utility", entityId: id.uuidString, delegated: delegated, notes: trimmedNotes
+                )
+            case .vehicle(let id, _):
+                try await HavenSupabase.delegateEntityToChez(
+                    entityType: "vehicle", entityId: id.uuidString, delegated: delegated, notes: trimmedNotes
+                )
+            case .insurance(let propertyId, let policyKey, _):
+                try await HavenSupabase.delegateEntityToChez(
+                    entityType: "insurance", entityId: policyKey, delegated: delegated, notes: trimmedNotes,
+                    propertyId: propertyId.uuidString
+                )
             }
             isOwned = delegated
             pendingNotes = ""
@@ -181,6 +261,19 @@ struct ChezOwnsToggle: View {
             if case .task = target {
                 NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
             }
+            // Phase 84 — fire surface-specific refresh notifications
+            // so the relevant detail views update after the toggle.
+            // Utility / vehicle / insurance don't have dedicated
+            // notifications today; piggyback on `propertyChanged`
+            // since they're all property-scoped.
+            switch target {
+            case .system: NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+            case .project: NotificationCenter.default.post(name: .projectChanged, object: nil)
+            case .document: NotificationCenter.default.post(name: .documentChanged, object: nil)
+            case .utility, .vehicle, .insurance:
+                NotificationCenter.default.post(name: .propertyChanged, object: nil)
+            default: break
+            }
             onChange?(delegated)
         } catch {
             errorMessage = error.localizedDescription
@@ -193,6 +286,12 @@ struct ChezOwnsToggle: View {
         case .routine: return "routine"
         case .contractor: return "contractor"
         case .task: return "task"
+        case .system: return "system"
+        case .project: return "project"
+        case .document: return "document"
+        case .utility: return "utility"
+        case .vehicle: return "vehicle"
+        case .insurance: return "insurance"
         }
     }
 }

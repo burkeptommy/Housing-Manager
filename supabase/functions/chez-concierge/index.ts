@@ -2386,6 +2386,740 @@ ${question}`;
 }
 
 // ============================================================================
+// Phase 84 — Universal entity-level delegation
+// ============================================================================
+//
+// `delegate_routine` / `delegate_contractor` / `delegate_task` already
+// exist (Phase 80.1 / 80.2). This phase adds a generic
+// `handleDelegateEntity` covering the remaining entity types — system,
+// project, document, utility, insurance, vehicle. The shape mirrors
+// `handleDelegateRoutine`: flip the chez_owned flag, create a parent
+// chez_request when delegating (so Tom has a thread + push), system-
+// message + admin email + push.
+
+interface DelegateEntityPayload {
+  entity_type: "system" | "project" | "document" | "utility" | "insurance" | "vehicle";
+  entity_id: string;                          // for insurance: the policy key (e.g., "homeowners" or "auto_<vehicle_id>")
+  delegated: boolean;
+  notes?: string;
+  property_id?: string;                       // required for "insurance" since insurance lives on properties
+}
+
+const ENTITY_TABLES: Record<string, { table: string; idCol: string; labelCol?: string; categoryCol?: string }> = {
+  system: { table: "home_systems", idCol: "id", labelCol: "name", categoryCol: "category" },
+  project: { table: "property_projects", idCol: "id", labelCol: "name" },
+  document: { table: "documents", idCol: "id", labelCol: "filename" },
+  utility: { table: "utility_accounts", idCol: "id", labelCol: "provider_name" },
+  vehicle: { table: "vehicles", idCol: "id" /* label built from year/make/model below */ },
+};
+
+const ENTITY_FRIENDLY_LABEL: Record<string, string> = {
+  system: "home system",
+  project: "project",
+  document: "document",
+  utility: "utility account",
+  insurance: "insurance policy",
+  vehicle: "vehicle",
+};
+
+const ENTITY_INSTRUCTION: Record<string, string> = {
+  system: "Customer asked Chez to manage this home system end-to-end. Schedule routine maintenance, log service, track warranty, order parts when needed.",
+  project: "Customer delegated this project to Chez. Source vendors, run quotes, negotiate pricing, manage the timeline + budget.",
+  document: "Customer asked Chez to manage this document. File, organize, share with vendors when relevant, scan for gaps.",
+  utility: "Customer asked Chez to manage this utility account. Audit bills for errors, negotiate rates, switch providers if a better deal appears.",
+  insurance: "Customer asked Chez to manage this insurance policy. File claims, audit coverage against property value, shop renewals.",
+  vehicle: "Customer asked Chez to manage this vehicle end-to-end. Service scheduling, recalls, registration renewal, insurance claims.",
+};
+
+async function handleDelegateEntity(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: DelegateEntityPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const entityType = payload.entity_type;
+  const entityId = compactString(payload.entity_id);
+  if (!entityType || !entityId) return json({ error: "entity_type + entity_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const now = new Date().toISOString();
+  let labelForThread = ENTITY_FRIENDLY_LABEL[entityType] ?? "entity";
+
+  // Branch on entity_type — most types follow the same pattern but
+  // insurance lives as a JSONB key on properties, so it has its own path.
+  if (entityType === "insurance") {
+    const propertyId = compactString(payload.property_id || "");
+    if (!propertyId) return json({ error: "property_id required for insurance" }, 400);
+
+    const { data: property, error: lookupErr } = await service
+      .from("properties")
+      .select("id, household_id, street, chez_owned_insurance")
+      .eq("id", propertyId)
+      .maybeSingle();
+    if (lookupErr || !property) return json({ error: "property not found" }, 404);
+    if ((property as { household_id: string }).household_id !== householdId) {
+      return json({ error: "not authorized" }, 403);
+    }
+
+    const existing = ((property as { chez_owned_insurance: Record<string, unknown> }).chez_owned_insurance) ?? {};
+    existing[entityId] = payload.delegated
+      ? { owned: true, owned_at: now }
+      : { owned: false, owned_at: null };
+
+    const { error: updateErr } = await service
+      .from("properties")
+      .update({ chez_owned_insurance: existing })
+      .eq("id", propertyId);
+    if (updateErr) return json({ error: updateErr.message }, 500);
+
+    labelForThread = `${entityId} insurance`;
+  } else {
+    const cfg = ENTITY_TABLES[entityType];
+    if (!cfg) return json({ error: "unknown entity_type" }, 400);
+
+    const selectCols = ["id", "household_id", cfg.labelCol, cfg.categoryCol]
+      .filter((s): s is string => !!s)
+      .concat(entityType === "vehicle" ? ["year", "make", "model"] : [])
+      .join(", ");
+
+    const { data: row, error: lookupErr } = await service
+      .from(cfg.table)
+      .select(selectCols)
+      .eq("id", entityId)
+      .maybeSingle();
+    if (lookupErr || !row) return json({ error: `${entityType} not found` }, 404);
+    if ((row as { household_id: string }).household_id !== householdId) {
+      return json({ error: "not authorized" }, 403);
+    }
+
+    const { error: updateErr } = await service
+      .from(cfg.table)
+      .update({
+        chez_owned: !!payload.delegated,
+        chez_owned_at: payload.delegated ? now : null,
+      })
+      .eq("id", entityId);
+    if (updateErr) return json({ error: updateErr.message }, 500);
+
+    if (entityType === "vehicle") {
+      const v = row as { year: number | null; make: string | null; model: string | null };
+      labelForThread = [v.year, v.make, v.model].filter(Boolean).join(" ").trim() || "vehicle";
+    } else if (cfg.labelCol) {
+      const lbl = (row as Record<string, unknown>)[cfg.labelCol];
+      if (typeof lbl === "string" && lbl.trim()) labelForThread = lbl.trim();
+    }
+  }
+
+  // Create a parent chez_request only when delegating ON. Revoking
+  // doesn't spawn a thread — it just flips the flag.
+  if (payload.delegated) {
+    const summary = `Standing engagement: ${labelForThread}`;
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: user.id,
+        category: "coordinate_task",
+        summary,
+        context: {
+          _kind: `standing_engagement_${entityType}`,
+          entity_type: entityType,
+          entity_id: entityId,
+          property_id: payload.property_id ?? null,
+          notes: payload.notes ?? "",
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: false,
+        unread_for_admin: true,
+      })
+      .select("*")
+      .single();
+    if (req) {
+      const r = req as { id: string };
+      const instruction = ENTITY_INSTRUCTION[entityType] ?? "Customer delegated this entity to Chez.";
+      await service.from("concierge_messages").insert({
+        household_id: householdId,
+        user_id: user.id,
+        request_id: r.id,
+        role: "system",
+        content: `${instruction}${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        attachments: [],
+      });
+      await sendPush(
+        serviceUrl,
+        serviceRoleKey,
+        adminUserIds(),
+        `Customer delegated a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez`,
+        summary,
+        { type: "chez_admin_request", request_id: r.id }
+      );
+      await sendAdminEmail(
+        adminEmails(),
+        `[Chez] New standing engagement: ${labelForThread}`,
+        `${instruction}\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+        emailBody({
+          preview: `Customer handed off a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez.`,
+          heading: "New standing engagement",
+          intro: `The customer wants Chez to own management of "${labelForThread}" from now on.`,
+          bodyText: payload.notes ?? "(no additional notes)",
+          ctaLabel: "Open in admin portal",
+          ctaUrl: adminPortalUrl(r.id),
+        })
+      );
+    }
+  }
+
+  return json({ ok: true });
+}
+
+// ============================================================================
+// Phase 84 — Group-level ownership ("Chez handles all my X")
+// ============================================================================
+
+const OWNERSHIP_GROUPS: Record<string, { table: string }> = {
+  all_routines: { table: "routines" },
+  all_systems: { table: "home_systems" },
+  all_vendors: { table: "contractors" },
+  all_projects: { table: "property_projects" },
+  all_bills: { table: "utility_accounts" },
+  all_documents: { table: "documents" },
+  all_vehicles: { table: "vehicles" },
+  // all_insurance is special-cased — see below.
+};
+
+interface SetOwnershipGroupPayload {
+  group: string;        // one of the keys above OR "all_insurance"
+  on: boolean;
+  notes?: string;
+}
+
+async function handleSetOwnershipGroup(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: SetOwnershipGroupPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const group = compactString(payload.group);
+  if (!group) return json({ error: "group required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const now = new Date().toISOString();
+
+  // 1. Update the ownership-groups JSONB on the household.
+  const { data: householdRow } = await service
+    .from("households")
+    .select("id, chez_ownership_groups")
+    .eq("id", householdId)
+    .maybeSingle();
+  const groups = ((householdRow as { chez_ownership_groups?: Record<string, unknown> } | null)?.chez_ownership_groups) ?? {};
+  groups[group] = payload.on
+    ? { on: true, set_at: now }
+    : { on: false, set_at: now };
+  await service
+    .from("households")
+    .update({ chez_ownership_groups: groups })
+    .eq("id", householdId);
+
+  // 2. Backfill: stamp every existing entity in the category as
+  //    owned/unowned. Single SQL update per group keeps this fast even
+  //    for households with hundreds of entities.
+  let backfillCount = 0;
+  if (group === "all_insurance") {
+    // Insurance lives as JSONB on properties — load each property,
+    // mark every key in chez_owned_insurance as on/off.
+    const { data: props } = await service
+      .from("properties")
+      .select("id, chez_owned_insurance")
+      .eq("household_id", householdId);
+    for (const p of (props ?? []) as Array<{ id: string; chez_owned_insurance: Record<string, unknown> }>) {
+      const existing = p.chez_owned_insurance ?? {};
+      // For first-time turn-on, seed a default "homeowners" key. Subsequent
+      // policies the homeowner adds will inherit via the new-entity hook.
+      if (Object.keys(existing).length === 0 && payload.on) {
+        existing["homeowners"] = { owned: true, owned_at: now };
+      } else {
+        for (const k of Object.keys(existing)) {
+          existing[k] = payload.on
+            ? { owned: true, owned_at: now }
+            : { owned: false, owned_at: null };
+        }
+      }
+      await service.from("properties").update({ chez_owned_insurance: existing }).eq("id", p.id);
+      backfillCount += Object.keys(existing).length;
+    }
+  } else {
+    const cfg = OWNERSHIP_GROUPS[group];
+    if (!cfg) return json({ error: "unknown group" }, 400);
+    const { data: rows, error: countErr } = await service
+      .from(cfg.table)
+      .update({
+        chez_owned: payload.on,
+        chez_owned_at: payload.on ? now : null,
+      })
+      .eq("household_id", householdId)
+      .select("id");
+    if (countErr) return json({ error: countErr.message }, 500);
+    backfillCount = (rows ?? []).length;
+  }
+
+  // 3. Single summary chez_request — not one per entity.
+  if (payload.on) {
+    const friendly: Record<string, string> = {
+      all_routines: "all routines",
+      all_systems: "all home systems",
+      all_vendors: "all vendor relationships",
+      all_projects: "all projects",
+      all_bills: "all utility accounts",
+      all_documents: "all documents",
+      all_vehicles: "all vehicles",
+      all_insurance: "all insurance policies",
+    };
+    const summary = `Standing engagement: ${friendly[group] ?? group}`;
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: user.id,
+        category: "coordinate_task",
+        summary,
+        context: {
+          _kind: "standing_engagement_group",
+          group,
+          backfill_count: backfillCount,
+          notes: payload.notes ?? "",
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: false,
+        unread_for_admin: true,
+      })
+      .select("*")
+      .single();
+    if (req) {
+      const r = req as { id: string };
+      await service.from("concierge_messages").insert({
+        household_id: householdId,
+        user_id: user.id,
+        request_id: r.id,
+        role: "system",
+        content: `Customer asked Chez to take over ${friendly[group] ?? group} (${backfillCount} item${backfillCount === 1 ? "" : "s"} now owned). New entries in this category will auto-delegate going forward.${payload.notes ? `\n\nNotes:\n${payload.notes}` : ""}`,
+        attachments: [],
+      });
+      await sendPush(
+        serviceUrl,
+        serviceRoleKey,
+        adminUserIds(),
+        "Customer delegated a category to Chez",
+        summary,
+        { type: "chez_admin_request", request_id: r.id }
+      );
+      await sendAdminEmail(
+        adminEmails(),
+        `[Chez] New group delegation: ${friendly[group] ?? group}`,
+        `Customer flipped on ${friendly[group] ?? group}. ${backfillCount} existing items now owned by Chez.\n\n${adminPortalUrl(r.id)}`,
+        emailBody({
+          preview: `${backfillCount} ${friendly[group] ?? group} now Chez-owned.`,
+          heading: "New group delegation",
+          intro: `The customer wants Chez to own ${friendly[group] ?? group} from now on.`,
+          bodyText: `${backfillCount} existing items stamped owned. ${payload.notes ?? ""}`,
+          ctaLabel: "Open in admin portal",
+          ctaUrl: adminPortalUrl(r.id),
+        })
+      );
+    }
+  }
+
+  return json({ ok: true, backfill_count: backfillCount });
+}
+
+// ============================================================================
+// Phase 84 — Workbench actions (admin-side ops audit trail)
+// ============================================================================
+
+interface WorkbenchActionPayload {
+  household_id: string;
+  entity_type: "system" | "routine" | "contractor" | "task" | "project" | "document" | "utility" | "insurance" | "vehicle";
+  entity_id: string;
+  action_type: string;                  // "schedule_visit" / "log_service" / "audit_bill" / etc.
+  payload?: Record<string, unknown>;
+  request_id?: string;                  // optional link to a case
+}
+
+async function handleWorkbenchAction(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: WorkbenchActionPayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const householdId = compactString(payload.household_id);
+  const entityType = payload.entity_type;
+  const entityId = compactString(payload.entity_id);
+  const actionType = compactString(payload.action_type);
+  if (!householdId || !entityType || !entityId || !actionType) {
+    return json({ error: "household_id + entity_type + entity_id + action_type required" }, 400);
+  }
+  const { data, error } = await service
+    .from("chez_workbench_actions")
+    .insert({
+      household_id: householdId,
+      entity_type: entityType,
+      entity_id: entityId,
+      action_type: actionType,
+      payload: payload.payload ?? {},
+      performed_by_user_id: user.id,
+      request_id: payload.request_id ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, action: data });
+}
+
+// ============================================================================
+// Phase 84 — Reminders + Upcoming feed
+// ============================================================================
+
+interface CreateReminderPayload {
+  household_id: string;
+  due_at: string;             // ISO
+  title: string;
+  notes?: string;
+  request_id?: string;
+  entity_type?: string;
+  entity_id?: string;
+}
+
+async function handleCreateReminder(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: CreateReminderPayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const householdId = compactString(payload.household_id);
+  const dueAt = compactString(payload.due_at);
+  const title = compactString(payload.title);
+  if (!householdId || !dueAt || !title) {
+    return json({ error: "household_id + due_at + title required" }, 400);
+  }
+  const { data, error } = await service
+    .from("chez_reminders")
+    .insert({
+      household_id: householdId,
+      due_at: dueAt,
+      title,
+      notes: payload.notes ?? null,
+      request_id: payload.request_id ?? null,
+      entity_type: payload.entity_type ?? null,
+      entity_id: payload.entity_id ?? null,
+      created_by_user_id: user.id,
+    })
+    .select("*")
+    .single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, reminder: data });
+}
+
+async function handleCompleteReminder(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { reminder_id: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const reminderId = compactString(payload.reminder_id);
+  if (!reminderId) return json({ error: "reminder_id required" }, 400);
+  const { error } = await service
+    .from("chez_reminders")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("id", reminderId);
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true });
+}
+
+interface FetchUpcomingPayload {
+  window_days?: number;       // default 14
+}
+
+async function handleFetchUpcoming(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchUpcomingPayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const windowDays = Math.max(1, Math.min(60, payload.window_days ?? 14));
+  const now = new Date();
+  const horizon = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000);
+  const horizonIso = horizon.toISOString();
+
+  // Pull each source in parallel. Each row is normalized to the same
+  // shape so the admin SPA can render them uniformly.
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; }
+    catch (e) { console.warn(`[upcoming] ${label} failed:`, e); return null; }
+  };
+
+  const [
+    routineVisitsRes,
+    chezVisitsRes,
+    casesRes,
+    remindersRes,
+    documentsRes,
+    vehiclesRes,
+    householdsRes,
+  ] = await Promise.all([
+    safe(service.from("routine_visits").select("id, routine_id, household_id, target_window_start, visit_state").gte("target_window_start", now.toISOString()).lte("target_window_start", horizonIso).neq("visit_state", "completed").neq("visit_state", "cancelled").limit(200), "routine_visits"),
+    safe(service.from("chez_visits").select("id, household_id, request_id, vendor_name, scheduled_for, state").gte("scheduled_for", now.toISOString()).lte("scheduled_for", horizonIso).neq("state", "completed").neq("state", "cancelled").limit(200), "chez_visits"),
+    safe(service.from("chez_requests").select("id, household_id, summary, sla_due_at, status").eq("status", "open").lte("sla_due_at", horizonIso).limit(200), "cases"),
+    safe(service.from("chez_reminders").select("id, household_id, due_at, title, notes, request_id, entity_type, entity_id").is("completed_at", null).lte("due_at", horizonIso).limit(200), "reminders"),
+    safe(service.from("documents").select("id, household_id, filename, expiration_date").not("expiration_date", "is", null).lte("expiration_date", horizonIso).limit(100), "documents"),
+    safe(service.from("vehicles").select("id, household_id, year, make, model, registration_expiry, insurance_expiry").or(`registration_expiry.lte.${horizonIso},insurance_expiry.lte.${horizonIso}`).limit(100), "vehicles"),
+    safe(service.from("households").select("id, name").limit(500), "households"),
+  ]);
+
+  const householdName = new Map<string, string>();
+  for (const h of ((householdsRes as { data?: Array<{ id: string; name: string }> })?.data ?? [])) {
+    householdName.set(h.id, h.name);
+  }
+  const hh = (id: string) => householdName.get(id) ?? "Unknown household";
+
+  type Row = {
+    id: string;
+    type: string;
+    household_id: string;
+    household_name: string;
+    due_at: string;
+    title: string;
+    sub: string | null;
+    priority: string;     // 'overdue' | 'today' | 'this_week' | 'next_14_days'
+    entity_type: string | null;
+    entity_id: string | null;
+    deep_link: string | null;
+  };
+
+  const items: Row[] = [];
+  const priorityFor = (dueIso: string) => {
+    const due = new Date(dueIso).getTime();
+    const ms = due - now.getTime();
+    if (ms < 0) return "overdue";
+    const oneDay = 24 * 60 * 60 * 1000;
+    if (ms < oneDay) return "today";
+    if (ms < 7 * oneDay) return "this_week";
+    return "next_14_days";
+  };
+
+  for (const r of (((routineVisitsRes as { data?: Array<{ id: string; routine_id: string; household_id: string; target_window_start: string }> })?.data) ?? [])) {
+    items.push({
+      id: `rv:${r.id}`,
+      type: "routine_visit",
+      household_id: r.household_id,
+      household_name: hh(r.household_id),
+      due_at: r.target_window_start,
+      title: "Routine visit",
+      sub: null,
+      priority: priorityFor(r.target_window_start),
+      entity_type: "routine",
+      entity_id: r.routine_id,
+      deep_link: null,
+    });
+  }
+  for (const v of (((chezVisitsRes as { data?: Array<{ id: string; household_id: string; request_id: string; vendor_name: string; scheduled_for: string }> })?.data) ?? [])) {
+    items.push({
+      id: `cv:${v.id}`,
+      type: "chez_visit",
+      household_id: v.household_id,
+      household_name: hh(v.household_id),
+      due_at: v.scheduled_for,
+      title: `Visit · ${v.vendor_name}`,
+      sub: null,
+      priority: priorityFor(v.scheduled_for),
+      entity_type: null,
+      entity_id: null,
+      deep_link: `/admin#concierge?case=${v.request_id}`,
+    });
+  }
+  for (const c of (((casesRes as { data?: Array<{ id: string; household_id: string; summary: string; sla_due_at: string }> })?.data) ?? [])) {
+    items.push({
+      id: `case:${c.id}`,
+      type: "case_sla",
+      household_id: c.household_id,
+      household_name: hh(c.household_id),
+      due_at: c.sla_due_at,
+      title: c.summary,
+      sub: "SLA",
+      priority: priorityFor(c.sla_due_at),
+      entity_type: null,
+      entity_id: null,
+      deep_link: `/admin#concierge?case=${c.id}`,
+    });
+  }
+  for (const r of (((remindersRes as { data?: Array<{ id: string; household_id: string; due_at: string; title: string; notes: string | null; request_id: string | null; entity_type: string | null; entity_id: string | null }> })?.data) ?? [])) {
+    items.push({
+      id: `rm:${r.id}`,
+      type: "reminder",
+      household_id: r.household_id,
+      household_name: hh(r.household_id),
+      due_at: r.due_at,
+      title: r.title,
+      sub: r.notes,
+      priority: priorityFor(r.due_at),
+      entity_type: r.entity_type,
+      entity_id: r.entity_id,
+      deep_link: r.request_id ? `/admin#concierge?case=${r.request_id}` : null,
+    });
+  }
+  for (const d of (((documentsRes as { data?: Array<{ id: string; household_id: string; filename: string; expiration_date: string }> })?.data) ?? [])) {
+    items.push({
+      id: `doc:${d.id}`,
+      type: "document_expiring",
+      household_id: d.household_id,
+      household_name: hh(d.household_id),
+      due_at: d.expiration_date,
+      title: `Expiring: ${d.filename}`,
+      sub: null,
+      priority: priorityFor(d.expiration_date),
+      entity_type: "document",
+      entity_id: d.id,
+      deep_link: null,
+    });
+  }
+  for (const v of (((vehiclesRes as { data?: Array<{ id: string; household_id: string; year: number | null; make: string | null; model: string | null; registration_expiry: string | null; insurance_expiry: string | null }> })?.data) ?? [])) {
+    const label = [v.year, v.make, v.model].filter(Boolean).join(" ").trim() || "Vehicle";
+    if (v.registration_expiry && new Date(v.registration_expiry) <= horizon) {
+      items.push({
+        id: `vreg:${v.id}`,
+        type: "vehicle_registration",
+        household_id: v.household_id,
+        household_name: hh(v.household_id),
+        due_at: v.registration_expiry,
+        title: `Registration expires: ${label}`,
+        sub: null,
+        priority: priorityFor(v.registration_expiry),
+        entity_type: "vehicle",
+        entity_id: v.id,
+        deep_link: null,
+      });
+    }
+    if (v.insurance_expiry && new Date(v.insurance_expiry) <= horizon) {
+      items.push({
+        id: `vins:${v.id}`,
+        type: "vehicle_insurance",
+        household_id: v.household_id,
+        household_name: hh(v.household_id),
+        due_at: v.insurance_expiry,
+        title: `Insurance expires: ${label}`,
+        sub: null,
+        priority: priorityFor(v.insurance_expiry),
+        entity_type: "vehicle",
+        entity_id: v.id,
+        deep_link: null,
+      });
+    }
+  }
+
+  // Sort: overdue first, then earliest first.
+  items.sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+
+  return json({ items, fetched_at: now.toISOString(), window_days: windowDays });
+}
+
+// ============================================================================
+// Phase 84 — Operator-initiated case creation ("+ New case" in cockpit)
+// ============================================================================
+//
+// Today every chez_request comes from the homeowner. This action lets
+// Tom spawn a case from the admin side — useful when he gets a phone
+// call, sees a vendor email, or wants to track work he's about to do
+// proactively.
+
+interface AdminSubmitPayload {
+  household_id: string;
+  category: "find_vendor" | "get_quote" | "schedule_visit" | "coordinate_task" | "find_handyman" | "general";
+  summary: string;
+  context?: Record<string, unknown>;
+  initial_message?: string;
+}
+
+async function handleAdminSubmit(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: AdminSubmitPayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const householdId = compactString(payload.household_id);
+  const summary = compactString(payload.summary);
+  if (!householdId || !summary) return json({ error: "household_id + summary required" }, 400);
+
+  // Resolve a primary user_id for the household. Cases attribute to the
+  // homeowner's user_id (so iOS RLS reads work) but flag admin_initiated
+  // so the iOS thread can show "Chez started this case for you."
+  const { data: ownerRow } = await service
+    .from("users")
+    .select("id")
+    .eq("household_id", householdId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const ownerId = (ownerRow as { id: string } | null)?.id;
+  if (!ownerId) return json({ error: "household has no users" }, 400);
+
+  const now = new Date().toISOString();
+  const slaDueAt = await businessHoursDue(service);
+  const { data: req, error: insertErr } = await service
+    .from("chez_requests")
+    .insert({
+      household_id: householdId,
+      user_id: ownerId,
+      category: payload.category,
+      summary,
+      context: payload.context ?? {},
+      status: "open",
+      sla_due_at: slaDueAt,
+      last_message_at: now,
+      unread_for_user: false,
+      unread_for_admin: true,
+      admin_initiated: true,
+    })
+    .select("*")
+    .single();
+  if (insertErr || !req) return json({ error: insertErr?.message ?? "insert failed" }, 500);
+
+  const r = req as { id: string };
+  // System message in the new thread so the homeowner sees how this case
+  // started.
+  await service.from("concierge_messages").insert({
+    household_id: householdId,
+    user_id: ownerId,
+    request_id: r.id,
+    role: "system",
+    content: `Chez started this case on your behalf.${payload.initial_message ? `\n\n${payload.initial_message}` : ""}`,
+    attachments: [],
+  });
+  // Optional initial message from the operator.
+  if (payload.initial_message && payload.initial_message.trim()) {
+    await service.from("concierge_messages").insert({
+      household_id: householdId,
+      user_id: ownerId,
+      request_id: r.id,
+      role: "concierge",
+      content: payload.initial_message.trim(),
+      attachments: [],
+    });
+  }
+
+  return json({ ok: true, request: req });
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -2567,6 +3301,62 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as AskAlfredPayload
+        );
+
+      // Phase 84 — Universal entity-level delegation (covers system,
+      // project, document, utility, insurance, vehicle in one generic
+      // handler).
+      case "delegate_entity":
+        return handleDelegateEntity(
+          service,
+          user,
+          body as unknown as DelegateEntityPayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+
+      // Phase 84 — Group-level delegation ("Chez handles all my X").
+      case "set_ownership_group":
+        return handleSetOwnershipGroup(
+          service,
+          user,
+          body as unknown as SetOwnershipGroupPayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+
+      // Phase 84 — Workbench audit + reminders + Upcoming feed.
+      case "workbench_action":
+        return handleWorkbenchAction(
+          service,
+          user,
+          body as unknown as WorkbenchActionPayload
+        );
+      case "create_reminder":
+        return handleCreateReminder(
+          service,
+          user,
+          body as unknown as CreateReminderPayload
+        );
+      case "complete_reminder":
+        return handleCompleteReminder(
+          service,
+          user,
+          body as { reminder_id: string }
+        );
+      case "fetch_upcoming":
+        return handleFetchUpcoming(
+          service,
+          user,
+          body as unknown as FetchUpcomingPayload
+        );
+
+      // Phase 84 — Operator-initiated case ("+ New case" in cockpit).
+      case "admin_submit":
+        return handleAdminSubmit(
+          service,
+          user,
+          body as unknown as AdminSubmitPayload
         );
 
       default:

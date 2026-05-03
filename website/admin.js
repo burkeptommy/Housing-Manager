@@ -5074,6 +5074,9 @@ function renderConciergeTopBarHtml(activeReq) {
           />
           <span class="cockpit-search__hint">⌘K</span>
         </label>
+        <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm" data-cockpit-action="new-case" title="Start a new case for any household — useful when a homeowner phones / emails / texts you directly.">
+          + New case
+        </button>
         <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-toggle-vendor title="Toggle vendor sourcing pane">
           ${ui.vendorOpen ? "✓ " : ""}Vendor sheet
         </button>
@@ -7528,6 +7531,16 @@ window.addEventListener("resize", () => {
 
 async function handleConciergeAction(action, req, btn) {
   switch (action) {
+    case "new-case":
+      // Phase 84 — operator-initiated case. A small modal: pick household,
+      // pick category, summary, optional initial message. Fires the
+      // admin_submit Edge Function action which creates a chez_requests
+      // row attributed to the homeowner's user_id but flagged
+      // admin_initiated so the iOS thread shows "Chez started this case
+      // for you."
+      await openConciergeNewCaseModal();
+      return;
+
     case "back-to-queue":
       // Phase 83.1 — Flip the queue rail back from chat-panel mode to the
       // case list. The selected case stays in state so the workspace
@@ -7949,6 +7962,124 @@ async function handleConciergeAction(action, req, btn) {
     default:
       console.warn("[concierge] unhandled action:", action);
   }
+}
+
+// Phase 84 — Operator-initiated case ("+ New case" in cockpit topbar).
+// Small modal: pick household + category + summary + optional message.
+// Fires admin_submit which creates a chez_requests row flagged
+// admin_initiated; the iOS thread surfaces "Chez started this for you".
+async function openConciergeNewCaseModal() {
+  // Tear down any existing modal.
+  document.querySelector("[data-chez-newcase-modal]")?.remove();
+
+  // Build the household picker from the unique households across the
+  // current chezRequests + dossier cache. For households we've never
+  // touched, we'd need a separate fetch; for v1 we use what we have.
+  const seenHouseholds = new Map();
+  for (const r of (state.chezRequests || [])) {
+    if (r.household_id && !seenHouseholds.has(r.household_id)) {
+      // Find a friendly name from the dossier cache if loaded.
+      const dossier = (state.chezDossiersByHousehold || {})[r.household_id];
+      const name = dossier ? primaryHomeownerLabel(dossier) : `Household ${r.household_id.slice(0, 8)}`;
+      seenHouseholds.set(r.household_id, name);
+    }
+  }
+  const households = Array.from(seenHouseholds.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const categoryOptions = [
+    { value: "find_vendor", label: "🔍 Find a vendor" },
+    { value: "get_quote", label: "💰 Get a quote" },
+    { value: "schedule_visit", label: "📅 Schedule a visit" },
+    { value: "coordinate_task", label: "✅ Coordinate a task" },
+    { value: "find_handyman", label: "🛠️ Find a handyman" },
+    { value: "general", label: "💬 General help" },
+  ];
+
+  const modal = document.createElement("div");
+  modal.className = "admin-modal";
+  modal.setAttribute("data-chez-newcase-modal", "");
+  modal.innerHTML = `
+    <div class="admin-modal__backdrop" data-modal-close></div>
+    <div class="admin-modal__panel" style="max-width: 540px;">
+      <header class="admin-modal__head">
+        <div>
+          <h2>Start a new case</h2>
+          <p class="admin-muted">For when a homeowner reaches you outside the app — phone, email, text. The case lands in the homeowner's iOS Chez thread flagged "Chez started this for you."</p>
+        </div>
+        <button type="button" class="admin-modal__close" data-modal-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-modal__body">
+        <label>
+          <span>Household</span>
+          <select name="household">
+            ${households.length === 0
+              ? `<option value="">— No households loaded yet — refresh the queue —</option>`
+              : `<option value="">Pick a household</option>` + households.map((h) => `<option value="${escapeHtml(h.id)}">${escapeHtml(h.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          <span>Category</span>
+          <select name="category">
+            ${categoryOptions.map((c) => `<option value="${escapeHtml(c.value)}">${escapeHtml(c.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          <span>One-line summary</span>
+          <input type="text" name="summary" placeholder="e.g. Margaret called about a roof leak — needs a roofer this week" />
+        </label>
+        <label>
+          <span>Initial message to homeowner (optional)</span>
+          <textarea name="initial_message" rows="3" placeholder="Hi Margaret — I'm starting a case to track the roofer hunt we just talked about. I'll have 2-3 options to you by Friday."></textarea>
+        </label>
+      </div>
+      <footer class="admin-modal__foot">
+        <button type="button" class="admin-button admin-button--ghost" data-modal-close>Cancel</button>
+        <button type="button" class="admin-button admin-button--primary" data-newcase-submit>Create case</button>
+      </footer>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-modal-close]").forEach((b) => b.addEventListener("click", () => modal.remove()));
+
+  modal.querySelector("[data-newcase-submit]").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const householdId = modal.querySelector("select[name='household']").value;
+    const category = modal.querySelector("select[name='category']").value;
+    const summary = modal.querySelector("input[name='summary']").value.trim();
+    const initialMessage = modal.querySelector("textarea[name='initial_message']").value.trim();
+    if (!householdId) { alert("Pick a household."); return; }
+    if (!summary) { alert("Add a one-line summary."); return; }
+    btn.disabled = true; btn.textContent = "Creating…";
+    try {
+      const result = await callChezConcierge({
+        action: "admin_submit",
+        household_id: householdId,
+        category,
+        summary,
+        context: { _admin_initiated: true },
+        initial_message: initialMessage || undefined,
+      });
+      modal.remove();
+      // Reload the queue + jump straight into the new case.
+      await loadAdminData();
+      const newId = (result?.request?.id) ?? null;
+      if (newId) {
+        const fresh = (state.chezRequests || []).find((r) => r.id === newId);
+        if (fresh) {
+          state.selectedChezRequest = fresh;
+          state.concierge.queueMode = "case";
+          await loadChezMessages(newId);
+        }
+      }
+      renderConciergeCockpit();
+    } catch (err) {
+      console.warn("[admin] new case failed", err);
+      alert(`Couldn't create case: ${err.message || err}`);
+      btn.disabled = false; btn.textContent = "Create case";
+    }
+  });
 }
 
 // Snooze: writes a system-only audit message + transitions status to
@@ -10474,6 +10605,376 @@ async function callChezConcierge(body) {
     throw new Error(message);
   }
   return resp.json();
+}
+
+// =============================================================================
+// Phase 72.5 — Vendor application review desk
+// =============================================================================
+//
+// In-portal version of the standalone admin-vendors.html surface. Lists
+// every vendor_applications row (status filter chips), shows the lifecycle
+// at a glance, and lets Tom resend confirmation emails / certify / reject
+// without leaving the cockpit. Backed by the admin-vendor-applications
+// edge function — same one the standalone page uses, gated on
+// CHEZ_ADMIN_EMAILS.
+
+const VENDOR_APP_STATUS_LABELS = {
+  pending_email_confirm: "Pending email",
+  live_unverified: "Live · review me",
+  chez_certified: "Chez Certified",
+  rejected: "Rejected",
+};
+
+const VENDOR_APP_FILTER_CHIPS = [
+  { id: "all", label: "All" },
+  { id: "pending_email_confirm", label: "Pending email" },
+  { id: "live_unverified", label: "Live · review me" },
+  { id: "chez_certified", label: "Certified" },
+  { id: "rejected", label: "Rejected" },
+];
+
+async function callAdminVendorApplications(action, payload = {}) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session) throw new Error("Not signed in");
+  const url = `${SUPABASE_URL}/functions/v1/admin-vendor-applications`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    let message = `Request failed (${resp.status})`;
+    try {
+      const json = JSON.parse(text);
+      if (json.error) message = json.error;
+    } catch {
+      if (text) message = text.slice(0, 200);
+    }
+    throw new Error(message);
+  }
+  return resp.json();
+}
+
+function renderVendorApplicationsView() {
+  const va = state.vendorApps;
+
+  // Hide legacy detail/empty-detail — this is a flat queue, no drill-down
+  el.detail?.classList.add("is-hidden");
+  el.emptyDetail?.classList.add("is-hidden");
+  // Hide the legacy admin-status-filter <select> — chips replace it
+  el.statusFilter?.classList.add("is-hidden");
+  el.search.value = state.search || "";
+  el.search.placeholder = "Search business, contact, email, phone…";
+
+  // Per-status counts come from the cached list
+  const counts = {
+    all: va.applications.length,
+    pending_email_confirm: 0,
+    live_unverified: 0,
+    chez_certified: 0,
+    rejected: 0,
+  };
+  va.applications.forEach((a) => {
+    if (counts[a.status] !== undefined) counts[a.status] += 1;
+  });
+
+  el.stats.innerHTML = `
+    <div class="admin-stats__tiles">
+      <div class="admin-stat"><strong>${counts.pending_email_confirm}</strong><span>Awaiting email confirm</span></div>
+      <div class="admin-stat"><strong>${counts.live_unverified}</strong><span>Live · ready to review</span></div>
+      <div class="admin-stat"><strong>${counts.chez_certified}</strong><span>Chez Certified</span></div>
+      <div class="admin-stat"><strong>${counts.rejected}</strong><span>Rejected</span></div>
+    </div>
+  `;
+
+  el.list.innerHTML = `
+    <div class="admin-vendor-apps">
+      <div class="admin-vendor-apps__toolbar">
+        <div class="admin-vendor-apps__chips" role="tablist">
+          ${VENDOR_APP_FILTER_CHIPS.map((chip) => `
+            <button type="button"
+                    class="admin-vendor-apps__chip ${va.filter === chip.id ? "is-active" : ""}"
+                    data-vapps-filter="${chip.id}"
+                    role="tab">
+              ${escapeHtml(chip.label)}
+            </button>
+          `).join("")}
+        </div>
+        <button type="button" class="admin-button admin-button--ghost" data-vapps-refresh>↻ Refresh</button>
+      </div>
+      <div class="admin-vendor-apps__feedback" data-vapps-feedback hidden></div>
+      <div class="admin-vendor-apps__rows" data-vapps-rows>
+        ${va.loading ? `<p class="admin-vendor-apps__empty admin-muted">Loading vendor applications…</p>` : ""}
+        ${va.error ? `<p class="admin-vendor-apps__empty admin-vendor-apps__empty--error">Error: ${escapeHtml(va.error)}</p>` : ""}
+      </div>
+    </div>
+  `;
+
+  el.list.querySelectorAll("[data-vapps-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = btn.dataset.vappsFilter;
+      if (va.filter === next) return;
+      va.filter = next;
+      loadVendorApplications();
+    });
+  });
+
+  el.list.querySelector("[data-vapps-refresh]")?.addEventListener("click", () => {
+    loadVendorApplications();
+  });
+
+  const rowsEl = el.list.querySelector("[data-vapps-rows]");
+  rowsEl?.addEventListener("click", handleVendorAppAction);
+
+  // Initial load if cache is empty, otherwise just paint
+  if (va.applications.length === 0 && !va.loading && !va.error) {
+    loadVendorApplications();
+  } else {
+    renderVendorAppRows();
+  }
+}
+
+async function loadVendorApplications() {
+  const va = state.vendorApps;
+  va.loading = true;
+  va.error = null;
+  if (state.view === "vendor_apps") renderVendorApplicationsView();
+  try {
+    const payload = va.filter === "all" ? {} : { status_filter: va.filter };
+    const data = await callAdminVendorApplications("list", { ...payload, limit: 200 });
+    va.applications = data.applications || [];
+    va.total = data.total || 0;
+  } catch (err) {
+    console.error("[vendor-apps] list failed:", err);
+    va.error = err.message || String(err);
+    va.applications = [];
+  } finally {
+    va.loading = false;
+    if (state.view === "vendor_apps") renderVendorApplicationsView();
+  }
+}
+
+function renderVendorAppRows() {
+  const va = state.vendorApps;
+  const rowsEl = el.list.querySelector("[data-vapps-rows]");
+  if (!rowsEl) return;
+
+  // Client-side search across the loaded set
+  const q = (state.search || "").trim().toLowerCase();
+  const filtered = q
+    ? va.applications.filter((a) => {
+        const hay = [
+          a.business_name,
+          a.contact_name,
+          a.email,
+          a.phone,
+          a.category,
+          (a.service_area_states || []).join(" "),
+        ].join(" ").toLowerCase();
+        return hay.includes(q);
+      })
+    : va.applications;
+
+  if (filtered.length === 0) {
+    rowsEl.innerHTML = `
+      <p class="admin-vendor-apps__empty admin-muted">
+        ${va.applications.length === 0
+          ? "No vendor applications match this filter yet. Tell a few vendors about getchez.com/vendor-apply.html and they'll show up here."
+          : "No applications match your search."}
+      </p>
+    `;
+    return;
+  }
+
+  rowsEl.innerHTML = filtered.map((app) => {
+    const buttons = vendorAppActionButtons(app);
+    const states = (app.service_area_states || []).join(", ");
+    const websiteHref = app.website && /^https?:\/\//i.test(app.website)
+      ? app.website
+      : (app.website ? `https://${app.website}` : "");
+    return `
+      <article class="admin-vendor-apps__row" data-vapps-row="${escapeHtml(app.id)}">
+        <header class="admin-vendor-apps__row-head">
+          <div class="admin-vendor-apps__row-title">
+            <strong>${escapeHtml(app.business_name)}</strong>
+            ${websiteHref ? `<a href="${escapeHtml(websiteHref)}" target="_blank" rel="noopener" class="admin-vendor-apps__row-website">${escapeHtml(app.website.replace(/^https?:\/\//, ""))} ↗</a>` : ""}
+          </div>
+          ${vendorAppStatusPill(app.status)}
+        </header>
+        <div class="admin-vendor-apps__row-grid">
+          <div class="admin-vendor-apps__row-cell">
+            <span class="admin-vendor-apps__row-label">Contact</span>
+            <span>${escapeHtml(app.contact_name)}</span>
+            <a href="mailto:${escapeHtml(app.email)}" class="admin-muted">${escapeHtml(app.email)}</a>
+            <a href="tel:${escapeHtml(app.phone)}" class="admin-muted">${escapeHtml(app.phone)}</a>
+          </div>
+          <div class="admin-vendor-apps__row-cell">
+            <span class="admin-vendor-apps__row-label">Category</span>
+            <span>${escapeHtml(app.category)}</span>
+          </div>
+          <div class="admin-vendor-apps__row-cell">
+            <span class="admin-vendor-apps__row-label">States</span>
+            <span class="admin-vendor-apps__row-states">${escapeHtml(states || "—")}</span>
+          </div>
+          <div class="admin-vendor-apps__row-cell">
+            <span class="admin-vendor-apps__row-label">Submitted</span>
+            <span>${escapeHtml(formatDateTime(app.created_at))}</span>
+            ${app.email_confirmed_at ? `<span class="admin-muted">Confirmed ${escapeHtml(formatDateTime(app.email_confirmed_at))}</span>` : ""}
+            ${app.verified_at ? `<span class="admin-muted">Certified ${escapeHtml(formatDateTime(app.verified_at))}</span>` : ""}
+            ${app.rejected_at ? `<span class="admin-muted">Rejected ${escapeHtml(formatDateTime(app.rejected_at))}</span>` : ""}
+          </div>
+        </div>
+        ${app.verified_notes ? `<p class="admin-vendor-apps__row-note"><strong>Notes:</strong> ${escapeHtml(app.verified_notes)}</p>` : ""}
+        ${app.rejection_notes ? `<p class="admin-vendor-apps__row-note admin-vendor-apps__row-note--reject"><strong>Reason:</strong> ${escapeHtml(app.rejection_notes)}</p>` : ""}
+        ${app.linked_google_place_id ? `<p class="admin-vendor-apps__row-meta admin-muted">↪ Linked to Google Place ${escapeHtml(app.linked_google_place_id)}</p>` : ""}
+        ${buttons ? `<div class="admin-vendor-apps__row-actions">${buttons}</div>` : ""}
+      </article>
+    `;
+  }).join("");
+}
+
+function vendorAppStatusPill(status) {
+  const label = VENDOR_APP_STATUS_LABELS[status] || status;
+  return `<span class="admin-pill admin-vendor-apps__status admin-vendor-apps__status--${escapeHtml(status)}">${escapeHtml(label)}</span>`;
+}
+
+function vendorAppActionButtons(app) {
+  const buttons = [];
+  if (app.status === "pending_email_confirm") {
+    buttons.push(`<button type="button" class="admin-button admin-button--ghost" data-vapps-action="resend_confirm" data-vapps-id="${escapeHtml(app.id)}" data-vapps-name="${escapeHtml(app.business_name)}">Resend email</button>`);
+  }
+  if (app.status === "live_unverified") {
+    buttons.push(`<button type="button" class="admin-button admin-button--primary" data-vapps-action="mark_certified" data-vapps-id="${escapeHtml(app.id)}" data-vapps-name="${escapeHtml(app.business_name)}">Certify</button>`);
+  }
+  if (app.status === "chez_certified") {
+    buttons.push(`<button type="button" class="admin-button admin-button--danger" data-vapps-action="mark_rejected" data-vapps-id="${escapeHtml(app.id)}" data-vapps-name="${escapeHtml(app.business_name)}">Revoke certification</button>`);
+  }
+  if (app.status !== "rejected" && app.status !== "chez_certified") {
+    buttons.push(`<button type="button" class="admin-button admin-button--danger" data-vapps-action="mark_rejected" data-vapps-id="${escapeHtml(app.id)}" data-vapps-name="${escapeHtml(app.business_name)}">Reject</button>`);
+  }
+  return buttons.join("");
+}
+
+async function handleVendorAppAction(e) {
+  const btn = e.target.closest("button[data-vapps-action]");
+  if (!btn) return;
+  const action = btn.dataset.vappsAction;
+  const applicationId = btn.dataset.vappsId;
+  const businessName = btn.dataset.vappsName || "this application";
+
+  if (action === "resend_confirm") {
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Sending…";
+    try {
+      await callAdminVendorApplications("resend_confirm", { application_id: applicationId });
+      showVendorAppFeedback(`Confirmation email re-sent to ${businessName}.`, "success");
+      await loadVendorApplications();
+    } catch (err) {
+      showVendorAppFeedback(`Resend failed: ${err.message}`, "error");
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+    return;
+  }
+
+  if (action === "mark_certified" || action === "mark_rejected") {
+    openVendorAppNotesModal({ action, applicationId, businessName });
+  }
+}
+
+function showVendorAppFeedback(message, kind) {
+  const fb = el.list.querySelector("[data-vapps-feedback]");
+  if (!fb) return;
+  fb.textContent = message;
+  fb.dataset.kind = kind;
+  fb.hidden = false;
+  clearTimeout(showVendorAppFeedback._t);
+  showVendorAppFeedback._t = setTimeout(() => { fb.hidden = true; }, 4000);
+}
+
+function openVendorAppNotesModal({ action, applicationId, businessName }) {
+  document.querySelector("[data-vapps-modal]")?.remove();
+
+  const isCertify = action === "mark_certified";
+  const modal = document.createElement("div");
+  modal.className = "admin-modal";
+  modal.setAttribute("data-vapps-modal", "");
+  modal.innerHTML = `
+    <div class="admin-modal__backdrop" data-vapps-modal-close></div>
+    <div class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <div>
+          <h2>${isCertify ? "Mark Chez Certified" : "Reject application"}</h2>
+          <p class="admin-muted">${escapeHtml(businessName)}</p>
+        </div>
+        <button type="button" class="admin-modal__close" data-vapps-modal-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-modal__body">
+        <p class="admin-muted">
+          ${isCertify
+            ? "Vendor will appear at the top of homeowner search results with the Chez Certified badge. They'll get a confirmation email."
+            : "Vendor will be removed from search results. No email is sent. They can re-apply with the same email after rejection."}
+        </p>
+        <label class="admin-vendor-apps__modal-label">
+          <span>${isCertify ? "Verification notes (optional, internal)" : "Rejection notes (optional, internal)"}</span>
+          <textarea data-vapps-modal-notes rows="4" placeholder="${isCertify ? 'e.g. Spoke with Joe, 15 yrs experience, COI on file' : 'e.g. Could not reach, business no longer operating'}"></textarea>
+        </label>
+      </div>
+      <footer class="admin-modal__foot">
+        <button type="button" class="admin-button" data-vapps-modal-close>Cancel</button>
+        <button type="button" class="admin-button ${isCertify ? "admin-button--primary" : "admin-button--danger"}" data-vapps-modal-confirm>
+          ${isCertify ? "Certify" : "Reject"}
+        </button>
+      </footer>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  modal.querySelectorAll("[data-vapps-modal-close]").forEach((btn) => {
+    btn.addEventListener("click", close);
+  });
+
+  modal.querySelector("[data-vapps-modal-confirm]").addEventListener("click", async (e) => {
+    const confirmBtn = e.currentTarget;
+    const notesEl = modal.querySelector("[data-vapps-modal-notes]");
+    confirmBtn.disabled = true;
+    const original = confirmBtn.textContent;
+    confirmBtn.textContent = "Working…";
+    try {
+      await callAdminVendorApplications(action, {
+        application_id: applicationId,
+        notes: notesEl?.value.trim() || null,
+      });
+      close();
+      showVendorAppFeedback(
+        isCertify
+          ? `${businessName} marked Chez Certified.`
+          : `${businessName} rejected.`,
+        "success",
+      );
+      await loadVendorApplications();
+    } catch (err) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = original;
+      let errEl = modal.querySelector("[data-vapps-modal-error]");
+      if (!errEl) {
+        errEl = document.createElement("p");
+        errEl.dataset.vappsModalError = "";
+        errEl.className = "admin-vendor-apps__modal-error";
+        modal.querySelector(".admin-modal__body").appendChild(errEl);
+      }
+      errEl.textContent = err.message || String(err);
+    }
+  });
+
+  setTimeout(() => modal.querySelector("[data-vapps-modal-notes]")?.focus(), 50);
 }
 
 function formatDateTime(iso) {

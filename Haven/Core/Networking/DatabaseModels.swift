@@ -17,6 +17,12 @@ struct HouseholdRow: Codable, Identifiable {
     /// prefer DIY or they need help finding one — the preference string
     /// lives in `properties.attributes.handyman_preference`).
     let preferredHandymanContractorId: UUID?
+    /// Phase 84: group-level Chez ownership flags. Shape:
+    ///   { "all_routines": { "on": true, "set_at": "..." },
+    ///     "all_systems":  { "on": false }, ... }
+    /// Read by the "What Chez handles" iOS page to render the 8 group
+    /// toggles. Written by the chez-concierge `set_ownership_group` action.
+    let chezOwnershipGroups: [String: ChezOwnershipGroupFlag]?
 
     enum CodingKeys: String, CodingKey {
         case id, name
@@ -24,11 +30,13 @@ struct HouseholdRow: Codable, Identifiable {
         case subscriptionTier = "subscription_tier"
         case subscriptionExpiresAt = "subscription_expires_at"
         case preferredHandymanContractorId = "preferred_handyman_contractor_id"
+        case chezOwnershipGroups = "chez_ownership_groups"
     }
 
     /// Resilient decoder (CLAUDE.md requirement for externally-fed structs).
     /// Pre-Phase-63 rows won't have the preferred_handyman_contractor_id
-    /// column, so we decodeIfPresent and fall back to nil.
+    /// column, so we decodeIfPresent and fall back to nil. Same for
+    /// Phase 84's chez_ownership_groups.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -37,6 +45,31 @@ struct HouseholdRow: Codable, Identifiable {
         subscriptionTier = try? c.decodeIfPresent(String.self, forKey: .subscriptionTier)
         subscriptionExpiresAt = try? c.decodeIfPresent(Date.self, forKey: .subscriptionExpiresAt)
         preferredHandymanContractorId = try? c.decodeIfPresent(UUID.self, forKey: .preferredHandymanContractorId)
+        chezOwnershipGroups = try? c.decodeIfPresent([String: ChezOwnershipGroupFlag].self, forKey: .chezOwnershipGroups)
+    }
+
+    /// Convenience: is a given group ("all_routines", "all_systems", ...) on?
+    func isOwnershipGroupOn(_ group: String) -> Bool {
+        chezOwnershipGroups?[group]?.on ?? false
+    }
+}
+
+/// Phase 84: per-group flag inside `households.chez_ownership_groups`.
+/// Stores `on` (whether Chez handles the whole category) plus the
+/// timestamp of the last change.
+struct ChezOwnershipGroupFlag: Codable, Hashable {
+    let on: Bool
+    let setAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case on
+        case setAt = "set_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        on = (try? c.decodeIfPresent(Bool.self, forKey: .on)) ?? false
+        setAt = try? c.decodeIfPresent(Date.self, forKey: .setAt)
     }
 }
 

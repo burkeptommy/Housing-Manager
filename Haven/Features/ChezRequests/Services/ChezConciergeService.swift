@@ -194,6 +194,64 @@ extension HavenSupabase {
         )
     }
 
+    /// Phase 84 — Universal entity-level delegation. One wrapper covers
+    /// every new entity type (system, project, document, utility,
+    /// vehicle, insurance) via the generic `delegate_entity` Edge
+    /// Function action. Insurance carries a `propertyId` because the
+    /// flag lives on the parent property, not its own table.
+    static func delegateEntityToChez(
+        entityType: String,
+        entityId: String,
+        delegated: Bool,
+        notes: String? = nil,
+        propertyId: String? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "delegate_entity"
+            let entity_type: String
+            let entity_id: String
+            let delegated: Bool
+            let notes: String?
+            let property_id: String?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(
+                entity_type: entityType,
+                entity_id: entityId,
+                delegated: delegated,
+                notes: notes,
+                property_id: propertyId
+            )
+        )
+    }
+
+    /// Phase 84 — Group-level delegation. Flips one of:
+    /// `all_routines`, `all_systems`, `all_vendors`, `all_projects`,
+    /// `all_bills`, `all_documents`, `all_insurance`, `all_vehicles`.
+    /// Server backfills every existing entity in that category +
+    /// posts a single summary system message in the chez_request thread.
+    static func setChezOwnershipGroup(
+        group: String,
+        on: Bool,
+        notes: String? = nil
+    ) async throws -> Int {
+        struct Body: Encodable {
+            let action = "set_ownership_group"
+            let group: String
+            let on: Bool
+            let notes: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+            let backfill_count: Int?
+        }
+        let data = try await callConciergeEdgeFunction(
+            body: Body(group: group, on: on, notes: notes)
+        )
+        let parsed = (try? JSONDecoder().decode(Response.self, from: data)) ?? Response(ok: nil, backfill_count: nil)
+        return parsed.backfill_count ?? 0
+    }
+
     // MARK: - Phase 80.1 — Structured proposal decisions
 
     /// Approve / decline / counter a structured proposal. `messageId`

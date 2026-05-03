@@ -145,6 +145,21 @@ struct DashboardView: View {
                             mergeRequestBanner(merge)
                         }
 
+                        // Phase 84 — Chez ownership hero card. Surfaces
+                        // "what % of your house Chez is running" and
+                        // routes to the new What Chez Handles page where
+                        // the homeowner can flip group toggles or browse
+                        // their inventory of delegated entities.
+                        if viewModel.hasCompletedAnyQuiz {
+                            ChezOwnershipHeroCard(
+                                activeGroupCount: viewModel.chezActiveGroupCount,
+                                delegatedItemCount: viewModel.chezDelegatedItemCount
+                            ) {
+                                Haptics.light()
+                                navigationPath.append("chez_ownership")
+                            }
+                        }
+
                         if viewModel.hasCompletedAnyQuiz {
                             HomeCoverageHero(
                                 propertyName: viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId })?.name
@@ -458,6 +473,11 @@ struct DashboardView: View {
                     InboxView()
                 } else if destination == "security" {
                     SecurityDashboardView()
+                } else if destination == "chez_ownership" {
+                    // Phase 84 — homeowner-facing primary surface for
+                    // picking what Chez handles. Reachable from the
+                    // Dashboard hero card AND from Settings.
+                    ChezOwnershipView()
                 } else if destination == "maintenance" {
                     // Phase 66: Default Maintenance tab lands on the new
                     // 5-section hub (Your Services / Handyman / Vehicles /

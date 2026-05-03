@@ -81,6 +81,14 @@ final class DashboardViewModel: ObservableObject {
     @Published var uncoveredSystemNames: [String] = []
     @Published var coveredSystemSummaries: [(systemName: String, vendorName: String, cadence: String?)] = []
 
+    /// Phase 84: Chez ownership counts for the Dashboard hero card.
+    /// `chezActiveGroupCount` is how many of the 8 group toggles are on
+    /// (e.g., "all routines", "all systems"). `chezDelegatedItemCount`
+    /// is the per-entity delegated count (individual routines /
+    /// contractors / tasks the homeowner toggled directly).
+    @Published var chezActiveGroupCount: Int = 0
+    @Published var chezDelegatedItemCount: Int = 0
+
     // Phase 50: Registry-aware coverage items for the redesigned sheet
     @Published var uncoveredCoverageItems: [VendorCoverageItem] = []
     @Published var coveredCoverageItems: [VendorCoverageItem] = []
@@ -220,6 +228,17 @@ final class DashboardViewModel: ObservableObject {
     /// household. Loaded alongside other dashboard data; gates the
     /// `HandymanSuggestionCard` at the top of the dashboard.
     @Published private(set) var handymanPunchItemCount: Int = 0
+
+    /// Phase 67 (G1): Seasonal "time to book your handyman" reminder.
+    /// Computed from the singleton `handyman_recurring` routine's anchor
+    /// months (April + October) and the current date. Surfaces in
+    /// Dashboard above Up Next when:
+    ///   * a handyman_recurring routine exists for the property,
+    ///   * pending punch items > 0,
+    ///   * today is within ±14 days of an April 1 / October 1 anchor.
+    /// Tap routes the user into the Tasks → Handyman flow via the
+    /// existing `.handymanModeRequested` notification.
+    @Published private(set) var handymanSeasonalReminder: HandymanSeasonalReminder?
 
     @Published var isLoading = false
     @Published var isRefreshing = false
@@ -663,6 +682,8 @@ final class DashboardViewModel: ObservableObject {
                 loadRecommendationData, loadEnrichmentData, loadInboxItems, loadVehicleAlerts,
                 loadEstateState, loadVendorVisits, loadHouseholdEmail,
                 loadHandymanPunchCount,
+                loadHandymanSeasonalReminder,
+                loadChezOwnershipCounts,
             ]
             for method in methods {
                 group.addTask { @MainActor in
@@ -728,6 +749,65 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
+    /// Phase 67 (G1): Compute the seasonal handyman reminder. Surfaces
+    /// the "Time to book your handyman" card on Dashboard above Up Next
+    /// when an April / October anchor is within ±14 days AND the user
+    /// has a handyman_recurring routine + at least one pending punch item.
+    /// Vendor name (if linked) drives a personalized subtitle ("Mike's
+    /// Handyman crew · 8 items ready").
+    private func loadHandymanSeasonalReminder() async {
+        guard let householdId = primaryHouseholdId,
+              let propertyId = primaryPropertyId else {
+            handymanSeasonalReminder = nil
+            return
+        }
+        // Window check first — cheap, avoids DB calls outside the seasonal window.
+        guard let window = HandymanSeasonalReminder.currentWindow() else {
+            handymanSeasonalReminder = nil
+            return
+        }
+
+        // Punch items + routine + optional vendor name. All three required
+        // for the card to render.
+        let punchCount: Int
+        do {
+            let items = try await DatabaseService.shared.fetchPendingHandymanPunchItems(householdId: householdId)
+            punchCount = items.filter { $0.propertyId == propertyId }.count
+        } catch {
+            punchCount = 0
+        }
+        guard punchCount > 0 else {
+            handymanSeasonalReminder = nil
+            return
+        }
+
+        let routine: RoutineRow?
+        do {
+            routine = try await DatabaseService.shared.fetchHandymanRoutine(
+                householdId: householdId,
+                propertyId: propertyId
+            )
+        } catch {
+            routine = nil
+        }
+        guard let routine, routine.archivedAt == nil else {
+            handymanSeasonalReminder = nil
+            return
+        }
+
+        var vendorName: String?
+        if let vendorId = routine.vendorId {
+            vendorName = (try? await DatabaseService.shared.fetchContractor(id: vendorId))?.companyName
+        }
+
+        handymanSeasonalReminder = HandymanSeasonalReminder(
+            season: window.season,
+            daysAway: window.daysAway,
+            pendingItemCount: punchCount,
+            vendorName: vendorName
+        )
+    }
+
     /// Phase 56.4: Whether to surface the proactive "Schedule handyman
     /// visit" suggestion. Triggered when:
     /// - Punch list has ≥1 pending item
@@ -757,6 +837,34 @@ final class DashboardViewModel: ObservableObject {
         if recentHandyman { return false }
 
         return true
+    }
+
+    /// Phase 84 — Count what's currently delegated to Chez. Drives the
+    /// Dashboard hero card's "Chez handles N for you" copy + the
+    /// 3-mode visual state (DIY / Blend / Full).
+    private func loadChezOwnershipCounts() async {
+        do {
+            let user = try await DatabaseService.shared.fetchCurrentUser()
+            guard let householdId = user.householdId else {
+                chezActiveGroupCount = 0
+                chezDelegatedItemCount = 0
+                return
+            }
+            async let householdReq = DatabaseService.shared.fetchHousehold(id: householdId)
+            async let routinesReq = DatabaseService.shared.fetchRoutines(householdId: householdId)
+            async let contractorsReq = DatabaseService.shared.fetchContractors()
+            async let tasksReq = DatabaseService.shared.fetchMaintenanceTasks()
+            let (household, routines, contractors, tasks) = try await (householdReq, routinesReq, contractorsReq, tasksReq)
+            let groups = ["all_routines", "all_systems", "all_vendors", "all_projects",
+                          "all_bills", "all_documents", "all_insurance", "all_vehicles"]
+            chezActiveGroupCount = groups.filter { household.isOwnershipGroupOn($0) }.count
+            let routineDel = routines.filter { $0.chezOwned }.count
+            let contractorDel = contractors.filter { $0.isChezOwned }.count
+            let taskDel = tasks.filter { $0.isChezOwned }.count
+            chezDelegatedItemCount = routineDel + contractorDel + taskDel
+        } catch {
+            print("[Dashboard] loadChezOwnershipCounts failed: \(error)")
+        }
     }
 
     private func loadCompletionScores() async {
