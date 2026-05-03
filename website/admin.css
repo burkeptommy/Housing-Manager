@@ -4711,7 +4711,12 @@
   white-space: pre-wrap;
 }
 
-@media (max-width: 1100px) {
+/* Phase 72.5 fix: the original 1100px breakpoint hid the sidebar on
+   any laptop with dev tools open or a vertical browser-tabs sidebar.
+   Lowered to 900px so a 13" MacBook (1280) with ~380px of side chrome
+   still shows the sidebar; only true tablet/phone widths collapse it.
+   Replacing the hidden sidebar with a hamburger menu is a follow-up. */
+@media (max-width: 900px) {
   .admin-app {
     grid-template-columns: 1fr;
   }
