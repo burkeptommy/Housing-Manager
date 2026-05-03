@@ -7157,6 +7157,24 @@ details.admin-chez__analysis-section pre {
   flex-direction: column;
   align-items: center;
   position: relative;
+  /* Phase 83.5 — clickable button. Reset chrome so stages look identical
+     to the prior div + add a hover affordance. */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  transition: transform 0.15s;
+}
+.admin-chez__stage:hover { transform: translateY(-1px); }
+.admin-chez__stage:hover .admin-chez__stage-label {
+  color: var(--indigo, #453A70);
+}
+.admin-chez__stage:focus-visible {
+  outline: 2px solid var(--indigo-500, #6B5AA0);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 .admin-chez__stage-dot {
   align-items: center;
@@ -9582,4 +9600,82 @@ details.admin-chez__analysis-section pre {
 .admin-chez__visit-coachmark span {
   font: 400 12px/1.5 var(--sans);
   color: var(--text-muted, #6F6A88);
+}
+
+/* Phase 83.5 — "About this case" overview card. Sits between the stage
+   tracker and the AI brief, surfacing the entity / vendor / source the
+   case is about. Vague-case variant is salmon-tinted. */
+.cockpit-overview {
+  margin: 16px 24px 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 14px;
+}
+.cockpit-overview.is-vague {
+  background: linear-gradient(135deg, #FFF5F2, #FFFFFF);
+  border-color: var(--salmon-pale, #FFE8E2);
+}
+.cockpit-overview__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.cockpit-overview__sub {
+  font-size: 12px;
+  font-style: italic;
+  flex: 1;
+  min-width: 0;
+}
+.cockpit-overview__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cockpit-overview__row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.cockpit-overview__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+}
+.cockpit-overview__value {
+  font-size: 13px;
+  color: var(--text, #2A2252);
+  font-weight: 500;
+}
+.cockpit-overview-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--indigo-500, #6B5AA0);
+  font: inherit;
+  text-decoration: underline;
+}
+.cockpit-overview-link:hover { color: var(--indigo, #453A70); }
+.cockpit-overview-warn {
+  color: var(--salmon-dark, #D14E3E);
+  font-weight: 600;
+}
+
+/* Phase 83.5 — completed step in the Resolve plan: green check + struck
+   through label. */
+.cockpit-resolve__step.is-done .cockpit-resolve__step-num {
+  border-color: var(--success, #4A7C59);
+  color: var(--success, #4A7C59);
+  background: rgba(74, 124, 89, 0.12);
+}
+.cockpit-resolve__step.is-done .cockpit-resolve__step-text {
+  color: var(--text-muted, #6F6A88);
+  text-decoration: line-through;
 }

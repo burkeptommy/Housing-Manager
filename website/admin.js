@@ -81,6 +81,21 @@ const VIEWS = [
     subtitle: "Voice / style fixes, tasks without a vendor, entities awaiting review, quiz questions adrift, vendors without tasks, missing vendor types, missing routines. Anything you've already noted lives on the Notes tab.",
   },
   {
+    // Phase 72.5 — Vendor self-signup review desk. Vendors apply via the
+    // public form on getchez.com/vendor-apply.html. Once their email is
+    // confirmed, they auto-appear in iOS find-vendor results without a
+    // badge. This surface is where Tom certifies them (badge + top sort)
+    // or rejects them. Backed by the admin-vendor-applications edge fn,
+    // which gates on the CHEZ_ADMIN_EMAILS allowlist.
+    id: "vendor_apps",
+    label: "Vendor Apps",
+    type: "vendor_application",
+    group: "action",
+    title: "Vendor Applications",
+    eyebrow: "Self-signup queue · getchez.com/vendor-apply.html",
+    subtitle: "Every business that has applied to list on Chez. They auto-appear in homeowner find-vendor results once they confirm their email — your job here is to call them, verify, and award the Chez Certified badge so they float to the top.",
+  },
+  {
     id: "quiz",
     label: "Quiz",
     type: "question",
@@ -567,6 +582,20 @@ const state = {
   chezReplyDraft: "",
   chezReplyAcknowledgement: false,
   chezReplyStatus: null, // optional status transition
+  // Phase 72.5 — Vendor application review desk state.
+  // `filter` mirrors the chip selection (all | pending_email_confirm |
+  // live_unverified | chez_certified | rejected). `applications` caches
+  // the last list response so chip switches don't re-fetch unless the
+  // user hits Refresh. `pending` holds the certify/reject in-flight
+  // confirmation while the modal is open.
+  vendorApps: {
+    filter: "all",
+    applications: [],
+    total: 0,
+    loading: false,
+    error: null,
+    pending: null, // { action, applicationId, businessName }
+  },
   // Phase 83 — Concierge cockpit local UI state. Persisted to localStorage
   // for things the agent expects to remember across sessions (Alfred on/off,
   // density). Per-case scratchpads (briefTab, composer.draft, alfred chat)
@@ -1775,6 +1804,8 @@ function render() {
     renderConciergeCockpit();
   } else if (state.view === "audit") {
     renderAuditView();
+  } else if (state.view === "vendor_apps") {
+    renderVendorApplicationsView();
   } else if (state.view === "notes") {
     renderNotesView();
   } else if (state.view === "decisions") {
@@ -5469,33 +5500,55 @@ function renderConciergeHomeownerPanelHtml(req) {
 }
 
 function renderConciergeFamilyListHtml(dossier) {
-  const rows = [];
+  // Phase 83.5 — Dedupe by name. The dossier returns users (auth accounts)
+  // AND family_members (the household roster). The household owner
+  // typically appears in BOTH because the iOS quiz creates a primary
+  // family_member that mirrors the auth user. We hash by lowercased
+  // full name and keep the more authoritative source (user > member).
+  const seen = new Map(); // key: normalized name, value: { html, rank }
+  const ranked = (entry, rank) => {
+    const existing = seen.get(entry.key);
+    if (!existing || existing.rank < rank) {
+      seen.set(entry.key, { html: entry.html, rank });
+    }
+  };
+  const norm = (s) => String(s || "").trim().toLowerCase();
+
   for (const u of (dossier.users || [])) {
-    const initials = (u.full_name || u.email || "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
-    rows.push(`
-      <div class="cockpit-row">
+    const fullName = u.full_name || u.email || "—";
+    const key = norm(fullName) || norm(u.email);
+    if (!key) continue;
+    const initials = fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+    const html = `
+      <button type="button" class="cockpit-row cockpit-row--clickable" data-cockpit-family-id="${escapeHtml(u.id)}" data-cockpit-family-kind="user">
         <span class="cockpit-avatar cockpit-avatar--md cockpit-avatar--indigo">${escapeHtml(initials)}</span>
         <div class="cockpit-row__main">
-          <div class="cockpit-row__title">${escapeHtml(u.full_name || u.email || "—")}</div>
-          <div class="cockpit-row__sub">${escapeHtml(u.role || "owner")}</div>
+          <div class="cockpit-row__title">${escapeHtml(fullName)}</div>
+          <div class="cockpit-row__sub">${escapeHtml(u.role || "Primary client")} · linked account</div>
         </div>
-      </div>
-    `);
+      </button>
+    `;
+    ranked({ key, html }, /* user is more authoritative */ 2);
   }
   for (const m of (dossier.family_members || [])) {
     const fullName = `${m.first_name || ""} ${m.last_name || ""}`.trim() || "Family member";
+    const key = norm(fullName);
+    if (!key) continue;
     const initials = fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
-    rows.push(`
-      <div class="cockpit-row">
+    const role = m.relationship || m.member_type || "family";
+    const html = `
+      <button type="button" class="cockpit-row cockpit-row--clickable" data-cockpit-family-id="${escapeHtml(m.id)}" data-cockpit-family-kind="family_member">
         <span class="cockpit-avatar cockpit-avatar--md cockpit-avatar--soft">${escapeHtml(initials)}</span>
         <div class="cockpit-row__main">
           <div class="cockpit-row__title">${escapeHtml(fullName)}</div>
-          <div class="cockpit-row__sub">${escapeHtml(m.relationship || m.member_type || "family")}</div>
+          <div class="cockpit-row__sub">${escapeHtml(role)}</div>
         </div>
-      </div>
-    `);
+      </button>
+    `;
+    // Member rank=1 — only kept if no user with the same name was seen.
+    ranked({ key, html }, 1);
   }
-  return rows.join("");
+  return Array.from(seen.values()).map((v) => v.html).join("");
 }
 
 // Heuristic: a system is "covered" if it has a service_vendor string OR a
@@ -5636,6 +5689,7 @@ function renderConciergeNotesListHtml(dossier) {
 function renderConciergeCaseWorkspaceHtml(req) {
   const messages = state.chezMessages[req.id] || [];
   const visits = (state.chezVisitsByRequest || {})[req.id];
+  const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
 
   // Lazy-load thread + visits if we don't have them.
   if (state.chezMessages[req.id] === undefined) {
@@ -5645,21 +5699,27 @@ function renderConciergeCaseWorkspaceHtml(req) {
     fetchChezVisits(req.id);
   }
 
+  const archetype = detectConciergeArchetype(req, dossier, messages);
+  // Phase 83.5 — Vendor sheet only shows for true vendor-sourcing cases
+  // (archetype find_vendor or quote). Pre-vendored cases (coordinate_vendor)
+  // skip the sheet because the vendor is already known. Internal-task and
+  // clarify cases never show vendor candidates.
+  const showVendorSheet = state.concierge.ui.vendorOpen
+    && (archetype.id === "find_vendor" || archetype.id === "quote");
+  // Non-vendor body (the small summary card) only renders for archetypes
+  // that aren't full vendor sourcing, so the operator gets a per-archetype
+  // brief next to the AI brief.
+  const showNonVendorBody = archetype.id !== "find_vendor";
+
   const headerHtml = renderConciergeCaseHeaderHtml(req);
+  const overviewHtml = renderConciergeCaseOverviewHtml(req, dossier, archetype);
   const briefHtml = renderConciergeAIBriefHtml(req);
-  const isVendorCase = req.category === "find_vendor" || req.category === "find_handyman" || req.category === "get_quote";
-  const ui = state.concierge.ui;
-  const vendorSheetHtml = (ui.vendorOpen && isVendorCase)
-    ? renderConciergeVendorSheetHtml(req)
-    : "";
-  const nonVendorBodyHtml = !isVendorCase
-    ? renderConciergeNonVendorBodyHtml(req)
-    : "";
+  const vendorSheetHtml = showVendorSheet ? renderConciergeVendorSheetHtml(req) : "";
+  const nonVendorBodyHtml = showNonVendorBody ? renderConciergeNonVendorBodyHtml(req, archetype) : "";
   const stageTrackerHtml = renderStageTrackerHtml(req, messages, visits);
   const visitsHtml = renderVisitsPanelHtml(req, visits);
   // Phase 83.1 — When the queue rail is in chat mode, the conversation
-  // already renders there. Skip it in the workspace to avoid duplication
-  // and free the operator's center column for AI brief + vendor sheet.
+  // already renders there. Skip it in the workspace to avoid duplication.
   const showConversationInWorkspace = state.concierge.queueMode !== "case";
   const conversationHtml = showConversationInWorkspace ? renderConciergeConversationHtml(req, messages) : "";
 
@@ -5668,6 +5728,7 @@ function renderConciergeCaseWorkspaceHtml(req) {
     <div class="cockpit-workspace__scroll" data-cockpit-workspace-scroll>
       <div class="cockpit-workspace__inner">
         ${stageTrackerHtml}
+        ${overviewHtml}
         ${briefHtml}
         ${nonVendorBodyHtml}
         ${visitsHtml}
@@ -5675,6 +5736,91 @@ function renderConciergeCaseWorkspaceHtml(req) {
         ${conversationHtml}
       </div>
     </div>
+  `;
+}
+
+// Phase 83.5 — "About this case" card. Surfaces the entity Tom needs to
+// know about at a glance: task title, system / area, vendor named in
+// context, original delegation source. Sits between the stage tracker
+// and the AI brief.
+function renderConciergeCaseOverviewHtml(req, dossier, archetype) {
+  const ctx = (req.context && typeof req.context === "object") ? req.context : {};
+  const taskTitle = ctx.task_title || ctx.title || null;
+  const systemId = ctx.system_id || null;
+  const systemCategory = ctx.system_category || ctx.category || null;
+  const namedVendor = archetype.vendor_name || ctx.vendor_name || ctx.contractor_name || null;
+  const delegationSource = ctx.source || ctx._source || ctx.entry_point || null;
+
+  // Resolve the linked system if we have an id.
+  const linkedSystem = systemId && dossier?.home_systems
+    ? dossier.home_systems.find((s) => s.id === systemId)
+    : null;
+
+  // Surface the homeowner's first message so Tom sees what they actually
+  // typed without scrolling to the chat.
+  const messages = state.chezMessages[req.id] || [];
+  const firstUserMsg = messages.find((m) => m.role === "user")?.content;
+
+  // Detect the homeowner's intent from the first message — surface a
+  // clarifying-question hint when the request is vague.
+  const isVague = archetype.id === "clarify";
+
+  // Skip the card entirely if we have nothing useful to show.
+  const hasContent = taskTitle || linkedSystem || namedVendor || delegationSource || firstUserMsg;
+  if (!hasContent) return "";
+
+  const rows = [];
+  if (taskTitle) {
+    rows.push({ label: "Task", value: escapeHtml(taskTitle) });
+  }
+  if (linkedSystem) {
+    rows.push({
+      label: "System",
+      value: `<button type="button" class="cockpit-overview-link" data-cockpit-dossier-entity="home_system" data-cockpit-dossier-id="${escapeHtml(linkedSystem.id)}">${escapeHtml(linkedSystem.name || linkedSystem.category)} → see full record</button>`,
+    });
+  } else if (systemCategory) {
+    rows.push({ label: "Area", value: escapeHtml(systemCategory) });
+  }
+  if (namedVendor) {
+    // Try to find the contractor in the dossier so we can deep-link.
+    const matched = (dossier?.contractors || []).find((c) => String(c.company_name || "").toLowerCase() === String(namedVendor).toLowerCase());
+    if (matched) {
+      rows.push({
+        label: "Vendor",
+        value: `<button type="button" class="cockpit-overview-link" data-cockpit-dossier-entity="contractor" data-cockpit-dossier-id="${escapeHtml(matched.id)}">${escapeHtml(matched.company_name)} → see record</button>`,
+      });
+    } else {
+      rows.push({ label: "Vendor", value: escapeHtml(namedVendor) });
+    }
+  }
+  if (delegationSource) {
+    rows.push({ label: "Source", value: escapeHtml(String(delegationSource)) });
+  }
+
+  // Vague-case hint. Visually salmon-tinted so the operator sees "this
+  // needs clarification before doing anything else."
+  if (isVague) {
+    rows.push({
+      label: "Heads up",
+      value: `<span class="cockpit-overview-warn">Vague request — recommend asking a clarifying question before routing.</span>`,
+    });
+  }
+
+  return `
+    <section class="cockpit-overview ${isVague ? "is-vague" : ""}">
+      <div class="cockpit-overview__head">
+        <span class="cockpit-eyebrow cockpit-eyebrow--inline">About this case</span>
+        ${firstUserMsg ? `<span class="cockpit-muted cockpit-overview__sub">"${escapeHtml(firstUserMsg.slice(0, 120))}${firstUserMsg.length > 120 ? "…" : ""}"</span>` : ""}
+      </div>
+      <div class="cockpit-overview__rows">
+        ${rows.map((r) => `
+          <div class="cockpit-overview__row">
+            <span class="cockpit-overview__label">${escapeHtml(r.label)}</span>
+            <span class="cockpit-overview__value">${r.value}</span>
+          </div>
+        `).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -5810,45 +5956,68 @@ function renderConciergeAIBriefHtml(req) {
 
 // -- Non-vendor body ------------------------------------------------------
 
-function renderConciergeNonVendorBodyHtml(req) {
-  // Per-category summary card. Maps the homeowner's request category to a
-  // concise eyebrow + headline + bullet breakdown + primary CTA. The CTA
-  // wires to a real action on every variant.
+function renderConciergeNonVendorBodyHtml(req, archetype) {
+  // Phase 83.5 — Per-archetype summary card. Replaces the prior per-category
+  // mapping which was identical across cases. Each archetype tells the
+  // operator the SHAPE of the work + the right primary action.
   const variants = {
-    schedule_visit: {
-      eyebrow: "Coordinate visit",
-      headline: "Pin down the date and confirm with the homeowner.",
+    clarify: {
+      eyebrow: "Clarification first",
+      headline: "Don't assume — ask the homeowner what kind of help they actually need.",
       bullets: [
-        "Reach the vendor and lock the slot.",
-        "Reply to the homeowner with the proposed window.",
-        "Stamp the visit row when confirmed.",
+        "Vague body without specifics → easy to mis-route to a vendor pipeline.",
+        "Send a one-line question covering: vendor / DIY guidance / recommendation.",
+        "Reclassify once they reply — the cockpit will route the right workflow.",
       ],
-      cta: "Send proposed dates",
+      cta: "Draft clarifying question",
+      ctaAction: "draft-clarifier",
+    },
+    coordinate_vendor: {
+      eyebrow: "Vendor named — coordinate visit",
+      headline: archetype?.vendor_name ? `${archetype.vendor_name} is locked in. Get dates + send to homeowner.` : "Vendor's named in context. Skip research; coordinate dates.",
+      bullets: [
+        "Call the vendor for 2-3 available dates.",
+        "Send those dates to the homeowner via the date-slot proposal.",
+        "Visit auto-confirms when they pick.",
+      ],
+      cta: "Send dates to homeowner",
       ctaAction: "open-proposal-builder",
     },
-    coordinate_task: {
-      eyebrow: "Coordinate task",
-      headline: "Owns the back-and-forth so the homeowner doesn't have to.",
+    internal_task: {
+      eyebrow: "Internal task — Chez does this",
+      headline: "Find the asset, save to their docs, reply with the link. No vendor involved.",
       bullets: [
-        "Identify the right vendor on file or source one.",
-        "Schedule + confirm window with the homeowner.",
-        "Track follow-up through completion.",
+        "Try the equipment-manuals catalog first (lookup by model number).",
+        "Manufacturer's website if not in catalog.",
+        "Save to homeowner's documents vault, then reply with link.",
       ],
-      cta: "Propose vendor + dates",
-      ctaAction: "open-proposal-builder",
+      cta: "Search equipment manuals",
+      ctaAction: "search-equipment-manuals",
+    },
+    quote: {
+      eyebrow: "Get a quote",
+      headline: "Gather 2-3 estimates, send a comparison summary.",
+      bullets: [
+        "Source 2-3 quote candidates.",
+        "Call each, log estimates in their call form.",
+        "Compose a side-by-side comparison and send.",
+      ],
+      cta: "Run vendor research",
+      ctaAction: "rerun-analysis",
     },
     general: {
-      eyebrow: "Account question",
+      eyebrow: "General help",
       headline: "Answer the homeowner directly with the right context.",
       bullets: [
-        "Use the conversation thread below to reply.",
+        "Use the conversation thread to reply.",
         "Promote to a structured proposal if vendor / dates / cost involved.",
+        "Mark resolved once their question is answered.",
       ],
-      cta: "Reply now",
-      ctaAction: "focus-composer",
+      cta: "Draft a reply",
+      ctaAction: "draft-from-brief",
     },
   };
-  const v = variants[req.category];
+  const v = variants[archetype?.id] || variants.general;
   if (!v) return "";
   return `
     <section class="cockpit-nonvendor">
@@ -6333,6 +6502,127 @@ function renderConciergeAlfredSidebarHtml(req) {
 // card and Quick actions list now mirror the actual stage tracker so the
 // operator sees only what's left to do, not what's already done. The
 // goal is "completed visit" — get the homeowner what they asked for.
+// =============================================================================
+// Phase 83.5 — Case archetype classification.
+// =============================================================================
+// Not every case is "find a vendor." The cockpit's progression + suggested
+// actions used to be one-size-fits-all, which led to:
+//   • Vague requests ("Help me with this") routing to vendor sourcing
+//   • Pre-vendored tasks ("Schedule with Handyman Express") suggesting we
+//     pick from 5 candidates
+//   • Internal tasks ("Find the Use & Care Guide") starting a vendor pipeline
+//
+// `detectConciergeArchetype` reads the request context, message text, and
+// dossier to slot the case into one of 6 archetypes. Each archetype gets
+// its own Resolve plan, Quick actions, and stage tracker semantics.
+//
+// Archetypes:
+//   clarify              — vague / unclear request; need a follow-up question
+//   coordinate_vendor    — vendor named in context, just schedule
+//   internal_task        — info gathering (manuals, docs, lookups), no vendor
+//   find_vendor          — full sourcing pipeline (the original default)
+//   quote                — competitive quote gathering
+//   general              — Q&A; reply-and-resolve
+
+const CHEZ_VAGUE_PHRASES = [
+  "help me",
+  "not sure",
+  "don't know",
+  "i don't know",
+  "what should",
+  "what to do",
+  "where this came from",
+  "where this task came from",
+  "anything you can do",
+  "please help",
+  "can you help",
+];
+
+function detectConciergeArchetype(req, dossier, messages) {
+  // Phase 83.5 — Manual override wins. Tom can flip the archetype via
+  // the "Reclassify this case" quick action when the auto-classifier
+  // gets it wrong.
+  const override = state.chezArchetypeOverride && state.chezArchetypeOverride[req.id];
+  if (override) {
+    const ctxOverride = (req.context && typeof req.context === "object") ? req.context : {};
+    const namedOverride = ctxOverride.vendor_name || ctxOverride.contractor_name || ctxOverride.contractor;
+    return { id: override, vendor_name: namedOverride ? String(namedOverride) : undefined };
+  }
+
+  const ctx = (req.context && typeof req.context === "object") ? req.context : {};
+  const summary = (req.summary || "").toLowerCase();
+  const firstMessage = (messages || []).find((m) => m.role === "user")?.content || "";
+  const firstText = String(firstMessage).toLowerCase();
+  const combined = `${summary} ${firstText}`;
+  const category = req.category || "general";
+
+  // Pre-vendored: a vendor name lives in the request context (set by iOS
+  // when the homeowner delegated a task that already had a contractor).
+  // Also matches when the message body explicitly names a known household
+  // vendor.
+  const namedVendor = ctx.vendor_name || ctx.contractor_name || ctx.contractor;
+  if (namedVendor) {
+    return { id: "coordinate_vendor", vendor_name: String(namedVendor) };
+  }
+  // Heuristic: message text mentions one of the homeowner's vendors by
+  // company name.
+  if (dossier?.contractors?.length) {
+    for (const c of dossier.contractors) {
+      const name = String(c.company_name || "").toLowerCase();
+      if (name.length > 3 && combined.includes(name)) {
+        return { id: "coordinate_vendor", vendor_name: c.company_name, vendor_id: c.id };
+      }
+    }
+  }
+
+  // Internal info task: docs, manuals, guides, lookups — Chez does these
+  // ourselves rather than calling a vendor.
+  const internalSignals = [
+    "use & care guide", "use and care guide", "user manual", "owner's manual",
+    "find the manual", "find the guide", "document", "warranty document",
+    "registration", "serial number", "model number lookup",
+  ];
+  if (internalSignals.some((s) => combined.includes(s))) {
+    return { id: "internal_task" };
+  }
+
+  // Quote-specific framing in the request category.
+  if (category === "get_quote") {
+    return { id: "quote" };
+  }
+
+  // General questions — short reply works.
+  if (category === "general") {
+    return { id: "general" };
+  }
+
+  // Vague request: signals like "help me with this", "not sure", short
+  // body without specifics. Triggers when the body is short AND uses a
+  // vague phrase. Long bodies with clear specifics fall through to the
+  // category-default.
+  const isShort = firstText.trim().split(/\s+/).length < 25;
+  const looksVague = CHEZ_VAGUE_PHRASES.some((p) => combined.includes(p));
+  if (isShort && looksVague) {
+    return { id: "clarify" };
+  }
+
+  // Default by category.
+  if (category === "find_vendor" || category === "find_handyman") {
+    return { id: "find_vendor" };
+  }
+  if (category === "schedule_visit") {
+    return { id: "coordinate_vendor", vendor_name: namedVendor };
+  }
+  if (category === "coordinate_task") {
+    // Coordinate task without a named vendor → most cases need vendor
+    // sourcing; the few that don't usually have an internal-task signal
+    // (caught above).
+    return { id: "find_vendor" };
+  }
+
+  return { id: "general" };
+}
+
 function computeConciergeCaseProgression(req, dossier) {
   const cached = state.chezAnalysisByRequest && state.chezAnalysisByRequest[req.id];
   const candidates = cached ? [
@@ -6345,13 +6635,23 @@ function computeConciergeCaseProgression(req, dossier) {
   const recommendedCount = Object.values(callState).filter((s) => s && s.recommended).length;
   const messages = state.chezMessages[req.id] || [];
   const vendorProposals = messages.filter((m) => m.proposal && m.proposal.kind === "vendor");
+  const dateProposals = messages.filter((m) => m.proposal && m.proposal.kind === "date_slot");
   const proposalsSent = vendorProposals.length > 0;
   const anyApproved = vendorProposals.some((m) => m.proposal.status === "approved");
+  const datesProposed = dateProposals.length > 0;
   const visits = (state.chezVisitsByRequest || {})[req.id] || [];
   const livingVisits = visits.filter((v) => v.state !== "cancelled");
   const visitScheduled = livingVisits.some((v) => v.state === "scheduled");
   const visitComplete = livingVisits.length > 0 && livingVisits.every((v) => v.state === "completed");
   const isResolved = req.status === "resolved";
+  // Whether we sent a clarifying question and got an answer.
+  // Detected by: any concierge message older than the most recent user
+  // message implies the homeowner replied to our outreach.
+  const adminMessages = messages.filter((m) => m.role === "concierge");
+  const userMessages = messages.filter((m) => m.role === "user");
+  const adminAsked = adminMessages.length > 0;
+  const homeownerReplied = userMessages.length > 1 ||
+    (userMessages.length === 1 && adminMessages.length > 0 && new Date(userMessages[0].created_at).getTime() > new Date(adminMessages[0].created_at).getTime());
   // Find the first vendor that's been called but not recommended yet —
   // that's the natural "next call to log" candidate.
   const nextUncalledIdx = candidates.findIndex((v) => {
@@ -6367,6 +6667,7 @@ function computeConciergeCaseProgression(req, dossier) {
     recommendedCount,
     proposalsSent,
     anyApproved,
+    datesProposed,
     visits,
     livingVisits,
     visitScheduled,
@@ -6376,170 +6677,57 @@ function computeConciergeCaseProgression(req, dossier) {
     hasResearch: !!cached && (candidates.length > 0),
     sentCount: vendorProposals.length,
     approvedCount: vendorProposals.filter((m) => m.proposal.status === "approved").length,
+    adminAsked,
+    homeownerReplied,
+    adminMessageCount: adminMessages.length,
+    userMessageCount: userMessages.length,
   };
 }
 
 function renderConciergeAlfredActionsHtml(req, dossier) {
+  const messages = state.chezMessages[req.id] || [];
+  const archetype = detectConciergeArchetype(req, dossier, messages);
   const p = computeConciergeCaseProgression(req, dossier);
 
-  // Build the lifecycle: 8 stages, each with a label + done flag + the
-  // primary action that progresses the case past that stage. We render
-  // ONLY the not-yet-done steps (max 4) so the operator sees what's left,
-  // not a list of work they already did.
-  const allSteps = [
-    {
-      id: "research",
-      label: p.hasResearch
-        ? `Researched ${p.candidates.length} vendor${p.candidates.length === 1 ? "" : "s"}`
-        : "Run vendor research to pull candidates",
-      done: p.hasResearch,
-      action: "rerun-analysis",
-    },
-    {
-      id: "calls",
-      label: p.callsLogged === 0
-        ? `Call vendors and log notes (${Math.min(3, p.candidates.length)} recommended)`
-        : p.callsLogged < Math.min(3, p.candidates.length)
-        ? `Log ${Math.min(3, p.candidates.length) - p.callsLogged} more call${Math.min(3, p.candidates.length) - p.callsLogged === 1 ? "" : "s"}`
-        : `Logged ${p.callsLogged} calls`,
-      done: p.callsLogged >= Math.min(3, Math.max(1, p.candidates.length)),
-      action: p.nextUncalledIdx >= 0 ? "alfred-resolve-open-top" : "alfred-resolve-open-top",
-    },
-    {
-      id: "recommend",
-      label: p.recommendedCount === 0
-        ? "Mark the strongest as Recommended"
-        : `${p.recommendedCount} vendor${p.recommendedCount === 1 ? "" : "s"} marked Recommended`,
-      done: p.recommendedCount > 0,
-      action: "alfred-resolve-open-top",
-    },
-    {
-      id: "send",
-      label: !p.proposalsSent
-        ? `Send ${p.recommendedCount > 0 ? p.recommendedCount + " " : ""}proposal${p.recommendedCount === 1 ? "" : "s"} to the homeowner`
-        : `Sent ${p.sentCount} proposal${p.sentCount === 1 ? "" : "s"}`,
-      done: p.proposalsSent,
-      action: p.recommendedCount > 0 ? "alfred-resolve-with-proposal" : "open-proposal-builder",
-    },
-    {
-      id: "picked",
-      label: !p.anyApproved
-        ? "Wait for homeowner to pick a vendor"
-        : `Homeowner picked ${p.livingVisits[0]?.vendor_name || "a vendor"}`,
-      done: p.anyApproved,
-      action: !p.anyApproved && p.proposalsSent ? "send-checkin-reminder" : null,
-    },
-    {
-      id: "scheduled",
-      label: !p.visitScheduled && !p.visitComplete
-        ? `Confirm visit date${p.livingVisits[0]?.vendor_name ? ` with ${p.livingVisits[0].vendor_name}` : ""}`
-        : "Visit booked",
-      done: p.visitScheduled || p.visitComplete,
-      action: p.anyApproved && !p.visitScheduled ? "scroll-to-visits" : null,
-    },
-    {
-      id: "complete",
-      label: !p.visitComplete
-        ? "After the visit, mark it completed"
-        : "Visit completed — work done",
-      done: p.visitComplete,
-      action: p.visitScheduled ? "scroll-to-visits" : null,
-    },
-    {
-      id: "resolved",
-      label: !p.isResolved ? "Mark case resolved" : "Case resolved",
-      done: p.isResolved,
-      action: p.visitComplete ? "resolved" : null,
-    },
-  ];
-
-  // Show: any not-done steps, plus one trailing done step for context.
-  const remainingSteps = allSteps.filter((s) => !s.done);
-  const visibleSteps = remainingSteps.slice(0, 4);
-
-  // Headline + primary CTA reflect the most pressing next action.
-  let headline = "";
-  let ctaLabel = "";
-  let ctaAction = "";
-
+  // Phase 83.5 — Branch the plan + quick actions by case archetype. Each
+  // case type has a different "shape" of work and shouldn't be forced
+  // through the find_vendor pipeline.
+  let plan;
   if (p.isResolved) {
-    headline = `Case resolved. <span class="cockpit-muted">Reopen if the homeowner needs more help.</span>`;
-    ctaLabel = "Reopen";
-    ctaAction = "reopen";
-  } else if (p.visitComplete) {
-    headline = `Visit completed. <span class="cockpit-muted">Wrap up — mark resolved so this drops off your queue.</span>`;
-    ctaLabel = "Mark resolved";
-    ctaAction = "resolved";
-  } else if (p.visitScheduled) {
-    const when = p.livingVisits.find((v) => v.state === "scheduled")?.scheduled_for;
-    const whenLabel = when ? formatSlotDisplay(when) : "the booked date";
-    headline = `Visit scheduled for ${escapeHtml(whenLabel)}. <span class="cockpit-muted">Mark completed once the visit is done.</span>`;
-    ctaLabel = "Open visit card";
-    ctaAction = "scroll-to-visits";
-  } else if (p.anyApproved) {
-    const vendor = p.livingVisits[0]?.vendor_name || "the vendor";
-    headline = `Homeowner picked ${escapeHtml(vendor)}. <span class="cockpit-muted">Confirm a date with them and mark scheduled.</span>`;
-    ctaLabel = "Confirm visit date";
-    ctaAction = "scroll-to-visits";
-  } else if (p.proposalsSent) {
-    headline = `${p.sentCount} proposal${p.sentCount === 1 ? "" : "s"} out. <span class="cockpit-muted">Waiting on the homeowner to pick — send a check-in note if it stalls.</span>`;
-    ctaLabel = "Send a check-in";
-    ctaAction = "draft-from-brief";
-  } else if (p.recommendedCount > 0) {
-    headline = `${p.recommendedCount} vendor${p.recommendedCount === 1 ? " is" : "s are"} ready to send. <span class="cockpit-muted">One click drafts the proposal and queues your approval.</span>`;
-    ctaLabel = "Open proposal builder";
-    ctaAction = "alfred-resolve-with-proposal";
-  } else if (p.callsLogged > 0) {
-    headline = `${p.callsLogged} call${p.callsLogged === 1 ? "" : "s"} logged. <span class="cockpit-muted">Mark the strongest as Recommended to send.</span>`;
-    ctaLabel = "Open #" + ((p.nextUncalledIdx >= 0 ? p.nextUncalledIdx : 0) + 1) + "'s form";
-    ctaAction = "alfred-resolve-open-top";
-  } else if (p.candidates.length > 0) {
-    const v = p.topVendor;
-    const vname = v?.company_name || v?.name || "top match";
-    headline = `${p.candidates.length} candidates ready. <span class="cockpit-muted">Call ${escapeHtml(vname)} first — they're the best fit.</span>`;
-    ctaLabel = "Open " + escapeForHtml(vname.split(" ")[0]) + "'s call form";
-    ctaAction = "alfred-resolve-open-top";
+    plan = {
+      headline: `Case resolved. <span class="cockpit-muted">Reopen if the homeowner needs more help.</span>`,
+      ctaLabel: "Reopen",
+      ctaAction: "reopen",
+      steps: [],
+      quickActions: [
+        { label: "Reopen this case", sub: "If the homeowner has follow-up questions", action: "reopen" },
+      ],
+      tone: "resolved",
+    };
+  } else if (archetype.id === "clarify") {
+    plan = buildClarifyPlan(req, dossier, p);
+  } else if (archetype.id === "coordinate_vendor") {
+    plan = buildCoordinateVendorPlan(req, dossier, p, archetype);
+  } else if (archetype.id === "internal_task") {
+    plan = buildInternalTaskPlan(req, dossier, p);
+  } else if (archetype.id === "quote") {
+    plan = buildQuotePlan(req, dossier, p);
+  } else if (archetype.id === "general") {
+    plan = buildGeneralPlan(req, dossier, p);
   } else {
-    headline = `Coordinate this end-to-end. <span class="cockpit-muted">Source vendors, log calls, send the proposal, track the visit.</span>`;
-    ctaLabel = "Run vendor research";
-    ctaAction = "rerun-analysis";
+    plan = buildFindVendorPlan(req, dossier, p);
   }
 
-  // Quick actions also adapt to the case stage. The list becomes more
-  // useful by surfacing only actions that matter at the current step.
-  const quickActions = [];
-  if (!p.hasResearch) {
-    quickActions.push({ label: "Run vendor research", sub: "Pull existing-network + local Places candidates", action: "rerun-analysis" });
-  }
-  if (p.candidates.length > 0 && p.callsLogged < p.candidates.length) {
-    quickActions.push({ label: "Open next vendor's call form", sub: "Voice the call — Alfred polishes the framing", action: "alfred-resolve-open-top" });
-  }
-  if (p.recommendedCount > 0 && !p.proposalsSent) {
-    quickActions.push({ label: "Send recommended vendors", sub: `Drafts ${p.recommendedCount} Approve/Counter/Decline card${p.recommendedCount === 1 ? "" : "s"}`, action: "alfred-resolve-with-proposal" });
-  }
-  if (p.proposalsSent && !p.anyApproved) {
-    quickActions.push({ label: "Send a warm check-in", sub: "Pre-fills the composer with a nudge", action: "draft-from-brief" });
-  }
-  if (p.anyApproved && !p.visitScheduled) {
-    quickActions.push({ label: "Confirm visit date", sub: "Open the visit card and pick a date/time", action: "scroll-to-visits" });
-  }
-  if (p.visitScheduled && !p.visitComplete) {
-    quickActions.push({ label: "Mark visit completed", sub: "Stamp the outcome and close the loop", action: "scroll-to-visits" });
-  }
-  if (p.visitComplete && !p.isResolved) {
-    quickActions.push({ label: "Mark case resolved", sub: "Drops this off your queue", action: "resolved" });
-  }
-  // Always-available utilities at the end.
-  quickActions.push({ label: "Mark waiting on customer", sub: "Pause SLA until they reply", action: "waiting" });
-  quickActions.push({ label: "Snooze this case", sub: "Resurface later — tracked as a system note", action: "snooze" });
-  if (p.hasResearch) {
-    quickActions.push({ label: "Re-run AI analysis", sub: "Refresh brief + vendor candidates", action: "rerun-analysis" });
-  }
+  // Always-available utilities at the bottom of the quick-actions list.
+  plan.quickActions = plan.quickActions.concat([
+    { label: "Mark waiting on customer", sub: "Pause SLA until they reply", action: "waiting" },
+    { label: "Snooze this case", sub: "Resurface later — tracked as a system note", action: "snooze" },
+    { label: "Reclassify this case", sub: "Wrong archetype? Pick the right workflow", action: "reclassify-case" },
+  ]);
 
   // Memory provenance: how many vendors Chez has sourced for this
   // homeowner historically. Pulled from the dossier's contractors with
-  // chez_recommended_at set. Surfaces "we've been good to them" at a
-  // glance.
+  // chez_recommended_at set.
   const chezSourced = (dossier?.contractors || []).filter((c) => c.chez_recommended_at);
   const memoryNote = chezSourced.length
     ? `${chezSourced.length} vendor${chezSourced.length === 1 ? "" : "s"} sourced by Chez for this household — saved to their profile.`
@@ -6555,31 +6743,42 @@ function renderConciergeAlfredActionsHtml(req, dossier) {
     p.visits.length ? `${p.visits.length} visit${p.visits.length === 1 ? "" : "s"} on the calendar` : null,
   ].filter(Boolean).join(" · ");
 
+  const archetypeLabel = {
+    clarify: "Clarification needed",
+    coordinate_vendor: "Coordinate visit · vendor named",
+    internal_task: "Internal task · Chez does this",
+    find_vendor: "Source vendors",
+    quote: "Get a quote",
+    general: "General help",
+  }[archetype.id] || "Resolve this case";
+
   return `
-    <div class="cockpit-resolve ${p.isResolved ? "is-resolved" : p.visitComplete ? "is-complete" : ""}">
+    <div class="cockpit-resolve ${plan.tone === "resolved" ? "is-resolved" : plan.tone === "complete" ? "is-complete" : ""} cockpit-resolve--${escapeHtml(archetype.id)}">
       <div class="cockpit-resolve__head">
         <span class="cockpit-spark cockpit-spark--sm">✦</span>
-        <span class="cockpit-resolve__eyebrow">${p.isResolved ? "Case resolved" : "Resolve this case"}</span>
+        <span class="cockpit-resolve__eyebrow">${escapeHtml(archetypeLabel)}</span>
       </div>
-      <div class="cockpit-resolve__headline">${headline}</div>
-      ${visibleSteps.length > 0 ? `
+      <div class="cockpit-resolve__headline">${plan.headline}</div>
+      ${plan.steps && plan.steps.length > 0 ? `
         <div class="cockpit-resolve__steps">
-          ${visibleSteps.map((s, i) => `
-            <div class="cockpit-resolve__step">
-              <span class="cockpit-resolve__step-num">${i + 1}</span>
+          ${plan.steps.slice(0, 4).map((s, i) => `
+            <div class="cockpit-resolve__step ${s.done ? "is-done" : ""}">
+              <span class="cockpit-resolve__step-num">${s.done ? "✓" : (i + 1)}</span>
               <span class="cockpit-resolve__step-text">${escapeHtml(s.label)}</span>
             </div>
           `).join("")}
         </div>
       ` : ""}
-      <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--full" data-cockpit-action="${escapeHtml(ctaAction)}">
-        <span class="cockpit-spark cockpit-spark--sm" style="color:#fff;">✦</span>${ctaLabel}
-      </button>
+      ${plan.ctaLabel ? `
+        <button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--full" data-cockpit-action="${escapeHtml(plan.ctaAction)}">
+          <span class="cockpit-spark cockpit-spark--sm" style="color:#fff;">✦</span>${plan.ctaLabel}
+        </button>
+      ` : ""}
     </div>
 
     <div class="cockpit-eyebrow cockpit-eyebrow--space">Quick actions</div>
     <div class="cockpit-actions">
-      ${quickActions.map((a) => renderConciergeActionRow(a.label, a.sub, a.action)).join("")}
+      ${plan.quickActions.map((a) => renderConciergeActionRow(a.label, a.sub, a.action)).join("")}
     </div>
 
     <div class="cockpit-context-box">
@@ -6592,6 +6791,345 @@ function renderConciergeAlfredActionsHtml(req, dossier) {
       <div class="cockpit-context-box__body">${escapeHtml(sourcesUsed || "loading…")}</div>
     </div>
   `;
+}
+
+// =============================================================================
+// Phase 83.5 — Plan builders per archetype.
+// =============================================================================
+
+// CLARIFY — vague request, need to ask the homeowner what they actually need.
+function buildClarifyPlan(req, dossier, p) {
+  const dossierObj = dossier || {};
+  const homeownerFirst = dossierObj.users?.[0]?.full_name?.split(" ")[0]
+    || dossierObj.family_members?.[0]?.first_name
+    || "the homeowner";
+
+  // Branch on whether we've already sent a clarifying question.
+  if (!p.adminAsked) {
+    return {
+      headline: `Vague request — start with a clarifying question. <span class="cockpit-muted">We don't know what kind of help they need yet.</span>`,
+      ctaLabel: "Draft clarifying question",
+      ctaAction: "draft-clarifier",
+      steps: [
+        { label: "Ask what kind of help they need", done: false },
+        { label: "Wait for their reply", done: false },
+        { label: "Re-classify into the right workflow", done: false },
+        { label: "Resolve once they have what they need", done: false },
+      ],
+      quickActions: [
+        { label: "Draft clarifying question", sub: `Pre-fills the composer with a tone-aware prompt for ${escapeHtml(homeownerFirst)}`, action: "draft-clarifier" },
+        { label: "Reclassify this case", sub: "If you already know what they need, pick the right workflow", action: "reclassify-case" },
+        { label: "Mark resolved", sub: "If this turned out to be a non-issue", action: "resolved" },
+      ],
+    };
+  }
+  if (p.adminAsked && !p.homeownerReplied) {
+    return {
+      headline: `Asked the homeowner what they need. <span class="cockpit-muted">Waiting on their reply — pause the SLA timer.</span>`,
+      ctaLabel: "Mark waiting on customer",
+      ctaAction: "waiting",
+      steps: [
+        { label: "Asked what they need", done: true },
+        { label: "Wait for reply", done: false },
+        { label: "Re-classify based on their answer", done: false },
+        { label: "Resolve", done: false },
+      ],
+      quickActions: [
+        { label: "Mark waiting on customer", sub: "Pause SLA until they reply", action: "waiting" },
+        { label: "Send a follow-up nudge", sub: "If they haven't replied", action: "draft-from-brief" },
+      ],
+    };
+  }
+  // Got a reply — operator should re-read it and reclassify.
+  return {
+    headline: `Homeowner replied. <span class="cockpit-muted">Read their answer and reclassify so the cockpit can route the right workflow.</span>`,
+    ctaLabel: "Reclassify this case",
+    ctaAction: "reclassify-case",
+    steps: [
+      { label: "Asked what they need", done: true },
+      { label: "Got their reply", done: true },
+      { label: "Re-classify into the right workflow", done: false },
+      { label: "Resolve once they have what they need", done: false },
+    ],
+    quickActions: [
+      { label: "Reclassify this case", sub: "Pick the right archetype for what they actually asked", action: "reclassify-case" },
+      { label: "Reply directly", sub: "Compose a normal reply if it's a simple Q&A", action: "draft-from-brief" },
+    ],
+  };
+}
+
+// COORDINATE_VENDOR — vendor is named in context. Skip research, go to dates.
+function buildCoordinateVendorPlan(req, dossier, p, archetype) {
+  const vendorName = archetype.vendor_name || "the named vendor";
+  const visit = p.livingVisits[0];
+  const visitState = visit?.state;
+
+  if (p.visitComplete) {
+    return {
+      headline: `${escapeHtml(vendorName)}'s visit is done. <span class="cockpit-muted">Mark resolved so this drops off your queue.</span>`,
+      ctaLabel: "Mark resolved",
+      ctaAction: "resolved",
+      tone: "complete",
+      steps: [
+        { label: `Called ${vendorName}`, done: true },
+        { label: "Sent dates to homeowner", done: true },
+        { label: "Visit booked", done: true },
+        { label: "Visit complete", done: true },
+      ],
+      quickActions: [
+        { label: "Mark resolved", sub: "Drops this off your queue", action: "resolved" },
+        { label: "Re-open the visit card", sub: "If you need to add notes or update the outcome", action: "scroll-to-visits" },
+      ],
+    };
+  }
+  if (p.visitScheduled) {
+    const when = visit?.scheduled_for ? formatSlotDisplay(visit.scheduled_for) : "the booked date";
+    return {
+      headline: `${escapeHtml(vendorName)} is booked for <strong>${escapeHtml(when)}</strong>. <span class="cockpit-muted">Mark completed once the visit is done.</span>`,
+      ctaLabel: "Mark visit completed",
+      ctaAction: "scroll-to-visits",
+      steps: [
+        { label: `Confirmed with ${vendorName}`, done: true },
+        { label: "Date locked", done: true },
+        { label: "After the visit, mark it completed", done: false },
+        { label: "Mark case resolved", done: false },
+      ],
+      quickActions: [
+        { label: "Open the visit card", sub: "Update outcome / mark completed", action: "scroll-to-visits" },
+        { label: "Reschedule", sub: "If the homeowner needs a different date", action: "scroll-to-visits" },
+      ],
+    };
+  }
+  if (p.anyApproved) {
+    return {
+      headline: `Homeowner picked their date with ${escapeHtml(vendorName)}. <span class="cockpit-muted">Confirm the slot with the vendor and mark scheduled.</span>`,
+      ctaLabel: "Open visit card to confirm",
+      ctaAction: "scroll-to-visits",
+      steps: [
+        { label: `Called ${vendorName} for available dates`, done: true },
+        { label: "Sent dates to homeowner", done: true },
+        { label: `Lock the date with ${vendorName}`, done: false },
+        { label: "Mark scheduled", done: false },
+      ],
+      quickActions: [
+        { label: "Open visit card", sub: "Confirm the date and mark scheduled", action: "scroll-to-visits" },
+        { label: `Call ${vendorName}`, sub: "Lock the homeowner's pick", action: "scroll-to-visits" },
+      ],
+    };
+  }
+  if (p.datesProposed) {
+    return {
+      headline: `Sent dates to homeowner. <span class="cockpit-muted">Waiting on them to pick — auto-confirms the visit when they approve.</span>`,
+      ctaLabel: "Send a check-in",
+      ctaAction: "send-checkin-reminder",
+      steps: [
+        { label: `Called ${vendorName} for dates`, done: true },
+        { label: "Sent dates to homeowner", done: true },
+        { label: "Wait for them to pick", done: false },
+        { label: "Visit auto-confirms on approval", done: false },
+      ],
+      quickActions: [
+        { label: "Send a warm check-in", sub: "Pre-fills the composer with a nudge", action: "send-checkin-reminder" },
+        { label: "Mark waiting on customer", sub: "Pause SLA until they reply", action: "waiting" },
+      ],
+    };
+  }
+  // Day 0: vendor named, no outreach yet.
+  return {
+    headline: `Vendor's named: <strong>${escapeHtml(vendorName)}</strong>. <span class="cockpit-muted">Call them for available dates, then offer those to the homeowner.</span>`,
+    ctaLabel: visit ? "Send dates to homeowner" : "Open proposal builder",
+    ctaAction: visit ? "scroll-to-visits" : "open-proposal-builder",
+    steps: [
+      { label: `Call ${vendorName} for 2-3 available dates`, done: false },
+      { label: "Send those dates to the homeowner", done: false },
+      { label: "Wait for them to pick", done: false },
+      { label: "Mark scheduled, then completed after the visit", done: false },
+    ],
+    quickActions: [
+      { label: "Open proposal builder · dates", sub: "Send 2-3 dates to homeowner", action: "open-proposal-builder" },
+      { label: "Draft a status update", sub: "Tell the homeowner you're calling the vendor", action: "draft-from-brief" },
+    ],
+  };
+}
+
+// INTERNAL_TASK — Chez does the work itself (manual lookups, doc fetches, etc.)
+function buildInternalTaskPlan(req, dossier, p) {
+  const isResolved = p.isResolved;
+  if (isResolved) {
+    return {
+      headline: `Internal task done. <span class="cockpit-muted">Asset delivered to the homeowner.</span>`,
+      ctaLabel: "Reopen",
+      ctaAction: "reopen",
+      tone: "resolved",
+      steps: [
+        { label: "Sourced the asset", done: true },
+        { label: "Saved to homeowner's documents", done: true },
+        { label: "Replied with the link", done: true },
+      ],
+      quickActions: [],
+    };
+  }
+  return {
+    headline: `Internal task — Chez does this directly. <span class="cockpit-muted">No vendor needed. Find the asset, save to their docs, reply with the link.</span>`,
+    ctaLabel: "Search equipment manuals",
+    ctaAction: "search-equipment-manuals",
+    steps: [
+      { label: "Search the equipment-manuals catalog", done: false },
+      { label: "Try the manufacturer's website if not in catalog", done: false },
+      { label: "Save to homeowner's documents", done: false },
+      { label: "Reply with the link + mark resolved", done: false },
+    ],
+    quickActions: [
+      { label: "Search equipment manuals", sub: "Open the lookup-manual catalog", action: "search-equipment-manuals" },
+      { label: "Open the homeowner's vault", sub: "Check existing documents first", action: "open-vault" },
+      { label: "Compose a reply with attachment", sub: "When you've got the asset", action: "draft-from-brief" },
+      { label: "Mark resolved", sub: "Once the homeowner has the asset", action: "resolved" },
+    ],
+  };
+}
+
+// FIND_VENDOR — original full sourcing pipeline.
+function buildFindVendorPlan(req, dossier, p) {
+  const allSteps = [
+    {
+      label: p.hasResearch
+        ? `Researched ${p.candidates.length} vendor${p.candidates.length === 1 ? "" : "s"}`
+        : "Run vendor research to pull candidates",
+      done: p.hasResearch,
+    },
+    {
+      label: p.callsLogged === 0
+        ? `Call vendors and log notes`
+        : p.callsLogged < Math.min(3, p.candidates.length)
+        ? `Log ${Math.min(3, p.candidates.length) - p.callsLogged} more call${Math.min(3, p.candidates.length) - p.callsLogged === 1 ? "" : "s"}`
+        : `Logged ${p.callsLogged} calls`,
+      done: p.callsLogged >= Math.min(3, Math.max(1, p.candidates.length)),
+    },
+    {
+      label: p.recommendedCount === 0
+        ? "Mark the strongest as Recommended"
+        : `${p.recommendedCount} marked Recommended`,
+      done: p.recommendedCount > 0,
+    },
+    {
+      label: !p.proposalsSent
+        ? `Send proposal${p.recommendedCount > 1 ? "s" : ""}`
+        : `Sent ${p.sentCount} proposal${p.sentCount === 1 ? "" : "s"}`,
+      done: p.proposalsSent,
+    },
+    {
+      label: !p.anyApproved ? "Wait for homeowner to pick" : `Picked ${p.livingVisits[0]?.vendor_name || "a vendor"}`,
+      done: p.anyApproved,
+    },
+    {
+      label: !p.visitScheduled && !p.visitComplete
+        ? `Send dates to homeowner${p.livingVisits[0]?.vendor_name ? ` (with ${p.livingVisits[0].vendor_name})` : ""}`
+        : "Visit booked",
+      done: p.visitScheduled || p.visitComplete,
+    },
+    { label: !p.visitComplete ? "After the visit, mark it completed" : "Visit completed", done: p.visitComplete },
+    { label: !p.isResolved ? "Mark case resolved" : "Case resolved", done: p.isResolved },
+  ];
+
+  let headline = "";
+  let ctaLabel = "";
+  let ctaAction = "";
+
+  if (p.visitComplete) {
+    headline = `Visit completed. <span class="cockpit-muted">Wrap up — mark resolved.</span>`;
+    ctaLabel = "Mark resolved"; ctaAction = "resolved";
+  } else if (p.visitScheduled) {
+    const when = p.livingVisits.find((v) => v.state === "scheduled")?.scheduled_for;
+    const whenLabel = when ? formatSlotDisplay(when) : "the booked date";
+    headline = `Visit scheduled for ${escapeHtml(whenLabel)}. <span class="cockpit-muted">Mark completed once the visit is done.</span>`;
+    ctaLabel = "Open visit card"; ctaAction = "scroll-to-visits";
+  } else if (p.anyApproved) {
+    const vendor = p.livingVisits[0]?.vendor_name || "the vendor";
+    headline = `Homeowner picked ${escapeHtml(vendor)}. <span class="cockpit-muted">Send 2-3 dates so they can pick a slot.</span>`;
+    ctaLabel = "Send dates to homeowner"; ctaAction = "scroll-to-visits";
+  } else if (p.proposalsSent) {
+    headline = `${p.sentCount} proposal${p.sentCount === 1 ? "" : "s"} out. <span class="cockpit-muted">Waiting on homeowner — send a check-in if it stalls.</span>`;
+    ctaLabel = "Send a check-in"; ctaAction = "send-checkin-reminder";
+  } else if (p.recommendedCount > 0) {
+    headline = `${p.recommendedCount} vendor${p.recommendedCount === 1 ? " is" : "s are"} ready to send. <span class="cockpit-muted">One click drafts the proposal.</span>`;
+    ctaLabel = "Open proposal builder"; ctaAction = "alfred-resolve-with-proposal";
+  } else if (p.callsLogged > 0) {
+    headline = `${p.callsLogged} call${p.callsLogged === 1 ? "" : "s"} logged. <span class="cockpit-muted">Mark the strongest as Recommended.</span>`;
+    ctaLabel = "Open #" + ((p.nextUncalledIdx >= 0 ? p.nextUncalledIdx : 0) + 1) + "'s form"; ctaAction = "alfred-resolve-open-top";
+  } else if (p.candidates.length > 0) {
+    const v = p.topVendor;
+    const vname = v?.company_name || v?.name || "top match";
+    headline = `${p.candidates.length} candidates ready. <span class="cockpit-muted">Call ${escapeHtml(vname)} first — best fit.</span>`;
+    ctaLabel = `Open ${escapeForHtml(vname.split(" ")[0])}'s call form`; ctaAction = "alfred-resolve-open-top";
+  } else {
+    headline = `Source vendors end-to-end. <span class="cockpit-muted">Pull candidates, log calls, propose, track the visit.</span>`;
+    ctaLabel = "Run vendor research"; ctaAction = "rerun-analysis";
+  }
+
+  const quickActions = [];
+  if (!p.hasResearch) quickActions.push({ label: "Run vendor research", sub: "Pull existing-network + local Places candidates", action: "rerun-analysis" });
+  if (p.candidates.length > 0 && p.callsLogged < p.candidates.length) quickActions.push({ label: "Open next vendor's call form", sub: "Log outcome + cost", action: "alfred-resolve-open-top" });
+  if (p.recommendedCount > 0 && !p.proposalsSent) quickActions.push({ label: "Send recommended vendors", sub: `Drafts ${p.recommendedCount} proposal card${p.recommendedCount === 1 ? "" : "s"}`, action: "alfred-resolve-with-proposal" });
+  if (p.proposalsSent && !p.anyApproved) quickActions.push({ label: "Send a warm check-in", sub: "Pre-fills the composer", action: "send-checkin-reminder" });
+  if (p.anyApproved && !p.visitScheduled) quickActions.push({ label: "Send dates to homeowner", sub: "Open the visit card · date_slot proposal", action: "scroll-to-visits" });
+  if (p.visitScheduled && !p.visitComplete) quickActions.push({ label: "Mark visit completed", sub: "Stamp the outcome", action: "scroll-to-visits" });
+  if (p.visitComplete && !p.isResolved) quickActions.push({ label: "Mark case resolved", sub: "Drops this off your queue", action: "resolved" });
+  if (p.hasResearch) quickActions.push({ label: "Re-run AI analysis", sub: "Refresh brief + candidates", action: "rerun-analysis" });
+
+  return { headline, ctaLabel, ctaAction, steps: allSteps, quickActions };
+}
+
+// QUOTE — competitive quote gathering. Lighter than full vendor sourcing.
+function buildQuotePlan(req, dossier, p) {
+  return {
+    headline: `Quote request. <span class="cockpit-muted">Gather 2-3 quotes, compose a comparison summary, send it to the homeowner.</span>`,
+    ctaLabel: p.hasResearch ? "Open call form for #1" : "Run vendor research",
+    ctaAction: p.hasResearch ? "alfred-resolve-open-top" : "rerun-analysis",
+    steps: [
+      { label: "Source 2-3 quote candidates", done: p.hasResearch },
+      { label: `Call each, log estimates (${p.callsLogged}/${Math.min(3, p.candidates.length || 3)})`, done: p.callsLogged >= 2 },
+      { label: "Compose comparison summary + send", done: p.proposalsSent },
+      { label: "Wait for homeowner pick · resolve", done: p.isResolved },
+    ],
+    quickActions: [
+      { label: p.hasResearch ? "Open next vendor's call form" : "Run vendor research", sub: "Get 2-3 estimates", action: p.hasResearch ? "alfred-resolve-open-top" : "rerun-analysis" },
+      { label: "Compose comparison summary", sub: "Pre-fills the composer with a quote breakdown", action: "draft-from-brief" },
+      { label: "Open proposal builder · cost tab", sub: "Send the comparison as structured cost cards", action: "open-proposal-builder" },
+    ],
+  };
+}
+
+// GENERAL — Q&A. Reply and resolve.
+function buildGeneralPlan(req, dossier, p) {
+  if (p.adminAsked && !p.homeownerReplied) {
+    return {
+      headline: `Replied. <span class="cockpit-muted">Waiting on a follow-up — mark waiting on customer if you want to pause SLA.</span>`,
+      ctaLabel: "Mark waiting on customer",
+      ctaAction: "waiting",
+      steps: [
+        { label: "Replied to homeowner", done: true },
+        { label: "Wait for any follow-up", done: false },
+        { label: "Mark resolved when done", done: false },
+      ],
+      quickActions: [
+        { label: "Mark waiting on customer", sub: "Pause SLA until they reply", action: "waiting" },
+        { label: "Mark resolved", sub: "If no follow-up needed", action: "resolved" },
+      ],
+    };
+  }
+  return {
+    headline: `General question. <span class="cockpit-muted">Compose a reply, mark resolved.</span>`,
+    ctaLabel: "Draft a reply",
+    ctaAction: "draft-from-brief",
+    steps: [
+      { label: "Compose a reply", done: false },
+      { label: "Mark resolved", done: false },
+    ],
+    quickActions: [
+      { label: "Draft a reply", sub: "Pre-fills the composer with tone QA", action: "draft-from-brief" },
+      { label: "Mark resolved", sub: "If you've answered the question", action: "resolved" },
+    ],
+  };
 }
 
 // Inline-safe HTML escape variant (the global `escapeHtml` returns a
@@ -6788,6 +7326,24 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
       const entity = btn.dataset.cockpitDossierEntity;
       const id = btn.dataset.cockpitDossierId;
       openDossierDrawer(activeReq.household_id, entity, id);
+    });
+  });
+
+  // Phase 83.5 — Family member clicks open a person-scoped drawer
+  // (related cases, assigned tasks, role + access).
+  host.querySelectorAll("[data-cockpit-family-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.cockpitFamilyId;
+      const kind = btn.dataset.cockpitFamilyKind || "family_member";
+      openFamilyMemberDrawer(activeReq.household_id, kind, id);
+    });
+  });
+
+  // Phase 83.5 — Stage tracker clicks scroll to the relevant section.
+  host.querySelectorAll("[data-cockpit-stage]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const stage = btn.dataset.cockpitStage;
+      scrollWorkspaceToStage(stage);
     });
   });
 
@@ -7107,6 +7663,112 @@ async function handleConciergeAction(action, req, btn) {
       requestAnimationFrame(() => {
         el.conciergeHost?.querySelector("[data-cockpit-reply-input]")?.focus();
       });
+      return;
+    }
+
+    case "draft-clarifier": {
+      // Phase 83.5 — Clarify-archetype CTA. Pre-fills the composer with a
+      // tone-aware question that gets the homeowner to tell us what kind
+      // of help they actually want, so we can route to the right workflow.
+      const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+      const first = dossier ? primaryHomeownerLabel(dossier).split(" ")[0] : "there";
+      const tone = state.concierge.composer?.[req.id]?.tone || "warm";
+      const drafts = {
+        warm: `Hey ${first} — got your note, happy to help! Quick clarifier so I get this right: are you looking for someone to come out and do this for you, advice on how to handle it yourself, or just a vendor recommendation? Also, is there a specific system / area in the house this is about?`,
+        direct: `${first} — to route this properly: do you want a vendor to handle it, advice on doing it yourself, or just a recommendation? And which system / area of the house?`,
+        formal: `Hello ${first}, to ensure we route your request to the right resource, could you let us know whether you'd like a vendor to perform the work, advice for handling it yourself, or simply a recommendation? Additionally, please specify which system or area of the home this concerns.`,
+      };
+      state.concierge.composer = state.concierge.composer || {};
+      state.concierge.composer[req.id] = { draft: drafts[tone] || drafts.warm, tone, critique: assessConciergeReplyTone(drafts[tone] || drafts.warm, tone) };
+      renderConciergeCockpit();
+      requestAnimationFrame(() => {
+        el.conciergeHost?.querySelector("[data-cockpit-reply-input]")?.focus();
+      });
+      return;
+    }
+
+    case "reclassify-case": {
+      // Phase 83.5 — Manual archetype override. Lets the operator pick
+      // the right workflow when the auto-classifier got it wrong (or when
+      // a clarify case has now been answered and needs to flip).
+      const choices = ["clarify", "coordinate_vendor", "internal_task", "find_vendor", "quote", "general"];
+      const labels = {
+        clarify: "Clarify — ask the homeowner first",
+        coordinate_vendor: "Coordinate visit — vendor is named",
+        internal_task: "Internal task — Chez does this directly",
+        find_vendor: "Source vendors — full pipeline",
+        quote: "Get a quote — competitive bidding",
+        general: "General — reply and resolve",
+      };
+      const message = "Pick the right workflow:\n\n" + choices.map((c, i) => `${i + 1}. ${labels[c]}`).join("\n") + "\n\n(Cancel to keep auto-classifier)";
+      const picked = window.prompt(message, "");
+      if (!picked) return;
+      const idx = parseInt(picked.trim(), 10) - 1;
+      if (idx < 0 || idx >= choices.length) {
+        alert("Invalid choice — leaving auto-classifier in place.");
+        return;
+      }
+      // Stash the override on the request's context (in-memory only for
+      // v1 — survives a re-render but not a page reload). Future: persist
+      // to chez_requests.archetype_override.
+      state.chezArchetypeOverride = state.chezArchetypeOverride || {};
+      state.chezArchetypeOverride[req.id] = choices[idx];
+      renderConciergeCockpit();
+      return;
+    }
+
+    case "search-equipment-manuals": {
+      // Phase 83.5 — Internal task helper. Opens a side prompt for a model
+      // number, then fires the existing lookup-manual edge function.
+      // Fallback: open the catalog browser tab.
+      const model = window.prompt("Equipment model number to search? (e.g. AOSCG502W2)", "");
+      if (!model || !model.trim()) return;
+      try {
+        const session = (await supabase.auth.getSession()).data.session;
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/lookup-manual`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ model_number: model.trim() }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const manualUrl = data?.manual_url || data?.url || null;
+          if (manualUrl) {
+            // Pre-fill the composer with a reply that includes the manual
+            // link so Tom can click Send.
+            const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+            const first = dossier ? primaryHomeownerLabel(dossier).split(" ")[0] : "there";
+            const tone = state.concierge.composer?.[req.id]?.tone || "warm";
+            const draft = `Hey ${first} — found the Use & Care Guide for your ${model.trim()}. Here's the link:\n\n${manualUrl}\n\nLet me know if you need anything else.`;
+            state.concierge.composer = state.concierge.composer || {};
+            state.concierge.composer[req.id] = { draft, tone, critique: assessConciergeReplyTone(draft, tone) };
+            renderConciergeCockpit();
+            return;
+          }
+          alert("No manual found in the catalog. Try the manufacturer's website or the homeowner's documents vault.");
+        } else {
+          alert(`Search failed (${resp.status}). Try the manufacturer's website directly.`);
+        }
+      } catch (err) {
+        console.warn("[concierge] manual search failed", err);
+        alert(`Search failed: ${err.message || err}`);
+      }
+      return;
+    }
+
+    case "open-vault": {
+      // Open the homeowner's documents vault in a new tab. For v1 this is
+      // a discoverability nudge — the admin doesn't have an in-cockpit
+      // doc browser yet, but tom@getchez.com has admin RLS bypass via
+      // service role so they can inspect the household's docs from the
+      // Supabase dashboard.
+      const householdId = req.household_id;
+      const dashboardUrl = `https://supabase.com/dashboard/project/jsucwnkntdrxhysojgri/editor/documents?filter=household_id%3Deq%3A${householdId}`;
+      window.open(dashboardUrl, "_blank");
       return;
     }
 
@@ -7926,14 +8588,18 @@ function renderStageTrackerHtml(req, messages, visits) {
   // If everything's done, mark the last as current.
   if (!currentSet && stages.length > 0) stages[stages.length - 1].current = true;
 
+  // Phase 83.5 — Stages are clickable buttons. Clicking jumps the
+  // workspace to the most relevant section (research → brief, sent →
+  // thread, booked → visits panel, etc.). Operators can re-orient
+  // themselves without scrolling.
   return `
     <nav class="admin-chez__stage-tracker" aria-label="Case stage">
       ${stages.map((s, i) => `
-        <div class="admin-chez__stage ${s.done ? "is-done" : ""} ${s.current ? "is-current" : ""}">
+        <button type="button" class="admin-chez__stage ${s.done ? "is-done" : ""} ${s.current ? "is-current" : ""}" data-cockpit-stage="${escapeHtml(s.id)}" title="Jump to ${escapeHtml(s.label)} section">
           <div class="admin-chez__stage-dot">${s.done ? "✓" : (s.current ? "●" : "")}</div>
           <div class="admin-chez__stage-label">${escapeHtml(s.label)}</div>
           ${i < stages.length - 1 ? `<div class="admin-chez__stage-rail ${s.done ? "is-done" : ""}"></div>` : ""}
-        </div>
+        </button>
       `).join("")}
     </nav>
   `;
@@ -9407,24 +10073,117 @@ function openDossierDrawer(householdId, entity, id) {
     row = (dossier.home_systems || []).find((s) => s.id === id);
     if (row) {
       title = row.name || row.category || "System";
-      bodyHtml = renderEntityKVList([
+
+      // Phase 83.5 — Full system mirror. Surface everything the homeowner
+      // sees on the iOS Property tab so the operator can answer any
+      // question about it without context-switching.
+
+      // Parent + child relationships (Phase 19+ sub-system hierarchy).
+      const parent = row.parent_system_id
+        ? (dossier.home_systems || []).find((s) => s.id === row.parent_system_id)
+        : null;
+      const children = (dossier.home_systems || []).filter((s) => s.parent_system_id === row.id);
+
+      // Sibling systems in the same top-level category.
+      const siblings = (dossier.home_systems || []).filter((s) =>
+        s.id !== row.id && !s.parent_system_id && String(s.category || "").toLowerCase() === String(row.category || "").toLowerCase()
+      );
+
+      // Linked vendor (matched by category).
+      const matchedVendor = (dossier.contractors || []).find((c) =>
+        String(c.category || "").toLowerCase() === String(row.category || "").toLowerCase()
+      );
+
+      // Linked tasks (active first, then completed).
+      const allTasks = (dossier.tasks || []).filter((t) => t.system_id === id);
+      const activeTasks = allTasks.filter((t) => !t.is_archived);
+      const completedTasks = allTasks.filter((t) => t.is_archived || t.last_completed_date);
+
+      // Section: identity + parent breadcrumb.
+      bodyHtml = "";
+      if (parent) {
+        bodyHtml += `
+          <div class="admin-chez__system-breadcrumb">
+            <button type="button" class="cockpit-overview-link" data-dossier-entity="home_system" data-dossier-id="${escapeHtml(parent.id)}">${escapeHtml(parent.name || parent.category)}</button>
+            <span class="admin-muted"> → ${escapeHtml(row.name || row.category || "Sub-system")}</span>
+          </div>
+        `;
+      }
+
+      bodyHtml += renderEntityKVList([
         ["Category", row.category],
         ["Subtype", row.subtype],
         ["Manufacturer", row.manufacturer],
         ["Model", row.model],
         ["Serial #", row.serial_number],
-        ["Install date", row.install_date],
-        ["Last service", row.last_service_date],
-        ["Service interval (days)", row.service_interval_days],
-        ["Service vendor", row.service_vendor],
+        ["Install date", row.install_date ? formatDateOnly(row.install_date) : null],
+        ["Last service", row.last_service_date ? formatDateOnly(row.last_service_date) : null],
+        ["Service interval", row.service_interval_days ? `${row.service_interval_days} days` : null],
+        ["Service vendor (string)", row.service_vendor],
+        ["Tank capacity", row.tank_capacity ? `${row.tank_capacity} gal` : null],
+        ["Estimated remaining", row.estimated_remaining ? `${row.estimated_remaining} gal` : null],
+        ["Filter change interval", row.filter_change_interval_months ? `${row.filter_change_interval_months} months` : null],
+        ["Last filter change", row.last_filter_change ? formatDateOnly(row.last_filter_change) : null],
         ["Notes", row.notes],
       ]);
-      // Linked tasks for this system
-      const linkedTasks = (dossier.tasks || []).filter((t) => t.system_id === id && !t.is_archived);
-      if (linkedTasks.length) {
+
+      // Vendor coverage status.
+      if (matchedVendor) {
         bodyHtml += `
-          <h4>Linked tasks · ${linkedTasks.length}</h4>
-          ${linkedTasks.slice(0, 8).map((t) => `<div>${escapeHtml(t.title)} — <span class="admin-muted">${escapeHtml(formatDateOnly(t.next_due_date))}</span></div>`).join("")}
+          <h4>Vendor on file · 1</h4>
+          <button type="button" class="admin-chez__dossier-row" data-dossier-entity="contractor" data-dossier-id="${escapeHtml(matchedVendor.id)}">
+            <span class="admin-chez__dossier-row-title">${escapeHtml(matchedVendor.company_name)}${matchedVendor.chez_recommended_at ? ` <span class="admin-pill" data-tone="amber">Sourced by Chez</span>` : ""}</span>
+            <span class="admin-chez__dossier-row-meta">${escapeHtml(matchedVendor.category || "—")}${matchedVendor.phone ? ` · ${escapeHtml(matchedVendor.phone)}` : ""}</span>
+          </button>
+        `;
+      } else {
+        bodyHtml += `<h4>Vendor coverage</h4><p class="admin-muted">No vendor on file for this category. Coverage gap.</p>`;
+      }
+
+      // Sub-systems beneath this one.
+      if (children.length) {
+        bodyHtml += `
+          <h4>Sub-systems · ${children.length}</h4>
+          ${children.map((c) => `
+            <button type="button" class="admin-chez__dossier-row" data-dossier-entity="home_system" data-dossier-id="${escapeHtml(c.id)}">
+              <span class="admin-chez__dossier-row-title">${escapeHtml(c.name || c.category)}</span>
+              <span class="admin-chez__dossier-row-meta">${escapeHtml(c.subtype || c.category || "—")}</span>
+            </button>
+          `).join("")}
+        `;
+      }
+
+      // Sibling systems in same category (peer drilldown).
+      if (siblings.length) {
+        bodyHtml += `
+          <h4>Other ${escapeHtml(row.category || "systems")} systems · ${siblings.length}</h4>
+          ${siblings.slice(0, 6).map((s) => `
+            <button type="button" class="admin-chez__dossier-row" data-dossier-entity="home_system" data-dossier-id="${escapeHtml(s.id)}">
+              <span class="admin-chez__dossier-row-title">${escapeHtml(s.name || s.category)}</span>
+              <span class="admin-chez__dossier-row-meta">${escapeHtml(s.subtype || "—")}${s.manufacturer ? ` · ${escapeHtml(s.manufacturer)}` : ""}</span>
+            </button>
+          `).join("")}
+        `;
+      }
+
+      // Active tasks for this system.
+      if (activeTasks.length) {
+        bodyHtml += `
+          <h4>Active tasks · ${activeTasks.length}</h4>
+          ${activeTasks.slice(0, 6).map((t) => `
+            <button type="button" class="admin-chez__dossier-row" data-dossier-entity="task" data-dossier-id="${escapeHtml(t.id)}">
+              <span class="admin-chez__dossier-row-title">${escapeHtml(t.title)}</span>
+              <span class="admin-chez__dossier-row-meta">${t.next_due_date ? "Due " + escapeHtml(formatDateOnly(t.next_due_date)) : "—"}${t.assignment_type ? ` · ${escapeHtml(t.assignment_type)}` : ""}</span>
+            </button>
+          `).join("")}
+        `;
+      }
+
+      // Service history.
+      if (completedTasks.length) {
+        bodyHtml += `
+          <h4>Service history · ${completedTasks.length}</h4>
+          ${completedTasks.slice(0, 5).map((t) => `<div>${escapeHtml(t.title)} <span class="admin-muted">— ${t.last_completed_date ? "completed " + escapeHtml(formatDateOnly(t.last_completed_date)) : "archived"}</span></div>`).join("")}
         `;
       }
     }
@@ -9514,6 +10273,17 @@ function openDossierDrawer(householdId, entity, id) {
   `;
   document.body.appendChild(drawer);
   drawer.querySelectorAll("[data-drawer-close]").forEach((b) => b.addEventListener("click", () => drawer.remove()));
+  // Phase 83.5 — In-drawer drilldown. Clicking a sibling/child system or
+  // linked task inside the drawer navigates to that entity without
+  // closing the drawer (we close + reopen with the new id).
+  drawer.querySelectorAll("[data-dossier-entity]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const newEntity = btn.dataset.dossierEntity;
+      const newId = btn.dataset.dossierId;
+      drawer.remove();
+      openDossierDrawer(householdId, newEntity, newId);
+    });
+  });
 }
 
 function renderEntityKVList(pairs) {
@@ -9521,6 +10291,142 @@ function renderEntityKVList(pairs) {
     .filter(([_, v]) => v !== null && v !== undefined && v !== "")
     .map(([k, v]) => `<div class="admin-chez__dossier-drawer-kv"><span>${escapeHtml(k)}</span><strong>${typeof v === "string" && v.startsWith("<a ") ? v : escapeHtml(String(v))}</strong></div>`);
   return lines.length ? lines.join("") : `<p class="admin-muted">No additional details on file.</p>`;
+}
+
+// Phase 83.5 — Family-member drilldown drawer. Click a person in the
+// homeowner panel to see role + access + their related cases + tasks +
+// vehicles. Reuses the dossier slice already loaded server-side.
+function openFamilyMemberDrawer(householdId, kind, id) {
+  document.querySelector("[data-chez-family-drawer]")?.remove();
+  const dossier = (state.chezDossiersByHousehold || {})[householdId];
+  if (!dossier) return;
+
+  let person = null;
+  let nameLine = "";
+  let roleLine = "";
+  let identityRows = [];
+
+  if (kind === "user") {
+    person = (dossier.users || []).find((u) => u.id === id);
+    if (!person) return;
+    nameLine = person.full_name || person.email || "—";
+    roleLine = `${person.role || "Primary client"} · linked account`;
+    identityRows = [
+      ["Email", person.email],
+      ["Role", person.role],
+      ["Account created", person.created_at ? formatDateOnly(person.created_at) : null],
+    ];
+  } else {
+    person = (dossier.family_members || []).find((m) => m.id === id);
+    if (!person) return;
+    nameLine = `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Family member";
+    roleLine = person.relationship || person.member_type || "family";
+    identityRows = [
+      ["Relationship", person.relationship],
+      ["Member type", person.member_type],
+      ["Date of birth", person.date_of_birth ? formatDateOnly(person.date_of_birth) : null],
+      ["Email", person.email],
+      ["Phone", person.phone],
+    ];
+  }
+  const initials = nameLine.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+
+  const personId = kind === "user" ? person.id : (person.linked_user_id || null);
+  const personalCases = (dossier.past_requests || []).filter((r) => r.user_id === personId);
+  const linkedCases = personalCases.filter((r) => r.id !== state.selectedChezRequest?.id);
+  const tasksAssigned = (dossier.tasks || []).filter((t) =>
+    !t.is_archived && (t.assigned_to_user_id === personId || (kind === "family_member" && t.assigned_to_family_member_id === id))
+  );
+  const vehiclesDriven = (dossier.vehicles || []).filter((v) =>
+    Array.isArray(v.covered_driver_ids) && v.covered_driver_ids.includes(id)
+  );
+
+  const drawer = document.createElement("div");
+  drawer.className = "admin-chez__dossier-drawer";
+  drawer.setAttribute("data-chez-family-drawer", "");
+  drawer.innerHTML = `
+    <div class="admin-chez__dossier-drawer-backdrop" data-drawer-close></div>
+    <aside class="admin-chez__dossier-drawer-panel">
+      <header>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="cockpit-avatar cockpit-avatar--lg ${kind === "user" ? "cockpit-avatar--indigo" : "cockpit-avatar--soft"}">${escapeHtml(initials)}</span>
+          <div>
+            <span class="admin-muted">${escapeHtml(kind === "user" ? "Linked account" : "Family member")}</span>
+            <h2 style="margin:0;">${escapeHtml(nameLine)}</h2>
+            <span class="admin-muted">${escapeHtml(roleLine)}</span>
+          </div>
+        </div>
+        <button type="button" data-drawer-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-chez__dossier-drawer-body">
+        ${renderEntityKVList(identityRows)}
+
+        <h4>Related cases · ${linkedCases.length}</h4>
+        ${linkedCases.length === 0
+          ? `<p class="admin-muted">No prior cases tied to this person.</p>`
+          : linkedCases.slice(0, 8).map((r) => `
+              <button type="button" class="admin-chez__dossier-row" data-family-case-id="${escapeHtml(r.id)}">
+                <span class="admin-chez__dossier-row-title">${escapeHtml(r.summary || "(no summary)")}</span>
+                <span class="admin-chez__dossier-row-meta">
+                  ${escapeHtml(CHEZ_CATEGORY_LABELS[r.category] || r.category || "—")}
+                  · ${escapeHtml(CHEZ_STATUS_LABELS[r.status] || r.status || "—")}
+                  · ${escapeHtml(r.created_at ? formatDateOnly(r.created_at) : "")}
+                </span>
+              </button>
+            `).join("")}
+
+        <h4>Tasks assigned · ${tasksAssigned.length}</h4>
+        ${tasksAssigned.length === 0
+          ? `<p class="admin-muted">No tasks currently assigned to this person.</p>`
+          : tasksAssigned.slice(0, 6).map((t) => `
+              <div>${escapeHtml(t.title)} <span class="admin-muted">${escapeHtml(t.next_due_date ? "· due " + formatDateOnly(t.next_due_date) : "")}</span></div>
+            `).join("")}
+
+        ${vehiclesDriven.length > 0 ? `
+          <h4>Vehicles · ${vehiclesDriven.length}</h4>
+          ${vehiclesDriven.map((v) => `<div>${escapeHtml(((v.year ? v.year + " " : "") + (v.make || "") + " " + (v.model || "")).trim())}</div>`).join("")}
+        ` : ""}
+      </div>
+    </aside>
+  `;
+  document.body.appendChild(drawer);
+  drawer.querySelectorAll("[data-drawer-close]").forEach((b) => b.addEventListener("click", () => drawer.remove()));
+  drawer.querySelectorAll("[data-family-case-id]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const caseId = b.dataset.familyCaseId;
+      drawer.remove();
+      const found = (state.chezRequests || []).find((r) => r.id === caseId);
+      if (!found) {
+        alert("That case isn't loaded in the queue. Refresh and try again.");
+        return;
+      }
+      state.selectedChezRequest = found;
+      state.concierge.queueMode = "case";
+      await loadChezMessages(caseId);
+      renderConciergeCockpit();
+    });
+  });
+}
+
+// Phase 83.5 — Stage-click navigation.
+function scrollWorkspaceToStage(stage) {
+  const host = el.conciergeHost;
+  if (!host) return;
+  let target = null;
+  if (stage === "submitted") target = host.querySelector(".cockpit-case-header");
+  else if (stage === "research") target = host.querySelector(".cockpit-brief");
+  else if (stage === "sent" || stage === "picked") {
+    target = host.querySelector(".cockpit-chatpanel__thread") || host.querySelector(".cockpit-conversation");
+  } else if (stage === "booked" || stage === "visit") {
+    target = host.querySelector(".admin-chez__visits");
+  } else if (stage === "done") {
+    target = host.querySelector(".cockpit-case-header");
+  }
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("is-pulsing");
+    setTimeout(() => target.classList.remove("is-pulsing"), 1500);
+  }
 }
 
 async function performChezTransition(req, toStatus) {
