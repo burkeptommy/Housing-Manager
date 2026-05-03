@@ -10186,6 +10186,39 @@ details.admin-chez__analysis-section pre {
   font-weight: 600;
 }
 
+/* Phase 84.1 — Chez-owned badge + chez-filter chip + row tint so the
+   operator can scan the queue and see at a glance what's already a Chez
+   commitment vs. a delegation opportunity. */
+.admin-upcoming__row-chez {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  font: 600 10px/1.4 var(--sans);
+  letter-spacing: 0.04em;
+  background: var(--salmon-50, #FFF5F2);
+  color: var(--salmon-dark, #D14E3E);
+  border: 1px solid var(--salmon-pale, #FFE8E2);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.admin-upcoming__row--chez {
+  border-left: 3px solid var(--salmon, #ED6955);
+  background: linear-gradient(90deg, rgba(237, 105, 85, 0.04) 0%, transparent 50%);
+}
+.admin-upcoming__filter--chez {
+  background: var(--salmon-50, #FFF5F2);
+  color: var(--salmon-dark, #D14E3E);
+  border-color: var(--salmon-pale, #FFE8E2) !important;
+}
+.admin-upcoming__filter--chez:hover {
+  border-color: var(--salmon, #ED6955) !important;
+}
+.admin-upcoming__filter--chez.is-active {
+  background: var(--salmon, #ED6955) !important;
+  color: #fff !important;
+  border-color: var(--salmon, #ED6955) !important;
+}
+
 
 /* ========================================================================
    Phase 84 PR 4 — Workbench action buttons + Project negotiation modal

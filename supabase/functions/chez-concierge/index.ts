@@ -2868,6 +2868,15 @@ async function handleFetchUpcoming(
     catch (e) { console.warn(`[upcoming] ${label} failed:`, e); return null; }
   };
 
+  // Phase 84.1 — added maintenance_tasks + handyman_punch_items + routines
+  // (for chez_owned enrichment of routine_visits). Without these sources
+  // the Upcoming feed collapsed to whatever cases/visits existed, so
+  // every click opened the cockpit and the surface was useless for
+  // looking at the actual home-management backlog Tom has to work
+  // through.
+  const horizonDate = horizonIso.slice(0, 10);
+  const overdueFloor = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const [
     routineVisitsRes,
     chezVisitsRes,
@@ -2876,6 +2885,9 @@ async function handleFetchUpcoming(
     documentsRes,
     vehiclesRes,
     householdsRes,
+    routinesRes,
+    maintenanceTasksRes,
+    handymanPunchRes,
   ] = await Promise.all([
     safe(service.from("routine_visits").select("id, routine_id, household_id, target_window_start, visit_state").gte("target_window_start", now.toISOString()).lte("target_window_start", horizonIso).neq("visit_state", "completed").neq("visit_state", "cancelled").limit(200), "routine_visits"),
     safe(service.from("chez_visits").select("id, household_id, request_id, vendor_name, scheduled_for, state").gte("scheduled_for", now.toISOString()).lte("scheduled_for", horizonIso).neq("state", "completed").neq("state", "cancelled").limit(200), "chez_visits"),
@@ -2884,6 +2896,9 @@ async function handleFetchUpcoming(
     safe(service.from("documents").select("id, household_id, filename, expiration_date").not("expiration_date", "is", null).lte("expiration_date", horizonIso).limit(100), "documents"),
     safe(service.from("vehicles").select("id, household_id, year, make, model, registration_expiry, insurance_expiry").or(`registration_expiry.lte.${horizonIso},insurance_expiry.lte.${horizonIso}`).limit(100), "vehicles"),
     safe(service.from("households").select("id, name").limit(500), "households"),
+    safe(service.from("routines").select("id, label, chez_owned, vendor_id").is("archived_at", null).limit(2000), "routines"),
+    safe(service.from("maintenance_tasks").select("id, household_id, title, scheduled_date, next_due_date, last_completed_date, chez_owned, assignment_type, needs_vendor, priority").is("archived_at", null).or(`scheduled_date.lte.${horizonDate},next_due_date.lte.${horizonDate}`).gte("next_due_date", overdueFloor).limit(300), "maintenance_tasks"),
+    safe(service.from("handyman_punch_items").select("id, household_id, title, created_at, source").is("archived_at", null).is("completed_at", null).limit(500), "handyman_punch_items"),
   ]);
 
   const householdName = new Map<string, string>();
@@ -2904,7 +2919,24 @@ async function handleFetchUpcoming(
     entity_type: string | null;
     entity_id: string | null;
     deep_link: string | null;
+    // Phase 84.1 — when true, the entity behind this row is already
+    // delegated to Chez (chez_owned on the underlying routine / task /
+    // contractor). Drives the "Chez owns" badge in the admin UI and
+    // floats these items to the top of the queue since they are
+    // explicit operator commitments.
+    chez_owned: boolean;
+    // Phase 84.1 — surface what the operator should do. Mostly cosmetic
+    // for now; future Phase 2 will turn this into a one-click action.
+    suggested_action: "schedule" | "delegate" | "verify" | "complete" | null;
   };
+
+  // Phase 84.1 — routines lookup so we can enrich routine_visits with
+  // their chez_owned + display label. Map id → row.
+  type RoutineRow = { id: string; label: string | null; chez_owned: boolean | null; vendor_id: string | null };
+  const routinesById = new Map<string, RoutineRow>();
+  for (const r of (((routinesRes as { data?: RoutineRow[] })?.data) ?? [])) {
+    routinesById.set(r.id, r);
+  }
 
   const items: Row[] = [];
   const priorityFor = (dueIso: string) => {
@@ -2918,18 +2950,22 @@ async function handleFetchUpcoming(
   };
 
   for (const r of (((routineVisitsRes as { data?: Array<{ id: string; routine_id: string; household_id: string; target_window_start: string }> })?.data) ?? [])) {
+    const routine = routinesById.get(r.routine_id);
+    const chezOwned = !!routine?.chez_owned;
     items.push({
       id: `rv:${r.id}`,
       type: "routine_visit",
       household_id: r.household_id,
       household_name: hh(r.household_id),
       due_at: r.target_window_start,
-      title: "Routine visit",
-      sub: null,
+      title: routine?.label ? `${routine.label} visit` : "Routine visit",
+      sub: chezOwned ? "Chez owns scheduling" : null,
       priority: priorityFor(r.target_window_start),
       entity_type: "routine",
       entity_id: r.routine_id,
       deep_link: null,
+      chez_owned: chezOwned,
+      suggested_action: chezOwned ? "schedule" : "delegate",
     });
   }
   for (const v of (((chezVisitsRes as { data?: Array<{ id: string; household_id: string; request_id: string; vendor_name: string; scheduled_for: string }> })?.data) ?? [])) {
@@ -2945,6 +2981,8 @@ async function handleFetchUpcoming(
       entity_type: null,
       entity_id: null,
       deep_link: `/admin#concierge?case=${v.request_id}`,
+      chez_owned: true, // every chez_visit is by definition Chez-coordinated
+      suggested_action: "verify",
     });
   }
   for (const c of (((casesRes as { data?: Array<{ id: string; household_id: string; summary: string; sla_due_at: string }> })?.data) ?? [])) {
@@ -2960,6 +2998,8 @@ async function handleFetchUpcoming(
       entity_type: null,
       entity_id: null,
       deep_link: `/admin#concierge?case=${c.id}`,
+      chez_owned: true,
+      suggested_action: "verify",
     });
   }
   for (const r of (((remindersRes as { data?: Array<{ id: string; household_id: string; due_at: string; title: string; notes: string | null; request_id: string | null; entity_type: string | null; entity_id: string | null }> })?.data) ?? [])) {
@@ -2975,6 +3015,68 @@ async function handleFetchUpcoming(
       entity_type: r.entity_type,
       entity_id: r.entity_id,
       deep_link: r.request_id ? `/admin#concierge?case=${r.request_id}` : null,
+      chez_owned: true,
+      suggested_action: "complete",
+    });
+  }
+  // Phase 84.1 — maintenance tasks coming due across all households.
+  // Tagged with chez_owned so already-delegated tasks float up; non-
+  // chez-owned tasks are delegation opportunities.
+  for (const t of (((maintenanceTasksRes as { data?: Array<{ id: string; household_id: string; title: string; scheduled_date: string | null; next_due_date: string | null; chez_owned: boolean | null; assignment_type: string | null; needs_vendor: boolean | null; priority: string | null }> })?.data) ?? [])) {
+    const due = t.scheduled_date ?? t.next_due_date;
+    if (!due) continue;
+    const dueIso = new Date(due + "T12:00:00Z").toISOString();
+    const chezOwned = !!t.chez_owned;
+    let sub: string | null = null;
+    if (chezOwned) sub = "Chez owns this task";
+    else if (t.needs_vendor) sub = "Needs a vendor";
+    else if (t.assignment_type === "vendor") sub = "Vendor-managed";
+    items.push({
+      id: `mt:${t.id}`,
+      type: "maintenance_task",
+      household_id: t.household_id,
+      household_name: hh(t.household_id),
+      due_at: dueIso,
+      title: t.title,
+      sub,
+      priority: priorityFor(dueIso),
+      entity_type: "maintenance_task",
+      entity_id: t.id,
+      deep_link: null,
+      chez_owned: chezOwned,
+      suggested_action: chezOwned ? "schedule" : (t.needs_vendor ? "delegate" : "schedule"),
+    });
+  }
+  // Phase 84.1 — open handyman punch items, summarized one-row-per-
+  // household. Punch items have no inherent due date — they accumulate
+  // until the next handyman visit — so the row's due_at uses the oldest
+  // item's created_at as a "stale since" anchor.
+  type PunchRow = { id: string; household_id: string; title: string; created_at: string; source: string | null };
+  const punchByHousehold = new Map<string, PunchRow[]>();
+  for (const p of (((handymanPunchRes as { data?: PunchRow[] })?.data) ?? [])) {
+    const arr = punchByHousehold.get(p.household_id) ?? [];
+    arr.push(p);
+    punchByHousehold.set(p.household_id, arr);
+  }
+  for (const [householdId, list] of punchByHousehold.entries()) {
+    if (list.length === 0) continue;
+    list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const oldest = list[0].created_at;
+    const examples = list.slice(0, 3).map((p) => p.title).join(", ");
+    items.push({
+      id: `hp:${householdId}`,
+      type: "handyman_punch",
+      household_id: householdId,
+      household_name: hh(householdId),
+      due_at: oldest,
+      title: `Handyman punch list · ${list.length} ${list.length === 1 ? "item" : "items"}`,
+      sub: examples.length > 0 ? `e.g. ${examples}` : null,
+      priority: priorityFor(oldest),
+      entity_type: "handyman_punch",
+      entity_id: householdId,
+      deep_link: null,
+      chez_owned: false,
+      suggested_action: "schedule",
     });
   }
   for (const d of (((documentsRes as { data?: Array<{ id: string; household_id: string; filename: string; expiration_date: string }> })?.data) ?? [])) {
@@ -2990,6 +3092,8 @@ async function handleFetchUpcoming(
       entity_type: "document",
       entity_id: d.id,
       deep_link: null,
+      chez_owned: false,
+      suggested_action: "verify",
     });
   }
   for (const v of (((vehiclesRes as { data?: Array<{ id: string; household_id: string; year: number | null; make: string | null; model: string | null; registration_expiry: string | null; insurance_expiry: string | null }> })?.data) ?? [])) {
@@ -3007,6 +3111,8 @@ async function handleFetchUpcoming(
         entity_type: "vehicle",
         entity_id: v.id,
         deep_link: null,
+        chez_owned: false,
+        suggested_action: "verify",
       });
     }
     if (v.insurance_expiry && new Date(v.insurance_expiry) <= horizon) {
@@ -3022,12 +3128,23 @@ async function handleFetchUpcoming(
         entity_type: "vehicle",
         entity_id: v.id,
         deep_link: null,
+        chez_owned: false,
+        suggested_action: "verify",
       });
     }
   }
 
-  // Sort: overdue first, then earliest first.
-  items.sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+  // Sort: overdue first; within each priority band, chez_owned floats to
+  // the top (operator commitments), then by due_at ascending.
+  items.sort((a, b) => {
+    const aOverdue = a.priority === "overdue" ? 0 : 1;
+    const bOverdue = b.priority === "overdue" ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+    const aChez = a.chez_owned ? 0 : 1;
+    const bChez = b.chez_owned ? 0 : 1;
+    if (aChez !== bChez) return aChez - bChez;
+    return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+  });
 
   return json({ items, fetched_at: now.toISOString(), window_days: windowDays });
 }

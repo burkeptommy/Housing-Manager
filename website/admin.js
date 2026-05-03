@@ -655,8 +655,11 @@ const state = {
     items: [],
     fetchedAt: 0,
     windowDays: 14,
-    typeFilter: "all",         // all | routine_visit | chez_visit | case_sla | reminder | document_expiring | vehicle_registration | vehicle_insurance
+    // Phase 84.1 — added maintenance_task + handyman_punch types so the
+    // queue surfaces actual home-management work, not just cases.
+    typeFilter: "all",         // all | maintenance_task | handyman_punch | routine_visit | chez_visit | case_sla | reminder | document_expiring | vehicle_registration | vehicle_insurance
     priorityFilter: "all",     // all | overdue | today | this_week
+    chezOwnedOnly: false,      // Phase 84.1 — narrow to items already delegated to Chez
     searchQuery: "",
   },
 };
@@ -17643,13 +17646,13 @@ async function renderUpcomingView() {
   const overdue = items.filter((i) => i.priority === "overdue").length;
   const today = items.filter((i) => i.priority === "today").length;
   const thisWeek = items.filter((i) => i.priority === "this_week").length;
-  const reminders = items.filter((i) => i.type === "reminder").length;
+  const chezOwnedCount = items.filter((i) => i.chez_owned).length;
 
   el.stats.innerHTML = `
     <div class="admin-stat"><strong>${overdue}</strong><span>Overdue</span></div>
     <div class="admin-stat"><strong>${today}</strong><span>Today</span></div>
     <div class="admin-stat"><strong>${thisWeek}</strong><span>This week</span></div>
-    <div class="admin-stat"><strong>${reminders}</strong><span>My reminders</span></div>
+    <div class="admin-stat"><strong>${chezOwnedCount}</strong><span>Chez owns</span></div>
   `;
 
   // Apply filters.
@@ -17660,6 +17663,9 @@ async function renderUpcomingView() {
   }
   if (state.upcoming.priorityFilter !== "all") {
     filtered = filtered.filter((i) => i.priority === state.upcoming.priorityFilter);
+  }
+  if (state.upcoming.chezOwnedOnly) {
+    filtered = filtered.filter((i) => i.chez_owned);
   }
   if (query) {
     filtered = filtered.filter((i) =>
@@ -17677,10 +17683,14 @@ async function renderUpcomingView() {
     { id: "next_14_days", label: "Next 14 days" },
   ];
 
+  // Phase 84.1 — added Tasks + Handyman type chips, plus the "Chez owns
+  // only" master toggle that floats already-delegated work.
   const filterChips = `
     <div class="admin-upcoming__filters">
       ${[
         { id: "all", label: "All" },
+        { id: "maintenance_task", label: "Tasks" },
+        { id: "handyman_punch", label: "Handyman" },
         { id: "routine_visit", label: "Routine visits" },
         { id: "chez_visit", label: "Chez visits" },
         { id: "case_sla", label: "Cases at SLA" },
@@ -17692,6 +17702,9 @@ async function renderUpcomingView() {
           ${escapeHtml(f.label)}
         </button>
       `).join("")}
+      <button type="button" class="admin-upcoming__filter admin-upcoming__filter--chez ${state.upcoming.chezOwnedOnly ? "is-active" : ""}" data-upcoming-toggle-chez>
+        ★ Chez owns only
+      </button>
       <button type="button" class="admin-upcoming__add" data-upcoming-add-reminder>+ Add reminder</button>
     </div>
   `;
@@ -17699,7 +17712,7 @@ async function renderUpcomingView() {
   el.list.innerHTML = `
     <div class="admin-audit admin-upcoming">
       <p class="admin-audit__intro">
-        What's next, across every home you manage. Routine visits, bills due, expirations, and your follow-ups — all in priority order.
+        What's next, across every home you manage. Maintenance tasks coming due, handyman backlog, vendor visits, expirations, and follow-ups — chez-owned items float to the top.
       </p>
       ${filterChips}
       ${filtered.length === 0
@@ -17723,6 +17736,11 @@ async function renderUpcomingView() {
       state.upcoming.typeFilter = btn.dataset.upcomingFilter;
       renderUpcomingView();
     });
+  });
+  // Phase 84.1 — Chez-owned-only master toggle.
+  el.list.querySelector("[data-upcoming-toggle-chez]")?.addEventListener("click", () => {
+    state.upcoming.chezOwnedOnly = !state.upcoming.chezOwnedOnly;
+    renderUpcomingView();
   });
   // Item click → deep-link.
   el.list.querySelectorAll("[data-upcoming-item-id]").forEach((btn) => {
@@ -17758,9 +17776,23 @@ async function renderUpcomingView() {
         }
         return;
       }
-      // Otherwise jump to the household workbench.
+      // Phase 84.1 — maintenance task / handyman bucket / routine visit /
+      // documents / vehicles all route to the household workbench. The
+      // workbench already groups entities by type so the right tab opens
+      // when state.households.workbenchTab is set.
+      const tabByType = {
+        maintenance_task: "tasks",
+        handyman_punch: "tasks",
+        routine_visit: "routines",
+        document_expiring: "documents",
+        vehicle_registration: "vehicles",
+        vehicle_insurance: "vehicles",
+      };
       state.view = "households";
       state.households.selectedId = item.household_id;
+      if (tabByType[item.type]) {
+        state.households.workbenchTab = tabByType[item.type];
+      }
       await loadHouseholdWorkbench(item.household_id);
       render();
     });
@@ -17777,13 +17809,16 @@ async function renderUpcomingView() {
   el.detail?.classList.add("is-hidden");
   if (el.emptyDetail) {
     el.emptyDetail.querySelector("h3").textContent = "Click a row to drill in";
-    el.emptyDetail.querySelector("p").textContent = "Routine visits + Chez-coordinated visits open the cockpit case. Document/vehicle expirations open the household workbench. Reminders complete inline.";
+    el.emptyDetail.querySelector("p").textContent = "Cases + Chez-coordinated visits open the cockpit. Maintenance tasks, handyman buckets, routines, documents, and vehicles open the household workbench on the right tab. Reminders complete inline.";
   }
 }
 
 function renderUpcomingItemHtml(item) {
   const dueRel = relativeTimeString(item.due_at);
+  // Phase 84.1 — added icons for the new types.
   const iconMap = {
+    maintenance_task: "🔧",
+    handyman_punch: "🔨",
     routine_visit: "📅",
     chez_visit: "📞",
     case_sla: "⏱",
@@ -17793,11 +17828,19 @@ function renderUpcomingItemHtml(item) {
     vehicle_insurance: "🛡",
   };
   const icon = iconMap[item.type] || "·";
+  // Phase 84.1 — chez-owned badge so Tom can scan the queue and see at a
+  // glance what's already a Chez commitment vs. a delegation opportunity.
+  const chezBadge = item.chez_owned
+    ? `<span class="admin-upcoming__row-chez">★ Chez owns</span>`
+    : "";
   return `
-    <button type="button" class="admin-audit__row admin-upcoming__row" data-upcoming-item-id="${escapeHtml(item.id)}">
+    <button type="button" class="admin-audit__row admin-upcoming__row ${item.chez_owned ? "admin-upcoming__row--chez" : ""}" data-upcoming-item-id="${escapeHtml(item.id)}">
       <div class="admin-upcoming__row-icon">${icon}</div>
       <div class="admin-upcoming__row-main">
-        <div class="admin-upcoming__row-title">${escapeHtml(item.title)}</div>
+        <div class="admin-upcoming__row-title">
+          ${escapeHtml(item.title)}
+          ${chezBadge}
+        </div>
         <div class="admin-upcoming__row-sub">
           ${escapeHtml(item.household_name)}
           ${item.sub ? ` · ${escapeHtml(item.sub)}` : ""}
