@@ -10812,7 +10812,7 @@ function renderVendorAppRows() {
 
   // Client-side search across the loaded set
   const q = (state.search || "").trim().toLowerCase();
-  const filtered = q
+  const searched = q
     ? va.applications.filter((a) => {
         const hay = [
           a.business_name,
@@ -10825,6 +10825,30 @@ function renderVendorAppRows() {
         return hay.includes(q);
       })
     : va.applications;
+
+  // Phase 72.5: prioritize action-needed rows + most-complete profiles.
+  // Status priority — live_unverified first (the queue Tom calls), then
+  // pending email confirm (waiting on vendor), then certified (already
+  // done), then rejected (archive). Within each tier, higher
+  // profile_completion_pct floats up so the most-cookable leads are at
+  // the top. The chip filters narrow further; this is the order inside
+  // whatever's selected.
+  const STATUS_ORDER = {
+    live_unverified: 0,
+    pending_email_confirm: 1,
+    chez_certified: 2,
+    rejected: 3,
+  };
+  const filtered = searched.slice().sort((a, b) => {
+    const sa = STATUS_ORDER[a.status] ?? 99;
+    const sb = STATUS_ORDER[b.status] ?? 99;
+    if (sa !== sb) return sa - sb;
+    const pa = typeof a.profile_completion_pct === "number" ? a.profile_completion_pct : 0;
+    const pb = typeof b.profile_completion_pct === "number" ? b.profile_completion_pct : 0;
+    if (pa !== pb) return pb - pa;
+    // Tiebreak: newer first
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   if (filtered.length === 0) {
     rowsEl.innerHTML = `
@@ -10850,7 +10874,10 @@ function renderVendorAppRows() {
             <strong>${escapeHtml(app.business_name)}</strong>
             ${websiteHref ? `<a href="${escapeHtml(websiteHref)}" target="_blank" rel="noopener" class="admin-vendor-apps__row-website">${escapeHtml(app.website.replace(/^https?:\/\//, ""))} ↗</a>` : ""}
           </div>
-          ${vendorAppStatusPill(app.status)}
+          <div class="admin-vendor-apps__row-pills">
+            ${vendorAppCompletionPill(app.profile_completion_pct)}
+            ${vendorAppStatusPill(app.status)}
+          </div>
         </header>
         <div class="admin-vendor-apps__row-grid">
           <div class="admin-vendor-apps__row-cell">
@@ -10887,6 +10914,21 @@ function renderVendorAppRows() {
 function vendorAppStatusPill(status) {
   const label = VENDOR_APP_STATUS_LABELS[status] || status;
   return `<span class="admin-pill admin-vendor-apps__status admin-vendor-apps__status--${escapeHtml(status)}">${escapeHtml(label)}</span>`;
+}
+
+// Phase 72.5: completion pill — shows how filled-in the vendor's profile is.
+// Tone tracks completeness so Tom can scan the queue and pick the most-
+// cookable leads to call first.
+//   ≥80%  success (green) — rich profile, ready for the certify call
+//   ≥40%  indigo         — a real attempt, getting there
+//   else   warning (amber) — bare-bones, may need a nudge or be a ghost
+function vendorAppCompletionPill(pct) {
+  const value = typeof pct === "number" ? pct : null;
+  if (value === null) return "";
+  let tone = "warning";
+  if (value >= 80) tone = "success";
+  else if (value >= 40) tone = "indigo";
+  return `<span class="admin-pill admin-vendor-apps__completion admin-vendor-apps__completion--${tone}" title="Profile completion">${value}% profile</span>`;
 }
 
 function vendorAppActionButtons(app) {

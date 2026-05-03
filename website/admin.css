@@ -9909,6 +9909,41 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--salmon-pale, #FFE8E2);
 }
 
+/* Right-side pill cluster on each row header — completion + status */
+.admin-vendor-apps__row-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Profile-completion pill — three tones tracking how full the profile is.
+   ≥80% success / 40-79 indigo / <40 warning. Lets Tom scan the queue and
+   pick the most-cookable leads to call first. */
+.admin-vendor-apps__completion {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-feature-settings: "tnum";
+}
+
+.admin-vendor-apps__completion--success {
+  background: rgba(74, 124, 89, 0.14);
+  color: var(--success, #4A7C59);
+  border: 1px solid rgba(74, 124, 89, 0.3);
+}
+
+.admin-vendor-apps__completion--indigo {
+  background: var(--indigo-50, #F2EFF8);
+  color: var(--indigo, #453A70);
+  border: 1px solid var(--indigo-100, #E8E4F2);
+}
+
+.admin-vendor-apps__completion--warning {
+  background: rgba(199, 126, 46, 0.14);
+  color: var(--warning, #C77E2E);
+  border: 1px solid rgba(199, 126, 46, 0.3);
+}
+
 /* Modal overrides — the admin-modal infrastructure already supplies the
    shell; we just need a label + textarea + inline error styling. */
 

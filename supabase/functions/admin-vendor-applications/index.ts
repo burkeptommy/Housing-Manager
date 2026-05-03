@@ -102,12 +102,17 @@ serve(async (req: Request) => {
             case "list": {
                 const limit = Math.min(Math.max(body.limit ?? 50, 1), 200);
                 const offset = Math.max(body.offset ?? 0, 0);
+                // Phase 72.5: include profile_completion_pct so the admin
+                // desk can show a per-row pill + sort the queue by it.
+                // PostgREST exposes the row-typed function as a computed
+                // column on this table.
                 let query = supabase
                     .from("vendor_applications")
                     .select(
                         "id, business_name, contact_name, email, phone, website, category, " +
                         "service_area_states, status, email_confirmed_at, verified_at, " +
-                        "verified_notes, rejected_at, rejection_notes, linked_google_place_id, created_at",
+                        "verified_notes, rejected_at, rejection_notes, linked_google_place_id, " +
+                        "created_at, profile_completion_pct",
                         { count: "exact" },
                     )
                     .order("created_at", { ascending: false })

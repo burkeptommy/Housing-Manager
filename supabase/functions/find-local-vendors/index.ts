@@ -194,13 +194,17 @@ async function mergeVendorApplications(
   rawCategory: string,
 ): Promise<VendorCandidate[]> {
   try {
+    // Phase 72.5: also fetch profile_completion_pct so we can use it as a
+    // secondary sort within each Chez tier — a 90%-complete vendor with a
+    // logo, photos, and credentials beats a 14%-complete bare-bones row.
     const { data: apps, error } = await supabase
       .from("vendor_applications")
-      .select("id, business_name, phone, website, linked_google_place_id, status, verified_at")
+      .select("id, business_name, phone, website, linked_google_place_id, status, verified_at, profile_completion_pct")
       .ilike("category", rawCategory)
       .contains("service_area_states", [state.toUpperCase()])
       .in("status", ["chez_certified", "live_unverified"])
       .order("status", { ascending: true })
+      .order("profile_completion_pct", { ascending: false, nullsFirst: false })
       .order("verified_at", { ascending: false, nullsFirst: false })
       .limit(20);
 
@@ -234,8 +238,11 @@ async function mergeVendorApplications(
       rankPosition: 0,
     }));
 
-    // Sort: chez_certified > live_unverified, preserves the verified_at
-    // ordering from the SQL query inside each tier.
+    // Sort: chez_certified > live_unverified. The SQL ORDER BY already
+    // puts chez_certified first AND sorts by profile_completion_pct DESC
+    // within each tier, so this client-side sort just preserves that.
+    // Belt-and-suspenders — if PostgREST drops the secondary sort for any
+    // reason, the JS sort still keeps Certified above Live.
     applicationVendors.sort((a, b) => {
       if (a.isChezCertified !== b.isChezCertified) return a.isChezCertified ? -1 : 1;
       return 0;

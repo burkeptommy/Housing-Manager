@@ -1,191 +1,290 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Confirm your Chez vendor application.">
-    <meta name="robots" content="noindex">
-
-    <title>Confirm your Chez vendor listing</title>
-    <link rel="stylesheet" href="/chez.css">
-    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=3">
-    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=3">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
-    <style>
-        .confirm-container {
-            max-width: 560px;
-            margin: 80px auto;
-            padding: 40px 32px;
-            text-align: center;
-            font-family: var(--sans);
-        }
-        .confirm-container h1 {
-            font-family: var(--serif);
-            font-size: 28px;
-            color: var(--ink);
-            margin: 0 0 16px;
-        }
-        .confirm-container p {
-            font-size: 15px;
-            color: var(--ink);
-            opacity: 0.8;
-            line-height: 1.6;
-            margin: 0 0 16px;
-        }
-        .icon-circle {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-        }
-        .icon-circle.success { background: #E8F5E9; color: #1B5E20; }
-        .icon-circle.error   { background: #FBEAEA; color: #8A2419; }
-        .icon-circle.info    { background: #FAF7F2; color: var(--ink); }
-        .cta {
-            display: inline-block;
-            background: var(--action);
-            color: #fff;
-            text-decoration: none;
-            padding: 12px 24px;
-            border-radius: 14px;
-            font-weight: 600;
-            font-size: 15px;
-            margin-top: 16px;
-        }
-        .cta-secondary {
-            display: inline-block;
-            color: var(--ink);
-            text-decoration: underline;
-            font-size: 14px;
-            margin-top: 16px;
-        }
-        .loading-pulse {
-            font-size: 14px;
-            color: var(--ink);
-            opacity: 0.6;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Confirm your Chez vendor application.">
+  <meta name="robots" content="noindex">
+  <title>Confirm your Chez vendor listing</title>
+  <link rel="stylesheet" href="/chez.css">
+  <link rel="icon" type="image/x-icon" href="/chez-handyman-favicon.ico?v=3">
+  <link rel="icon" type="image/svg+xml" href="/chez-handyman-favicon.svg?v=3">
+  <link rel="icon" type="image/png" sizes="192x192" href="/chez-handyman-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="512x512" href="/chez-handyman-512.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-handyman.png?v=3">
+  <script defer src="chez.js"></script>
+  <style>
+    .confirm-section {
+      padding: 96px 0 120px;
+      min-height: calc(100vh - 68px);
+      display: flex;
+      align-items: center;
+    }
+    .confirm-card {
+      background: var(--white);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-lg);
+      padding: 56px 48px;
+      max-width: 560px;
+      margin: 0 auto;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .confirm-icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 600;
+    }
+    .confirm-icon--success {
+      background: rgba(74, 124, 89, 0.12);
+      color: var(--success);
+      border: 1px solid rgba(74, 124, 89, 0.28);
+    }
+    .confirm-icon--error {
+      background: var(--salmon-50);
+      color: var(--salmon-dark);
+      border: 1px solid var(--salmon-pale);
+    }
+    .confirm-icon--info {
+      background: var(--indigo-50);
+      color: var(--indigo);
+      border: 1px solid var(--indigo-100);
+    }
+    .confirm-card h1 {
+      font-family: var(--serif);
+      font-size: clamp(26px, 3vw, 36px);
+      font-weight: 500;
+      letter-spacing: -0.018em;
+      color: var(--text);
+      margin-bottom: 14px;
+      line-height: 1.2;
+    }
+    .confirm-card p {
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin: 0 0 14px;
+    }
+    .confirm-card p strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .confirm-card a.confirm-link {
+      color: var(--indigo);
+      font-weight: 500;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .confirm-card a.confirm-link:hover { color: var(--salmon); }
+    .confirm-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 28px;
+    }
+    .confirm-pulse {
+      font-family: var(--sans);
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .confirm-secondary {
+      font-family: var(--sans);
+      font-size: 13px;
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .confirm-secondary:hover { color: var(--indigo); }
+    @media (max-width: 480px) {
+      .confirm-card { padding: 40px 28px; }
+      .confirm-section { padding: 56px 0 80px; }
+    }
+  </style>
 </head>
 <body>
-    <header class="site-header">
-        <div class="container">
-            <a href="/" class="brand">
-                <img src="/chez-logo.png" alt="Chez" />
-            </a>
-        </div>
-    </header>
 
-    <main class="confirm-container" id="confirm-container">
-        <p class="loading-pulse">Confirming your application…</p>
-    </main>
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand" aria-label="Chez home">
+      <span class="nav-brand-mark"><img src="chez-handyman-logo.png" alt=""></span>
+      <span>chez</span>
+    </a>
+    <div class="nav-links">
+      <a href="/" class="nav-link nav-link-text-hide">Homeowners</a>
+      <a href="handymen.html" class="nav-link nav-link-text-hide">Handymen</a>
+      <a href="vendor-apply.html" class="nav-link nav-link-text-hide">List your business</a>
+      <a href="security.html" class="nav-link nav-link-text-hide">Security</a>
+      <a href="vendor-portal.html" class="btn btn-salmon btn-sm">Manage listing</a>
+    </div>
+  </div>
+</nav>
 
-    <footer style="text-align:center;padding:32px 24px;font-family:var(--sans);font-size:12px;color:var(--ink);opacity:0.5;">
-        <p>&copy; 2026 Chez · <a href="mailto:tom@getchez.com" style="color:inherit;">tom@getchez.com</a></p>
-    </footer>
+<section class="confirm-section bg-pearl">
+  <div class="container">
+    <div class="confirm-card" id="confirm-container">
+      <p class="confirm-pulse">Confirming your application…</p>
+    </div>
+  </div>
+</section>
 
-    <script>
-        const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew";
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand-block">
+        <a href="/" class="nav-brand">
+          <span class="nav-brand-mark"><img src="chez-handyman-logo.png" alt=""></span>
+          <span>chez</span>
+        </a>
+        <p>Your home, organized. The iOS app for high-net-worth homeowners and the platform for the handymen who serve them.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Product</h5>
+        <ul>
+          <li><a href="/">For Homeowners</a></li>
+          <li><a href="handymen.html">For Handymen</a></li>
+          <li><a href="vendor-apply.html">List your business</a></li>
+          <li><a href="vendor-portal.html">Manage your listing</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Trust</h5>
+        <ul>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="mailto:tom@getchez.com">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Chez. All rights reserved.</span>
+      <span>Made with care for the people who keep their homes well.</span>
+    </div>
+  </div>
+</footer>
 
-        const container = document.getElementById("confirm-container");
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
+<script>
+  const SUPABASE_URL = "https://jsucwnkntdrxhysojgri.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew";
 
-        function render(html) {
-            container.innerHTML = html;
-        }
+  const container = document.getElementById("confirm-container");
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
 
-        function renderSuccess(businessName, alreadyConfirmed) {
-            render(`
-                <div class="icon-circle success">✓</div>
-                <h1>You're listed${alreadyConfirmed ? "" : " on Chez"}.</h1>
-                <p>
-                    <strong>${businessName}</strong> is now visible to households
-                    searching for vendors in your service area.
-                </p>
-                <p>
-                    We'll reach out by phone over the next few days to verify your
-                    business and award the <strong>Chez Certified</strong> badge,
-                    which floats your listing to the top of every match.
-                </p>
-                <p>
-                    Questions? Email <a href="mailto:tom@getchez.com" style="color:var(--ink);">tom@getchez.com</a>.
-                </p>
-                <a href="/vendor-portal.html" class="cta">Manage your listing</a>
-                <p style="margin-top:16px;"><a href="/" class="cta-secondary">Back to Chez</a></p>
-            `);
-        }
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]
+    ));
+  }
 
-        function renderError(title, message, retry) {
-            render(`
-                <div class="icon-circle error">!</div>
-                <h1>${title}</h1>
-                <p>${message}</p>
-                ${retry ? `<a href="/vendor-apply.html" class="cta">Re-apply</a>` : `<a href="/" class="cta-secondary">Back to Chez</a>`}
-            `);
-        }
+  function render(html) { container.innerHTML = html; }
 
-        if (!token) {
+  function renderSuccess(businessName, alreadyConfirmed) {
+    const safeName = escapeHtml(businessName || "Your business");
+    render(`
+      <div class="confirm-icon confirm-icon--success">✓</div>
+      <h1>${alreadyConfirmed ? "You're listed." : "You're listed on Chez."}</h1>
+      <p>
+        <strong>${safeName}</strong> is now visible to households searching for vendors in your service area.
+      </p>
+      <p>
+        Next step: complete your profile so homeowners see your logo, photos, and credentials. The richer your listing, the higher you appear in matches.
+      </p>
+      <p>
+        We'll also reach out by phone over the next few days to verify your business and award the <strong>Chez Certified</strong> badge.
+      </p>
+      <div class="confirm-actions">
+        <a href="/vendor-portal.html" class="btn btn-salmon btn-lg">Complete your profile →</a>
+        <a href="/" class="confirm-secondary">Back to Chez</a>
+      </div>
+    `);
+  }
+
+  function renderError(title, message, retry) {
+    render(`
+      <div class="confirm-icon confirm-icon--error">!</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p>${escapeHtml(message)}</p>
+      <div class="confirm-actions">
+        ${retry
+          ? `<a href="/vendor-apply.html" class="btn btn-salmon btn-lg">Re-apply</a>
+             <a href="/" class="confirm-secondary">Back to Chez</a>`
+          : `<a href="/" class="btn btn-ghost btn-lg">Back to Chez</a>`}
+      </div>
+    `);
+  }
+
+  if (!token) {
+    renderError(
+      "Missing confirmation link",
+      "This page was opened without a confirmation token. Check the email link you clicked, or re-submit your application.",
+      true,
+    );
+  } else {
+    fetch(
+      `${SUPABASE_URL}/functions/v1/confirm-vendor-application?token=${encodeURIComponent(token)}`,
+      {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      },
+    )
+      .then((r) => r.json().then((d) => ({ status: r.status, data: d })))
+      .then(({ data }) => {
+        switch (data.status) {
+          case "confirmed":
+            renderSuccess(data.business_name, false);
+            break;
+          case "already_confirmed":
+            renderSuccess(data.business_name, true);
+            break;
+          case "expired":
+            renderError("Link expired", data.message, true);
+            break;
+          case "rejected":
+            renderError("Application not active", data.message, false);
+            break;
+          case "not_found":
+            renderError("Link not found", data.message, true);
+            break;
+          case "invalid":
+            renderError("Invalid link", data.message, true);
+            break;
+          default:
             renderError(
-                "Missing confirmation link",
-                "This page was opened without a confirmation token. Check the email link you clicked, or re-submit your application.",
-                true,
+              "Something went wrong",
+              data.message || "Please try the link again, or contact tom@getchez.com.",
+              false,
             );
-        } else {
-            fetch(
-                `${SUPABASE_URL}/functions/v1/confirm-vendor-application?token=${encodeURIComponent(token)}`,
-                {
-                    method: "POST",
-                    headers: {
-                        "apikey": SUPABASE_ANON_KEY,
-                        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-                    },
-                },
-            )
-                .then((r) => r.json().then((d) => ({ status: r.status, data: d })))
-                .then(({ status, data }) => {
-                    switch (data.status) {
-                        case "confirmed":
-                            renderSuccess(data.business_name, false);
-                            break;
-                        case "already_confirmed":
-                            renderSuccess(data.business_name, true);
-                            break;
-                        case "expired":
-                            renderError("Link expired", data.message, true);
-                            break;
-                        case "rejected":
-                            renderError("Application not active", data.message, false);
-                            break;
-                        case "not_found":
-                            renderError("Link not found", data.message, true);
-                            break;
-                        case "invalid":
-                            renderError("Invalid link", data.message, true);
-                            break;
-                        default:
-                            renderError(
-                                "Something went wrong",
-                                data.message || "Please try the link again, or contact tom@getchez.com.",
-                                false,
-                            );
-                    }
-                })
-                .catch((err) => {
-                    console.error(err);
-                    renderError(
-                        "Network error",
-                        "We couldn't reach Chez. Please check your connection and try the link again.",
-                        false,
-                    );
-                });
         }
-    </script>
+      })
+      .catch((err) => {
+        console.error(err);
+        renderError(
+          "Network error",
+          "We couldn't reach Chez. Please check your connection and try the link again.",
+          false,
+        );
+      });
+  }
+</script>
+
 </body>
 </html>
