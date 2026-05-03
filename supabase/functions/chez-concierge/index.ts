@@ -3120,6 +3120,253 @@ async function handleAdminSubmit(
 }
 
 // ============================================================================
+// Phase 84 — Households workbench data
+// ============================================================================
+//
+// `fetch_households_list` returns one row per household with stats
+// suitable for the admin Households tab list view. `fetch_household_workbench`
+// returns the deep per-household data needed to render the workbench
+// (every owned entity grouped by type + open cases + recent workbench
+// actions). One round-trip for the whole panel.
+
+async function handleFetchHouseholdsList(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[households_list] ${label} failed:`, e); return null; }
+  };
+
+  const [householdsRes, requestsRes, routinesRes, contractorsRes, tasksRes, systemsRes, projectsRes] = await Promise.all([
+    safe(service.from("households").select("id, name, created_at, chez_ownership_groups").order("created_at", { ascending: false }), "households"),
+    safe(service.from("chez_requests").select("id, household_id, status, last_message_at, sla_due_at"), "requests"),
+    safe(service.from("routines").select("id, household_id, chez_owned").eq("chez_owned", true), "routines"),
+    safe(service.from("contractors").select("id, household_id, chez_owned").eq("chez_owned", true), "contractors"),
+    safe(service.from("maintenance_tasks").select("id, household_id, chez_owned").eq("chez_owned", true), "tasks"),
+    safe(service.from("home_systems").select("id, household_id, chez_owned").eq("chez_owned", true), "systems"),
+    safe(service.from("property_projects").select("id, household_id, chez_owned").eq("chez_owned", true), "projects"),
+  ]);
+
+  type HH = { id: string; name: string; created_at: string; chez_ownership_groups: Record<string, { on?: boolean }> };
+  const households = ((householdsRes as { data?: HH[] })?.data ?? []) as HH[];
+  const requests = (((requestsRes as { data?: Array<{ id: string; household_id: string; status: string; last_message_at: string; sla_due_at: string }> })?.data) ?? []);
+  const ownedRoutines = (((routinesRes as { data?: Array<{ household_id: string }> })?.data) ?? []);
+  const ownedContractors = (((contractorsRes as { data?: Array<{ household_id: string }> })?.data) ?? []);
+  const ownedTasks = (((tasksRes as { data?: Array<{ household_id: string }> })?.data) ?? []);
+  const ownedSystems = (((systemsRes as { data?: Array<{ household_id: string }> })?.data) ?? []);
+  const ownedProjects = (((projectsRes as { data?: Array<{ household_id: string }> })?.data) ?? []);
+
+  // Bucket per household.
+  const byHousehold = new Map<string, { open_cases: number; owned_count: number; group_count: number; last_activity_at: string | null }>();
+  for (const h of households) {
+    const groupCount = Object.values(h.chez_ownership_groups ?? {}).filter((g) => (g as { on?: boolean }).on === true).length;
+    byHousehold.set(h.id, { open_cases: 0, owned_count: 0, group_count: groupCount, last_activity_at: null });
+  }
+  for (const r of requests) {
+    const stat = byHousehold.get(r.household_id);
+    if (!stat) continue;
+    if (r.status === "open" || r.status === "waiting_customer") stat.open_cases += 1;
+    if (r.last_message_at && (!stat.last_activity_at || new Date(r.last_message_at) > new Date(stat.last_activity_at))) {
+      stat.last_activity_at = r.last_message_at;
+    }
+  }
+  const inc = (id: string) => { const s = byHousehold.get(id); if (s) s.owned_count += 1; };
+  for (const r of ownedRoutines) inc(r.household_id);
+  for (const r of ownedContractors) inc(r.household_id);
+  for (const r of ownedTasks) inc(r.household_id);
+  for (const r of ownedSystems) inc(r.household_id);
+  for (const r of ownedProjects) inc(r.household_id);
+
+  const items = households.map((h) => ({
+    id: h.id,
+    name: h.name,
+    created_at: h.created_at,
+    open_cases: byHousehold.get(h.id)?.open_cases ?? 0,
+    owned_count: byHousehold.get(h.id)?.owned_count ?? 0,
+    group_count: byHousehold.get(h.id)?.group_count ?? 0,
+    last_activity_at: byHousehold.get(h.id)?.last_activity_at ?? null,
+    chez_ownership_groups: h.chez_ownership_groups ?? {},
+  }));
+
+  // Sort: most-recent-activity first (households with no activity sink to bottom).
+  items.sort((a, b) => {
+    const aT = a.last_activity_at ? new Date(a.last_activity_at).getTime() : 0;
+    const bT = b.last_activity_at ? new Date(b.last_activity_at).getTime() : 0;
+    return bT - aT;
+  });
+
+  return json({ households: items });
+}
+
+interface FetchHouseholdWorkbenchPayload {
+  household_id: string;
+}
+
+async function handleFetchHouseholdWorkbench(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchHouseholdWorkbenchPayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const householdId = compactString(payload.household_id);
+  if (!householdId) return json({ error: "household_id required" }, 400);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[workbench] ${label} failed:`, e); return null; }
+  };
+
+  const [
+    householdRes, propertiesRes, usersRes, familyRes,
+    routinesRes, systemsRes, contractorsRes, tasksRes, projectsRes,
+    documentsRes, utilitiesRes, vehiclesRes,
+    casesRes, workbenchActionsRes, remindersRes,
+  ] = await Promise.all([
+    safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
+    safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
+    safe(service.from("users").select("id, full_name, email, role").eq("household_id", householdId), "users"),
+    safe(service.from("family_members").select("*").eq("household_id", householdId), "family"),
+    safe(service.from("routines").select("*").eq("household_id", householdId).is("archived_at", null), "routines"),
+    safe(service.from("home_systems").select("*").eq("household_id", householdId), "systems"),
+    safe(service.from("contractors").select("*").eq("household_id", householdId), "contractors"),
+    safe(service.from("maintenance_tasks").select("*").eq("household_id", householdId).eq("is_archived", false), "tasks"),
+    safe(service.from("property_projects").select("*").eq("household_id", householdId), "projects"),
+    safe(service.from("documents").select("id, household_id, filename, category, mime_type, expiration_date, chez_owned, chez_owned_at").eq("household_id", householdId).limit(200), "documents"),
+    safe(service.from("utility_accounts").select("*").eq("household_id", householdId), "utilities"),
+    safe(service.from("vehicles").select("*").eq("household_id", householdId), "vehicles"),
+    safe(service.from("chez_requests").select("*").eq("household_id", householdId).neq("status", "resolved").order("last_message_at", { ascending: false }), "open_cases"),
+    safe(service.from("chez_workbench_actions").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(20), "workbench_actions"),
+    safe(service.from("chez_reminders").select("*").eq("household_id", householdId).is("completed_at", null).order("due_at", { ascending: true }).limit(20), "reminders"),
+  ]);
+
+  return json({
+    household: (householdRes as { data?: unknown } | null)?.data ?? null,
+    properties: ((propertiesRes as { data?: unknown[] })?.data) ?? [],
+    users: ((usersRes as { data?: unknown[] })?.data) ?? [],
+    family_members: ((familyRes as { data?: unknown[] })?.data) ?? [],
+    routines: ((routinesRes as { data?: unknown[] })?.data) ?? [],
+    home_systems: ((systemsRes as { data?: unknown[] })?.data) ?? [],
+    contractors: ((contractorsRes as { data?: unknown[] })?.data) ?? [],
+    tasks: ((tasksRes as { data?: unknown[] })?.data) ?? [],
+    projects: ((projectsRes as { data?: unknown[] })?.data) ?? [],
+    documents: ((documentsRes as { data?: unknown[] })?.data) ?? [],
+    utility_accounts: ((utilitiesRes as { data?: unknown[] })?.data) ?? [],
+    vehicles: ((vehiclesRes as { data?: unknown[] })?.data) ?? [],
+    open_cases: ((casesRes as { data?: unknown[] })?.data) ?? [],
+    workbench_actions: ((workbenchActionsRes as { data?: unknown[] })?.data) ?? [],
+    reminders: ((remindersRes as { data?: unknown[] })?.data) ?? [],
+  });
+}
+
+// ============================================================================
+// Phase 84 PR 4 — Project negotiation tracking
+// ============================================================================
+
+interface AddProjectNegotiationTurnPayload {
+  quote_id?: string;
+  // The two sides of a negotiation. "chez" is the operator messaging the
+  // vendor on behalf of the homeowner; "vendor" is the response coming
+  // back. We don't track "homeowner" here — when the homeowner approves
+  // a final number, we close the loop via the existing proposal flow.
+  from?: "chez" | "vendor";
+  message?: string;
+  price_cents?: number;
+  // Optional terms metadata so future shapes (payment schedule,
+  // exclusions, scope deltas) can ride alongside without a column add.
+  terms?: Record<string, unknown>;
+}
+
+interface NegotiationTurn {
+  from: "chez" | "vendor";
+  message: string;
+  price_cents?: number;
+  terms?: Record<string, unknown>;
+  sent_at: string;
+  performed_by_user_id?: string;
+}
+
+/// Operator-only — appends one row to `project_quotes.negotiation_history`.
+/// The history is ordered chronologically; UI renders newest first by
+/// reversing on read so we don't have to deal with prepend semantics
+/// in JSONB. Service role write because we don't expose project_quotes
+/// mutations to the homeowner via RLS today.
+async function handleAddProjectNegotiationTurn(
+  service: ServiceClient,
+  user: { id: string; email: string },
+  payload: AddProjectNegotiationTurnPayload
+): Promise<Response> {
+  if (!isAdminUser(user)) {
+    return json({ error: "admin only" }, 403);
+  }
+  const quoteId = payload.quote_id?.trim();
+  const from = payload.from;
+  const message = payload.message?.trim() ?? "";
+  if (!quoteId || !from || !message) {
+    return json(
+      { error: "quote_id, from, and message are required" },
+      400
+    );
+  }
+  if (from !== "chez" && from !== "vendor") {
+    return json({ error: "from must be 'chez' or 'vendor'" }, 400);
+  }
+
+  // Fetch existing history so we can append. Postgres array_append on
+  // JSONB is awkward through PostgREST; round-tripping the array is
+  // simplest and the array is bounded in practice (a real negotiation
+  // is < 50 turns).
+  const { data: row, error: fetchErr } = await service
+    .from("project_quotes")
+    .select("id, project_id, negotiation_history")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (fetchErr) {
+    console.error("[chez-concierge] negotiation fetch failed:", fetchErr);
+    return json({ error: fetchErr.message }, 500);
+  }
+  if (!row) {
+    return json({ error: "quote not found" }, 404);
+  }
+
+  const existing: NegotiationTurn[] = Array.isArray(
+    (row as { negotiation_history?: unknown }).negotiation_history
+  )
+    ? ((row as { negotiation_history: NegotiationTurn[] }).negotiation_history)
+    : [];
+
+  const turn: NegotiationTurn = {
+    from,
+    message,
+    price_cents: typeof payload.price_cents === "number" ? payload.price_cents : undefined,
+    terms: payload.terms && typeof payload.terms === "object" ? payload.terms : undefined,
+    sent_at: new Date().toISOString(),
+    performed_by_user_id: user.id,
+  };
+  const next = [...existing, turn];
+
+  const { error: updateErr } = await service
+    .from("project_quotes")
+    .update({
+      negotiation_history: next,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", quoteId);
+  if (updateErr) {
+    console.error("[chez-concierge] negotiation update failed:", updateErr);
+    return json({ error: updateErr.message }, 500);
+  }
+
+  return json({
+    ok: true,
+    quote_id: quoteId,
+    project_id: (row as { project_id?: string }).project_id,
+    turn_count: next.length,
+    turn,
+  });
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -3357,6 +3604,27 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as AdminSubmitPayload
+        );
+
+      // Phase 84 — Households workbench data.
+      case "fetch_households_list":
+        return handleFetchHouseholdsList(service, user);
+      case "fetch_household_workbench":
+        return handleFetchHouseholdWorkbench(
+          service,
+          user,
+          body as unknown as FetchHouseholdWorkbenchPayload
+        );
+
+      // Phase 84 PR 4 — project negotiation tracking. Each call appends
+      // one turn to project_quotes.negotiation_history. Admin-only;
+      // mutation goes through service role since the operator may not
+      // have homeowner-side RLS access to write project_quotes.
+      case "add_project_negotiation_turn":
+        return handleAddProjectNegotiationTurn(
+          service,
+          user,
+          body as unknown as AddProjectNegotiationTurnPayload
         );
 
       default:

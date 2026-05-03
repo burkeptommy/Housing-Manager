@@ -44,6 +44,10 @@ struct SystemDetailRowView: View {
     @State private var catalogDetails: CatalogDetails?
     /// Phase 50: Toggles the FrequencyPickerSheet.
     @State private var showFrequencyPicker = false
+    /// Phase 84 — local mirror for ChezOwnsToggle's Binding. Seeded from
+    /// the system on first appear; flips before the network call so the
+    /// UI feels immediate.
+    @State private var chezOwnedLocal: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     private let db = DatabaseService.shared
@@ -103,6 +107,7 @@ struct SystemDetailRowView: View {
                 if !isServiceCategory && !manualLinks.isEmpty { manualsCard }
                 if !isServiceCategory { componentsCard }
                 preferredVendorCard
+                chezOwnsCard
                 askAlfredCard
                 maintenanceCard
                 serviceRecordsCard
@@ -1278,6 +1283,35 @@ struct SystemDetailRowView: View {
     }
 
     // MARK: - Maintenance
+
+    // MARK: - Chez ownership (Phase 84)
+
+    /// Universal entity-level delegation toggle. The toggle component
+    /// handles the prompt-for-notes flow, the optimistic-state binding,
+    /// and the cross-surface refresh notifications — we just need to
+    /// pass the right Target. ChezOwnsBadge.chezOwnedSection() already
+    /// renders a section card around it; we wrap in a HavenCard for
+    /// visual consistency with the surrounding cards.
+    private var chezOwnsCard: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            ChezOwnsToggle(
+                target: .system(id: system.id, name: system.displayName),
+                isOwned: $chezOwnedLocal,
+                onChange: { _ in
+                    NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+                }
+            )
+            Text("Chez logs service, schedules maintenance visits, links warranty docs, and orders parts when something fails.")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(HavenTheme.spacing16)
+        .background(HavenColors.surface)
+        .cornerRadius(HavenTheme.radiusMedium)
+        .onAppear {
+            chezOwnedLocal = system.isChezOwned
+        }
+    }
 
     // MARK: - Ask Alfred
 

@@ -472,11 +472,38 @@ final class ChezOwnershipViewModel: ObservableObject {
         do {
             let user = try await DatabaseService.shared.fetchCurrentUser()
             guard let householdId = user.householdId else { return }
+            // Phase 84 — fan out to every entity type that supports
+            // delegation. Each fetch is independent; we await all in
+            // parallel so the inventory page renders in one network
+            // round-trip even when all 8 categories have items.
+            // `fetchHomeSystems()` and `fetchVehicles()` are already
+            // household-scoped via the user's session; for the
+            // property-scoped fetches (utility accounts, projects) we
+            // fetch the properties list and iterate.
             async let householdReq = DatabaseService.shared.fetchHousehold(id: householdId)
             async let routinesReq = DatabaseService.shared.fetchRoutines(householdId: householdId)
             async let contractorsReq = DatabaseService.shared.fetchContractors()
             async let tasksReq = DatabaseService.shared.fetchMaintenanceTasks()
-            let (hh, routines, contractors, tasks) = try await (householdReq, routinesReq, contractorsReq, tasksReq)
+            async let systemsReq = DatabaseService.shared.fetchHomeSystems()
+            async let documentsReq = DatabaseService.shared.fetchDocuments(category: nil, status: nil)
+            async let propertiesReq = DatabaseService.shared.fetchProperties()
+            async let vehiclesReq = DatabaseService.shared.fetchVehicles()
+            let (hh, routines, contractors, tasks, systems, documents, properties, vehicles) = try await (householdReq, routinesReq, contractorsReq, tasksReq, systemsReq, documentsReq, propertiesReq, vehiclesReq)
+            // Per-property fan-out for the rows that aren't yet
+            // household-scoped at the DatabaseService layer. v1
+            // households almost always have exactly one property —
+            // sequential is fine, and parallelism here would only
+            // matter for the rare multi-property case.
+            var projects: [PropertyProjectRow] = []
+            var utilities: [UtilityAccountRow] = []
+            for p in properties {
+                if let projs = try? await DatabaseService.shared.fetchProjects(propertyId: p.id) {
+                    projects.append(contentsOf: projs)
+                }
+                if let utils = try? await DatabaseService.shared.fetchUtilityAccounts(propertyId: p.id) {
+                    utilities.append(contentsOf: utils)
+                }
+            }
             household = hh
 
             var inventory: [InventoryItem] = []
@@ -508,6 +535,56 @@ final class ChezOwnershipViewModel: ObservableObject {
                     subtitle: "Task — Chez owns coordination",
                     revokeKind: .task(id: t.id),
                     sortDate: t.chezOwnedAt
+                ))
+            }
+            for s in systems where s.isChezOwned {
+                inventory.append(InventoryItem(
+                    id: "system:\(s.id.uuidString)",
+                    icon: "wrench.and.screwdriver.fill",
+                    title: s.displayName,
+                    subtitle: "System — Chez handles service + warranty",
+                    revokeKind: .system(id: s.id),
+                    sortDate: s.chezOwnedAt
+                ))
+            }
+            for p in projects where p.isChezOwned {
+                inventory.append(InventoryItem(
+                    id: "project:\(p.id.uuidString)",
+                    icon: "hammer.fill",
+                    title: p.name,
+                    subtitle: "Project — Chez owns sourcing + budget",
+                    revokeKind: .project(id: p.id),
+                    sortDate: p.chezOwnedAt
+                ))
+            }
+            for d in documents where d.isChezOwned {
+                inventory.append(InventoryItem(
+                    id: "document:\(d.id.uuidString)",
+                    icon: "doc.fill",
+                    title: d.title,
+                    subtitle: "Document — Chez files + organizes",
+                    revokeKind: .document(id: d.id),
+                    sortDate: d.chezOwnedAt
+                ))
+            }
+            for u in utilities where u.isChezOwned {
+                inventory.append(InventoryItem(
+                    id: "utility:\(u.id.uuidString)",
+                    icon: u.typeIcon,
+                    title: u.providerName,
+                    subtitle: "\(u.typeLabel) — Chez audits + negotiates",
+                    revokeKind: .utility(id: u.id),
+                    sortDate: u.chezOwnedAt
+                ))
+            }
+            for v in vehicles where v.isChezOwned {
+                inventory.append(InventoryItem(
+                    id: "vehicle:\(v.id.uuidString)",
+                    icon: "car.fill",
+                    title: v.displayName.isEmpty ? v.name : v.displayName,
+                    subtitle: "Vehicle — Chez handles service + recalls + registration",
+                    revokeKind: .vehicle(id: v.id),
+                    sortDate: v.chezOwnedAt
                 ))
             }
             delegations = inventory.sorted(by: { ($0.sortDate ?? .distantPast) > ($1.sortDate ?? .distantPast) })
@@ -573,6 +650,16 @@ final class ChezOwnershipViewModel: ObservableObject {
                 try await HavenSupabase.delegateContractorToChez(contractorId: id, delegated: false, notes: nil)
             case .task(let id):
                 try await HavenSupabase.delegateTaskToChez(taskId: id, delegated: false, notes: nil)
+            case .system(let id):
+                try await HavenSupabase.delegateEntityToChez(entityType: "system", entityId: id.uuidString, delegated: false, notes: nil, propertyId: nil)
+            case .project(let id):
+                try await HavenSupabase.delegateEntityToChez(entityType: "project", entityId: id.uuidString, delegated: false, notes: nil, propertyId: nil)
+            case .document(let id):
+                try await HavenSupabase.delegateEntityToChez(entityType: "document", entityId: id.uuidString, delegated: false, notes: nil, propertyId: nil)
+            case .utility(let id):
+                try await HavenSupabase.delegateEntityToChez(entityType: "utility", entityId: id.uuidString, delegated: false, notes: nil, propertyId: nil)
+            case .vehicle(let id):
+                try await HavenSupabase.delegateEntityToChez(entityType: "vehicle", entityId: id.uuidString, delegated: false, notes: nil, propertyId: nil)
             }
             Haptics.success()
             NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
@@ -595,6 +682,12 @@ final class ChezOwnershipViewModel: ObservableObject {
             case routine(id: UUID)
             case contractor(id: UUID)
             case task(id: UUID)
+            // Phase 84 — universal entity-level delegation surfaces.
+            case system(id: UUID)
+            case project(id: UUID)
+            case document(id: UUID)
+            case utility(id: UUID)
+            case vehicle(id: UUID)
         }
     }
 }

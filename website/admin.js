@@ -72,6 +72,30 @@ const VIEWS = [
     subtitle: "Every homeowner request, in one cockpit. Queue on the left, full homeowner context, AI brief, vendor sourcing, conversation, and Alfred co-pilot — all on one screen.",
   },
   {
+    // Phase 84 — Cross-household priority queue. Surfaces every
+    // time-bound item across every household so the operator can
+    // start their day with "what should I work on next."
+    id: "upcoming",
+    label: "Upcoming",
+    type: "upcoming",
+    group: "action",
+    title: "Upcoming",
+    eyebrow: "What's next, across every home",
+    subtitle: "Routine visits, bills due, warranties expiring, insurance renewals, follow-ups, and stale cases — sorted by urgency across every household Chez manages.",
+  },
+  {
+    // Phase 84 — Per-household ongoing oversight. Lists every
+    // household; clicking opens a workbench showing every owned
+    // entity grouped by type with action buttons.
+    id: "households",
+    label: "Households",
+    type: "household",
+    group: "action",
+    title: "Households workbench",
+    eyebrow: "Ongoing oversight of every owned entity",
+    subtitle: "Every household, every entity Chez owns for them. Routines, systems, vendors, projects, documents, bills, insurance, vehicles. Cases live on the Concierge tab.",
+  },
+  {
     id: "audit",
     label: "Audit",
     type: "audit",
@@ -616,6 +640,24 @@ const state = {
       chat: {},               // { [requestId]: [{ from: 'alfred'|'user', text }] }
       input: {},              // { [requestId]: '' }
     },
+  },
+  // Phase 84 — Households workbench state.
+  households: {
+    list: [],                  // [{ id, name, open_cases, owned_count, group_count, last_activity_at, ... }]
+    listLoadedAt: 0,
+    selectedId: null,
+    workbench: null,           // full per-household payload for the selected one
+    workbenchLoadedAt: 0,
+    workbenchTab: "routines",  // routines | systems | vendors | tasks | projects | documents | utilities | vehicles | cases
+  },
+  // Phase 84 — Upcoming feed state.
+  upcoming: {
+    items: [],
+    fetchedAt: 0,
+    windowDays: 14,
+    typeFilter: "all",         // all | routine_visit | chez_visit | case_sla | reminder | document_expiring | vehicle_registration | vehicle_insurance
+    priorityFilter: "all",     // all | overdue | today | this_week
+    searchQuery: "",
   },
 };
 
@@ -1802,6 +1844,10 @@ function render() {
 
   if (state.view === "chez") {
     renderConciergeCockpit();
+  } else if (state.view === "upcoming") {
+    renderUpcomingView();
+  } else if (state.view === "households") {
+    renderHouseholdsView();
   } else if (state.view === "audit") {
     renderAuditView();
   } else if (state.view === "vendor_apps") {
@@ -16986,4 +17032,825 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+// =============================================================================
+// Phase 84 — Households workbench + Upcoming feed (admin surfaces)
+// =============================================================================
+//
+// Two new admin tabs alongside Concierge:
+//   • Households (per-household ongoing oversight) — list every household
+//     with stats + click into a per-household command center showing
+//     every owned entity grouped by type.
+//   • Upcoming (cross-household priority queue) — every time-bound item
+//     across every household, sorted by urgency.
+//
+// Both reuse the existing admin layout (el.list + el.auditFocused for
+// the focused detail rail), so no new HTML container is needed.
+
+// ----- Households list view --------------------------------------------------
+
+async function renderHouseholdsView() {
+  // Use the existing standard layout (el.list + el.auditFocused).
+  el.search.value = state.search || "";
+  el.stats.innerHTML = `<div class="admin-stat"><strong>—</strong><span>Loading…</span></div>`;
+  el.list.innerHTML = `<p class="admin-audit__intro">Loading households…</p>`;
+
+  // Fire fetch on first render or after 60s.
+  const stale = Date.now() - state.households.listLoadedAt > 60_000;
+  if (stale || state.households.list.length === 0) {
+    try {
+      const result = await callChezConcierge({ action: "fetch_households_list" });
+      state.households.list = (result.households ?? []);
+      state.households.listLoadedAt = Date.now();
+    } catch (e) {
+      el.list.innerHTML = `<p class="admin-muted">Couldn't load households: ${escapeHtml(String(e.message || e))}</p>`;
+      return;
+    }
+  }
+
+  const items = state.households.list;
+  const totalOwned = items.reduce((s, h) => s + (h.owned_count || 0), 0);
+  const totalCases = items.reduce((s, h) => s + (h.open_cases || 0), 0);
+  const fullyDelegated = items.filter((h) => (h.group_count || 0) >= 8).length;
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${items.length}</strong><span>Households</span></div>
+    <div class="admin-stat"><strong>${totalOwned}</strong><span>Owned entities</span></div>
+    <div class="admin-stat"><strong>${totalCases}</strong><span>Open cases</span></div>
+    <div class="admin-stat"><strong>${fullyDelegated}</strong><span>Fully delegated</span></div>
+  `;
+
+  // Search filter (over name).
+  const query = (state.search || "").toLowerCase().trim();
+  const filtered = query
+    ? items.filter((h) => (h.name || "").toLowerCase().includes(query))
+    : items;
+
+  if (filtered.length === 0) {
+    el.list.innerHTML = `
+      <div class="admin-audit admin-chez">
+        <p class="admin-audit__intro">No households yet. New homeowners land here automatically when they sign up.</p>
+      </div>
+    `;
+    return;
+  }
+
+  el.list.innerHTML = `
+    <div class="admin-audit admin-chez admin-households">
+      <p class="admin-audit__intro">
+        Every household and what Chez is currently managing for them. Click a row to open the workbench — every owned entity grouped by type with action buttons.
+      </p>
+      ${filtered.map(renderHouseholdRowHtml).join("")}
+    </div>
+  `;
+
+  el.list.querySelectorAll("[data-household-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.householdId;
+      state.households.selectedId = id;
+      await loadHouseholdWorkbench(id);
+      renderHouseholdsView();
+      renderHouseholdWorkbenchDetail();
+    });
+  });
+
+  // Restore the focused panel if a household was previously selected.
+  if (state.households.selectedId) {
+    renderHouseholdWorkbenchDetail();
+  } else {
+    el.auditFocused?.classList.add("is-hidden");
+    el.noteFocused?.classList.add("is-hidden");
+    el.decisionFocused?.classList.add("is-hidden");
+    el.emptyDetail?.classList.remove("is-hidden");
+    el.detail?.classList.add("is-hidden");
+    if (el.emptyDetail) {
+      el.emptyDetail.querySelector("h3").textContent = "Click a household to open the workbench";
+      el.emptyDetail.querySelector("p").textContent = "The workbench shows every entity Chez owns for that household — routines, systems, vendors, projects, documents, bills, insurance, vehicles — with action buttons per row.";
+    }
+  }
+}
+
+function renderHouseholdRowHtml(h) {
+  const isActive = state.households.selectedId === h.id;
+  const groupBadge = (h.group_count ?? 0) > 0
+    ? `<span class="admin-pill" data-tone="green">${h.group_count} ${h.group_count === 1 ? "group" : "groups"} delegated</span>`
+    : "";
+  const fullPill = (h.group_count ?? 0) >= 8
+    ? `<span class="admin-pill" data-tone="green">FULL DELEGATION</span>` : "";
+  const lastActivity = h.last_activity_at
+    ? `<span class="admin-muted">Last activity ${escapeHtml(relativeTimeString(h.last_activity_at))}</span>`
+    : `<span class="admin-muted">No recent activity</span>`;
+
+  return `
+    <button type="button" class="admin-audit__row admin-chez__row ${isActive ? "is-active" : ""}" data-household-id="${escapeHtml(h.id)}">
+      <div class="admin-audit__row-top">
+        <strong>${escapeHtml(h.name || "Household")}</strong>
+        ${fullPill || groupBadge}
+      </div>
+      <p class="admin-audit__row-reason">
+        <span>${h.owned_count} owned</span>
+        · <span>${h.open_cases} open ${h.open_cases === 1 ? "case" : "cases"}</span>
+        · ${lastActivity}
+      </p>
+    </button>
+  `;
+}
+
+async function loadHouseholdWorkbench(householdId) {
+  try {
+    const result = await callChezConcierge({
+      action: "fetch_household_workbench",
+      household_id: householdId,
+    });
+    state.households.workbench = result;
+    state.households.workbenchLoadedAt = Date.now();
+  } catch (e) {
+    console.warn("[households] workbench fetch failed", e);
+    state.households.workbench = null;
+  }
+}
+
+function renderHouseholdWorkbenchDetail() {
+  if (!state.households.selectedId || !state.households.workbench) return;
+  const wb = state.households.workbench;
+  const tab = state.households.workbenchTab || "routines";
+
+  el.emptyDetail?.classList.add("is-hidden");
+  el.detail?.classList.remove("is-hidden");
+  el.detailTabs?.classList.add("is-hidden");
+  el.curatedForm?.classList.add("is-hidden");
+  if (el.formHost) el.formHost.innerHTML = "";
+  if (el.diffHost) el.diffHost.innerHTML = "";
+  document.querySelector("[data-detail-quick-actions]")?.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
+  el.detailActionsRow?.classList.add("is-hidden");
+  el.notesBox?.classList.add("is-hidden");
+  el.promoteItem.disabled = true;
+  el.duplicateItem.disabled = true;
+  el.deleteItem.disabled = true;
+  el.saveItem.textContent = "Save";
+  el.saveItem.disabled = true;
+
+  if (!el.auditFocused) return;
+  el.auditFocused.classList.remove("is-hidden");
+  el.auditFocused.innerHTML = renderHouseholdWorkbenchHtml(wb, tab);
+
+  // Tab switcher.
+  el.auditFocused.querySelectorAll("[data-workbench-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.households.workbenchTab = btn.dataset.workbenchTab;
+      renderHouseholdWorkbenchDetail();
+    });
+  });
+
+  // Phase 84 PR 4 — wire per-entity action buttons. Each fires
+  // `workbench_action` server-side, which records an audit row +
+  // executes the side effect (insert service_record / update task /
+  // etc.). The "open_project_workbench" action is handled locally —
+  // it opens the negotiation modal instead of firing an Edge
+  // Function call.
+  el.auditFocused.querySelectorAll('[data-cockpit-action="workbench-action"]').forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const actionId = btn.dataset.actionId;
+      const entityType = btn.dataset.entityType;
+      const entityId = btn.dataset.entityId;
+      if (!actionId || !entityType || !entityId) return;
+
+      // Project negotiation pane — open the modal, don't fire the action yet.
+      if (actionId === "open_project_workbench") {
+        await openProjectNegotiationModal(entityId);
+        return;
+      }
+
+      const householdId = state.households.selectedId;
+      if (!householdId) return;
+      btn.disabled = true;
+      btn.textContent = "…";
+      try {
+        await callChezConcierge({
+          action: "workbench_action",
+          household_id: householdId,
+          entity_type: entityType,
+          entity_id: entityId,
+          action_type: actionId,
+          payload: {},
+        });
+        btn.textContent = "✓ Logged";
+        // Reload the workbench so the "Recent activity" strip + the
+        // entity row's status (e.g. last_service_date for log_service)
+        // refresh in place.
+        await loadHouseholdWorkbench(householdId);
+      } catch (err) {
+        console.error("[workbench-action] failed:", err);
+        btn.textContent = "Failed — retry";
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+// Phase 84 PR 4 — Project negotiation pane modal. Renders
+// project_quotes for the selected project + each quote's
+// negotiation_history as a chronological feed. Composer at
+// the bottom posts a new turn via add_project_negotiation_turn.
+async function openProjectNegotiationModal(projectId) {
+  const overlay = document.createElement("div");
+  overlay.className = "admin-modal-overlay";
+  overlay.innerHTML = `
+    <div class="admin-modal admin-modal--wide">
+      <header class="admin-modal__head">
+        <h2>Project negotiation</h2>
+        <button type="button" class="admin-modal__close" aria-label="Close">&times;</button>
+      </header>
+      <div class="admin-modal__body" data-negotiation-body>
+        <p class="admin-muted">Loading quotes…</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".admin-modal__close").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const body = overlay.querySelector("[data-negotiation-body]");
+  try {
+    // Pull the project's quotes directly from PostgREST — admin uses
+    // service-role context via supabase.auth, so the existing
+    // PostgREST client suffices for the read.
+    const { data: quotes, error } = await supabase
+      .from("project_quotes")
+      .select("id, project_id, vendor_name, total_amount_cents, status, negotiation_history, updated_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    body.innerHTML = renderNegotiationModalHtml(projectId, quotes || []);
+    attachNegotiationModalHandlers(overlay, projectId);
+  } catch (e) {
+    body.innerHTML = `<p class="admin-error">Failed to load quotes: ${escapeHtml(String(e))}</p>`;
+  }
+}
+
+function renderNegotiationModalHtml(projectId, quotes) {
+  if (!Array.isArray(quotes) || quotes.length === 0) {
+    return `<p class="admin-muted">No quotes on this project yet. Vendor sourcing happens in the cockpit's vendor pane.</p>`;
+  }
+  return `
+    <div class="admin-negotiation">
+      ${quotes.map((q) => {
+        const turns = Array.isArray(q.negotiation_history) ? q.negotiation_history : [];
+        const latestPrice = turns
+          .slice()
+          .reverse()
+          .find((t) => typeof t.price_cents === "number")?.price_cents;
+        return `
+          <article class="admin-negotiation__quote" data-quote-id="${escapeHtml(q.id)}">
+            <header class="admin-negotiation__quote-head">
+              <strong>${escapeHtml(q.vendor_name || "(unnamed vendor)")}</strong>
+              <span class="admin-pill" data-tone="${q.status === "accepted" ? "success" : "muted"}">${escapeHtml(q.status || "pending")}</span>
+              <span class="admin-muted">
+                ${typeof q.total_amount_cents === "number" ? "Initial: $" + formatCompact(q.total_amount_cents / 100) : ""}
+                ${typeof latestPrice === "number" ? " · Current: $" + formatCompact(latestPrice / 100) : ""}
+              </span>
+            </header>
+            <div class="admin-negotiation__feed">
+              ${turns.length === 0 ? `<p class="admin-muted">No back-and-forth yet. Add the first turn below.</p>` : turns.map((t) => `
+                <div class="admin-negotiation__turn admin-negotiation__turn--${escapeHtml(t.from || "chez")}">
+                  <span class="admin-negotiation__turn-from">${t.from === "chez" ? "Chez" : "Vendor"}</span>
+                  <span class="admin-negotiation__turn-meta">${escapeHtml(relativeTimeString(t.sent_at))}${typeof t.price_cents === "number" ? " · $" + formatCompact(t.price_cents / 100) : ""}</span>
+                  <p>${escapeHtml(t.message || "")}</p>
+                </div>
+              `).join("")}
+            </div>
+            <form class="admin-negotiation__composer" data-composer-quote="${escapeHtml(q.id)}">
+              <select data-composer-from class="admin-input">
+                <option value="chez">Chez (operator)</option>
+                <option value="vendor">Vendor (response)</option>
+              </select>
+              <input type="number" min="0" step="1" placeholder="New price ($)" data-composer-price class="admin-input admin-input--narrow" />
+              <textarea placeholder="Message (e.g. 'Can you do better than $12,400?')" data-composer-message class="admin-input" rows="2" required></textarea>
+              <button type="submit" class="admin-pill admin-pill--action">Add turn</button>
+            </form>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function attachNegotiationModalHandlers(overlay, projectId) {
+  overlay.querySelectorAll('[data-composer-quote]').forEach((form) => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const quoteId = form.dataset.composerQuote;
+      const from = form.querySelector('[data-composer-from]').value;
+      const message = form.querySelector('[data-composer-message]').value.trim();
+      const priceStr = form.querySelector('[data-composer-price]').value.trim();
+      const price_cents = priceStr ? Math.round(Number(priceStr) * 100) : undefined;
+      if (!quoteId || !message) return;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving…";
+      try {
+        await callChezConcierge({
+          action: "add_project_negotiation_turn",
+          quote_id: quoteId,
+          from,
+          message,
+          price_cents,
+        });
+        // Re-render the modal in place to surface the new turn.
+        const body = overlay.querySelector("[data-negotiation-body]");
+        body.innerHTML = `<p class="admin-muted">Refreshing…</p>`;
+        const { data: quotes } = await supabase
+          .from("project_quotes")
+          .select("id, project_id, vendor_name, total_amount_cents, status, negotiation_history, updated_at")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: true });
+        body.innerHTML = renderNegotiationModalHtml(projectId, quotes || []);
+        attachNegotiationModalHandlers(overlay, projectId);
+      } catch (err) {
+        submitBtn.textContent = "Failed — retry";
+        submitBtn.disabled = false;
+        console.error("[negotiation] add turn failed:", err);
+      }
+    });
+  });
+}
+
+function renderHouseholdWorkbenchHtml(wb, tab) {
+  const household = wb.household ?? {};
+  const homeownerName = primaryHomeownerLabel({ users: wb.users, family_members: wb.family_members, household: wb.household });
+  const property = (wb.properties || [])[0] || null;
+
+  const ownedRoutines = (wb.routines || []).filter((r) => r.chez_owned);
+  const ownedSystems = (wb.home_systems || []).filter((s) => s.chez_owned);
+  const ownedVendors = (wb.contractors || []).filter((c) => c.chez_owned);
+  const ownedTasks = (wb.tasks || []).filter((t) => t.chez_owned);
+  const ownedProjects = (wb.projects || []).filter((p) => p.chez_owned);
+  const ownedDocuments = (wb.documents || []).filter((d) => d.chez_owned);
+  const ownedUtilities = (wb.utility_accounts || []).filter((u) => u.chez_owned);
+  const ownedVehicles = (wb.vehicles || []).filter((v) => v.chez_owned);
+  const openCases = wb.open_cases || [];
+  const reminders = wb.reminders || [];
+  const recentActions = wb.workbench_actions || [];
+
+  const tabs = [
+    { id: "routines", label: "Routines", count: ownedRoutines.length },
+    { id: "systems", label: "Systems", count: ownedSystems.length },
+    { id: "vendors", label: "Vendors", count: ownedVendors.length },
+    { id: "tasks", label: "Tasks", count: ownedTasks.length },
+    { id: "projects", label: "Projects", count: ownedProjects.length },
+    { id: "documents", label: "Documents", count: ownedDocuments.length },
+    { id: "utilities", label: "Bills", count: ownedUtilities.length },
+    { id: "vehicles", label: "Vehicles", count: ownedVehicles.length },
+    { id: "cases", label: "Open cases", count: openCases.length },
+  ];
+
+  const tabBody = (() => {
+    switch (tab) {
+      case "routines": return renderWorkbenchListHtml(ownedRoutines, "No routines owned by Chez yet.", (r) => ({
+        title: r.label || r.routine_kind, sub: `${r.cadence_type || ""}${r.vendor_id ? " · vendor on file" : ""}`,
+        meta: r.next_visit_date ? `Next ${formatDateOnly(r.next_visit_date)}` : "",
+        actions: [
+          { id: "schedule_visit", label: "Schedule next visit", entityType: "routine", entityId: r.id },
+          { id: "log_visit", label: "Log a visit", entityType: "routine", entityId: r.id },
+        ],
+      }));
+      case "systems": return renderWorkbenchListHtml(ownedSystems, "No systems owned by Chez yet.", (s) => ({
+        title: s.name || s.category, sub: `${s.category}${s.manufacturer ? " · " + s.manufacturer : ""}${s.model ? " · " + s.model : ""}`,
+        meta: s.last_service_date ? `Last service ${formatDateOnly(s.last_service_date)}` : "",
+        actions: [
+          { id: "log_service", label: "Log service", entityType: "system", entityId: s.id },
+          { id: "schedule_maintenance", label: "Schedule maintenance", entityType: "system", entityId: s.id },
+        ],
+      }));
+      case "vendors": return renderWorkbenchListHtml(ownedVendors, "No vendors owned by Chez yet.", (c) => ({
+        title: c.company_name, sub: `${c.category || ""}${c.phone ? " · " + c.phone : ""}`,
+        meta: c.chez_recommended_at ? "Sourced by Chez" : "",
+        actions: [
+          { id: "log_call", label: "Log a call", entityType: "contractor", entityId: c.id },
+          { id: "send_message", label: "Send message", entityType: "contractor", entityId: c.id },
+        ],
+      }));
+      case "tasks": return renderWorkbenchListHtml(ownedTasks, "No tasks owned by Chez yet.", (t) => ({
+        title: t.title, sub: `${t.assignment_type || "task"}${t.frequency ? " · " + t.frequency : ""}`,
+        meta: t.next_due_date ? `Due ${formatDateOnly(t.next_due_date)}` : "",
+        actions: [
+          { id: "schedule", label: "Schedule", entityType: "task", entityId: t.id },
+          { id: "complete_on_behalf", label: "Complete on behalf", entityType: "task", entityId: t.id },
+          { id: "snooze", label: "Snooze 7d", entityType: "task", entityId: t.id },
+        ],
+      }));
+      case "projects": return renderWorkbenchListHtml(ownedProjects, "No projects owned by Chez yet.", (p) => ({
+        title: p.name, sub: `${p.status || ""}${p.estimated_budget ? " · est. $" + formatCompact(p.estimated_budget) : ""}`,
+        meta: "",
+        actions: [
+          { id: "open_project_workbench", label: "Open negotiation pane", entityType: "project", entityId: p.id },
+        ],
+      }));
+      case "documents": return renderWorkbenchListHtml(ownedDocuments, "No documents owned by Chez yet.", (d) => ({
+        title: d.filename, sub: d.category || "Document",
+        meta: d.expiration_date ? `Expires ${formatDateOnly(d.expiration_date)}` : "",
+        actions: [
+          { id: "mark_filed", label: "Mark filed", entityType: "document", entityId: d.id },
+          { id: "share_with_vendor", label: "Share with vendor", entityType: "document", entityId: d.id },
+        ],
+      }));
+      case "utilities": return renderWorkbenchListHtml(ownedUtilities, "No utility accounts owned by Chez yet.", (u) => ({
+        title: u.provider_name || u.account_name || "Utility", sub: u.utility_type || "",
+        meta: u.estimated_monthly_cost ? `~$${u.estimated_monthly_cost}/mo` : "",
+        actions: [
+          { id: "audit_bill", label: "Audit bill", entityType: "utility", entityId: u.id },
+          { id: "draft_negotiation", label: "Draft negotiation email", entityType: "utility", entityId: u.id },
+        ],
+      }));
+      case "vehicles": return renderWorkbenchListHtml(ownedVehicles, "No vehicles owned by Chez yet.", (v) => ({
+        title: [v.year, v.make, v.model].filter(Boolean).join(" "), sub: v.license_plate || "",
+        meta: v.registration_expiry ? `Reg expires ${formatDateOnly(v.registration_expiry)}` : "",
+        actions: [
+          { id: "schedule_service", label: "Schedule service", entityType: "vehicle", entityId: v.id },
+          { id: "handle_recall", label: "Handle recall", entityType: "vehicle", entityId: v.id },
+        ],
+      }));
+      case "cases": return openCases.length === 0
+        ? `<p class="admin-muted">No open cases for this household.</p>`
+        : openCases.map((c) => `
+          <button type="button" class="admin-audit__row" data-workbench-case-id="${escapeHtml(c.id)}">
+            <div class="admin-audit__row-top">
+              <strong>${escapeHtml(c.summary || "(no summary)")}</strong>
+              <span class="admin-pill" data-tone="${c.status === "open" ? "amber" : "muted"}">${escapeHtml(c.status)}</span>
+            </div>
+            <p class="admin-audit__row-reason">${escapeHtml(CHEZ_CATEGORY_LABELS[c.category] || c.category || "")}${c.last_message_at ? " · last activity " + escapeHtml(relativeTimeString(c.last_message_at)) : ""}</p>
+          </button>
+        `).join("");
+      default: return "";
+    }
+  })();
+
+  return `
+    <section class="admin-focused admin-households__workbench">
+      <header class="admin-focused__head">
+        <h2>${escapeHtml(homeownerName)}</h2>
+        <div class="admin-focused__meta">
+          <span class="admin-pill admin-pill--note">${escapeHtml(household.name || "Household")}</span>
+          ${property ? `<span class="admin-muted">${escapeHtml(formatAddress(property))}</span>` : ""}
+        </div>
+      </header>
+
+      <div class="admin-households__tabs">
+        ${tabs.map((t) => `
+          <button type="button" class="admin-households__tab ${tab === t.id ? "is-active" : ""}" data-workbench-tab="${escapeHtml(t.id)}">
+            ${escapeHtml(t.label)}<span class="admin-households__tab-count">${t.count}</span>
+          </button>
+        `).join("")}
+      </div>
+
+      <div class="admin-households__panel">
+        ${tabBody || `<p class="admin-muted">Nothing here yet.</p>`}
+      </div>
+
+      ${reminders.length > 0 ? `
+        <div class="admin-households__section">
+          <h4>Reminders · ${reminders.length}</h4>
+          ${reminders.slice(0, 5).map((r) => `
+            <div class="admin-households__reminder">
+              <strong>${escapeHtml(r.title)}</strong>
+              <span class="admin-muted">due ${escapeHtml(formatDateTimeShort(r.due_at))}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+
+      ${recentActions.length > 0 ? `
+        <div class="admin-households__section">
+          <h4>Recent workbench activity · ${recentActions.length}</h4>
+          ${recentActions.slice(0, 5).map((a) => `
+            <div class="admin-households__action-row">
+              <strong>${escapeHtml(a.action_type.replace(/_/g, " "))}</strong>
+              <span class="admin-muted">${escapeHtml(a.entity_type)} · ${escapeHtml(relativeTimeString(a.created_at))}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderWorkbenchListHtml(items, emptyCopy, formatter) {
+  if (items.length === 0) {
+    return `<p class="admin-muted">${escapeHtml(emptyCopy)}</p>`;
+  }
+  return items.map((it) => {
+    const f = formatter(it);
+    // Phase 84 PR 4 — every workbench row gets per-entity action
+    // buttons. Each button fires `workbench_action` (or, for project,
+    // opens the negotiation pane modal). Buttons stamp the entity
+    // type + id via data-* attrs which the click handler reads.
+    const actionsHtml = (Array.isArray(f.actions) && f.actions.length > 0)
+      ? `<div class="admin-households__entity-actions">
+          ${f.actions.map((a) => `
+            <button type="button"
+              class="admin-pill admin-pill--action admin-households__entity-action"
+              data-cockpit-action="workbench-action"
+              data-action-id="${escapeHtml(a.id)}"
+              data-entity-type="${escapeHtml(a.entityType)}"
+              data-entity-id="${escapeHtml(a.entityId)}">
+              ${escapeHtml(a.label)}
+            </button>
+          `).join("")}
+        </div>`
+      : "";
+    return `
+      <div class="admin-households__entity-row">
+        <div class="admin-households__entity-main">
+          <strong>${escapeHtml(f.title || "(unnamed)")}</strong>
+          ${f.sub ? `<span class="admin-muted">${escapeHtml(f.sub)}</span>` : ""}
+        </div>
+        ${f.meta ? `<span class="admin-households__entity-meta">${escapeHtml(f.meta)}</span>` : ""}
+        ${actionsHtml}
+      </div>
+    `;
+  }).join("");
+}
+
+// ----- Upcoming feed view ----------------------------------------------------
+
+async function renderUpcomingView() {
+  el.search.value = state.search || "";
+  el.stats.innerHTML = `<div class="admin-stat"><strong>—</strong><span>Loading…</span></div>`;
+  el.list.innerHTML = `<p class="admin-audit__intro">Loading the upcoming feed…</p>`;
+
+  const stale = Date.now() - state.upcoming.fetchedAt > 60_000;
+  if (stale || state.upcoming.items.length === 0) {
+    try {
+      const result = await callChezConcierge({
+        action: "fetch_upcoming",
+        window_days: state.upcoming.windowDays,
+      });
+      state.upcoming.items = (result.items ?? []);
+      state.upcoming.fetchedAt = Date.now();
+    } catch (e) {
+      el.list.innerHTML = `<p class="admin-muted">Couldn't load upcoming: ${escapeHtml(String(e.message || e))}</p>`;
+      return;
+    }
+  }
+
+  const items = state.upcoming.items;
+  const overdue = items.filter((i) => i.priority === "overdue").length;
+  const today = items.filter((i) => i.priority === "today").length;
+  const thisWeek = items.filter((i) => i.priority === "this_week").length;
+  const reminders = items.filter((i) => i.type === "reminder").length;
+
+  el.stats.innerHTML = `
+    <div class="admin-stat"><strong>${overdue}</strong><span>Overdue</span></div>
+    <div class="admin-stat"><strong>${today}</strong><span>Today</span></div>
+    <div class="admin-stat"><strong>${thisWeek}</strong><span>This week</span></div>
+    <div class="admin-stat"><strong>${reminders}</strong><span>My reminders</span></div>
+  `;
+
+  // Apply filters.
+  const query = (state.search || "").toLowerCase().trim();
+  let filtered = items;
+  if (state.upcoming.typeFilter !== "all") {
+    filtered = filtered.filter((i) => i.type === state.upcoming.typeFilter);
+  }
+  if (state.upcoming.priorityFilter !== "all") {
+    filtered = filtered.filter((i) => i.priority === state.upcoming.priorityFilter);
+  }
+  if (query) {
+    filtered = filtered.filter((i) =>
+      (i.title || "").toLowerCase().includes(query) ||
+      (i.household_name || "").toLowerCase().includes(query) ||
+      (i.sub || "").toLowerCase().includes(query)
+    );
+  }
+
+  // Group by priority band for visual grouping.
+  const bands = [
+    { id: "overdue", label: "Overdue" },
+    { id: "today", label: "Today" },
+    { id: "this_week", label: "This week" },
+    { id: "next_14_days", label: "Next 14 days" },
+  ];
+
+  const filterChips = `
+    <div class="admin-upcoming__filters">
+      ${[
+        { id: "all", label: "All" },
+        { id: "routine_visit", label: "Routine visits" },
+        { id: "chez_visit", label: "Chez visits" },
+        { id: "case_sla", label: "Cases at SLA" },
+        { id: "reminder", label: "My reminders" },
+        { id: "document_expiring", label: "Warranties" },
+        { id: "vehicle_registration", label: "Vehicles" },
+      ].map((f) => `
+        <button type="button" class="admin-upcoming__filter ${state.upcoming.typeFilter === f.id ? "is-active" : ""}" data-upcoming-filter="${escapeHtml(f.id)}">
+          ${escapeHtml(f.label)}
+        </button>
+      `).join("")}
+      <button type="button" class="admin-upcoming__add" data-upcoming-add-reminder>+ Add reminder</button>
+    </div>
+  `;
+
+  el.list.innerHTML = `
+    <div class="admin-audit admin-upcoming">
+      <p class="admin-audit__intro">
+        What's next, across every home you manage. Routine visits, bills due, expirations, and your follow-ups — all in priority order.
+      </p>
+      ${filterChips}
+      ${filtered.length === 0
+        ? `<p class="admin-muted">Nothing matches that filter.</p>`
+        : bands.map((b) => {
+            const inBand = filtered.filter((i) => i.priority === b.id);
+            if (inBand.length === 0) return "";
+            return `
+              <div class="admin-upcoming__band">
+                <h4 class="admin-upcoming__band-label">${escapeHtml(b.label)} · ${inBand.length}</h4>
+                ${inBand.map(renderUpcomingItemHtml).join("")}
+              </div>
+            `;
+          }).join("")}
+    </div>
+  `;
+
+  // Filter chip handlers.
+  el.list.querySelectorAll("[data-upcoming-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.upcoming.typeFilter = btn.dataset.upcomingFilter;
+      renderUpcomingView();
+    });
+  });
+  // Item click → deep-link.
+  el.list.querySelectorAll("[data-upcoming-item-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.upcomingItemId;
+      const item = state.upcoming.items.find((i) => i.id === id);
+      if (!item) return;
+      // Reminder rows can be completed inline.
+      if (item.type === "reminder") {
+        const rid = item.id.replace(/^rm:/, "");
+        if (confirm(`Complete reminder "${item.title}"?`)) {
+          try {
+            await callChezConcierge({ action: "complete_reminder", reminder_id: rid });
+            state.upcoming.items = state.upcoming.items.filter((i) => i.id !== item.id);
+            renderUpcomingView();
+          } catch (e) {
+            alert(`Couldn't complete: ${e.message || e}`);
+          }
+        }
+        return;
+      }
+      // Case-bound items deep-link to the cockpit.
+      if (item.type === "case_sla" || item.type === "chez_visit") {
+        const requestId = item.deep_link?.match(/case=([0-9a-f-]+)/)?.[1];
+        if (requestId) {
+          state.view = "chez";
+          state.selectedChezRequest = (state.chezRequests || []).find((r) => r.id === requestId);
+          if (state.selectedChezRequest) {
+            state.concierge.queueMode = "case";
+            await loadChezMessages(requestId);
+          }
+          render();
+        }
+        return;
+      }
+      // Otherwise jump to the household workbench.
+      state.view = "households";
+      state.households.selectedId = item.household_id;
+      await loadHouseholdWorkbench(item.household_id);
+      render();
+    });
+  });
+  // Add-reminder button.
+  el.list.querySelector("[data-upcoming-add-reminder]")?.addEventListener("click", () => {
+    openAddReminderModal();
+  });
+
+  el.auditFocused?.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
+  el.emptyDetail?.classList.remove("is-hidden");
+  el.detail?.classList.add("is-hidden");
+  if (el.emptyDetail) {
+    el.emptyDetail.querySelector("h3").textContent = "Click a row to drill in";
+    el.emptyDetail.querySelector("p").textContent = "Routine visits + Chez-coordinated visits open the cockpit case. Document/vehicle expirations open the household workbench. Reminders complete inline.";
+  }
+}
+
+function renderUpcomingItemHtml(item) {
+  const dueRel = relativeTimeString(item.due_at);
+  const iconMap = {
+    routine_visit: "📅",
+    chez_visit: "📞",
+    case_sla: "⏱",
+    reminder: "🔔",
+    document_expiring: "📄",
+    vehicle_registration: "🚗",
+    vehicle_insurance: "🛡",
+  };
+  const icon = iconMap[item.type] || "·";
+  return `
+    <button type="button" class="admin-audit__row admin-upcoming__row" data-upcoming-item-id="${escapeHtml(item.id)}">
+      <div class="admin-upcoming__row-icon">${icon}</div>
+      <div class="admin-upcoming__row-main">
+        <div class="admin-upcoming__row-title">${escapeHtml(item.title)}</div>
+        <div class="admin-upcoming__row-sub">
+          ${escapeHtml(item.household_name)}
+          ${item.sub ? ` · ${escapeHtml(item.sub)}` : ""}
+        </div>
+      </div>
+      <div class="admin-upcoming__row-due">
+        <strong>${escapeHtml(dueRel)}</strong>
+        <span class="admin-muted">${escapeHtml(formatDateTimeShort(item.due_at))}</span>
+      </div>
+    </button>
+  `;
+}
+
+// ----- Add-reminder modal ----------------------------------------------------
+
+function openAddReminderModal() {
+  document.querySelector("[data-chez-reminder-modal]")?.remove();
+  // Build household picker from the cached list.
+  const households = state.households.list.length > 0
+    ? state.households.list
+    : Array.from(new Map((state.chezRequests || []).map((r) => {
+        const dossier = (state.chezDossiersByHousehold || {})[r.household_id];
+        const name = dossier ? primaryHomeownerLabel(dossier) : `Household ${r.household_id.slice(0, 8)}`;
+        return [r.household_id, { id: r.household_id, name }];
+      })).values());
+
+  const modal = document.createElement("div");
+  modal.className = "admin-modal";
+  modal.setAttribute("data-chez-reminder-modal", "");
+  modal.innerHTML = `
+    <div class="admin-modal__backdrop" data-modal-close></div>
+    <div class="admin-modal__panel" style="max-width: 480px;">
+      <header class="admin-modal__head">
+        <div>
+          <h2>Add a reminder</h2>
+          <p class="admin-muted">Set a follow-up that doesn't fit an existing entity timeline. Lands in the Upcoming feed.</p>
+        </div>
+        <button type="button" class="admin-modal__close" data-modal-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-modal__body">
+        <label>
+          <span>Household</span>
+          <select name="household">
+            <option value="">Pick a household</option>
+            ${households.map((h) => `<option value="${escapeHtml(h.id)}">${escapeHtml(h.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          <span>Title</span>
+          <input type="text" name="title" placeholder="e.g. Call A&A about counter-offer" />
+        </label>
+        <label>
+          <span>Due</span>
+          <input type="datetime-local" name="due_at" />
+        </label>
+        <label>
+          <span>Notes (optional)</span>
+          <textarea name="notes" rows="2" placeholder="Any context that helps future-you remember why this matters."></textarea>
+        </label>
+      </div>
+      <footer class="admin-modal__foot">
+        <button type="button" class="admin-button admin-button--ghost" data-modal-close>Cancel</button>
+        <button type="button" class="admin-button admin-button--primary" data-reminder-submit>Add reminder</button>
+      </footer>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-modal-close]").forEach((b) => b.addEventListener("click", () => modal.remove()));
+  modal.querySelector("[data-reminder-submit]").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const householdId = modal.querySelector("select[name='household']").value;
+    const title = modal.querySelector("input[name='title']").value.trim();
+    const dueAtLocal = modal.querySelector("input[name='due_at']").value;
+    const notes = modal.querySelector("textarea[name='notes']").value.trim();
+    if (!householdId || !title || !dueAtLocal) {
+      alert("Fill in household, title, and due date.");
+      return;
+    }
+    const dueIso = new Date(dueAtLocal).toISOString();
+    btn.disabled = true; btn.textContent = "Adding…";
+    try {
+      await callChezConcierge({
+        action: "create_reminder",
+        household_id: householdId,
+        due_at: dueIso,
+        title,
+        notes: notes || undefined,
+      });
+      // Force a refetch on next render.
+      state.upcoming.fetchedAt = 0;
+      modal.remove();
+      renderUpcomingView();
+    } catch (err) {
+      alert(`Couldn't add: ${err.message || err}`);
+      btn.disabled = false; btn.textContent = "Add reminder";
+    }
+  });
 }

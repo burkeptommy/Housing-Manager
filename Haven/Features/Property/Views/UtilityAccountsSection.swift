@@ -681,6 +681,10 @@ struct UtilityDetailSheet: View {
     @State private var phone: String
     @State private var website: String
     @State private var isSaving = false
+    /// Phase 84 — local mirror for ChezOwnsToggle's Binding. Seeded
+    /// from the account on init; flips immediately on toggle, network
+    /// call follows.
+    @State private var chezOwnedLocal: Bool
 
     init(account: UtilityAccountRow, onUpdate: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
         self.account = account
@@ -691,6 +695,7 @@ struct UtilityDetailSheet: View {
         _planName = State(initialValue: account.planName ?? "")
         _phone = State(initialValue: account.phone ?? "")
         _website = State(initialValue: account.website ?? "")
+        _chezOwnedLocal = State(initialValue: account.isChezOwned)
     }
 
     var body: some View {
@@ -725,6 +730,24 @@ struct UtilityDetailSheet: View {
                     TextField("Website", text: $website)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
+                }
+
+                // Phase 84 — Chez delegation. Homeowner can hand the
+                // account over to Chez to audit bills, negotiate rates,
+                // and switch providers when better.
+                Section {
+                    ChezOwnsToggle(
+                        target: .utility(id: account.id, providerName: "\(account.providerName) (\(account.typeLabel))"),
+                        isOwned: $chezOwnedLocal,
+                        onChange: { _ in
+                            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+                            onUpdate?()
+                        }
+                    )
+                } footer: {
+                    Text("Chez audits the bill cycle, negotiates rates, and shops for a better provider when it's time.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
 
                 Section {

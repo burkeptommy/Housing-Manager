@@ -49,6 +49,8 @@ struct ProjectDetailView: View {
 
     @State private var showDocumentUpload = false
     @State private var showLinkDocument = false
+    /// Phase 84 — local mirror for ChezOwnsToggle's Binding.
+    @State private var chezOwnedLocal: Bool = false
 
     var body: some View {
         ScrollView {
@@ -77,6 +79,7 @@ struct ProjectDetailView: View {
                         projectContactsSection
                     }
                     askAlfredButton
+                    chezOwnsProjectCard
                     chezConciergeEntry
                     notesSection
                 }
@@ -1489,6 +1492,33 @@ struct ProjectDetailView: View {
     /// scheduled / executed). Insurance claims always route as
     /// `coordinateTask` because that's the canonical "back-and-forth"
     /// scenario.
+    /// Phase 84 — universal entity-level Chez delegation. Toggling "owned"
+    /// flips the `property_projects.chez_owned` flag and creates a parent
+    /// "Standing engagement" case so Chez runs vendor sourcing,
+    /// counter-offer tracking, and budget rollup as part of project
+    /// lifecycle. Distinct from `chezConciergeEntry` which is a one-off
+    /// escalation; ownership is the continuous-management commitment.
+    private var chezOwnsProjectCard: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            ChezOwnsToggle(
+                target: .project(id: liveProject.id, name: liveProject.name),
+                isOwned: $chezOwnedLocal,
+                onChange: { _ in
+                    NotificationCenter.default.post(name: .projectChanged, object: nil)
+                }
+            )
+            Text("Chez owns sourcing, negotiates with every vendor, tracks the budget, and brings you the final picks.")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(HavenTheme.spacing16)
+        .background(HavenColors.surface)
+        .cornerRadius(HavenTheme.radiusMedium)
+        .onAppear {
+            chezOwnedLocal = liveProject.isChezOwned
+        }
+    }
+
     private var chezConciergeEntry: some View {
         let category: ChezCategory = {
             if isInsuranceClaim { return .coordinateTask }

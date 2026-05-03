@@ -9679,3 +9679,595 @@ details.admin-chez__analysis-section pre {
   color: var(--text-muted, #6F6A88);
   text-decoration: line-through;
 }
+
+/* =============================================================================
+ * Phase 72.5 — Vendor application review desk
+ * Standalone surface mounted into the admin shell's list panel.
+ * ========================================================================== */
+
+.admin-vendor-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-vendor-apps__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-vendor-apps__chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-vendor-apps__chip {
+  font: 500 13px/1 var(--sans, system-ui, sans-serif);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #d8dadf);
+  background: var(--surface, #fff);
+  color: var(--text, #2A2252);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-vendor-apps__chip:hover {
+  border-color: var(--indigo, #453A70);
+}
+
+.admin-vendor-apps__chip.is-active {
+  background: var(--indigo, #453A70);
+  border-color: var(--indigo, #453A70);
+  color: #fff;
+}
+
+.admin-vendor-apps__feedback {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font: 500 14px/1.5 var(--sans, system-ui, sans-serif);
+  background: rgba(74, 124, 89, 0.12);
+  color: var(--success, #4A7C59);
+  border: 1px solid rgba(74, 124, 89, 0.28);
+}
+
+.admin-vendor-apps__feedback[data-kind="error"] {
+  background: rgba(237, 105, 85, 0.12);
+  color: var(--salmon-dark, #D14E3E);
+  border-color: rgba(237, 105, 85, 0.32);
+}
+
+.admin-vendor-apps__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-vendor-apps__empty {
+  padding: 32px 24px;
+  text-align: center;
+  background: var(--surface, #fff);
+  border: 1px dashed var(--border, #d8dadf);
+  border-radius: 12px;
+}
+
+.admin-vendor-apps__empty--error {
+  color: var(--salmon-dark, #D14E3E);
+  border-color: rgba(237, 105, 85, 0.4);
+}
+
+.admin-vendor-apps__row {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #edeef0);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(42, 34, 82, 0.04);
+}
+
+.admin-vendor-apps__row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-vendor-apps__row-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-vendor-apps__row-title strong {
+  font: 600 17px/1.3 var(--sans, system-ui, sans-serif);
+  color: var(--text, #2A2252);
+}
+
+.admin-vendor-apps__row-website {
+  font: 500 12px/1.3 var(--sans, system-ui, sans-serif);
+  color: var(--text-muted, #6F6A88);
+  text-decoration: none;
+}
+
+.admin-vendor-apps__row-website:hover {
+  color: var(--indigo, #453A70);
+  text-decoration: underline;
+}
+
+.admin-vendor-apps__row-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 18px;
+}
+
+.admin-vendor-apps__row-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font: 500 13px/1.4 var(--sans, system-ui, sans-serif);
+  color: var(--text, #2A2252);
+}
+
+.admin-vendor-apps__row-cell a {
+  color: var(--text-muted, #6F6A88);
+  text-decoration: none;
+}
+
+.admin-vendor-apps__row-cell a:hover {
+  color: var(--indigo, #453A70);
+  text-decoration: underline;
+}
+
+.admin-vendor-apps__row-label {
+  font: 600 11px/1.3 var(--sans, system-ui, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+  margin-bottom: 2px;
+}
+
+.admin-vendor-apps__row-states {
+  font-feature-settings: "tnum";
+}
+
+.admin-vendor-apps__row-note {
+  font: 500 13px/1.5 var(--sans, system-ui, sans-serif);
+  color: var(--text-muted, #6F6A88);
+  background: var(--bg, #f8f9fa);
+  border-left: 3px solid var(--indigo-100, #E8E4F2);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 0;
+}
+
+.admin-vendor-apps__row-note strong {
+  color: var(--text, #2A2252);
+  margin-right: 4px;
+}
+
+.admin-vendor-apps__row-note--reject {
+  border-left-color: var(--salmon-pale, #FFE8E2);
+  color: var(--salmon-dark, #D14E3E);
+}
+
+.admin-vendor-apps__row-note--reject strong {
+  color: var(--salmon-dark, #D14E3E);
+}
+
+.admin-vendor-apps__row-meta {
+  font: 500 12px/1.4 var(--sans, system-ui, sans-serif);
+  margin: 0;
+}
+
+.admin-vendor-apps__row-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border, #edeef0);
+  margin-top: 4px;
+  padding-top: 14px;
+}
+
+/* Status pills — re-use admin-pill base, just override colors */
+
+.admin-vendor-apps__status {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.admin-vendor-apps__status--pending_email_confirm {
+  background: rgba(199, 126, 46, 0.14);
+  color: var(--warning, #C77E2E);
+  border: 1px solid rgba(199, 126, 46, 0.3);
+}
+
+.admin-vendor-apps__status--live_unverified {
+  background: var(--indigo-50, #F2EFF8);
+  color: var(--indigo, #453A70);
+  border: 1px solid var(--indigo-100, #E8E4F2);
+}
+
+.admin-vendor-apps__status--chez_certified {
+  background: rgba(74, 124, 89, 0.14);
+  color: var(--success, #4A7C59);
+  border: 1px solid rgba(74, 124, 89, 0.3);
+}
+
+.admin-vendor-apps__status--rejected {
+  background: var(--salmon-50, #FFF5F2);
+  color: var(--salmon-dark, #D14E3E);
+  border: 1px solid var(--salmon-pale, #FFE8E2);
+}
+
+/* Modal overrides — the admin-modal infrastructure already supplies the
+   shell; we just need a label + textarea + inline error styling. */
+
+.admin-vendor-apps__modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.admin-vendor-apps__modal-label > span {
+  font: 600 13px/1.3 var(--sans, system-ui, sans-serif);
+  color: var(--text, #2A2252);
+}
+
+.admin-vendor-apps__modal-label textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  font: 400 14px/1.5 var(--sans, system-ui, sans-serif);
+  color: var(--text, #2A2252);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8dadf);
+  border-radius: 8px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.admin-vendor-apps__modal-label textarea:focus {
+  outline: none;
+  border-color: var(--indigo, #453A70);
+  box-shadow: 0 0 0 3px var(--indigo-50, #F2EFF8);
+}
+
+.admin-vendor-apps__modal-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font: 500 13px/1.5 var(--sans, system-ui, sans-serif);
+  color: var(--salmon-dark, #D14E3E);
+  background: var(--salmon-50, #FFF5F2);
+  border: 1px solid var(--salmon-pale, #FFE8E2);
+}
+
+/* =============================================================================
+ * Phase 84 — Households workbench + Upcoming feed
+ * ============================================================================= */
+
+/* Households list ---------------------------------------------------------- */
+
+.admin-households__workbench { padding: 0; }
+
+.admin-households__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 12px 16px;
+  background: var(--neutral-200, #EDEEF0);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.admin-households__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #6F6A88);
+  font: 600 12px var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.admin-households__tab.is-active {
+  background: #fff;
+  color: var(--text, #2A2252);
+  box-shadow: 0 1px 2px rgba(42, 34, 82, 0.08);
+}
+.admin-households__tab-count {
+  font-size: 11px;
+  color: var(--text-soft, #9C98AD);
+  font-weight: 500;
+}
+
+.admin-households__panel {
+  padding: 0 16px 16px;
+}
+
+.admin-households__entity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EDEEF0);
+  margin-bottom: 6px;
+}
+.admin-households__entity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-households__entity-main strong {
+  font: 600 13px var(--sans);
+  color: var(--text, #2A2252);
+}
+.admin-households__entity-main span {
+  font: 400 12px var(--sans);
+  color: var(--text-muted, #6F6A88);
+}
+.admin-households__entity-meta {
+  font: 500 11px var(--sans);
+  color: var(--text-soft, #9C98AD);
+  white-space: nowrap;
+}
+
+.admin-households__section {
+  margin: 16px;
+  padding: 12px;
+  background: var(--bg, #f8f9fa);
+  border-radius: 10px;
+}
+.admin-households__section h4 {
+  margin: 0 0 8px;
+  font: 600 11px var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+}
+.admin-households__reminder,
+.admin-households__action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font: 400 12px var(--sans);
+  color: var(--text, #2A2252);
+}
+.admin-households__reminder strong,
+.admin-households__action-row strong {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* Upcoming feed ------------------------------------------------------------ */
+
+.admin-upcoming__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border, #EDEEF0);
+  margin-bottom: 12px;
+}
+.admin-upcoming__filter {
+  padding: 6px 12px;
+  border: 1px solid var(--border, #EDEEF0);
+  background: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 500 11px var(--sans);
+  color: var(--text-muted, #6F6A88);
+  transition: all 0.15s;
+}
+.admin-upcoming__filter.is-active {
+  background: var(--indigo, #453A70);
+  color: #fff;
+  border-color: var(--indigo, #453A70);
+}
+.admin-upcoming__filter:hover { border-color: var(--indigo-500, #6B5AA0); }
+.admin-upcoming__add {
+  padding: 6px 14px;
+  background: var(--salmon, #ED6955);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  margin-left: auto;
+}
+.admin-upcoming__add:hover { background: var(--salmon-dark, #D14E3E); }
+
+.admin-upcoming__band {
+  margin-bottom: 16px;
+}
+.admin-upcoming__band-label {
+  margin: 0 16px 8px;
+  font: 600 10px var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+}
+
+.admin-upcoming__row {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px !important;
+}
+.admin-upcoming__row-icon {
+  font-size: 18px;
+  width: 32px;
+  text-align: center;
+}
+.admin-upcoming__row-main {
+  min-width: 0;
+}
+.admin-upcoming__row-title {
+  font: 600 13px var(--sans);
+  color: var(--text, #2A2252);
+}
+.admin-upcoming__row-sub {
+  font: 400 12px var(--sans);
+  color: var(--text-muted, #6F6A88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-upcoming__row-due {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+}
+.admin-upcoming__row-due strong {
+  color: var(--text, #2A2252);
+  font-weight: 600;
+}
+
+
+/* ========================================================================
+   Phase 84 PR 4 — Workbench action buttons + Project negotiation modal
+   ======================================================================== */
+
+.admin-households__entity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  width: 100%;
+}
+.admin-households__entity-action {
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  cursor: pointer;
+}
+.admin-households__entity-action:hover {
+  background: var(--surface-hover, #F1F0F7) !important;
+}
+
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 50, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.admin-modal {
+  background: var(--surface, #FFF);
+  border-radius: 16px;
+  width: min(720px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(20, 16, 50, 0.24);
+}
+.admin-modal--wide {
+  width: min(960px, 92vw);
+}
+.admin-modal__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border, #E8E6F2);
+}
+.admin-modal__head h2 {
+  font: 600 16px var(--serif);
+  color: var(--text, #2A2252);
+  margin: 0;
+}
+.admin-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 24px;
+  color: var(--text-muted, #6F6A88);
+  cursor: pointer;
+}
+.admin-modal__body {
+  padding: 18px 22px;
+  overflow-y: auto;
+}
+
+.admin-negotiation__quote {
+  border: 1px solid var(--border, #E8E6F2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.admin-negotiation__quote-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.admin-negotiation__feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.admin-negotiation__turn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface-soft, #F8F7FB);
+  border-left: 3px solid var(--brand-soft, #C9C2E6);
+}
+.admin-negotiation__turn--chez {
+  border-left-color: var(--brand-strong, #ED6955);
+  background: rgba(237, 105, 85, 0.06);
+}
+.admin-negotiation__turn-from {
+  display: inline-block;
+  font: 600 10px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text, #2A2252);
+}
+.admin-negotiation__turn-meta {
+  font: 400 11px var(--sans);
+  color: var(--text-muted, #6F6A88);
+  margin-left: 8px;
+}
+.admin-negotiation__turn p {
+  margin: 4px 0 0;
+  font: 400 13px var(--sans);
+  color: var(--text, #2A2252);
+}
+.admin-negotiation__composer {
+  display: grid;
+  grid-template-columns: 160px 140px 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+.admin-negotiation__composer textarea {
+  resize: vertical;
+  font: 400 13px var(--sans);
+}
+.admin-input--narrow {
+  max-width: 140px;
+}

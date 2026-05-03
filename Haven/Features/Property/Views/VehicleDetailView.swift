@@ -20,6 +20,8 @@ struct VehicleDetailView: View {
     @State private var brandInfo: HavenSupabase.BrandLogoResponse?
     @State private var showMileageUpdate = false
     @State private var showRegUpload = false
+    /// Phase 84 — local mirror for ChezOwnsToggle's Binding.
+    @State private var chezOwnedLocal: Bool = false
     @State private var showInsuranceUpload = false
     @State private var showPurchaseDatePicker = false
 
@@ -185,6 +187,11 @@ struct VehicleDetailView: View {
                 // there's an open recall. The two cases need different
                 // copy: "find a mechanic" vs "handle this recall."
                 chezVehicleEntry
+
+                // 3c. Phase 84 — universal entity-level Chez delegation.
+                // Hand off the whole vehicle (service scheduling, recalls,
+                // registration, insurance) instead of one-off cases.
+                chezOwnsVehicleCard
 
                 // 4. Cost summary row (Step 4 placeholder)
                 costSummaryRow
@@ -846,6 +853,40 @@ struct VehicleDetailView: View {
     /// (2) one or more open recalls → "have Chez handle this recall"
     /// hand-off. When both apply, recall takes precedence (more urgent).
     /// Returns an empty view when the vehicle is fully covered.
+    /// Phase 84 — universal entity-level Chez delegation for vehicles.
+    /// When on, Chez handles end-to-end vehicle management: service
+    /// scheduling, recalls, registration renewal, insurance shopping,
+    /// inspection, mileage-based maintenance. Distinct from
+    /// `chezVehicleEntry` which is a single-use case for find-mechanic
+    /// or handle-recall — ownership is the continuous-management
+    /// commitment.
+    @ViewBuilder
+    private var chezOwnsVehicleCard: some View {
+        if let v = viewModel.vehicle {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                ChezOwnsToggle(
+                    target: .vehicle(id: v.id, label: v.displayName.isEmpty ? v.name : v.displayName),
+                    isOwned: $chezOwnedLocal,
+                    onChange: { _ in
+                        // No vehicle-changed notification today; force a
+                        // viewModel reload so the card reflects the new
+                        // chezOwnedAt timestamp.
+                        Task { await viewModel.load(vehicleId: v.id, force: true) }
+                    }
+                )
+                Text("Chez handles service scheduling, recalls, registration renewals, inspection, and insurance shopping for this vehicle.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing16)
+            .background(HavenColors.surface)
+            .cornerRadius(HavenTheme.radiusMedium)
+            .onAppear {
+                chezOwnedLocal = v.isChezOwned
+            }
+        }
+    }
+
     @ViewBuilder
     private var chezVehicleEntry: some View {
         let openRecallCount = viewModel.recalls.filter { !$0.isResolved }.count
@@ -874,7 +915,8 @@ struct VehicleDetailView: View {
         var c: [String: String] = ["_source": "vehicle_mechanic_card"]
         if let v = viewModel.vehicle {
             c["vehicle_id"] = v.id.uuidString
-            c["vehicle"] = "\(v.year) \(v.make) \(v.model)"
+            let parts = [v.year.map(String.init), v.make, v.model].compactMap { $0 }
+            if !parts.isEmpty { c["vehicle"] = parts.joined(separator: " ") }
             if let trim = v.trim, !trim.isEmpty { c["trim"] = trim }
             if let mileage = v.currentMileage { c["mileage"] = "\(mileage)" }
         }
@@ -888,7 +930,8 @@ struct VehicleDetailView: View {
         ]
         if let v = viewModel.vehicle {
             c["vehicle_id"] = v.id.uuidString
-            c["vehicle"] = "\(v.year) \(v.make) \(v.model)"
+            let parts = [v.year.map(String.init), v.make, v.model].compactMap { $0 }
+            if !parts.isEmpty { c["vehicle"] = parts.joined(separator: " ") }
         }
         let openRecalls = viewModel.recalls.filter { !$0.isResolved }.prefix(5)
         let titles = openRecalls.compactMap { $0.component }.joined(separator: ", ")

@@ -359,6 +359,11 @@ struct DocumentRow: Codable, Identifiable {
     /// Phase 59: "high" | "medium" | "low" | "ambiguous" — tier of the
     /// vendor match. Drives the auto-file vs inbox-fallback branch.
     let vendorMatchConfidence: String?
+    /// Phase 84 — Chez delegation. When true the homeowner has handed
+    /// this document over to Chez to file, organize, share with vendors,
+    /// and scan for gaps.
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
 
     /// Convenience accessor that defaults to `true` when the column is nil
     /// (legacy rows from before build 87, or rows decoded without the
@@ -367,6 +372,8 @@ struct DocumentRow: Codable, Identifiable {
     var isVisibleToHomeManagers: Bool {
         visibleToHomeManagers ?? true
     }
+
+    var isChezOwned: Bool { chezOwned ?? false }
 
     enum CodingKeys: String, CodingKey {
         case id, title, category, status, notes, tags, metadata
@@ -398,6 +405,8 @@ struct DocumentRow: Codable, Identifiable {
         case invoiceNumber = "invoice_number"
         case invoiceLineItems = "invoice_line_items"
         case vendorMatchConfidence = "vendor_match_confidence"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
     }
 }
 
@@ -846,6 +855,11 @@ struct HomeSystemRow: Identifiable {
     /// the legacy "Find a contractor for X" seeded task. Read by
     /// `VendorCoverageSheet` to surface the consolidated gap card.
     let needsVendorCoverage: Bool?
+    /// Phase 84 — universal entity-level Chez delegation. When true the
+    /// homeowner has handed this specific system over to Chez to manage
+    /// end-to-end (service scheduling, warranty, parts, history).
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status, subtype
@@ -879,7 +893,12 @@ struct HomeSystemRow: Identifiable {
         case installDateConfirmedAt = "install_date_confirmed_at"
         case archivedAt = "archived_at"
         case needsVendorCoverage = "needs_vendor_coverage"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
     }
+
+    /// Convenience used across views/UI.
+    var isChezOwned: Bool { chezOwned ?? false }
 }
 
 extension HomeSystemRow: Hashable {
@@ -933,6 +952,8 @@ extension HomeSystemRow: Decodable {
         installDateConfirmedAt = try? c.decodeIfPresent(Date.self, forKey: .installDateConfirmedAt)
         archivedAt = try? c.decodeIfPresent(Date.self, forKey: .archivedAt)
         needsVendorCoverage = try? c.decodeIfPresent(Bool.self, forKey: .needsVendorCoverage)
+        chezOwned = try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)
+        chezOwnedAt = try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)
     }
 }
 
@@ -3604,6 +3625,11 @@ struct PropertyProjectRow: Codable, Identifiable, Hashable {
     let createdBy: UUID?
     let activeQuoteId: UUID?
     let entryType: String?
+    /// Phase 84 — Chez delegation. When true the homeowner has handed
+    /// this project to Chez to run end-to-end (vendor sourcing,
+    /// negotiation, budget tracking, timeline coordination).
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, name, description, category, status, priority, notes
@@ -3628,11 +3654,49 @@ struct PropertyProjectRow: Codable, Identifiable, Hashable {
         case createdBy = "created_by"
         case activeQuoteId = "active_quote_id"
         case entryType = "entry_type"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
+    }
+
+    /// Resilient decoder so new fields don't break legacy rows.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        description = try? c.decodeIfPresent(String.self, forKey: .description)
+        category = (try? c.decode(String.self, forKey: .category)) ?? ""
+        status = (try? c.decode(String.self, forKey: .status)) ?? "planning"
+        projectType = (try? c.decode(String.self, forKey: .projectType)) ?? "diy"
+        priority = try? c.decodeIfPresent(String.self, forKey: .priority)
+        estimatedBudget = try? c.decodeIfPresent(Double.self, forKey: .estimatedBudget)
+        actualSpend = try? c.decodeIfPresent(Double.self, forKey: .actualSpend)
+        aiEstimatedDiyCost = try? c.decodeIfPresent(Double.self, forKey: .aiEstimatedDiyCost)
+        aiEstimatedProCost = try? c.decodeIfPresent(Double.self, forKey: .aiEstimatedProCost)
+        targetStartDate = try? c.decodeIfPresent(String.self, forKey: .targetStartDate)
+        targetEndDate = try? c.decodeIfPresent(String.self, forKey: .targetEndDate)
+        actualStartDate = try? c.decodeIfPresent(String.self, forKey: .actualStartDate)
+        actualEndDate = try? c.decodeIfPresent(String.self, forKey: .actualEndDate)
+        aiResearch = try? c.decodeIfPresent(ProjectAIResearch.self, forKey: .aiResearch)
+        aiResearchUpdatedAt = try? c.decodeIfPresent(Date.self, forKey: .aiResearchUpdatedAt)
+        estimatedTotal = try? c.decodeIfPresent(Double.self, forKey: .estimatedTotal)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        parentProjectId = try? c.decodeIfPresent(UUID.self, forKey: .parentProjectId)
+        personalPropertyAmount = try? c.decodeIfPresent(Double.self, forKey: .personalPropertyAmount)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
+        createdBy = try? c.decodeIfPresent(UUID.self, forKey: .createdBy)
+        activeQuoteId = try? c.decodeIfPresent(UUID.self, forKey: .activeQuoteId)
+        entryType = try? c.decodeIfPresent(String.self, forKey: .entryType)
+        chezOwned = try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)
+        chezOwnedAt = try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)
     }
 
     var isInsuranceClaim: Bool { projectType == "insurance_claim" }
     var isChildProject: Bool { parentProjectId != nil }
     var isHistorical: Bool { (entryType ?? "planned") == "historical" }
+    var isChezOwned: Bool { chezOwned ?? false }
 }
 
 struct PropertyProjectInsert: Codable {
@@ -4399,6 +4463,11 @@ struct UtilityAccountRow: Codable, Identifiable {
     let providerId: UUID?
     let logoUrl: String?
     let brandColor: String?
+    /// Phase 84 — universal entity-level Chez delegation. When true the
+    /// homeowner has handed this utility account to Chez to audit bills,
+    /// negotiate rates, and switch providers when better.
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, phone, website, notes
@@ -4414,6 +4483,8 @@ struct UtilityAccountRow: Codable, Identifiable {
         case providerId = "provider_id"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
     }
 
     /// Phase 18e: resilient init so older deploys (pre-snapshot columns)
@@ -4436,7 +4507,12 @@ struct UtilityAccountRow: Codable, Identifiable {
         providerId = try? c.decodeIfPresent(UUID.self, forKey: .providerId)
         logoUrl = try? c.decodeIfPresent(String.self, forKey: .logoUrl)
         brandColor = try? c.decodeIfPresent(String.self, forKey: .brandColor)
+        chezOwned = try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)
+        chezOwnedAt = try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)
     }
+
+    /// Phase 84 — convenience getter for delegation status.
+    var isChezOwned: Bool { chezOwned ?? false }
 
     var typeIcon: String {
         switch providerType {
@@ -4750,6 +4826,11 @@ struct VehicleRow: Codable, Identifiable {
     let estimatedValueHigh: Double?
     let estimatedValueUpdatedAt: Date?
     let estimatedValueSource: String?
+    /// Phase 84 — Chez delegation. When true the homeowner has handed this
+    /// vehicle to Chez to manage end-to-end (service scheduling, recalls,
+    /// registration, insurance).
+    let chezOwned: Bool?
+    let chezOwnedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, name, year, make, model, trim, color, vin, notes
@@ -4776,6 +4857,8 @@ struct VehicleRow: Codable, Identifiable {
         case estimatedValueHigh = "estimated_value_high"
         case estimatedValueUpdatedAt = "estimated_value_updated_at"
         case estimatedValueSource = "estimated_value_source"
+        case chezOwned = "chez_owned"
+        case chezOwnedAt = "chez_owned_at"
     }
 
     init(from decoder: Decoder) throws {
@@ -4812,7 +4895,12 @@ struct VehicleRow: Codable, Identifiable {
         estimatedValueHigh = try? c.decodeIfPresent(Double.self, forKey: .estimatedValueHigh)
         estimatedValueUpdatedAt = try? c.decodeIfPresent(Date.self, forKey: .estimatedValueUpdatedAt)
         estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
+        chezOwned = try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)
+        chezOwnedAt = try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)
     }
+
+    /// Phase 84 — convenience getter for delegation status.
+    var isChezOwned: Bool { chezOwned ?? false }
 
     var displayName: String {
         [year.map { String($0) }, make, model].compactMap { $0 }.joined(separator: " ")

@@ -22,6 +22,8 @@ struct DocumentDetailView: View {
     /// sheet that lets the homeowner override the category-default
     /// `visible_to_home_managers` flag.
     @State private var showHomeManagerAccessSheet = false
+    /// Phase 84 — local mirror for ChezOwnsToggle's Binding.
+    @State private var chezOwnedLocal: Bool = false
     @StateObject private var trustedContactVM = TrustedContactsViewModel()
 
     // Invoice processing
@@ -256,6 +258,11 @@ struct DocumentDetailView: View {
                 // Status and dates
                 metadataCard(doc)
 
+                // Phase 84 — Chez ownership toggle. When on, Chez files
+                // the doc, organizes it, shares it with vendors when
+                // relevant, and scans for gaps.
+                chezOwnsDocumentCard(doc)
+
                 // Chez v1: estate attorney card removed; estate management
                 // is out of v1 scope.
 
@@ -436,6 +443,32 @@ struct DocumentDetailView: View {
                 }
                 Spacer()
             }
+        }
+    }
+
+    // MARK: - Chez Ownership (Phase 84)
+
+    /// Universal entity-level Chez delegation. When the homeowner flips
+    /// the toggle, Chez takes over filing the doc, sharing with vendors
+    /// when relevant, and scanning for gaps. Identical pattern to
+    /// SystemDetailView / ProjectDetailView / VehicleDetailView.
+    private func chezOwnsDocumentCard(_ doc: DocumentRow) -> some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                ChezOwnsToggle(
+                    target: .document(id: doc.id, filename: doc.title),
+                    isOwned: $chezOwnedLocal,
+                    onChange: { _ in
+                        NotificationCenter.default.post(name: .documentChanged, object: nil)
+                    }
+                )
+                Text("Chez files this doc, organizes it with related records, shares it with vendors when relevant, and scans for missing pieces.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .onAppear {
+            chezOwnedLocal = doc.isChezOwned
         }
     }
 
