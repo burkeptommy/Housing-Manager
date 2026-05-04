@@ -2438,6 +2438,56 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Phase 85: Handyman trust profile + reviews
+
+    /// Fetch a handyman's trust profile by member ID. Reads the
+    /// `handyman_member_stats` view which joins provider_workspace_members
+    /// with aggregate review counts + avg rating.
+    func fetchHandymanTrustProfile(memberId: UUID) async throws -> HandymanTrustProfile? {
+        let rows: [HandymanTrustProfile] = try await from("handyman_member_stats")
+            .select()
+            .eq("handyman_member_id", value: memberId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Submit a homeowner's post-visit review. Caller is responsible
+    /// for ensuring `homeownerId` matches `auth.uid()` (the RLS policy
+    /// enforces this server-side regardless).
+    func submitHandymanReview(
+        handymanMemberId: UUID,
+        assessmentId: UUID?,
+        homeownerId: UUID,
+        householdId: UUID,
+        rating: Int,
+        reviewText: String?,
+        tags: [String] = []
+    ) async throws {
+        struct ReviewInsert: Encodable {
+            let handyman_member_id: String
+            let assessment_id: String?
+            let homeowner_id: String
+            let household_id: String
+            let rating: Int
+            let review_text: String?
+            let tags: [String]
+        }
+        let insert = ReviewInsert(
+            handyman_member_id: handymanMemberId.uuidString,
+            assessment_id: assessmentId?.uuidString,
+            homeowner_id: homeownerId.uuidString,
+            household_id: householdId.uuidString,
+            rating: max(1, min(5, rating)),
+            review_text: (reviewText?.isEmpty == false) ? reviewText : nil,
+            tags: tags
+        )
+        _ = try await from("handyman_reviews")
+            .insert(insert)
+            .execute()
+    }
+
     // MARK: - Phase 66: Routines as first-class Services
 
     /// Phase 66: Fetch routines filtered by scope + setup state. Used by
