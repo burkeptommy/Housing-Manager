@@ -1182,6 +1182,19 @@ struct MaintenanceScheduleView: View {
 
     /// Phase 56.4: Apply the active stats pill filter (if any) to a task
     /// list. Filters by `nextDueDate` against the appropriate time window.
+    /// Phase 95 (gap #14): footnote text under the stats pills. Surfaces
+    /// the routine-owned task count so users discover where Phase 66
+    /// hiding sent their tasks ("they're on the routine — tap to view").
+    /// Falls back to the legacy `+ N recurring` shape when there are no
+    /// child tasks to expose.
+    private func footnoteText(activeRoutineCount: Int, hiddenTaskCount: Int) -> String {
+        let routineWord = activeRoutineCount == 1 ? "recurring" : "recurring"
+        let routinePart = "+ \(activeRoutineCount) \(routineWord)"
+        guard hiddenTaskCount > 0 else { return routinePart }
+        let taskWord = hiddenTaskCount == 1 ? "task" : "tasks"
+        return "\(routinePart) · \(hiddenTaskCount) \(taskWord) inside"
+    }
+
     private func applyStatsFilter(_ tasks: [MaintenanceTaskDBRow]) -> [MaintenanceTaskDBRow] {
         guard let filter = activeStatsPillFilter else { return tasks }
         let formatter = DateFormatter()
@@ -2518,6 +2531,12 @@ struct MaintenanceScheduleView: View {
         // they fire. Paused/archived rows excluded for consistency
         // with what the schedule actually renders.
         let activeRoutineCount = routines.filter { !$0.isPaused && $0.archivedAt == nil }.count
+        // Phase 95 (gap #14): count tasks the Phase 66 hiding rule pulls
+        // out of the bucket so users understand the delta. "Why don't
+        // I see my Petro tune-up here? It moved into the routine."
+        let routineOwnedTaskCount = viewModel.tasks.filter { task in
+            task.parentRoutineId != nil && task.archivedAt == nil
+        }.count
 
         return VStack(spacing: 8) {
             // Phase 56.4: Tap-to-filter stats pills. Count = 0 pills are
@@ -2574,6 +2593,13 @@ struct MaintenanceScheduleView: View {
             // Phase 55.2 / 56.4: "+ X recurring" footnote is now
             // tappable — opens the routines list. Hidden when the
             // user has no routines configured.
+            //
+            // Phase 95 (gap #14): when there are tasks parented to a
+            // routine (and therefore filtered out of the buckets above),
+            // append the count to the footnote so users understand
+            // where those tasks went. "+ 4 recurring · 12 tasks managed
+            // by your routines" reads as a discovery breadcrumb instead
+            // of a vague footnote.
             if activeRoutineCount > 0 {
                 Button {
                     Haptics.light()
@@ -2582,7 +2608,7 @@ struct MaintenanceScheduleView: View {
                     HStack {
                         Image(systemName: "calendar.badge.clock")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("+ \(activeRoutineCount) recurring")
+                        Text(footnoteText(activeRoutineCount: activeRoutineCount, hiddenTaskCount: routineOwnedTaskCount))
                             .font(HavenTypography.uiCaption)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
