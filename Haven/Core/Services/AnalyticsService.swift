@@ -157,6 +157,11 @@ enum AnalyticsEvent: String {
     case handymanVisitScheduled = "handyman_visit_scheduled"
     case handymanVisitCompleted = "handyman_visit_completed"
     case handymanVisitSkipped = "handyman_visit_skipped"
+    /// Phase 95 (gap #67) — fired when the homeowner taps Send in the
+    /// MFMessageComposeViewController / MFMailComposeViewController for a
+    /// field-PWA invite. `channel` payload key holds "sms" or "email".
+    /// Used to instrument invite-send → portal-open funnel.
+    case handymanInviteSent = "handyman_invite_sent"
     /// Phase 73 sub-phase A — bidirectional visit-time scheduling.
     case handymanVisitTimeProposed = "handyman_visit_time_proposed"
     case handymanVisitTimeAccepted = "handyman_visit_time_accepted"

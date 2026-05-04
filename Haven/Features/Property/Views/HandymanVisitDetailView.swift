@@ -277,8 +277,17 @@ struct HandymanVisitDetailView: View {
                         preferredTiming: preferredTimingLabel,
                         portalURL: providerInviteURL
                     ),
-                    onFinish: { _ in
+                    onFinish: { result in
                         showInviteSMSComposer = false
+                        // Phase 95 (gap #67) — stamp last_invite_sent_at
+                        // on the portal session whenever the user
+                        // commits the SMS. Only `.sent` qualifies;
+                        // cancel / failure leaves the column alone so
+                        // the visit detail "no opens yet" status stays
+                        // accurate. Best-effort; failures don't block.
+                        if result == .sent {
+                            Task { await markInviteSent(channel: "sms") }
+                        }
                     }
                 )
             }
@@ -302,8 +311,11 @@ struct HandymanVisitDetailView: View {
                     attachmentData: nil,
                     attachmentMimeType: nil,
                     attachmentFileName: nil,
-                    onDismiss: { _ in
+                    onDismiss: { result in
                         showInviteMailComposer = false
+                        if result == .sent {
+                            Task { await markInviteSent(channel: "email") }
+                        }
                     }
                 )
             }
@@ -492,6 +504,12 @@ struct HandymanVisitDetailView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                        }
+
+                        if let caption = inviteStatusCaption {
+                            Text(caption)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
                     } else if preferredHandyman == nil {
                         Text("Choose a preferred handyman first. Once a date is set, Chez will prepare the secure provider link so they can confirm the visit, ask questions, or start the job.")
@@ -2112,6 +2130,51 @@ struct HandymanVisitDetailView: View {
         } else {
             statusToast = "Text invite isn't available on this device."
         }
+    }
+
+    /// Phase 95 (gap #67): records that the homeowner committed an
+    /// invite send (SMS or email) by stamping
+    /// `last_invite_sent_at` on the active portal session. Best-
+    /// effort — failure doesn't block, the homeowner just won't see a
+    /// "sent X hours ago" caption until the next refresh that
+    /// successfully writes.
+    @MainActor
+    private func markInviteSent(channel: String) async {
+        guard let session = portalSession else { return }
+        do {
+            let now = Date()
+            let updated = try await DatabaseService.shared.updateHandymanPortalSession(
+                id: session.id,
+                HandymanPortalSessionUpdate(lastInviteSentAt: now)
+            )
+            portalSession = updated
+            Analytics.track(.handymanInviteSent, [
+                "session_id": session.id.uuidString,
+                "channel": channel
+            ])
+        } catch {
+            // Swallow — the SMS or email already left the device. We just
+            // can't badge the visit as "invite sent" until the next
+            // successful update.
+        }
+    }
+
+    /// Phase 95 (gap #67): one-line status caption beneath the invite
+    /// buttons that tells the homeowner whether the field PWA invite
+    /// has been sent and whether the handyman has opened the link
+    /// yet. Renders nothing when no invite has gone out — keeps the
+    /// pre-invite UI clean.
+    private var inviteStatusCaption: String? {
+        guard let session = portalSession,
+              let sentAt = session.lastInviteSentAt else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        let sentRelative = formatter.localizedString(for: sentAt, relativeTo: Date())
+        if let openedAt = session.lastOpenedAt, openedAt >= sentAt {
+            let openedRelative = formatter.localizedString(for: openedAt, relativeTo: Date())
+            return "Invite sent \(sentRelative). Opened \(openedRelative)."
+        }
+        return "Invite sent \(sentRelative). Not opened yet."
     }
 
     private func sendInviteEmail() {

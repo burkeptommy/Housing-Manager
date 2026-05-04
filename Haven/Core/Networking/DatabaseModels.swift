@@ -1897,6 +1897,13 @@ struct HandymanPortalSessionRow: Codable, Identifiable {
     let firstVisit: Bool
     let seedPayload: HandymanPortalSeedPayload
     let lastOpenedAt: Date?
+    /// Phase 95 (gap #67): timestamp of the most recent successful
+    /// Messages-composer SMS invite send. Set by iOS when the user
+    /// taps Send in MFMessageComposeViewController. Combined with
+    /// `lastOpenedAt` lets the visit detail view surface "Invite sent
+    /// 6h ago, no opens yet" so the homeowner can re-send, switch
+    /// channels, or escalate.
+    let lastInviteSentAt: Date?
     let expiresAt: Date?
     let createdAt: Date
     let updatedAt: Date
@@ -1912,6 +1919,7 @@ struct HandymanPortalSessionRow: Codable, Identifiable {
         case firstVisit = "first_visit"
         case seedPayload = "seed_payload"
         case lastOpenedAt = "last_opened_at"
+        case lastInviteSentAt = "last_invite_sent_at"
         case expiresAt = "expires_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -1950,6 +1958,7 @@ struct HandymanPortalSessionUpdate: Codable {
     var portalToken: String?
     var seedPayload: HandymanPortalSeedPayload?
     var lastOpenedAt: Date?
+    var lastInviteSentAt: Date?
     var expiresAt: Date?
     var updatedAt: Date? = Date()
 
@@ -1958,6 +1967,7 @@ struct HandymanPortalSessionUpdate: Codable {
         case portalToken = "portal_token"
         case seedPayload = "seed_payload"
         case lastOpenedAt = "last_opened_at"
+        case lastInviteSentAt = "last_invite_sent_at"
         case expiresAt = "expires_at"
         case updatedAt = "updated_at"
     }
