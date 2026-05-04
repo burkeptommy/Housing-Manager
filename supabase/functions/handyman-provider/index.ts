@@ -1,5 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  householdContractorCategoryFor,
+  routineKindForChip,
+  defaultCadenceForQuizRoutine,
+  isLikelySameVendor,
+  normalizeCompanyName,
+  chezRequestRoutingForUrgency,
+  type AssessmentUrgency,
+} from "../_shared/quiz-mapper-shared.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -4794,6 +4803,1392 @@ async function acceptVisitTimeForProvider(
   return { request: updated };
 }
 
+// ============================================================================
+// Phase 84.5 — Free Handyman Assessment + 3-Mode Onboarding
+// ============================================================================
+//
+// Field-side actions for capturing systems / vendors / routines / documents
+// during a home_assessment visit. The homeowner-side actions live in
+// chez-concierge/index.ts. The shared workspace is the public.home_assessments
+// table created by 20261210_chez_home_assessment.sql.
+
+interface AssessmentRecord {
+  id: string;
+  household_id: string;
+  property_id: string;
+  status: string;
+  visit_assignment_id: string | null;
+  handyman_member_id: string | null;
+  captured_quiz_state: Record<string, unknown> | null;
+  captured_systems: Array<Record<string, unknown>> | null;
+  captured_contractors: Array<Record<string, unknown>> | null;
+  captured_routines: Array<Record<string, unknown>> | null;
+  captured_document_paths: string[] | null;
+  captured_attributes: Record<string, unknown> | null;
+}
+
+async function loadAssessment(service: ServiceClient, assessmentId: string): Promise<AssessmentRecord | null> {
+  const { data, error } = await service
+    .from("home_assessments")
+    .select("*")
+    .eq("id", assessmentId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as unknown as AssessmentRecord;
+}
+
+async function assertHandymanCanWrite(
+  service: ServiceClient,
+  user: { id: string },
+  assessment: AssessmentRecord
+): Promise<{ ok: boolean; reason?: string }> {
+  if (!assessment.visit_assignment_id) {
+    return { ok: false, reason: "assessment has no dispatched visit yet" };
+  }
+  const { data: visit } = await service
+    .from("provider_visit_assignments")
+    .select("workspace_id, assigned_member_id")
+    .eq("id", assessment.visit_assignment_id)
+    .maybeSingle();
+  if (!visit) return { ok: false, reason: "visit not found" };
+  const v = visit as { workspace_id: string; assigned_member_id: string | null };
+  // Caller must be a member of the workspace.
+  const { data: membership } = await service
+    .from("provider_workspace_members")
+    .select("id, role")
+    .eq("workspace_id", v.workspace_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership) return { ok: false, reason: "not a member of the assigned workspace" };
+  return { ok: true };
+}
+
+async function dispatchHomeAssessment(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const workspaceId = compactString(body.workspace_id);
+  const memberId = compactString(body.member_id) || null;
+  const routeDate = compactString(body.route_date) || null;
+  const windowStart = compactString(body.window_start_time) || null;
+  const windowEnd = compactString(body.window_end_time) || null;
+  if (!assessmentId || !workspaceId) {
+    throw new Error("assessment_id + workspace_id required");
+  }
+  await assertWorkspaceAccess(service, user.id, workspaceId);
+
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+
+  // home_assessment dispatch creates a placeholder handyman_request +
+  // provider_visit_assignment so the technician sees it in their queue.
+  // The visit's request_id points at a stub handyman_requests row.
+
+  // 1. Create a stub handyman_request (the existing assignment infra
+  //    requires one; we treat it as the assessment's surrogate).
+  const { data: stubRequest, error: reqErr } = await service
+    .from("handyman_requests")
+    .insert({
+      household_id: assessment.household_id,
+      property_id: assessment.property_id,
+      title: "Home assessment (Chez free)",
+      summary: "Capture systems, vendors, routines, documents during the free Chez home assessment.",
+      status: "scheduled",
+      request_kind: "home_assessment",
+    })
+    .select("id")
+    .single();
+  if (reqErr || !stubRequest) {
+    // request_kind column may not exist on older schemas — retry
+    // without it. Surfaces as a clearer error if both fail.
+    const { data: retry } = await service
+      .from("handyman_requests")
+      .insert({
+        household_id: assessment.household_id,
+        property_id: assessment.property_id,
+        title: "Home assessment (Chez free)",
+        summary: "Capture systems, vendors, routines, documents during the free Chez home assessment.",
+        status: "scheduled",
+      })
+      .select("id")
+      .single();
+    if (!retry) throw new Error(`failed to create stub request: ${reqErr?.message ?? "unknown"}`);
+    (stubRequest as unknown as { id: string }).id = (retry as { id: string }).id;
+  }
+  const stubRequestId = (stubRequest as { id: string }).id;
+
+  // 2. Create the visit assignment, tagged as home_assessment.
+  const { data: visit, error: visitErr } = await service
+    .from("provider_visit_assignments")
+    .insert({
+      workspace_id: workspaceId,
+      request_id: stubRequestId,
+      assigned_member_id: memberId,
+      assigned_by_user_id: user.id,
+      route_date: routeDate,
+      window_start_time: windowStart,
+      window_end_time: windowEnd,
+      visit_type: "home_assessment",
+    })
+    .select("*")
+    .single();
+  if (visitErr || !visit) throw new Error(`failed to create visit: ${visitErr?.message ?? "unknown"}`);
+
+  // 3. Update the assessment row to point at the visit + technician.
+  await service
+    .from("home_assessments")
+    .update({
+      visit_assignment_id: (visit as { id: string }).id,
+      handyman_member_id: memberId,
+      status: "scheduled",
+      scheduled_at: isoNow(),
+    })
+    .eq("id", assessmentId);
+
+  return { ok: true, visit_assignment_id: (visit as { id: string }).id, request_id: stubRequestId };
+}
+
+async function markAssessmentEnRoute(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  if (!assessmentId) throw new Error("assessment_id required");
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const auth = await assertHandymanCanWrite(service, user, assessment);
+  if (!auth.ok) throw new Error(auth.reason ?? "not authorized");
+
+  await service
+    .from("home_assessments")
+    .update({ status: "en_route", en_route_at: isoNow() })
+    .eq("id", assessmentId);
+  return { ok: true, status: "en_route" };
+}
+
+async function startAssessmentVisit(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  if (!assessmentId) throw new Error("assessment_id required");
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const auth = await assertHandymanCanWrite(service, user, assessment);
+  if (!auth.ok) throw new Error(auth.reason ?? "not authorized");
+
+  await service
+    .from("home_assessments")
+    .update({ status: "in_progress", started_at: isoNow() })
+    .eq("id", assessmentId);
+  return { ok: true, status: "in_progress" };
+}
+
+function mergeJsonbArrayByKey(
+  existing: Array<Record<string, unknown>> | null,
+  incoming: Array<Record<string, unknown>> | null,
+  keyField: string
+): Array<Record<string, unknown>> {
+  // Dedup by keyField, preferring incoming values. Used for captured_systems
+  // (key=category), captured_contractors (key=company_name),
+  // captured_routines (key=kind+vendor_name).
+  const merged = new Map<string, Record<string, unknown>>();
+  for (const item of existing ?? []) {
+    const k = compactString((item as Record<string, unknown>)[keyField]).toLowerCase();
+    if (k) merged.set(k, item);
+  }
+  for (const item of incoming ?? []) {
+    const k = compactString((item as Record<string, unknown>)[keyField]).toLowerCase();
+    if (k) merged.set(k, { ...(merged.get(k) ?? {}), ...item });
+  }
+  return Array.from(merged.values());
+}
+
+async function updateAssessmentProgress(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  if (!assessmentId) throw new Error("assessment_id required");
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const auth = await assertHandymanCanWrite(service, user, assessment);
+  if (!auth.ok) throw new Error(auth.reason ?? "not authorized");
+
+  const updates: Record<string, unknown> = {};
+
+  if (body.captured_quiz_state && typeof body.captured_quiz_state === "object") {
+    updates.captured_quiz_state = {
+      ...(assessment.captured_quiz_state ?? {}),
+      ...(body.captured_quiz_state as Record<string, unknown>),
+    };
+  }
+  if (Array.isArray(body.captured_systems)) {
+    updates.captured_systems = mergeJsonbArrayByKey(
+      assessment.captured_systems,
+      body.captured_systems as Array<Record<string, unknown>>,
+      "category"
+    );
+  }
+  if (Array.isArray(body.captured_contractors)) {
+    updates.captured_contractors = mergeJsonbArrayByKey(
+      assessment.captured_contractors,
+      body.captured_contractors as Array<Record<string, unknown>>,
+      "company_name"
+    );
+  }
+  if (Array.isArray(body.captured_routines)) {
+    // Routines key on (kind + vendor_name) — synthesize a pseudo-key.
+    const synthesized = (body.captured_routines as Array<Record<string, unknown>>).map((r) => ({
+      ...r,
+      _key: `${compactString(r.kind)}::${compactString(r.vendor_name)}`,
+    }));
+    const existing = (assessment.captured_routines ?? []).map((r) => ({
+      ...r,
+      _key: `${compactString(r.kind)}::${compactString(r.vendor_name)}`,
+    }));
+    updates.captured_routines = mergeJsonbArrayByKey(existing, synthesized, "_key").map((r) => {
+      const copy = { ...r };
+      delete (copy as Record<string, unknown>)._key;
+      return copy;
+    });
+  }
+  if (Array.isArray(body.captured_document_paths)) {
+    const existing = new Set(assessment.captured_document_paths ?? []);
+    for (const p of body.captured_document_paths as string[]) {
+      const c = compactString(p);
+      if (c) existing.add(c);
+    }
+    updates.captured_document_paths = Array.from(existing);
+  }
+  if (body.captured_attributes && typeof body.captured_attributes === "object") {
+    updates.captured_attributes = {
+      ...(assessment.captured_attributes ?? {}),
+      ...(body.captured_attributes as Record<string, unknown>),
+    };
+  }
+  if (typeof body.handyman_notes === "string") {
+    updates.handyman_notes = body.handyman_notes;
+  }
+  if (Object.keys(updates).length === 0) {
+    return { ok: true, no_op: true };
+  }
+
+  await service.from("home_assessments").update(updates).eq("id", assessmentId);
+  return { ok: true };
+}
+
+async function submitAssessmentData(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  const assessmentId = compactString(body.assessment_id);
+  if (!assessmentId) throw new Error("assessment_id required");
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const auth = await assertHandymanCanWrite(service, user, assessment);
+  if (!auth.ok) throw new Error(auth.reason ?? "not authorized");
+  if (assessment.status === "completed" || assessment.status === "cancelled") {
+    throw new Error(`cannot submit from status ${assessment.status}`);
+  }
+
+  // Final updates on the captured_* JSONB if the handyman shipped any
+  // last-second changes alongside submit.
+  if (
+    body.captured_quiz_state || body.captured_systems || body.captured_contractors ||
+    body.captured_routines || body.captured_document_paths || body.captured_attributes ||
+    body.handyman_notes
+  ) {
+    await updateAssessmentProgress(service, user, body);
+  }
+
+  await service
+    .from("home_assessments")
+    .update({ status: "submitted", submitted_at: isoNow() })
+    .eq("id", assessmentId);
+
+  // Run the ingestion path. On any error, roll status back to in_progress.
+  let ingestionError: string | null = null;
+  try {
+    await ingestAssessment(service, assessmentId);
+  } catch (err) {
+    ingestionError = err instanceof Error ? err.message : String(err);
+    console.error("[handyman-provider] ingestion failed:", err);
+    await service
+      .from("home_assessments")
+      .update({
+        status: "submitted", // stay submitted so admin can retry; admin_notes captures the error
+        admin_notes: `Ingestion failed: ${ingestionError}`,
+      })
+      .eq("id", assessmentId);
+    return { ok: false, error: `ingestion failed: ${ingestionError}` };
+  }
+
+  // Push the homeowner that their home is set up.
+  const fresh = await loadAssessment(service, assessmentId);
+  if (fresh) {
+    const { data: householdUsers } = await service
+      .from("users")
+      .select("id")
+      .eq("household_id", fresh.household_id);
+    const userIds = ((householdUsers as Array<{ id: string }> | null) ?? []).map((u) => u.id);
+    if (userIds.length > 0) {
+      await sendAssessmentPush(serviceUrl, serviceRoleKey, userIds, "Your home is set up", "Your Chez handyman finished — open Haven to see what we captured.", {
+        type: "chez_assessment_complete",
+        assessment_id: assessmentId,
+      });
+    }
+  }
+
+  return { ok: true, status: "awaiting_review" };
+}
+
+async function uploadAssessmentDocument(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const filename = compactString(body.filename);
+  const contentType = compactString(body.content_type) || "application/octet-stream";
+  const base64 = compactString(body.file_base64);
+  if (!assessmentId || !filename || !base64) {
+    throw new Error("assessment_id + filename + file_base64 required");
+  }
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const auth = await assertHandymanCanWrite(service, user, assessment);
+  if (!auth.ok) throw new Error(auth.reason ?? "not authorized");
+
+  // Decode + upload to the documents bucket under assessments/<id>/...
+  const safeName = filename.replace(/[^a-zA-Z0-9_.\-]/g, "_");
+  const path = `assessments/${assessmentId}/${Date.now()}_${safeName}`;
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const { error: upErr } = await service.storage
+    .from("documents")
+    .upload(path, bytes, { contentType, upsert: false });
+  if (upErr) throw new Error(`upload failed: ${upErr.message}`);
+
+  // Append the path to captured_document_paths.
+  const existing = assessment.captured_document_paths ?? [];
+  const next = Array.from(new Set([...existing, path]));
+  await service.from("home_assessments").update({ captured_document_paths: next }).eq("id", assessmentId);
+
+  return { ok: true, path };
+}
+
+async function fetchAssessmentForVisit(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const visitId = compactString(body.visit_assignment_id);
+  const assessmentId = compactString(body.assessment_id);
+  if (!visitId && !assessmentId) {
+    throw new Error("visit_assignment_id or assessment_id required");
+  }
+
+  let q = service.from("home_assessments").select("*");
+  if (assessmentId) {
+    q = q.eq("id", assessmentId);
+  } else {
+    q = q.eq("visit_assignment_id", visitId);
+  }
+  const { data, error } = await q.maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return { assessment: null };
+
+  // Also include household + property context for the field app's
+  // "where am I" header.
+  const a = data as unknown as AssessmentRecord;
+  const { data: property } = await service
+    .from("properties")
+    .select("id, address_line_1, city, state, zip_code, year_built, square_footage")
+    .eq("id", a.property_id)
+    .maybeSingle();
+  const { data: household } = await service
+    .from("households")
+    .select("id, name")
+    .eq("id", a.household_id)
+    .maybeSingle();
+
+  return { assessment: a, property, household };
+}
+
+async function sendAssessmentPush(
+  serviceUrl: string,
+  serviceRoleKey: string,
+  userIds: string[],
+  title: string,
+  bodyText: string,
+  data: Record<string, unknown>
+) {
+  if (!userIds.length) return;
+  try {
+    await fetch(`${serviceUrl}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+      body: JSON.stringify({ user_ids: userIds, title, body: bodyText, data }),
+    });
+  } catch (err) {
+    console.error("[handyman-provider] push failed:", err);
+  }
+}
+
+// ============================================================================
+// Phase 84.5 — Ingestion path
+// ============================================================================
+//
+// Reads captured_* JSONB from a submitted home_assessments row and writes
+// the canonical Haven tables (home_systems, contractors, routines,
+// documents, properties.house_quiz_state).  Run on submit_assessment_data
+// (auto) or admin "Run ingestion" override.
+
+async function ingestAssessment(service: ServiceClient, assessmentId: string) {
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  if (assessment.status === "completed" || assessment.status === "awaiting_review") {
+    return; // idempotent — don't re-ingest
+  }
+
+  const householdId = assessment.household_id;
+  const propertyId = assessment.property_id;
+  const isSupplement = (assessment as Record<string, unknown>).is_existing_user_supplement === true;
+
+  // ============================================================
+  // 1. SYSTEMS — G6 / G15 / G18 / G44 (condition + decommission)
+  // ============================================================
+  const systems = (assessment.captured_systems ?? []) as Array<Record<string, unknown>>;
+  for (const s of systems) {
+    const category = compactString(s.category);
+    if (!category) continue;
+    const manufacturer = compactString(s.manufacturer) || null;
+    const model = compactString(s.model) || null;
+    const installYear = typeof s.install_year === "number" ? s.install_year : null;
+    const installDate = installYear ? `${installYear}-01-01` : null;
+    const subtype = compactString(s.subtype) || null;
+    const notes = compactString(s.notes) || null;
+    const conditionRating = compactString(s.condition_rating) || null;
+    const conditionNotes = compactString(s.condition_notes) || null;
+    const conditionPhotos = Array.isArray(s.condition_photos) ? s.condition_photos : [];
+    const equipmentPhotos = Array.isArray(s.equipment_plate_photos) ? s.equipment_plate_photos : [];
+    const isDecommissioned = s.is_decommissioned === true;
+    const decommissionReason = compactString(s.decommissioned_reason) || null;
+
+    // find-or-create by (household, property, category, model). Supplement
+    // mode patches existing rows; first-time mode skips duplicates.
+    const { data: existing } = await service
+      .from("home_systems")
+      .select("id, install_date_source, condition_rating")
+      .eq("household_id", householdId)
+      .eq("property_id", propertyId)
+      .eq("category", category)
+      .eq("model_number", model ?? "")
+      .maybeSingle();
+
+    if (existing) {
+      // Supplement / update path: handyman observation always wins over
+      // ATTOM estimate (G6). Apply decommission flag if set.
+      const update: Record<string, unknown> = {
+        condition_rating: conditionRating ?? existing.condition_rating,
+        condition_notes: conditionNotes,
+        condition_photos: conditionPhotos.length ? conditionPhotos : undefined,
+        last_assessed_at: isoNow(),
+        install_date_source: existing.install_date_source === "vendor_invoice"
+          ? "vendor_invoice"
+          : "handyman_observed",
+      };
+      if (isDecommissioned) {
+        update.is_active = false;
+        update.decommissioned_at = isoNow();
+        update.decommissioned_reason = decommissionReason;
+      }
+      await service.from("home_systems").update(update).eq("id", existing.id);
+      continue;
+    }
+
+    await service.from("home_systems").insert({
+      household_id: householdId,
+      property_id: propertyId,
+      category,
+      subtype,
+      name: [manufacturer, model].filter(Boolean).join(" ") || category,
+      manufacturer,
+      model_number: model,
+      install_date: installDate,
+      install_date_source: "handyman_observed",
+      notes,
+      condition_rating: conditionRating,
+      condition_notes: conditionNotes,
+      condition_photos: conditionPhotos,
+      photos: equipmentPhotos,
+      last_assessed_at: isoNow(),
+      onboarded_via: "handyman_assessment",
+      is_active: !isDecommissioned,
+      decommissioned_at: isDecommissioned ? isoNow() : null,
+      decommissioned_reason: isDecommissioned ? decommissionReason : null,
+    });
+  }
+
+  // ============================================================
+  // 2. CONTRACTORS — G7 (fuzzy dedup) / G8 (canonical category) / G15
+  // ============================================================
+  const contractors = (assessment.captured_contractors ?? []) as Array<Record<string, unknown>>;
+  // Pre-load existing contractors once for fuzzy dedup
+  const { data: existingContractors } = await service
+    .from("contractors")
+    .select("id, company_name, phone, category")
+    .eq("household_id", householdId);
+  const existingList = (existingContractors ?? []) as Array<{
+    id: string; company_name: string; phone: string | null; category: string | null;
+  }>;
+
+  for (const c of contractors) {
+    const companyName = compactString(c.company_name);
+    if (!companyName) continue;
+    const phone = compactString(c.phone) || null;
+    // Canonicalize category from chip_id when handyman captured via chip
+    const chipId = compactString(c.chip_id) || null;
+    const category = compactString(c.category)
+      || (chipId ? householdContractorCategoryFor(chipId) : null);
+
+    // Fuzzy dedup against existing roster
+    const match = existingList.find((row) => isLikelySameVendor(
+      { companyName: row.company_name, phone: row.phone },
+      { companyName, phone }
+    ));
+
+    if (match) {
+      // Patch only fields that are currently null
+      const update: Record<string, unknown> = {};
+      if (!match.phone && phone) update.phone = phone;
+      if (!match.category && category) update.category = category;
+      if (Object.keys(update).length > 0) {
+        await service.from("contractors").update(update).eq("id", match.id);
+      }
+      continue;
+    }
+
+    const { data: inserted } = await service
+      .from("contractors")
+      .insert({
+        household_id: householdId,
+        company_name: companyName,
+        category,
+        phone,
+        email: compactString(c.email) || null,
+        website: compactString(c.website) || null,
+        source: "home_assessment",
+        onboarded_via: "handyman_assessment",
+      })
+      .select("id, company_name, phone, category")
+      .single();
+    if (inserted) {
+      existingList.push(inserted as { id: string; company_name: string; phone: string | null; category: string | null });
+    }
+  }
+
+  // ============================================================
+  // 3. ROUTINES — G12 full RoutineInsert shape, G15 attribution
+  // ============================================================
+  const routines = (assessment.captured_routines ?? []) as Array<Record<string, unknown>>;
+  for (const r of routines) {
+    const kind = compactString(r.kind) || (compactString(r.chip_id) ? routineKindForChip(compactString(r.chip_id)) : null);
+    if (!kind) continue;
+    const vendorName = compactString(r.vendor_name) || null;
+    const label = compactString(r.label) || (vendorName ? `${kind} · ${vendorName}` : kind);
+
+    // Apply default cadence + active_months based on kind, then override
+    // with anything explicitly captured.
+    const defaults = defaultCadenceForQuizRoutine(kind);
+    const cadenceType = compactString(r.cadence_type) || defaults.cadenceType;
+    const cadenceIntervalDays = typeof r.cadence_interval_days === "number"
+      ? r.cadence_interval_days
+      : defaults.cadenceIntervalDays;
+    const daysOfWeek = Array.isArray(r.days_of_week)
+      ? r.days_of_week
+      : (typeof r.day_of_week === "number" ? [r.day_of_week] : null);
+    const activeMonths = Array.isArray(r.active_months) ? r.active_months : defaults.activeMonths;
+    const timeOfDay = compactString(r.time_of_day) || null;
+
+    // Look up vendor_id by company name (with fuzzy dedup just used).
+    let vendorId: string | null = null;
+    if (vendorName) {
+      const v = existingList.find((row) =>
+        normalizeCompanyName(row.company_name) === normalizeCompanyName(vendorName)
+      );
+      if (v) vendorId = v.id;
+    }
+
+    // Dedup by (household, kind, vendor_id)
+    const { data: existing } = await service
+      .from("routines")
+      .select("id")
+      .eq("household_id", householdId)
+      .eq("routine_kind", kind)
+      .eq("vendor_id", vendorId ?? "")
+      .is("archived_at", null)
+      .maybeSingle();
+    if (existing) continue;
+
+    await service.from("routines").insert({
+      household_id: householdId,
+      property_id: propertyId,
+      label,
+      routine_kind: kind,
+      cadence_type: cadenceType,
+      cadence_interval_days: cadenceIntervalDays,
+      days_of_week: daysOfWeek,
+      active_months: activeMonths,
+      time_of_day: timeOfDay,
+      vendor_id: vendorId,
+      setup_state: vendorId ? "active" : "pending_vendor",
+      scope: "property",
+      onboarded_via: "handyman_assessment",
+    });
+  }
+
+  // ============================================================
+  // 4. VEHICLES — Q24 (was missing from original)
+  // ============================================================
+  const vehicles = ((assessment as Record<string, unknown>).captured_vehicles ?? []) as Array<Record<string, unknown>>;
+  for (const v of vehicles) {
+    const vin = compactString(v.vin);
+    const make = compactString(v.make);
+    const model = compactString(v.model);
+    if (!vin && !make && !model) continue;
+    // Dedup on VIN
+    if (vin) {
+      const { data: existing } = await service
+        .from("vehicles")
+        .select("id")
+        .eq("household_id", householdId)
+        .eq("vin", vin)
+        .maybeSingle();
+      if (existing) continue;
+    }
+    await service.from("vehicles").insert({
+      household_id: householdId,
+      vin: vin || null,
+      year: typeof v.year === "number" ? v.year : null,
+      make: make || null,
+      model: model || null,
+      trim: compactString(v.trim) || null,
+      color: compactString(v.color) || null,
+      license_plate: compactString(v.license_plate) || null,
+      mileage: typeof v.mileage === "number" ? v.mileage : null,
+      onboarded_via: "handyman_assessment",
+    });
+  }
+
+  // ============================================================
+  // 5. UTILITY ACCOUNTS — Q16/17/19/26
+  // ============================================================
+  const utilityAccounts = ((assessment as Record<string, unknown>).captured_utility_accounts ?? []) as Array<Record<string, unknown>>;
+  for (const ua of utilityAccounts) {
+    const providerName = compactString(ua.provider_name);
+    const providerType = compactString(ua.provider_type);
+    if (!providerName || !providerType) continue;
+    const { data: existing } = await service
+      .from("utility_accounts")
+      .select("id")
+      .eq("household_id", householdId)
+      .eq("provider_type", providerType)
+      .ilike("provider_name", providerName)
+      .maybeSingle();
+    if (existing) continue;
+    await service.from("utility_accounts").insert({
+      household_id: householdId,
+      property_id: propertyId,
+      provider_name: providerName,
+      provider_type: providerType,
+      account_number: compactString(ua.account_number) || null,
+      monthly_cost_cents: typeof ua.monthly_cost_cents === "number" ? ua.monthly_cost_cents : null,
+      phone: compactString(ua.phone) || null,
+      website: compactString(ua.website) || null,
+      onboarded_via: "handyman_assessment",
+    });
+  }
+
+  // ============================================================
+  // 6. DOCUMENTS — G4 attribution
+  // ============================================================
+  const docPaths = (assessment.captured_document_paths ?? []) as Array<string | Record<string, unknown>>;
+  for (const item of docPaths) {
+    const path = typeof item === "string" ? item : compactString((item as Record<string, unknown>).path);
+    if (!path) continue;
+    const docMeta = typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const filename = path.split("/").pop() ?? path;
+    const { data: existing } = await service
+      .from("documents")
+      .select("id")
+      .eq("household_id", householdId)
+      .eq("file_path", path)
+      .maybeSingle();
+    if (existing) continue;
+    await service.from("documents").insert({
+      household_id: householdId,
+      property_id: propertyId,
+      filename,
+      file_path: path,
+      category: compactString(docMeta.category) || "Home Document",
+      visible_to_home_managers: true,
+      uploaded_via: "handyman_assessment",
+    });
+  }
+
+  // ============================================================
+  // 7. QUICK-FIXES → backdated service_records (G21)
+  // ============================================================
+  const quickFixes = ((assessment as Record<string, unknown>).captured_quick_fixes ?? []) as Array<Record<string, unknown>>;
+  for (const qf of quickFixes) {
+    const description = compactString(qf.description);
+    if (!description) continue;
+    await service.from("service_records").insert({
+      household_id: householdId,
+      property_id: propertyId,
+      system_id: compactString(qf.system_id) || null,
+      service_date: new Date().toISOString().slice(0, 10),
+      description,
+      cost_cents: typeof qf.cost_cents === "number" ? qf.cost_cents : 0,
+      notes: "Fixed during Chez handyman assessment.",
+    });
+  }
+
+  // ============================================================
+  // 8. RECOMMENDED TASKS → chez_requests / property_projects /
+  //    maintenance_tasks (G19, G20, G25, G36, G45, G46, G48)
+  // ============================================================
+  const { data: recommendations } = await service
+    .from("assessment_recommended_tasks")
+    .select("*")
+    .eq("assessment_id", assessmentId);
+  const recList = (recommendations ?? []) as Array<Record<string, unknown>>;
+  const HIGH_COST_THRESHOLD_CENTS = 500_000; // $5,000
+
+  for (const rec of recList) {
+    // Skip already-handled rows
+    if (rec.fixed_during_visit === true) continue;
+    if (rec.spawned_chez_request_id || rec.spawned_project_id || rec.spawned_maintenance_task_id) continue;
+
+    const recId = compactString(rec.id);
+    const homeownerResponse = compactString(rec.homeowner_response);
+    const urgency = compactString(rec.urgency) as AssessmentUrgency;
+    const isDisputed = rec.disputed === true;
+    const isHomeownerHandled = homeownerResponse === "homeowner_handled";
+    const isDeclined = homeownerResponse === "declined";
+    const observationSource = compactString(rec.observation_source) || "handyman_observed";
+    const needsVerification = rec.needs_verification === true || observationSource === "homeowner_reported";
+    const estCost = typeof rec.estimated_cost_cents === "number" ? rec.estimated_cost_cents : 0;
+
+    // G46: homeowner_handled → spawn maintenance_task with their date
+    if (isHomeownerHandled) {
+      const { data: task } = await service
+        .from("maintenance_tasks")
+        .insert({
+          household_id: householdId,
+          property_id: propertyId,
+          system_id: compactString(rec.system_id) || null,
+          title: compactString(rec.title),
+          description: compactString(rec.description) || null,
+          priority: "medium",
+          status: "pending",
+          assignment_type: "personal",
+          assigned_route: "diy",
+          scheduled_date: compactString(rec.homeowner_handled_scheduled_for) || null,
+          notes: `Homeowner-handled via ${compactString(rec.homeowner_handled_vendor) || "their own arrangement"}.`,
+        })
+        .select("id")
+        .single();
+      if (task) {
+        await service
+          .from("assessment_recommended_tasks")
+          .update({ spawned_maintenance_task_id: (task as { id: string }).id })
+          .eq("id", recId);
+      }
+      continue;
+    }
+
+    // G48: declined-but-disputed → still create chez_request, mark disputed
+    // G48: declined-and-not-disputed → skip entirely (homeowner doesn't want it)
+    if (isDeclined && !isDisputed) continue;
+
+    const routing = chezRequestRoutingForUrgency(urgency);
+    const tags: string[] = [];
+    if (needsVerification) tags.push("needs_verification");
+    if (isDisputed) tags.push("disputed");
+    if (urgency === "urgent") tags.push("urgent_safety");
+
+    // Create chez_request
+    const reqInsert: Record<string, unknown> = {
+      household_id: householdId,
+      property_id: propertyId,
+      submitted_by_user_id: null, // handyman-generated, not homeowner-submitted
+      category: routing.category,
+      summary: compactString(rec.title),
+      description: compactString(rec.description) || compactString(rec.homeowner_visible_notes),
+      status: "open",
+      sla_due_at: routing.bypassesSLA ? null : (
+        routing.slaHours
+          ? new Date(Date.now() + routing.slaHours * 3600_000).toISOString()
+          : null
+      ),
+      admin_initiated: true,
+      tags,
+      source: "home_assessment",
+    };
+    const { data: chezReq } = await service
+      .from("chez_requests")
+      .insert(reqInsert)
+      .select("id")
+      .single();
+
+    let projectId: string | null = null;
+
+    // G36: high-cost → ALSO create property_projects
+    if (estCost > HIGH_COST_THRESHOLD_CENTS) {
+      const { data: proj } = await service
+        .from("property_projects")
+        .insert({
+          household_id: householdId,
+          property_id: propertyId,
+          title: compactString(rec.title),
+          description: compactString(rec.description) || null,
+          status: "planning",
+          entry_type: "planned",
+          estimated_budget: estCost / 100,
+        })
+        .select("id")
+        .single();
+      if (proj) projectId = (proj as { id: string }).id;
+    }
+
+    // Backlink the recommendation row
+    await service
+      .from("assessment_recommended_tasks")
+      .update({
+        spawned_chez_request_id: chezReq ? (chezReq as { id: string }).id : null,
+        spawned_project_id: projectId,
+      })
+      .eq("id", recId);
+  }
+
+  // ============================================================
+  // 9. PRE-VISIT QUIZ ANSWERS + completedAt
+  // ============================================================
+  const captured_quiz_state = assessment.captured_quiz_state ?? {};
+  const merged_quiz_state = {
+    ...captured_quiz_state,
+    completedAt: new Date().toISOString(),
+  };
+  const { data: prop } = await service
+    .from("properties")
+    .select("house_quiz_state, attributes")
+    .eq("id", propertyId)
+    .maybeSingle();
+  const existingState = ((prop as { house_quiz_state: Record<string, unknown> | null } | null)?.house_quiz_state) ?? {};
+  // Merge captured_attributes deep — preserve any existing keys not overridden
+  const mergedAttributes = {
+    ...((prop as { attributes: Record<string, unknown> | null } | null)?.attributes ?? {}),
+    ...(assessment.captured_attributes ?? {}),
+  };
+  // Stamp assessment_mode so the homeowner-side knows ingestion happened
+  mergedAttributes["assessment_mode"] = "handyman";
+  await service
+    .from("properties")
+    .update({
+      house_quiz_state: { ...existingState, ...merged_quiz_state },
+      attributes: mergedAttributes,
+    })
+    .eq("id", propertyId);
+
+  // ============================================================
+  // 10. AUTO-FLIP chez_owned ON GROUP TOGGLES (Phase 84 inheritance)
+  // ============================================================
+  // If household has chez_ownership_groups.{systems|vendors|routines}.on=true,
+  // every newly-created entity in that group gets chez_owned=true.
+  const { data: hh } = await service
+    .from("households")
+    .select("chez_ownership_groups")
+    .eq("id", householdId)
+    .maybeSingle();
+  const groups = (hh as { chez_ownership_groups: Record<string, unknown> | null } | null)?.chez_ownership_groups ?? {};
+  const isOwned = (group: string) => {
+    const g = groups[group] as { on?: boolean } | undefined;
+    return g?.on === true;
+  };
+  if (isOwned("systems")) {
+    await service.from("home_systems")
+      .update({ chez_owned: true, chez_owned_at: isoNow() })
+      .eq("property_id", propertyId)
+      .eq("onboarded_via", "handyman_assessment")
+      .is("chez_owned", null);
+  }
+  if (isOwned("vendors")) {
+    await service.from("contractors")
+      .update({ chez_owned: true, chez_owned_at: isoNow() })
+      .eq("household_id", householdId)
+      .eq("onboarded_via", "handyman_assessment")
+      .is("chez_owned", null);
+  }
+  if (isOwned("routines")) {
+    await service.from("routines")
+      .update({ chez_owned: true, chez_owned_at: isoNow() })
+      .eq("household_id", householdId)
+      .eq("onboarded_via", "handyman_assessment")
+      .is("chez_owned", null);
+  }
+
+  // ============================================================
+  // 11. FINAL STATUS FLIP
+  // ============================================================
+  await service
+    .from("home_assessments")
+    .update({
+      status: "awaiting_review",
+      ingested_at: isoNow(),
+    })
+    .eq("id", assessmentId);
+
+  // ============================================================
+  // 12. CHEZ ACTIVITY LOG — Phase 85 PR 5c
+  // ============================================================
+  //
+  // Surface the completed assessment in the homeowner's "This week
+  // with Chez" digest + permanent activity history. Soft-fail: if
+  // log_chez_activity isn't deployed yet (pre-20261213 envs) the
+  // ingestion still succeeds.
+  try {
+    const systemCount = systems.length;
+    const recommendationCount = recList.length;
+    const quickFixCount = quickFixes.length;
+    const titleParts: string[] = [];
+    if (systemCount > 0) titleParts.push(`${systemCount} system${systemCount === 1 ? "" : "s"}`);
+    if (recommendationCount > 0) titleParts.push(`${recommendationCount} follow-up${recommendationCount === 1 ? "" : "s"}`);
+    if (quickFixCount > 0) titleParts.push(`${quickFixCount} quick fix${quickFixCount === 1 ? "" : "es"}`);
+    const summary = titleParts.length > 0 ? titleParts.join(" · ") : "Visit complete";
+    await service.rpc("log_chez_activity", {
+      p_household_id: householdId,
+      p_activity_type: "assessment_completed",
+      p_title: "Home assessment complete",
+      p_description: summary,
+      p_entity_type: "home_assessment",
+      p_entity_id: assessmentId,
+      p_cost_cents: null,
+      p_occurred_at: isoNow(),
+      p_surface_on_dashboard: true,
+    });
+
+    // Per-system log entries — only when there's a notable count to
+    // signal in the digest (skip noise on tiny visits)
+    if (systemCount >= 3) {
+      await service.rpc("log_chez_activity", {
+        p_household_id: householdId,
+        p_activity_type: "system_added",
+        p_title: `${systemCount} systems documented`,
+        p_description: null,
+        p_entity_type: "home_assessment",
+        p_entity_id: assessmentId,
+        p_cost_cents: null,
+        p_occurred_at: isoNow(),
+        p_surface_on_dashboard: false,
+      });
+    }
+    if (recommendationCount > 0) {
+      await service.rpc("log_chez_activity", {
+        p_household_id: householdId,
+        p_activity_type: "recommendation_logged",
+        p_title: `${recommendationCount} recommendation${recommendationCount === 1 ? "" : "s"} logged`,
+        p_description: null,
+        p_entity_type: "home_assessment",
+        p_entity_id: assessmentId,
+        p_cost_cents: null,
+        p_occurred_at: isoNow(),
+        p_surface_on_dashboard: false,
+      });
+    }
+  } catch (err) {
+    console.warn("[handyman-provider] log_chez_activity failed (non-fatal):", err);
+  }
+}
+
+// ============================================================================
+// Phase 84.5 round 2 — additional helper actions (G18-G50)
+// ============================================================================
+
+/** Homeowner-side: create or fetch the assessment row at signup. */
+async function requestHomeAssessment(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const propertyId = compactString(body.property_id);
+  const householdId = compactString(body.household_id);
+  if (!propertyId || !householdId) throw new Error("property_id + household_id required");
+
+  // Idempotent — reuse an active assessment if one exists.
+  const { data: existing } = await service
+    .from("home_assessments")
+    .select("*")
+    .eq("property_id", propertyId)
+    .not("status", "in", "(completed,cancelled)")
+    .maybeSingle();
+  if (existing) {
+    return { ok: true, assessment: existing, was_existing: true };
+  }
+
+  const { data: created, error } = await service
+    .from("home_assessments")
+    .insert({
+      property_id: propertyId,
+      household_id: householdId,
+      status: "pending",
+      homeowner_concerns: compactString(body.homeowner_concerns) || null,
+      homeowner_present: body.homeowner_present !== false,
+      homeowner_access_notes: compactString(body.homeowner_access_notes) || null,
+      is_existing_user_supplement: body.is_existing_user_supplement === true,
+    })
+    .select("*")
+    .single();
+  if (error || !created) throw new Error(`failed to create assessment: ${error?.message}`);
+
+  return { ok: true, assessment: created, was_existing: false };
+}
+
+/** Handyman captures a recommendation during the visit. (G18, G19, G20, G45) */
+async function addRecommendedTask(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  if (!assessmentId) throw new Error("assessment_id required");
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const auth = await assertHandymanCanWrite(service, user, assessment);
+  if (!auth.ok) throw new Error(auth.reason ?? "not authorized");
+
+  const urgency = compactString(body.urgency) || "soon";
+  const observationSource = compactString(body.observation_source) || "handyman_observed";
+  const needsVerification = body.needs_verification === true
+    || observationSource === "homeowner_reported";
+
+  const { data: created, error } = await service
+    .from("assessment_recommended_tasks")
+    .insert({
+      assessment_id: assessmentId,
+      system_id: compactString(body.system_id) || null,
+      zone: compactString(body.zone) || null,
+      title: compactString(body.title),
+      description: compactString(body.description) || null,
+      category: compactString(body.category) || null,
+      urgency,
+      recommended_owner: compactString(body.recommended_owner) || "chez_vendor",
+      recommended_template_key: compactString(body.recommended_template_key) || null,
+      observation_source: observationSource,
+      needs_verification: needsVerification,
+      estimated_cost_cents: typeof body.estimated_cost_cents === "number"
+        ? body.estimated_cost_cents : null,
+      handyman_notes: compactString(body.handyman_notes) || null,
+      homeowner_visible_notes: compactString(body.homeowner_visible_notes) || null,
+      photos: Array.isArray(body.photos) ? body.photos : [],
+    })
+    .select("*")
+    .single();
+  if (error || !created) throw new Error(`failed: ${error?.message}`);
+
+  // G20: urgent finding — fire admin push immediately
+  if (urgency === "urgent") {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const adminEmails = (Deno.env.get("CHEZ_ADMIN_EMAILS") ?? "").split(",").filter(Boolean);
+    if (adminEmails.length > 0) {
+      const { data: admins } = await service
+        .from("users")
+        .select("id")
+        .in("email", adminEmails);
+      const adminIds = ((admins as Array<{ id: string }> | null) ?? []).map((u) => u.id);
+      if (adminIds.length > 0) {
+        await sendAssessmentPush(
+          supabaseUrl, serviceRoleKey, adminIds,
+          "🚨 Urgent finding during assessment",
+          compactString(body.title),
+          { type: "chez_assessment_urgent_finding", assessment_id: assessmentId, recommendation_id: (created as { id: string }).id }
+        );
+      }
+    }
+  }
+
+  return { ok: true, recommended_task: created };
+}
+
+/** Wrap-up: homeowner_response / disputed / homeowner_handled. (G46, G48) */
+async function updateRecommendedTask(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const taskId = compactString(body.task_id);
+  if (!taskId) throw new Error("task_id required");
+
+  const update: Record<string, unknown> = {};
+  const allowed = [
+    "homeowner_response", "homeowner_handled_scheduled_for", "homeowner_handled_vendor",
+    "disputed", "title", "description", "urgency", "estimated_cost_cents",
+    "handyman_notes", "homeowner_visible_notes", "needs_verification",
+    "recommended_owner",
+  ];
+  for (const k of allowed) {
+    if (body[k] !== undefined) update[k] = body[k];
+  }
+  if (Object.keys(update).length === 0) return { ok: true, no_changes: true };
+
+  const { data: updated, error } = await service
+    .from("assessment_recommended_tasks")
+    .update(update)
+    .eq("id", taskId)
+    .select("*")
+    .single();
+  if (error) throw new Error(`failed: ${error.message}`);
+  return { ok: true, recommended_task: updated };
+}
+
+/** G21 — handyman quick-fix during the visit. */
+async function markTaskFixedDuringVisit(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const taskId = compactString(body.task_id);
+  const costCents = typeof body.cost_cents === "number" ? body.cost_cents : 0;
+  if (!taskId) throw new Error("task_id required");
+
+  const { data: rec } = await service
+    .from("assessment_recommended_tasks")
+    .select("*, home_assessments!inner(household_id, property_id)")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (!rec) throw new Error("recommended task not found");
+  const r = rec as Record<string, unknown> & { home_assessments: { household_id: string; property_id: string } };
+
+  // Create backdated service_record
+  const { data: sr } = await service
+    .from("service_records")
+    .insert({
+      household_id: r.home_assessments.household_id,
+      property_id: r.home_assessments.property_id,
+      system_id: compactString(r.system_id) || null,
+      service_date: new Date().toISOString().slice(0, 10),
+      description: `Fixed during Chez assessment: ${compactString(r.title)}`,
+      cost_cents: costCents,
+      notes: compactString(r.handyman_notes) || null,
+    })
+    .select("id")
+    .single();
+
+  await service
+    .from("assessment_recommended_tasks")
+    .update({
+      fixed_during_visit: true,
+      spawned_service_record_id: sr ? (sr as { id: string }).id : null,
+    })
+    .eq("id", taskId);
+
+  return { ok: true, service_record_id: sr ? (sr as { id: string }).id : null };
+}
+
+/** G44 — mark a system inactive without archiving. */
+async function decommissionSystem(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const systemId = compactString(body.system_id);
+  const reason = compactString(body.reason) || null;
+  if (!systemId) throw new Error("system_id required");
+
+  await service
+    .from("home_systems")
+    .update({
+      is_active: false,
+      decommissioned_at: isoNow(),
+      decommissioned_reason: reason,
+    })
+    .eq("id", systemId);
+
+  return { ok: true };
+}
+
+/** G47 — multi-handyman support: add a workspace member to an assessment. */
+async function addAssessmentMember(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const memberId = compactString(body.member_id);
+  const role = compactString(body.role) || null;
+  const isPrimary = body.is_primary === true;
+  if (!assessmentId || !memberId) throw new Error("assessment_id + member_id required");
+
+  // If marking primary, demote existing primary first
+  if (isPrimary) {
+    await service
+      .from("home_assessment_members")
+      .update({ is_primary: false })
+      .eq("assessment_id", assessmentId)
+      .eq("is_primary", true);
+  }
+
+  const { data, error } = await service
+    .from("home_assessment_members")
+    .upsert({
+      assessment_id: assessmentId,
+      member_id: memberId,
+      is_primary: isPrimary,
+      role,
+    }, { onConflict: "assessment_id,member_id" })
+    .select("*")
+    .single();
+  if (error) throw new Error(`failed: ${error.message}`);
+  return { ok: true, member: data };
+}
+
+/** G32 — multi-session: open a continuation visit. */
+async function startContinuationVisit(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const workspaceId = compactString(body.workspace_id);
+  const memberId = compactString(body.member_id) || null;
+  const routeDate = compactString(body.route_date) || null;
+  const windowStart = compactString(body.window_start_time) || null;
+  const windowEnd = compactString(body.window_end_time) || null;
+  if (!assessmentId || !workspaceId) throw new Error("assessment_id + workspace_id required");
+
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  const orig = assessment as unknown as { request_id?: string; visit_assignment_id: string | null; session_count: number };
+
+  // Get the original handyman_request id from the existing visit
+  let stubRequestId: string | null = null;
+  if (orig.visit_assignment_id) {
+    const { data: origVisit } = await service
+      .from("provider_visit_assignments")
+      .select("request_id")
+      .eq("id", orig.visit_assignment_id)
+      .maybeSingle();
+    stubRequestId = (origVisit as { request_id: string } | null)?.request_id ?? null;
+  }
+  if (!stubRequestId) throw new Error("original visit not found — cannot open continuation");
+
+  const { data: visit, error: visitErr } = await service
+    .from("provider_visit_assignments")
+    .insert({
+      workspace_id: workspaceId,
+      request_id: stubRequestId,
+      assigned_member_id: memberId,
+      assigned_by_user_id: user.id,
+      route_date: routeDate,
+      window_start_time: windowStart,
+      window_end_time: windowEnd,
+      visit_type: "home_assessment_continuation",
+    })
+    .select("*")
+    .single();
+  if (visitErr || !visit) throw new Error(`failed: ${visitErr?.message ?? "unknown"}`);
+
+  await service
+    .from("home_assessments")
+    .update({
+      visit_assignment_id: (visit as { id: string }).id,
+      session_count: (orig.session_count ?? 1) + 1,
+      status: "scheduled",
+    })
+    .eq("id", assessmentId);
+
+  return { ok: true, visit_assignment_id: (visit as { id: string }).id };
+}
+
+/** G40 — homeowner cancels a pending assessment. */
+async function cancelAssessment(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const reason = compactString(body.reason) || null;
+  if (!assessmentId) throw new Error("assessment_id required");
+
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+  if (assessment.status === "completed") throw new Error("cannot cancel a completed assessment");
+
+  await service
+    .from("home_assessments")
+    .update({
+      status: "cancelled",
+      cancelled_at: isoNow(),
+      cancellation_reason: reason,
+    })
+    .eq("id", assessmentId);
+
+  // Clear assessment_mode on the property so the homeowner sees the
+  // self-onboard flow on next launch.
+  const { data: prop } = await service
+    .from("properties")
+    .select("attributes")
+    .eq("id", assessment.property_id)
+    .maybeSingle();
+  const attrs = ((prop as { attributes: Record<string, unknown> | null } | null)?.attributes) ?? {};
+  delete attrs["assessment_mode"];
+  await service
+    .from("properties")
+    .update({ attributes: attrs })
+    .eq("id", assessment.property_id);
+
+  return { ok: true };
+}
+
+/** G40 — homeowner requests a different time. */
+async function rescheduleAssessment(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const requestNotes = compactString(body.notes) || null;
+  if (!assessmentId) throw new Error("assessment_id required");
+
+  await service
+    .from("home_assessments")
+    .update({
+      reschedule_requested_at: isoNow(),
+      reschedule_request_notes: requestNotes,
+    })
+    .eq("id", assessmentId);
+
+  return { ok: true };
+}
+
+// ============================================================================
+// End Phase 84.5
+// ============================================================================
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -5942,6 +7337,123 @@ serve(async (req) => {
 
         return json({ ok: true });
       }
+
+      // ============================================================
+      // Phase 84.5 — Free Handyman Assessment dispatch + capture flow
+      // ============================================================
+
+      // Admin-only. Creates the provider_visit_assignments row that
+      // links a home_assessments row to a workspace + technician,
+      // moving the assessment from 'pending' to 'scheduled'.
+      if (action === "dispatch_home_assessment") {
+        const result = await dispatchHomeAssessment(service, user, body);
+        return json(result);
+      }
+
+      // Handyman flips status='en_route' on their assessment visit.
+      if (action === "mark_assessment_en_route") {
+        const result = await markAssessmentEnRoute(service, user, body);
+        return json(result);
+      }
+
+      // Handyman flips status='in_progress' when they arrive at the home.
+      if (action === "start_assessment_visit") {
+        const result = await startAssessmentVisit(service, user, body);
+        return json(result);
+      }
+
+      // Autosave during capture. Handyman pushes a partial captured_*
+      // payload; we deep-merge into the row so partial work survives
+      // crashes / connectivity drops.
+      if (action === "update_assessment_progress") {
+        const result = await updateAssessmentProgress(service, user, body);
+        return json(result);
+      }
+
+      // Final submission. Stamps submitted_at then runs the ingestion
+      // path (writes home_systems / contractors / routines / documents /
+      // house_quiz_state from the captured_* JSONB) and pushes the
+      // homeowner.
+      if (action === "submit_assessment_data") {
+        const result = await submitAssessmentData(service, user, body, supabaseUrl, serviceRoleKey);
+        return json(result);
+      }
+
+      // Handyman uploads a document captured at the home (warranty,
+      // manual, invoice). Writes to the `documents` storage bucket
+      // and appends the path to home_assessments.captured_document_paths.
+      if (action === "upload_assessment_document") {
+        const result = await uploadAssessmentDocument(service, user, body);
+        return json(result);
+      }
+
+      // HavenField loads assessment context for an active visit.
+      if (action === "fetch_assessment_for_visit") {
+        const result = await fetchAssessmentForVisit(service, user, body);
+        return json(result);
+      }
+
+      // ============================================================
+      // Phase 84.5 round 2 — gap-closure actions
+      // ============================================================
+
+      // Homeowner-side: create the pending assessment row at signup.
+      if (action === "request_home_assessment") {
+        const result = await requestHomeAssessment(service, user, body);
+        return json(result);
+      }
+
+      // Handyman captures a recommendation. Urgent items fire admin push.
+      if (action === "add_recommended_task") {
+        const result = await addRecommendedTask(service, user, body);
+        return json(result);
+      }
+
+      // Wrap-up: homeowner_response / homeowner_handled / disputed.
+      if (action === "update_recommended_task") {
+        const result = await updateRecommendedTask(service, user, body);
+        return json(result);
+      }
+
+      // Quick-fix during the visit. Skips chez_request fan-out.
+      if (action === "mark_task_fixed_during_visit") {
+        const result = await markTaskFixedDuringVisit(service, user, body);
+        return json(result);
+      }
+
+      // Decommission a system without archiving (G44).
+      if (action === "decommission_system") {
+        const result = await decommissionSystem(service, user, body);
+        return json(result);
+      }
+
+      // Multi-handyman: add a workspace member (G47).
+      if (action === "add_assessment_member") {
+        const result = await addAssessmentMember(service, user, body);
+        return json(result);
+      }
+
+      // Open a continuation visit for a paused assessment (G32).
+      if (action === "start_continuation_visit") {
+        const result = await startContinuationVisit(service, user, body);
+        return json(result);
+      }
+
+      // Homeowner cancels (G40).
+      if (action === "cancel_assessment") {
+        const result = await cancelAssessment(service, user, body);
+        return json(result);
+      }
+
+      // Homeowner requests a different time (G40).
+      if (action === "reschedule_assessment") {
+        const result = await rescheduleAssessment(service, user, body);
+        return json(result);
+      }
+
+      // ============================================================
+      // End Phase 84.5
+      // ============================================================
 
       // Cron-callable. Flips proposal_status='expired' on all rows past
       // proposal_expires_at. Service-role only — guarded by the function's
