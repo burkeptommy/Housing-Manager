@@ -153,6 +153,25 @@ struct VehicleProgramSetupSheet: View {
                     ? nil
                     : notes
             )
+
+            // Phase 95 (audit gaps #87/#88) — when the user activates a
+            // shop-managed program, run the grouping engine so the
+            // vehicle's existing oil-change / tire-rotation tasks get
+            // `parent_routine_id` set and stop rendering individually.
+            // Without this the user sees the program card AND every
+            // single task it's supposed to subsume — confusing because
+            // the routine card says "the shop handles this" while the
+            // task list still surfaces every line item. Self-managed
+            // mode skips the link by design (linkVehicleTasksToRoutine
+            // is a no-op when programMode != .shopManaged).
+            if routine.typedSetupState == .active {
+                _ = try? await RoutineGroupingEngine.linkVehicleTasksToRoutine(
+                    routine,
+                    in: householdId
+                )
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            }
+
             Analytics.track(.routineActivated, [
                 "routine_id": routine.id.uuidString,
                 "scope": "vehicle",
