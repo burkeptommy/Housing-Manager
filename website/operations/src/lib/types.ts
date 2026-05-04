@@ -163,6 +163,14 @@ export interface VisitRow {
   assignment: VisitAssignment | null;
   latestMessage: VisitMessagePreview | null;
   quote: VisitQuotePreview | null;
+  /// Phase 84.5 — discriminator on the underlying provider_visit_assignments
+  /// row. "standard_visit" / "home_assessment" / "inspection" / "follow_up".
+  /// Defaults to "standard_visit" when the column is missing on older rows.
+  visitType?: "standard_visit" | "home_assessment" | "inspection" | "follow_up";
+  /// Phase 84.5 — link back to the home_assessments row for this visit
+  /// when visitType === "home_assessment". The field app uses this to
+  /// load the captured_* JSONB and render the GuidedAssessmentView.
+  homeAssessmentId?: string | null;
 }
 
 export interface HomeSystemPhoto {
@@ -241,6 +249,7 @@ export interface TeamMember {
   openVisits: number;
   completedCount: number;
   mobileFocus: boolean;
+  isDefaultAssignee: boolean;
 }
 
 export interface QuoteLineItem {

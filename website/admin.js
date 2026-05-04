@@ -6474,6 +6474,9 @@ function renderConciergeConversationHtml(req, messages) {
 
       <div class="cockpit-quickactions">
         <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="open-proposal-builder">Manual proposal</button>
+        ${isHomeAssessmentRequest(req)
+          ? `<button type="button" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm" data-cockpit-action="assign-handyman">Assign handyman</button>`
+          : ""}
         <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="waiting">Mark waiting on customer</button>
         ${req.status !== "resolved"
           ? `<button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="resolved">Mark resolved</button>`
@@ -6481,6 +6484,18 @@ function renderConciergeConversationHtml(req, messages) {
       </div>
     </section>
   `;
+}
+
+// Phase 85 dispatch — discriminator helper. Home-assessment requests
+// are stored as `category="coordinate_task"` rows with
+// `context._kind === "home_assessment_request"` and a populated
+// `context.assessment_id`. The "Assign handyman" CTA is only useful
+// on these — every other request stays unaffected.
+function isHomeAssessmentRequest(req) {
+  if (!req || !req.context) return false;
+  const ctx = req.context;
+  if (ctx._kind !== "home_assessment_request") return false;
+  return typeof ctx.assessment_id === "string" && ctx.assessment_id.length > 0;
 }
 
 // Heuristic tone-assessment (no AI round trip). Looks for warmth tokens,
@@ -7707,6 +7722,10 @@ async function handleConciergeAction(action, req, btn) {
 
     case "open-proposal-builder":
       startProposalFlow(req);
+      return;
+
+    case "assign-handyman":
+      await assignHandymanToAssessmentFlow(req, btn);
       return;
 
     case "scroll-to-visits": {
@@ -10107,6 +10126,139 @@ async function visitSaveAction(req, btn) {
 // Phase 81.1 — Package recommended vendors and send each as a
 // proposal message. One click → all recommended vendors land in
 // the homeowner's thread as separate Approve/Counter/Decline cards.
+// Phase 85 dispatch — admin Concierge "Assign handyman" flow.
+// Renders a workspace picker modal, lets the operator confirm the
+// default assignee (or override), then calls
+// chez-concierge.assign_handyman_to_assessment which creates the
+// provider_visit_assignment + posts a system message into this thread.
+// On success, refreshes the cockpit so the new audit row appears.
+async function assignHandymanToAssessmentFlow(req, btn) {
+  if (!isHomeAssessmentRequest(req)) {
+    alert("Assign handyman only applies to home-assessment requests.");
+    return;
+  }
+  const ctx = req.context || {};
+  const assessmentId = ctx.assessment_id;
+  if (!assessmentId) {
+    alert("Missing assessment_id on this request — cannot dispatch.");
+    return;
+  }
+
+  // Try to surface the property's state so we can prefer in-state
+  // workspaces. The dossier is loaded lazily; fall back to "" if absent.
+  const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
+  const propertyState = dossier?.properties?.[0]?.state || "";
+
+  const origLabel = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+  let workspaces = [];
+  try {
+    const resp = await callChezConcierge({
+      action: "list_eligible_workspaces",
+      property_state: propertyState,
+    });
+    workspaces = resp.workspaces || [];
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+    alert(`Couldn't load eligible workspaces: ${err.message || err}`);
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+
+  if (workspaces.length === 0) {
+    alert("No workspaces with active members are available. Add a handyman workspace first via Vendor Apps.");
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.className = "admin-modal";
+  modal.innerHTML = `
+    <div class="admin-modal__backdrop" data-modal-close></div>
+    <div class="admin-modal__panel" style="max-width: 600px;">
+      <header class="admin-modal__head">
+        <div>
+          <h2>Assign a handyman</h2>
+          <p class="admin-muted">Pick a workspace to dispatch this free home assessment to. ${propertyState ? `In-state (${escapeHtml(propertyState)}) workspaces are listed first.` : ""}</p>
+        </div>
+        <button type="button" class="admin-modal__close" data-modal-close aria-label="Close">×</button>
+      </header>
+      <div class="admin-modal__body">
+        <div class="admin-assign-list" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto;">
+          ${workspaces.map((w) => {
+            const def = w.defaultMember;
+            return `
+              <button type="button" class="admin-assign-row"
+                data-ws-id="${escapeHtml(w.id)}"
+                data-member-id="${escapeHtml(def?.id || "")}"
+                data-member-label="${escapeHtml(def?.fullName || "")}"
+                style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--neutral-200, #EDEEF0);border-radius:10px;background:#fff;cursor:pointer;text-align:left;width:100%;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:14px;font-weight:600;color:var(--text, #111);display:flex;gap:6px;align-items:center;">
+                    <span>${escapeHtml(w.companyName || "(unnamed workspace)")}</span>
+                    ${w.stateMatch ? `<span class="cockpit-pill cockpit-pill--success cockpit-pill--xs">In state</span>` : ""}
+                  </div>
+                  <div style="font-size:12px;color:var(--text-muted, #666);margin-top:2px;">
+                    ${escapeHtml([w.serviceCity, w.serviceState].filter(Boolean).join(", ") || "Service area not set")}
+                    · ${w.activeMemberCount} active ${w.activeMemberCount === 1 ? "member" : "members"}
+                  </div>
+                  ${def
+                    ? `<div style="font-size:12px;color:var(--text-muted, #666);margin-top:4px;"><span class="cockpit-pill cockpit-pill--indigo cockpit-pill--xs">Default</span> ${escapeHtml(def.fullName)}${def.email ? ` · ${escapeHtml(def.email)}` : ""}</div>`
+                    : `<div style="font-size:12px;color:var(--text-muted, #666);margin-top:4px;font-style:italic;">No default assignee set</div>`}
+                </div>
+                <span style="color:var(--text-soft, #999);">→</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+        <p class="admin-muted" style="margin-top:12px;font-size:12px;">
+          Dispatching creates a provider_visit_assignment, sets the assessment to <b>scheduled</b>, posts an audit row into this thread, and notifies the assigned handyman by push + email.
+        </p>
+      </div>
+      <footer class="admin-modal__foot">
+        <button type="button" class="admin-button admin-button--ghost" data-modal-close>Cancel</button>
+      </footer>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-modal-close]").forEach((b) =>
+    b.addEventListener("click", () => modal.remove())
+  );
+
+  modal.querySelectorAll(".admin-assign-row").forEach((row) => {
+    row.addEventListener("click", async () => {
+      const wsId = row.getAttribute("data-ws-id");
+      const memberId = row.getAttribute("data-member-id") || null;
+      const memberLabel = row.getAttribute("data-member-label") || "the workspace's default";
+      const wsName = row.querySelector("div span").textContent.trim();
+      if (!confirm(`Dispatch this assessment to ${wsName}${memberLabel ? ` (${memberLabel})` : ""}?`)) return;
+
+      row.style.opacity = "0.6";
+      row.querySelectorAll("button, .admin-assign-row").forEach((b) => { b.disabled = true; });
+      try {
+        await callChezConcierge({
+          action: "assign_handyman_to_assessment",
+          assessment_id: assessmentId,
+          workspace_id: wsId,
+          member_id: memberId,
+          request_id: req.id,
+        });
+        modal.remove();
+        // Refresh thread immediately so the audit row is visible; do
+        // a backgrounded loadAdminData() so the queue picks up any
+        // status flips on the chez_request side.
+        delete state.chezMessages[req.id];
+        await loadChezMessages(req.id);
+        loadAdminData().finally(() => renderConciergeCockpit());
+        renderConciergeCockpit();
+      } catch (err) {
+        row.style.opacity = "1";
+        row.querySelectorAll("button, .admin-assign-row").forEach((b) => { b.disabled = false; });
+        alert(`Dispatch failed: ${err.message || err}`);
+      }
+    });
+  });
+}
+
 async function packageAndSendRecommendedVendors(req) {
   const callState = state.chezVendorCallsByRequest?.[req.id] || {};
   const cached = state.chezAnalysisByRequest?.[req.id];

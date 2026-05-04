@@ -1495,6 +1495,10 @@ async function ensureWorkspaceForUser(
     status: "active",
     last_seen_at: now,
     updated_at: now,
+    // Phase 85 dispatch: brand-new workspace → signup user is the
+    // default assignee. Sole-prop case is the common one; a second
+    // teammate added later can be re-flipped via the Crew screen.
+    is_default_assignee: true,
   });
 
   if (memberError) throw memberError;
@@ -1828,7 +1832,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   ] = await Promise.all([
     service
       .from("provider_workspace_members")
-      .select("id, workspace_id, user_id, full_name, email, phone, title, role, status, invite_token, last_seen_at, created_at, updated_at")
+      .select("id, workspace_id, user_id, full_name, email, phone, title, role, status, invite_token, last_seen_at, created_at, updated_at, is_default_assignee")
       .eq("workspace_id", workspaceId)
       .order("status", { ascending: true })
       .order("created_at", { ascending: true }),
@@ -2398,6 +2402,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       openVisits,
       completedCount,
       mobileFocus: compactString(member.role) === "technician",
+      isDefaultAssignee: member.is_default_assignee === true,
     };
   }).sort((lhs, rhs) => {
     if (lhs.status !== rhs.status) return lhs.status.localeCompare(rhs.status);
@@ -3298,6 +3303,30 @@ async function updateTeamMember(
   if (typeof body.status !== "undefined") updates.status = compactString(body.status);
   if (typeof body.title !== "undefined") updates.title = compactString(body.title) || null;
   if (typeof body.phone !== "undefined") updates.phone = compactString(body.phone) || null;
+
+  // Phase 85 dispatch: flipping is_default_assignee=true must clear
+  // every peer first because the partial unique index allows only one
+  // default per workspace. Do the clear in the same transaction-y
+  // pattern Tom uses elsewhere — best-effort sequential writes,
+  // tolerant of the rare race where two operators flip simultaneously
+  // (the second update will surface a 23505 unique-violation that the
+  // SPA can retry).
+  const flippingDefault =
+    typeof body.isDefaultAssignee !== "undefined" &&
+    body.isDefaultAssignee === true;
+  if (typeof body.isDefaultAssignee !== "undefined") {
+    updates.is_default_assignee = body.isDefaultAssignee === true;
+  }
+
+  if (flippingDefault) {
+    const { error: clearError } = await service
+      .from("provider_workspace_members")
+      .update({ is_default_assignee: false, updated_at: isoNow() })
+      .eq("workspace_id", workspaceId)
+      .neq("id", memberId)
+      .eq("is_default_assignee", true);
+    if (clearError) throw clearError;
+  }
 
   const { data, error } = await service
     .from("provider_workspace_members")

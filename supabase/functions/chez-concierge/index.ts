@@ -4413,6 +4413,262 @@ async function handleAdminFetchAssessment(
   return json({ ok: true, assessment, property, household });
 }
 
+/// Phase 85 dispatch — admin lists workspaces eligible for an assessment
+/// dispatch. State-aware: workspaces serving the property's state float
+/// to the top, with the workspace's default assignee surfaced so the
+/// admin can confirm in-place. Returns ALL active workspaces; the
+/// admin picks. Workspaces without any active member are excluded
+/// (they'd have no one to assign to).
+async function handleListEligibleWorkspaces(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { property_state?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const propertyState = compactString(payload.property_state).toUpperCase().slice(0, 2) || null;
+
+  const { data: workspaces, error: wsErr } = await service
+    .from("provider_workspaces")
+    .select("id, company_name, primary_email, primary_phone, service_state, service_city, categories")
+    .order("company_name", { ascending: true });
+  if (wsErr) return json({ error: wsErr.message }, 500);
+  const wsRows = (workspaces ?? []) as Record<string, unknown>[];
+
+  const wsIds = wsRows.map((w) => compactString(w.id)).filter(Boolean);
+  if (wsIds.length === 0) return json({ ok: true, workspaces: [] });
+
+  const { data: members } = await service
+    .from("provider_workspace_members")
+    .select("id, workspace_id, full_name, email, role, status, is_default_assignee")
+    .in("workspace_id", wsIds);
+  const memberRows = (members ?? []) as Record<string, unknown>[];
+
+  const enriched = wsRows
+    .map((w) => {
+      const wsId = compactString(w.id);
+      const wsMembers = memberRows.filter((m) => compactString(m.workspace_id) === wsId);
+      const activeMembers = wsMembers.filter((m) => compactString(m.status) === "active");
+      const defaultMember = wsMembers.find((m) => m.is_default_assignee === true) ?? null;
+      const wsState = compactString(w.service_state).toUpperCase() || null;
+      const stateMatch = !!(propertyState && wsState && wsState === propertyState);
+      return {
+        id: wsId,
+        companyName: compactString(w.company_name),
+        primaryEmail: compactString(w.primary_email),
+        primaryPhone: compactString(w.primary_phone),
+        serviceState: wsState,
+        serviceCity: compactString(w.service_city) || null,
+        categories: Array.isArray(w.categories) ? (w.categories as string[]) : [],
+        activeMemberCount: activeMembers.length,
+        defaultMember: defaultMember ? {
+          id: compactString(defaultMember.id),
+          fullName: compactString(defaultMember.full_name) || compactString(defaultMember.email) || "Team member",
+          email: compactString(defaultMember.email),
+          role: compactString(defaultMember.role),
+        } : null,
+        stateMatch,
+      };
+    })
+    .filter((w) => w.activeMemberCount > 0 || w.defaultMember !== null);
+
+  // Sort: state match first, then by name.
+  enriched.sort((a, b) => {
+    if (a.stateMatch !== b.stateMatch) return a.stateMatch ? -1 : 1;
+    return a.companyName.localeCompare(b.companyName);
+  });
+
+  return json({ ok: true, workspaces: enriched });
+}
+
+/// Phase 85 dispatch — admin assigns a workspace + handyman to an
+/// assessment. Reuses the dispatchHomeAssessment logic in
+/// handyman-provider but skips its assertWorkspaceAccess gate (admin
+/// dispatches across any workspace, not their own). The flow:
+///
+///   1. Stub a `handyman_requests` row tagged `request_kind="home_assessment"`.
+///   2. Insert the `provider_visit_assignments` row scoping the
+///      handyman's RLS access to the assessment's JSONB.
+///   3. Update `home_assessments.{visit_assignment_id, handyman_member_id, status, scheduled_at}`.
+///   4. Post a system message to the related chez_request thread so
+///      the homeowner sees "Chez assigned a handyman" in the audit
+///      trail.
+///   5. Notify the assigned member by push + email so they see the
+///      visit in their operations SPA queue.
+async function handleAssignHandymanToAssessment(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: {
+    assessment_id?: string;
+    workspace_id?: string;
+    member_id?: string | null;
+    request_id?: string | null;
+    route_date?: string | null;
+    window_start_time?: string | null;
+    window_end_time?: string | null;
+  },
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const assessmentId = compactString(payload.assessment_id);
+  const workspaceId = compactString(payload.workspace_id);
+  if (!assessmentId || !workspaceId) {
+    return json({ error: "assessment_id + workspace_id required" }, 400);
+  }
+  const requestedMemberId = compactString(payload.member_id) || null;
+  const chezRequestId = compactString(payload.request_id) || null;
+  const routeDate = compactString(payload.route_date) || null;
+  const windowStart = compactString(payload.window_start_time) || null;
+  const windowEnd = compactString(payload.window_end_time) || null;
+
+  const { data: assessmentRow } = await service
+    .from("home_assessments")
+    .select("id, household_id, property_id, status")
+    .eq("id", assessmentId)
+    .maybeSingle();
+  if (!assessmentRow) return json({ error: "assessment not found" }, 404);
+  const assessment = assessmentRow as { id: string; household_id: string; property_id: string; status: string };
+
+  // If the caller didn't pass an explicit member, fall back to the
+  // workspace's default assignee. Sole-prop is the common case so the
+  // admin doesn't have to think about it.
+  let memberId = requestedMemberId;
+  if (!memberId) {
+    const { data: defaultMemberRow } = await service
+      .from("provider_workspace_members")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("is_default_assignee", true)
+      .maybeSingle();
+    memberId = defaultMemberRow ? compactString((defaultMemberRow as { id: string }).id) || null : null;
+  }
+
+  const { data: memberRow } = memberId
+    ? await service
+        .from("provider_workspace_members")
+        .select("id, full_name, email, user_id, workspace_id")
+        .eq("id", memberId)
+        .eq("workspace_id", workspaceId)
+        .maybeSingle()
+    : { data: null };
+
+  // 1. Stub handyman_request row.
+  let stubRequestId: string | null = null;
+  const { data: stubRequest, error: reqErr } = await service
+    .from("handyman_requests")
+    .insert({
+      household_id: assessment.household_id,
+      property_id: assessment.property_id,
+      title: "Home assessment (Chez free)",
+      summary: "Capture systems, vendors, routines, documents during the free Chez home assessment.",
+      status: "scheduled",
+      request_kind: "home_assessment",
+    })
+    .select("id")
+    .single();
+  if (stubRequest && !reqErr) {
+    stubRequestId = (stubRequest as { id: string }).id;
+  } else {
+    // Older schemas may not have request_kind — retry without it.
+    const { data: retry } = await service
+      .from("handyman_requests")
+      .insert({
+        household_id: assessment.household_id,
+        property_id: assessment.property_id,
+        title: "Home assessment (Chez free)",
+        summary: "Capture systems, vendors, routines, documents during the free Chez home assessment.",
+        status: "scheduled",
+      })
+      .select("id")
+      .single();
+    if (!retry) return json({ error: `failed to create stub request: ${reqErr?.message ?? "unknown"}` }, 500);
+    stubRequestId = (retry as { id: string }).id;
+  }
+
+  // 2. Visit assignment.
+  const { data: visit, error: visitErr } = await service
+    .from("provider_visit_assignments")
+    .insert({
+      workspace_id: workspaceId,
+      request_id: stubRequestId,
+      assigned_member_id: memberId,
+      assigned_by_user_id: user.id,
+      route_date: routeDate,
+      window_start_time: windowStart,
+      window_end_time: windowEnd,
+      visit_type: "home_assessment",
+    })
+    .select("id")
+    .single();
+  if (visitErr || !visit) {
+    return json({ error: `failed to create visit: ${visitErr?.message ?? "unknown"}` }, 500);
+  }
+  const visitId = (visit as { id: string }).id;
+
+  // 3. Flip assessment row.
+  const nowIso = new Date().toISOString();
+  await service
+    .from("home_assessments")
+    .update({
+      visit_assignment_id: visitId,
+      handyman_member_id: memberId,
+      status: "scheduled",
+      scheduled_at: nowIso,
+    })
+    .eq("id", assessmentId);
+
+  // 4. Audit-trail message on the chez_request (if linked).
+  const member = memberRow as { full_name?: string; email?: string; user_id?: string; workspace_id?: string } | null;
+  const memberLabel = member
+    ? compactString(member.full_name) || compactString(member.email) || "a handyman"
+    : "a handyman";
+  if (chezRequestId) {
+    await service.from("concierge_messages").insert({
+      household_id: assessment.household_id,
+      user_id: user.id,
+      request_id: chezRequestId,
+      role: "system",
+      content: `Chez assigned ${memberLabel} for the home assessment visit.${routeDate ? ` Scheduled for ${routeDate}.` : ""}`,
+      attachments: [],
+    });
+  }
+
+  // 5. Notify the assigned member (push + email).
+  const memberUserId = compactString(member?.user_id) || null;
+  if (memberUserId) {
+    await sendPush(
+      serviceUrl, serviceRoleKey, [memberUserId],
+      "New home assessment assigned",
+      "You've been assigned a Chez free home assessment visit. Open the Chez Operations Desk to confirm.",
+      { type: "home_assessment_assigned", assessment_id: assessmentId, visit_assignment_id: visitId }
+    );
+  }
+  const memberEmail = compactString(member?.email);
+  if (memberEmail) {
+    await sendAdminEmail(
+      [memberEmail],
+      "New Chez home assessment assigned to you",
+      `You've been assigned a Chez free home assessment visit.\n\nOpen the Chez Operations Desk: https://www.getchez.com/operations/\n\n— Chez`,
+      emailBody({
+        preview: "You've been assigned a new Chez home assessment visit.",
+        heading: "New home assessment assigned",
+        intro: "Chez has dispatched a free home assessment to your workspace. Confirm the visit in the Operations Desk to lock in the date and notify the homeowner.",
+        bodyText: `Visit type: free home assessment.${routeDate ? `\nScheduled for: ${routeDate}.` : ""}`,
+        ctaLabel: "Open Operations Desk",
+        ctaUrl: "https://www.getchez.com/operations/",
+      })
+    );
+  }
+
+  return json({
+    ok: true,
+    visit_assignment_id: visitId,
+    handyman_request_id: stubRequestId,
+    handyman_member_id: memberId,
+    assigned_member_label: memberLabel,
+  });
+}
+
 // ============================================================================
 // Server entry
 // ============================================================================
@@ -4692,6 +4948,18 @@ serve(async (req: Request) => {
       case "admin_fetch_assessment":
         return handleAdminFetchAssessment(
           service, user, body as { assessment_id?: string }
+        );
+
+      // Phase 85 dispatch — admin-only.
+      case "list_eligible_workspaces":
+        return handleListEligibleWorkspaces(
+          service, user, body as { property_state?: string }
+        );
+      case "assign_handyman_to_assessment":
+        return handleAssignHandymanToAssessment(
+          service, user,
+          body as Parameters<typeof handleAssignHandymanToAssessment>[2],
+          supabaseUrl, serviceRoleKey
         );
 
       default:

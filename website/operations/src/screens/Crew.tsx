@@ -5,13 +5,34 @@ import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
-import { formatRelativeTime, isToday } from "../lib/api";
+import { formatRelativeTime, isToday, postProviderAction } from "../lib/api";
 
 export default function CrewScreen() {
-  const { dashboard, mode } = useWorkspace();
+  const { dashboard, mode, refresh } = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const members = useMemo(() => dashboard?.teamMembers ?? [], [dashboard]);
+
+  async function setDefaultAssignee(memberId: string) {
+    if (!dashboard) return;
+    if (busyMemberId) return;
+    setError(null);
+    setBusyMemberId(memberId);
+    try {
+      await postProviderAction("update_team_member", {
+        workspaceId: dashboard.workspace.id,
+        memberId,
+        isDefaultAssignee: true,
+      });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update default assignee");
+    } finally {
+      setBusyMemberId(null);
+    }
+  }
   const selected = useMemo(() => {
     if (!members.length) return null;
     return members.find((m) => m.id === selectedId) ?? members[0];
@@ -46,6 +67,7 @@ export default function CrewScreen() {
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{members[0].fullName || members[0].email}</div>
                 <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{members[0].title || members[0].role}</div>
               </div>
+              {members[0].isDefaultAssignee && <Pill tone="success">Default</Pill>}
               <Pill tone="indigo">{members[0].role === "owner" ? "Owner" : members[0].role}</Pill>
               <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />
             </button>
@@ -70,7 +92,10 @@ export default function CrewScreen() {
                 >
                   <Avatar initials={initialsFor(m.fullName || m.email)} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{m.fullName || m.email}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.fullName || m.email}</span>
+                      {m.isDefaultAssignee && <Pill tone="success">Default</Pill>}
+                    </div>
                     <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{m.title || m.role}</div>
                   </div>
                   <Pill tone={m.status === "invited" ? "warning" : "indigo"}>
@@ -107,6 +132,47 @@ export default function CrewScreen() {
                 <Detail icon="briefcase" label="Role"   value={selected.role} />
                 <Detail icon="shield"    label="Last seen" value={selected.lastSeenAt ? formatRelativeTime(selected.lastSeenAt) : "—"} />
               </div>
+            </Card>
+
+            <Card padding="default">
+              <div className="ops-section-label" style={{ marginBottom: 8 }}>Dispatch</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: selected.isDefaultAssignee ? "var(--salmon-50)" : "var(--indigo-50)", color: selected.isDefaultAssignee ? "var(--salmon)" : "var(--indigo)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                  <Icon name="check" size={16} stroke={2.2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                    Default assignee for new home assessments
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.45 }}>
+                    {selected.isDefaultAssignee
+                      ? "Chez auto-suggests this teammate when dispatching new assessment visits to your workspace."
+                      : "Mark this teammate as the default and Chez will auto-suggest them when dispatching new visits."}
+                  </div>
+                </div>
+                {selected.isDefaultAssignee ? (
+                  <Pill tone="success" withDot>Default</Pill>
+                ) : (
+                  <button
+                    className="ops-button ops-button--salmon"
+                    style={{ opacity: busyMemberId === selected.id ? 0.6 : 1 }}
+                    disabled={busyMemberId === selected.id || selected.status !== "active"}
+                    onClick={() => setDefaultAssignee(selected.id)}
+                  >
+                    {busyMemberId === selected.id ? "Saving…" : "Make default"}
+                  </button>
+                )}
+              </div>
+              {selected.status !== "active" && !selected.isDefaultAssignee && (
+                <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--text-soft)", fontStyle: "italic" }}>
+                  Only active teammates can be set as the default.
+                </div>
+              )}
+              {error && (
+                <div style={{ marginTop: 10, fontSize: 12, color: "var(--critical, #B91C1C)" }}>
+                  {error}
+                </div>
+              )}
             </Card>
 
             <Card padding="default">
