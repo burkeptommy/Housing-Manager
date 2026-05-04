@@ -67,6 +67,17 @@ struct VendorVisitCard: View {
                         Text("Next: \(task.nextDueDate.havenDateShort)")
                             .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textPrimary)
+                        Spacer(minLength: HavenTheme.spacing4)
+                        // Phase 95 (gap #27) — coordination state pill.
+                        // Surfaces the task's lifecycle position so a
+                        // glance at the card answers "is this booked,
+                        // pending, or do I need to find someone?"
+                        // without opening the detail sheet. Hidden when
+                        // there's no meaningful state to show (a freshly-
+                        // created DIY task with no vendor + no schedule).
+                        if let pill = coordinationStatusPill {
+                            coordinationPillView(pill)
+                        }
                     }
                     Text(metadataLine)
                         .font(HavenTypography.uiCaption)
@@ -192,6 +203,65 @@ struct VendorVisitCard: View {
             return isFollowUp ? "One-time follow-up" : "Schedule with vendor"
         }
         return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Coordination state (Phase 95 / gap #27)
+
+    /// Phase 95 (gap #27) — derives a single-line lifecycle pill
+    /// from the task's existing fields. No new schema; reads the
+    /// signals already in `MaintenanceTaskDBRow`.
+    private struct CoordinationPill {
+        let label: String
+        let icon: String
+        let color: Color
+    }
+
+    private var coordinationStatusPill: CoordinationPill? {
+        if task.isChezOwned {
+            return CoordinationPill(
+                label: "Chez handling",
+                icon: "person.fill.checkmark",
+                color: HavenColors.action
+            )
+        }
+        if task.scheduledDate != nil {
+            return CoordinationPill(
+                label: "Scheduled",
+                icon: "calendar.badge.checkmark",
+                color: HavenColors.success
+            )
+        }
+        if task.assignedContractorId != nil {
+            return CoordinationPill(
+                label: "Awaiting confirm",
+                icon: "clock.badge.questionmark",
+                color: HavenColors.warning
+            )
+        }
+        if task.needsVendor == true {
+            return CoordinationPill(
+                label: "Finding pro",
+                icon: "magnifyingglass",
+                color: HavenColors.info
+            )
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func coordinationPillView(_ pill: CoordinationPill) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: pill.icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(pill.label)
+                .font(HavenTypography.uiLabelSmall)
+                .lineLimit(1)
+        }
+        .foregroundStyle(pill.color)
+        .padding(.horizontal, HavenTheme.spacing8)
+        .padding(.vertical, 3)
+        .background(pill.color.opacity(0.12))
+        .clipShape(Capsule())
     }
 
     // MARK: - Category icon fallback
