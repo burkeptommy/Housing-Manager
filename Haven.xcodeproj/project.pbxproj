@@ -863,6 +863,7 @@
 		F51ECF5E04C7BADB5CD09CB0 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3AAB2BFCB6E921B9BE9C459 /* LoadingView.swift */; };
 		F52507EB3AA830122241C680 /* HavenButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */; };
 		F56158AD8F13451724292623 /* ServiceLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 618647B92D0DEC8867F15F9F /* ServiceLibrary.swift */; };
+		F6BF3D8329CA864C19AD734D /* HomeManagerWelcomeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6536D9473E1D1982D3ED813B /* HomeManagerWelcomeCard.swift */; };
 		F70F5AA7A789D17522B34CF2 /* ChezRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8635CF862702F024A018D242 /* ChezRequest.swift */; };
 		F7CF7F0663F5B667057A4072 /* HandymanVisitReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB60FB496A805EE82863BA6 /* HandymanVisitReportView.swift */; };
 		F7D04F0B5A7916E58F2C9935 /* ManageSystemTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */; };
@@ -891,6 +892,7 @@
 		FE60132CF3D2DA06E9CA6D41 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518F88EE5413D96632C93167 /* NotificationService.swift */; };
 		FEBC76B713F702B40F4A43E8 /* PropertyRecapEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */; };
 		FEEAF0C71107387A5BCCD8DA /* HavenTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCD278A06338019D17B809C /* HavenTheme.swift */; };
+		FF2CF547DCC2A32A73836E4F /* HomeManagerWelcomeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6536D9473E1D1982D3ED813B /* HomeManagerWelcomeCard.swift */; };
 		FF313F4CCB691AB024801682 /* PropertyDecisionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489B2A7C6A61B8D82B6DEA2B /* PropertyDecisionSheets.swift */; };
 		FF43A02330353A46BA74D972 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C149790C33B097708FA1F8D /* Constants.swift */; };
 		FF712FF6E191EC10B80B0599 /* FamilyMemberFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C30DF79412FDA919D65837 /* FamilyMemberFormView.swift */; };
@@ -1092,6 +1094,7 @@
 		6249BFC2EEC544EF640144E4 /* InstallDatePrefiller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallDatePrefiller.swift; sourceTree = "<group>"; };
 		6340ADC069BE25F5E7560F0B /* RoutineOccurrenceExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineOccurrenceExpander.swift; sourceTree = "<group>"; };
 		64034CFB7BF6DD7FBF01B1BA /* MaintenanceHubSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceHubSections.swift; sourceTree = "<group>"; };
+		6536D9473E1D1982D3ED813B /* HomeManagerWelcomeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeManagerWelcomeCard.swift; sourceTree = "<group>"; };
 		6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentCardView.swift; sourceTree = "<group>"; };
 		6723E0CE09CC17C68336D66E /* MaintenanceOperationalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceOperationalViews.swift; sourceTree = "<group>"; };
 		673C13C7EF8406BB271DA144 /* RecommendedSystemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedSystemsView.swift; sourceTree = "<group>"; };
@@ -2251,6 +2254,7 @@
 				5F2C3B86B919F0A4AA84792F /* HomeAssessmentPrepCard.swift */,
 				D1A5B5010F96AEA87C5D406C /* HomeAssessmentSheets.swift */,
 				9CFFBCDCDA9F773F07AC5C25 /* HomeCoverageHero.swift */,
+				6536D9473E1D1982D3ED813B /* HomeManagerWelcomeCard.swift */,
 				DDCCEE76628155483DFF9776 /* HouseholdStaffStrip.swift */,
 				312B0AF8C491CCA685866EA9 /* HouseholdStrip.swift */,
 				323BDB0C2C8F73B8F72CFCD7 /* LegacyTasksNotificationCard.swift */,
@@ -2774,6 +2778,7 @@
 				046687F3BFCD17675067C969 /* HomeAssessmentSheets.swift in Sources */,
 				42ED97592B585181011E0D87 /* HomeCoverageHero.swift in Sources */,
 				B6639066B6C54D157EDD8580 /* HomeDetailsView.swift in Sources */,
+				FF2CF547DCC2A32A73836E4F /* HomeManagerWelcomeCard.swift in Sources */,
 				73F578310CDA4553B2078C6F /* HomeSystem.swift in Sources */,
 				FCE0D582B3552A8CEC796493 /* HookContent.swift in Sources */,
 				A022B375C4CF2B9A09702FAC /* HouseQuizAnswerFeedbackCard.swift in Sources */,
@@ -3228,6 +3233,7 @@
 				101A623AA6FF9C320024BCBC /* HomeAssessmentSheets.swift in Sources */,
 				098C030C711EAD15772FFF3E /* HomeCoverageHero.swift in Sources */,
 				F1252E55F1A423BE97744BF7 /* HomeDetailsView.swift in Sources */,
+				F6BF3D8329CA864C19AD734D /* HomeManagerWelcomeCard.swift in Sources */,
 				DCD73B99B3002D3260C4264B /* HomeSystem.swift in Sources */,
 				4BAE970B4D55FAE7B1CA6858 /* HookContent.swift in Sources */,
 				378F8041C217FCE8EB24D790 /* HouseQuizAnswerFeedbackCard.swift in Sources */,

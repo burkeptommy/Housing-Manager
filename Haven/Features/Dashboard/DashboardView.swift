@@ -113,6 +113,24 @@ struct DashboardView: View {
                         // view. Saves ~32pt vertical.
                         compactGreeting
 
+                        // Phase 95 (gap #56) — first-launch welcome
+                        // for users signed in as a home manager.
+                        // Renders only for staff member_types and
+                        // self-dismisses via @AppStorage keyed per
+                        // user, so the homeowner / spouse / family
+                        // members never see it.
+                        if viewModel.isHomeManagerUser, let userId = viewModel.signedInUserId {
+                            // Household-name source isn't published
+                            // on DashboardViewModel today; passing
+                            // nil falls back to a generic "Welcome
+                            // to Chez" headline. Wiring in the real
+                            // household label is future work.
+                            HomeManagerWelcomeCard(
+                                userId: userId,
+                                householdName: nil
+                            )
+                        }
+
                         // Phase 84.5 — Assessment pending card (the
                         // homeowner picked "Have Chez handle it" at
                         // signup). Renders status-specific copy across

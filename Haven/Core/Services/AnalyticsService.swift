@@ -461,6 +461,11 @@ enum AnalyticsEvent: String {
     /// Differentiated from `chezRequestSubmitted` so we can
     /// see how often the quick path is used vs the full form.
     case chezQuickQuestionSent = "chez_quick_question_sent"
+    /// Phase 95 (gap #56) — fired when a home manager dismisses
+    /// the first-launch welcome card. Lets us see how many home
+    /// managers are reaching the dashboard and how many engage
+    /// with the role-explainer copy before dismissing.
+    case homeManagerWelcomeDismissed = "home_manager_welcome_dismissed"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

@@ -425,6 +425,29 @@ final class DashboardViewModel: ObservableObject {
         return familyMembers.first { $0.linkedUserId == userId }?.firstName
     }
 
+    /// Phase 95 (gap #56) — true when the signed-in user's
+    /// linked `family_members.member_type` is `home_manager` or
+    /// `staff`. Drives the welcome-card render on the dashboard.
+    /// Returns false when the user isn't linked or their member
+    /// type is the default `family` (homeowner / spouse / kids).
+    var isHomeManagerUser: Bool {
+        guard let userId = currentUserId else { return false }
+        // Pull from `householdStaff` fetch path; staff are filtered
+        // out of `familyMembers` server-side. Falls back to the
+        // family list as a defensive read so a misconfigured
+        // staff row still gets matched.
+        if let staffMatch = householdStaff.first(where: { $0.linkedUserId == userId }) {
+            return staffMatch.isStaff
+        }
+        return familyMembers.first(where: { $0.linkedUserId == userId })?.isStaff ?? false
+    }
+
+    /// Phase 95 (gap #56) — public read-only accessor for the
+    /// auth user id so dashboard surfaces (welcome cards, etc.)
+    /// can key per-user state without forcing every consumer to
+    /// fetch the user themselves.
+    var signedInUserId: UUID? { currentUserId }
+
     var unifiedAttentionItems: [AttentionItem] {
         var items: [AttentionItem] = []
         let formatter = DateFormatter()
