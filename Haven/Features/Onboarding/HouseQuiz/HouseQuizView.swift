@@ -566,6 +566,11 @@ struct HouseQuizView: View {
             // answer instead of showing an empty form.
             if let q = viewModel.currentQuestion {
                 hydrateEntryState(for: q)
+                // Phase 95 (gap #10) — also restore any persisted
+                // mid-question draft for this question. Layered AFTER
+                // the answered-state hydrator so a saved answer wins
+                // over a half-typed draft when both exist.
+                hydrateDraft(for: q)
             }
             // Build 84: warm the forwarding email cache so the Q17 milestone
             // reveal renders without a loading state. Silent fail — falls
@@ -584,9 +589,100 @@ struct HouseQuizView: View {
         // questions (back arrow or auto-advance). Without this, going back
         // to a multi-select question shows empty chips even though the
         // answer is saved in `viewModel.state.answers`.
-        .onChange(of: viewModel.currentIndex) { _, _ in
+        .onChange(of: viewModel.currentIndex) { oldIndex, _ in
+            // Phase 95 (gap #10) — clear the prior question's draft
+            // when navigating away. If the user committed an answer
+            // for that question, the draft is now stale; if they
+            // backed out without answering, the canonical
+            // answered-state hydrator handles return visits, so
+            // leaving a stale draft would briefly resurrect work
+            // that was already saved under the answer path.
+            let questions = viewModel.allQuestions
+            if oldIndex >= 0, oldIndex < questions.count {
+                QuizDraftStore.clear(
+                    propertyId: viewModel.property.id,
+                    questionId: questions[oldIndex].id
+                )
+            }
             if let q = viewModel.currentQuestion {
                 hydrateEntryState(for: q)
+                hydrateDraft(for: q)
+            }
+        }
+        // Phase 95 (gap #10) — debounced draft persistence. Each
+        // `.onChange` fires whenever the homeowner edits a tracked
+        // field, and `persistCurrentDraft()` writes the merged blob
+        // to UserDefaults under the active question's key. SwiftUI
+        // already debounces typing so this does not write per
+        // keystroke.
+        .onChange(of: currencyText) { _, _ in persistCurrentDraft() }
+        .onChange(of: selectedCurrencyOptionId) { _, _ in persistCurrentDraft() }
+        .onChange(of: multiSelectIds) { _, _ in persistCurrentDraft() }
+        .onChange(of: multiSelectCustomEntries) { _, _ in persistCurrentDraft() }
+        .onChange(of: q22GeneratorType) { _, _ in persistCurrentDraft() }
+        .onChange(of: q22GeneratorFuel) { _, _ in persistCurrentDraft() }
+        .onChange(of: q22GeneratorProvider?.id) { _, _ in persistCurrentDraft() }
+    }
+
+    /// Phase 95 (gap #10) — pulls every tracked inline-form `@State`
+    /// into a single `QuizInlineDraft` and writes it to the store
+    /// under the active question's id. Empty drafts get cleared so
+    /// UserDefaults doesn't accumulate junk.
+    private func persistCurrentDraft() {
+        guard let q = viewModel.currentQuestion else { return }
+        let draft = QuizInlineDraft(
+            currencyText: currencyText.isEmpty ? nil : currencyText,
+            selectedCurrencyOptionId: selectedCurrencyOptionId,
+            multiSelectIds: multiSelectIds.isEmpty ? nil : Array(multiSelectIds),
+            multiSelectCustomEntries: multiSelectCustomEntries.isEmpty ? nil : multiSelectCustomEntries,
+            q22GeneratorType: q22GeneratorType,
+            q22GeneratorFuel: q22GeneratorFuel,
+            q22GeneratorProviderId: q22GeneratorProvider?.id
+        )
+        QuizDraftStore.save(
+            propertyId: viewModel.property.id,
+            questionId: q.id,
+            draft: draft
+        )
+    }
+
+    /// Phase 95 (gap #10) — restores any persisted draft for the
+    /// active question after `hydrateEntryState(for:)` runs. The
+    /// answered-state path takes precedence (a committed answer
+    /// shouldn't be overwritten by a stale draft), so we only fill
+    /// fields that aren't already populated. Provider re-resolution
+    /// is best-effort: if the persisted UUID no longer maps to a
+    /// utility_providers row, the field stays nil and the user
+    /// re-picks.
+    private func hydrateDraft(for q: HouseQuizQuestion) {
+        guard let draft = QuizDraftStore.load(
+            propertyId: viewModel.property.id,
+            questionId: q.id
+        ) else { return }
+
+        if currencyText.isEmpty, let saved = draft.currencyText {
+            currencyText = saved
+        }
+        if selectedCurrencyOptionId == nil, let saved = draft.selectedCurrencyOptionId {
+            selectedCurrencyOptionId = saved
+        }
+        if multiSelectIds.isEmpty, let saved = draft.multiSelectIds {
+            multiSelectIds = Set(saved)
+        }
+        if multiSelectCustomEntries.isEmpty, let saved = draft.multiSelectCustomEntries {
+            multiSelectCustomEntries = saved
+        }
+        if q22GeneratorType == nil, let saved = draft.q22GeneratorType {
+            q22GeneratorType = saved
+        }
+        if q22GeneratorFuel == nil, let saved = draft.q22GeneratorFuel {
+            q22GeneratorFuel = saved
+        }
+        if q22GeneratorProvider == nil, let savedId = draft.q22GeneratorProviderId {
+            Task {
+                if let provider = try? await DatabaseService.shared.fetchUtilityProvider(id: savedId) {
+                    await MainActor.run { q22GeneratorProvider = provider }
+                }
             }
         }
     }
