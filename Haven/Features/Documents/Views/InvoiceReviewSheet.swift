@@ -134,6 +134,24 @@ struct InvoiceReviewSheet: View {
                         followUpSection(followUps)
                     }
 
+                    // Phase 95 (gap #83) — vehicle invoice mileage
+                    // section. Only renders for vehicle invoices
+                    // (`vehicleId != nil` on the view model) when
+                    // the server captured a mileage reading. The
+                    // server already updated `vehicles.current_mileage`
+                    // to the higher of (existing, reported) before
+                    // returning; this card is the explicit
+                    // confirmation so the homeowner sees what
+                    // happened. Same card surfaces next-service
+                    // suggestions when present.
+                    if viewModel.vehicleId != nil,
+                       let mileage = result.mileageReported {
+                        vehicleMileageSection(
+                            mileage: mileage,
+                            nextSuggestions: result.nextServiceSuggestions ?? []
+                        )
+                    }
+
                     if let suggestion = result.specialtySystemSuggestion, !suggestionDismissed {
                         specialtySuggestionSection(suggestion)
                     }
@@ -619,6 +637,101 @@ struct InvoiceReviewSheet: View {
                     .font(HavenTypography.uiLabelSmall)
             }
             .foregroundColor(HavenColors.textTertiary)
+        }
+    }
+
+    // MARK: - Vehicle Mileage (Phase 95 / gap #83)
+
+    /// Shows the mileage reading the server pulled off the invoice
+    /// plus any next-service suggestions Claude inferred. The
+    /// server has already written the mileage to
+    /// `vehicles.current_mileage` (using `max(existing, reported)`)
+    /// before returning; this card is the visible confirmation so
+    /// the homeowner sees the auto-update + can use the next-
+    /// service hints when scheduling.
+    private func vehicleMileageSection(
+        mileage: Int,
+        nextSuggestions: [VehicleNextServiceSuggestion]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("VEHICLE MILEAGE")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundColor(HavenColors.textSecondary)
+                .tracking(1.5)
+
+            HStack(spacing: HavenTheme.spacing12) {
+                Image(systemName: "speedometer")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(HavenColors.success)
+                    .frame(width: 36, height: 36)
+                    .background(HavenColors.success.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mileage updated to \(mileage.formatted()) mi")
+                        .font(HavenTypography.body)
+                        .foregroundColor(HavenColors.textPrimary)
+                    Text("Pulled from this invoice. Service-record stamp matches the invoice date.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundColor(HavenColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+            }
+            .padding(HavenTheme.spacing16)
+            .background(HavenColors.surface)
+            .cornerRadius(HavenTheme.radiusMedium)
+
+            if !nextSuggestions.isEmpty {
+                ForEach(Array(nextSuggestions.enumerated()), id: \.offset) { _, suggestion in
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(humanizeServiceType(suggestion.type))
+                                .font(HavenTypography.uiLabel)
+                                .foregroundColor(HavenColors.textPrimary)
+                            HStack(spacing: 6) {
+                                if let date = suggestion.suggestedDate, !date.isEmpty {
+                                    Text("Around \(formatDate(date))")
+                                }
+                                if let mi = suggestion.suggestedMileage {
+                                    Text("·")
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                    Text("at ~\(mi.formatted()) mi")
+                                }
+                            }
+                            .font(HavenTypography.uiCaption)
+                            .foregroundColor(HavenColors.textSecondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(HavenTheme.spacing12)
+                    .background(HavenColors.creamLight)
+                    .cornerRadius(HavenTheme.radiusMedium)
+                }
+            }
+        }
+    }
+
+    /// Human label for service-type tokens like "oil_change" or
+    /// "tire_rotation". Falls back to capitalizing the raw string
+    /// when the token isn't recognized.
+    private func humanizeServiceType(_ type: String) -> String {
+        switch type.lowercased() {
+        case "oil_change": return "Next oil change"
+        case "tire_rotation": return "Next tire rotation"
+        case "brake_service", "brakes": return "Brake service"
+        case "alignment": return "Wheel alignment"
+        case "transmission_fluid": return "Transmission fluid"
+        case "coolant_flush", "coolant": return "Coolant service"
+        case "battery": return "Battery check"
+        case "inspection": return "State inspection"
+        default:
+            return type
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
         }
     }
 
