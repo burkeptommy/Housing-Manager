@@ -19,6 +19,28 @@ final class AppState: ObservableObject {
     /// DashboardView clears it after handing it to its quiz cover.
     @Published var pendingQuizProperty: PropertyRow?
 
+    /// Phase 95 (gap #55) — cached `family_members.member_type`
+    /// for the auth user. Loaded by `refreshCurrentMemberType()`
+    /// on auth resolution. Drives UI gating: home managers and
+    /// staff don't see destructive actions like Delete Property,
+    /// Delete Family Member, or Remove Household Access (RLS
+    /// would block them server-side, but hiding the affordances
+    /// up-front is friendlier than letting them tap and fail).
+    /// Nil = not loaded yet OR user isn't linked to a family_member
+    /// row, in which case we treat them as the homeowner (full
+    /// rights) so a misconfigured pre-PR-38 install doesn't lose
+    /// access to its own controls.
+    @Published var currentMemberType: String?
+
+    /// Phase 95 (gap #55) — convenience getter. True when the
+    /// signed-in user's member_type is `home_manager` or `staff`.
+    /// Defaults to false when nil so legacy / pre-link installs
+    /// keep full UI affordances.
+    var isStaffUser: Bool {
+        let type = currentMemberType ?? "family"
+        return type == "home_manager" || type == "staff"
+    }
+
     // Force-update gate (Phase 13). When `requiresUpdate` is true, ContentView
     // renders ForceUpdateView before any other routing. The optional fields
     // hold the message and App Store URL for the blocking screen and the
@@ -51,6 +73,30 @@ final class AppState: ObservableObject {
             primaryProperty = nil
         }
         hasCheckedPrimaryProperty = true
+    }
+
+    /// Phase 95 (gap #55) — resolves the signed-in user's
+    /// `family_members.member_type` and caches it on AppState.
+    /// Driven from `resolveExperienceContext` so it runs once per
+    /// auth resolution. Failures leave `currentMemberType` nil
+    /// (which `isStaffUser` treats as homeowner = full UI).
+    func refreshCurrentMemberType() async {
+        do {
+            let user = try await DatabaseService.shared.fetchCurrentUser()
+            // Pull staff first; staff are filtered out of
+            // `fetchFamilyMembers` server-side so a homeowner-side
+            // call wouldn't see them. `fetchHouseholdStaff` exists
+            // exactly for this.
+            let staff = (try? await DatabaseService.shared.fetchHouseholdStaff()) ?? []
+            if let staffMatch = staff.first(where: { $0.linkedUserId == user.id }) {
+                currentMemberType = staffMatch.memberType
+                return
+            }
+            let family = (try? await DatabaseService.shared.fetchFamilyMembers()) ?? []
+            currentMemberType = family.first(where: { $0.linkedUserId == user.id })?.memberType
+        } catch {
+            currentMemberType = nil
+        }
     }
 
     private func resolveExperienceContext() async {
@@ -97,6 +143,13 @@ final class AppState: ObservableObject {
 
         activeExperience = .homeowner
         fieldDashboard = nil
+
+        // Phase 95 (gap #55) — cache the user's member_type now
+        // that auth + household state are resolved. Drives UI
+        // gating across destructive controls. Failures leave
+        // `currentMemberType` nil so the gating treats them as
+        // homeowner with full rights.
+        await refreshCurrentMemberType()
     }
 
     /// Asks `app_config` whether the running build is at or above the

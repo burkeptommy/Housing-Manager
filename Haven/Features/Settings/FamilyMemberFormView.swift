@@ -42,6 +42,9 @@ struct FamilyMemberFormView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    /// Phase 95 (gap #55) — drives Delete-button gating for
+    /// home managers and staff.
+    @EnvironmentObject private var appState: AppState
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var relationship = "Child"
@@ -333,7 +336,11 @@ struct FamilyMemberFormView: View {
                 }
             }
 
-            if isEditing {
+            // Phase 95 (gap #55) — destructive Delete is hidden
+            // from home managers and staff. RLS would deny the
+            // delete on attempt; suppressing the affordance up
+            // front matches the documented role boundary.
+            if isEditing && !appState.isStaffUser {
                 Section {
                     Button(role: .destructive) { showDeleteConfirmation = true } label: {
                         HStack { Spacer(); Label("Delete Family Member", systemImage: "trash"); Spacer() }

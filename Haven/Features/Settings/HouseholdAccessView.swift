@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct HouseholdAccessView: View {
+    /// Phase 95 (gap #55) — drives Remove-access menu gating
+    /// for home managers and staff.
+    @EnvironmentObject private var appState: AppState
     @State private var householdUsers: [UserRow] = []
     @State private var familyMembers: [FamilyMemberRow] = []
     @State private var trustedContacts: [TrustedContactRow] = []
@@ -171,7 +174,11 @@ struct HouseholdAccessView: View {
                 Image(systemName: "link.circle.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(HavenColors.success)
-            } else {
+            } else if !appState.isStaffUser {
+                // Phase 95 (gap #55) — Remove-access menu hidden
+                // from home managers and staff. Only the homeowner
+                // (and other family-typed members) can revoke
+                // household access.
                 Menu {
                     Button(role: .destructive) {
                         pendingAccessRemoval = user

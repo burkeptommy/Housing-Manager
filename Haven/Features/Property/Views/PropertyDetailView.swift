@@ -829,12 +829,19 @@ struct PropertyDetailView: View {
             } label: {
                 Label("Add System", systemImage: "plus.circle.fill")
             }
-            Divider()
-            Button(role: .destructive) {
-                Analytics.track(.propertyDeleted, ["property_id": propertyID.uuidString])
-                showDeleteConfirmation = true
-            } label: {
-                Label("Delete Property", systemImage: "trash")
+            // Phase 95 (gap #55) — Delete Property hidden from
+            // home managers and staff. RLS would block them
+            // server-side, but suppressing the affordance up
+            // front matches the role boundary documented in
+            // CLAUDE.md and avoids an error-toast experience.
+            if !appState.isStaffUser {
+                Divider()
+                Button(role: .destructive) {
+                    Analytics.track(.propertyDeleted, ["property_id": propertyID.uuidString])
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Delete Property", systemImage: "trash")
+                }
             }
         } label: {
             Image(systemName: "ellipsis.circle")
