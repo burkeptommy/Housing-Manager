@@ -445,6 +445,27 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
     }
 
+    // MARK: - Phase 95 (gaps #29 / #68) — handyman email fallback
+
+    private struct NotifyHandymanFallbackRequest: Encodable {
+        let request_id: String
+    }
+
+    /// Phase 95 — fire-and-forget post-message fallback. Calls the
+    /// `notify-handyman-message-fallback` Edge Function which checks
+    /// portal activity + per-request rate limit and emails the
+    /// handyman with the latest message body when in-app delivery is
+    /// likely unread. No-op when the handyman has been active in the
+    /// portal recently.
+    static func notifyHandymanMessageFallback(requestId: UUID) async throws -> Data {
+        let body = NotifyHandymanFallbackRequest(request_id: requestId.uuidString)
+        return try await callEdgeFunction(
+            name: "notify-handyman-message-fallback",
+            body: body,
+            timeoutSeconds: 10
+        )
+    }
+
     // MARK: - Phase 84.5: Home Assessment (free Chez handyman onboarding)
 
     /// Homeowner-side: create the pending assessment after the foundational

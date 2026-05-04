@@ -96,6 +96,24 @@ struct HandymanSoftInquirySheet: View {
 
         do {
             let request = try await DatabaseService.shared.createHandymanRequest(insert)
+            // Phase 95 (gaps #29 / #68) — every soft inquiry also gets
+            // a `homeowner` message under it so the fallback path
+            // can email the handyman a copy when the portal hasn't
+            // been opened recently. Stamping it as a child message
+            // mirrors the request-then-message shape the rest of the
+            // flow expects.
+            _ = try? await DatabaseService.shared.createHandymanRequestMessage(
+                HandymanRequestMessageInsert(
+                    requestId: request.id,
+                    householdId: householdId,
+                    senderRole: "homeowner",
+                    body: trimmedDetails,
+                    metadata: ["event": "soft_inquiry"]
+                )
+            )
+            Task.detached { [requestId = request.id] in
+                _ = try? await HavenSupabase.notifyHandymanMessageFallback(requestId: requestId)
+            }
             Analytics.track(.handymanSoftInquirySent, [
                 "contractor_id": contractor.id.uuidString,
                 "request_id": request.id.uuidString

@@ -832,6 +832,17 @@ enum HandymanVisitService {
                 metadata: metadata
             )
         )
+        // Phase 95 (gaps #29 / #68): fire the email-fallback path on
+        // homeowner messages. The function self-rate-limits to once
+        // per request per 24h and short-circuits when the handyman
+        // has been active in the portal recently. Fire-and-forget —
+        // failures don't block the message that already landed
+        // in-app.
+        if senderRole == "homeowner" {
+            Task.detached {
+                _ = try? await HavenSupabase.notifyHandymanMessageFallback(requestId: request.id)
+            }
+        }
     }
 
     private static func portalSystems(from systems: [HomeSystemRow]) -> [HandymanPortalSystemRecord] {

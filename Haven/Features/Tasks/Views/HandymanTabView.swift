@@ -2128,6 +2128,12 @@ final class HandymanRequestCoordinator: ObservableObject {
             if !messages.contains(where: { $0.id == inserted.id }) {
                 messages.append(inserted)
             }
+            // Phase 95 (gaps #29 / #68): email-fallback path. The
+            // function self-rate-limits and short-circuits when the
+            // handyman has been active recently — fire-and-forget.
+            Task.detached { [requestId = req.id] in
+                _ = try? await HavenSupabase.notifyHandymanMessageFallback(requestId: requestId)
+            }
             return true
         } catch {
             print("[HandymanRequestCoordinator] sendMessage failed: \(error)")

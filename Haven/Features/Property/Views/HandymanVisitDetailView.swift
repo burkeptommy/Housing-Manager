@@ -2556,6 +2556,14 @@ struct HandymanRequestMessageComposerSheet: View {
                 )
             )
 
+            // Phase 95 (gaps #29 / #68): email-fallback to the handyman
+            // when in-app delivery is likely unread. Self-rate-limited
+            // to once per 24h per request; short-circuits when the
+            // portal has been opened recently.
+            Task.detached { [requestId = request.id] in
+                _ = try? await HavenSupabase.notifyHandymanMessageFallback(requestId: requestId)
+            }
+
             if let defaultStatusOnReply {
                 var update = HandymanRequestUpdate()
                 update.status = defaultStatusOnReply.rawValue
