@@ -434,6 +434,31 @@ final class MaintenanceViewModel: ObservableObject {
                 ))
             }
 
+            // Phase 95 (audit gap #89) — capture mileage at completion
+            // for vehicle-linked tasks so the next mileage-trigger
+            // recalc (Phase 95 PR 11) has an accurate baseline. We use
+            // the vehicle's current odometer as the proxy — better than
+            // nothing, and the user can correct later via
+            // MileageUpdateSheet. Without this, every-N-miles tasks
+            // never accumulate baseline mileage and the scheduler
+            // perpetually treats the entire current_mileage as accrued
+            // service distance after the first completion.
+            if let vehicleId = task.vehicleId {
+                let vehicle = try? await db.fetchVehicle(id: vehicleId)
+                _ = try? await db.createVehicleServiceRecord(VehicleServiceRecordInsert(
+                    vehicleId: vehicleId,
+                    householdId: task.householdId,
+                    serviceDate: formatter.string(from: .now),
+                    serviceType: task.templateId ?? "maintenance",
+                    description: task.title,
+                    cost: nil,
+                    mileageAtService: vehicle?.currentMileage,
+                    contractorId: task.assignedContractorId,
+                    invoiceDocumentId: nil,
+                    notes: nil
+                ))
+            }
+
             // Phase 67H: archive any `recurrence='once'` bundle custom
             // subitems that were attached to this task. They served
             // their purpose for this visit; future bundle fires
