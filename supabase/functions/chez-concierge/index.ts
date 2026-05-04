@@ -3008,12 +3008,20 @@ async function runWorkbenchSideEffect(args: {
     case "complete_on_behalf": {
       const completedRaw = asString(payload.completed_at) ?? new Date().toISOString();
       const completedAt = completedRaw.slice(0, 10);
+      const cost = asNumber(payload.cost_cents);
+      const notes = asString(payload.notes);
       // Stamp last_completed_date and clear scheduled_date. We don't
       // recompute next_due_date server-side here — the iOS reconciler
       // recomputes it on the next reconcile pass via interval-aware
       // logic that lives in MaintenanceTaskReconciler. For tasks
       // without a frequency (one-shots), next_due_date stays null,
       // which surfaces them as resolved.
+      const { data: taskRow, error: readErr } = await service
+        .from("maintenance_tasks")
+        .select("system_id, property_id, household_id, title, assigned_contractor_id")
+        .eq("id", entityId)
+        .maybeSingle();
+      if (readErr) throw new Error(`task lookup failed: ${readErr.message}`);
       const { error } = await service
         .from("maintenance_tasks")
         .update({
@@ -3022,7 +3030,42 @@ async function runWorkbenchSideEffect(args: {
         })
         .eq("id", entityId);
       if (error) throw new Error(`maintenance_tasks update failed: ${error.message}`);
-      return { completed_at: completedAt };
+      // Phase 85 PR 5.1 — when the task is system-scoped and the
+      // operator captured a cost, also write a service_records row so
+      // it lands on the system's service history (matches the
+      // homeowner's mental model: "what happened on this system,
+      // when, and what did it cost?"). Cost-less notes-less
+      // completions don't warrant the row.
+      let serviceRecordId: string | null = null;
+      if (taskRow?.system_id && taskRow.property_id && (cost !== null || notes)) {
+        const { data: srv, error: srvErr } = await service
+          .from("service_records")
+          .insert({
+            system_id: taskRow.system_id,
+            property_id: taskRow.property_id,
+            household_id: taskRow.household_id,
+            contractor_id: taskRow.assigned_contractor_id,
+            service_date: completedAt,
+            service_type: "scheduled_maintenance",
+            description: taskRow.title ?? "Task completed by Chez",
+            cost: cost !== null ? cost / 100 : null,
+            notes,
+          })
+          .select("id")
+          .single();
+        if (srvErr) {
+          console.warn("[workbench] service_records insert failed:", srvErr);
+        } else {
+          serviceRecordId = (srv as { id: string }).id;
+          if (taskRow.system_id) {
+            await service
+              .from("home_systems")
+              .update({ last_service_date: completedAt })
+              .eq("id", taskRow.system_id);
+          }
+        }
+      }
+      return { completed_at: completedAt, cost_cents: cost, service_record_id: serviceRecordId };
     }
     case "snooze": {
       // Push next_due_date out N days (default 7).

@@ -675,6 +675,7 @@ const state = {
     priorityFilter: "all",     // all | overdue | today | this_week
     chezOwnedOnly: false,      // Phase 84.1 — narrow to items already delegated to Chez
     searchQuery: "",
+    selectedItemId: null,      // Phase 85 PR 5.1 — highlight the row whose focused-detail is open in the right pane.
   },
 };
 
@@ -17540,6 +17541,14 @@ function closeFocusedEntityDetail() {
   state.households.focusedEntity = null;
   state.households.focusedEntityData = null;
   state.households.focusedEntityRelations = {};
+  // Phase 85 PR 5.1 — when the focused detail was opened from the
+  // Upcoming feed, "Back" should return to the Upcoming empty-state
+  // pane, not the households workbench list. Branch on state.view.
+  if (state.view === "upcoming") {
+    state.upcoming.selectedItemId = null;
+    renderUpcomingView();
+    return;
+  }
   renderHouseholdWorkbenchDetail();
 }
 
@@ -17788,7 +17797,7 @@ function renderFocusedTaskHtml(t, wb) {
         <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Schedule</button>
-          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="complete_on_behalf" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Complete on behalf</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="complete_on_behalf" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Mark complete</button>
           <button type="button" class="admin-pill" data-cockpit-action="workbench-action" data-action-id="snooze" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Snooze 7d</button>
           <button type="button" class="admin-pill" data-focused-toggle-owned>${t.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
         </div>
@@ -18275,10 +18284,16 @@ const WORKBENCH_ACTION_FIELD_SETS = {
     fields: [{ key: "scheduled_date", label: "Scheduled date", type: "date", required: true }],
   },
   complete_on_behalf: {
-    title: "Complete on behalf of homeowner", submit: "Mark complete",
+    // Phase 85 PR 5.1 — renamed in copy from the awkward "Complete on
+    // behalf" framing to "Mark complete." The action_type stays
+    // `complete_on_behalf` server-side so already-deployed audit rows
+    // keep their type. UI label is what the operator reads.
+    title: "Mark task complete", submit: "Save",
+    intro: "Records the completion date so it stops surfacing as overdue. Optional cost + notes get appended to the audit trail.",
     fields: [
       { key: "completed_at", label: "Completed on", type: "date", required: true, defaultToToday: true },
-      { key: "notes", label: "Notes (optional)", type: "textarea" },
+      { key: "cost_cents", label: "Cost (cents, optional)", type: "number", placeholder: "e.g. 18500 for $185" },
+      { key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "What was done. Lands in the homeowner's activity feed." },
     ],
   },
   snooze: {
@@ -18384,6 +18399,36 @@ function openWorkbenchActionModal({ actionId, entityType, entityId, householdId 
     const overlay = document.createElement("div");
     overlay.className = "admin-modal-overlay";
     const todayIso = new Date().toISOString().slice(0, 10);
+    // Phase 85 PR 5.1 — generate quick-select date pills for date
+    // fields. (Today / Tomorrow / This Friday / Next Mon / Custom).
+    // The pills set the value of the underlying <input type="date">.
+    const dateQuickPills = (fieldKey) => {
+      const today = new Date();
+      const fmt = (d) => d.toISOString().slice(0, 10);
+      const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+      const nextDow = (target) => {
+        const d = new Date(today);
+        const diff = (target - d.getDay() + 7) % 7 || 7;
+        d.setDate(d.getDate() + diff);
+        return d;
+      };
+      const friday = nextDow(5);
+      const nextMonday = nextDow(1);
+      const pills = [
+        { label: "Today", date: fmt(today) },
+        { label: "Tomorrow", date: fmt(addDays(today, 1)) },
+        { label: "This Fri", date: fmt(friday) },
+        { label: "Next Mon", date: fmt(nextMonday) },
+        { label: "+1 week", date: fmt(addDays(today, 7)) },
+      ];
+      return `
+        <div class="admin-modal__quickpills" data-quickpill-target="${escapeHtml(fieldKey)}">
+          ${pills.map((p) => `
+            <button type="button" class="admin-quickpill" data-quickpill-value="${escapeHtml(p.date)}">${escapeHtml(p.label)}</button>
+          `).join("")}
+        </div>
+      `;
+    };
     const fieldsHtml = def.fields.map((f) => {
       const id = `wb-act-${f.key}`;
       const required = f.required ? "required" : "";
@@ -18411,10 +18456,12 @@ function openWorkbenchActionModal({ actionId, entityType, entityId, householdId 
         `;
       }
       const inputType = f.type === "number" ? "number" : f.type === "date" ? "date" : "text";
+      const quickPills = f.type === "date" ? dateQuickPills(f.key) : "";
       return `
         <label class="admin-modal__field" for="${id}">
           <span>${escapeHtml(f.label)}${reqMark}</span>
           <input type="${inputType}" id="${id}" name="${escapeHtml(f.key)}" value="${escapeHtml(initialValue)}" ${required}${placeholder} class="admin-input" />
+          ${quickPills}
         </label>
       `;
     }).join("");
@@ -18425,6 +18472,7 @@ function openWorkbenchActionModal({ actionId, entityType, entityId, householdId 
           <button type="button" class="admin-modal__close" aria-label="Close">&times;</button>
         </header>
         <form class="admin-modal__body admin-modal__form" data-workbench-action-form>
+          ${def.intro ? `<p class="admin-modal__intro">${escapeHtml(def.intro)}</p>` : ""}
           ${fieldsHtml}
           <p class="admin-modal__error admin-error" data-error hidden></p>
           <div class="admin-modal__buttons">
@@ -18435,6 +18483,28 @@ function openWorkbenchActionModal({ actionId, entityType, entityId, householdId 
       </div>
     `;
     document.body.appendChild(overlay);
+    // Wire quick-select date pills.
+    overlay.querySelectorAll("[data-quickpill-target]").forEach((group) => {
+      const targetKey = group.dataset.quickpillTarget;
+      const input = overlay.querySelector(`input[name="${CSS.escape(targetKey)}"]`);
+      group.querySelectorAll("[data-quickpill-value]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!input) return;
+          input.value = btn.dataset.quickpillValue;
+          group.querySelectorAll("[data-quickpill-value]").forEach((b) => b.classList.remove("is-active"));
+          btn.classList.add("is-active");
+        });
+      });
+      // Sync the active pill with the current input value on first paint.
+      const matchActive = () => {
+        const current = input?.value || "";
+        group.querySelectorAll("[data-quickpill-value]").forEach((b) => {
+          b.classList.toggle("is-active", b.dataset.quickpillValue === current);
+        });
+      };
+      matchActive();
+      input?.addEventListener("change", matchActive);
+    });
     const close = (result) => { overlay.remove(); resolve(result); };
     overlay.querySelector(".admin-modal__close").addEventListener("click", () => close(false));
     overlay.querySelector("[data-cancel]").addEventListener("click", () => close(false));
@@ -18482,6 +18552,32 @@ function openWorkbenchActionModal({ actionId, entityType, entityId, householdId 
     });
     setTimeout(() => overlay.querySelector("input, textarea, select")?.focus(), 0);
   });
+}
+
+// Phase 85 PR 5.1 — friendly label per action_type. Beats the
+// underscore-replace version that rendered "Complete On Behalf" in
+// the Recent activity strip. Stays in sync with the action button
+// labels everywhere else in the UI.
+const WORKBENCH_ACTION_LABELS = {
+  schedule_visit: "Scheduled visit",
+  log_visit: "Logged visit",
+  log_service: "Logged service",
+  schedule_maintenance: "Scheduled maintenance",
+  schedule: "Scheduled task",
+  complete_on_behalf: "Marked task complete",
+  snooze: "Snoozed task",
+  log_call: "Logged vendor call",
+  send_message: "Recorded vendor message",
+  mark_filed: "Filed document",
+  share_with_vendor: "Shared with vendor",
+  audit_bill: "Audited bill",
+  draft_negotiation: "Drafted negotiation",
+  schedule_service: "Scheduled service",
+  handle_recall: "Resolved recall",
+  admin_note: "Added admin note",
+};
+function workbenchActionLabel(actionType) {
+  return WORKBENCH_ACTION_LABELS[actionType] || actionType.replace(/_/g, " ");
 }
 
 function renderHouseholdWorkbenchHtml(wb, tab) {
@@ -18710,7 +18806,7 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
           <h4>Recent workbench activity · ${recentActions.length}</h4>
           ${recentActions.slice(0, 5).map((a) => `
             <div class="admin-households__action-row">
-              <strong>${escapeHtml(a.action_type.replace(/_/g, " "))}</strong>
+              <strong>${escapeHtml(workbenchActionLabel(a.action_type))}</strong>
               <span class="admin-muted">${escapeHtml(a.entity_type)} · ${escapeHtml(relativeTimeString(a.created_at))}</span>
             </div>
           `).join("")}
@@ -18724,33 +18820,25 @@ function renderWorkbenchListHtml(items, emptyCopy, formatter) {
   if (items.length === 0) {
     return `<p class="admin-muted">${escapeHtml(emptyCopy)}</p>`;
   }
+  // Phase 85 PR 5.1 — list rows are glance-only. Click drills into the
+  // focused-detail pane on the right where actions live. The previous
+  // per-row SCHEDULE / COMPLETE / SNOOZE button stack made the list
+  // feel like a bingo card and didn't match the rest of the admin
+  // portal (cockpit queue + catalog tabs all use clean rows + side
+  // detail). The `actions` field on the formatter result is now ignored
+  // here — kept on the formatter so the focused-detail panel can pull
+  // the same set when it needs to render its action stack.
   return items.map((it) => {
     const f = formatter(it);
-    // Phase 85 PR 5C — every entity row drills into a focused-detail
-    // panel via data-drill-entity-* attrs. Action buttons inside still
-    // e.stopPropagation so clicking a button doesn't also fire the
-    // row drill-in.
     const drillAttrs = f.drillIn
       ? ` data-drill-entity-type="${escapeHtml(f.drillIn.entityType)}" data-drill-entity-id="${escapeHtml(f.drillIn.entityId)}"`
       : "";
     const drillClass = f.drillIn ? " is-clickable" : "";
-    // Phase 85 PR 5B — owned badge replaces the old owned-only filter.
     const ownedBadge = f.isOwned
-      ? `<span class="admin-households__owned-badge" title="Chez owns this">★ Chez</span>`
+      ? `<span class="admin-households__owned-badge" title="Chez owns this">★</span>`
       : "";
-    const actionsHtml = (Array.isArray(f.actions) && f.actions.length > 0)
-      ? `<div class="admin-households__entity-actions">
-          ${f.actions.map((a) => `
-            <button type="button"
-              class="admin-pill admin-pill--action admin-households__entity-action"
-              data-cockpit-action="workbench-action"
-              data-action-id="${escapeHtml(a.id)}"
-              data-entity-type="${escapeHtml(a.entityType)}"
-              data-entity-id="${escapeHtml(a.entityId)}">
-              ${escapeHtml(a.label)}
-            </button>
-          `).join("")}
-        </div>`
+    const chevron = f.drillIn
+      ? `<span class="admin-households__entity-chevron" aria-hidden="true">›</span>`
       : "";
     return `
       <div class="admin-households__entity-row${drillClass}"${drillAttrs}>
@@ -18759,7 +18847,7 @@ function renderWorkbenchListHtml(items, emptyCopy, formatter) {
           ${f.sub ? `<span class="admin-muted">${escapeHtml(f.sub)}</span>` : ""}
         </div>
         ${f.meta ? `<span class="admin-households__entity-meta">${escapeHtml(f.meta)}</span>` : ""}
-        ${actionsHtml}
+        ${chevron}
       </div>
     `;
   }).join("");
@@ -18921,15 +19009,17 @@ async function renderUpcomingView() {
         }
         return;
       }
-      // Phase 85 PR 5D — Upcoming row click now opens the focused
-      // entity detail panel (where the operator can review the entity,
-      // message the homeowner, send suggestions, fire workbench actions)
-      // instead of just landing on the household's workbench list. The
-      // workbench list is still reachable via the back button.
-      // Phase 85 PR 5D — only items that map to a single concrete entity
-      // open a focused-detail panel. handyman_punch is a per-household
-      // summary row (entity_id is the household id), so it falls through
-      // to the workbench tasks list.
+      // Phase 85 PR 5.1 — Upcoming row click STAYS on the Upcoming view.
+      // The focused-detail pane renders into the same right pane that
+      // shows the "Click a row to drill in" empty state. Previously we
+      // navigated to state.view = "households" which felt like a
+      // context switch; Tom flagged it as wrong. Now: load the host
+      // household's workbench data (so lookupFocusedEntity can resolve
+      // the row), but don't switch views — render the focused detail
+      // directly into the Upcoming surface's right pane.
+      // handyman_punch is a per-household summary row (entity_id is the
+      // household id), not a single entity; it falls through to the
+      // households workbench since there's no single "task" to focus.
       const drillTypeByItem = {
         maintenance_task: { type: "task", idKey: "entity_id" },
         routine_visit: { type: "routine", idKey: "entity_id" },
@@ -18937,35 +19027,35 @@ async function renderUpcomingView() {
         vehicle_registration: { type: "vehicle", idKey: "entity_id" },
         vehicle_insurance: { type: "vehicle", idKey: "entity_id" },
       };
+      const drill = drillTypeByItem[item.type];
+      if (drill) {
+        const entityId = item[drill.idKey];
+        if (entityId) {
+          // Load the host household quietly (without switching views)
+          // so lookupFocusedEntity can find the row and the focused
+          // detail can show the entity's relations.
+          state.households.selectedId = item.household_id;
+          await loadHouseholdWorkbench(item.household_id);
+          // Tag the active row so the operator can see what's selected
+          // alongside the right-pane detail.
+          state.upcoming.selectedItemId = item.id;
+          renderUpcomingView();
+          openFocusedEntityDetail(drill.type, entityId);
+        }
+        return;
+      }
+      // For handyman_punch (no single entity to focus), fall back to
+      // navigating into the household's workbench tasks tab.
       const tabByType = {
-        maintenance_task: "tasks",
         handyman_punch: "tasks",
-        routine_visit: "routines",
-        document_expiring: "documents",
-        vehicle_registration: "vehicles",
-        vehicle_insurance: "vehicles",
       };
       state.view = "households";
       state.households.selectedId = item.household_id;
       if (tabByType[item.type]) {
         state.households.workbenchTab = tabByType[item.type];
       }
-      // Load the household first so lookupFocusedEntity can find the row.
       await loadHouseholdWorkbench(item.household_id);
       render();
-      const drill = drillTypeByItem[item.type];
-      if (drill) {
-        const entityId = item[drill.idKey];
-        if (entityId) {
-          // Defer one tick so renderHouseholdsView's right-pane swap
-          // settles before we override it with the focused-detail
-          // panel. Without this, the workbench detail render runs
-          // after our focused render and clobbers it.
-          setTimeout(() => {
-            openFocusedEntityDetail(drill.type, entityId);
-          }, 0);
-        }
-      }
     });
   });
   // Add-reminder button.
@@ -19004,8 +19094,12 @@ function renderUpcomingItemHtml(item) {
   const chezBadge = item.chez_owned
     ? `<span class="admin-upcoming__row-chez">★ Chez owns</span>`
     : "";
+  // Phase 85 PR 5.1 — highlight the row whose focused-detail is open
+  // in the right pane. Mirror the Concierge cockpit's active-case
+  // visual so the operator can scan the list and see what's loaded.
+  const isActive = state.upcoming.selectedItemId === item.id;
   return `
-    <button type="button" class="admin-audit__row admin-upcoming__row ${item.chez_owned ? "admin-upcoming__row--chez" : ""}" data-upcoming-item-id="${escapeHtml(item.id)}">
+    <button type="button" class="admin-audit__row admin-upcoming__row ${item.chez_owned ? "admin-upcoming__row--chez" : ""} ${isActive ? "is-active" : ""}" data-upcoming-item-id="${escapeHtml(item.id)}">
       <div class="admin-upcoming__row-icon">${icon}</div>
       <div class="admin-upcoming__row-main">
         <div class="admin-upcoming__row-title">
