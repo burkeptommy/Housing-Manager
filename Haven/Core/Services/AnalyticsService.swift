@@ -439,6 +439,12 @@ enum AnalyticsEvent: String {
     /// vehicle (sold / traded / totaled / other). Distinct from
     /// `vehicleDeleted` which is the destructive path.
     case vehicleArchived = "vehicle_archived"
+    /// Phase 95 (gap #23) — fired when the homeowner opens the
+    /// "Browse local pros" path from `AddVendorSheet`. `source`
+    /// payload identifies the entry point; `has_category` tracks
+    /// whether the caller pre-seeded a category vs. routing
+    /// through the picker.
+    case contractorBrowseLocalOpened = "contractor_browse_local_opened"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

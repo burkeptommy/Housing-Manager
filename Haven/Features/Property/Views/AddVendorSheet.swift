@@ -17,12 +17,22 @@ struct AddVendorSheet: View {
     @State private var showContactPicker = false
     @State private var showWebsiteImport = false
     @State private var showManualForm = false
+    /// Phase 95 (gap #23) — drives the "Browse local pros" path. When
+    /// the caller passed a `prefilledCategory`, tapping the option
+    /// opens FindLocalVendorSheet directly. Otherwise the user picks
+    /// a category first via `showBrowseCategoryPicker`.
+    @State private var showBrowseLocal = false
+    @State private var showBrowseCategoryPicker = false
+    @State private var browseCategory: String?
+    @State private var browseTown: String = ""
+    @State private var browseState: String = ""
+    @State private var browseHouseholdId: UUID?
 
     // Pre-filled data from contact or website import
     @State private var importedVendor = ImportedVendorData()
 
     enum VendorImportMethod {
-        case contacts, website, manual
+        case contacts, website, manual, browseLocal
     }
 
     /// Phase 56.1: Notion-style paste detection. On sheet appear we
@@ -109,7 +119,32 @@ struct AddVendorSheet: View {
                             showWebsiteImport = true
                         }
 
-                        // Option 3: Manual
+                        // Option 3: Browse local pros (Phase 95 / gap #23)
+                        // Opens FindLocalVendorSheet for the prefilled
+                        // category. When the caller didn't seed one,
+                        // we route through `showBrowseCategoryPicker`
+                        // so the user picks a category from the
+                        // canonical SystemCategoryRegistry list first.
+                        importOptionCard(
+                            icon: "magnifyingglass",
+                            title: "Browse local pros",
+                            subtitle: "Top-rated vendors near your home",
+                            color: HavenColors.action
+                        ) {
+                            Haptics.light()
+                            Analytics.track(.contractorBrowseLocalOpened, [
+                                "source": "add_vendor_sheet",
+                                "has_category": prefilledCategory != nil
+                            ])
+                            if let cat = prefilledCategory {
+                                browseCategory = cat
+                                Task { await openBrowseLocal() }
+                            } else {
+                                showBrowseCategoryPicker = true
+                            }
+                        }
+
+                        // Option 4: Manual
                         importOptionCard(
                             icon: "square.and.pencil",
                             title: "Enter Manually",
@@ -184,6 +219,120 @@ struct AddVendorSheet: View {
                     }
                 )
             }
+            // Phase 95 (gap #23) — category picker that fronts
+            // FindLocalVendorSheet when the caller didn't pre-seed
+            // a category. List sources from SystemCategoryRegistry's
+            // universal + conditional + specialty tiers (excluding
+            // sub-systems) so the user only sees categories that
+            // match a real Places filter on the edge function side.
+            .sheet(isPresented: $showBrowseCategoryPicker) {
+                NavigationStack {
+                    List {
+                        ForEach(browseCategoryOptions, id: \.categoryKey) { meta in
+                            Button {
+                                browseCategory = meta.categoryKey
+                                showBrowseCategoryPicker = false
+                                Task { await openBrowseLocal() }
+                            } label: {
+                                HStack(spacing: HavenTheme.spacing12) {
+                                    Image(systemName: meta.icon)
+                                        .frame(width: 24)
+                                        .foregroundStyle(HavenColors.navy700)
+                                    Text(meta.displayName)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                                .padding(.vertical, HavenTheme.spacing4)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .navigationTitle("Pick a category")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showBrowseCategoryPicker = false }
+                        }
+                    }
+                }
+            }
+            // Phase 95 (gap #23) — the actual local-pros browser.
+            // Reuses the same FindLocalVendorSheet that powers the
+            // "Find a contractor for X" task path; the only
+            // difference is we're here without a triggering task.
+            .sheet(isPresented: $showBrowseLocal) {
+                if let category = browseCategory,
+                   let householdId = browseHouseholdId,
+                   !browseTown.isEmpty,
+                   !browseState.isEmpty {
+                    FindLocalVendorSheet(
+                        task: nil,
+                        householdId: householdId,
+                        town: browseTown,
+                        state: browseState,
+                        systemCategory: category,
+                        categoryDisplayName: SystemCategoryRegistry.byCategoryKey[category]?.displayName ?? category,
+                        onComplete: {
+                            onComplete?()
+                            dismiss()
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    /// Phase 95 (gap #23) — the deduplicated category list shown to
+    /// the homeowner. Excludes sub-system entries (those are
+    /// component-level; they don't have their own vendor lane) and
+    /// preserves the registry's display priority so the most
+    /// frequently-needed categories surface first.
+    private var browseCategoryOptions: [SystemCategoryMeta] {
+        let combined = SystemCategoryRegistry.universal
+            + SystemCategoryRegistry.conditional
+            + SystemCategoryRegistry.specialty
+        return combined.sorted { lhs, rhs in
+            if lhs.tier != rhs.tier {
+                return lhs.tier.rawValue < rhs.tier.rawValue
+            }
+            return lhs.displayPriority < rhs.displayPriority
+        }
+    }
+
+    /// Phase 95 (gap #23) — fetches the user's primary property to
+    /// resolve town + state for the FindLocalVendorSheet query.
+    /// Without these the edge function returns no results. When the
+    /// fetch fails we silently fall back to the manual form so the
+    /// user has a path forward — never block them in this flow.
+    @MainActor
+    private func openBrowseLocal() async {
+        do {
+            let user = try await DatabaseService.shared.fetchCurrentUser()
+            guard let householdId = user.householdId else {
+                showManualForm = true
+                return
+            }
+            browseHouseholdId = householdId
+            let properties = (try? await DatabaseService.shared.fetchProperties()) ?? []
+            if let primary = properties.first {
+                browseTown = primary.city ?? ""
+                browseState = primary.state ?? ""
+            }
+            if browseTown.isEmpty || browseState.isEmpty {
+                // No address on file — manual entry is the only
+                // sensible path until the user adds a property.
+                showManualForm = true
+                return
+            }
+            showBrowseLocal = true
+        } catch {
+            showManualForm = true
         }
     }
 
