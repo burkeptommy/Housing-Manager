@@ -44,6 +44,13 @@ final class OnboardingViewModel: ObservableObject {
     /// screen — when false, the handyman card is replaced with a
     /// waitlist tile.
     @Published var coverageAvailable: Bool = false
+    /// Phase 95 (gap #6) — true while the post-handyman-tap confirmation
+    /// overlay is up. Set after `requestHomeAssessment` returns
+    /// successfully (or fails — the user still needs ack); cleared by
+    /// the overlay's "Got it" CTA or after a 4-second auto-dismiss.
+    /// Only the handyman path uses this; quiz / waitlist drop to
+    /// dashboard immediately.
+    @Published var showHandymanBookingConfirmation: Bool = false
     /// Stashed during runComplete so applyModeChoice can stamp attributes
     /// onto the right property without re-fetching.
     var stampedPropertyIdForMode: UUID? = nil
@@ -942,8 +949,34 @@ final class OnboardingViewModel: ObservableObject {
             Analytics.track(.onboardingModeForkHandyman, [:])
         }
 
-        // Final flag flip — drops the user onto MainTabView.
-        // Always runs, regardless of partial failures above.
+        // Phase 95 (gap #6) — handyman path gets an explicit booking
+        // confirmation overlay before dropping to dashboard. The user
+        // tapped a CTA that fires a non-trivial commitment ("we're
+        // sending someone to your home") and the previous flow gave
+        // zero acknowledgment between tap and landing on a Dashboard
+        // showing a status card they hadn't seen before. Quiz and
+        // waitlist paths still drop straight through.
+        if mode == .handyman {
+            showHandymanBookingConfirmation = true
+            // The confirmation overlay calls dismissHandymanConfirmation()
+            // when the user acknowledges or after auto-dismiss. Do NOT
+            // flip needsModeChoice / needsOnboarding here — that happens
+            // in dismiss.
+            return
+        }
+
+        // Quiz + waitlist paths: final flag flip drops the user onto
+        // MainTabView. Always runs, regardless of partial failures above.
+        needsModeChoice = false
+        authService.needsOnboarding = false
+    }
+
+    /// Phase 95 (gap #6) — called by the booking-confirmation overlay
+    /// once the user acknowledges. Performs the deferred onboarding-flag
+    /// flips that applyModeChoice(.handyman) skipped so we could show
+    /// the confirmation in the first place.
+    func dismissHandymanConfirmation(authService: AuthService) {
+        showHandymanBookingConfirmation = false
         needsModeChoice = false
         authService.needsOnboarding = false
     }

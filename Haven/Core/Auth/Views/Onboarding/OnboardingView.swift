@@ -64,6 +64,18 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(HavenColors.background.ignoresSafeArea())
+            // Phase 95 (gap #6) — booking confirmation overlay for the
+            // handyman path. Renders over whatever onboarding state the
+            // user was on so the tap → confirmation → dashboard handoff
+            // is visually continuous. Auto-dismisses after 4 seconds OR
+            // when the user taps "Got it".
+            .overlay {
+                if viewModel.showHandymanBookingConfirmation {
+                    handymanBookingConfirmationOverlay
+                        .transition(.opacity)
+                }
+            }
+            .animation(HavenTheme.animationStandard, value: viewModel.showHandymanBookingConfirmation)
         }
         .trackScreen("OnboardingView")
         .task {
@@ -117,6 +129,71 @@ struct OnboardingView: View {
                 print("[Onboarding] escape hatch timer fired — forcing hasFinishedPrefill=true so user can proceed manually")
                 showEscapeHatch = true
                 viewModel.hasFinishedPrefill = true
+            }
+        }
+    }
+
+    // MARK: - Handyman Booking Confirmation (Phase 95, gap #6)
+
+    /// Booking-confirmation overlay shown after the homeowner taps "Send
+    /// a Chez handyman" on OnboardingModeForkView. Acknowledges the
+    /// commitment, sets expectations on what happens next, and auto-
+    /// dismisses to dashboard after 4 seconds (or on user tap). The
+    /// underlying `requestHomeAssessment` call has already returned by
+    /// the time this renders — it's the visual backstop for that
+    /// silent network call.
+    private var handymanBookingConfirmationOverlay: some View {
+        ZStack {
+            HavenColors.navy800.opacity(0.55)
+                .ignoresSafeArea()
+
+            VStack(spacing: 22) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(HavenColors.success)
+
+                VStack(spacing: 8) {
+                    Text("Your free Chez handyman visit is booked.")
+                        .font(HavenTypography.title2)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .multilineTextAlignment(.center)
+
+                    Text("We'll text you within 1 business day to confirm a window. The full visit takes about 90 minutes; you don't need to do anything to prep.")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button {
+                    Haptics.success()
+                    viewModel.dismissHandymanConfirmation(authService: appState.authService)
+                } label: {
+                    Text("Got it")
+                        .font(HavenTypography.uiButton)
+                        .foregroundStyle(HavenColors.textOnAction)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: HavenTheme.buttonHeight)
+                        .background(HavenColors.action)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .fill(HavenColors.surface)
+            )
+            .padding(.horizontal, 32)
+        }
+        .onAppear {
+            Haptics.success()
+            // Auto-dismiss after 4 seconds. The user can tap "Got it" to
+            // acknowledge sooner; either way the same dismiss path runs.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                if viewModel.showHandymanBookingConfirmation {
+                    viewModel.dismissHandymanConfirmation(authService: appState.authService)
+                }
             }
         }
     }
