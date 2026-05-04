@@ -8,6 +8,12 @@ struct NotificationPreferences: Codable {
     var overdueItems: Bool = true
     var morningDigest: Bool = false
     var insuranceRenewals: Bool = true
+    /// Phase 95 (gap #30) — push reminders for upcoming visits with a
+    /// confirmed `scheduled_date` (vendor or handyman). Defaults on.
+    /// Separate from `maintenanceDue` because the cadence is different
+    /// (T-7 / T-1 / day-of at 8am) and the reminder is for a confirmed
+    /// appointment, not a generic due-date.
+    var visitReminders: Bool = true
 
     private static let key = "notification_preferences"
 

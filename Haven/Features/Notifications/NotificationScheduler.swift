@@ -147,9 +147,113 @@ final class NotificationScheduler {
                 scheduleHandymanSeasonalReminders()
             }
 
+            // Phase 95 (gap #30): visit reminders for confirmed
+            // appointments. Distinct from generic maintenance-due
+            // notifications because `scheduled_date` represents a
+            // booked vendor / handyman visit, not a flexible due
+            // window. Three pings per visit: T-7, T-1, day-of at 8am.
+            if prefs.visitReminders {
+                await scheduleVisitReminders()
+            }
+
         } catch {
             // silently handle — notifications are best-effort
         }
+    }
+
+    /// Phase 95 (gap #30) — schedule push reminders for tasks with a
+    /// `scheduled_date` set (i.e. a confirmed visit, not just a due
+    /// window). Three reminders per visit:
+    ///   • T-7 days at 9am — "Don't forget Tyler Heating next week"
+    ///   • T-1 day at 6pm — "Reminder: Tyler Heating tomorrow"
+    ///   • Day-of at 8am — "Tyler Heating arrives today"
+    /// Idempotent — `rescheduleAll` clears all pending notifications
+    /// before this runs, so the same visit is re-scheduled on every
+    /// pass without piling up.
+    private func scheduleVisitReminders() async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let tasks: [MaintenanceTaskDBRow]
+        do {
+            tasks = try await db.fetchMaintenanceTasks(includeArchived: false)
+        } catch {
+            return
+        }
+
+        let contractors = (try? await db.fetchContractors()) ?? []
+        let contractorById: [UUID: ContractorRow] = Dictionary(
+            uniqueKeysWithValues: contractors.map { ($0.id, $0) }
+        )
+
+        for task in tasks {
+            guard let scheduledDateStr = task.scheduledDate,
+                  let scheduledDate = formatter.date(from: scheduledDateStr),
+                  scheduledDate > .now else { continue }
+            // Skip already-completed tasks even if scheduled_date is
+            // still set — they shouldn't ping the user post-completion.
+            if let completed = task.lastCompletedDate, !completed.isEmpty { continue }
+
+            let vendorName = task.assignedContractorId
+                .flatMap { contractorById[$0]?.companyName }
+            let visitLabel: String = vendorName ?? task.title
+
+            // T-7 at 9am
+            if let oneWeek = Calendar.current.date(byAdding: .day, value: -7, to: scheduledDate),
+               let alert = combineDate(oneWeek, hour: 9, minute: 0),
+               alert > .now {
+                scheduleNotification(
+                    id: "visit-t7-\(task.id)",
+                    title: "Visit next week",
+                    body: "\(visitLabel) is scheduled for \(formatVisitDate(scheduledDate)).",
+                    date: alert,
+                    category: "visit_reminder"
+                )
+            }
+
+            // T-1 at 6pm
+            if let oneDay = Calendar.current.date(byAdding: .day, value: -1, to: scheduledDate),
+               let alert = combineDate(oneDay, hour: 18, minute: 0),
+               alert > .now {
+                scheduleNotification(
+                    id: "visit-t1-\(task.id)",
+                    title: "Visit tomorrow",
+                    body: "Reminder: \(visitLabel) tomorrow. Be ready to greet them.",
+                    date: alert,
+                    category: "visit_reminder"
+                )
+            }
+
+            // Day-of at 8am
+            if let alert = combineDate(scheduledDate, hour: 8, minute: 0),
+               alert > .now {
+                scheduleNotification(
+                    id: "visit-dayof-\(task.id)",
+                    title: "Visit today",
+                    body: "\(visitLabel) is on the calendar for today.",
+                    date: alert,
+                    category: "visit_reminder"
+                )
+            }
+        }
+    }
+
+    /// Helper to combine a calendar day with a specific hour/minute.
+    private func combineDate(_ day: Date, hour: Int, minute: Int) -> Date? {
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: day)
+        components.hour = hour
+        components.minute = minute
+        return Calendar.current.date(from: components)
+    }
+
+    /// Short visit-date label for notification body copy
+    /// ("Tuesday, May 13").
+    private func formatVisitDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: date)
     }
 
     /// Schedule notifications for a single newly-created maintenance task
