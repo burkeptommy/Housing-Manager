@@ -238,6 +238,14 @@ enum AnalyticsEvent: String {
     case contractorContactPickerUsed = "contractor_contact_picker_used"
     case contractorReviewSubmitted = "contractor_review_submitted"
     case contractorDeleted = "contractor_deleted"
+    /// Phase 95 (gap #22) — fired after the Brandfetch logo lookup
+    /// resolves successfully so we can chart hit rate.
+    case contractorBrandLogoResolved = "contractor_brand_logo_resolved"
+    /// Phase 95 (gap #22) — fired when the Brandfetch lookup returns
+    /// nil (no match). Gives us a debug signal for missing logos
+    /// without surfacing a hard error to the user — initials are a
+    /// graceful fallback.
+    case contractorBrandLogoMissed = "contractor_brand_logo_missed"
 
     // MARK: - Warranties
     case warrantyTrackerViewed = "warranty_tracker_viewed"

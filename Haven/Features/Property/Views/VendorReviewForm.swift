@@ -279,7 +279,16 @@ struct VendorReviewForm: View {
 
             var contractor = try await DatabaseService.shared.createContractor(insert)
 
-            // Fetch brand logo: try domain first, fall back to company name search
+            // Fetch brand logo: try domain first, fall back to company name search.
+            //
+            // Phase 95 (gap #22): the previous flow silently fell back to
+            // initials when the Brandfetch lookup returned nothing or
+            // errored. The contractor still saved, but the user had no
+            // signal that we tried + failed. We now log the outcome
+            // explicitly (analytics + console) so debugging missing logos
+            // doesn't require re-running through the UI. The vendor row
+            // saves with no logo regardless — initials are a graceful
+            // fallback, never an error case.
             let websiteForLookup = vendor.website.isEmpty ? nil : vendor.website
             if let response = await HavenSupabase.fetchBrandLogoWithFallback(
                 domain: websiteForLookup,
@@ -289,6 +298,16 @@ struct VendorReviewForm: View {
                 logoUpdate.logoUrl = response.logoUrl
                 logoUpdate.brandColor = response.brandColor
                 contractor = (try? await DatabaseService.shared.updateContractor(id: contractor.id, logoUpdate)) ?? contractor
+                Analytics.track(.contractorBrandLogoResolved, [
+                    "contractor_id": contractor.id.uuidString,
+                    "source": websiteForLookup != nil ? "domain" : "company_name"
+                ])
+            } else {
+                print("[VendorReview] Brand logo lookup returned no result for \(vendor.companyName) (domain: \(websiteForLookup ?? "nil"))")
+                Analytics.track(.contractorBrandLogoMissed, [
+                    "contractor_id": contractor.id.uuidString,
+                    "had_domain": websiteForLookup != nil ? "true" : "false"
+                ])
             }
             savedContractorId = contractor.id
             Analytics.track(.contractorCreated, ["contractor_id": contractor.id.uuidString, "source": vendor.source == .manual ? "manual" : vendor.source == .contacts ? "contacts" : "website"])
