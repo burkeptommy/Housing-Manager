@@ -1228,6 +1228,67 @@ final class HouseQuizViewModel: ObservableObject {
         }
     }
 
+    /// Phase 95 (gap #7) — mid-quiz handover to handyman mode.
+    ///
+    /// Saves whatever answers the user has so far, fires the
+    /// `requestHomeAssessment` Edge Function for the active property,
+    /// stamps `assessment_mode = "handyman"` on `properties.attributes`
+    /// so the Dashboard's HomeAssessmentPendingCard renders. Mirrors
+    /// the OnboardingViewModel.applyModeChoice(.handyman) flow except
+    /// the user is mid-quiz, not on the mode-fork screen.
+    ///
+    /// On success, sets `savedAndReady = true` so the view can dismiss
+    /// the same way it does after a normal save+exit. Failures fall
+    /// through to `saveErrorMessage` like the regular saveAndExit path.
+    func switchToHandymanMode() async {
+        isSaving = true
+        savedAndReady = false
+        saveErrorMessage = nil
+        defer { isSaving = false }
+
+        // Always persist quiz answers first. If the user backs out of
+        // handyman later or the API call fails, their work is preserved.
+        do {
+            try await persistStateThrowing()
+        } catch {
+            saveErrorMessage = "Couldn't save your progress before switching. Check your connection and try again."
+            Analytics.track(.quizMidQuizHandymanFailed, ["error": "\(error)", "stage": "persist"])
+            return
+        }
+
+        // Stamp the mode attribute (best-effort — same pattern as
+        // OnboardingViewModel).
+        do {
+            _ = try await DatabaseService.shared.updatePropertyAttribute(
+                propertyId: property.id,
+                key: "assessment_mode",
+                value: .string("handyman")
+            )
+        } catch {
+            print("[HouseQuiz] mid-quiz handyman: assessment_mode stamp failed: \(error)")
+        }
+
+        // Fire the request. On hard failure surface a banner; the user
+        // can retry from the dialog.
+        do {
+            _ = try await HavenSupabase.requestHomeAssessment(
+                propertyId: property.id.uuidString,
+                householdId: property.householdId.uuidString,
+                homeownerConcerns: nil,
+                homeownerPresent: true,
+                homeownerAccessNotes: nil,
+                isExistingUserSupplement: false
+            )
+            savedAndReady = true
+            Analytics.track(.quizMidQuizHandymanSwitched, [
+                "answered": state.answers.count,
+            ])
+        } catch {
+            saveErrorMessage = "Couldn't request the Chez handyman visit. Try again."
+            Analytics.track(.quizMidQuizHandymanFailed, ["error": "\(error)", "stage": "request"])
+        }
+    }
+
     /// Chez v1: lightweight helper to read a property's `year_built`
     /// for ATTOM pre-fill in the post-quiz sweep prep. Returns nil if
     /// the row is missing or the column is null.

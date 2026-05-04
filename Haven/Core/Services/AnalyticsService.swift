@@ -63,6 +63,13 @@ enum AnalyticsEvent: String {
     case quizCompletionViewMaintenanceTapped = "quiz_completion_view_maintenance_tapped"
     case quizSavedAndExited = "quiz_saved_and_exited"
     case quizSaveAndExitFailed = "quiz_save_and_exit_failed"
+    /// Phase 95 (gap #7) — homeowner mid-quiz tapped "Send a Chez handyman
+    /// instead." We persisted answers and fired requestHomeAssessment.
+    case quizMidQuizHandymanSwitched = "quiz_mid_quiz_handyman_switched"
+    /// Phase 95 (gap #7) — mid-quiz handyman switch hit an error
+    /// (persist failure or requestHomeAssessment failure). The `stage`
+    /// payload distinguishes which.
+    case quizMidQuizHandymanFailed = "quiz_mid_quiz_handyman_failed"
     case quizPersistFailed = "quiz_persist_failed"
     // Phase 85: intake → walk-through split + path-decision flow
     case quizPathChosen = "quiz_path_chosen"

@@ -503,9 +503,24 @@ struct HouseQuizView: View {
                                     // any in-memory answers.
                                 }
                             }
+                            // Phase 95 (gap #7) — mid-quiz handover. Persists
+                            // current answers, fires requestHomeAssessment,
+                            // and dismisses to dashboard. The handyman picks
+                            // up where the homeowner left off when the
+                            // submitted assessment ingestion runs server-side.
+                            Button("Send a Chez handyman instead") {
+                                Task {
+                                    await viewModel.switchToHandymanMode()
+                                    if viewModel.savedAndReady {
+                                        showSavedToast = true
+                                        try? await Task.sleep(nanoseconds: 900_000_000)
+                                        dismiss()
+                                    }
+                                }
+                            }
                             Button("Cancel", role: .cancel) {}
                         } message: {
-                            Text("We'll save your place. You can pick up where you left off anytime.")
+                            Text("We'll save your place. You can pick up where you left off anytime, or hand the rest off to a Chez handyman.")
                         }
                     }
                 }
