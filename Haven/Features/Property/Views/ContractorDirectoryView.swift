@@ -36,7 +36,7 @@ struct ContractorDirectoryView: View {
                 ContentUnavailableView {
                     Label("Your vendor network", systemImage: "person.crop.rectangle.badge.plus")
                 } description: {
-                    Text("Add contractors, attorneys, financial advisors, insurance agents, and other trusted pros.")
+                    Text("Add contractors, financial advisors, insurance agents, and other trusted pros who help you run your home.")
                 } actions: {
                     Button("Add a vendor or advisor") {
                         showAddContractor = true
@@ -820,7 +820,7 @@ struct ContractorDetailView: View {
                 }
             }
         } message: {
-            Text("This will remove the vendor and unassign them from any linked tasks.")
+            Text(deleteWarningMessage)
         }
         .trackScreen("ContractorDetailView", properties: ["contractor_id": contractor.id.uuidString])
         .task {
@@ -1522,6 +1522,27 @@ struct ContractorDetailView: View {
         let allTasks = (try? await DatabaseService.shared.fetchMaintenanceTasksByContractor(contractor.id)) ?? []
         upcomingTasks = allTasks.filter { $0.nextDueDate >= today() }.sorted { $0.nextDueDate < $1.nextDueDate }
         taskCompletions = allTasks.filter { $0.lastCompletedDate != nil }
+    }
+
+    /// Phase 95 — enumerated delete-confirmation copy. Each linked-record
+    /// type contributes a phrase to the warning so the homeowner sees
+    /// exactly what gets unassigned, not a vague "linked tasks" line.
+    private var deleteWarningMessage: String {
+        var parts: [String] = []
+        if !upcomingTasks.isEmpty {
+            parts.append("\(upcomingTasks.count) upcoming task\(upcomingTasks.count == 1 ? "" : "s")")
+        }
+        if !linkedRoutines.isEmpty {
+            parts.append("\(linkedRoutines.count) routine\(linkedRoutines.count == 1 ? "" : "s")")
+        }
+        if !vendorDocuments.isEmpty {
+            parts.append("\(vendorDocuments.count) document\(vendorDocuments.count == 1 ? "" : "s")")
+        }
+        if parts.isEmpty {
+            return "This vendor has no upcoming work, routines, or documents linked. Removing is safe."
+        }
+        let summary = parts.joined(separator: ", ")
+        return "This will remove the vendor and unassign \(summary). Past completions stay in your history."
     }
 
     private func loadDocuments() async {

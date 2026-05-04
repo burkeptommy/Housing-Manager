@@ -30,6 +30,12 @@ struct AddVehicleView: View {
     @State private var hasInspectionExpiry = false
     @State private var notes = ""
 
+    // Phase 95 — optional vehicle photo. Captured at create time so the
+    // brand hero on VehicleDetailView has imagery as soon as the row
+    // saves. Uploaded post-create so the path can include vehicle.id.
+    @State private var photoItem: PhotosPickerItem?
+    @State private var photoImage: UIImage?
+
     // Relationships
     @State private var familyMembers: [FamilyMemberRow] = []
     @State private var selectedDriverId: UUID?
@@ -186,6 +192,46 @@ struct AddVehicleView: View {
                 }
             }
 
+            Section("Photo") {
+                HStack(spacing: 12) {
+                    if let photoImage {
+                        Image(uiImage: photoImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 64, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(HavenColors.beige200)
+                                .frame(width: 64, height: 48)
+                            Image(systemName: "car.side.fill")
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+
+                    PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
+                        Text(photoImage == nil ? "Add a photo" : "Change photo")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.action)
+                    }
+
+                    Spacer()
+
+                    if photoImage != nil {
+                        Button {
+                            photoItem = nil
+                            photoImage = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
             Section("Vehicle Details") {
                 TextField("Name (e.g., Tom's Q5)", text: $name)
                 TextField("Year", text: $year)
@@ -243,6 +289,17 @@ struct AddVehicleView: View {
         }
         .scrollContentBackground(.hidden)
         .background(HavenColors.background)
+        .onChange(of: photoItem) { _, newItem in
+            Task {
+                guard let item = newItem,
+                      let data = try? await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data) else {
+                    photoImage = nil
+                    return
+                }
+                photoImage = image
+            }
+        }
     }
 
     // MARK: - VIN Lookup
@@ -313,6 +370,18 @@ struct AddVehicleView: View {
             insert.notes = notes.isEmpty ? nil : notes
 
             let vehicle = try await db.createVehicle(insert)
+
+            // Phase 95 — upload optional vehicle photo. Fire-and-forget;
+            // if the upload fails the vehicle row still saves with no
+            // photo and the brand-color gradient covers the hero. The
+            // upload service writes `photo_url` back to the row on success.
+            if let photoImage {
+                _ = try? await AvatarPhotoService.shared.uploadVehiclePhoto(
+                    image: photoImage,
+                    vehicleId: vehicle.id,
+                    householdId: householdId
+                )
+            }
 
             // Save recalls
             for recall in recallsToSave {

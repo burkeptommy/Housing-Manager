@@ -34,7 +34,6 @@ enum AttentionKind {
     case expiration(String)  // carries the type: "document" or "warranty"
     case maintenance(MaintenanceTaskDBRow)
     case vehicleAlert
-    case estateNudge
 }
 
 // MARK: - Unified Attention List
@@ -139,14 +138,6 @@ struct UnifiedAttentionList: View {
                 Haptics.light()
                 Analytics.track(.unifiedAttentionItemTapped, ["kind": "vehicle"])
                 onItemTapped(item)
-            } label: { row }
-            .buttonStyle(.plain)
-
-        case .estateNudge:
-            Button {
-                Haptics.light()
-                Analytics.track(.unifiedAttentionItemTapped, ["kind": "estate"])
-                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
             } label: { row }
             .buttonStyle(.plain)
         }

@@ -36,7 +36,6 @@ enum ContactsFilter: String, CaseIterable, Identifiable {
     case serviceBased = "Home services"
     case utilitiesPolicies = "Utilities & policies"
     case routine = "Recurring"
-    case estate = "Estate"
     case needsAttention = "Needs review"
 
     var id: String { rawValue }
@@ -47,7 +46,6 @@ enum ContactsFilter: String, CaseIterable, Identifiable {
         case .serviceBased: return "wrench.and.screwdriver.fill"
         case .utilitiesPolicies: return "bolt.horizontal.circle.fill"
         case .routine: return "calendar.badge.clock"
-        case .estate: return "building.columns.fill"
         case .needsAttention: return "exclamationmark.triangle.fill"
         }
     }
@@ -5801,13 +5799,13 @@ struct PropertyDetailView: View {
         guard let specialties = contractor.specialties, !specialties.isEmpty else {
             return contractor.contactName
         }
-        let estateLabels: Set<String> = [
+        let genericLabels: Set<String> = [
             "Contractor / Service Provider", "Attorney",
             "Financial Advisor / CPA", "Insurance Agent",
             "Property Manager", "Other"
         ]
-        let nonEstate = specialties.filter { !estateLabels.contains($0) }
-        let pool = nonEstate.isEmpty ? specialties : nonEstate
+        let specific = specialties.filter { !genericLabels.contains($0) }
+        let pool = specific.isEmpty ? specialties : specific
         let visible = Array(pool.prefix(2))
         var caption = visible.joined(separator: " \u{00B7} ")
         let hidden = pool.count - visible.count
@@ -5848,8 +5846,6 @@ struct PropertyDetailView: View {
             result = result.filter(isUtilityPolicyRelationship)
         case .routine:
             result = result.filter(isRecurringRelationship)
-        case .estate:
-            result = result.filter(isEstateRelationship)
         case .needsAttention:
             result = result.filter(isRelationshipNeedingReview)
         }
@@ -5860,7 +5856,6 @@ struct PropertyDetailView: View {
     private var directorySummaryLine: String {
         let homeServices = directoryRelationships.filter(isHomeServiceRelationship).count
         let utilities = directoryRelationships.filter(isUtilityPolicyRelationship).count
-        let estate = directoryRelationships.filter(isEstateRelationship).count
 
         var parts: [String] = []
         if homeServices > 0 {
@@ -5868,9 +5863,6 @@ struct PropertyDetailView: View {
         }
         if utilities > 0 {
             parts.append("\(utilities) utilit\(utilities == 1 ? "y" : "ies") & polic\(utilities == 1 ? "y" : "ies")")
-        }
-        if estate > 0 {
-            parts.append("\(estate) estate relationship\(estate == 1 ? "" : "s")")
         }
 
         if parts.isEmpty {
@@ -5912,8 +5904,8 @@ struct PropertyDetailView: View {
 
     private func isHomeServiceRelationship(_ relationship: PropertyRelationshipItem) -> Bool {
         switch relationship {
-        case .contractor(let contractor):
-            return !isEstateContractor(contractor)
+        case .contractor:
+            return true
         case .utility(let account):
             return UtilityContractorMirror.serviceCategory(forProviderType: account.providerType) != nil
         }
@@ -5937,15 +5929,6 @@ struct PropertyDetailView: View {
         }
     }
 
-    private func isEstateRelationship(_ relationship: PropertyRelationshipItem) -> Bool {
-        switch relationship {
-        case .contractor(let contractor):
-            return isEstateContractor(contractor)
-        case .utility:
-            return false
-        }
-    }
-
     private func isRelationshipNeedingReview(_ relationship: PropertyRelationshipItem) -> Bool {
         switch relationship {
         case .contractor(let contractor):
@@ -5954,14 +5937,6 @@ struct PropertyDetailView: View {
         case .utility(let account):
             return !missingFields(for: account).isEmpty
         }
-    }
-
-    private func isEstateContractor(_ contractor: ContractorRow) -> Bool {
-        let estateLabels = Set([
-            "Attorney", "Financial Advisor / CPA", "Insurance Agent", "Property Manager"
-        ])
-        guard let specialties = contractor.specialties else { return false }
-        return specialties.contains(where: { estateLabels.contains($0) })
     }
 
     private func matchedContractor(for account: UtilityAccountRow) -> ContractorRow? {

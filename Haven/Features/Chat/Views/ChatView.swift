@@ -228,7 +228,7 @@ struct ChatView: View {
                     Text("Alfred")
                         .font(HavenTypography.title)
                         .foregroundStyle(HavenColors.textPrimary)
-                    Text("Ask me about your documents, estate plan, home maintenance, or anything about your household.")
+                    Text("Ask me about your documents, home maintenance, vendors, or anything about your household.")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -292,7 +292,7 @@ struct ChatView: View {
     }
 
     private var suggestedChips: [String] {
-        ["What documents am I missing?", "Summarize my estate plan", "What maintenance is overdue?", "Find me a plumber near Bethel, CT", "Help me schedule a home service", "Connect me with my concierge"]
+        ["What documents am I missing?", "What maintenance is overdue?", "Find me a plumber near Bethel, CT", "Help me schedule a home service", "Summarize my home insurance", "Connect me with my concierge"]
     }
 
     /// Phase 80 — context dict for the Chez handoff from the chat.

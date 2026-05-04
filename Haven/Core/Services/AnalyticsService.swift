@@ -371,11 +371,6 @@ enum AnalyticsEvent: String {
     case serviceHistoryViewed = "service_history_viewed"
     case serviceRecordCreated = "service_record_created"
 
-    // MARK: - Estate Readiness
-    case estateReadinessViewed = "estate_readiness_viewed"
-    case readinessDetailViewed = "readiness_detail_viewed"
-    case categorySectionDismissed = "category_section_dismissed"
-
     // MARK: - Enrichment
     case enrichmentCardViewed = "enrichment_card_viewed"
     case enrichmentCardCompleted = "enrichment_card_completed"

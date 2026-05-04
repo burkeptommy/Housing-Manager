@@ -146,7 +146,7 @@ struct PreVisitTrustCard: View {
     // MARK: credential chips
 
     private var credentialChips: some View {
-        FlowLayout(spacing: 6) {
+        TrustChipFlowLayout(spacing: 6) {
             // Specialties first (most relatable to homeowner).
             ForEach(Array(profile.specialties.prefix(compact ? 3 : 8)), id: \.self) { specialty in
                 chip(text: specialty, verified: false)
@@ -209,13 +209,13 @@ struct PreVisitTrustCard: View {
     }
 }
 
-// MARK: - FlowLayout (chip wrapping)
+// MARK: - TrustChipFlowLayout (chip wrapping)
 
 /// Phase 85: lightweight flow layout for the credential chip rail.
 /// SwiftUI's HStack can't wrap; this preserves the row when the chip
 /// labels overflow. iOS 16+; matches the existing `Layout` API.
 @available(iOS 16.0, *)
-struct FlowLayout: Layout {
+struct TrustChipFlowLayout: Layout {
     var spacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

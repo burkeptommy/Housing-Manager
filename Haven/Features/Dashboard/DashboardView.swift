@@ -422,10 +422,6 @@ struct DashboardView: View {
                             .padding(.top, HavenTheme.spacing4)
                         }
 
-                        // Chez v1: FoundationCard (estate intake nudge) removed.
-                        // Estate management is out of v1 scope; the card and
-                        // its supporting EstateStateService go in Phase 3.
-
                         // ── Conditional sections ──
 
                         // "Make it Yours" hero card for invitees
@@ -1652,7 +1648,7 @@ struct DashboardView: View {
                         Text("Scenario Planning")
                             .font(HavenTypography.fraunces(size: 18, weight: 700))
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Explore what-if questions with your real data: estate, taxes, home, wealth")
+                        Text("Explore what-if questions with your real data: taxes, home, projects, wealth")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                             .lineLimit(2)
@@ -2091,7 +2087,7 @@ struct DashboardView: View {
                   ?? viewModel.recentlyCompletedTasks.first(where: { $0.id == id }) {
                 selectedDashboardTask = task
             }
-        case .documentProcessed, .invoiceProcessed, .estateDocumentExtracted:
+        case .documentProcessed, .invoiceProcessed:
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
         case .vendorLinked, .systemAdded, .propertyAdded, .projectCreated:
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])

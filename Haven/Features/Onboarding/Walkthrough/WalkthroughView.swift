@@ -58,7 +58,7 @@ final class WalkthroughViewModel: ObservableObject {
         if system.modelNumber?.isEmpty == false { filled += 1 }
         if system.installDate != nil { filled += 1 }
         if system.conditionRating?.isEmpty == false { filled += 1 }
-        let hasPhotos = (system.photos?.isEmpty == false) || (system.conditionPhotos?.isEmpty == false)
+        let hasPhotos = system.conditionPhotos?.isEmpty == false
         if hasPhotos || system.notes?.isEmpty == false { filled += 1 }
         return total > 0 ? filled / total : 0
     }

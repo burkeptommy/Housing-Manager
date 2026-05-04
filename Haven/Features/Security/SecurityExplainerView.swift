@@ -38,7 +38,7 @@ struct SecurityExplainerView: View {
             icon: "lock.doc.fill",
             iconAnimation: .vaultLock,
             headline: "The Nuclear Option",
-            body: "For any document you consider ultra-sensitive, you can enable Vault Lock. This adds a second layer of encryption using a key that exists only on your device. Not even Chez's servers can decrypt a Vault Locked document. The tradeoff: the AI can't analyze Vault Locked files. But they're there, they're counted in your estate inventory, and they are untouchable by anyone but you.",
+            body: "For any document you consider ultra-sensitive, you can enable Vault Lock. This adds a second layer of encryption using a key that exists only on your device. Not even Chez's servers can decrypt a Vault Locked document. The tradeoff: the AI can't analyze Vault Locked files. But they're there, they're counted in your document inventory, and they are untouchable by anyone but you.",
             secondaryText: "Most clients don't need Vault Lock for everything \u{2014} the standard encryption is extremely strong. But it's there if you want it."
         ),
     ]

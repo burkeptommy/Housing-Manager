@@ -8,8 +8,7 @@ struct IntroExplainerView: View {
         VStack(spacing: 0) {
             TabView(selection: $currentPage) {
                 propertyPage.tag(0)
-                estatePage.tag(1)
-                alfredPage.tag(2)
+                alfredPage.tag(1)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.3), value: currentPage)
@@ -18,7 +17,7 @@ struct IntroExplainerView: View {
             VStack(spacing: 24) {
                 // Custom page indicators
                 HStack(spacing: 10) {
-                    ForEach(0..<3, id: \.self) { index in
+                    ForEach(0..<2, id: \.self) { index in
                         Capsule()
                             .fill(index == currentPage ? HavenColors.navy800 : HavenColors.beige300)
                             .frame(width: index == currentPage ? 24 : 8, height: 8)
@@ -27,7 +26,7 @@ struct IntroExplainerView: View {
                 }
 
                 // Button
-                if currentPage == 2 {
+                if currentPage == 1 {
                     Button {
                         Haptics.medium()
                         onContinue()
@@ -57,7 +56,7 @@ struct IntroExplainerView: View {
                 }
 
                 // Skip option (not on last page)
-                if currentPage < 2 {
+                if currentPage < 1 {
                     Button {
                         Haptics.light()
                         onContinue()
@@ -92,24 +91,7 @@ struct IntroExplainerView: View {
         )
     }
 
-    // MARK: - Page 2: Estate Management
-
-    private var estatePage: some View {
-        introPage(
-            icon: "building.columns.fill",
-            iconColor: HavenColors.navy800,
-            headline: "Your legacy, organized.",
-            subheadline: "Wills, trusts, insurance, financial accounts \u{2014} everything your family would need, securely organized and always current.",
-            features: [
-                IntroFeature(icon: "doc.text.fill", text: "AI-powered document analysis that categorizes and extracts key details"),
-                IntroFeature(icon: "person.3.fill", text: "Family member linking, trusted contacts, and access controls"),
-                IntroFeature(icon: "lock.shield.fill", text: "Bank-level encryption with optional device-only vault lock"),
-                IntroFeature(icon: "chart.bar.doc.horizontal.fill", text: "Estate readiness scoring and gap analysis"),
-            ]
-        )
-    }
-
-    // MARK: - Page 3: Alfred AI
+    // MARK: - Page 2: Alfred AI
 
     private var alfredPage: some View {
         introPage(
@@ -118,7 +100,7 @@ struct IntroExplainerView: View {
             headline: "Alfred, at your service.",
             subheadline: "Your built-in AI concierge reads your documents, answers questions, runs scenarios, and helps you plan \u{2014} backed by real human support when you need it.",
             features: [
-                IntroFeature(icon: "bubble.left.and.bubble.right.fill", text: "Ask anything about your home, estate, finances, or family"),
+                IntroFeature(icon: "bubble.left.and.bubble.right.fill", text: "Ask anything about your home, finances, or family"),
                 IntroFeature(icon: "lightbulb.fill", text: "\u{201C}What If?\u{201D} scenarios powered by your real data"),
                 IntroFeature(icon: "doc.badge.plus", text: "Upload documents by photo, scan, or file \u{2014} Alfred handles the rest"),
                 IntroFeature(icon: "calendar.badge.clock", text: "Schedule maintenance, draft emails, and find vendors for you"),

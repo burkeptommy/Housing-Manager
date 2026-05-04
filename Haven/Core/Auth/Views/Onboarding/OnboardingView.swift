@@ -26,6 +26,38 @@ struct OnboardingView: View {
                     errorView
                 } else if viewModel.hasFinishedPrefill && !viewModel.hasAutoCompleted {
                     nameFallbackView
+                } else if viewModel.needsFoundationalQuestions {
+                    // Phase 84.5 round 2 — universal 7-question form
+                    // BEFORE the mode fork. Both onboarding paths use
+                    // the same answers as a baseline; the quiz path
+                    // skips them via firstUnresolvedIndex().
+                    FoundationalQuestionsForm { answers in
+                        viewModel.completeFoundationalQuestions(answers)
+                    }
+                } else if viewModel.needsModeChoice {
+                    // Phase 84.5 round 2 — binary fork: continue the
+                    // quiz yourself, or send a Chez handyman.
+                    OnboardingModeForkView(
+                        coverageAvailable: viewModel.coverageAvailable,
+                        inWinterMonths: Self.isCurrentMonthWinter(),
+                        onSelectQuiz: {
+                            Task {
+                                // Self-onboard path → .diy mode. Phase 84
+                                // group toggles handle delegation later.
+                                await viewModel.applyModeChoice(.diy, authService: appState.authService)
+                            }
+                        },
+                        onSelectHandyman: {
+                            Task {
+                                await viewModel.applyModeChoice(.handyman, authService: appState.authService)
+                            }
+                        },
+                        onJoinWaitlist: {
+                            Task {
+                                await viewModel.joinCoverageWaitlist(authService: appState.authService)
+                            }
+                        }
+                    )
                 } else {
                     setupSplash
                 }
@@ -65,6 +97,13 @@ struct OnboardingView: View {
             escapeHatchTimer?.cancel()
             escapeHatchTimer = nil
         }
+    }
+
+    /// Phase 84.5 G41 — true when current month is Dec / Jan / Feb so the
+    /// mode-fork screen can show the seasonality hint.
+    static func isCurrentMonthWinter() -> Bool {
+        let month = Calendar.current.component(.month, from: Date())
+        return month == 12 || month == 1 || month == 2
     }
 
     private func startEscapeHatchTimer() {
@@ -238,7 +277,7 @@ struct OnboardingView: View {
             Text("You've Been Invited!")
                 .font(HavenTypography.title)
 
-            Text("Join your family's Chez household to share documents, properties, and estate planning.")
+            Text("Join your family's Chez household to share documents, properties, and home management.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)

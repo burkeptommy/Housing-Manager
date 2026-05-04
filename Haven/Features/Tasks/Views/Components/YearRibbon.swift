@@ -23,6 +23,13 @@ struct YearRibbon: View {
     /// the active season's reference period (Winter Dec/Jan straddles).
     var year: Int = Season.year(for: .current(), referenceDate: .now)
 
+    /// Tap handler. When set, the parent owns navigation — we update
+    /// `activeSeason` for visual selection and then call the closure
+    /// (typically pushes into `MaintenanceScheduleView` scrolled to
+    /// the selected season). When nil, taps only re-scope the binding
+    /// in place — the legacy in-screen-only behavior.
+    var onTap: ((Season) -> Void)? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Eyebrow: "2026 · YEAR AT A GLANCE"
@@ -41,11 +48,11 @@ struct YearRibbon: View {
                         isCurrent: season == currentSeason
                     )
                     .onTapGesture {
-                        guard activeSeason != season else { return }
                         Haptics.selection()
                         withAnimation(TasksV5.easeRibbon) {
                             activeSeason = season
                         }
+                        onTap?(season)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(accessibilityLabel(for: season))

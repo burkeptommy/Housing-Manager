@@ -6,9 +6,11 @@ Tom Burke. Solo founder/developer of Haven. Full-time AE at Salesforce, so bandw
 
 ## What Haven Is
 
-A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with home property management. Backed by Supabase and Claude AI (via Edge Functions). No competitor offers this combination. Target audience: high-net-worth families ($500K-$5M net worth).
+A native iOS app (SwiftUI, iOS 17+) for premium home management — vendor coordination, maintenance orchestration, vehicle programs, and a concierge layer (Chez) that can take over any of it. Backed by Supabase and Claude AI (via Edge Functions). Target audience: high-net-worth families ($500K-$5M net worth).
 
-**The core insight:** Haven's AI creates intelligence, not just convenience. Documents get analyzed, gaps get identified, scenarios get simulated. The real competition is insecure alternatives (Google Drive, email attachments, filing cabinets) -- not enterprise vault solutions.
+**Chez v1 scope note:** estate intelligence (Phase 48) was removed for the initial release — the iOS surfaces, `estate_state` / `estate_pdf_exports` tables, and the `verify-estate-export` Edge Function are all gone (`20260901_chez_v1_estate_removal.sql`). Document categories like Will / Trust / POA still exist as enum values for backward decode of any documents already uploaded, but the dedicated intake / scoring / handoff flows are not part of v1.
+
+**The core insight:** Haven's AI creates intelligence, not just convenience. Invoices get parsed into tasks, vendor visits get coordinated, recalls get surfaced, scenarios get simulated. The real competition is the spreadsheet-and-email-attachments status quo, not enterprise property management software.
 
 **Status:** TestFlight with public link (`https://testflight.apple.com/join/sw4xWsTA`). App Store Connect ID: `6757167606`. Version 1.0.2, build 85.
 
@@ -143,7 +145,7 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 
 ## Supabase Database (Key Tables)
 
-households (Phase 80.1: chez_profile JSONB), users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id, service_interval_days, service_interval_source), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor; Phase 80.2: chez_owned BOOLEAN, chez_owned_at, chez_request_id FK), documents (vehicle_id, project_id, visible_to_home_managers, linked_attorney_contact_id), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source; Phase 80.1: chez_owned BOOLEAN, chez_owned_at), service_records, service_contracts, chat_messages, concierge_messages (Phase 80: request_id FK, attachments JSONB, 'system' role for status-change rows; Phase 80.1: proposal JSONB + proposal_kind text for structured Approve/Counter/Decline cards), scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items (Phase 80: related_chez_request_id FK + chez_reply_action_needed / chez_reply_informational / chez_status_change types), inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls, estate_state (Phase 48), estate_pdf_exports (Phase 48), chez_requests (Phase 80 — homeowner concierge requests with category/status/sla_due_at; Phase 80.1: pending_proposal_count denorm), routines (Phase 80.1: chez_owned BOOLEAN, chez_owned_at)
+households (Phase 80.1: chez_profile JSONB), users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id, service_interval_days, service_interval_source), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor; Phase 80.2: chez_owned BOOLEAN, chez_owned_at, chez_request_id FK), documents (vehicle_id, project_id, visible_to_home_managers), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source; Phase 80.1: chez_owned BOOLEAN, chez_owned_at), service_records, service_contracts, chat_messages, concierge_messages (Phase 80: request_id FK, attachments JSONB, 'system' role for status-change rows; Phase 80.1: proposal JSONB + proposal_kind text for structured Approve/Counter/Decline cards), scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items (Phase 80: related_chez_request_id FK + chez_reply_action_needed / chez_reply_informational / chez_status_change types), inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls, chez_requests (Phase 80 — homeowner concierge requests with category/status/sla_due_at; Phase 80.1: pending_proposal_count denorm), routines (Phase 80.1: chez_owned BOOLEAN, chez_owned_at). (Chez v1: Phase 48 `estate_state` / `estate_pdf_exports` and `documents.linked_attorney_contact_id` were dropped — see migration `20260901_chez_v1_estate_removal.sql`.)
 
 **RLS is on everything.** All tables scoped by `household_id`. Service role key is only used in Edge Functions.
 
@@ -170,7 +172,6 @@ See `supabase/functions/CLAUDE.md` for detailed patterns and full inventory. Key
 **Vendor/Document:** `extract-vendor`, `view-document`
 **Catalog:** `enrich-catalog`, `expand-catalog`, `scrape-manuals`, `download-manuals`, `upload-manual`, `send-catalog-request`, `score-property`
 **Local Vendors (Phase 19n):** `find-local-vendors` (Google Places Text Search + 60-day cache via `local_vendor_results` table; returns up to 4 vendors per (town, state, category) with Haven Certified badge on top 2 that meet 4.7+ stars + 25+ reviews + non-chain heuristic)
-**Estate (Phase 48):** `verify-estate-export` (public endpoint, no auth -- validates estate PDF verification tokens, checks expiry/access count, logs hashed IP)
 **Chez Concierge (Phase 80 / 80.1 / 80.2 / 81 / 82 / 83):** `chez-concierge` (single function with action discriminator. Phase 80 actions: `submit` / `reply` / `mark_read` / `transition_status`. Phase 80.1 added `fetch_profile` / `update_profile` (household standing instructions in `households.chez_profile` JSONB), `delegate_routine` / `delegate_contractor` (recurring delegation), `propose` / `decide_proposal` (structured Approve/Counter/Decline cards). Phase 80.2 added `delegate_task` with smart category routing. Phase 81 added `fetch_dossier` (full household snapshot for the admin focused panel) + `suggest_vendor_framing` (Claude polishes raw call notes into homeowner-facing recommendation copy). Phase 81.1 added `analyze_request` (single Claude call that infers vendor category, summarizes situation, drafts call script + key questions + recommended approach, then concurrently fetches existing-network matches + Google Places candidates). Phase 82 added `fetch_visits` + `update_visit` for case lifecycle tracking. Phase 83 added `ask_alfred` for case-scoped chat (loads request + dossier + thread + recent messages + past requests server-side, asks Claude sonnet 4.6 with a constrained voice/rules system prompt, returns single-shot answer; multi-turn deferred). Admin allowlist via `CHEZ_ADMIN_EMAILS` env var. Push to admin user IDs + SendGrid email backstop on every customer-initiated action since Tom doesn't have iOS in admin context. Smart inbox routing: admin replies create `inbox_items` with `chez_reply_action_needed` (when `acknowledgement_required: true`) or `chez_reply_informational`; same call can transition status via optional `to_status`. System-role audit-trail messages auto-insert on status flips. All user-facing strings render as "Chez" — the human operator (Tom) is invisible from the homeowner's view.)
 
 ### Concierge Cockpit (Phase 83) — admin portal customer-service desktop
@@ -185,36 +186,19 @@ The admin portal's **"Concierge"** tab (renamed from "Chez Requests") is a fixed
 - **Hard rule for new cockpit code: every button is functional or it doesn't ship.** UI without UX is rejected. If a feature needs server work (e.g. multi-turn chat, voice capture), wire the surface AND the backend in the same phase or hide the affordance until both are live. Phase 83 disabled voice capture with an explanatory tooltip rather than ship a non-functional mic button.
 - **Heuristic AI where round-trips don't pay.** `computeChezVendorFit` is a deterministic 50-line function (existing-network bonus + rating tier + review volume + phone availability, capped 15-99). `assessConciergeReplyTone` is a heuristic check for warm/direct/formal cues + length sanity. Both render in <1ms with zero cost. Use Claude only where the operator's question genuinely needs reasoning (`analyze_request`, `suggest_vendor_framing`, `ask_alfred`).
 
-## Estate Intelligence (Phase 48)
+## Estate Intelligence — REMOVED (Chez v1)
 
-**Tables:** `estate_state` (one row per household, UNIQUE on household_id), `estate_pdf_exports` (verification-token-indexed export records). `documents.linked_attorney_contact_id` FK to `trusted_contacts`.
+The Phase 48 estate intelligence module has been removed for the initial release. This section is retained only as a tombstone so context-aware searches don't re-surface deprecated patterns:
 
-**`estate_state` schema:** Typed boolean presence flags (has_will, has_revocable_trust, has_irrevocable_trust, has_poa, has_health_proxy, has_living_will, has_hipaa_auth, has_prenup, has_business_agreement, has_disposition_of_remains). Execution dates per doc type. Estate attorney contact FK. JSONB fields: fiduciaries (name/role/is_alternate/source), concerns (15 H/S/L/NA ratings), wishes, assets_summary, intake_state (mirrors house_quiz_state save-per-answer pattern), nominations (executor/trustee/guardian/health_proxy/poa_agent/disposition_agent with primary+alternate per role). Computed: estate_readiness_score (0-100), staleness_tier (none/info/amber/critical), staleness_reasons array, household_snapshot.
+- **DB:** `estate_state` and `estate_pdf_exports` tables dropped, `documents.linked_attorney_contact_id` column dropped — all in migration `20260901_chez_v1_estate_removal.sql`.
+- **iOS:** `Haven/Features/Estate/` directory and all `EstateStateService` / `EstateOverviewCard` / `FiduciaryRoleCard` / `LinkedAttorneyField` / `EstateIntakeDripCard` / `EstateConcernsCardStack` / `EstateIntakeFormView` / `EstateExportService` / `EstateExportView` files do not exist. `DatabaseModels.swift` no longer declares any `EstateStateRow` / `EstatePdfExportRow` / supporting Codable types.
+- **Edge Functions:** `verify-estate-export/` is deleted. `analyze-document` no longer runs the estate-extraction branch. `gap-analysis` / `chat` / `simulate-scenario` / `proactive-scan` no longer read `estate_state`.
+- **Quiz / dashboard:** Q29 (estate documents) is removed; the legacy `q29_estate_docs` answer-id is preserved in `HouseQuizAnswerMapper` as a no-op for backward decode of saved-for-later state. The dashboard `estateNudge`, `EstateIntakeDripCard`, "compact Estate Scorecard," `FoundationCard`, and `.estateStateChanged` notification are all gone.
+- **Document categories:** `DocumentCategory.swift` still declares `Will / Trust / Power of Attorney / Healthcare Directive / Guardianship Designation / Letter of Intent / Living Will / HIPAA Authorization / Prenup / Postnup / Disposition of Remains / Deed in Trust` so any documents already uploaded with those categories still decode. `DocumentCategoryGroups.swift` no longer exposes the "Estate Planning" group in the picker.
 
-**iOS files:** `Haven/Features/Estate/` directory:
-- `EstateStateService.swift` -- singleton service: CRUD, concern ratings, intake answers, readiness score computation (household-composition-aware), staleness computation (3/5/7yr tiers + life changes + 2026 TCJA), auto-populate from household data
-- `EstateOverviewCard.swift` -- adaptive hero card on Life tab (3 states: empty/partial/full), progress ring, staleness badge, fiduciary preview/chips
-- `FiduciaryRoleCard.swift` -- compact card per fiduciary role (filled + ghost variants), static icon/displayRole helpers
-- `LinkedAttorneyField.swift` -- tappable metadataCard-style row for estate docs, attorney picker sheet, add-new-attorney flow
-- `EstateIntakeDripCard.swift` -- dashboard nudge card (3 content variants: empty/stale/partial), 3-tier snooze (today/7-day/indefinitely) via UserDefaults
-- `EstateConcernsCardStack.swift` -- swipeable ZStack of 15 concern cards, H/S/L/NA rating buttons, spring animation, progress counter
-- `EstateIntakeFormView.swift` -- 6-section intake form (household/advisors/concerns/fiduciaries/wishes/assets), save-per-answer, progress bar, back-nav, auto-fill from household data, privacy notes
-- `EstateExportService.swift` -- PDF generation (UIGraphicsPDFRenderer, 3 templates: pre-meeting/annual-review/hybrid), encrypted upload, export record creation, SHA-256 hash
-- `EstateExportView.swift` -- 4-step export flow (preview/generating/review/send), template selection, attorney picker, MailComposeView integration with fallback copy-link
+Estate intelligence remains valid future work; the audit + reintroduction will land as a fresh phase, not by uncommenting this code.
 
-**Shared:** `Haven/Shared/Components/MailComposeView.swift` -- UIViewControllerRepresentable wrapping MFMailComposeViewController
-
-**Document extraction:** `analyze-document` has an estate branch that runs a second Claude call for estate categories, extracting fiduciaries, execution dates, attorney info, estate_sub_type. PII redaction via regex post-extraction. Fire-and-forget upserts to estate_state.
-
-**Edge function extensions:** `gap-analysis`, `chat`, `simulate-scenario`, `proactive-scan` all fetch `estate_state` in their Promise.all and inject an ESTATE STATE/PLANNING section into the household context string sent to Claude.
-
-**Staleness tiers:** Info (3yr docs, no life changes), Amber (5yr docs OR life changes post-execution), Critical (7yr docs OR major events OR 2026 TCJA sunset). Computed both client-side (EstateStateService) and server-side (proactive-scan).
-
-**Attorney handoff:** Client-side PDF generation with verification footer on every page. Uploaded encrypted to estate-exports bucket. `verify-estate-export` public Edge Function validates tokens (3-use limit, 7-day expiry, IP-hashed access log). `getchez.com/verify?token=<UUID>` static page calls the function.
-
-**SmartRecommendations:** Estate staleness at priority 5 (critical) and 35 (amber). Existing estate readiness recommendations preserved at lower priorities.
-
-All use `claude-sonnet-4-6`. All return JSON. All use CORS headers. All deployed with `--no-verify-jwt`.
+Edge Functions all use `claude-sonnet-4-6`. All return JSON. All use CORS headers. All deployed with `--no-verify-jwt`.
 
 ## iOS Networking Pattern
 
@@ -222,17 +206,17 @@ All Edge Function calls go through `HavenSupabase.callEdgeFunction()` in `Supaba
 
 ## Dashboard Architecture
 
-**Phase 50 sub-phase B first-login gating:** The dashboard is conditionally collapsed on Day 0 so the only CTA is the House Quiz. `DashboardViewModel.hasCompletedAnyQuiz` (true once any property has `houseQuizState.completedAt != nil`) gates the YOUR HOME vendor section, the Unified Attention List, the compact Estate Scorecard, the compact Scenario card, and the Security Trust Badge — all of them only render once at least one property's quiz is done. `showGettingStarted` collapsed to `!hasProperty || !hasCompletedAnyQuiz` so the Getting Started / Quiz hero card disappears entirely as soon as any quiz finishes. Post-quiz, the `VendorScheduleStrip` empty state ("Your maintenance plan is ready") absorbs the role of the old Step 2 ("Upload your first document"). The Quiz hero `gettingStartedCard` was simplified to a two-state shape (full checklist when `!hasProperty`, Quiz hero when `hasProperty`) — the legacy `hasProperty && hasDocuments && !hasUsedAlfred` Alfred prompt branch is gone because Alfred is reachable from its own tab and the post-quiz model treats the upload + Alfred steps as side affordances rather than gated milestones.
+**Phase 50 sub-phase B first-login gating:** The dashboard is conditionally collapsed on Day 0 so the only CTA is the House Quiz. `DashboardViewModel.hasCompletedAnyQuiz` (true once any property has `houseQuizState.completedAt != nil`) gates the YOUR HOME vendor section, the Unified Attention List, the compact Scenario card, and the Security Trust Badge — all of them only render once at least one property's quiz is done. `showGettingStarted` collapsed to `!hasProperty || !hasCompletedAnyQuiz` so the Getting Started / Quiz hero card disappears entirely as soon as any quiz finishes. Post-quiz, the `VendorScheduleStrip` empty state ("Your maintenance plan is ready") absorbs the role of the old Step 2 ("Upload your first document"). The Quiz hero `gettingStartedCard` was simplified to a two-state shape (full checklist when `!hasProperty`, Quiz hero when `hasProperty`) — the legacy `hasProperty && hasDocuments && !hasUsedAlfred` Alfred prompt branch is gone because Alfred is reachable from its own tab and the post-quiz model treats the upload + Alfred steps as side affordances rather than gated milestones.
 
 **Scroll order (Day 0, no quiz done):** Haven nav title (Inbox + Settings on right; Security shield on left; **no "+" button**) > greeting > **Getting Started / Quiz hero** (single CTA) > banners (incomplete address / merge request) > **HouseholdStrip** > HouseholdStaffStrip (if any) > expecting members > inbox banners > email forwarding callout. **Nothing else renders.**
 
-**Scroll order (post-quiz):** Haven nav title > greeting > banners > **YOUR HOME — VendorScheduleStrip** (now ABOVE HouseholdStrip; empty state shows "Your maintenance plan is ready" + Upload invoice / Add vendor buttons + a forwarding email caption with copy-to-clipboard pulled from `DashboardViewModel.householdForwardingEmail` via `DatabaseService.fetchHouseholdEmailAddress()`; populated state is the existing horizontal scroll of `VendorVisitCard`s with overdue pill + "X tasks this week" summary) > **CadenceSuggestionCard** (amber prompt when `process-invoice` extracted an explicit recurring cadence; one-tap accept writes `home_systems.service_interval_days`) > **HouseholdStrip** (now BELOW vendor section) > HouseholdStaffStrip > Make-it-yours hero > expecting members > inbox banners > email forwarding callout > **EstateIntakeDripCard** (Phase 48; only after all quizzes done) > **UnifiedAttentionList** > **compact Estate Scorecard** > **compact Scenario card** > Security trust badge.
+**Scroll order (post-quiz):** Haven nav title > greeting > banners > **YOUR HOME — VendorScheduleStrip** (now ABOVE HouseholdStrip; empty state shows "Your maintenance plan is ready" + Upload invoice / Add vendor buttons + a forwarding email caption with copy-to-clipboard pulled from `DashboardViewModel.householdForwardingEmail` via `DatabaseService.fetchHouseholdEmailAddress()`; populated state is the existing horizontal scroll of `VendorVisitCard`s with overdue pill + "X tasks this week" summary) > **CadenceSuggestionCard** (amber prompt when `process-invoice` extracted an explicit recurring cadence; one-tap accept writes `home_systems.service_interval_days`) > **HouseholdStrip** (now BELOW vendor section) > HouseholdStaffStrip > Make-it-yours hero > expecting members > inbox banners > email forwarding callout > **UnifiedAttentionList** > **compact Scenario card** > Security trust badge.
 
 **Dashboard "Up Next" section (Phase 52):** Replaced "THIS WEEK" (7-day window, 3-item cap) with "UP NEXT" (60-day window, 5-item cap). User-assignment filtering: only shows tasks assigned to the current user or unassigned. Inline snooze button (zzz icon) pushes due date +7 days. Empty state: "Nothing to schedule in the next 60 days." "See all" navigates to MaintenanceScheduleView with `.mine` filter.
 
 **"View full schedule" entry point (Phase 54A):** The link under "Up Next" now pushes `navigationPath.append("maintenance_calendar")` instead of opening a sheet. The `maintenance_calendar` destination maps to `MaintenanceScheduleView(initialLayout: .calendar)` so the user lands on the canonical maintenance surface with the Calendar layout preselected. The old `ScheduleCalendarView.swift` was deleted (file + Xcode project membership) because it duplicated the same data with weaker cards (no vendor logos, no inline Schedule/Skip).
 
-**Recent Activity Feed (Phase 52):** Expanded from 4 event types to 14: `taskCompleted`, `documentProcessed`, `systemAdded`, `vendorLinked`, `invoiceProcessed`, `familyMemberJoined`, `propertyAdded`, `vehicleAdded`, `recallDetected`, `scenarioRun`, `inboxItemReceived`, `projectCreated`, `gapAnalysisRun`, `estateDocumentExtracted`. Visible count: 7 (was 5). Verb-first titles ("Invoice processed: Tyler Heating"). "View all activity" link opens `ActivityLogView` (full-screen list grouped by day).
+**Recent Activity Feed (Phase 52):** Expanded from 4 event types to 13: `taskCompleted`, `documentProcessed`, `systemAdded`, `vendorLinked`, `invoiceProcessed`, `familyMemberJoined`, `propertyAdded`, `vehicleAdded`, `recallDetected`, `scenarioRun`, `inboxItemReceived`, `projectCreated`, `gapAnalysisRun`. (Chez v1: `estateDocumentExtracted` removed.) Visible count: 7 (was 5). Verb-first titles ("Invoice processed: Tyler Heating"). "View all activity" link opens `ActivityLogView` (full-screen list grouped by day).
 
 **Forwarding email caption (Phase 50 sub-phase B first-login):** `VendorScheduleStrip` empty state appends a subtle caption below the Upload/Add vendor button row: a `Divider()` with `HavenColors.beige200`, an Inter caption "Or forward invoices to", a tappable `navy700` email row with a `doc.on.doc` icon that flips to `checkmark` for 2 seconds on copy, and an Inter caption "and we'll automatically build this out." Same pattern as `ProjectEmailView.swift` lines 159-175 and the Q17 quiz milestone — `UIPasteboard.general.string`, `Haptics.success()`, `Analytics.track(.dashboardForwardingEmailCopied, ["source": "vendor_schedule_strip"])`. The whole caption is gated on a non-nil `forwardingEmail` prop so households without an address provisioned see a clean two-button card.
 
@@ -254,11 +238,11 @@ All Edge Function calls go through `HavenSupabase.callEdgeFunction()` in `Supaba
 
 **Canonical surface:** `PropertyDetailView` → Contacts sub-tab is the single directory for every vendor, advisor, and service provider in the household. `ContractorDirectoryView` is preserved only in picker mode (delegation flows, task "Assign a Vendor") — never as a standalone destination. Every Add button lands the user on `AddVendorSheet` in one tap.
 
-**Sub-tab structure:** Header + Add button > search field (magnifier + clear-X, `HavenColors.creamLight` background) > five filter chips (All / Service-based / Routines / Estate professionals / Needs attention) > filtered contact rows > "ADD OR DISCOVER" section. Search + filter + add-or-discover only render when `viewModel.contractors.isEmpty == false`.
+**Sub-tab structure:** Header + Add button > search field (magnifier + clear-X, `HavenColors.creamLight` background) > four filter chips (All / Service-based / Utilities & policies / Routines / Needs review) > filtered contact rows > "ADD OR DISCOVER" section. (Chez v1: the legacy "Estate professionals" filter chip was removed alongside the rest of the estate intelligence module.) Search + filter + add-or-discover only render when `viewModel.contractors.isEmpty == false`.
 
-**`ContactsFilter` enum** lives at the top level in `PropertyDetailView.swift` so SwiftUI diffing stays stable. Each case has an SF Symbol (person.2.fill / wrench.and.screwdriver.fill / calendar.badge.clock / building.columns.fill / exclamationmark.triangle.fill). `filteredContacts` applies search across `companyName` + `contactName` + `specialties`, then filters: `serviceBased` excludes the estate labels (`Attorney` / `Financial Advisor / CPA` / `Insurance Agent` / `Property Manager`); `routine` cross-references `viewModel.routineVendorIds` (loaded in `PropertyDetailViewModel.loadProperty` via `db.fetchRoutines`); `estate` matches only those four labels; `needsAttention` flags rows with no specialty or no email.
+**`ContactsFilter` enum** lives at the top level in `PropertyDetailView.swift` so SwiftUI diffing stays stable. Each case has an SF Symbol. `filteredContacts` applies search across `companyName` + `contactName` + `specialties`, then filters: `serviceBased` includes every contractor (the legacy estate-label exclusion is gone); `utilitiesPolicies` matches accounts whose provider type isn't a service category; `routine` cross-references `viewModel.routineVendorIds` (loaded in `PropertyDetailViewModel.loadProperty` via `db.fetchRoutines`); `needsAttention` flags rows with no specialty or no email.
 
-**Row rendering:** Apple Contacts-style density via `contractorRow(_:)` — 32pt `VendorLogoView`, single-line label via `displayName(for:)` (truncates long vendor names like "Tyler Heating, Air Conditioning, Refrigeration..." to "Tyler Heating" by taking everything before the first comma; full name shows in `ContractorDetailView`), single-line caption via `primarySpecialty(for:)` (skips estate-type labels so the trade shows), optional "Routine" pill when `isRoutineServed`, chevron. Replaces the old `HavenCard`-chromed `contractorCardInline`.
+**Row rendering:** Apple Contacts-style density via `contractorRow(_:)` — 32pt `VendorLogoView`, single-line label via `displayName(for:)` (truncates long vendor names like "Tyler Heating, Air Conditioning, Refrigeration..." to "Tyler Heating" by taking everything before the first comma; full name shows in `ContractorDetailView`), single-line caption via `primarySpecialty(for:)` (skips generic labels like "Contractor / Service Provider" / "Other" so the trade shows), optional "Routine" pill when `isRoutineServed`, chevron. Replaces the old `HavenCard`-chromed `contractorCardInline`.
 
 **Add-or-discover section:** Five `addOrDiscoverRow` entries at the bottom of Contacts — Add a vendor, Browse specialty systems, Add a custom system, Add a routine, See recommended services. Each wires to existing sheet state (`showAddVendor` / `showAddSystem` / `showWeeklyCadences` / `showRecommendedServices`). Consolidates the discovery actions that used to live in Vendor Coverage.
 
@@ -524,7 +508,7 @@ Key files: `HouseQuizQuestionLibrary.swift` (questions), `HouseQuizModels.swift`
 
 ## Family Members & Profiles
 
-**FamilyMemberProfileView** opens from HouseholdStrip. Sections: hero, documents (junction table), vehicles (covered drivers only), assigned tasks (via `assignedToUserId`), events (tagged via `taggedMemberIds`), estate readiness.
+**FamilyMemberProfileView** opens from HouseholdStrip. Sections: hero, documents (junction table), vehicles (covered drivers only), assigned tasks (via `assignedToUserId`), events (tagged via `taggedMemberIds`).
 
 **User resolution:** `resolveUserId()` matches by linkedUserId, email, full name, first name, or "Primary Client" relationship. Searches ALL household users.
 
@@ -536,7 +520,7 @@ Key files: `HouseQuizQuestionLibrary.swift` (questions), `HouseQuizModels.swift`
 
 ## Home Manager Role (Build 87)
 
-Home managers (`family_members.member_type = 'home_manager'`) are linked household users with full editing permissions across tasks, systems, contractors, projects, and vehicles, EXCEPT for restricted document access and destructive operations. The role exists so HNW families can give their property manager / executive assistant their own Haven login that lets them manage the home but never exposes estate, financial, or medical documents the homeowner hasn't explicitly shared.
+Home managers (`family_members.member_type = 'home_manager'`) are linked household users with full editing permissions across tasks, systems, contractors, projects, and vehicles, EXCEPT for restricted document access and destructive operations. The role exists so HNW families can give their property manager / executive assistant their own Haven login that lets them manage the home but never exposes financial or medical documents the homeowner hasn't explicitly shared.
 
 ### Capabilities
 
@@ -557,7 +541,7 @@ Home managers (`family_members.member_type = 'home_manager'`) are linked househo
 - Delete properties, family members, the household, or the home manager role itself (V1 enforces this in the iOS view models — no DB-level enforcement)
 - Change household ownership
 - Invite other linked users
-- Access estate, legal, financial, or medical document categories unless specifically shared
+- Access legal, financial, or medical document categories unless specifically shared
 
 ### Document access enforcement
 
@@ -586,7 +570,7 @@ Settings → Household Staff → AddHouseholdStaffSheet remains the manual entry
 
 **Flow:** User forwards email to `[anything]@alfred.getchez.com` > SendGrid Inbound Parse > `receive-email` Edge Function > Claude classification > type-specific handling > inbox item created > user reviews in `InboxItemDetailView`. (Legacy `@alfred.havenhome.dev` and `@projects.havenhome.dev` still route to the same function for backward compatibility — the regex matches all three.)
 
-**Classification types (9):** `contractor_quote`, `estate_document`, `home_document`, `vehicle_document`, `bill_invoice`, `insurance_claim`, `vendor_contact`, `family`, `other`. Vehicle invoices are `bill_invoice` with `vehicleContext: true`.
+**Classification types (9):** `contractor_quote`, `estate_document`, `home_document`, `vehicle_document`, `bill_invoice`, `insurance_claim`, `vendor_contact`, `family`, `other`. (Chez v1: the AI classifier still emits `estate_document` for legal docs the homeowner forwards, but iOS routes it through the standard document flow with no estate-specific UI.) Vehicle invoices are `bill_invoice` with `vehicleContext: true`.
 
 **User confirmation:** ALL documents get `needs_action: true` with `action_type: "confirm_document_category"`. High-confidence docs show "Looks Good" with subtle "Change Category"; low-confidence show picker-first. Insurance claims prompt "Create Claim Project" / "Save as Document" (no auto-project-creation). Quotes prompt "New Project" / "Add to Project" / "Just Save Document".
 
@@ -608,7 +592,7 @@ Settings → Household Staff → AddHouseholdStaffSheet remains the manual entry
 
 **Manual upload (DocumentUploadViewModel):** Same hash + check. Upload BLOCKED on duplicate. Alert with same 3 buttons. `replaceDuplicate()` cleans up old storage file via `HavenSupabase.storage.from("documents").remove()`.
 
-**Email pipeline (receive-email):** `computeContentHash()` computes SHA-256 from attachment base64. `checkDocumentDuplicate()` queries `documents.content_hash` before insert. All 3 document insert paths (estate/home, vehicle, bill) set `content_hash` and check for duplicates. If duplicate found, document is still created but inbox item gets `action_type: "resolve_duplicate"`.
+**Email pipeline (receive-email):** `computeContentHash()` computes SHA-256 from attachment base64. `checkDocumentDuplicate()` queries `documents.content_hash` before insert. All 3 document insert paths (general, vehicle, bill) set `content_hash` and check for duplicates. If duplicate found, document is still created but inbox item gets `action_type: "resolve_duplicate"`.
 
 **Email resolution (process-inbox-item):** `resolve_duplicate` action with sub-actions via `document_category` param: `"replace"` (delete existing + storage), `"save_both"` (keep both), `"delete"` (delete new + storage).
 
@@ -656,15 +640,15 @@ AES-256-GCM document encryption, biometric auth, vault lock, screenshot preventi
 
 ## Strategic Context
 
-**Five moats:** (1) Only app combining estate intelligence + home management, (2) AI that creates intelligence not convenience, (3) Scenario Studio (no equivalent), (4) Free in a paid market, (5) Premium design for premium audience.
+**Five moats (Chez v1):** (1) AI that creates intelligence — invoices parse into tasks, photos identify equipment, recurring cadence gets detected automatically, (2) The Chez concierge layer (homeowner can offload any routine / vendor / task to a real human via the in-app request thread), (3) Vehicle programs — VIN scan → NHTSA recall + AI maintenance schedule + service-record auto-linking, (4) Premium design for premium audience, (5) Free during the homeowner pilot, paid for the handyman provider workspace.
 
-**Competitors:** Homer (freemium, Apple-featured), Trustworthy ($120-240/yr), HomeZada ($59-149/yr), Nines Living (enterprise/$1K+), Everplans ($99/yr), Centriq, Dib.
+**Competitors:** Homer (freemium, Apple-featured), Trustworthy ($120-240/yr — estate-leaning, different market post-v1), HomeZada ($59-149/yr), Nines Living (enterprise/$1K+), Centriq, Dib.
 
-**Key decisions:** No Android/hardware (validate with iPad first). True E2E encryption ruled out (incompatible with server-side AI). SOC 2 deferred. Security messaging must be precise -- no "bank-level" or "end-to-end" overclaims.
+**Key decisions:** No Android/hardware (validate with iPad first). True E2E encryption ruled out (incompatible with server-side AI). SOC 2 deferred. Security messaging must be precise -- no "bank-level" or "end-to-end" overclaims. Estate intelligence (Phase 48) cut from v1; will return as a fresh phase, not by reviving the deleted code.
 
 ## GTM Status
 
-TestFlight active (~10 couples, ~7 active). Estate attorney referral kit in progress. getchez.com live with security page. SendGrid email pipeline configured. Push notifications wired end-to-end.
+TestFlight active (~10 couples, ~7 active). getchez.com live with security page. SendGrid email pipeline configured. Push notifications wired end-to-end.
 
 ## Routines as first-class Services (Phase 66)
 

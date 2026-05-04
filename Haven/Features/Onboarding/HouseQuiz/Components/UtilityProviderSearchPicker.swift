@@ -429,7 +429,6 @@ struct UtilityProviderSearchPicker: View {
         case "pest_control": return "ant.fill"
         case "irrigation": return "sprinkler.and.droplets.fill"
         case "security": return "shield.checkered"
-        case "estate_attorney": return "building.columns.fill"
         case "cpa_tax": return "dollarsign.circle.fill"
         case "financial_advisor": return "chart.line.uptrend.xyaxis"
         case "life_insurance": return "heart.text.square.fill"
@@ -597,7 +596,6 @@ struct UtilityProviderSearchPicker: View {
     /// the sort logic in `filteredProviders` without disturbing the
     /// existing utility flow.
     private static let advisorProviderTypes: Set<String> = [
-        "estate_attorney",
         "cpa_tax",
         "financial_advisor",
         "life_insurance"

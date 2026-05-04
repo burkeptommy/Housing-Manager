@@ -628,6 +628,41 @@ struct VehicleDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
             }
 
+            // Phase 95 — manual recall refresh. The `check-vehicle-recalls`
+            // Edge Function compares the household's VINs against NHTSA's
+            // current campaigns and inserts only new rows. Without a
+            // user-pullable button, recalls only land via the cron sweep
+            // — which is fine for steady state but doesn't give a worried
+            // homeowner a way to confirm "I'm clear right now".
+            HStack {
+                Spacer()
+                Button {
+                    guard let vehicleId = viewModel.vehicle?.id else { return }
+                    Haptics.light()
+                    Task {
+                        do {
+                            _ = try await HavenSupabase.checkVehicleRecalls(vehicleId: vehicleId)
+                            await viewModel.load(vehicleId: vehicleId, force: true)
+                            Haptics.success()
+                        } catch {
+                            print("[VehicleDetail] manual recall check failed: \(error)")
+                            Haptics.error()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 11))
+                        Text("Check for new recalls")
+                            .font(HavenTypography.uiLabelSmall)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Check NHTSA for new recalls on this vehicle")
+            }
+            .padding(.top, 4)
+
             // "View all recalls" link
             if !viewModel.recalls.isEmpty {
                 DisclosureGroup(isExpanded: $showAllRecalls) {

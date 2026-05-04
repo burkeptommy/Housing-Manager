@@ -58,7 +58,7 @@ final class ChezRequestComposeViewModel: ObservableObject {
                 let path = "chez-requests/\(userId)/\(suggestedName)"
                 _ = try await HavenSupabase.client.storage
                     .from("documents")
-                    .upload(path: path, file: data, options: .init(contentType: "image/jpeg", upsert: false))
+                    .upload(path, data: data, options: .init(contentType: "image/jpeg", upsert: false))
                 pendingAttachments.append(
                     ChezAttachmentMeta(
                         path: path,
@@ -87,7 +87,7 @@ final class ChezRequestComposeViewModel: ObservableObject {
         do {
             _ = try await HavenSupabase.client.storage
                 .from("documents")
-                .upload(path: path, file: data, options: .init(contentType: mimeType, upsert: false))
+                .upload(path, data: data, options: .init(contentType: mimeType, upsert: false))
             pendingAttachments.append(
                 ChezAttachmentMeta(
                     path: path,

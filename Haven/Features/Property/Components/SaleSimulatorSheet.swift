@@ -7,12 +7,17 @@ struct SaleSimulatorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var salePrice: Double
-    @State private var feeRate: Double = 0.08
+    @State private var feeRate: Double
 
     init(property: PropertyRow, totalProjectSpend: Double) {
         self.property = property
         self.totalProjectSpend = totalProjectSpend
         _salePrice = State(initialValue: property.currentEstimatedValue ?? property.purchasePrice ?? 0)
+        // Phase 95 — initialize from persisted attribute (set last time the
+        // user moved the slider). Falls back to the historical 8% default.
+        let persisted = property.attributes?["selling_fee_rate"]?.stringValue
+        let parsed = persisted.flatMap(Double.init)
+        _feeRate = State(initialValue: parsed ?? 0.08)
     }
 
     // Computed in realtime
@@ -102,8 +107,21 @@ struct SaleSimulatorSheet: View {
                     .foregroundStyle(HavenColors.textPrimary)
                     .frame(width: 44)
             }
+            .onChange(of: feeRate) { _, newValue in
+                // Phase 95 — persist on every step so the InvestmentSummaryCard
+                // waterfall reflects the user's negotiated rate next time
+                // they open the property. Fire-and-forget; the card already
+                // defaults to 8% if the attribute is missing or malformed.
+                Task {
+                    _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                        propertyId: property.id,
+                        key: "selling_fee_rate",
+                        value: FlexibleValue.string(String(format: "%.4f", newValue))
+                    )
+                }
+            }
 
-            Text("Typical: 5-6% (agent), 1-3% (FSBO), 8-10% (with repairs/staging)")
+            Text("Typical: 5-6% (agent), 1-3% (FSBO), 8-10% (with repairs/staging). Saved for this property.")
                 .font(HavenTypography.uiCaption)
                 .foregroundStyle(HavenColors.textTertiary)
         }

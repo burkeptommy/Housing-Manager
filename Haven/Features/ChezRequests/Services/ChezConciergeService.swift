@@ -370,4 +370,178 @@ extension Notification.Name {
     /// to (or revoked from) Chez. Listeners refresh badges + the
     /// "Standing engagements" surfaces.
     static let chezDelegationChanged = Notification.Name("chezDelegationChanged")
+
+    /// Phase 84.5 — Posted whenever the homeowner's home_assessments row
+    /// changes (status flip, captured data update, completion). Dashboard
+    /// pending card and any other surface listening for assessment state
+    /// reloads on this.
+    static let chezHomeAssessmentChanged = Notification.Name("chezHomeAssessmentChanged")
+
+    /// Phase 84.5 — Posted when a chez_assessment_complete push arrives
+    /// so that the AssessmentReviewView auto-presents.
+    static let openChezAssessmentReview = Notification.Name("openChezAssessmentReview")
+}
+
+// MARK: - Phase 84.5 — Home Assessment wrappers
+
+extension HavenSupabase {
+
+    /// Picks "Have Chez handle it" at signup. Creates (idempotent) a
+    /// `home_assessments` row, stamps `properties.attributes['assessment_mode']
+    /// = 'handyman'`, force-completes the quiz so the quiz card hides,
+    /// notifies the operator side. The returned `assessmentId` is what
+    /// the dashboard pending card should load.
+    static func requestHomeAssessment(
+        propertyId: UUID,
+        notes: String? = nil,
+        preVisitNotes: String? = nil,
+        preVisitPhotos: [String]? = nil
+    ) async throws -> RequestHomeAssessmentResponse {
+        struct Body: Encodable {
+            let action = "request_home_assessment"
+            let property_id: String
+            let notes: String?
+            let pre_visit_notes: String?
+            let pre_visit_photos: [String]?
+        }
+        let data = try await callConciergeEdgeFunction(
+            body: Body(
+                property_id: propertyId.uuidString,
+                notes: notes,
+                pre_visit_notes: preVisitNotes,
+                pre_visit_photos: preVisitPhotos
+            )
+        )
+        return try JSONDecoder().decode(RequestHomeAssessmentResponse.self, from: data)
+    }
+
+    /// Homeowner cancels their pending/in-flight assessment (mode switch
+    /// to DIY, or any other reason). Releases `assessment_mode` so the
+    /// quiz card returns; flips the assessment row to status='cancelled'.
+    static func cancelHomeAssessment(
+        assessmentId: UUID,
+        reason: String? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "cancel_home_assessment"
+            let assessment_id: String
+            let reason: String?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(assessment_id: assessmentId.uuidString, reason: reason)
+        )
+    }
+
+    /// Homeowner asks the operator to move the visit. Just flags the row
+    /// — the operator handles the actual reschedule via the cockpit.
+    static func requestAssessmentReschedule(
+        assessmentId: UUID,
+        notes: String? = nil,
+        preferredDates: [String]? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "request_assessment_reschedule"
+            let assessment_id: String
+            let notes: String?
+            let preferred_dates: [String]?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(
+                assessment_id: assessmentId.uuidString,
+                notes: notes,
+                preferred_dates: preferredDates
+            )
+        )
+    }
+
+    /// Homeowner approves the captured data after handyman submits.
+    /// Flips status='completed'.
+    static func submitAssessmentReview(assessmentId: UUID) async throws {
+        struct Body: Encodable {
+            let action = "submit_assessment_review"
+            let assessment_id: String
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(assessment_id: assessmentId.uuidString)
+        )
+    }
+
+    /// Homeowner flags items the handyman missed or got wrong. Opens a
+    /// follow-up chez_request thread + flips status='corrections_requested'.
+    static func requestAssessmentCorrections(
+        assessmentId: UUID,
+        items: [AssessmentCorrectionItem]
+    ) async throws {
+        struct Body: Encodable {
+            let action = "request_assessment_corrections"
+            let assessment_id: String
+            let items: [AssessmentCorrectionItem]
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(assessment_id: assessmentId.uuidString, items: items)
+        )
+    }
+
+    /// Updates the homeowner's pre-visit prep — notes, photos,
+    /// captured_attributes (year built corrections, has_pets, etc.).
+    /// Deep-merges with whatever's already there.
+    static func updatePreVisitData(
+        assessmentId: UUID,
+        notes: String? = nil,
+        photos: [String]? = nil,
+        attributes: [String: String]? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "update_pre_visit_data"
+            let assessment_id: String
+            let pre_visit_notes: String?
+            let pre_visit_photos: [String]?
+            let captured_attributes: [String: String]?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(
+                assessment_id: assessmentId.uuidString,
+                pre_visit_notes: notes,
+                pre_visit_photos: photos,
+                captured_attributes: attributes
+            )
+        )
+    }
+
+    /// Reads the active home_assessments row for this household / property.
+    /// Returns nil when no active assessment exists.
+    static func fetchHomeAssessment(
+        assessmentId: UUID? = nil,
+        propertyId: UUID? = nil
+    ) async throws -> HomeAssessmentRow? {
+        struct Body: Encodable {
+            let action = "fetch_home_assessment"
+            let assessment_id: String?
+            let property_id: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool
+            let assessment: HomeAssessmentRow?
+        }
+        let data = try await callConciergeEdgeFunction(
+            body: Body(
+                assessment_id: assessmentId?.uuidString,
+                property_id: propertyId?.uuidString
+            )
+        )
+        let response = try JSONDecoder().decode(Response.self, from: data)
+        return response.assessment
+    }
+}
+
+/// Response from `request_home_assessment`.
+struct RequestHomeAssessmentResponse: Decodable {
+    let ok: Bool
+    let assessmentId: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case ok, status
+        case assessmentId = "assessment_id"
+    }
 }

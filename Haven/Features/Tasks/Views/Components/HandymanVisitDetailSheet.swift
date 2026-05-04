@@ -2,15 +2,17 @@ import SwiftUI
 
 /// Detail view for a scheduled handyman visit. Surfaces:
 ///   - Hero with vendor + scheduled date + status
-///   - Full punch list (parsed children from notes)
+///   - Full punch list (structured rows from `handyman_punch_items`,
+///     falling back to notes-parsed children for legacy visits)
 ///   - Action row: Reschedule, Add to list, Cancel
 ///   - Notes about real-time updates (en route / on site / wrapped up)
 ///
 /// Presented from `HandymanTabView` when the user taps the visit hero.
+/// Loads its own punch list per-visit so each upcoming visit (hero or
+/// rail) shows the right items.
 struct HandymanVisitDetailSheet: View {
     let visit: MaintenanceTaskDBRow
     let vendor: ContractorRow?
-    let children: [VisitChildItem]
     let onMessage: () -> Void
     var onReviewQuote: (() -> Void)? = nil
 
@@ -18,6 +20,26 @@ struct HandymanVisitDetailSheet: View {
     @ObservedObject private var coordinator = HandymanRequestCoordinator.shared
     @State private var showRescheduleSheet = false
     @State private var showCancelConfirm = false
+    @State private var structuredItems: [HandymanPunchItemRow] = []
+    @State private var hasLoadedItems = false
+
+    /// Punch list children to render. Prefers structured rows from
+    /// `handyman_punch_items` (the canonical source the field app
+    /// writes to). Falls back to regex-parsing the visit's notes for
+    /// legacy visits the Phase 78 backfill missed.
+    private var displayChildren: [VisitChildItem] {
+        if !structuredItems.isEmpty {
+            return structuredItems.map { row in
+                VisitChildItem(
+                    id: row.id.uuidString,
+                    title: row.title,
+                    estimatedMinutes: row.estimatedMinutes
+                )
+            }
+        }
+        guard let notes = visit.notes, !notes.isEmpty else { return [] }
+        return VisitNotesParser.parsePunchList(from: notes)
+    }
 
     private var dateLabel: String {
         let dateString = visit.scheduledDate ?? visit.nextDueDate
@@ -28,7 +50,7 @@ struct HandymanVisitDetailSheet: View {
     }
 
     private var totalEstimateLabel: String? {
-        let total = children.compactMap { $0.estimatedMinutes }.reduce(0, +)
+        let total = displayChildren.compactMap { $0.estimatedMinutes }.reduce(0, +)
         guard total > 0 else { return nil }
         let hours = Double(total) / 60.0
         if hours < 1 { return "~\(total) min" }
@@ -63,7 +85,7 @@ struct HandymanVisitDetailSheet: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 24)
 
-                    if let notes = visit.notes, !notes.isEmpty, children.isEmpty {
+                    if let notes = visit.notes, !notes.isEmpty, displayChildren.isEmpty, hasLoadedItems {
                         notesFallbackSection(notes: notes)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 24)
@@ -83,6 +105,10 @@ struct HandymanVisitDetailSheet: View {
                 // thread was invisible because Realtime + the chat
                 // sheet read from coordinator.request.
                 await coordinator.load(visit: visit, vendor: vendor)
+                await loadStructuredItems()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
+                Task { await loadStructuredItems() }
             }
             .navigationTitle("Visit details")
             .navigationBarTitleDisplayMode(.inline)
@@ -273,7 +299,7 @@ struct HandymanVisitDetailSheet: View {
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(1.5)
                     .foregroundStyle(HavenColors.textTertiary)
-                Text("\(children.count) item\(children.count == 1 ? "" : "s")")
+                Text("\(displayChildren.count) item\(displayChildren.count == 1 ? "" : "s")")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(HavenColors.textTertiary)
                 Spacer()
@@ -292,12 +318,12 @@ struct HandymanVisitDetailSheet: View {
             }
             .padding(.horizontal, 4)
 
-            if children.isEmpty {
+            if displayChildren.isEmpty {
                 emptyPunchListPlaceholder
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(children.enumerated()), id: \.element.id) { index, child in
-                        VisitChildDetailRow(child: child, isLast: index == children.count - 1)
+                    ForEach(Array(displayChildren.enumerated()), id: \.element.id) { index, child in
+                        VisitChildDetailRow(child: child, isLast: index == displayChildren.count - 1)
                     }
                 }
                 .background(
@@ -349,6 +375,27 @@ struct HandymanVisitDetailSheet: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(HavenColors.beige200, lineWidth: 1)
                 )
+        }
+    }
+
+    // MARK: - Loaders
+
+    /// Load structured punch items for THIS visit. Reads
+    /// `handyman_punch_items WHERE assigned_visit_task_id = visit.id`
+    /// — the canonical source the field app writes to. The home
+    /// screen does the same load against the soonest visit; this
+    /// mirrors that path so any visit drilled in from the rail shows
+    /// its own items instead of the soonest-visit's.
+    private func loadStructuredItems() async {
+        let fetched = (try? await DatabaseService.shared.fetchHandymanPunchItemsForVisit(visitTaskId: visit.id)) ?? []
+        let active = fetched.filter { $0.archivedAt == nil }
+            .sorted { lhs, rhs in
+                if lhs.isDone != rhs.isDone { return !lhs.isDone }
+                return lhs.createdAt < rhs.createdAt
+            }
+        await MainActor.run {
+            self.structuredItems = active
+            self.hasLoadedItems = true
         }
     }
 }

@@ -253,4 +253,44 @@ enum RoutineGroupingEngine {
         default: return nil
         }
     }
+
+    /// Phase 67: Default cadence + active months per routine kind. Single
+    /// source of truth shared by the Q15b vendor capture in
+    /// `HouseQuizAnswerMapper.ensureVendorRoutineForCategory` and by the
+    /// reconciler v2 path in
+    /// `MaintenanceTaskReconciler.ensureRoutineForRoutineTierTemplate`.
+    /// The user can refine cadence later via Q37 or the routine edit sheet.
+    ///
+    /// Returns `(cadenceType, intervalDays, activeMonths)` matching the
+    /// `RoutineInsert` columns. `intervalDays` is only consumed when
+    /// `cadenceType == .customDays`; for the other cadences the column
+    /// stays nil and the cadence_type alone determines the period.
+    static func defaultCadenceForRoutineKind(
+        _ kind: RoutineKind
+    ) -> (RoutineCadenceType, Int, [Int]) {
+        let yearRound = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        switch kind {
+        case .cleaning: return (.biweekly, 14, yearRound)
+        case .landscaping: return (.weekly, 7, [4, 5, 6, 7, 8, 9, 10, 11])
+        case .poolService: return (.weekly, 7, [5, 6, 7, 8, 9])
+        case .pestControl: return (.quarterly, 91, yearRound)
+        case .petWaste: return (.weekly, 7, yearRound)
+        case .mosquitoTick: return (.monthly, 30, [4, 5, 6, 7, 8, 9, 10])
+        case .snowRemoval: return (.annual, 365, [12, 1, 2, 3, 4])
+        case .gutterCleaning: return (.semiannual, 182, yearRound)
+        case .windowCleaning: return (.semiannual, 182, yearRound)
+        case .treeService: return (.annual, 365, yearRound)
+        // Phase 67: handyman_recurring is a singleton on-demand routine —
+        // most callers go through `DatabaseService.fetchOrCreateHandymanRoutine`
+        // which uses customDays/9999 to keep the routine "always present"
+        // without firing on a calendar. The G1 seasonal reminder does its
+        // own April/October anchor check independent of activeMonths. The
+        // values returned here are the spec-aligned spring/fall semantics
+        // for any future caller that creates a handyman routine through
+        // this shared path (e.g. a manual "create routine" affordance for
+        // a household whose preferences want a fixed cadence).
+        case .handymanRecurring: return (.semiannual, 182, [4, 10])
+        default: return (.annual, 365, yearRound)
+        }
+    }
 }

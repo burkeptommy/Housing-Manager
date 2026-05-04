@@ -12,7 +12,9 @@ import type { VisitRow, RequestStatus } from "../lib/types";
 export default function DispatchScreen() {
   const { dashboard, mode, refresh } = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filterChip, setFilterChip] = useState<"all" | "urgent" | "older">("all");
+  // Phase 84.5 — added "assessment" filter to surface free home-assessment
+  // visits separately from standard handyman work.
+  const [filterChip, setFilterChip] = useState<"all" | "urgent" | "older" | "assessment">("all");
   const [assigning, setAssigning] = useState(false);
   const [routeDate, setRouteDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [windowSlot, setWindowSlot] = useState<string>("9-11");
@@ -32,6 +34,11 @@ export default function DispatchScreen() {
       if (filterChip === "older") {
         const created = new Date(u.updatedAt).getTime();
         return Date.now() - created > 24 * 60 * 60 * 1000;
+      }
+      // Phase 84.5 — show only free home-assessment visits when this
+      // chip is active.
+      if (filterChip === "assessment") {
+        return u.visitType === "home_assessment";
       }
       return true;
     });
@@ -157,8 +164,8 @@ export default function DispatchScreen() {
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
           <div className="ops-section-label">Unassigned · {filteredQueue.length}</div>
         </div>
-        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-          {(["all", "urgent", "older"] as const).map((c) => (
+        <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+          {(["all", "urgent", "older", "assessment"] as const).map((c) => (
             <button
               key={c}
               className="ops-button ops-button--ghost"
@@ -169,7 +176,7 @@ export default function DispatchScreen() {
               }}
               onClick={() => setFilterChip(c)}
             >
-              {c === "all" ? "All" : c === "urgent" ? "Need response" : "24h+"}
+              {c === "all" ? "All" : c === "urgent" ? "Need response" : c === "older" ? "24h+" : "Home assessments"}
             </button>
           ))}
         </div>

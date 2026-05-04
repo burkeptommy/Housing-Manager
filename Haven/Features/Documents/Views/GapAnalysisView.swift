@@ -206,7 +206,7 @@ struct GapAnalysisView: View {
             .frame(maxWidth: .infinity)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Estate readiness score: \(result.overallReadinessScore) out of 100")
+        .accessibilityLabel("Document readiness score: \(result.overallReadinessScore) out of 100")
     }
 
     private func scoreColor(_ score: Int) -> Color {

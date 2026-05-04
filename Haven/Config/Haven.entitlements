@@ -10,6 +10,9 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:getchez.com</string>
+		<string>applinks:www.getchez.com</string>
+		<string>applinks:api.getchez.com</string>
 		<string>applinks:havenhome.dev</string>
 		<string>applinks:api.havenhome.dev</string>
 	</array>

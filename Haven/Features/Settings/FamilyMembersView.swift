@@ -21,7 +21,7 @@ struct FamilyMembersView: View {
                     ContentUnavailableView {
                         Label("Your Family", systemImage: "person.3.fill")
                     } description: {
-                        Text("Add family members to track documents, estate planning, and readiness for each person.")
+                        Text("Add family members so Alfred and Chez can match documents, vehicles, and tasks to the right person.")
                     } actions: {
                         Button("Add Family Member") { showAddChooser = true }
                             .buttonStyle(.borderedProminent)

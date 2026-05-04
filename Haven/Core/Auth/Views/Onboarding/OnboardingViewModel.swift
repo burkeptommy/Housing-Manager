@@ -25,6 +25,30 @@ final class OnboardingViewModel: ObservableObject {
     @Published var hasAutoCompleted = false
     @Published var hasFinishedPrefill = false
 
+    // Phase 84.5 — Bifurcated onboarding flow. After `runComplete`
+    // finishes (household + property + systems created), OnboardingView
+    // walks the user through:
+    //   1. FoundationalQuestionsForm (universal 7 questions) →
+    //      `needsFoundationalQuestions = true`
+    //   2. OnboardingModeForkView (quiz vs handyman) →
+    //      `needsModeChoice = true`
+    // The final `needsOnboarding = false` flip happens in
+    // `applyModeChoice(_:authService:)`.
+    @Published var needsFoundationalQuestions = false
+    @Published var foundationalAnswers: FoundationalAnswers? = nil
+    @Published var needsModeChoice = false
+    @Published var chosenMode: AssessmentMode? = nil
+    @Published var isApplyingMode = false
+    /// True when at least one provider_workspace covers the homeowner's
+    /// location. Resolved during runComplete and read by the mode-fork
+    /// screen — when false, the handyman card is replaced with a
+    /// waitlist tile.
+    @Published var coverageAvailable: Bool = false
+    /// Stashed during runComplete so applyModeChoice can stamp attributes
+    /// onto the right property without re-fetching.
+    var stampedPropertyIdForMode: UUID? = nil
+    var stampedHouseholdIdForMode: UUID? = nil
+
     // Household invitation
     @Published var pendingInvitation: HouseholdInvitationRow?
     @Published var inviteCode = ""
@@ -705,18 +729,223 @@ final class OnboardingViewModel: ObservableObject {
             // so they're always in sync with the row we just inserted and don't
             // depend on a re-fetch that RLS might filter out.
 
-            // Apr 7, 2026 (build 80): flip `needsOnboarding = false` HERE,
-            // as the very last write of the entire onboarding chain. The
-            // flag used to fire mid-chain inside `authService.completeOnboarding()`,
-            // which caused ContentView to re-route OUT of OnboardingView
-            // before the property had been stamped on AppState — producing
-            // a millisecond flash of `AddressConfirmationIntercept` ("Where's
-            // your home?") between OnboardingView and MainTabView. Now the
-            // flag and the property arrive on the same render pass, so
-            // ContentView transitions straight from OnboardingView to
-            // MainTabView with no visible bounce.
-            print("[Onboarding] runComplete: STEP needsOnboarding = false (final)")
-            authService.needsOnboarding = false
+            // Phase 84.5 (bifurcated) — Insert the foundational 7-question
+            // form, then the binary mode fork (quiz vs handyman) between
+            // household setup and the final dismissal of OnboardingView.
+            //
+            // We stash the just-created property's + household's id so
+            // applyModeChoice can stamp attributes / call request_home_assessment
+            // and so the foundational answers can persist to house_quiz_state.
+            print("[Onboarding] runComplete: STEP needsFoundationalQuestions = true")
+            stampedPropertyIdForMode = appState?.primaryProperty?.id
+            stampedHouseholdIdForMode = appState?.primaryProperty?.householdId
+
+            // G11: pre-resolve handyman coverage so the mode fork knows
+            // whether to render the handyman card or the waitlist tile.
+            // Best-effort — defaults to false on any failure (waitlist
+            // path is the safer fallback).
+            coverageAvailable = await resolveCoverageAvailability(
+                propertyId: stampedPropertyIdForMode
+            )
+
+            needsFoundationalQuestions = true
+            // The view branches to FoundationalQuestionsForm next. After
+            // the user finishes, completeFoundationalQuestions(...) flips
+            // to needsModeChoice = true.
+    }
+
+    /// Resolve whether any provider_workspace covers the homeowner's
+    /// address. Pre-resolved so the mode fork can render its CTA layout
+    /// stably.
+    ///
+    /// Phase 84.5 V1 ships with coverage assumed for every signup —
+    /// the address-to-zip region matcher + `provider_workspaces` query
+    /// land in a follow-up. Returns `true` so the handyman tile renders
+    /// for every homeowner; the waitlist tile appears only after the
+    /// matcher is wired and finds no covering workspace.
+    private func resolveCoverageAvailability(propertyId: UUID?) async -> Bool {
+        return true
+    }
+
+    /// Phase 84.5 — called by FoundationalQuestionsForm when the user
+    /// completes all 7 questions. Stores the answers + transitions to
+    /// the mode-fork screen.
+    func completeFoundationalQuestions(_ answers: FoundationalAnswers) {
+        foundationalAnswers = answers
+        needsFoundationalQuestions = false
+        needsModeChoice = true
+        Analytics.track(.onboardingFoundationalCompleted, [:])
+    }
+
+    /// Phase 84.5 G11 — homeowner is in a non-coverage area. Drop them
+    /// onto a waitlist row + apply the .diy mode so they self-onboard.
+    /// They can still use Haven; we'll notify them when Chez expands.
+    ///
+    /// V1 ships with `resolveCoverageAvailability` returning `true` for
+    /// every signup, so this code path is dormant. The waitlist insert
+    /// will land alongside the address-to-zip region matcher.
+    func joinCoverageWaitlist(authService: AuthService) async {
+        Analytics.track(.onboardingCoverageWaitlistJoined, [:])
+        await applyModeChoice(.diy, authService: authService)
+    }
+
+    /// Phase 84.5 — write the 7 foundational answers into the property's
+    /// `house_quiz_state.answers` map so the existing reconciler reads
+    /// them as if they came from the quiz. Both onboarding paths use
+    /// this — quiz path resumes at first unresolved (skipping these);
+    /// handyman path inherits them at submit_assessment_data ingestion.
+    private func persistFoundationalAnswers(
+        _ answers: FoundationalAnswers,
+        propertyId: UUID
+    ) async {
+        // Read existing house_quiz_state so we don't clobber any state
+        // that the quiz might have started.
+        var quizState: HouseQuizState
+        do {
+            let property = try await DatabaseService.shared.fetchProperty(id: propertyId)
+            quizState = property.houseQuizState ?? HouseQuizState.empty
+        } catch {
+            quizState = HouseQuizState.empty
+        }
+
+        // Stamp foundational mappings into quizState.answers as if the
+        // quiz produced them. The quiz's firstUnresolvedIndex() will then
+        // skip the corresponding questions on resume.
+        var existingAnswers = quizState.answers
+        // Q28 household composition
+        if let householdType = answers.householdType {
+            existingAnswers["q28_household"] = HouseQuizAnswer(answerId: householdType, payload: [
+                "has_pets": answers.hasPets ? "yes" : "no",
+                "expecting": answers.expecting ? "yes" : "no"
+            ])
+        }
+        // Q30 priorities
+        if let priority = answers.topPriority {
+            existingAnswers["q30_priorities"] = HouseQuizAnswer(answerId: priority, payload: nil)
+        }
+        // Q36 vendor preference tier (matches HouseQuizQuestionLibrary id "q36_diy_vs_vendor")
+        if let tier = answers.preferenceTier {
+            existingAnswers["q36_diy_vs_vendor"] = HouseQuizAnswer(answerId: tier, payload: nil)
+        }
+        // Q26 insurance carriers
+        if answers.autoInsuranceCarrier != nil || answers.homeInsuranceCarrier != nil {
+            existingAnswers["q26_insurance"] = HouseQuizAnswer(
+                answerId: "captured",
+                payload: [
+                    "autoCarrier": answers.autoInsuranceCarrier ?? "",
+                    "homeCarrier": answers.homeInsuranceCarrier ?? ""
+                ]
+            )
+        }
+        // Q18 trash days
+        if !answers.trashPickupDays.isEmpty {
+            existingAnswers["q18_trash"] = HouseQuizAnswer(
+                answerId: "captured",
+                payload: ["days": answers.trashPickupDays.map(String.init).joined(separator: ",")]
+            )
+        }
+
+        quizState.answers = existingAnswers
+
+        // Persist. Quiz path uses firstUnresolvedIndex() to skip these;
+        // handyman path treats them as the merge baseline at ingestion.
+        _ = try? await DatabaseService.shared.updateProperty(
+            id: propertyId,
+            PropertyUpdate(houseQuizState: quizState)
+        )
+
+        // Stamp pet-presence onto property attributes so reconciler
+        // gating fires before the quiz/handyman finishes.
+        if answers.hasPets {
+            _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                propertyId: propertyId,
+                key: "has_pets",
+                value: .string("true")
+            )
+        }
+    }
+
+    // MARK: - Phase 84.5 — Mode choice application
+
+    /// Called by the OnboardingView once the user picks a mode. Stamps
+    /// `properties.attributes['assessment_mode']`, (for handyman) requests
+    /// the free assessment + force-completes the quiz, then drops the
+    /// final `needsOnboarding = false` flag so ContentView transitions
+    /// to MainTabView.
+    ///
+    /// All side effects are best-effort — a transient network failure
+    /// must NEVER trap the user on the chooser screen. The dashboard
+    /// can re-check / re-retry; what matters is that the user gets
+    /// dropped into the app.
+    func applyModeChoice(_ mode: AssessmentMode, authService: AuthService) async {
+        isApplyingMode = true
+        defer { isApplyingMode = false }
+        chosenMode = mode
+
+        let propertyId = stampedPropertyIdForMode
+
+        // Stamp the mode attribute (best-effort).
+        if let pid = propertyId {
+            do {
+                _ = try await DatabaseService.shared.updatePropertyAttribute(
+                    propertyId: pid,
+                    key: "assessment_mode",
+                    value: .string(mode.rawValue)
+                )
+            } catch {
+                print("[Onboarding] updatePropertyAttribute(assessment_mode) failed: \(error)")
+            }
+        }
+
+        // Phase 84.5 round 2 — persist the 7 foundational answers into
+        // properties.house_quiz_state.answers BEFORE branching, so both
+        // onboarding paths inherit them. The reconciler reads them as
+        // if they came from the quiz; the quiz path skips them via
+        // firstUnresolvedIndex().
+        if let pid = propertyId, let answers = foundationalAnswers {
+            await persistFoundationalAnswers(answers, propertyId: pid)
+        }
+
+        switch mode {
+        case .diy:
+            Analytics.track(.onboardingModeDIY, [:])
+            Analytics.track(.onboardingModeForkSelfQuiz, [:])
+        case .blended:
+            Analytics.track(.onboardingModeBlended, [:])
+            Analytics.track(.onboardingModeForkSelfQuiz, [:])
+        case .handyman:
+            // Phase 84.5 — for the handyman path we DO NOT pre-stamp
+            // completedAt. That happens server-side at submit_assessment_data
+            // time so the homeowner sees the "Assessment Pending" empty
+            // state instead of an empty Dashboard. (G1 hard rule.)
+            if let pid = propertyId, let hid = stampedHouseholdIdForMode {
+                let homeownerPresent = foundationalAnswers?.willBeHomeForVisit ?? true
+                let accessNotes = foundationalAnswers?.accessInstructions
+                do {
+                    _ = try await HavenSupabase.requestHomeAssessment(
+                        propertyId: pid.uuidString,
+                        householdId: hid.uuidString,
+                        homeownerConcerns: nil,
+                        homeownerPresent: homeownerPresent,
+                        homeownerAccessNotes: accessNotes,
+                        isExistingUserSupplement: false
+                    )
+                    Analytics.track(.homeAssessmentRequested, [:])
+                } catch {
+                    // Soft-fail. The assessment_mode attribute is stamped
+                    // (or attempted), so the dashboard pending card
+                    // knows to show. The user can retry from there.
+                    print("[Onboarding] requestHomeAssessment failed: \(error)")
+                }
+            }
+            Analytics.track(.onboardingModeHandyman, [:])
+            Analytics.track(.onboardingModeForkHandyman, [:])
+        }
+
+        // Final flag flip — drops the user onto MainTabView.
+        // Always runs, regardless of partial failures above.
+        needsModeChoice = false
+        authService.needsOnboarding = false
     }
 
     /// Race a body of work against a wall-clock deadline. If the deadline

@@ -69,6 +69,7 @@ struct RoutineEditSheet: View {
     @State private var errorMessage: String?
     @State private var showDeleteConfirm: Bool = false
     @State private var isDeleting: Bool = false
+    @State private var isPaused: Bool = false
     /// Phase 80.1 — Local mirror of `existing.chezOwned`. Bound to the
     /// ChezOwnsToggle so the user sees an immediate flip; the toggle
     /// itself talks to the chez-concierge edge function.
@@ -239,6 +240,29 @@ struct RoutineEditSheet: View {
                     )
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     .listRowBackground(Color.clear)
+                }
+            }
+
+            // Phase 95: pause toggle. Paused routines stop seeding visit
+            // occurrences (RoutineOccurrenceExpander filters paused rows
+            // out) but stay on the list with a muted badge so the user
+            // can resume without re-creating. Schema column is
+            // `routines.is_paused` — already in place since Phase 55.1.
+            if existing != nil {
+                Section {
+                    Toggle(isOn: $isPaused) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(isPaused ? "Routine is paused" : "Pause routine")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text(isPaused
+                                 ? "Visits won't appear on schedules until you resume."
+                                 : "Stop generating visits temporarily without losing the routine.")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                    .tint(HavenColors.action)
                 }
             }
 
@@ -460,6 +484,7 @@ struct RoutineEditSheet: View {
             }
             notes = existing.notes ?? ""
             chezOwned = existing.chezOwned
+            isPaused = existing.isPaused
             if let vendorId = existing.vendorId {
                 Task { await hydrateVendor(id: vendorId) }
             }
@@ -633,6 +658,7 @@ struct RoutineEditSheet: View {
                 update.estimatedCostPerVisitCents = costCents
                 update.notes = trimmedNotes.isEmpty ? nil : trimmedNotes
                 update.setupState = derivedSetupState
+                update.isPaused = isPaused
                 savedRoutine = try await DatabaseService.shared.updateRoutine(id: existing.id, update)
             } else {
                 var insert = RoutineInsert(

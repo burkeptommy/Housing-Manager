@@ -240,7 +240,7 @@ struct OnboardingFamilyStep: View {
                         .foregroundStyle(HavenColors.textPrimary)
                     Text("Family Members")
                         .font(HavenTypography.title2)
-                    Text("Add people named in your estate documents — children, parents, guardians, or trustees. Chez will match them when you upload documents.")
+                    Text("Add the people who live in or rely on your home — partners, children, parents, or other family members. Chez will match them when you upload documents.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -316,7 +316,7 @@ struct OnboardingFeaturesStep: View {
 
             VStack(alignment: .leading, spacing: 16) {
                 featureRow(icon: "house.fill", title: "Home Management", description: "Track systems, maintenance, vendors, and costs")
-                featureRow(icon: "doc.text.fill", title: "Document Vault", description: "Securely organize estate and property documents")
+                featureRow(icon: "doc.text.fill", title: "Document Vault", description: "Securely organize property and household documents")
                 featureRow(icon: "sparkles", title: "Alfred AI", description: "Personalized guidance, scenarios, and gap analysis")
             }
             .padding(.horizontal, 8)
@@ -373,7 +373,7 @@ struct OnboardingModulesStep: View {
                     icon: "doc.text.fill",
                     title: "Document Vault",
                     items: [
-                        "Upload and organize estate documents with AI analysis",
+                        "Upload and organize property documents with AI analysis",
                         "Expiration reminders and Family Reference Binder"
                     ]
                 )

@@ -200,6 +200,7 @@ struct HomeAssessmentPendingCard: View {
         case .submitted: return "Setting up your home"
         case .awaitingReview: return "Ready to review"
         case .correctionsRequested: return "Following up"
+        case .ingestionFailed: return "Setup paused"
         case .completed: return "All set"
         case .cancelled: return "Cancelled"
         }
@@ -214,6 +215,7 @@ struct HomeAssessmentPendingCard: View {
         case .submitted: return "gearshape.2.fill"
         case .awaitingReview: return "checkmark.seal.fill"
         case .correctionsRequested: return "arrow.triangle.2.circlepath"
+        case .ingestionFailed: return "exclamationmark.triangle.fill"
         case .completed: return "checkmark.circle.fill"
         case .cancelled: return "xmark.circle"
         }
@@ -238,6 +240,8 @@ struct HomeAssessmentPendingCard: View {
             return "Your home is set up."
         case .correctionsRequested:
             return "We're following up on a few items."
+        case .ingestionFailed:
+            return "We hit a snag setting up your home."
         case .completed:
             return "Welcome to your fully-set-up home."
         case .cancelled:
@@ -261,6 +265,8 @@ struct HomeAssessmentPendingCard: View {
             return "Tap to review what we captured for you."
         case .correctionsRequested:
             return "Your handyman will return to fix the items you flagged."
+        case .ingestionFailed:
+            return "Our team is on it. We'll text you once setup completes."
         case .completed:
             return "Everything's been set up for you."
         case .cancelled:

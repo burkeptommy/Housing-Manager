@@ -20,10 +20,7 @@ struct TrustedContactFormView: View {
     private var isEditing: Bool { editingContact != nil }
 
     private let roleOptions = [
-        ("estate_attorney", "Estate Attorney"),
-        ("executor", "Executor"),
         ("financial_advisor", "Financial Advisor"),
-        ("trustee", "Trustee"),
         ("accountant", "Accountant"),
         ("insurance_agent", "Insurance Agent"),
         ("family", "Family Member"),

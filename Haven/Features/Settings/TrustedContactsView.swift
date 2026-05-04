@@ -12,7 +12,7 @@ struct TrustedContactsView: View {
                 ContentUnavailableView {
                     Label("Your Trusted Circle", systemImage: "person.badge.key")
                 } description: {
-                    Text("Add trusted contacts like your attorney, executor, or financial advisor. They can be granted access to specific documents for estate planning.")
+                    Text("Add trusted contacts like your financial advisor, accountant, or insurance agent. They can be granted access to specific documents.")
                 } actions: {
                     Button {
                         showAddContact = true

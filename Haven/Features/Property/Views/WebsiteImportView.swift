@@ -55,12 +55,27 @@ struct WebsiteImportView: View {
                     )
 
                     if let error {
-                        Text(error)
-                            .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.critical)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(error)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.critical)
+                            // Phase 95 — explicit fallback. After an error,
+                            // surface the manual-entry path so the user
+                            // isn't stuck retrying a failing edge function.
+                            Button {
+                                Haptics.light()
+                                let fallback = ImportedVendorData(website: url, source: .website)
+                                onResult(fallback)
+                            } label: {
+                                Text("Enter details manually instead →")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.action)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
 
-                    HavenButton(title: isLoading ? "Scanning website..." : "Extract Contact Info") {
+                    HavenButton(title: isLoading ? "Scanning website..." : (error == nil ? "Extract Contact Info" : "Try again")) {
                         Task { await extractFromWebsite() }
                     }
                     .disabled(url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)

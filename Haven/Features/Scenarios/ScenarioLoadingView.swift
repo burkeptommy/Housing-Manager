@@ -19,12 +19,12 @@ struct ScenarioLoadingView: View {
     ]
 
     private let funFacts = [
-        "The average American family has 4 key estate documents.",
-        "Only 33% of Americans have a will or living trust.",
-        "Probate can take 6-18 months and cost 3-7% of the estate.",
-        "Updating beneficiaries takes about 15 minutes per account.",
-        "A properly funded trust avoids probate entirely.",
-        "The lifetime gift tax exemption is $13.61 million per person in 2024.",
+        "Homes maintained well sell for ~7.4% more than neglected ones.",
+        "The average homeowner spends $4,283/year on home maintenance.",
+        "Skipped HVAC tune-ups can cut system lifespan by 30-50%.",
+        "Replacing a roof early can prevent 5x more in interior damage.",
+        "Annual chimney sweeps prevent 90% of chimney fires.",
+        "Home insurance claims average $13,800; a quarter are water-related.",
         "529 plans can now be rolled over to Roth IRAs (up to $35K).",
         "Cost segregation studies can accelerate depreciation by 10-15 years.",
     ]

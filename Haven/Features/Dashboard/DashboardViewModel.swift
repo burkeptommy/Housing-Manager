@@ -28,21 +28,8 @@ struct ActivityItem: Identifiable {
     let date: Date
 }
 
-struct CategoryScore: Identifiable {
-    let id = UUID()
-    let category: String
-    let percentage: Double
-    let actual: Int
-    let expected: Int
-}
-
 @MainActor
 final class DashboardViewModel: ObservableObject {
-    @Published var overallReadiness: Double = 0
-    @Published var categoryScores: [CategoryScore] = []
-    @Published var uploadedCount: Int = 0
-    @Published var missingCount: Int = 0
-    @Published var expiringCount: Int = 0
     @Published var upcomingExpirations: [ExpirationItem] = []
     @Published var overdueMaintenanceTasks: [MaintenanceTaskDBRow] = []
     @Published var dueThisWeekTasks: [MaintenanceTaskDBRow] = []
@@ -134,11 +121,6 @@ final class DashboardViewModel: ObservableObject {
     /// user-assignment filtering in computeThisWeekItems.
     private var currentUserId: UUID?
 
-    /// Foundation: contextual estate card that only shows when actionable.
-    @Published var shouldShowFoundation: Bool = false
-    @Published var foundationMessage: String = ""
-    @Published var foundationIcon: String = "doc.text.fill"
-
     var vendorCoverageRatio: Double {
         guard totalVendorSystemCount > 0 else { return 1.0 }
         return Double(coveredSystemCount) / Double(totalVendorSystemCount)
@@ -186,7 +168,7 @@ final class DashboardViewModel: ObservableObject {
         case 11:
             return "Winterization window. Irrigation blowout, exterior paint touch-up."
         case 12, 1, 2:
-            return "Winter mode. Indoor maintenance only. Good time to review estate documents."
+            return "Winter mode. Indoor maintenance only. Good time to plan spring projects."
         default:
             return nil
         }
@@ -325,9 +307,6 @@ final class DashboardViewModel: ObservableObject {
     @Published var unresolvedVehicleRecalls: Int = 0
     @Published var propertyNeedsAddress: PropertyRow?
 
-    // Estate drip card (Phase 48)
-    @Published var estateState: EstateStateRow?
-
     /// Phase 50 (sub-phase B first-login): the household's
     /// `*@alfred.havenhome.dev` forwarding address. Loaded by
     /// `loadHouseholdEmail()` in `fetchAll()` and surfaced inside the
@@ -342,12 +321,6 @@ final class DashboardViewModel: ObservableObject {
     /// applied inside `computeCoverage` so swiped rows stay hidden across
     /// dashboard reloads.
     @Published var dismissedCoverageCategories: Set<String> = []
-
-    // Chez v1: shouldShowEstateDripCard + dismissEstateDrip removed —
-    // estate management is out of v1 scope. estateState property kept
-    // as @Published var for now since RecommendationEngine + edge
-    // function context still reference it; SmartRecommendations cleanup
-    // and estateState removal land in the same Phase 3 sweep.
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -635,20 +608,6 @@ final class DashboardViewModel: ObservableObject {
             ))
         }
 
-        // 6. Estate readiness nudge (if score < 20% and getting started is complete)
-        if !showGettingStarted && overallReadiness < 20 {
-            items.append(AttentionItem(
-                id: UUID(),
-                sourceId: nil,
-                title: "Upload estate documents",
-                subtitle: "Protect your family's future",
-                icon: "doc.badge.plus",
-                urgencyColor: HavenColors.navy800,
-                daysRemaining: 999,
-                kind: .estateNudge
-            ))
-        }
-
         return items.sorted { $0.daysRemaining < $1.daysRemaining }
     }
 
@@ -656,8 +615,7 @@ final class DashboardViewModel: ObservableObject {
         guard cancellables.isEmpty else { return }
         let names: [Notification.Name] = [
             .maintenanceTaskChanged, .homeSystemChanged, .contractorChanged,
-            .documentChanged, .propertyChanged, .projectChanged,
-            .estateStateChanged
+            .documentChanged, .propertyChanged, .projectChanged
         ]
         for name in names {
             NotificationCenter.default.publisher(for: name)
@@ -702,10 +660,10 @@ final class DashboardViewModel: ObservableObject {
         // Each task updates @Published properties on MainActor independently.
         await withTaskGroup(of: Void.self) { group in
             let methods: [() async -> Void] = [
-                loadCompletionScores, loadExpirations, loadOverdueMaintenance,
+                loadExpirations, loadOverdueMaintenance,
                 loadRecentDocuments, loadUserName, loadGettingStartedState,
                 loadRecommendationData, loadEnrichmentData, loadInboxItems, loadVehicleAlerts,
-                loadEstateState, loadVendorVisits, loadHouseholdEmail,
+                loadVendorVisits, loadHouseholdEmail,
                 loadHandymanPunchCount,
                 loadHandymanSeasonalReminder,
                 loadChezOwnershipCounts,
@@ -729,7 +687,6 @@ final class DashboardViewModel: ObservableObject {
 
         // Build 90: compute derived dashboard state after all data is loaded
         computeThisWeekItems()
-        computeFoundationState()
         computeRecentActivity()
     }
 
@@ -987,25 +944,6 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-    private func loadCompletionScores() async {
-        do {
-            let readiness = try await DatabaseService.shared.calculateEstateReadiness()
-            overallReadiness = readiness.overallPercentage
-            categoryScores = readiness.sectionScores.map { score in
-                CategoryScore(
-                    category: score.section,
-                    percentage: score.percentage,
-                    actual: score.filledCategories,
-                    expected: score.totalCategories
-                )
-            }
-            uploadedCount = readiness.uploadedCount
-            missingCount = readiness.missingCount
-            expiringCount = readiness.expiringCount
-        } catch {
-            print("[Dashboard] Failed to calculate readiness: \(error)")
-        }
-    }
 
     private func loadExpirations() async {
         var items: [ExpirationItem] = []
@@ -1358,14 +1296,6 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             print("[Dashboard] Failed to load vehicle alerts: \(error)")
         }
-    }
-
-    private func loadEstateState() async {
-        // Chez v1: estate state fetch is a no-op. The property is kept on
-        // the view model so RecommendationEngine + activity feed can still
-        // pass it through, but it always reads as nil and nothing in the
-        // UI depends on it any more.
-        estateState = nil
     }
 
     func loadInboxItems() async {
@@ -1755,16 +1685,6 @@ final class DashboardViewModel: ObservableObject {
         _ = try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)
         Haptics.light()
         await refresh()
-    }
-
-    /// Chez v1: estate-driven foundation card removed from the Dashboard.
-    /// The function is now a no-op so existing call sites keep compiling
-    /// while the published flags stay false. The properties themselves
-    /// (`shouldShowFoundation`, `foundationMessage`, `foundationIcon`)
-    /// stay declared so anything observing them doesn't crash; they
-    /// can be removed alongside the SmartRecommendations estate sweep.
-    func computeFoundationState() {
-        shouldShowFoundation = false
     }
 
     // MARK: - Phase 50: Recent Activity

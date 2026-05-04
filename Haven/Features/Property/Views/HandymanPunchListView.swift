@@ -22,6 +22,12 @@ struct HandymanPunchListView: View {
     /// `.manual` entries are promotable — `.task` rows are already on
     /// the maintenance rail.
     @State private var promotingEntry: HandymanPunchItemRow?
+    /// Phase 95 — inline title editing. Holds the punch item being
+    /// edited; its title is bound to `editedTitle` while the alert is
+    /// open. Only `.manual` items are editable (template-seeded items
+    /// derive their title from the catalog and shouldn't drift).
+    @State private var editingItem: HandymanPunchItemRow?
+    @State private var editedTitle: String = ""
 
     var body: some View {
         Group {
@@ -122,6 +128,31 @@ struct HandymanPunchListView: View {
                 }
             }
             .presentationDetents([.medium])
+        }
+        // Phase 95 — inline title edit alert. Bound to `editingItem` so a
+        // long-press on a manual punch row opens this with the current
+        // title prefilled. Saves through the view model's update helper.
+        .alert("Edit punch item", isPresented: Binding(
+            get: { editingItem != nil },
+            set: { if !$0 { editingItem = nil } }
+        )) {
+            TextField("Title", text: $editedTitle)
+            Button("Save") {
+                if let item = editingItem {
+                    let trimmed = editedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty, trimmed != item.title {
+                        Task {
+                            await viewModel.updateTitle(item: item, title: trimmed, householdId: householdId, propertyId: propertyId)
+                        }
+                    }
+                }
+                editingItem = nil
+            }
+            Button("Cancel", role: .cancel) {
+                editingItem = nil
+            }
+        } message: {
+            Text("What needs fixing? Keep it short — the handyman reads this on the day of the visit.")
         }
         .overlay(alignment: .top) {
             if let toast = viewModel.toast {
@@ -240,6 +271,26 @@ struct HandymanPunchListView: View {
                                 .clipShape(Capsule())
                         }
                     }
+                }
+            }
+            // Phase 95 — context-menu edit + remove. The X-button stays as
+            // the primary remove affordance; this gives long-press users
+            // an explicit Edit + Remove pair without crowding the row.
+            .contextMenu {
+                if let manual = entry.manualPunchItem {
+                    Button {
+                        Haptics.light()
+                        editedTitle = manual.title
+                        editingItem = manual
+                    } label: {
+                        Label("Edit title", systemImage: "pencil")
+                    }
+                }
+                Button(role: .destructive) {
+                    Haptics.medium()
+                    Task { await viewModel.archive(entry: entry) }
+                } label: {
+                    Label("Remove from punch list", systemImage: "trash")
                 }
             }
         }
@@ -839,6 +890,22 @@ final class HandymanPunchListViewModel: ObservableObject {
             Analytics.track(.handymanPunchItemRemoved, ["source": item.source])
         } catch {
             print("[HandymanPunchListViewModel] archive failed: \(error)")
+        }
+    }
+
+    /// Phase 95 — inline title edit. Writes the new title to Supabase
+    /// and re-loads the punch list so the UI reflects the change. Posts
+    /// the punch-list-changed notification so any other surface that's
+    /// observing (Tasks tab handyman row count, Maintenance hub) refreshes.
+    /// `HandymanPunchItemRow.title` is immutable, so we re-fetch rather
+    /// than mutating the local cache.
+    func updateTitle(item: HandymanPunchItemRow, title: String, householdId: UUID, propertyId: UUID? = nil) async {
+        do {
+            try await db.updateHandymanPunchItemTitle(id: item.id, title: title)
+            await load(householdId: householdId, propertyId: propertyId)
+            NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
+        } catch {
+            print("[HandymanPunchListViewModel] update title failed: \(error)")
         }
     }
 

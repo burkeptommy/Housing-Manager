@@ -29,9 +29,8 @@ final class ChatViewModel: ObservableObject {
 
     let suggestedPrompts = [
         "What documents am I missing?",
-        "Summarize my estate plan",
         "What maintenance is overdue?",
-        "Explain what a pour-over will is",
+        "Summarize my home insurance",
         "What warranties are expiring soon?"
     ]
 

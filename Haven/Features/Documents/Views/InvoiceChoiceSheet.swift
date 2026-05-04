@@ -189,8 +189,10 @@ struct InvoiceChoiceSheet: View {
             do {
                 async let propsTask = DatabaseService.shared.fetchProperties()
                 async let vehiclesTask = DatabaseService.shared.fetchVehicles()
+                async let docTask = DatabaseService.shared.fetchDocument(id: review.documentId)
                 properties = try await propsTask
                 vehicles = try await vehiclesTask
+                let document = try? await docTask
 
                 if properties.count == 1 {
                     selectedPropertyId = properties[0].id
@@ -199,13 +201,27 @@ struct InvoiceChoiceSheet: View {
                     selectedVehicleId = vehicles[0].id
                 }
 
-                // Auto-detect vehicle invoice from document title keywords
-                let titleLower = review.documentTitle.lowercased()
-                let vehicleKeywords = ["oil change", "tire", "brake", "auto", "vehicle", "car service",
-                                       "mechanic", "transmission", "alignment", "inspection", "smog",
-                                       "emission", "dealer", "body shop", "collision"]
-                if vehicleKeywords.contains(where: { titleLower.contains($0) }) && !vehicles.isEmpty {
+                // Phase 95 — auto-select vehicle when `analyze-document`
+                // already matched one. `documents.metadata.matched_vehicle_ids`
+                // is populated by the VIN-detection pass; previously the user
+                // had to re-pick even though the server knew. We now flip
+                // mode + select the matched row automatically; users can
+                // still toggle to property if the match was wrong.
+                let matchedVehicleIds = document?.metadata?.matchedVehicleIds ?? []
+                if let firstMatchString = matchedVehicleIds.first,
+                   let firstMatchId = UUID(uuidString: firstMatchString),
+                   vehicles.contains(where: { $0.id == firstMatchId }) {
                     mode = .vehicle
+                    selectedVehicleId = firstMatchId
+                } else {
+                    // Fallback to title-keyword heuristic when no VIN match.
+                    let titleLower = review.documentTitle.lowercased()
+                    let vehicleKeywords = ["oil change", "tire", "brake", "auto", "vehicle", "car service",
+                                           "mechanic", "transmission", "alignment", "inspection", "smog",
+                                           "emission", "dealer", "body shop", "collision"]
+                    if vehicleKeywords.contains(where: { titleLower.contains($0) }) && !vehicles.isEmpty {
+                        mode = .vehicle
+                    }
                 }
             } catch {
                 print("[InvoiceChoice] Failed to load data: \(error)")

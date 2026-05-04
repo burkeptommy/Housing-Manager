@@ -356,10 +356,7 @@ struct HouseholdAccessView: View {
 
     private func iconForRole(_ role: String) -> String {
         switch role {
-        case "executor": return "doc.badge.gearshape.fill"
-        case "estate_attorney": return "building.columns.fill"
         case "financial_advisor": return "chart.line.uptrend.xyaxis"
-        case "trustee": return "shield.checkered"
         case "accountant": return "dollarsign.circle.fill"
         case "insurance_agent": return "umbrella.fill"
         case "family": return "person.2.fill"

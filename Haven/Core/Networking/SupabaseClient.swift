@@ -445,6 +445,186 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
     }
 
+    // MARK: - Phase 84.5: Home Assessment (free Chez handyman onboarding)
+
+    /// Homeowner-side: create the pending assessment after the foundational
+    /// 7-question form and the mode-fork screen. Idempotent — server reuses
+    /// an existing active assessment for this property if one exists.
+    struct RequestHomeAssessmentRequest: Encodable {
+        let action = "request_home_assessment"
+        let propertyId: String
+        let householdId: String
+        let homeownerConcerns: String?
+        let homeownerPresent: Bool
+        let homeownerAccessNotes: String?
+        let isExistingUserSupplement: Bool
+    }
+
+    static func requestHomeAssessment(
+        propertyId: String,
+        householdId: String,
+        homeownerConcerns: String? = nil,
+        homeownerPresent: Bool = true,
+        homeownerAccessNotes: String? = nil,
+        isExistingUserSupplement: Bool = false
+    ) async throws -> Data {
+        let body = RequestHomeAssessmentRequest(
+            propertyId: propertyId,
+            householdId: householdId,
+            homeownerConcerns: homeownerConcerns,
+            homeownerPresent: homeownerPresent,
+            homeownerAccessNotes: homeownerAccessNotes,
+            isExistingUserSupplement: isExistingUserSupplement
+        )
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Homeowner-side: cancel a pending/scheduled assessment before ingestion.
+    struct CancelAssessmentRequest: Encodable {
+        let action = "cancel_assessment"
+        let assessmentId: String
+        let reason: String?
+    }
+
+    static func cancelHomeAssessment(assessmentId: String, reason: String? = nil) async throws -> Data {
+        let body = CancelAssessmentRequest(
+            assessmentId: assessmentId,
+            reason: (reason?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+        )
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Homeowner-side: request a different time window. Admin reviews +
+    /// reassigns from Operations Desk.
+    struct RescheduleAssessmentRequest: Encodable {
+        let action = "reschedule_assessment"
+        let assessmentId: String
+        let notes: String?
+    }
+
+    static func rescheduleHomeAssessment(assessmentId: String, notes: String? = nil) async throws -> Data {
+        let body = RescheduleAssessmentRequest(assessmentId: assessmentId, notes: notes)
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Handyman-side: capture a recommendation during the visit.
+    /// Urgent recommendations fire admin push on the server side.
+    struct AddRecommendedTaskRequest: Encodable {
+        let action = "add_recommended_task"
+        let assessmentId: String
+        let systemId: String?
+        let zone: String?
+        let title: String
+        let description: String?
+        let category: String?
+        let urgency: String
+        let recommendedOwner: String
+        let recommendedTemplateKey: String?
+        let observationSource: String
+        let needsVerification: Bool
+        let estimatedCostCents: Int?
+        let handymanNotes: String?
+        let homeownerVisibleNotes: String?
+        let photos: [String]?
+    }
+
+    static func addAssessmentRecommendedTask(
+        assessmentId: String,
+        title: String,
+        urgency: AssessmentTaskUrgency,
+        recommendedOwner: AssessmentTaskOwner,
+        observationSource: AssessmentTaskObservationSource = .handymanObserved,
+        zone: String? = nil,
+        systemId: String? = nil,
+        description: String? = nil,
+        category: String? = nil,
+        recommendedTemplateKey: String? = nil,
+        needsVerification: Bool = false,
+        estimatedCostCents: Int? = nil,
+        handymanNotes: String? = nil,
+        homeownerVisibleNotes: String? = nil,
+        photos: [String]? = nil
+    ) async throws -> Data {
+        let body = AddRecommendedTaskRequest(
+            assessmentId: assessmentId,
+            systemId: systemId,
+            zone: zone,
+            title: title,
+            description: description,
+            category: category,
+            urgency: urgency.rawValue,
+            recommendedOwner: recommendedOwner.rawValue,
+            recommendedTemplateKey: recommendedTemplateKey,
+            observationSource: observationSource.rawValue,
+            needsVerification: needsVerification,
+            estimatedCostCents: estimatedCostCents,
+            handymanNotes: handymanNotes,
+            homeownerVisibleNotes: homeownerVisibleNotes,
+            photos: photos
+        )
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Wrap-up: homeowner_response per recommendation. Including
+    /// `homeownerHandled` with optional scheduled date + vendor (G46), and
+    /// dispute flag (G48).
+    struct UpdateRecommendedTaskRequest: Encodable {
+        let action = "update_recommended_task"
+        let taskId: String
+        let homeownerResponse: String?
+        let homeownerHandledScheduledFor: String?
+        let homeownerHandledVendor: String?
+        let disputed: Bool?
+        let urgency: String?
+        let estimatedCostCents: Int?
+    }
+
+    static func updateAssessmentRecommendedTask(
+        taskId: String,
+        homeownerResponse: AssessmentTaskHomeownerResponse? = nil,
+        homeownerHandledScheduledFor: String? = nil,
+        homeownerHandledVendor: String? = nil,
+        disputed: Bool? = nil,
+        urgency: AssessmentTaskUrgency? = nil,
+        estimatedCostCents: Int? = nil
+    ) async throws -> Data {
+        let body = UpdateRecommendedTaskRequest(
+            taskId: taskId,
+            homeownerResponse: homeownerResponse?.rawValue,
+            homeownerHandledScheduledFor: homeownerHandledScheduledFor,
+            homeownerHandledVendor: homeownerHandledVendor,
+            disputed: disputed,
+            urgency: urgency?.rawValue,
+            estimatedCostCents: estimatedCostCents
+        )
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// Handyman quick-fix during the visit. Creates backdated
+    /// `service_records` row + skips chez_request fan-out for that task.
+    struct MarkTaskFixedRequest: Encodable {
+        let action = "mark_task_fixed_during_visit"
+        let taskId: String
+        let costCents: Int
+    }
+
+    static func markAssessmentTaskFixedDuringVisit(taskId: String, costCents: Int = 0) async throws -> Data {
+        let body = MarkTaskFixedRequest(taskId: taskId, costCents: costCents)
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
+    }
+
+    /// G44: mark a system inactive without archiving.
+    struct DecommissionSystemRequest: Encodable {
+        let action = "decommission_system"
+        let systemId: String
+        let reason: String?
+    }
+
+    static func decommissionHomeSystem(systemId: String, reason: String? = nil) async throws -> Data {
+        let body = DecommissionSystemRequest(systemId: systemId, reason: reason)
+        return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 15)
+    }
+
     // MARK: - Extract Vendor from Website
 
     struct ExtractVendorRequest: Encodable {
@@ -829,6 +1009,26 @@ enum HavenSupabase {
         let body = VehicleValueRequest(year: year, make: make, model: model, trim: trim, mileage: mileage, condition: condition)
         let data = try await callEdgeFunction(name: "vehicle-value", body: body, timeoutSeconds: 30)
         return try JSONDecoder().decode(VehicleValueResponse.self, from: data)
+    }
+
+    // MARK: - Vehicle Recalls (manual refresh)
+
+    struct CheckVehicleRecallsRequest: Encodable {
+        let vehicle_id: String?
+    }
+
+    struct CheckVehicleRecallsResponse: Decodable {
+        let checked: Int?
+        let new_recalls: Int?
+    }
+
+    /// Phase 95 — manual recall sweep, mirrors `check-vehicle-recalls`
+    /// Edge Function. Pass `vehicleId` to refresh just one car or `nil`
+    /// to refresh every vehicle in the household.
+    static func checkVehicleRecalls(vehicleId: UUID? = nil) async throws -> CheckVehicleRecallsResponse {
+        let body = CheckVehicleRecallsRequest(vehicle_id: vehicleId?.uuidString)
+        let data = try await callEdgeFunction(name: "check-vehicle-recalls", body: body, timeoutSeconds: 30)
+        return try JSONDecoder().decode(CheckVehicleRecallsResponse.self, from: data)
     }
 
     // MARK: - Equipment Catalog Search

@@ -78,7 +78,7 @@ struct ChatBubble: View {
 #Preview {
     VStack(spacing: 12) {
         ChatBubble(message: ChatMessage(role: .user, content: "What documents am I missing?"))
-        ChatBubble(message: ChatMessage(role: .assistant, content: "Based on your vault, you're missing a **Healthcare Directive** and **Power of Attorney**. These are critical estate planning documents."))
+        ChatBubble(message: ChatMessage(role: .assistant, content: "Based on your vault, you're missing a **homeowners insurance declaration page** and **HVAC service contract**. Want me to walk you through what to upload?"))
     }
     .padding()
     .background(HavenColors.background)

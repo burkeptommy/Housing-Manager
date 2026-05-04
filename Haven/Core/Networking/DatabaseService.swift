@@ -1645,6 +1645,21 @@ final class DatabaseService {
             .execute()
     }
 
+    /// Phase 95: inline title edit for a manual punch item. Used by the
+    /// long-press → "Edit title" affordance on `HandymanPunchListView`.
+    /// Only the `title` column is updated; description / minutes / notes
+    /// stay untouched (a heavier edit-sheet can land later if homeowners
+    /// ask for it).
+    func updateHandymanPunchItemTitle(id: UUID, title: String) async throws {
+        struct TitleUpdate: Encodable {
+            let title: String
+        }
+        try await from("handyman_punch_items")
+            .update(TitleUpdate(title: title))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Phase 54B: Mark a batch of punch items complete + link them to
     /// the handyman visit task they were rolled into. Called by
     /// `HandymanPunchListView` after it creates the Handyman:spring /
@@ -3005,90 +3020,6 @@ final class DatabaseService {
         } catch {
             print("[AccessLog] Failed to log \(action): \(error.localizedDescription)")
         }
-    }
-
-    // MARK: - Estate Readiness Calculation
-
-    struct EstateReadinessScore {
-        let overallPercentage: Double
-        let totalCategories: Int
-        let filledCategories: Int
-        let uploadedCount: Int
-        let missingCount: Int
-        let expiringCount: Int
-        let sectionScores: [SectionScore]
-    }
-
-    struct SectionScore: Identifiable {
-        var id: String { section }
-        let section: String
-        let categories: [String]
-        let filledCategories: Int
-        let totalCategories: Int
-        var percentage: Double {
-            totalCategories > 0 ? Double(filledCategories) / Double(totalCategories) * 100 : 0
-        }
-    }
-
-    func calculateEstateReadiness() async throws -> EstateReadinessScore {
-        let documents = try await fetchDocuments()
-        let dismissed = (try? await fetchDismissedCategories()) ?? []
-        let dismissedSet = Set(dismissed.map(\.category))
-
-        let sectionMap: [(String, [String])] = [
-            ("Estate Planning", ["Will", "Trust", "Power of Attorney", "Healthcare Directive", "Guardianship Designation", "Letter of Intent"]),
-            ("Entity Documents", ["LLC Operating Agreement", "LP Agreement", "S-Corp Documents", "EIN Documentation", "Annual Filings", "Bylaws"]),
-            ("Real Estate", ["Deed", "Mortgage", "Title Insurance", "Survey", "HOA Documents", "Lease Agreement", "Property Tax Records"]),
-            ("Insurance", ["Life Insurance", "Umbrella Insurance", "Homeowners Insurance", "Auto Insurance", "Jewelry/Art Rider", "Long-Term Care Insurance", "Disability Insurance", "Directors & Officers Insurance"]),
-            ("Financial Accounts", ["Brokerage Account", "Retirement Account (IRA/401k)", "Bank Account", "529 Plan", "Beneficiary Designation", "Stock Options/RSUs", "Crypto Wallet", "Alternative Investments"]),
-            ("Tax Records", ["Federal Tax Return", "State Tax Return", "Gift Tax Return (Form 709)", "Property Tax Record", "Estate & Trust Return (Form 1041)"]),
-            ("Personal Property", ["Vehicle Title", "Art Appraisal", "Jewelry Appraisal", "Collectibles Documentation", "Boat/Aircraft Registration"]),
-            ("Digital Assets", ["Domain Names", "Digital Account Inventory", "Social Media Accounts", "Intellectual Property"]),
-            ("Personal Identification", ["Passport", "Birth Certificate", "Marriage Certificate", "Divorce Decree", "Social Security Card", "Citizenship/Immigration", "Death Certificate"]),
-            ("Professional & Business", ["Employment Agreement", "Non-Compete/NDA", "Partnership Agreement", "Buy-Sell Agreement", "Succession Plan"]),
-        ]
-
-        let existingCategories = Set(documents.map { $0.category })
-
-        var sectionScores: [SectionScore] = []
-        var totalCategories = 0
-        var filledCategories = 0
-
-        for (section, categories) in sectionMap {
-            let activeCategories = categories.filter { !dismissedSet.contains($0) }
-            let filled = activeCategories.filter { existingCategories.contains($0) }.count
-            sectionScores.append(SectionScore(
-                section: section,
-                categories: activeCategories,
-                filledCategories: filled,
-                totalCategories: activeCategories.count
-            ))
-            totalCategories += activeCategories.count
-            filledCategories += filled
-        }
-
-        // Count expiring (within 90 days)
-        let now = Date()
-        let ninetyDays = Calendar.current.date(byAdding: .day, value: 90, to: now) ?? now
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let expiringCount = documents.filter { doc in
-            guard let expStr = doc.expirationDate,
-                  let expDate = dateFormatter.date(from: expStr) else { return false }
-            return expDate > now && expDate < ninetyDays
-        }.count
-
-        let overallPct = totalCategories > 0 ? Double(filledCategories) / Double(totalCategories) * 100 : 0
-
-        return EstateReadinessScore(
-            overallPercentage: overallPct,
-            totalCategories: totalCategories,
-            filledCategories: filledCategories,
-            uploadedCount: documents.count,
-            missingCount: totalCategories - filledCategories,
-            expiringCount: expiringCount,
-            sectionScores: sectionScores
-        )
     }
 
     // MARK: - Documents (vault lock helpers)

@@ -5485,8 +5485,8 @@ function renderConciergeHomeownerPanelHtml(req) {
   const systems = dossier.home_systems || [];
   const covered = systems.filter((s) => systemHasVendor(s, dossier.contractors || [])).length;
 
-  // Estate value from primary property.
-  const estateValue = property?.current_estimated_value
+  // Property value from primary property.
+  const propertyValue = property?.current_estimated_value
     ? `$${formatCompact(property.current_estimated_value)}`
     : "—";
 
@@ -5522,8 +5522,8 @@ function renderConciergeHomeownerPanelHtml(req) {
         </div>
         <div class="cockpit-homeowner__strip">
           <div>
-            <div class="cockpit-homeowner__strip-label">Estate value</div>
-            <div class="cockpit-homeowner__strip-num">${estateValue}</div>
+            <div class="cockpit-homeowner__strip-label">Property value</div>
+            <div class="cockpit-homeowner__strip-num">${propertyValue}</div>
           </div>
           <div>
             <div class="cockpit-homeowner__strip-label">Coverage</div>

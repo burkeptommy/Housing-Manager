@@ -47,6 +47,47 @@ final class AvatarPhotoService {
             .eq("id", value: memberId.uuidString)
             .execute()
     }
+
+    /// Phase 95 — vehicle photo upload. Reuses the same `avatars` bucket
+    /// + 1-year signed URL strategy as family member avatars; the path
+    /// scheme is distinct (`{household}/vehicles/{vehicleId}.jpg`) so the
+    /// two flows can't collide. Writes the URL back to `vehicles.photo_url`.
+    func uploadVehiclePhoto(image: UIImage, vehicleId: UUID, householdId: UUID) async throws -> String {
+        let resized = image.resizedToFit(maxDimension: 1200)
+        guard let data = resized.jpegData(compressionQuality: 0.85) else {
+            throw NSError(domain: "VehiclePhoto", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to compress image"])
+        }
+
+        let path = "\(householdId.uuidString.lowercased())/vehicles/\(vehicleId.uuidString.lowercased()).jpg"
+
+        try await HavenSupabase.storage
+            .from(bucketName)
+            .upload(path, data: data, options: .init(contentType: "image/jpeg", upsert: true))
+
+        let url = try await HavenSupabase.storage
+            .from(bucketName)
+            .createSignedURL(path: path, expiresIn: 60 * 60 * 24 * 365)
+
+        try await HavenSupabase.from("vehicles")
+            .update(["photo_url": url.absoluteString])
+            .eq("id", value: vehicleId.uuidString)
+            .execute()
+
+        return url.absoluteString
+    }
+
+    /// Delete the vehicle photo and clear the URL on `vehicles`.
+    func deleteVehiclePhoto(vehicleId: UUID, householdId: UUID) async throws {
+        let path = "\(householdId.uuidString.lowercased())/vehicles/\(vehicleId.uuidString.lowercased()).jpg"
+        try await HavenSupabase.storage
+            .from(bucketName)
+            .remove(paths: [path])
+
+        try await HavenSupabase.from("vehicles")
+            .update(["photo_url": nil] as [String: String?])
+            .eq("id", value: vehicleId.uuidString)
+            .execute()
+    }
 }
 
 // MARK: - UIImage Resize Helper

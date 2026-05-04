@@ -134,10 +134,6 @@ enum HouseQuizValueMeter {
             if petsAnswer == "no_pets" { return 12_000 }
             if petsAnswer != nil { return 14_500 }
             return 9_000  // pets sub-step not yet completed
-        case "q29_estate_docs":
-            // Estate vault anchor — the Life tab's whole promise.
-            let count = max(1, selectedIds.count)
-            return min(16_000, 4_000 * Double(count))
         case "q30_priorities":
             return 4_500
 

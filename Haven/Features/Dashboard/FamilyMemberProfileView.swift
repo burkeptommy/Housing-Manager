@@ -25,8 +25,6 @@ struct FamilyMemberProfileView: View {
                 if !viewModel.vehicles.isEmpty {
                     vehiclesSection
                 }
-
-                estateReadinessSection
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             .padding(.bottom, 40)
@@ -329,42 +327,6 @@ struct FamilyMemberProfileView: View {
             .background(HavenColors.surface)
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
             .havenShadow()
-        }
-    }
-
-    // MARK: - Estate Readiness
-
-    private var estateReadinessSection: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            Text("ESTATE READINESS")
-                .font(HavenTypography.uiSectionHeader)
-                .tracking(1.5)
-                .foregroundStyle(HavenColors.textTertiary)
-
-            HStack(spacing: 12) {
-                Image(systemName: "shield.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(HavenColors.navy700)
-
-                Text("\(member.firstName) is covered by \(viewModel.documents.count) document\(viewModel.documents.count == 1 ? "" : "s")")
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textPrimary)
-
-                Spacer()
-
-                Button {
-                    Haptics.light()
-                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
-                } label: {
-                    Text("View")
-                        .font(HavenTypography.uiLabelSmall)
-                        .foregroundStyle(HavenColors.navy500)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(HavenTheme.spacing16)
-            .background(HavenColors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
         }
     }
 

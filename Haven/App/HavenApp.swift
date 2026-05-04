@@ -268,6 +268,37 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     userInfo: payload
                 )
 
+            // Phase 84.5 — Home Assessment lifecycle pushes. Routes to
+            // Dashboard. `chez_assessment_complete` auto-presents the
+            // review screen via `.openChezAssessmentReview`. Other
+            // statuses just refresh the dashboard pending card via
+            // `.chezHomeAssessmentChanged`.
+            case "chez_assessment_complete":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+                NotificationCenter.default.post(name: .chezHomeAssessmentChanged, object: nil)
+                NotificationCenter.default.post(
+                    name: .openChezAssessmentReview,
+                    object: nil,
+                    userInfo: userInfo
+                )
+            case "chez_assessment_scheduled",
+                 "chez_assessment_en_route",
+                 "chez_assessment_in_progress",
+                 "chez_assessment_corrections_received",
+                 // Phase 84.5 round 2 — added pre-visit reminder + ready states.
+                 "chez_assessment_pre_visit_reminder",
+                 "chez_assessment_morning_of",
+                 "chez_assessment_pdf_ready":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+                NotificationCenter.default.post(name: .chezHomeAssessmentChanged, object: nil)
+            case "chez_assessment_urgent_finding",
+                 "chez_assessment_started",
+                 "chez_assessment_engagement_watch":
+                // Admin-only types — homeowner devices may receive them
+                // if the user is also a workspace admin. Treat as a
+                // dashboard refresh.
+                NotificationCenter.default.post(name: .chezHomeAssessmentChanged, object: nil)
+
             // Phase 80 — Chez Concierge pushes. Server sends
             // `type: "chez_request_reply"` (Tom replied), `"chez_status_change"`
             // (Tom marked open / waiting / resolved), or `"chez_admin_request"`

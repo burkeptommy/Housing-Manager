@@ -316,9 +316,8 @@ export const OBJECT_MAP = [
       "A file the homeowner has — bill, warranty, insurance, contract, plan, manual. Routes through analyze-document for OCR + categorization.",
     primaryKeys: ["id (uuid)", "household_id (uuid)"],
     keyFields: [
-      { label: "category", desc: "AI-suggested or user-corrected (Mortgage, Utility, Will, etc.)." },
+      { label: "category", desc: "AI-suggested or user-corrected (Mortgage, Utility, Insurance, etc.)." },
       { label: "visible_to_home_managers", desc: "Build 87 — gates document visibility for home_manager + staff member_types." },
-      { label: "linked_attorney_contact_id", desc: "For estate docs, points at the attorney trusted_contact." },
       { label: "vehicle_id / project_id", desc: "Optional links to the thing this document is about." },
       { label: "content_hash", desc: "SHA-256 dedup key." },
       { label: "detected_vins / matched_vehicle_ids", desc: "VIN auto-link from analyze-document." },

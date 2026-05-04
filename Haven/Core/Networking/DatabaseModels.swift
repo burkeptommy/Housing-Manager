@@ -330,10 +330,6 @@ struct DocumentRow: Codable, Identifiable {
     let fileSize: Int?
     let deletedAt: String?
     let metadata: DocumentMetadata?
-    /// Phase 48: FK to trusted_contacts for the attorney who prepared
-    /// this estate document. Populated by analyze-document estate
-    /// extraction or manually via LinkedAttorneyField.
-    let linkedAttorneyContactId: UUID?
     /// Build 87 (Home Manager expansion): when false, household members
     /// whose `family_members.member_type` is `home_manager` or `staff`
     /// cannot see this document via the `household_documents_select` RLS
@@ -397,7 +393,6 @@ struct DocumentRow: Codable, Identifiable {
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case deletedAt = "deleted_at"
-        case linkedAttorneyContactId = "linked_attorney_contact_id"
         case visibleToHomeManagers = "visible_to_home_managers"
         case contractorId = "contractor_id"
         case invoiceAmount = "invoice_amount"
@@ -533,8 +528,6 @@ struct DocumentUpdate: Codable {
     var metadata: DocumentMetadata?
     var contentHash: String?
     var fileSize: Int?
-    /// Phase 48: link/unlink estate attorney on a document.
-    var linkedAttorneyContactId: UUID?
     /// Build 87 (Home Manager expansion): toggled per-document via the
     /// Access pill in `DocumentDetailView` → `DocumentAccessSheet`.
     var visibleToHomeManagers: Bool?
@@ -565,7 +558,6 @@ struct DocumentUpdate: Codable {
         case propertyId = "property_id"
         case vehicleId = "vehicle_id"
         case projectId = "project_id"
-        case linkedAttorneyContactId = "linked_attorney_contact_id"
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case visibleToHomeManagers = "visible_to_home_managers"
@@ -860,6 +852,20 @@ struct HomeSystemRow: Identifiable {
     /// end-to-end (service scheduling, warranty, parts, history).
     let chezOwned: Bool?
     let chezOwnedAt: Date?
+    /// Phase 84.5 G18 — handyman-rated condition at last assessment.
+    /// Values: good / fair / needs_attention / urgent.
+    let conditionRating: String?
+    let conditionNotes: String?
+    let conditionPhotos: [String]?
+    let lastAssessedAt: Date?
+    /// Phase 84.5 G44 — false for decommissioned systems (e.g. old well
+    /// after city water hookup). Reconciler skips inactive systems.
+    let isActive: Bool?
+    let decommissionedAt: Date?
+    let decommissionedReason: String?
+    /// Phase 84.5 G15 — display-only origin tag. self_quiz / handyman_assessment
+    /// / manual / attom / invoice_extraction / chez_admin.
+    let onboardedVia: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status, subtype
@@ -895,10 +901,22 @@ struct HomeSystemRow: Identifiable {
         case needsVendorCoverage = "needs_vendor_coverage"
         case chezOwned = "chez_owned"
         case chezOwnedAt = "chez_owned_at"
+        case conditionRating = "condition_rating"
+        case conditionNotes = "condition_notes"
+        case conditionPhotos = "condition_photos"
+        case lastAssessedAt = "last_assessed_at"
+        case isActive = "is_active"
+        case decommissionedAt = "decommissioned_at"
+        case decommissionedReason = "decommissioned_reason"
+        case onboardedVia = "onboarded_via"
     }
 
     /// Convenience used across views/UI.
     var isChezOwned: Bool { chezOwned ?? false }
+
+    /// Phase 84.5 G44 — true unless the system has been explicitly
+    /// decommissioned. Defaults to true for legacy rows missing the column.
+    var isActiveOrDefault: Bool { isActive ?? true }
 }
 
 extension HomeSystemRow: Hashable {
@@ -954,6 +972,14 @@ extension HomeSystemRow: Decodable {
         needsVendorCoverage = try? c.decodeIfPresent(Bool.self, forKey: .needsVendorCoverage)
         chezOwned = try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)
         chezOwnedAt = try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)
+        conditionRating = try? c.decodeIfPresent(String.self, forKey: .conditionRating)
+        conditionNotes = try? c.decodeIfPresent(String.self, forKey: .conditionNotes)
+        conditionPhotos = try? c.decodeIfPresent([String].self, forKey: .conditionPhotos)
+        lastAssessedAt = try? c.decodeIfPresent(Date.self, forKey: .lastAssessedAt)
+        isActive = try? c.decodeIfPresent(Bool.self, forKey: .isActive)
+        decommissionedAt = try? c.decodeIfPresent(Date.self, forKey: .decommissionedAt)
+        decommissionedReason = try? c.decodeIfPresent(String.self, forKey: .decommissionedReason)
+        onboardedVia = try? c.decodeIfPresent(String.self, forKey: .onboardedVia)
     }
 }
 
@@ -3026,359 +3052,15 @@ struct TrustedContactDocumentInsert: Codable {
     }
 }
 
-// MARK: - Estate State
-
-struct EstateStateRow: Codable, Identifiable {
-    let id: UUID
-    let householdId: UUID
-    // Presence flags
-    let hasWill: Bool
-    let hasRevocableTrust: Bool
-    let hasIrrevocableTrust: Bool
-    let hasPoa: Bool
-    let hasHealthProxy: Bool
-    let hasLivingWill: Bool
-    let hasHipaaAuth: Bool
-    let hasPrenup: Bool
-    let hasBusinessAgreement: Bool
-    let hasDispositionOfRemains: Bool
-    // Dates
-    let willDate: String?
-    let trustDate: String?
-    let poaDate: String?
-    let healthProxyDate: String?
-    // Attorney
-    let estateAttorneyContactId: UUID?
-    let lastEstateReviewDate: String?
-    // JSONB fields
-    let fiduciaries: [EstateFiduciary]?
-    let concerns: [EstateConcernRating]?
-    let wishes: [EstateWish]?
-    let assetsSummary: EstateAssetsSummary?
-    let intakeState: EstateIntakeState?
-    let nominations: EstateNominations?
-    // Computed
-    let estateReadinessScore: Int
-    let stalenessTier: String
-    let stalenessReasons: [String]?
-    let householdSnapshot: EstateHouseholdSnapshot?
-    // Timestamps
-    let lastRecomputedAt: String?
-    let createdAt: String?
-    let updatedAt: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case householdId = "household_id"
-        case hasWill = "has_will"
-        case hasRevocableTrust = "has_revocable_trust"
-        case hasIrrevocableTrust = "has_irrevocable_trust"
-        case hasPoa = "has_poa"
-        case hasHealthProxy = "has_health_proxy"
-        case hasLivingWill = "has_living_will"
-        case hasHipaaAuth = "has_hipaa_auth"
-        case hasPrenup = "has_prenup"
-        case hasBusinessAgreement = "has_business_agreement"
-        case hasDispositionOfRemains = "has_disposition_of_remains"
-        case willDate = "will_date"
-        case trustDate = "trust_date"
-        case poaDate = "poa_date"
-        case healthProxyDate = "health_proxy_date"
-        case estateAttorneyContactId = "estate_attorney_contact_id"
-        case lastEstateReviewDate = "last_estate_review_date"
-        case fiduciaries, concerns, wishes
-        case assetsSummary = "assets_summary"
-        case intakeState = "intake_state"
-        case nominations
-        case estateReadinessScore = "estate_readiness_score"
-        case stalenessTier = "staleness_tier"
-        case stalenessReasons = "staleness_reasons"
-        case householdSnapshot = "household_snapshot"
-        case lastRecomputedAt = "last_recomputed_at"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-}
-
-struct EstateStateInsert: Codable {
-    let householdId: UUID
-
-    enum CodingKeys: String, CodingKey {
-        case householdId = "household_id"
-    }
-}
-
-struct EstateStateUpdate: Codable {
-    var hasWill: Bool?
-    var hasRevocableTrust: Bool?
-    var hasIrrevocableTrust: Bool?
-    var hasPoa: Bool?
-    var hasHealthProxy: Bool?
-    var hasLivingWill: Bool?
-    var hasHipaaAuth: Bool?
-    var hasPrenup: Bool?
-    var hasBusinessAgreement: Bool?
-    var hasDispositionOfRemains: Bool?
-    var willDate: String?
-    var trustDate: String?
-    var poaDate: String?
-    var healthProxyDate: String?
-    var estateAttorneyContactId: UUID?
-    var lastEstateReviewDate: String?
-    var fiduciaries: [EstateFiduciary]?
-    var concerns: [EstateConcernRating]?
-    var wishes: [EstateWish]?
-    var assetsSummary: EstateAssetsSummary?
-    var intakeState: EstateIntakeState?
-    var nominations: EstateNominations?
-    var estateReadinessScore: Int?
-    var stalenessTier: String?
-    var stalenessReasons: [String]?
-    var householdSnapshot: EstateHouseholdSnapshot?
-    var lastRecomputedAt: String?
-
-    enum CodingKeys: String, CodingKey {
-        case hasWill = "has_will"
-        case hasRevocableTrust = "has_revocable_trust"
-        case hasIrrevocableTrust = "has_irrevocable_trust"
-        case hasPoa = "has_poa"
-        case hasHealthProxy = "has_health_proxy"
-        case hasLivingWill = "has_living_will"
-        case hasHipaaAuth = "has_hipaa_auth"
-        case hasPrenup = "has_prenup"
-        case hasBusinessAgreement = "has_business_agreement"
-        case hasDispositionOfRemains = "has_disposition_of_remains"
-        case willDate = "will_date"
-        case trustDate = "trust_date"
-        case poaDate = "poa_date"
-        case healthProxyDate = "health_proxy_date"
-        case estateAttorneyContactId = "estate_attorney_contact_id"
-        case lastEstateReviewDate = "last_estate_review_date"
-        case fiduciaries, concerns, wishes
-        case assetsSummary = "assets_summary"
-        case intakeState = "intake_state"
-        case nominations
-        case estateReadinessScore = "estate_readiness_score"
-        case stalenessTier = "staleness_tier"
-        case stalenessReasons = "staleness_reasons"
-        case householdSnapshot = "household_snapshot"
-        case lastRecomputedAt = "last_recomputed_at"
-    }
-}
-
-// MARK: - Estate Supporting Types
-
-struct EstateFiduciary: Codable, Hashable {
-    let name: String
-    let role: String
-    let isAlternate: Bool?
-    let source: String
-    let trustedContactId: UUID?
-    let familyMemberId: UUID?
-
-    enum CodingKeys: String, CodingKey {
-        case name, role, source
-        case isAlternate = "is_alternate"
-        case trustedContactId = "trusted_contact_id"
-        case familyMemberId = "family_member_id"
-    }
-}
-
-struct EstateConcernRating: Codable, Identifiable {
-    let concernId: String
-    let rating: String
-    let ratedAt: String
-    var id: String { concernId }
-
-    enum CodingKeys: String, CodingKey {
-        case concernId = "concern_id"
-        case rating
-        case ratedAt = "rated_at"
-    }
-}
-
-struct EstateWish: Codable, Identifiable {
-    let wishId: String
-    let value: String
-    let notedAt: String
-    var id: String { wishId }
-
-    enum CodingKeys: String, CodingKey {
-        case wishId = "wish_id"
-        case value
-        case notedAt = "noted_at"
-    }
-}
-
-struct EstateAssetsSummary: Codable {
-    let realEstateCount: Int?
-    let vehicleCount: Int?
-    let businessCount: Int?
-    let financialAccountsCount: Int?
-    let lifeInsuranceCount: Int?
-    let netWorthBucket: String?
-
-    enum CodingKeys: String, CodingKey {
-        case realEstateCount = "real_estate_count"
-        case vehicleCount = "vehicle_count"
-        case businessCount = "business_count"
-        case financialAccountsCount = "financial_accounts_count"
-        case lifeInsuranceCount = "life_insurance_count"
-        case netWorthBucket = "net_worth_bucket"
-    }
-}
-
-struct EstateIntakeState: Codable, Equatable {
-    var startedAt: String?
-    var completedAt: String?
-    var currentSection: String?
-    var answers: [String: EstateIntakeAnswer]?
-    var skipped: [String]?
-
-    enum CodingKeys: String, CodingKey {
-        case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case currentSection = "current_section"
-        case answers, skipped
-    }
-}
-
-struct EstateIntakeAnswer: Codable, Equatable {
-    var value: String?
-    var selectedIds: [String]?
-    var answeredAt: String
-
-    enum CodingKeys: String, CodingKey {
-        case value
-        case selectedIds = "selected_ids"
-        case answeredAt = "answered_at"
-    }
-}
-
-struct EstateNominations: Codable {
-    var executor: FiduciaryNomination?
-    var trustee: FiduciaryNomination?
-    var guardian: FiduciaryNomination?
-    var healthProxy: FiduciaryNomination?
-    var poaAgent: FiduciaryNomination?
-    var dispositionAgent: FiduciaryNomination?
-
-    enum CodingKeys: String, CodingKey {
-        case executor, trustee, guardian
-        case healthProxy = "health_proxy"
-        case poaAgent = "poa_agent"
-        case dispositionAgent = "disposition_agent"
-    }
-}
-
-struct FiduciaryNomination: Codable {
-    var primary: NominatedPerson?
-    var alternate: NominatedPerson?
-}
-
-struct NominatedPerson: Codable {
-    var name: String
-    var trustedContactId: UUID?
-    var familyMemberId: UUID?
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case trustedContactId = "trusted_contact_id"
-        case familyMemberId = "family_member_id"
-    }
-}
-
-struct EstateHouseholdSnapshot: Codable {
-    let memberCount: Int?
-    let propertyCount: Int?
-    let vehicleCount: Int?
-    let snapshotDate: String?
-
-    enum CodingKeys: String, CodingKey {
-        case memberCount = "member_count"
-        case propertyCount = "property_count"
-        case vehicleCount = "vehicle_count"
-        case snapshotDate = "snapshot_date"
-    }
-}
-
-// MARK: - Estate PDF Exports
-
-struct EstatePdfExportRow: Codable, Identifiable {
-    let id: UUID
-    let householdId: UUID
-    let generatedBy: UUID?
-    let storagePath: String
-    let verificationToken: UUID
-    let templateUsed: String
-    let maxAccessCount: Int
-    let accessCount: Int
-    let recipientEmail: String?
-    let recipientName: String?
-    let linkedAttorneyContactId: UUID?
-    let estateReadinessScore: Int?
-    let pdfContentHash: String?
-    let expiresAt: String
-    let revokedAt: String?
-    let mailComposePresentedAt: String?
-    let createdAt: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case householdId = "household_id"
-        case generatedBy = "generated_by"
-        case storagePath = "storage_path"
-        case verificationToken = "verification_token"
-        case templateUsed = "template_used"
-        case maxAccessCount = "max_access_count"
-        case accessCount = "access_count"
-        case recipientEmail = "recipient_email"
-        case recipientName = "recipient_name"
-        case linkedAttorneyContactId = "linked_attorney_contact_id"
-        case estateReadinessScore = "estate_readiness_score"
-        case pdfContentHash = "pdf_content_hash"
-        case expiresAt = "expires_at"
-        case revokedAt = "revoked_at"
-        case mailComposePresentedAt = "mail_compose_presented_at"
-        case createdAt = "created_at"
-    }
-}
-
-struct EstatePdfExportInsert: Codable {
-    let householdId: UUID
-    let storagePath: String
-    let templateUsed: String
-    var recipientEmail: String?
-    var recipientName: String?
-    var linkedAttorneyContactId: UUID?
-    var estateReadinessScore: Int?
-    var pdfContentHash: String?
-    let expiresAt: String
-
-    enum CodingKeys: String, CodingKey {
-        case householdId = "household_id"
-        case storagePath = "storage_path"
-        case templateUsed = "template_used"
-        case recipientEmail = "recipient_email"
-        case recipientName = "recipient_name"
-        case linkedAttorneyContactId = "linked_attorney_contact_id"
-        case estateReadinessScore = "estate_readiness_score"
-        case pdfContentHash = "pdf_content_hash"
-        case expiresAt = "expires_at"
-    }
-}
-
-struct EstatePdfExportUpdate: Codable {
-    var accessCount: Int?
-    var revokedAt: String?
-    var mailComposePresentedAt: String?
-
-    enum CodingKeys: String, CodingKey {
-        case accessCount = "access_count"
-        case revokedAt = "revoked_at"
-        case mailComposePresentedAt = "mail_compose_presented_at"
-    }
-}
+// MARK: - Estate State [REMOVED — Chez v1 estate intelligence cut]
+/* Phase 48 EstateStateRow / Insert / Update + supporting types
+   (EstateFiduciary, EstateConcernRating, EstateWish,
+   EstateAssetsSummary, EstateIntakeState, EstateIntakeAnswer,
+   EstateNominations, FiduciaryNomination, NominatedPerson,
+   EstateHouseholdSnapshot) and EstatePdfExport* removed for the
+   Chez v1 release. The underlying tables were dropped via
+   migration 20260901_chez_v1_estate_removal.sql.
+*/
 
 // MARK: - Dismissed Category
 
@@ -4707,7 +4389,6 @@ struct HouseholdAdvisorRow: Codable, Identifiable {
 
     var typeIcon: String {
         switch advisorType {
-        case "estate_attorney": return "building.columns.fill"
         case "cpa_tax": return "dollarsign.circle.fill"
         case "financial_advisor": return "chart.line.uptrend.xyaxis"
         case "life_insurance": return "heart.text.square.fill"
@@ -4717,7 +4398,6 @@ struct HouseholdAdvisorRow: Codable, Identifiable {
 
     var typeLabel: String {
         switch advisorType {
-        case "estate_attorney": return "Estate Attorney"
         case "cpa_tax": return "CPA / Tax Advisor"
         case "financial_advisor": return "Financial Advisor"
         case "life_insurance": return "Life Insurance"
@@ -5451,5 +5131,354 @@ struct CategoryCadenceDefaultRow: Codable, Identifiable {
         case defaultIntervalDays = "default_interval_days"
         case seasonalPauseMonths = "seasonal_pause_months"
         case serviceDescriptionTemplate = "service_description_template"
+    }
+}
+
+// MARK: - Phase 84.5 — Home Assessment (Free Handyman Assessment + 3-Mode Onboarding)
+
+/// One of the three modes a homeowner can pick at signup.
+/// Stored as `properties.attributes["assessment_mode"]` (a JSONB string key).
+enum AssessmentMode: String, Codable, CaseIterable {
+    case diy
+    case blended
+    case handyman
+}
+
+/// Lifecycle of a `home_assessments` row.
+enum HomeAssessmentStatus: String, Codable {
+    case pending
+    case scheduled
+    case enRoute = "en_route"
+    case inProgress = "in_progress"
+    case submitted
+    case awaitingReview = "awaiting_review"
+    case correctionsRequested = "corrections_requested"
+    /// G3 — added round 2: rolled back ingestion needs admin manual replay.
+    case ingestionFailed = "ingestion_failed"
+    case completed
+    case cancelled
+
+    /// True when the homeowner should still see the pending dashboard
+    /// card. False once the assessment is closed (completed / cancelled).
+    var isActive: Bool {
+        switch self {
+        case .completed, .cancelled: return false
+        default: return true
+        }
+    }
+
+    /// True when the homeowner should be prompted to review captured data.
+    var needsReview: Bool { self == .awaitingReview }
+}
+
+/// A single captured-system entry inside `home_assessments.captured_systems`.
+struct HomeAssessmentSystemEntry: Codable, Hashable {
+    let category: String
+    let manufacturer: String?
+    let model: String?
+    let installYear: Int?
+    let subtype: String?
+    let photos: [String]?
+    let notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case category, manufacturer, model, subtype, photos, notes
+        case installYear = "install_year"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        category = (try? c.decodeIfPresent(String.self, forKey: .category)) ?? ""
+        manufacturer = try? c.decodeIfPresent(String.self, forKey: .manufacturer)
+        model = try? c.decodeIfPresent(String.self, forKey: .model)
+        installYear = try? c.decodeIfPresent(Int.self, forKey: .installYear)
+        subtype = try? c.decodeIfPresent(String.self, forKey: .subtype)
+        photos = try? c.decodeIfPresent([String].self, forKey: .photos)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+    }
+
+    init(category: String, manufacturer: String? = nil, model: String? = nil,
+         installYear: Int? = nil, subtype: String? = nil, photos: [String]? = nil,
+         notes: String? = nil) {
+        self.category = category
+        self.manufacturer = manufacturer
+        self.model = model
+        self.installYear = installYear
+        self.subtype = subtype
+        self.photos = photos
+        self.notes = notes
+    }
+}
+
+/// A single captured-contractor entry inside `home_assessments.captured_contractors`.
+struct HomeAssessmentContractorEntry: Codable, Hashable {
+    let companyName: String
+    let category: String?
+    let phone: String?
+    let email: String?
+    let source: String?
+
+    enum CodingKeys: String, CodingKey {
+        case category, phone, email, source
+        case companyName = "company_name"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        companyName = (try? c.decodeIfPresent(String.self, forKey: .companyName)) ?? ""
+        category = try? c.decodeIfPresent(String.self, forKey: .category)
+        phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+        email = try? c.decodeIfPresent(String.self, forKey: .email)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+    }
+
+    init(companyName: String, category: String? = nil, phone: String? = nil,
+         email: String? = nil, source: String? = "homeowner_uses") {
+        self.companyName = companyName
+        self.category = category
+        self.phone = phone
+        self.email = email
+        self.source = source
+    }
+}
+
+/// A single captured-routine entry inside `home_assessments.captured_routines`.
+struct HomeAssessmentRoutineEntry: Codable, Hashable {
+    let kind: String
+    let label: String?
+    let vendorName: String?
+    let cadence: String?
+    let dayOfWeek: Int?
+    let activeMonths: [Int]?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, label, cadence
+        case vendorName = "vendor_name"
+        case dayOfWeek = "day_of_week"
+        case activeMonths = "active_months"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? ""
+        label = try? c.decodeIfPresent(String.self, forKey: .label)
+        vendorName = try? c.decodeIfPresent(String.self, forKey: .vendorName)
+        cadence = try? c.decodeIfPresent(String.self, forKey: .cadence)
+        dayOfWeek = try? c.decodeIfPresent(Int.self, forKey: .dayOfWeek)
+        activeMonths = try? c.decodeIfPresent([Int].self, forKey: .activeMonths)
+    }
+
+    init(kind: String, label: String? = nil, vendorName: String? = nil,
+         cadence: String? = nil, dayOfWeek: Int? = nil, activeMonths: [Int]? = nil) {
+        self.kind = kind
+        self.label = label
+        self.vendorName = vendorName
+        self.cadence = cadence
+        self.dayOfWeek = dayOfWeek
+        self.activeMonths = activeMonths
+    }
+}
+
+/// One row of `public.home_assessments`. Externally-fed → resilient decoder.
+struct HomeAssessmentRow: Codable, Identifiable {
+    let id: UUID
+    let propertyId: UUID
+    let householdId: UUID
+    let visitAssignmentId: UUID?
+    let handymanMemberId: UUID?
+
+    let status: HomeAssessmentStatus
+
+    /// Phase 84.5 G16/G32 — multi-session and existing-user supplement metadata.
+    let assessmentRound: Int
+    let sessionCount: Int
+    let isExistingUserSupplement: Bool
+
+    /// Phase 84.5 G24/G31/G34 — pre-visit homeowner-supplied context.
+    let homeownerPresent: Bool
+    let homeownerAccessNotes: String?
+    let homeownerConcerns: String?
+    let homeownerWrapupNotes: String?
+
+    let capturedQuizState: [String: FlexibleValue]?
+    let capturedSystems: [HomeAssessmentSystemEntry]?
+    let capturedContractors: [HomeAssessmentContractorEntry]?
+    let capturedRoutines: [HomeAssessmentRoutineEntry]?
+    let capturedDocumentPaths: [String]?
+    let capturedAttributes: [String: FlexibleValue]?
+
+    let preVisitNotes: String?
+    let preVisitPhotos: [String]?
+
+    let scheduledAt: Date?
+    let enRouteAt: Date?
+    let startedAt: Date?
+    let submittedAt: Date?
+    let ingestedAt: Date?
+    let reviewedAt: Date?
+    let completedAt: Date?
+    let cancelledAt: Date?
+    let cancellationReason: String?
+
+    let rescheduleRequestedAt: Date?
+    let rescheduleRequestNotes: String?
+
+    let handymanNotes: String?
+    let adminNotes: String?
+
+    let isFree: Bool
+    let chargeableCostCents: Int?
+    let paymentStatus: String?
+
+    /// Phase 84.5 — server-rendered PDF export of the captured assessment,
+    /// plus error message when ingestion fails.
+    let pdfExportPath: String?
+    let ingestionError: String?
+
+    let createdAt: Date?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case visitAssignmentId = "visit_assignment_id"
+        case handymanMemberId = "handyman_member_id"
+        case assessmentRound = "assessment_round"
+        case sessionCount = "session_count"
+        case isExistingUserSupplement = "is_existing_user_supplement"
+        case homeownerPresent = "homeowner_present"
+        case homeownerAccessNotes = "homeowner_access_notes"
+        case homeownerConcerns = "homeowner_concerns"
+        case homeownerWrapupNotes = "homeowner_wrapup_notes"
+        case capturedQuizState = "captured_quiz_state"
+        case capturedSystems = "captured_systems"
+        case capturedContractors = "captured_contractors"
+        case capturedRoutines = "captured_routines"
+        case capturedDocumentPaths = "captured_document_paths"
+        case capturedAttributes = "captured_attributes"
+        case preVisitNotes = "pre_visit_notes"
+        case preVisitPhotos = "pre_visit_photos"
+        case scheduledAt = "scheduled_at"
+        case enRouteAt = "en_route_at"
+        case startedAt = "started_at"
+        case submittedAt = "submitted_at"
+        case ingestedAt = "ingested_at"
+        case reviewedAt = "reviewed_at"
+        case completedAt = "completed_at"
+        case cancelledAt = "cancelled_at"
+        case cancellationReason = "cancellation_reason"
+        case rescheduleRequestedAt = "reschedule_requested_at"
+        case rescheduleRequestNotes = "reschedule_request_notes"
+        case handymanNotes = "handyman_notes"
+        case adminNotes = "admin_notes"
+        case isFree = "is_free"
+        case chargeableCostCents = "chargeable_cost_cents"
+        case paymentStatus = "payment_status"
+        case pdfExportPath = "pdf_export_path"
+        case ingestionError = "ingestion_error"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        visitAssignmentId = try? c.decodeIfPresent(UUID.self, forKey: .visitAssignmentId)
+        handymanMemberId = try? c.decodeIfPresent(UUID.self, forKey: .handymanMemberId)
+
+        // Status falls back to .pending if decode fails (e.g. server adds a
+        // new status value before the iOS app catches up).
+        let rawStatus = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "pending"
+        status = HomeAssessmentStatus(rawValue: rawStatus) ?? .pending
+
+        assessmentRound = (try? c.decodeIfPresent(Int.self, forKey: .assessmentRound)) ?? 1
+        sessionCount = (try? c.decodeIfPresent(Int.self, forKey: .sessionCount)) ?? 1
+        isExistingUserSupplement = (try? c.decodeIfPresent(Bool.self, forKey: .isExistingUserSupplement)) ?? false
+
+        homeownerPresent = (try? c.decodeIfPresent(Bool.self, forKey: .homeownerPresent)) ?? true
+        homeownerAccessNotes = try? c.decodeIfPresent(String.self, forKey: .homeownerAccessNotes)
+        homeownerConcerns = try? c.decodeIfPresent(String.self, forKey: .homeownerConcerns)
+        homeownerWrapupNotes = try? c.decodeIfPresent(String.self, forKey: .homeownerWrapupNotes)
+
+        capturedQuizState = try? c.decodeIfPresent([String: FlexibleValue].self, forKey: .capturedQuizState)
+        capturedSystems = try? c.decodeIfPresent([HomeAssessmentSystemEntry].self, forKey: .capturedSystems)
+        capturedContractors = try? c.decodeIfPresent([HomeAssessmentContractorEntry].self, forKey: .capturedContractors)
+        capturedRoutines = try? c.decodeIfPresent([HomeAssessmentRoutineEntry].self, forKey: .capturedRoutines)
+        capturedDocumentPaths = try? c.decodeIfPresent([String].self, forKey: .capturedDocumentPaths)
+        capturedAttributes = try? c.decodeIfPresent([String: FlexibleValue].self, forKey: .capturedAttributes)
+
+        preVisitNotes = try? c.decodeIfPresent(String.self, forKey: .preVisitNotes)
+        preVisitPhotos = try? c.decodeIfPresent([String].self, forKey: .preVisitPhotos)
+
+        scheduledAt = try? c.decodeIfPresent(Date.self, forKey: .scheduledAt)
+        enRouteAt = try? c.decodeIfPresent(Date.self, forKey: .enRouteAt)
+        startedAt = try? c.decodeIfPresent(Date.self, forKey: .startedAt)
+        submittedAt = try? c.decodeIfPresent(Date.self, forKey: .submittedAt)
+        ingestedAt = try? c.decodeIfPresent(Date.self, forKey: .ingestedAt)
+        reviewedAt = try? c.decodeIfPresent(Date.self, forKey: .reviewedAt)
+        completedAt = try? c.decodeIfPresent(Date.self, forKey: .completedAt)
+        cancelledAt = try? c.decodeIfPresent(Date.self, forKey: .cancelledAt)
+        cancellationReason = try? c.decodeIfPresent(String.self, forKey: .cancellationReason)
+
+        rescheduleRequestedAt = try? c.decodeIfPresent(Date.self, forKey: .rescheduleRequestedAt)
+        rescheduleRequestNotes = try? c.decodeIfPresent(String.self, forKey: .rescheduleRequestNotes)
+
+        handymanNotes = try? c.decodeIfPresent(String.self, forKey: .handymanNotes)
+        adminNotes = try? c.decodeIfPresent(String.self, forKey: .adminNotes)
+
+        isFree = (try? c.decodeIfPresent(Bool.self, forKey: .isFree)) ?? true
+        chargeableCostCents = try? c.decodeIfPresent(Int.self, forKey: .chargeableCostCents)
+        paymentStatus = try? c.decodeIfPresent(String.self, forKey: .paymentStatus)
+
+        pdfExportPath = try? c.decodeIfPresent(String.self, forKey: .pdfExportPath)
+        ingestionError = try? c.decodeIfPresent(String.self, forKey: .ingestionError)
+
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
+    }
+
+    /// Pre-visit display: is the visit still pending (no submission yet)?
+    var isPendingVisit: Bool {
+        switch status {
+        case .pending, .scheduled, .enRoute:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Post-visit display: has the homeowner not yet reviewed the captured data?
+    var isAwaitingReview: Bool {
+        status == .awaitingReview || status == .submitted
+    }
+
+    /// Visit is fully closed.
+    var isClosed: Bool {
+        status == .completed || status == .cancelled
+    }
+}
+
+extension HomeAssessmentRow: Equatable, Hashable {
+    static func == (lhs: HomeAssessmentRow, rhs: HomeAssessmentRow) -> Bool {
+        lhs.id == rhs.id && lhs.status == rhs.status && lhs.updatedAt == rhs.updatedAt
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+/// Item in a homeowner's "request_assessment_corrections" payload —
+/// flagging something the handyman missed or got wrong.
+struct AssessmentCorrectionItem: Codable, Hashable {
+    let section: String   // "system" | "contractor" | "routine" | "document" | "attribute"
+    let entityId: String?
+    let note: String
+
+    enum CodingKeys: String, CodingKey {
+        case section, note
+        case entityId = "entity_id"
     }
 }

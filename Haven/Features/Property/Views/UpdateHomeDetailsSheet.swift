@@ -216,7 +216,7 @@ struct UpdateHomeDetailsSheet: View {
             HavenCard {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     toggleRow(title: "Scheduled valuables rider",
-                              subtitle: "Jewelry, art, or wine. Surfaces a periodic appraisal recommendation in your estate readiness scorecard.",
+                              subtitle: "Jewelry, art, or wine. Surfaces a periodic appraisal recommendation alongside your insurance renewal.",
                               isOn: $hasScheduledValuables)
                 }
             }

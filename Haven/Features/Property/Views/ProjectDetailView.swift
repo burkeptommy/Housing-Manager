@@ -1234,6 +1234,22 @@ struct ProjectDetailView: View {
                             .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
+                // Phase 95 — tappable star promotes the quote to active.
+                // Long-press context menu is preserved for power users; the
+                // star is the discoverable affordance for everyone else.
+                Button {
+                    guard !isActive else { return }
+                    Haptics.selection()
+                    Task { try? await viewModel.activateQuote(quote, for: liveProject.id) }
+                } label: {
+                    Image(systemName: isActive ? "star.fill" : "star")
+                        .font(.system(size: 14))
+                        .foregroundStyle(isActive ? HavenColors.success : HavenColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isActive ? "Active quote" : "Make active quote")
+                .padding(.trailing, 4)
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(HavenColors.textTertiary)

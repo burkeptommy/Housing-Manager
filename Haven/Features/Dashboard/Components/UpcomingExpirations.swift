@@ -93,7 +93,7 @@ struct RequiresAttentionSection: View {
                                 }
                                 .buttonStyle(.plain)
 
-                            case .vehicleAlert, .estateNudge:
+                            case .vehicleAlert:
                                 attentionRow(item)
                             }
                         }

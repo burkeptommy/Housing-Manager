@@ -40,7 +40,6 @@ extension Notification.Name {
     /// Posted by AddPropertyFlow's confirmation step when the user taps
     /// "Take House Quiz". `object` carries the new `PropertyRow`.
     static let startHouseQuiz = Notification.Name("startHouseQuiz")
-    static let estateStateChanged = Notification.Name("estateStateChanged")
 
     /// Phase 50: Posted by `InvoiceProcessingViewModel` after it detects an
     /// explicit recurring service cadence on an invoice (>0.8 confidence).

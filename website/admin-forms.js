@@ -58,7 +58,6 @@ export const ENUMS = {
     { value: "snow_removal", label: "Snow removal" },
     { value: "auto_insurance", label: "Auto insurance" },
     { value: "home_insurance", label: "Home insurance" },
-    { value: "estate_attorney", label: "Estate attorney" },
     { value: "cpa_tax", label: "CPA / Tax" },
     { value: "financial_advisor", label: "Financial advisor" },
     { value: "life_insurance", label: "Life insurance" },

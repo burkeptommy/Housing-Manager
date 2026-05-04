@@ -37,7 +37,7 @@ struct ProjectEmailView: View {
                         .foregroundStyle(HavenColors.textPrimary)
                         .multilineTextAlignment(.center)
 
-                    Text("Forward anything related to your home, estate, or family to this address. Alfred will automatically extract vendors, analyze quotes, categorize documents, and create projects for you.")
+                    Text("Forward anything related to your home, vendors, or family to this address. Alfred will automatically extract vendors, analyze quotes, categorize documents, and create projects for you.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -73,7 +73,7 @@ struct ProjectEmailView: View {
                             .foregroundStyle(HavenColors.textTertiary)
 
                         alfredAction(icon: "doc.text.magnifyingglass", title: "Contractor Quotes", detail: "Analyzes every line item against market rates, creates a project, and adds the vendor")
-                        alfredAction(icon: "doc.fill", title: "Documents", detail: "Categorizes insurance, estate, tax, and home documents. Extracts dates and key details.")
+                        alfredAction(icon: "doc.fill", title: "Documents", detail: "Categorizes insurance, tax, vehicle, and home documents. Extracts dates and key details.")
                         alfredAction(icon: "person.crop.circle.badge.plus", title: "Vendor Info", detail: "Adds contractors and service providers to your vendor directory automatically")
                         alfredAction(icon: "wrench.and.screwdriver.fill", title: "Home Systems", detail: "Extracts appliance details, model numbers, and warranty info from manuals and inspections")
                         alfredAction(icon: "calendar.badge.clock", title: "Maintenance", detail: "Creates maintenance tasks from inspection reports and service recommendations")
@@ -494,7 +494,7 @@ struct ProjectEmailView: View {
         contact.emailAddresses = [
             CNLabeledValue(label: CNLabelWork, value: email as NSString)
         ]
-        contact.note = "Forward contractor quotes, home documents, insurance, vendor info, and anything related to your home or estate to this address. Alfred processes everything automatically."
+        contact.note = "Forward contractor quotes, home documents, insurance, vendor info, and anything related to your home to this address. Alfred processes everything automatically."
 
         let store = CNContactStore()
         store.requestAccess(for: .contacts) { granted, _ in

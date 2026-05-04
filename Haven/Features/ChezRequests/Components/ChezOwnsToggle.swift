@@ -43,6 +43,10 @@ struct ChezOwnsToggle: View {
     @State private var errorMessage: String?
     @State private var showNotesPrompt: Bool = false
     @State private var pendingNotes: String = ""
+    /// Phase 95 — transient confirmation flash so the user gets visible
+    /// feedback after a successful flip (haptic alone is too quiet on
+    /// the contractor / task detail surfaces). Cleared after 2 seconds.
+    @State private var confirmationMessage: String?
 
     private var label: String {
         switch target {
@@ -152,6 +156,16 @@ struct ChezOwnsToggle: View {
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.critical)
             }
+            if let confirmation = confirmationMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(HavenColors.success)
+                    Text(confirmation)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(14)
         .background(
@@ -247,6 +261,15 @@ struct ChezOwnsToggle: View {
             isOwned = delegated
             pendingNotes = ""
             Haptics.success()
+            confirmationMessage = delegated ? "Chez is on it." : "Returned to you."
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if confirmationMessage != nil {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        confirmationMessage = nil
+                    }
+                }
+            }
             Analytics.track(.chezDelegationToggled, [
                 "target": targetKindKey,
                 "delegated": String(delegated),

@@ -236,18 +236,26 @@ struct AddVendorSheet: View {
     private func detectClipboardContent() {
         guard let raw = UIPasteboard.general.string?
             .trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty,
-              raw.count <= 500 else { return }
+              !raw.isEmpty else { return }
 
-        let lowered = raw.lowercased()
+        // Only inspect the first ~2KB. Long pastes (full emails, articles,
+        // multi-line addresses) aren't valid URLs or phone numbers and the
+        // detection regexes below would just waste cycles. The previous
+        // 500-char cap silently dropped legitimately long URLs (campaign
+        // tracking parameters, signed AWS / Brandfetch links).
+        let inspectable = raw.count <= 2048 ? raw : String(raw.prefix(2048))
+
+        let lowered = inspectable.lowercased()
         if lowered.hasPrefix("http://")
             || lowered.hasPrefix("https://")
             || lowered.hasPrefix("www.") {
+            // Pass the full string through — the user pasted it, the
+            // import flow can decide what to do with the length.
             clipboardSuggestion = .url(raw)
             return
         }
 
-        let digits = raw.components(separatedBy: CharacterSet.decimalDigits.inverted)
+        let digits = inspectable.components(separatedBy: CharacterSet.decimalDigits.inverted)
             .joined()
         if digits.count >= 7 && digits.count <= 15 {
             clipboardSuggestion = .phone(raw)

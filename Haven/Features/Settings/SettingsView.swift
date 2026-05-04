@@ -179,7 +179,7 @@ struct SettingsView: View {
                     .tracking(1.5)
                     .foregroundStyle(HavenColors.textTertiary)
             } footer: {
-                Text("Forward quotes, documents, vendor info, and anything home or estate related. Alfred processes and organizes everything automatically.")
+                Text("Forward quotes, documents, vendor info, and anything home related. Alfred processes and organizes everything automatically.")
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)
             }

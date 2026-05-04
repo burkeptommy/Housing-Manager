@@ -523,14 +523,12 @@ struct HouseQuizView: View {
             // tap target. On dismiss, the walk-through view marks
             // walkthroughCompletedAt so the cinematic reveal can fire.
             .fullScreenCover(isPresented: $showWalkthrough) {
-                if let householdId = viewModel.property.householdId {
-                    NavigationStack {
-                        WalkthroughView(
-                            propertyId: viewModel.property.id,
-                            householdId: householdId,
-                            quizViewModel: viewModel
-                        )
-                    }
+                NavigationStack {
+                    WalkthroughView(
+                        propertyId: viewModel.property.id,
+                        householdId: viewModel.property.householdId,
+                        quizViewModel: viewModel
+                    )
                 }
             }
             // Phase 60.1 — edit sheet for the recap card's tap-to-correct

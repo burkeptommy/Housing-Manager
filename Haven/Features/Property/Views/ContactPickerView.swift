@@ -8,8 +8,10 @@ struct ContactPickerView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> CNContactPickerViewController {
         let picker = CNContactPickerViewController()
         picker.delegate = context.coordinator
-        // Only show contacts with at least a phone number
-        picker.predicateForEnablingContact = NSPredicate(format: "phoneNumbers.@count > 0")
+        // Allow any contact through. Vendors-by-email-only is a real case
+        // (HOA managers, attorneys, financial advisors) so we don't gate
+        // on phone-number presence. Empty fields just leave the AddVendor
+        // form un-prefilled.
         return picker
     }
 

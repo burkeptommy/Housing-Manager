@@ -16,7 +16,6 @@ enum ActivityEventType: String {
     case inboxItemReceived
     case projectCreated
     case gapAnalysisRun
-    case estateDocumentExtracted
 }
 
 struct RecentActivityEvent: Identifiable {
@@ -211,7 +210,6 @@ extension ActivityEventType {
         case .inboxItemReceived:        return "envelope.badge.fill"
         case .projectCreated:           return "hammer.fill"
         case .gapAnalysisRun:           return "chart.bar.xaxis"
-        case .estateDocumentExtracted:  return "building.columns.fill"
         }
     }
 
@@ -230,7 +228,6 @@ extension ActivityEventType {
         case .inboxItemReceived:        return HavenColors.warning
         case .projectCreated:           return HavenColors.navy700
         case .gapAnalysisRun:           return HavenColors.info
-        case .estateDocumentExtracted:  return HavenColors.navy700
         }
     }
 }
@@ -420,7 +417,6 @@ extension RecentActivityFeed {
         // TODO: Phase 52 -- add scenarioRun events once ScenarioHistoryRow exists
         // TODO: Phase 52 -- add recallDetected events from vehicle recall data
         // TODO: Phase 52 -- add gapAnalysisRun events (no per-run row model yet)
-        // TODO: Phase 52 -- add estateDocumentExtracted events from estate document analysis
 
         // Dedup by eventType + normalized title, sort by date desc
         var seenKeys = Set<String>()

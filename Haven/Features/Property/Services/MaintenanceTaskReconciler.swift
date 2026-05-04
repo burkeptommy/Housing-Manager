@@ -151,7 +151,8 @@ enum MaintenanceTaskReconciler {
         fuelType: String? = nil,
         flags: [String: Bool] = [:],
         mode: ReconcileMode = .full,
-        preferredContractorId: UUID? = nil
+        preferredContractorId: UUID? = nil,
+        excludeTemplateKeys: Set<String> = []
     ) async -> ReconciliationResult {
         // Phase 19j: Fetch the property once so template `{city}` and
         // `{state}` placeholders can be substituted with the user's actual
@@ -220,7 +221,16 @@ enum MaintenanceTaskReconciler {
             regionalPack: regionalPack
         )
 
-        let correctTemplates = rawTemplates.map {
+        // Phase 84.5 G28: when the handyman submits an assessment, the
+        // ingestion path passes the templateKeys of recommended tasks
+        // it just fanned out into chez_requests. The reconciler skips
+        // those templates so the same work doesn't get seeded twice.
+        // Empty set in non-assessment contexts — no behavior change.
+        let filteredRawTemplates = rawTemplates.filter { template in
+            !excludeTemplateKeys.contains(template.templateKey)
+        }
+
+        let correctTemplates = filteredRawTemplates.map {
             $0.interpolated(city: property?.city, state: property?.state)
         }
 
@@ -229,8 +239,8 @@ enum MaintenanceTaskReconciler {
         // existing tasks compare against the underlying template identity.
         // Build 88: also include bundleIds so the remove pass recognizes
         // bundled tasks as still-correct.
-        var correctTemplateKeys = Set(rawTemplates.map { $0.templateKey })
-        for t in rawTemplates {
+        var correctTemplateKeys = Set(filteredRawTemplates.map { $0.templateKey })
+        for t in filteredRawTemplates {
             if let bid = t.bundleId { correctTemplateKeys.insert(bid) }
         }
         let knownTitlesForCategory = MaintenanceTemplates.knownTemplateTitles(forCategory: systemCategory)
@@ -370,7 +380,7 @@ enum MaintenanceTaskReconciler {
             // bundleId → [(rawIndex, rawTemplate, interpolatedTemplate)]
             var bundleGroups: [String: [(Int, MaintenanceTemplate, MaintenanceTemplate)]] = [:]
 
-            for (index, rawTemplate) in rawTemplates.enumerated() {
+            for (index, rawTemplate) in filteredRawTemplates.enumerated() {
                 if let bid = rawTemplate.bundleId {
                     bundleGroups[bid, default: []].append((index, rawTemplate, correctTemplates[index]))
                 } else {
@@ -380,7 +390,7 @@ enum MaintenanceTaskReconciler {
 
             // --- Standalone templates (unchanged logic) ---
             for index in standaloneIndices {
-                let rawTemplate = rawTemplates[index]
+                let rawTemplate = filteredRawTemplates[index]
                 let templateKey = rawTemplate.templateKey
                 guard !existingTemplateIds.contains(templateKey) else { continue }
 
@@ -736,7 +746,11 @@ enum MaintenanceTaskReconciler {
     ///   - The post-quiz cleanup pass (catches systems that weren't touched
     ///     by a specific quiz answer but had their subtype inferred).
     ///   - The one-time legacy migration in `AppState.initialize()`.
-    static func reconcileAll(propertyId: UUID, householdId: UUID) async -> ReconciliationResult {
+    static func reconcileAll(
+        propertyId: UUID,
+        householdId: UUID,
+        excludeTemplateKeys: Set<String> = []
+    ) async -> ReconciliationResult {
         var aggregate = ReconciliationResult.empty
         let systems: [HomeSystemRow]
         do {
@@ -750,6 +764,13 @@ enum MaintenanceTaskReconciler {
         var processedCategories = Set<String>()
 
         for system in systems {
+            // Phase 84.5 G44: skip systems the homeowner / handyman has
+            // marked decommissioned (e.g. old well after city water hookup).
+            // The system row stays for history but stops generating tasks.
+            guard system.isActiveOrDefault else {
+                processedCategories.insert(system.category.lowercased())
+                continue
+            }
             let result = await reconcile(
                 propertyId: propertyId,
                 householdId: householdId,
@@ -758,7 +779,8 @@ enum MaintenanceTaskReconciler {
                 confirmedSubtype: system.subtype,
                 fuelType: system.catalogFuelType,
                 flags: [:],
-                preferredContractorId: system.preferredContractorId
+                preferredContractorId: system.preferredContractorId,
+                excludeTemplateKeys: excludeTemplateKeys
             )
             aggregate = aggregate.merging(result)
             processedCategories.insert(system.category.lowercased())
@@ -777,7 +799,8 @@ enum MaintenanceTaskReconciler {
                 systemCategory: category,
                 confirmedSubtype: nil,
                 fuelType: nil,
-                flags: [:]
+                flags: [:],
+                excludeTemplateKeys: excludeTemplateKeys
             )
             aggregate = aggregate.merging(result)
         }

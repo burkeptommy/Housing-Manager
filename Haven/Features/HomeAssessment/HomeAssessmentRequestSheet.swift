@@ -33,7 +33,7 @@ struct HomeAssessmentRequestSheet: View {
     @State private var errorMessage: String?
 
     private var householdId: String? {
-        viewModel.property.householdId.flatMap { $0.uuidString }
+        viewModel.property.householdId.uuidString
     }
 
     var body: some View {

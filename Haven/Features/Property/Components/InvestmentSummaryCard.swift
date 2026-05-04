@@ -57,7 +57,18 @@ struct InvestmentSummaryCard: View {
     }
 
     private var totalInvested: Double { purchasePrice + totalProjectSpend }
-    private var sellingCosts: Double { estimatedValue * 0.08 }
+    /// Phase 95 — selling-fee rate is read from `properties.attributes`
+    /// when the user has set one in `SaleSimulatorSheet`, otherwise
+    /// defaults to 8% (the historical national average). Westchester /
+    /// Fairfield negotiate down to 5–6% routinely; making this editable
+    /// + persisted unblocks honest math.
+    private var sellingFeeRate: Double {
+        guard let raw = property.attributes?["selling_fee_rate"]?.stringValue,
+              let rate = Double(raw),
+              rate > 0, rate < 1 else { return 0.08 }
+        return rate
+    }
+    private var sellingCosts: Double { estimatedValue * sellingFeeRate }
     private var netAfterSale: Double { estimatedValue - sellingCosts }
     private var gainLoss: Double { netAfterSale - totalInvested }
     private var gainLossPercent: Double { totalInvested > 0 ? (gainLoss / totalInvested) : 0 }
@@ -260,6 +271,19 @@ struct InvestmentSummaryCard: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    }
+                    // Phase 95 — confidence chip directly under the source
+                    // caption so the user reads value + confidence together.
+                    // Previously confidence only showed inside the AI
+                    // reasoning sheet (one tap removed).
+                    if let confidence = property.estimatedValueConfidence {
+                        Text("\(confidence)% confidence")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(confidenceColor(for: confidence))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(confidenceColor(for: confidence).opacity(0.12))
+                            .clipShape(Capsule())
                     }
                 }
 
@@ -519,7 +543,7 @@ struct InvestmentSummaryCard: View {
                 flowItem(label: "Estimated value", value: formatCurrency(estimatedValue), barColor: HavenColors.info)
 
                 dashedConnector
-                flowItem(label: "- Selling costs (8%)", value: "-\(formatCurrency(sellingCosts))", barColor: HavenColors.textTertiary)
+                flowItem(label: "- Selling costs (\(String(format: "%.1f%%", sellingFeeRate * 100)))", value: "-\(formatCurrency(sellingCosts))", barColor: HavenColors.textTertiary)
 
                 dashedConnector
                 resultCard
@@ -679,5 +703,14 @@ struct InvestmentSummaryCard: View {
 
     private func formatCurrencyCompact(_ value: Double) -> String {
         value.formattedCompactCurrency()
+    }
+
+    /// Phase 95 — confidence chip color tiers. ≥80 reads as solid
+    /// (greenish), 60–79 as nominal (info), <60 as caution (warning) so
+    /// the user can read the tier at a glance without doing the math.
+    private func confidenceColor(for confidence: Int) -> Color {
+        if confidence >= 80 { return HavenColors.success }
+        if confidence >= 60 { return HavenColors.info }
+        return HavenColors.warning
     }
 }

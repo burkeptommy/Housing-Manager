@@ -193,9 +193,7 @@ enum Day1TaskCurator {
                 return nil
             }()
 
-            let template = MaintenanceTemplates.template(forKey: templateKey)
             let isVendor = (task.assignmentType == "vendor")
-            let isDIY = (task.assignmentType == "personal")
 
             // --- 1. Vendor routes ---
             if isVendor, let category {
