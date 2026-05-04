@@ -4370,6 +4370,54 @@ final class DatabaseService {
         try await from("vehicle_recalls").update(RecallUpdate(isResolved: isResolved, resolvedDate: resolvedDate)).eq("id", value: id.uuidString).execute()
     }
 
+    /// Phase 95 (gap #86) — stamp the "scheduled with dealer"
+    /// intermediate state without resolving the recall. Pass nil to
+    /// clear the timestamp (e.g. user un-schedules).
+    func updateVehicleRecallScheduledWithDealer(id: UUID, scheduledAt: Date?) async throws {
+        struct ScheduleUpdate: Codable {
+            let scheduledWithDealerAt: Date?
+            enum CodingKeys: String, CodingKey {
+                case scheduledWithDealerAt = "scheduled_with_dealer_at"
+            }
+        }
+        try await from("vehicle_recalls")
+            .update(ScheduleUpdate(scheduledWithDealerAt: scheduledAt))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Phase 95 (gap #86) — link a vehicle service record to a
+    /// recall as the resolution evidence. Sets `is_resolved = true`
+    /// and `resolved_date = service_record.service_date` so the
+    /// resolution maps cleanly onto the work that was actually
+    /// done. Passing nil for `serviceRecordId` clears the link
+    /// without touching resolved state.
+    func linkVehicleRecallToServiceRecord(
+        recallId: UUID,
+        serviceRecordId: UUID?,
+        resolvedDate: String? = nil
+    ) async throws {
+        struct LinkUpdate: Codable {
+            let isResolved: Bool?
+            let resolvedDate: String?
+            let resolvedServiceRecordId: UUID?
+            enum CodingKeys: String, CodingKey {
+                case isResolved = "is_resolved"
+                case resolvedDate = "resolved_date"
+                case resolvedServiceRecordId = "resolved_service_record_id"
+            }
+        }
+        let update = LinkUpdate(
+            isResolved: serviceRecordId != nil ? true : nil,
+            resolvedDate: serviceRecordId != nil ? resolvedDate : nil,
+            resolvedServiceRecordId: serviceRecordId
+        )
+        try await from("vehicle_recalls")
+            .update(update)
+            .eq("id", value: recallId.uuidString)
+            .execute()
+    }
+
     // MARK: - Vehicle Documents
 
     func fetchVehicleDocuments(vehicleId: UUID) async throws -> [DocumentRow] {

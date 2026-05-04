@@ -1870,6 +1870,14 @@ struct VehicleAlertDetailSheet: View {
     @State private var completionCost = ""
     @State private var completionNotes = ""
     @State private var renewalDate = Date()
+    /// Phase 95 (gap #86) — drives the "Schedule with dealer"
+    /// intermediate state. Distinct from `isCompleting` so the two
+    /// CTAs can spinner independently and the user gets immediate
+    /// feedback on whichever path they pick.
+    @State private var isScheduling = false
+    @State private var serviceRecords: [VehicleServiceRecordRow] = []
+    @State private var showLinkRecordPicker = false
+    @State private var linkedServiceRecordId: UUID?
 
     var body: some View {
         NavigationStack {
@@ -1983,10 +1991,33 @@ struct VehicleAlertDetailSheet: View {
                 }
             }
 
-            // Mark resolved
+            // Phase 95 (gap #86) — three-state recall ack. Schedule
+            // pill renders when scheduledWithDealerAt is set but the
+            // recall isn't resolved yet, giving the homeowner
+            // explicit confirmation that the intermediate state took
+            // hold without re-firing the safety badge.
+            if !recall.isResolved, let scheduledAt = recall.scheduledWithDealerAt {
+                HavenCard {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .foregroundStyle(HavenColors.warning)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Scheduled with dealer")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Booked \(Self.relativeDateString(for: scheduledAt))")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+
+            // Acknowledgment actions
             HavenCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("MARK RESOLVED")
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    Text("ACKNOWLEDGE")
                         .font(HavenTypography.uiSectionHeader)
                         .foregroundStyle(HavenColors.textTertiary)
                         .tracking(1.5)
@@ -1996,15 +2027,167 @@ struct VehicleAlertDetailSheet: View {
                         .background(HavenColors.beige200)
                         .cornerRadius(HavenTheme.radiusMedium)
 
+                    // Phase 95 (gap #86) — "Schedule with dealer"
+                    // intermediate state. Only renders when the
+                    // recall is open AND not already scheduled, so
+                    // a re-tap doesn't re-stamp the timestamp.
+                    if !recall.isResolved, recall.scheduledWithDealerAt == nil {
+                        HavenButton(
+                            title: isScheduling ? "Saving..." : "Schedule with dealer",
+                            action: { Task { await scheduleWithDealer(recall) } },
+                            style: .secondary,
+                            icon: "calendar.badge.plus",
+                            isLoading: isScheduling,
+                            isDisabled: isScheduling || isCompleting
+                        )
+                    }
+
                     HavenButton(
-                        title: isCompleting ? "Saving..." : "Mark Resolved",
+                        title: isCompleting ? "Saving..." : "Mark completed",
                         action: { Task { await completeAlert() } },
                         icon: "checkmark.circle.fill",
                         isLoading: isCompleting,
-                        isDisabled: isCompleting
+                        isDisabled: isCompleting || isScheduling
                     )
+
+                    // Phase 95 (gap #86) — "Link service record"
+                    // path. Only surfaces when the user has at least
+                    // one record on file; otherwise the hint is
+                    // dead-end. Tap opens an inline picker that
+                    // stamps both is_resolved AND
+                    // resolved_service_record_id so the recall maps
+                    // back to the actual work that fixed it.
+                    if !serviceRecords.isEmpty, !recall.isResolved {
+                        Button {
+                            Haptics.selection()
+                            showLinkRecordPicker = true
+                        } label: {
+                            HStack(spacing: HavenTheme.spacing4) {
+                                Image(systemName: "link")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Link to a past service record")
+                                    .font(HavenTypography.uiLabel)
+                            }
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.vertical, HavenTheme.spacing4)
+                            .frame(minHeight: 32)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
+        }
+        .task {
+            // Pull the vehicle's service records once so the link
+            // picker has data when it opens. Cheap query, runs once.
+            serviceRecords = (try? await DatabaseService.shared.fetchVehicleServiceRecords(vehicleId: vehicle.id)) ?? []
+        }
+        .sheet(isPresented: $showLinkRecordPicker) {
+            recallLinkServicePicker(recall: recall)
+                .presentationDetents([.medium, .large])
+        }
+    }
+
+    /// Phase 95 (gap #86) — picker sheet that lists the vehicle's
+    /// service records and lets the homeowner pick one to mark this
+    /// recall resolved against. Tap a row → write
+    /// `resolved_service_record_id` + flip `is_resolved = true` +
+    /// stamp `resolved_date` to the record's service_date.
+    @ViewBuilder
+    private func recallLinkServicePicker(recall: VehicleRecallRow) -> some View {
+        NavigationStack {
+            List {
+                if serviceRecords.isEmpty {
+                    Text("No service records on file yet.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                } else {
+                    ForEach(serviceRecords) { record in
+                        Button {
+                            Task { await linkServiceRecord(record, to: recall) }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(record.description)
+                                    .font(HavenTypography.body)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                HStack(spacing: HavenTheme.spacing8) {
+                                    Text(record.serviceDate)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                    if let mi = record.mileageAtService {
+                                        Text("·")
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                        Text("\(mi.formatted()) mi")
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                    }
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Link service record")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showLinkRecordPicker = false }
+                }
+            }
+        }
+    }
+
+    /// Phase 95 (gap #86) — formats a relative-time label for the
+    /// "Scheduled with dealer" pill. Lives at static scope because
+    /// SwiftUI ViewBuilders can't host imperative formatter
+    /// configuration alongside view returns.
+    private static func relativeDateString(for date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    @MainActor
+    private func scheduleWithDealer(_ recall: VehicleRecallRow) async {
+        isScheduling = true
+        defer { isScheduling = false }
+        do {
+            try await DatabaseService.shared.updateVehicleRecallScheduledWithDealer(
+                id: recall.id,
+                scheduledAt: Date()
+            )
+            Analytics.track(.vehicleRecallScheduled, [
+                "recall_id": recall.id.uuidString,
+                "vehicle_id": vehicle.id.uuidString
+            ])
+            Haptics.success()
+            onComplete?()
+            dismiss()
+        } catch {
+            Haptics.error()
+        }
+    }
+
+    @MainActor
+    private func linkServiceRecord(_ record: VehicleServiceRecordRow, to recall: VehicleRecallRow) async {
+        do {
+            try await DatabaseService.shared.linkVehicleRecallToServiceRecord(
+                recallId: recall.id,
+                serviceRecordId: record.id,
+                resolvedDate: record.serviceDate
+            )
+            Analytics.track(.vehicleRecallLinkedToService, [
+                "recall_id": recall.id.uuidString,
+                "service_record_id": record.id.uuidString
+            ])
+            Haptics.success()
+            showLinkRecordPicker = false
+            onComplete?()
+            dismiss()
+        } catch {
+            Haptics.error()
         }
     }
 

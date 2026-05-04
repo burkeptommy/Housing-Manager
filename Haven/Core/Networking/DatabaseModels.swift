@@ -4818,6 +4818,12 @@ struct VehicleRecallRow: Codable, Identifiable {
     let isResolved: Bool
     let resolvedDate: String?
     let resolvedServiceRecordId: UUID?
+    /// Phase 95 (gap #86) — intermediate "scheduled with dealer"
+    /// timestamp. Non-nil + isResolved=false means the homeowner
+    /// has booked the appointment but the work isn't complete yet.
+    /// UI surfaces a "Scheduled" pill in this state. Persists past
+    /// resolution as audit history.
+    let scheduledWithDealerAt: Date?
     let notes: String?
     let createdAt: Date?
 
@@ -4830,6 +4836,7 @@ struct VehicleRecallRow: Codable, Identifiable {
         case isResolved = "is_resolved"
         case resolvedDate = "resolved_date"
         case resolvedServiceRecordId = "resolved_service_record_id"
+        case scheduledWithDealerAt = "scheduled_with_dealer_at"
         case createdAt = "created_at"
     }
 }

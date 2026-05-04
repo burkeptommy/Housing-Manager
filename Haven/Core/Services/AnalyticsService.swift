@@ -427,6 +427,14 @@ enum AnalyticsEvent: String {
     /// holds the recalc count so we can spot-check whether per-mile
     /// cadences are getting bumped at the rate we'd expect.
     case mileageTasksRecalced = "mileage_tasks_recalced"
+    /// Phase 95 (gap #86) — fired when the homeowner taps "Schedule
+    /// with dealer" on a recall, putting it in the intermediate
+    /// state without resolving.
+    case vehicleRecallScheduled = "vehicle_recall_scheduled"
+    /// Phase 95 (gap #86) — fired when the homeowner picks an
+    /// existing service record as the resolution evidence for a
+    /// recall. Resolves the recall AND links the service record.
+    case vehicleRecallLinkedToService = "vehicle_recall_linked_to_service"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 
