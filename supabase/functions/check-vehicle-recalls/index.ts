@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+interface CollectedRecall {
+  vehicleId: string;
+  vehicleName: string;
+  component: string;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -38,6 +44,7 @@ serve(async (req: Request) => {
     }
 
     let totalNewRecalls = 0;
+    const collected: CollectedRecall[] = [];
 
     for (const vehicle of vehicles) {
       if (!vehicle.vin || vehicle.vin.length !== 17) continue;
@@ -76,11 +83,69 @@ serve(async (req: Request) => {
             recall_date: recall.ReportReceivedDate,
           });
           totalNewRecalls++;
+
+          // Track for push notification — Phase 95 audit gap #85.
+          // Without this, a user-initiated recall refresh silently
+          // inserts safety recalls without paging the household. The
+          // cron path (proactive-scan) already pushes; this closes the
+          // user-tapped path.
+          collected.push({
+            vehicleId: vehicle.id,
+            vehicleName: vehicle.name,
+            component: recall.Component ?? "Unknown component",
+          });
         }
 
         console.log(`[check-recalls] ${vehicle.name}: ${nhtsaRecalls.length} NHTSA, ${totalNewRecalls} new`);
       } catch (err) {
         console.warn(`[check-recalls] Failed for ${vehicle.name}: ${err}`);
+      }
+    }
+
+    // Send push notifications for any new recalls. Mirrors the
+    // proactive-scan pattern — one push per recall per device token,
+    // tagged with `vehicle_recall` so the iOS push handler routes the
+    // tap to VehicleDetailView. Failures are warned and swallowed; the
+    // row was already inserted, so the user will still see the recall
+    // the next time they open the app.
+    if (collected.length > 0) {
+      try {
+        const { data: hhUsers } = await supabase
+          .from("users")
+          .select("id")
+          .eq("household_id", household_id);
+        const userIds = (hhUsers ?? []).map((u: any) => u.id);
+
+        if (userIds.length > 0) {
+          const { data: tokens } = await supabase
+            .from("device_tokens")
+            .select("token")
+            .in("user_id", userIds);
+
+          if (tokens && tokens.length > 0) {
+            for (const recall of collected) {
+              for (const { token } of tokens) {
+                try {
+                  await supabase.functions.invoke("send-push-notification", {
+                    body: {
+                      token,
+                      title: `New Recall: ${recall.vehicleName}`,
+                      body: `${recall.component} - Contact your dealer for details`,
+                      data: {
+                        type: "vehicle_recall",
+                        vehicle_id: recall.vehicleId,
+                      },
+                    },
+                  });
+                } catch (pushErr) {
+                  console.warn(`[check-recalls] Push failed for token: ${pushErr}`);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[check-recalls] Push notification error: ${err}`);
       }
     }
 
