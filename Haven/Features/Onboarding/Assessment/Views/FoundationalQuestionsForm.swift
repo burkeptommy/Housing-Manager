@@ -36,7 +36,13 @@ struct FoundationalQuestionsForm: View {
         self.onSkip = onSkip
     }
 
-    private let totalSteps = 7
+    /// Phase 95 (gap #2): bumped from 7 → 8 to capture will-be-home and
+    /// access instructions inline. Previously these fields existed on
+    /// FoundationalAnswers but were never collected during the form;
+    /// the handyman path's prep card collected them after the fork.
+    /// Now we capture them upfront so applyModeChoice(.handyman) can
+    /// fire requestHomeAssessment with real data the first time.
+    private let totalSteps = 8
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,6 +74,7 @@ struct FoundationalQuestionsForm: View {
                         case 4: trashStep
                         case 5: priorityStep
                         case 6: tierStep
+                        case 7: visitDetailsStep
                         default: EmptyView()
                         }
                     }
@@ -146,6 +153,7 @@ struct FoundationalQuestionsForm: View {
         case 4: return ("Trash & recycling", "We'll remind you the day before each pickup.")
         case 5: return ("What matters most to you?", "Drives how we prioritize recommendations.")
         case 6: return ("How do you like to handle work?", "We use this to route every task — DIY-able vs hire-out vendor.")
+        case 7: return ("If a Chez handyman visits...", "Helps the field team know what to expect on day one.")
         default: return ("", "")
         }
     }
@@ -420,6 +428,63 @@ struct FoundationalQuestionsForm: View {
         }
     }
 
+    // MARK: Step 8 — Visit details (Phase 95, gap #2)
+
+    /// Captures will-be-home + access notes upfront so the handyman
+    /// path can fire requestHomeAssessment with real data the first
+    /// time. The field is also useful for the DIY path (e.g. when the
+    /// homeowner later requests an assessment from Settings).
+    @ViewBuilder
+    private var visitDetailsStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Toggle(isOn: $answers.willBeHomeForVisit) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("I'll be home")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Greet the team and walk through your home with them.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+            .tint(HavenColors.action)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .stroke(HavenColors.border, lineWidth: 1)
+            )
+
+            // Access notes only show when the user won't be home — that's
+            // when gate codes / lockbox locations / dog-in-yard caveats
+            // become important. Always-home visits don't need them.
+            if !answers.willBeHomeForVisit {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ACCESS INSTRUCTIONS")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    TextEditor(text: Binding(
+                        get: { answers.accessInstructions ?? "" },
+                        set: { answers.accessInstructions = $0.isEmpty ? nil : $0 }
+                    ))
+                    .frame(minHeight: 88)
+                    .padding(8)
+                    .background(HavenColors.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                            .stroke(HavenColors.border, lineWidth: 1)
+                    )
+                    Text("Gate code, lockbox location, dog in the yard, where to park — anything we should know before arriving.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+    }
+
     // MARK: Helpers
 
     private func singleChoiceRow(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -489,6 +554,7 @@ struct FoundationalQuestionsForm: View {
         case 4: return true   // trash days optional
         case 5: return answers.topPriority != nil
         case 6: return answers.preferenceTier != nil
+        case 7: return true   // visit details all optional; toggle defaults to true
         default: return true
         }
     }
