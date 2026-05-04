@@ -4528,6 +4528,11 @@ struct VehicleRow: Codable, Identifiable {
     let isEv: Bool?
     let batteryCapacityKwh: Double?
     let chargerType: String?
+    /// Phase 95 (gap #90) — soft-delete. Non-nil = vehicle has been
+    /// sold / traded / totaled. Active garage queries filter these
+    /// out; service history reads via direct id keep working.
+    let archivedAt: Date?
+    let archiveReason: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, year, make, model, trim, color, vin, notes
@@ -4559,6 +4564,8 @@ struct VehicleRow: Codable, Identifiable {
         case isEv = "is_ev"
         case batteryCapacityKwh = "battery_capacity_kwh"
         case chargerType = "charger_type"
+        case archivedAt = "archived_at"
+        case archiveReason = "archive_reason"
     }
 
     init(from decoder: Decoder) throws {
@@ -4600,10 +4607,15 @@ struct VehicleRow: Codable, Identifiable {
         isEv = try? c.decodeIfPresent(Bool.self, forKey: .isEv)
         batteryCapacityKwh = try? c.decodeIfPresent(Double.self, forKey: .batteryCapacityKwh)
         chargerType = try? c.decodeIfPresent(String.self, forKey: .chargerType)
+        archivedAt = try? c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        archiveReason = try? c.decodeIfPresent(String.self, forKey: .archiveReason)
     }
 
     /// Phase 84 — convenience getter for delegation status.
     var isChezOwned: Bool { chezOwned ?? false }
+
+    /// Phase 95 (gap #90) — convenience getter for archived state.
+    var isArchived: Bool { archivedAt != nil }
 
     /// Phase 95 (gap #91) — convenience getter for the EV flag. Treats
     /// nil as false so callers can branch without unwrapping.

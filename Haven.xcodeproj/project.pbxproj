@@ -147,6 +147,7 @@
 		2756D44332E73867AAEF0560 /* HavenFieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 740A04DEF46264975B1D1273 /* HavenFieldView.swift */; };
 		27F9D01A4FE1FFFA16C8E05C /* AppleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97DA2A9A5015DD76D290D7F9 /* AppleSignInCoordinator.swift */; };
 		280715FF2834474248F6AC9C /* QuoteAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90DE1FAE9B5571505CFE68 /* QuoteAnalysisView.swift */; };
+		28419252A894714EBAB65BEC /* ArchiveVehicleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733F8443471C1E4864CEDDEC /* ArchiveVehicleSheet.swift */; };
 		28A5F3BA3672CD7AF4341B51 /* MaintenanceTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF47343974F44B306A4C18DE /* MaintenanceTaskRow.swift */; };
 		28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90DE1FAE9B5571505CFE68 /* QuoteAnalysisView.swift */; };
 		28DD8B5AD8EB0E65FB264AA1 /* EnrichmentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */; };
@@ -606,6 +607,7 @@
 		AE44B4CCC62101D930AEFBA6 /* DocumentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AADE9042AEE29A1723D203 /* DocumentCard.swift */; };
 		AE640787BE30EAE0049C12BB /* QuizContinueButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7940D86E0543CF38978E45F3 /* QuizContinueButton.swift */; };
 		AF55FEC179B73D00611A3004 /* TokenManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164BF6C3C64C2E76B6836067 /* TokenManager.swift */; };
+		AFAA2619FC3A8D3334667419 /* ArchiveVehicleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733F8443471C1E4864CEDDEC /* ArchiveVehicleSheet.swift */; };
 		AFE6F1D79C403411616481ED /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A9B2A9169E8DF0AF4A26342 /* DatabaseService.swift */; };
 		B0175AFD507FB8072EBD9702 /* InlineInsightPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0938C9921AE566F16F6CE67 /* InlineInsightPill.swift */; };
 		B0419988F9A5CF0AD7188A0C /* BundleCustomSubitem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F17EC3D832149D4CC09D7 /* BundleCustomSubitem.swift */; };
@@ -1102,6 +1104,7 @@
 		711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewArrivalChecklist.swift; sourceTree = "<group>"; };
 		71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizInsightOverlay.swift; sourceTree = "<group>"; };
 		715AA20065124665D9D16D60 /* AvatarPhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPhotoService.swift; sourceTree = "<group>"; };
+		733F8443471C1E4864CEDDEC /* ArchiveVehicleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveVehicleSheet.swift; sourceTree = "<group>"; };
 		740A04DEF46264975B1D1273 /* HavenFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenFieldView.swift; sourceTree = "<group>"; };
 		742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioView.swift; sourceTree = "<group>"; };
 		7469C5E2107D7848DE8EF580 /* Q38HandymanPunchListBody.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Q38HandymanPunchListBody.swift; sourceTree = "<group>"; };
@@ -2124,6 +2127,7 @@
 				FF285398DF308A59B99CB085 /* AddVendorSheet.swift */,
 				F8A2100EC9330C5275C4EA97 /* AddWarrantySheet.swift */,
 				D3AE3F7AF466829498D26D39 /* AppliancesListView.swift */,
+				733F8443471C1E4864CEDDEC /* ArchiveVehicleSheet.swift */,
 				BBC24845830A2362EE847792 /* ChezDirectorySearchView.swift */,
 				012A4D8E967F9F73E579FAB8 /* ContactPickerView.swift */,
 				6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */,
@@ -2587,6 +2591,7 @@
 				B712650F6D815063CCDF67FA /* AppliancePictogramGrid.swift in Sources */,
 				D999F256BE13EDBE78FE61AF /* ApplianceSetupSheet.swift in Sources */,
 				A9F59641F2DE50FEA0BA8CAF /* AppliancesListView.swift in Sources */,
+				28419252A894714EBAB65BEC /* ArchiveVehicleSheet.swift in Sources */,
 				EE73ECD56393466A5B1A9C45 /* AssessmentPendingCard.swift in Sources */,
 				6431FBBC682CB86D898C1382 /* AssessmentReviewView.swift in Sources */,
 				9451E048C0F3A1D5972DC5B8 /* AuthService.swift in Sources */,
@@ -3036,6 +3041,7 @@
 				88C72B20B7698B9757D9A281 /* AppliancePictogramGrid.swift in Sources */,
 				16E2F812F32E89F2F6D69566 /* ApplianceSetupSheet.swift in Sources */,
 				B885422296F917644A3F238C /* AppliancesListView.swift in Sources */,
+				AFAA2619FC3A8D3334667419 /* ArchiveVehicleSheet.swift in Sources */,
 				3F694A7E22AA6E4ACE14FB2E /* AssessmentPendingCard.swift in Sources */,
 				8F1D2D71CADE93F741FB79B8 /* AssessmentReviewView.swift in Sources */,
 				4BB95A13981626E740A08AB1 /* AuthService.swift in Sources */,

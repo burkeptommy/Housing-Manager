@@ -435,6 +435,10 @@ enum AnalyticsEvent: String {
     /// existing service record as the resolution evidence for a
     /// recall. Resolves the recall AND links the service record.
     case vehicleRecallLinkedToService = "vehicle_recall_linked_to_service"
+    /// Phase 95 (gap #90) — fired when the homeowner archives a
+    /// vehicle (sold / traded / totaled / other). Distinct from
+    /// `vehicleDeleted` which is the destructive path.
+    case vehicleArchived = "vehicle_archived"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

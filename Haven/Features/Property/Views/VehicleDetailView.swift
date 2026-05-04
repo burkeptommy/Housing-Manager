@@ -10,6 +10,10 @@ struct VehicleDetailView: View {
     }
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
+    /// Phase 95 (gap #90) — drives the soft-archive sheet. Tom-
+    /// preferred path for sold / traded / totaled vehicles; the
+    /// destructive delete is reserved for "I never owned this".
+    @State private var showArchiveSheet = false
     @State private var showEditVehicle = false
     @State private var showAddService = false
     @State private var showDocumentUpload = false
@@ -61,6 +65,12 @@ struct VehicleDetailView: View {
                         Label("Edit Vehicle", systemImage: "pencil")
                     }
                     Divider()
+                    // Phase 95 (gap #90) — soft archive (sold /
+                    // traded / totaled). Preserves history and
+                    // takes the vehicle off the active garage list.
+                    Button { showArchiveSheet = true } label: {
+                        Label("Archive vehicle", systemImage: "archivebox")
+                    }
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label("Delete Vehicle", systemImage: "trash")
                     }
@@ -87,6 +97,20 @@ struct VehicleDetailView: View {
             }
         } message: {
             Text("This will permanently delete this vehicle and all its service records.")
+        }
+        // Phase 95 (gap #90) — soft-archive sheet.
+        .sheet(isPresented: $showArchiveSheet) {
+            if let vehicle = viewModel.vehicle {
+                ArchiveVehicleSheet(vehicle: vehicle) {
+                    Task {
+                        await viewModel.load(vehicleId: vehicleID)
+                        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                    }
+                    showArchiveSheet = false
+                    dismiss()
+                }
+                .presentationDetents([.medium])
+            }
         }
         .sheet(item: $selectedAlert) { alert in
             VehicleAlertDetailSheet(

@@ -4314,8 +4314,17 @@ final class DatabaseService {
 
     // MARK: - Vehicles
 
+    /// Phase 95 (gap #90) — active vehicles only. Archived rows
+    /// (sold / traded / totaled) are filtered out at the query
+    /// level so the active garage list never has to filter
+    /// client-side.
     func fetchVehicles() async throws -> [VehicleRow] {
-        try await from("vehicles").select().order("name").execute().value
+        try await from("vehicles")
+            .select()
+            .is("archived_at", value: nil)
+            .order("name")
+            .execute()
+            .value
     }
 
     func fetchVehicle(id: UUID) async throws -> VehicleRow {
@@ -4332,6 +4341,46 @@ final class DatabaseService {
 
     func deleteVehicle(id: UUID) async throws {
         try await from("vehicles").delete().eq("id", value: id.uuidString).execute()
+    }
+
+    /// Phase 95 (gap #90) — soft-delete. Stamps archived_at + reason
+    /// so the vehicle drops off the active garage list while every
+    /// service record, recall, and document linked via vehicle_id
+    /// stays accessible via direct lookup. Use this for sold /
+    /// traded / totaled cases; reserve `deleteVehicle` for true
+    /// "I never owned this" mistakes.
+    func archiveVehicle(id: UUID, reason: String) async throws {
+        struct ArchiveUpdate: Codable {
+            let archivedAt: Date
+            let archiveReason: String
+            enum CodingKeys: String, CodingKey {
+                case archivedAt = "archived_at"
+                case archiveReason = "archive_reason"
+            }
+        }
+        try await from("vehicles")
+            .update(ArchiveUpdate(archivedAt: Date(), archiveReason: reason))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Phase 95 (gap #90) — restore. Clears the archive flags so
+    /// the vehicle reappears in the active garage. Used by an
+    /// "Undo archive" toast or the rare case of restoring a
+    /// vehicle that was archived by mistake.
+    func unarchiveVehicle(id: UUID) async throws {
+        struct Unarchive: Codable {
+            let archivedAt: Date?
+            let archiveReason: String?
+            enum CodingKeys: String, CodingKey {
+                case archivedAt = "archived_at"
+                case archiveReason = "archive_reason"
+            }
+        }
+        try await from("vehicles")
+            .update(Unarchive(archivedAt: nil, archiveReason: nil))
+            .eq("id", value: id.uuidString)
+            .execute()
     }
 
     // MARK: - Vehicle Service Records
