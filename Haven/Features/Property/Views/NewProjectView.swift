@@ -5,6 +5,14 @@ struct NewProjectView: View {
     let propertyID: UUID
     let householdId: UUID
     @ObservedObject var viewModel: ProjectsViewModel
+    /// Phase 95 (gap #36) — when set, the new project is linked as
+    /// a sub-project under this insurance-claim parent. Used by
+    /// `ProjectDetailView`'s claim section "+ Add new project"
+    /// affordance so users can spin out a sub-project (e.g.
+    /// "Kitchen drywall replacement") directly into an in-flight
+    /// claim without navigating back to the project list and using
+    /// the link picker.
+    var parentProjectId: UUID? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -206,7 +214,7 @@ struct NewProjectView: View {
 
         Task {
             do {
-                let insert = PropertyProjectInsert(
+                var insert = PropertyProjectInsert(
                     householdId: householdId,
                     propertyId: propertyID,
                     name: name.trimmingCharacters(in: .whitespaces),
@@ -214,6 +222,9 @@ struct NewProjectView: View {
                     category: category.rawValue,
                     projectType: approach.rawValue
                 )
+                // Phase 95 (gap #36) — link to insurance-claim parent
+                // when invoked from the claim sub-project flow.
+                insert.parentProjectId = parentProjectId
                 let project = try await viewModel.createProject(insert)
                 Analytics.track(.propertyCreated, ["type": "project", "category": category.rawValue, "approach": approach.rawValue])
 

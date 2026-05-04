@@ -16,6 +16,9 @@ struct ProjectDetailView: View {
     @State private var compareTrade: String?
     @State private var showDeleteConfirmation = false
     @State private var showLinkProject = false
+    /// Phase 95 (gap #36) — drives the "Add new" sub-project sheet
+    /// next to "Link existing" on the insurance-claim section.
+    @State private var showCreateSubProject = false
     @State private var showPersonalPropertyEdit = false
     @State private var personalPropertyInput = ""
     @State private var showEditProject = false
@@ -713,27 +716,67 @@ struct ProjectDetailView: View {
                 }
             }
 
-            // Link project button
-            Button {
-                Haptics.light()
-                showLinkProject = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "link.badge.plus")
-                        .font(.system(size: 14))
-                    Text("Link a Project")
-                        .font(HavenTypography.uiLabel)
+            // Phase 95 (gap #36) — two-button affordance: link an
+            // existing project, OR spin out a new sub-project
+            // directly under this claim. The new-project path
+            // pre-seeds parentProjectId so the link is set on
+            // insert without an extra step.
+            HStack(spacing: HavenTheme.spacing8) {
+                Button {
+                    Haptics.light()
+                    showLinkProject = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "link.badge.plus")
+                            .font(.system(size: 14))
+                        Text("Link existing")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 }
-                .foregroundStyle(HavenColors.textPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(HavenColors.navy.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .buttonStyle(.plain)
+
+                Button {
+                    Haptics.light()
+                    showCreateSubProject = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Add new")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .sheet(isPresented: $showLinkProject) {
             linkProjectSheet
+        }
+        .sheet(isPresented: $showCreateSubProject) {
+            // Phase 95 (gap #36) — direct create-sub-project path.
+            // Reuses the canonical NewProjectView with parentProjectId
+            // pre-seeded so the new row is linked on insert.
+            NewProjectView(
+                propertyID: liveProject.propertyId,
+                householdId: liveProject.householdId,
+                viewModel: viewModel,
+                parentProjectId: project.id
+            )
+            .onDisappear {
+                Task {
+                    await viewModel.loadSubProjects(parentId: project.id, propertyId: liveProject.propertyId)
+                }
+            }
         }
     }
 
