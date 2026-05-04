@@ -2769,21 +2769,454 @@ async function handleWorkbenchAction(
   if (!householdId || !entityType || !entityId || !actionType) {
     return json({ error: "household_id + entity_type + entity_id + action_type required" }, 400);
   }
-  const { data, error } = await service
+
+  // Phase 85 PR 5E — every workbench button does real work, not just an
+  // audit row. Dispatch on action_type before the audit insert so the
+  // audit row can capture the resulting record id where one is created.
+  // Errors at the side-effect layer surface to the operator with a clear
+  // message — the audit row is rolled back by virtue of not being
+  // inserted (we only insert it after a successful side-effect).
+  const sidePayload = (payload.payload ?? {}) as Record<string, unknown>;
+  let sideEffectResult: Record<string, unknown> | null = null;
+  let sideEffectError: string | null = null;
+
+  try {
+    sideEffectResult = await runWorkbenchSideEffect({
+      service,
+      user,
+      entityType,
+      entityId,
+      actionType,
+      payload: sidePayload,
+      householdId,
+    });
+  } catch (e) {
+    console.error("[chez-concierge] workbench side-effect failed:", e);
+    sideEffectError = (e as Error).message ?? String(e);
+  }
+
+  if (sideEffectError) {
+    return json({ error: sideEffectError, action_type: actionType }, 500);
+  }
+
+  // Audit row goes in last so it carries any new entity ids from the
+  // side-effect result. Failure to insert the audit row is logged but
+  // doesn't fail the request — the side-effect already landed.
+  const auditPayload = { ...sidePayload, ...(sideEffectResult ?? {}) };
+  const { data: auditRow, error: auditErr } = await service
     .from("chez_workbench_actions")
     .insert({
       household_id: householdId,
       entity_type: entityType,
       entity_id: entityId,
       action_type: actionType,
-      payload: payload.payload ?? {},
+      payload: auditPayload,
       performed_by_user_id: user.id,
       request_id: payload.request_id ?? null,
     })
     .select("*")
     .single();
-  if (error) return json({ error: error.message }, 500);
-  return json({ ok: true, action: data });
+  if (auditErr) {
+    console.warn("[chez-concierge] audit insert failed (side-effect already landed):", auditErr);
+  }
+  return json({ ok: true, action: auditRow ?? null, side_effect: sideEffectResult });
+}
+
+// ----------------------------------------------------------------------------
+// Phase 85 PR 5E — workbench side-effect dispatcher.
+//
+// Each action_type maps to a real DB write. We keep the dispatcher in one
+// function so the audit-row insert above stays generic and we can extend
+// the action set without touching the wrapper. Returns a partial object
+// merged into the audit payload (e.g. `{ visit_id: "..." }` so we can
+// trace the audit row back to the side-effect).
+// ----------------------------------------------------------------------------
+
+async function runWorkbenchSideEffect(args: {
+  service: ServiceClient;
+  user: { id: string; email?: string | null };
+  entityType: string;
+  entityId: string;
+  actionType: string;
+  payload: Record<string, unknown>;
+  householdId: string;
+}): Promise<Record<string, unknown> | null> {
+  const { service, user, entityType, entityId, actionType, payload, householdId } = args;
+
+  const asString = (v: unknown): string | null =>
+    typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+  const asNumber = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const asIso = (v: unknown): string | null => {
+    const s = asString(v);
+    if (!s) return null;
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  };
+
+  switch (actionType) {
+    // ----- Routines -----
+    // routine_visits columns (Phase 55 + Phase 66 extensions):
+    //   routine_id (FK), scheduled_date DATE NOT NULL, status TEXT,
+    //   visit_state TEXT, target_window_start/end DATE,
+    //   confirmed_at, confirmed_by, actual_cost_cents, notes.
+    // Note: NO household_id — inherits via routine_id.
+    case "schedule_visit": {
+      const targetDate = asString(payload.scheduled_date) ?? asString(payload.target_window_start);
+      if (!targetDate) throw new Error("scheduled_date required for schedule_visit (YYYY-MM-DD)");
+      const dateOnly = targetDate.length >= 10 ? targetDate.slice(0, 10) : targetDate;
+      const notes = asString(payload.notes);
+      const { data, error } = await service
+        .from("routine_visits")
+        .insert({
+          routine_id: entityId,
+          scheduled_date: dateOnly,
+          status: "upcoming",
+          visit_state: "scheduled",
+          target_window_start: dateOnly,
+          confirmed_by: user.id,
+          notes,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`routine_visits insert failed: ${error.message}`);
+      return { visit_id: data.id, scheduled_date: dateOnly };
+    }
+    case "log_visit": {
+      const occurredRaw = asString(payload.occurred_at) ?? new Date().toISOString();
+      const dateOnly = occurredRaw.slice(0, 10);
+      const cost = asNumber(payload.actual_cost_cents);
+      const notes = asString(payload.notes);
+      const { data, error } = await service
+        .from("routine_visits")
+        .insert({
+          routine_id: entityId,
+          scheduled_date: dateOnly,
+          status: "confirmed",
+          visit_state: "completed",
+          confirmed_at: new Date().toISOString(),
+          confirmed_by: user.id,
+          actual_cost_cents: cost,
+          notes,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`routine_visits insert failed: ${error.message}`);
+      return { visit_id: data.id, occurred_at: dateOnly };
+    }
+
+    // ----- Systems -----
+    // service_records columns: system_id, property_id (NOT NULL),
+    // household_id, contractor_id, service_date (DATE NOT NULL),
+    // service_type (NOT NULL), description (NOT NULL), cost (DECIMAL),
+    // invoice_document_id, notes.
+    case "log_service": {
+      const occurredRaw = asString(payload.occurred_at) ?? new Date().toISOString();
+      const serviceDate = occurredRaw.slice(0, 10);
+      const cost = asNumber(payload.cost_cents);
+      const costDecimal = cost !== null ? cost / 100 : null;
+      const vendorId = asString(payload.contractor_id);
+      const description = asString(payload.description) ?? asString(payload.notes) ?? "Service logged by Chez";
+      const serviceType = asString(payload.service_type) ?? "maintenance";
+
+      // Look up property_id from the home_systems row — service_records
+      // requires it as NOT NULL.
+      const { data: sys, error: sysErr } = await service
+        .from("home_systems")
+        .select("property_id")
+        .eq("id", entityId)
+        .maybeSingle();
+      if (sysErr || !sys?.property_id) {
+        throw new Error(`home_systems lookup failed: ${sysErr?.message ?? "missing property_id"}`);
+      }
+
+      const { data, error } = await service
+        .from("service_records")
+        .insert({
+          system_id: entityId,
+          property_id: sys.property_id,
+          household_id: householdId,
+          contractor_id: vendorId,
+          service_date: serviceDate,
+          service_type: serviceType,
+          description,
+          cost: costDecimal,
+          notes: asString(payload.notes),
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`service_records insert failed: ${error.message}`);
+
+      const { error: stampErr } = await service
+        .from("home_systems")
+        .update({ last_service_date: serviceDate })
+        .eq("id", entityId);
+      if (stampErr) {
+        console.warn("[workbench] home_systems.last_service_date stamp failed:", stampErr);
+      }
+      return { service_record_id: data.id, service_date: serviceDate };
+    }
+    case "schedule_maintenance": {
+      const rawDate = asString(payload.scheduled_date) ?? asString(payload.next_due_date);
+      if (!rawDate) throw new Error("scheduled_date required for schedule_maintenance (YYYY-MM-DD)");
+      const dueDate = rawDate.slice(0, 10);
+      const title = asString(payload.title) ?? "Scheduled by Chez";
+      const description = asString(payload.notes) ?? "";
+      const frequency = asString(payload.frequency) ?? "once";
+      // Look up property_id from the system row.
+      const { data: sys, error: sysErr } = await service
+        .from("home_systems")
+        .select("property_id")
+        .eq("id", entityId)
+        .maybeSingle();
+      if (sysErr || !sys?.property_id) {
+        throw new Error(`home_systems lookup failed: ${sysErr?.message ?? "missing property_id"}`);
+      }
+      const { data, error } = await service
+        .from("maintenance_tasks")
+        .insert({
+          household_id: householdId,
+          property_id: sys.property_id,
+          system_id: entityId,
+          title,
+          description,
+          frequency,
+          scheduled_date: dueDate,
+          next_due_date: dueDate,
+          assignment_type: "vendor",
+          chez_owned: true,
+          chez_owned_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`maintenance_tasks insert failed: ${error.message}`);
+      return { task_id: data.id, scheduled_date: dueDate };
+    }
+
+    // ----- Tasks -----
+    case "schedule": {
+      const rawDate = asString(payload.scheduled_date);
+      if (!rawDate) throw new Error("scheduled_date required for schedule (YYYY-MM-DD)");
+      const scheduled = rawDate.slice(0, 10);
+      const { error } = await service
+        .from("maintenance_tasks")
+        .update({ scheduled_date: scheduled })
+        .eq("id", entityId);
+      if (error) throw new Error(`maintenance_tasks update failed: ${error.message}`);
+      return { scheduled_date: scheduled };
+    }
+    case "complete_on_behalf": {
+      const completedRaw = asString(payload.completed_at) ?? new Date().toISOString();
+      const completedAt = completedRaw.slice(0, 10);
+      // Stamp last_completed_date and clear scheduled_date. We don't
+      // recompute next_due_date server-side here — the iOS reconciler
+      // recomputes it on the next reconcile pass via interval-aware
+      // logic that lives in MaintenanceTaskReconciler. For tasks
+      // without a frequency (one-shots), next_due_date stays null,
+      // which surfaces them as resolved.
+      const { error } = await service
+        .from("maintenance_tasks")
+        .update({
+          last_completed_date: completedAt,
+          scheduled_date: null,
+        })
+        .eq("id", entityId);
+      if (error) throw new Error(`maintenance_tasks update failed: ${error.message}`);
+      return { completed_at: completedAt };
+    }
+    case "snooze": {
+      // Push next_due_date out N days (default 7).
+      const days = asNumber(payload.days) ?? 7;
+      const { data: row, error: readErr } = await service
+        .from("maintenance_tasks")
+        .select("next_due_date")
+        .eq("id", entityId)
+        .maybeSingle();
+      if (readErr || !row) throw new Error(`task not found: ${readErr?.message ?? "missing"}`);
+      const base = row.next_due_date ? new Date(row.next_due_date) : new Date();
+      base.setDate(base.getDate() + days);
+      const newDue = base.toISOString().slice(0, 10);
+      const { error } = await service
+        .from("maintenance_tasks")
+        .update({ next_due_date: newDue })
+        .eq("id", entityId);
+      if (error) throw new Error(`maintenance_tasks update failed: ${error.message}`);
+      return { snoozed_until: newDue, days };
+    }
+
+    // ----- Vendors -----
+    case "log_call": {
+      const channel = asString(payload.channel) ?? "call";
+      const direction = asString(payload.direction) ?? "outbound";
+      const subject = asString(payload.subject);
+      const notes = asString(payload.notes);
+      const duration = asNumber(payload.duration_seconds);
+      const { data, error } = await service
+        .from("contractor_engagement_log")
+        .insert({
+          contractor_id: entityId,
+          household_id: householdId,
+          channel,
+          direction,
+          subject,
+          notes,
+          duration_seconds: duration,
+          performed_by_user_id: user.id,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`engagement insert failed: ${error.message}`);
+      return { engagement_id: data.id };
+    }
+    case "send_message": {
+      // The composer lives client-side; server records the act.
+      const { data, error } = await service
+        .from("contractor_engagement_log")
+        .insert({
+          contractor_id: entityId,
+          household_id: householdId,
+          channel: asString(payload.channel) ?? "email",
+          direction: "outbound",
+          subject: asString(payload.subject),
+          notes: asString(payload.notes) ?? asString(payload.body),
+          performed_by_user_id: user.id,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`engagement insert failed: ${error.message}`);
+      return { engagement_id: data.id };
+    }
+
+    // ----- Documents -----
+    case "mark_filed": {
+      const now = new Date().toISOString();
+      const { error: updErr } = await service
+        .from("documents")
+        .update({ chez_filed_at: now, chez_filed_by_user_id: user.id })
+        .eq("id", entityId);
+      if (updErr) throw new Error(`documents update failed: ${updErr.message}`);
+      const { data, error } = await service
+        .from("document_share_log")
+        .insert({
+          document_id: entityId,
+          household_id: householdId,
+          action: "filed",
+          notes: asString(payload.notes),
+          performed_by_user_id: user.id,
+        })
+        .select("id")
+        .single();
+      if (error) console.warn("[workbench] document_share_log insert failed:", error);
+      return { filed_at: now, log_id: data?.id ?? null };
+    }
+    case "share_with_vendor": {
+      const contractorId = asString(payload.contractor_id);
+      const email = asString(payload.email);
+      const expiresAt = asIso(payload.expires_at);
+      const shareUrl = asString(payload.share_url); // operator can paste a generated link in v1
+      const { data, error } = await service
+        .from("document_share_log")
+        .insert({
+          document_id: entityId,
+          household_id: householdId,
+          shared_with_contractor_id: contractorId,
+          shared_with_email: email,
+          share_url: shareUrl,
+          expires_at: expiresAt,
+          action: "shared",
+          notes: asString(payload.notes),
+          performed_by_user_id: user.id,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`document_share_log insert failed: ${error.message}`);
+      return { share_log_id: data.id };
+    }
+
+    // ----- Utility (bills) -----
+    case "audit_bill": {
+      const billAmount = asNumber(payload.bill_amount_cents);
+      if (billAmount == null) throw new Error("bill_amount_cents required for audit_bill");
+      const priorAmount = asNumber(payload.prior_amount_cents);
+      const variance = asNumber(payload.variance_cents) ??
+        (priorAmount !== null ? billAmount - priorAmount : null);
+      const { data, error } = await service
+        .from("utility_bill_audits")
+        .insert({
+          utility_account_id: entityId,
+          household_id: householdId,
+          bill_period_start: asString(payload.bill_period_start),
+          bill_period_end: asString(payload.bill_period_end),
+          bill_amount_cents: billAmount,
+          prior_amount_cents: priorAmount,
+          variance_cents: variance,
+          finding: asString(payload.finding),
+          notes: asString(payload.notes),
+          performed_by_user_id: user.id,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`utility_bill_audits insert failed: ${error.message}`);
+      return { audit_id: data.id, variance_cents: variance };
+    }
+    case "draft_negotiation": {
+      // No DB write today — Claude draft will be wired in PR 7. For
+      // now we just record the intent in the audit trail.
+      return { drafted: false, reason: "claude_draft_not_yet_wired" };
+    }
+
+    // ----- Vehicles -----
+    case "schedule_service": {
+      const rawDate = asString(payload.scheduled_date);
+      if (!rawDate) throw new Error("scheduled_date required for schedule_service (YYYY-MM-DD)");
+      const dueDate = rawDate.slice(0, 10);
+      const title = asString(payload.title) ?? "Vehicle service (Chez-scheduled)";
+      const description = asString(payload.notes) ?? "";
+      const cost = asNumber(payload.cost_cents);
+      const frequency = asString(payload.frequency) ?? "once";
+      const { data, error } = await service
+        .from("maintenance_tasks")
+        .insert({
+          household_id: householdId,
+          vehicle_id: entityId,
+          title,
+          description,
+          frequency,
+          scheduled_date: dueDate,
+          next_due_date: dueDate,
+          assignment_type: "vendor",
+          chez_owned: true,
+          chez_owned_at: new Date().toISOString(),
+          estimated_cost: cost !== null ? cost / 100 : null,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`maintenance_tasks insert failed: ${error.message}`);
+      return { task_id: data.id, scheduled_date: dueDate, cost_cents: cost };
+    }
+    case "handle_recall": {
+      // Tom passes the specific recall id in payload.recall_id; the
+      // entityId is the vehicle. If recall_id is missing, mark every
+      // open recall on the vehicle as resolved (rare, but supported).
+      // vehicle_recalls uses { is_resolved BOOLEAN, resolved_date DATE }.
+      const recallId = asString(payload.recall_id);
+      const today = new Date().toISOString().slice(0, 10);
+      const update = { is_resolved: true, resolved_date: today };
+      const query = service.from("vehicle_recalls").update(update);
+      const final = recallId
+        ? query.eq("id", recallId)
+        : query.eq("vehicle_id", entityId).eq("is_resolved", false);
+      const { error } = await final;
+      if (error) throw new Error(`vehicle_recalls update failed: ${error.message}`);
+      return { resolved_date: today, recall_id: recallId };
+    }
+
+    default:
+      // Unknown action — record audit only, no side-effect. Avoids
+      // breaking the workbench when a new button gets shipped before
+      // its server handler.
+      return { dispatched: false, reason: "unhandled_action_type" };
+  }
 }
 
 // ============================================================================
@@ -3507,6 +3940,437 @@ async function businessHoursDue(service: ServiceClient): Promise<string> {
 }
 
 // ============================================================================
+// Phase 84.5 — Home Assessment (Free Handyman Assessment + 3-mode onboarding)
+// ============================================================================
+//
+// Homeowner-facing actions. Field-side actions (handyman-side capture +
+// ingestion) live in handyman-provider/index.ts. Shared workspace table:
+// public.home_assessments (migration 20261210).
+
+interface RequestHomeAssessmentPayload {
+  property_id: string;
+  notes?: string;
+  pre_visit_notes?: string;
+  pre_visit_photos?: string[];
+}
+interface CancelHomeAssessmentPayload {
+  assessment_id: string;
+  reason?: string;
+}
+interface RequestAssessmentReschedulePayload {
+  assessment_id: string;
+  notes?: string;
+  preferred_dates?: string[];
+}
+interface SubmitAssessmentReviewPayload {
+  assessment_id: string;
+}
+interface RequestAssessmentCorrectionsPayload {
+  assessment_id: string;
+  items: Array<{
+    section: "system" | "contractor" | "routine" | "document" | "attribute";
+    entity_id?: string;
+    note: string;
+  }>;
+}
+interface UpdatePreVisitDataPayload {
+  assessment_id: string;
+  pre_visit_notes?: string;
+  pre_visit_photos?: string[];
+  captured_attributes?: Record<string, unknown>;
+}
+interface FetchHomeAssessmentPayload {
+  assessment_id?: string;
+  property_id?: string;
+}
+
+async function handleRequestHomeAssessment(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: RequestHomeAssessmentPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const propertyId = compactString(payload.property_id);
+  if (!propertyId) return json({ error: "property_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: property, error: propErr } = await service
+    .from("properties")
+    .select("id, household_id, attributes, address_line_1, city, state, zip_code")
+    .eq("id", propertyId)
+    .maybeSingle();
+  if (propErr || !property) return json({ error: "property not found" }, 404);
+  if ((property as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+
+  const { data: assessment, error: rpcErr } = await service.rpc(
+    "find_or_create_home_assessment",
+    { p_property_id: propertyId, p_household_id: householdId }
+  );
+  if (rpcErr || !assessment) return json({ error: rpcErr?.message ?? "create failed" }, 500);
+  const a = (Array.isArray(assessment) ? assessment[0] : assessment) as {
+    id: string;
+    status: string;
+    pre_visit_notes: string | null;
+  };
+
+  const attrs = ((property as { attributes: Record<string, unknown> | null }).attributes) ?? {};
+  attrs["assessment_mode"] = "handyman";
+  await service.from("properties").update({ attributes: attrs }).eq("id", propertyId);
+
+  if (payload.pre_visit_notes || payload.pre_visit_photos) {
+    await service.from("home_assessments")
+      .update({
+        pre_visit_notes: payload.pre_visit_notes ?? a.pre_visit_notes,
+        pre_visit_photos: payload.pre_visit_photos ?? [],
+      })
+      .eq("id", a.id);
+  }
+
+  const propAddr = property as { address_line_1: string | null; city: string | null; state: string | null; zip_code: string | null };
+  const addrSummary = [propAddr.address_line_1, propAddr.city, propAddr.state].filter(Boolean).join(", ");
+  const summary = `Home assessment requested${addrSummary ? ` (${addrSummary})` : ""}`;
+  const slaDueAt = await businessHoursDue(service);
+  const { data: req } = await service
+    .from("chez_requests")
+    .insert({
+      household_id: householdId,
+      user_id: user.id,
+      category: "coordinate_task",
+      summary,
+      context: {
+        _kind: "home_assessment_request",
+        assessment_id: a.id,
+        property_id: propertyId,
+        notes: payload.notes ?? "",
+      },
+      status: "open",
+      sla_due_at: slaDueAt,
+      last_message_at: new Date().toISOString(),
+      unread_for_user: false,
+      unread_for_admin: true,
+    })
+    .select("*")
+    .single();
+
+  if (req) {
+    const r = req as { id: string };
+    await service.from("concierge_messages").insert({
+      household_id: householdId,
+      user_id: user.id,
+      request_id: r.id,
+      role: "system",
+      content: `Customer picked "Have Chez handle it" at signup. Dispatch a handyman to ${addrSummary || "their home"} for a free home assessment.${payload.notes ? `\n\nCustomer notes:\n${payload.notes}` : ""}`,
+      attachments: [],
+    });
+    await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
+      "New free home assessment request", summary,
+      { type: "chez_admin_request", request_id: r.id });
+    await sendAdminEmail(adminEmails(),
+      `[Chez] Free home assessment: ${addrSummary}`,
+      `New free assessment requested by the homeowner.\n\nCustomer notes: ${payload.notes ?? "(none)"}\n\n${adminPortalUrl(r.id)}`,
+      emailBody({
+        preview: `Free assessment for ${addrSummary}.`,
+        heading: "New home assessment request",
+        intro: `Customer picked "Have Chez handle it" at signup. Dispatch a handyman to capture their systems, vendors, routines, and documents.`,
+        bodyText: payload.notes ?? "(no additional notes)",
+        ctaLabel: "Open in admin portal",
+        ctaUrl: adminPortalUrl(r.id),
+      }));
+  }
+
+  return json({ ok: true, assessment_id: a.id, status: a.status });
+}
+
+async function handleCancelHomeAssessment(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: CancelHomeAssessmentPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const assessmentId = compactString(payload.assessment_id);
+  if (!assessmentId) return json({ error: "assessment_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: assessment } = await service
+    .from("home_assessments")
+    .select("id, household_id, property_id, status")
+    .eq("id", assessmentId)
+    .maybeSingle();
+  if (!assessment) return json({ error: "assessment not found" }, 404);
+  if ((assessment as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+  const a = assessment as { property_id: string; status: string };
+  if (a.status === "completed" || a.status === "cancelled") {
+    return json({ ok: true, status: a.status });
+  }
+
+  await service.from("home_assessments")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: payload.reason ?? "homeowner_self_serve",
+    })
+    .eq("id", assessmentId);
+
+  const { data: prop } = await service
+    .from("properties").select("attributes").eq("id", a.property_id).maybeSingle();
+  const attrs = ((prop as { attributes: Record<string, unknown> | null } | null)?.attributes) ?? {};
+  if (attrs["assessment_mode"] === "handyman") {
+    delete attrs["assessment_mode"];
+    await service.from("properties").update({ attributes: attrs }).eq("id", a.property_id);
+  }
+
+  await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
+    "Home assessment cancelled",
+    `Customer cancelled their assessment (${payload.reason ?? "homeowner_self_serve"}).`,
+    { type: "chez_admin_request", assessment_id: assessmentId });
+  return json({ ok: true, status: "cancelled" });
+}
+
+async function handleRequestAssessmentReschedule(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: RequestAssessmentReschedulePayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const assessmentId = compactString(payload.assessment_id);
+  if (!assessmentId) return json({ error: "assessment_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: assessment } = await service
+    .from("home_assessments").select("id, household_id, status").eq("id", assessmentId).maybeSingle();
+  if (!assessment) return json({ error: "assessment not found" }, 404);
+  if ((assessment as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+
+  await service.from("home_assessments")
+    .update({
+      reschedule_requested_at: new Date().toISOString(),
+      reschedule_request_notes: payload.notes ?? null,
+    })
+    .eq("id", assessmentId);
+
+  const preferredText = (payload.preferred_dates ?? []).join(", ");
+  await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
+    "Reschedule requested",
+    `Customer asked to reschedule their assessment.${preferredText ? ` Preferred: ${preferredText}` : ""}`,
+    { type: "chez_admin_request", assessment_id: assessmentId });
+  return json({ ok: true });
+}
+
+async function handleSubmitAssessmentReview(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: SubmitAssessmentReviewPayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const assessmentId = compactString(payload.assessment_id);
+  if (!assessmentId) return json({ error: "assessment_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: assessment } = await service
+    .from("home_assessments").select("id, household_id, status").eq("id", assessmentId).maybeSingle();
+  if (!assessment) return json({ error: "assessment not found" }, 404);
+  if ((assessment as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+  const a = assessment as { status: string };
+  if (a.status !== "awaiting_review") {
+    return json({ error: `cannot review from status ${a.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+  await service.from("home_assessments")
+    .update({ status: "completed", reviewed_at: now, completed_at: now })
+    .eq("id", assessmentId);
+  return json({ ok: true, status: "completed" });
+}
+
+async function handleRequestAssessmentCorrections(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: RequestAssessmentCorrectionsPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const assessmentId = compactString(payload.assessment_id);
+  if (!assessmentId) return json({ error: "assessment_id required" }, 400);
+  if (!Array.isArray(payload.items) || payload.items.length === 0) {
+    return json({ error: "items required" }, 400);
+  }
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: assessment } = await service
+    .from("home_assessments").select("id, household_id").eq("id", assessmentId).maybeSingle();
+  if (!assessment) return json({ error: "assessment not found" }, 404);
+  if ((assessment as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+
+  await service.from("home_assessments")
+    .update({ status: "corrections_requested" })
+    .eq("id", assessmentId);
+
+  const summary = `Assessment corrections (${payload.items.length} item${payload.items.length === 1 ? "" : "s"})`;
+  const slaDueAt = await businessHoursDue(service);
+  const { data: req } = await service
+    .from("chez_requests")
+    .insert({
+      household_id: householdId, user_id: user.id, category: "coordinate_task",
+      summary,
+      context: {
+        _kind: "assessment_corrections",
+        assessment_id: assessmentId,
+        items: payload.items,
+      },
+      status: "open", sla_due_at: slaDueAt,
+      last_message_at: new Date().toISOString(),
+      unread_for_user: false, unread_for_admin: true,
+    })
+    .select("*")
+    .single();
+
+  if (req) {
+    const r = req as { id: string };
+    const itemList = payload.items
+      .map((i, idx) => `${idx + 1}. [${i.section}] ${i.note}${i.entity_id ? ` (entity: ${i.entity_id})` : ""}`)
+      .join("\n");
+    await service.from("concierge_messages").insert({
+      household_id: householdId, user_id: user.id, request_id: r.id,
+      role: "user",
+      content: `My handyman missed or got these things wrong:\n\n${itemList}`,
+      attachments: [],
+    });
+    await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
+      "Assessment corrections requested",
+      `Customer flagged ${payload.items.length} item${payload.items.length === 1 ? "" : "s"} on their assessment.`,
+      { type: "chez_admin_request", request_id: r.id });
+  }
+
+  return json({ ok: true, status: "corrections_requested" });
+}
+
+async function handleUpdatePreVisitData(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: UpdatePreVisitDataPayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const assessmentId = compactString(payload.assessment_id);
+  if (!assessmentId) return json({ error: "assessment_id required" }, 400);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const { data: assessment } = await service
+    .from("home_assessments")
+    .select("id, household_id, captured_attributes, pre_visit_photos")
+    .eq("id", assessmentId)
+    .maybeSingle();
+  if (!assessment) return json({ error: "assessment not found" }, 404);
+  if ((assessment as { household_id: string }).household_id !== householdId) {
+    return json({ error: "not authorized" }, 403);
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (typeof payload.pre_visit_notes === "string") {
+    updates.pre_visit_notes = payload.pre_visit_notes;
+  }
+  if (Array.isArray(payload.pre_visit_photos)) {
+    updates.pre_visit_photos = payload.pre_visit_photos;
+  }
+  if (payload.captured_attributes && typeof payload.captured_attributes === "object") {
+    const existing = ((assessment as { captured_attributes: Record<string, unknown> | null }).captured_attributes) ?? {};
+    updates.captured_attributes = { ...existing, ...payload.captured_attributes };
+  }
+  if (Object.keys(updates).length === 0) return json({ ok: true, no_op: true });
+
+  await service.from("home_assessments").update(updates).eq("id", assessmentId);
+  return json({ ok: true });
+}
+
+async function handleFetchHomeAssessment(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchHomeAssessmentPayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const householdId = await householdIdForUser(service, user.id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  let q = service.from("home_assessments").select("*").eq("household_id", householdId);
+  const assessmentId = compactString(payload.assessment_id);
+  const propertyId = compactString(payload.property_id);
+  if (assessmentId) {
+    q = q.eq("id", assessmentId);
+  } else if (propertyId) {
+    q = q.eq("property_id", propertyId).order("created_at", { ascending: false }).limit(1);
+  } else {
+    q = q.not("status", "in", "(completed,cancelled)").order("created_at", { ascending: false }).limit(1);
+  }
+
+  const { data, error } = await q.maybeSingle();
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, assessment: data });
+}
+
+/// Admin-only — list every active home_assessments row (drives the
+/// cockpit's Pending Assessments queue).
+async function handleFetchPendingAssessments(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const { data, error } = await service
+    .from("chez_pending_assessments_v")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, assessments: data ?? [] });
+}
+
+/// Admin-only — fetch one assessment with full captured payload + property
+/// + household context for the Captured Data review modal.
+async function handleAdminFetchAssessment(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { assessment_id?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const assessmentId = compactString(payload.assessment_id);
+  if (!assessmentId) return json({ error: "assessment_id required" }, 400);
+
+  const { data: assessment } = await service
+    .from("home_assessments").select("*").eq("id", assessmentId).maybeSingle();
+  if (!assessment) return json({ error: "not found" }, 404);
+
+  const a = assessment as { household_id: string; property_id: string };
+  const { data: property } = await service
+    .from("properties")
+    .select("id, address_line_1, city, state, zip_code, year_built, square_footage")
+    .eq("id", a.property_id).maybeSingle();
+  const { data: household } = await service
+    .from("households").select("id, name").eq("id", a.household_id).maybeSingle();
+
+  return json({ ok: true, assessment, property, household });
+}
+
+// ============================================================================
 // Server entry
 // ============================================================================
 
@@ -3742,6 +4606,49 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as AddProjectNegotiationTurnPayload
+        );
+
+      // Phase 84.5 — Free Handyman Assessment + 3-Mode Onboarding.
+      // Homeowner-facing actions (handyman-side actions live in
+      // handyman-provider/index.ts).
+      case "request_home_assessment":
+        return handleRequestHomeAssessment(
+          service, user, body as unknown as RequestHomeAssessmentPayload,
+          supabaseUrl, serviceRoleKey
+        );
+      case "cancel_home_assessment":
+        return handleCancelHomeAssessment(
+          service, user, body as unknown as CancelHomeAssessmentPayload,
+          supabaseUrl, serviceRoleKey
+        );
+      case "request_assessment_reschedule":
+        return handleRequestAssessmentReschedule(
+          service, user, body as unknown as RequestAssessmentReschedulePayload,
+          supabaseUrl, serviceRoleKey
+        );
+      case "submit_assessment_review":
+        return handleSubmitAssessmentReview(
+          service, user, body as unknown as SubmitAssessmentReviewPayload
+        );
+      case "request_assessment_corrections":
+        return handleRequestAssessmentCorrections(
+          service, user, body as unknown as RequestAssessmentCorrectionsPayload,
+          supabaseUrl, serviceRoleKey
+        );
+      case "update_pre_visit_data":
+        return handleUpdatePreVisitData(
+          service, user, body as unknown as UpdatePreVisitDataPayload
+        );
+      case "fetch_home_assessment":
+        return handleFetchHomeAssessment(
+          service, user, body as unknown as FetchHomeAssessmentPayload
+        );
+      // Phase 84.5 — Admin-only assessment data
+      case "fetch_pending_assessments":
+        return handleFetchPendingAssessments(service, user);
+      case "admin_fetch_assessment":
+        return handleAdminFetchAssessment(
+          service, user, body as { assessment_id?: string }
         );
 
       default:

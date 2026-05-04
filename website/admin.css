@@ -10040,18 +10040,32 @@ details.admin-chez__analysis-section pre {
   padding: 0 16px 16px;
 }
 
+/* Phase 85 PR 5A — convert to grid so the per-row action strip can
+   sit on its own row. The previous flex layout collided with the
+   PR 4 actions row's `width: 100%` and forced entity-main to collapse
+   to per-character text wrap. */
 .admin-households__entity-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 12px;
+  gap: 4px 12px;
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--surface, #fff);
   border: 1px solid var(--border, #EDEEF0);
   margin-bottom: 6px;
+  min-width: 0;
+}
+.admin-households__entity-row.is-clickable {
+  cursor: pointer;
+  transition: background-color 80ms ease, border-color 80ms ease;
+}
+.admin-households__entity-row.is-clickable:hover {
+  background: var(--surface-hover, #FAFAFC);
+  border-color: var(--border-strong, #DCDDE3);
 }
 .admin-households__entity-main {
-  flex: 1;
+  grid-column: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -10060,15 +10074,39 @@ details.admin-chez__analysis-section pre {
 .admin-households__entity-main strong {
   font: 600 13px var(--sans);
   color: var(--text, #2A2252);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .admin-households__entity-main span {
   font: 400 12px var(--sans);
   color: var(--text-muted, #6F6A88);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .admin-households__entity-meta {
+  grid-column: 2;
   font: 500 11px var(--sans);
   color: var(--text-soft, #9C98AD);
   white-space: nowrap;
+}
+/* Owned badge — small inline marker on rows where chez_owned = true. */
+.admin-households__owned-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: rgba(237, 105, 85, 0.12);
+  color: var(--brand-strong, #ED6955);
+  font: 600 10px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
 }
 
 .admin-households__section {
@@ -10225,11 +10263,14 @@ details.admin-chez__analysis-section pre {
    ======================================================================== */
 
 .admin-households__entity-actions {
+  /* Phase 85 PR 5A — grid_column: 1 / -1 so the actions row spans
+     both columns of the parent grid (main + meta) and sits below them.
+     Previous `width: 100%` was the cause of the per-character wrap. */
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
-  width: 100%;
+  margin-top: 6px;
 }
 .admin-households__entity-action {
   font-size: 11px !important;
@@ -10343,4 +10384,306 @@ details.admin-chez__analysis-section pre {
 }
 .admin-input--narrow {
   max-width: 140px;
+}
+
+/* ========================================================================
+   Phase 85 PR 5B/5C — workbench toolbar + owned badge + tab counts
+   ======================================================================== */
+
+.admin-households__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.admin-households__search {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #EDEEF0);
+  border-radius: 8px;
+  font: 400 13px var(--sans);
+  background: var(--surface, #FFF);
+  color: var(--text, #2A2252);
+}
+.admin-households__search:focus {
+  outline: none;
+  border-color: var(--brand-strong, #ED6955);
+  box-shadow: 0 0 0 3px rgba(237, 105, 85, 0.12);
+}
+.admin-pill--toggle {
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #EDEEF0);
+  background: var(--surface, #FFF);
+  font: 500 11px var(--sans);
+  color: var(--text-muted, #6F6A88);
+}
+.admin-pill--toggle.is-active {
+  background: rgba(237, 105, 85, 0.1);
+  border-color: var(--brand-strong, #ED6955);
+  color: var(--brand-strong, #ED6955);
+}
+
+/* Owned count appears in faint salmon next to the total tab count. */
+.admin-households__tab-owned {
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--brand-strong, #ED6955);
+  font-weight: 600;
+}
+
+/* ========================================================================
+   Phase 85 PR 5F — concierge queue status filter + status pills
+   ======================================================================== */
+
+.cockpit-queue__status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 12px 0;
+}
+.cockpit-pill--filter {
+  font: 500 10px var(--sans);
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #EDEEF0);
+  background: transparent;
+  color: var(--text-muted, #6F6A88);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cockpit-pill--filter.is-active {
+  background: var(--text, #2A2252);
+  border-color: var(--text, #2A2252);
+  color: #FFF;
+}
+.cockpit-pill--filter .cockpit-pill__count {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* Two-pill case foot row replaces the single SLA + plain-text awaiting line. */
+.cockpit-queue__case-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.cockpit-pill--status {
+  font: 500 10px var(--sans);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #EDEEF0);
+}
+.cockpit-pill--warning {
+  background: rgba(237, 105, 85, 0.10);
+  border-color: rgba(237, 105, 85, 0.30);
+  color: var(--brand-strong, #ED6955);
+}
+.cockpit-pill--info {
+  background: rgba(90, 110, 200, 0.10);
+  border-color: rgba(90, 110, 200, 0.30);
+  color: #4A5FB8;
+}
+.cockpit-pill--muted {
+  background: rgba(111, 106, 136, 0.06);
+  border-color: rgba(111, 106, 136, 0.20);
+  color: var(--text-muted, #6F6A88);
+}
+
+/* ========================================================================
+   Phase 85 PR 5E — workbench action modals
+   ======================================================================== */
+
+.admin-modal--sm {
+  width: min(520px, 90vw);
+}
+.admin-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font: 500 12px var(--sans);
+  color: var(--text, #2A2252);
+}
+.admin-modal__field span {
+  font-weight: 600;
+}
+.admin-modal__field input,
+.admin-modal__field textarea,
+.admin-modal__field select {
+  padding: 8px 10px;
+  border: 1px solid var(--border, #EDEEF0);
+  border-radius: 8px;
+  font: 400 13px var(--sans);
+  color: var(--text, #2A2252);
+  background: var(--surface, #FFF);
+}
+.admin-modal__field input:focus,
+.admin-modal__field textarea:focus,
+.admin-modal__field select:focus {
+  outline: none;
+  border-color: var(--brand-strong, #ED6955);
+  box-shadow: 0 0 0 3px rgba(237, 105, 85, 0.12);
+}
+.admin-required {
+  color: var(--brand-strong, #ED6955);
+}
+.admin-modal__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.admin-modal__error {
+  margin: 0;
+  color: #C53030;
+  font: 500 12px var(--sans);
+}
+
+/* ========================================================================
+   Phase 85 PR 5C — focused entity detail panel
+   ======================================================================== */
+
+.admin-households__focused {
+  padding: 0;
+}
+.admin-focused__head--compact {
+  padding: 12px 16px 4px;
+  border-bottom: 0;
+}
+.admin-households__back-pill {
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  padding: 6px 12px;
+  background: var(--surface, #FFF);
+  border: 1px solid var(--border, #EDEEF0);
+  color: var(--text, #2A2252);
+}
+.admin-households__back-pill:hover {
+  background: var(--surface-hover, #F1F0F7);
+}
+
+.admin-focused__entity {
+  padding: 0 22px 32px;
+}
+.admin-focused__entity-head {
+  margin: 8px 0 18px;
+}
+.admin-focused__entity-head h2 {
+  font: 600 22px var(--serif);
+  color: var(--text, #2A2252);
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+.admin-focused__entity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.admin-pill--owned {
+  background: rgba(237, 105, 85, 0.12);
+  border-color: rgba(237, 105, 85, 0.30);
+  color: var(--brand-strong, #ED6955);
+}
+
+.admin-focused__field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px 18px;
+  padding: 14px 16px;
+  background: var(--surface-soft, #FAFAFC);
+  border: 1px solid var(--border, #EDEEF0);
+  border-radius: 12px;
+  margin-bottom: 18px;
+}
+.admin-focused__field-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.admin-focused__field-grid label {
+  font: 600 10px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+}
+.admin-focused__field-grid strong {
+  font: 600 13px var(--sans);
+  color: var(--text, #2A2252);
+  word-break: break-word;
+}
+
+.admin-focused__notes-block {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #EDEEF0);
+  border-radius: 10px;
+  background: var(--surface, #FFF);
+}
+.admin-focused__notes-block h3 {
+  font: 600 10px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+  margin: 0 0 6px;
+}
+.admin-focused__notes-block p {
+  margin: 0;
+  font: 400 13px var(--sans);
+  color: var(--text, #2A2252);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.admin-focused__actions {
+  margin: 0 0 22px;
+}
+.admin-focused__actions h3 {
+  font: 600 10px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+  margin: 0 0 10px;
+}
+.admin-focused__action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.admin-pill--secondary {
+  background: rgba(67, 75, 145, 0.10);
+  border-color: rgba(67, 75, 145, 0.25);
+  color: #434B91;
+}
+
+.admin-focused__list-block {
+  margin: 0 0 22px;
+}
+.admin-focused__list-block h3 {
+  font: 600 10px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+  margin: 0 0 10px;
+}
+
+.admin-modal__field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.admin-modal__field--inline span {
+  font-weight: 400;
 }

@@ -17256,11 +17256,53 @@ function renderHouseholdWorkbenchDetail() {
   el.auditFocused.classList.remove("is-hidden");
   el.auditFocused.innerHTML = renderHouseholdWorkbenchHtml(wb, tab);
 
-  // Tab switcher.
+  // Tab switcher. Clear search query on tab switch (per-tab, not sticky).
   el.auditFocused.querySelectorAll("[data-workbench-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.households.workbenchTab = btn.dataset.workbenchTab;
+      state.households.workbenchQuery = "";
+      // Owned-only flag intentionally persists across tab switches so
+      // an operator narrowing to "Chez-owned only" stays narrowed.
       renderHouseholdWorkbenchDetail();
+    });
+  });
+
+  // Phase 85 PR 5B — search input. Debounced re-render.
+  const searchInput = el.auditFocused.querySelector("[data-workbench-search]");
+  if (searchInput) {
+    let searchDebounce;
+    searchInput.addEventListener("input", (e) => {
+      const v = e.target.value;
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => {
+        state.households.workbenchQuery = v;
+        renderHouseholdWorkbenchDetail();
+        // Restore focus + caret after re-render.
+        const newInput = el.auditFocused.querySelector("[data-workbench-search]");
+        if (newInput) {
+          newInput.focus();
+          newInput.setSelectionRange(v.length, v.length);
+        }
+      }, 120);
+    });
+  }
+
+  // Phase 85 PR 5B — owned-only toggle chip.
+  el.auditFocused.querySelector("[data-workbench-owned-toggle]")?.addEventListener("click", () => {
+    state.households.workbenchOwnedOnly = !state.households.workbenchOwnedOnly;
+    renderHouseholdWorkbenchDetail();
+  });
+
+  // Phase 85 PR 5C — entity row drill-in. Clicking the row (but not a
+  // button inside) opens the focused-detail panel for that entity.
+  // Action buttons inside the row e.stopPropagation in their own handler
+  // so they don't trip this.
+  el.auditFocused.querySelectorAll("[data-drill-entity-id]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const entityType = row.dataset.drillEntityType;
+      const entityId = row.dataset.drillEntityId;
+      if (!entityType || !entityId) return;
+      openFocusedEntityDetail(entityType, entityId);
     });
   });
 
@@ -17286,27 +17328,50 @@ function renderHouseholdWorkbenchDetail() {
 
       const householdId = state.households.selectedId;
       if (!householdId) return;
+      // Phase 85 PR 5E — every action goes through openWorkbenchActionModal
+      // which (a) prompts for the action's required payload (date, cost,
+      // notes, etc.), (b) fires the workbench_action Edge Function call,
+      // and (c) refreshes the workbench in place. Buttons no longer fire
+      // empty-payload calls — every click captures the operator's intent.
+      const original = btn.textContent;
       btn.disabled = true;
       btn.textContent = "…";
       try {
-        await callChezConcierge({
-          action: "workbench_action",
-          household_id: householdId,
-          entity_type: entityType,
-          entity_id: entityId,
-          action_type: actionId,
-          payload: {},
+        const submitted = await openWorkbenchActionModal({
+          actionId,
+          entityType,
+          entityId,
+          householdId,
         });
+        if (!submitted) {
+          btn.disabled = false;
+          btn.textContent = original;
+          return;
+        }
         btn.textContent = "✓ Logged";
-        // Reload the workbench so the "Recent activity" strip + the
-        // entity row's status (e.g. last_service_date for log_service)
-        // refresh in place.
         await loadHouseholdWorkbench(householdId);
+        renderHouseholdWorkbenchDetail();
       } catch (err) {
         console.error("[workbench-action] failed:", err);
         btn.textContent = "Failed — retry";
         btn.disabled = false;
       }
+    });
+  });
+
+  // Phase 84 PR 4 — open-cases strip deep-link wiring (was missing in
+  // PR 4; landed dead). Click a workbench case row → flip to the
+  // cockpit with the case selected.
+  el.auditFocused.querySelectorAll("[data-workbench-case-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.workbenchCaseId;
+      const req = (state.chezRequests || []).find((r) => r.id === id);
+      if (!req) return;
+      state.view = "chez";
+      state.selectedChezRequest = req;
+      state.concierge.queueMode = "case";
+      try { await loadChezMessages(id); } catch (e) { console.warn("[workbench→case] message load failed", e); }
+      render();
     });
   });
 }
@@ -17438,101 +17503,1141 @@ function attachNegotiationModalHandlers(overlay, projectId) {
   });
 }
 
+// =============================================================================
+// Phase 85 PR 5C — Focused entity detail panel
+//
+// When the operator clicks any entity row on the workbench (or arrives
+// via Upcoming), the right pane swaps from the workbench list to a
+// focused-detail view of that entity. The view mirrors what the
+// homeowner sees in the iOS app, exposed as editable form fields where
+// applicable, plus admin-only affordances (Send message to homeowner,
+// Add admin note, the workbench actions stack).
+// =============================================================================
+
+async function openFocusedEntityDetail(entityType, entityId) {
+  if (!entityType || !entityId) return;
+  let wb = state.households.workbench;
+  // If we're navigating from Upcoming or another household, we may not
+  // have the target household's workbench loaded yet. Resolve by walking
+  // every household's cache or requesting fresh.
+  if (!wb) {
+    console.warn("[focused] no workbench loaded — caller should load first");
+    return;
+  }
+  state.households.focusedEntity = { type: entityType, id: entityId };
+  state.households.focusedEntityData = lookupFocusedEntity(wb, entityType, entityId);
+  state.households.focusedEntityRelations = {};
+  renderFocusedEntityDetail();
+  hydrateFocusedEntityRelations(entityType, entityId).then(() => {
+    if (state.households.focusedEntity?.type === entityType &&
+        state.households.focusedEntity?.id === entityId) {
+      renderFocusedEntityDetail();
+    }
+  }).catch((e) => console.warn("[focused] hydrate failed", e));
+}
+
+function closeFocusedEntityDetail() {
+  state.households.focusedEntity = null;
+  state.households.focusedEntityData = null;
+  state.households.focusedEntityRelations = {};
+  renderHouseholdWorkbenchDetail();
+}
+
+function lookupFocusedEntity(wb, entityType, entityId) {
+  const find = (arr) => (arr || []).find((x) => x.id === entityId) ?? null;
+  switch (entityType) {
+    case "task": return find(wb.tasks);
+    case "system": return find(wb.home_systems);
+    case "routine": return find(wb.routines);
+    case "contractor": return find(wb.contractors);
+    case "project": return find(wb.projects);
+    case "document": return find(wb.documents);
+    case "utility": return find(wb.utility_accounts);
+    case "vehicle": return find(wb.vehicles);
+    default: return null;
+  }
+}
+
+async function hydrateFocusedEntityRelations(entityType, entityId) {
+  const relations = state.households.focusedEntityRelations =
+    state.households.focusedEntityRelations || {};
+  switch (entityType) {
+    case "system": {
+      const [services, warranties] = await Promise.all([
+        supabase.from("service_records").select("*").eq("system_id", entityId).order("service_date", { ascending: false }).limit(20),
+        supabase.from("warranties").select("*").eq("home_system_id", entityId),
+      ]);
+      relations.services = services.data || [];
+      relations.warranties = warranties.data || [];
+      break;
+    }
+    case "routine": {
+      const r = await supabase.from("routine_visits").select("*").eq("routine_id", entityId).order("scheduled_date", { ascending: false }).limit(30);
+      relations.visits = r.data || [];
+      break;
+    }
+    case "contractor": {
+      const r = await supabase.from("contractor_engagement_log").select("*").eq("contractor_id", entityId).order("created_at", { ascending: false }).limit(20);
+      relations.engagements = r.data || [];
+      break;
+    }
+    case "vehicle": {
+      const r = await supabase.from("vehicle_recalls").select("*").eq("vehicle_id", entityId);
+      relations.recalls = r.data || [];
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+function renderFocusedEntityDetail() {
+  if (!el.auditFocused) return;
+  const focused = state.households.focusedEntity;
+  if (!focused) {
+    renderHouseholdWorkbenchDetail();
+    return;
+  }
+  const entity = state.households.focusedEntityData;
+  if (!entity) {
+    el.auditFocused.classList.remove("is-hidden");
+    el.auditFocused.innerHTML = `
+      <section class="admin-focused">
+        <header class="admin-focused__head">
+          <button type="button" class="admin-pill" data-focused-back>← Back to workbench</button>
+          <h2>Entity not found</h2>
+        </header>
+        <p class="admin-muted">This entity isn't in the loaded workbench. Try refreshing the household.</p>
+      </section>
+    `;
+    el.auditFocused.querySelector("[data-focused-back]")?.addEventListener("click", closeFocusedEntityDetail);
+    return;
+  }
+  const wb = state.households.workbench || {};
+  const relations = state.households.focusedEntityRelations || {};
+  let body = "";
+  switch (focused.type) {
+    case "task":      body = renderFocusedTaskHtml(entity, wb); break;
+    case "system":    body = renderFocusedSystemHtml(entity, wb, relations); break;
+    case "routine":   body = renderFocusedRoutineHtml(entity, wb, relations); break;
+    case "contractor": body = renderFocusedContractorHtml(entity, wb, relations); break;
+    case "project":   body = renderFocusedProjectHtml(entity, wb); break;
+    case "document":  body = renderFocusedDocumentHtml(entity, wb); break;
+    case "utility":   body = renderFocusedUtilityHtml(entity, wb); break;
+    case "vehicle":   body = renderFocusedVehicleHtml(entity, wb, relations); break;
+    default:          body = `<p class="admin-muted">Detail view for "${escapeHtml(focused.type)}" not built yet.</p>`;
+  }
+  el.auditFocused.classList.remove("is-hidden");
+  el.auditFocused.innerHTML = `
+    <section class="admin-focused admin-households__focused">
+      <header class="admin-focused__head admin-focused__head--compact">
+        <button type="button" class="admin-pill admin-households__back-pill" data-focused-back>← Back to workbench</button>
+      </header>
+      ${body}
+    </section>
+  `;
+  attachFocusedEntityHandlers();
+}
+
+function attachFocusedEntityHandlers() {
+  const focused = state.households.focusedEntity;
+  if (!focused) return;
+  const householdId = state.households.selectedId;
+
+  el.auditFocused.querySelector("[data-focused-back]")?.addEventListener("click", closeFocusedEntityDetail);
+
+  // Workbench action buttons inside the focused panel use the same
+  // dispatcher as the workbench list.
+  el.auditFocused.querySelectorAll('[data-cockpit-action="workbench-action"]').forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const actionId = btn.dataset.actionId;
+      const entityType = btn.dataset.entityType;
+      const entityId = btn.dataset.entityId;
+      if (!actionId || !entityType || !entityId) return;
+      if (actionId === "open_project_workbench") {
+        await openProjectNegotiationModal(entityId);
+        return;
+      }
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "…";
+      try {
+        const submitted = await openWorkbenchActionModal({ actionId, entityType, entityId, householdId });
+        if (!submitted) {
+          btn.disabled = false;
+          btn.textContent = original;
+          return;
+        }
+        btn.textContent = "✓ Logged";
+        await loadHouseholdWorkbench(householdId);
+        state.households.focusedEntityData = lookupFocusedEntity(state.households.workbench, focused.type, focused.id);
+        await hydrateFocusedEntityRelations(focused.type, focused.id);
+        renderFocusedEntityDetail();
+      } catch (err) {
+        console.error("[focused] action failed", err);
+        btn.textContent = "Failed — retry";
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Drill into related rows (sub-systems, linked tasks, etc.) inside
+  // a focused panel — same drill-in pattern as the workbench list.
+  el.auditFocused.querySelectorAll("[data-drill-entity-id]").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      openFocusedEntityDetail(row.dataset.drillEntityType, row.dataset.drillEntityId);
+    });
+  });
+
+  // Workbench case rows inside focused panels deep-link to the cockpit.
+  el.auditFocused.querySelectorAll("[data-workbench-case-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.workbenchCaseId;
+      const req = (state.chezRequests || []).find((r) => r.id === id);
+      if (!req) return;
+      state.view = "chez";
+      state.selectedChezRequest = req;
+      state.concierge.queueMode = "case";
+      try { await loadChezMessages(id); } catch (e) { console.warn("[focused→case] load failed", e); }
+      render();
+    });
+  });
+
+  // ✉ Message homeowner.
+  el.auditFocused.querySelector("[data-focused-message-homeowner]")?.addEventListener("click", () => {
+    const requestId = el.auditFocused.querySelector("[data-focused-message-homeowner]").dataset.requestId;
+    openMessageHomeownerModal({ requestId, entityType: focused.type, entityId: focused.id, householdId });
+  });
+
+  // + Add admin note.
+  el.auditFocused.querySelector("[data-focused-add-note]")?.addEventListener("click", async () => {
+    const submitted = await openWorkbenchActionModal({
+      actionId: "admin_note",
+      entityType: focused.type,
+      entityId: focused.id,
+      householdId,
+    });
+    if (submitted) {
+      await loadHouseholdWorkbench(householdId);
+      renderFocusedEntityDetail();
+    }
+  });
+
+  // Toggle Chez ownership inline.
+  el.auditFocused.querySelector("[data-focused-toggle-owned]")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const entity = state.households.focusedEntityData;
+    const nextValue = !entity?.chez_owned;
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      await callChezConcierge({
+        action: "delegate_entity",
+        entity_type: focused.type,
+        entity_id: focused.id,
+        delegated: nextValue,
+      });
+      await loadHouseholdWorkbench(householdId);
+      state.households.focusedEntityData = lookupFocusedEntity(state.households.workbench, focused.type, focused.id);
+      renderFocusedEntityDetail();
+    } catch (err) {
+      console.error("[focused] toggle owned failed", err);
+      btn.disabled = false;
+      btn.textContent = "Toggle failed — retry";
+    }
+  });
+}
+
+function activeMonthsLabel(months) {
+  if (!Array.isArray(months) || months.length === 0) return "Year-round";
+  if (months.length === 12) return "Year-round";
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return months.slice().sort((a,b) => a-b).map((m) => names[m-1]).join(" · ");
+}
+
+// ----- Per-type focused detail renderers -----------------------------------
+
+function renderFocusedTaskHtml(t, wb) {
+  const system = (wb.home_systems || []).find((s) => s.id === t.system_id);
+  const vendor = (wb.contractors || []).find((c) => c.id === t.assigned_contractor_id);
+  const ownedBadge = t.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const status = t.last_completed_date ? `Completed ${formatDateOnly(t.last_completed_date)}` : t.scheduled_date ? `Scheduled ${formatDateOnly(t.scheduled_date)}` : t.next_due_date ? `Due ${formatDateOnly(t.next_due_date)}` : "Unscheduled";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(t.title || "(untitled task)")}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          <span class="admin-pill admin-pill--note">${escapeHtml(t.assignment_type || "task")}</span>
+          ${t.priority ? `<span class="admin-pill">${escapeHtml(t.priority)}</span>` : ""}
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Status</label><strong>${escapeHtml(status)}</strong></div>
+        <div><label>Frequency</label><strong>${escapeHtml(t.frequency || "—")}</strong></div>
+        <div><label>System</label><strong>${escapeHtml(system?.name || system?.category || "—")}</strong></div>
+        <div><label>Vendor</label><strong>${escapeHtml(vendor?.company_name || (t.needs_vendor ? "Needs vendor" : "—"))}</strong></div>
+        <div><label>Estimated cost</label><strong>${t.estimated_cost ? "$" + formatCompact(t.estimated_cost) : "—"}</strong></div>
+        <div><label>Last completed</label><strong>${t.last_completed_date ? formatDateOnly(t.last_completed_date) : "Never"}</strong></div>
+      </section>
+      ${t.description ? `<section class="admin-focused__notes-block"><h3>Description</h3><p>${escapeHtml(t.description)}</p></section>` : ""}
+      ${t.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(t.notes)}</p></section>` : ""}
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Schedule</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="complete_on_behalf" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Complete on behalf</button>
+          <button type="button" class="admin-pill" data-cockpit-action="workbench-action" data-action-id="snooze" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Snooze 7d</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${t.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+        </div>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action admin-pill--secondary" data-focused-message-homeowner data-request-id="${escapeHtml(t.chez_request_id || "")}">✉ Message homeowner</button>
+          <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
+        </div>
+      </section>
+      ${t.chez_request_id ? `
+        <section class="admin-focused__notes-block">
+          <h3>Linked case</h3>
+          <button type="button" class="admin-pill" data-workbench-case-id="${escapeHtml(t.chez_request_id)}">Open case in cockpit →</button>
+        </section>
+      ` : ""}
+    </article>
+  `;
+}
+
+function renderFocusedSystemHtml(s, wb, rel) {
+  const childSystems = (wb.home_systems || []).filter((x) => x.parent_system_id === s.id);
+  const linkedTasks = (wb.tasks || []).filter((t) => t.system_id === s.id && !t.is_archived);
+  const services = rel.services || [];
+  const warranties = rel.warranties || [];
+  const ownedBadge = s.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(s.name || s.category)}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          <span class="admin-pill admin-pill--note">${escapeHtml(s.category)}</span>
+          ${s.subtype ? `<span class="admin-pill">${escapeHtml(s.subtype)}</span>` : ""}
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Manufacturer</label><strong>${escapeHtml(s.manufacturer || "—")}</strong></div>
+        <div><label>Model</label><strong>${escapeHtml(s.model_number || s.model || "—")}</strong></div>
+        <div><label>Serial</label><strong>${escapeHtml(s.serial_number || "—")}</strong></div>
+        <div><label>Installed</label><strong>${escapeHtml(s.install_date || "—")}</strong></div>
+        <div><label>Last service</label><strong>${s.last_service_date ? formatDateOnly(s.last_service_date) : "—"}</strong></div>
+        <div><label>Next service</label><strong>${s.next_maintenance_date ? formatDateOnly(s.next_maintenance_date) : "—"}</strong></div>
+      </section>
+      ${s.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(s.notes)}</p></section>` : ""}
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_service" data-entity-type="system" data-entity-id="${escapeHtml(s.id)}">Log service</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_maintenance" data-entity-type="system" data-entity-id="${escapeHtml(s.id)}">Schedule maintenance</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${s.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+          <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
+        </div>
+      </section>
+      ${childSystems.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Components · ${childSystems.length}</h3>
+          ${childSystems.map((c) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="system" data-drill-entity-id="${escapeHtml(c.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(c.name || c.category)}</strong>
+                <span class="admin-muted">${escapeHtml(c.manufacturer || "")}${c.model_number ? " · " + escapeHtml(c.model_number) : ""}</span>
+              </div>
+            </div>
+          `).join("")}
+        </section>
+      ` : ""}
+      ${linkedTasks.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Tasks · ${linkedTasks.length}</h3>
+          ${linkedTasks.slice(0, 8).map((t) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(t.title)}</strong>
+                <span class="admin-muted">${escapeHtml(t.frequency || "")}${t.next_due_date ? " · due " + formatDateOnly(t.next_due_date) : ""}</span>
+              </div>
+            </div>
+          `).join("")}
+        </section>
+      ` : ""}
+      ${services.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Service history · ${services.length}</h3>
+          ${services.slice(0, 8).map((sv) => `
+            <div class="admin-households__entity-row">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(sv.service_type || "Service")}${sv.cost ? " · $" + formatCompact(sv.cost) : ""}</strong>
+                <span class="admin-muted">${escapeHtml(formatDateOnly(sv.service_date))}${sv.description ? " · " + escapeHtml(sv.description) : ""}</span>
+              </div>
+            </div>
+          `).join("")}
+        </section>
+      ` : ""}
+      ${warranties.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Warranties · ${warranties.length}</h3>
+          ${warranties.map((w) => `
+            <div class="admin-households__entity-row">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(w.coverage_type || "Warranty")}</strong>
+                <span class="admin-muted">${w.expires_at ? "Expires " + formatDateOnly(w.expires_at) : ""}</span>
+              </div>
+            </div>
+          `).join("")}
+        </section>
+      ` : ""}
+    </article>
+  `;
+}
+
+function renderFocusedRoutineHtml(r, wb, rel) {
+  const vendor = (wb.contractors || []).find((c) => c.id === r.vendor_id);
+  const visits = rel.visits || [];
+  const ownedBadge = r.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const cadenceLabel = `${r.cadence_type || ""}${r.cadence_interval_days ? ` (${r.cadence_interval_days}d)` : ""}`;
+  const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const dows = (Array.isArray(r.days_of_week) && r.days_of_week.length > 0)
+    ? r.days_of_week.map((d) => dayLabels[((d - 1) % 7 + 7) % 7]).join(" · ")
+    : "—";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(r.label || r.routine_kind)}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          <span class="admin-pill admin-pill--note">${escapeHtml(r.routine_kind)}</span>
+          ${r.setup_state ? `<span class="admin-pill">${escapeHtml(r.setup_state)}</span>` : ""}
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Cadence</label><strong>${escapeHtml(cadenceLabel)}</strong></div>
+        <div><label>Days</label><strong>${escapeHtml(dows)}</strong></div>
+        <div><label>Time</label><strong>${escapeHtml(r.time_of_day || "any time")}</strong></div>
+        <div><label>Vendor</label><strong>${escapeHtml(vendor?.company_name || "—")}</strong></div>
+        <div><label>Active months</label><strong>${escapeHtml(activeMonthsLabel(r.active_months))}</strong></div>
+        <div><label>Cost / visit</label><strong>${r.cost_per_visit_cents ? "$" + formatCompact(r.cost_per_visit_cents / 100) : "—"}</strong></div>
+      </section>
+      ${r.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(r.notes)}</p></section>` : ""}
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_visit" data-entity-type="routine" data-entity-id="${escapeHtml(r.id)}">Schedule next visit</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_visit" data-entity-type="routine" data-entity-id="${escapeHtml(r.id)}">Log a visit</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${r.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+          <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
+        </div>
+      </section>
+      ${visits.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Recent visits · ${visits.length}</h3>
+          ${visits.slice(0, 12).map((v) => `
+            <div class="admin-households__entity-row">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(formatDateOnly(v.scheduled_date))}${v.actual_cost_cents ? " · $" + formatCompact(v.actual_cost_cents / 100) : ""}</strong>
+                <span class="admin-muted">${escapeHtml(v.visit_state || v.status || "")}${v.notes ? " · " + escapeHtml(v.notes) : ""}</span>
+              </div>
+            </div>
+          `).join("")}
+        </section>
+      ` : `<p class="admin-muted">No visits recorded yet.</p>`}
+    </article>
+  `;
+}
+
+function renderFocusedContractorHtml(c, wb, rel) {
+  const linkedSystems = (wb.home_systems || []).filter((s) => s.preferred_vendor_id === c.id);
+  const linkedRoutines = (wb.routines || []).filter((r) => r.vendor_id === c.id);
+  const linkedTasks = (wb.tasks || []).filter((t) => t.assigned_contractor_id === c.id);
+  const engagements = rel.engagements || [];
+  const ownedBadge = c.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(c.company_name || "(unnamed vendor)")}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          <span class="admin-pill admin-pill--note">${escapeHtml(c.category || "Vendor")}</span>
+          ${c.chez_recommended_at ? `<span class="admin-pill">Sourced by Chez</span>` : ""}
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Phone</label><strong>${escapeHtml(c.phone || "—")}</strong></div>
+        <div><label>Email</label><strong>${escapeHtml(c.email || "—")}</strong></div>
+        <div><label>Website</label><strong>${escapeHtml(c.website || "—")}</strong></div>
+        <div><label>Source</label><strong>${escapeHtml(c.source || "—")}</strong></div>
+      </section>
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_call" data-entity-type="contractor" data-entity-id="${escapeHtml(c.id)}">Log a call</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="send_message" data-entity-type="contractor" data-entity-id="${escapeHtml(c.id)}">Record message</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${c.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+        </div>
+      </section>
+      ${linkedSystems.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Linked systems · ${linkedSystems.length}</h3>
+          ${linkedSystems.map((s) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="system" data-drill-entity-id="${escapeHtml(s.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(s.name || s.category)}</strong><span class="admin-muted">${escapeHtml(s.category)}</span></div></div>`).join("")}
+        </section>` : ""}
+      ${linkedRoutines.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Linked routines · ${linkedRoutines.length}</h3>
+          ${linkedRoutines.map((r) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="routine" data-drill-entity-id="${escapeHtml(r.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(r.label || r.routine_kind)}</strong><span class="admin-muted">${escapeHtml(r.cadence_type)}</span></div></div>`).join("")}
+        </section>` : ""}
+      ${linkedTasks.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Open tasks · ${linkedTasks.length}</h3>
+          ${linkedTasks.slice(0, 8).map((t) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(t.title)}</strong><span class="admin-muted">${t.next_due_date ? "due " + formatDateOnly(t.next_due_date) : ""}</span></div></div>`).join("")}
+        </section>` : ""}
+      ${engagements.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Recent engagements · ${engagements.length}</h3>
+          ${engagements.slice(0, 8).map((e) => `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>${escapeHtml(e.channel)} · ${escapeHtml(e.direction)}</strong><span class="admin-muted">${escapeHtml(relativeTimeString(e.created_at))}${e.subject ? " · " + escapeHtml(e.subject) : ""}</span></div></div>`).join("")}
+        </section>` : `<p class="admin-muted">No engagements logged yet. Log a call to start the timeline.</p>`}
+    </article>
+  `;
+}
+
+function renderFocusedProjectHtml(p, wb) {
+  const ownedBadge = p.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(p.name)}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          <span class="admin-pill admin-pill--note">${escapeHtml(p.status || "planned")}</span>
+          ${p.project_type ? `<span class="admin-pill">${escapeHtml(p.project_type)}</span>` : ""}
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Estimated budget</label><strong>${p.estimated_budget ? "$" + formatCompact(p.estimated_budget) : "—"}</strong></div>
+        <div><label>Active quote</label><strong>${escapeHtml(p.active_quote_id || "—")}</strong></div>
+        <div><label>Entry type</label><strong>${escapeHtml(p.entry_type || "planned")}</strong></div>
+      </section>
+      ${p.description ? `<section class="admin-focused__notes-block"><h3>Description</h3><p>${escapeHtml(p.description)}</p></section>` : ""}
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="open_project_workbench" data-entity-type="project" data-entity-id="${escapeHtml(p.id)}">Open negotiation pane</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${p.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+          <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
+        </div>
+      </section>
+    </article>
+  `;
+}
+
+function renderFocusedDocumentHtml(d, wb) {
+  const ownedBadge = d.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const filed = d.chez_filed_at ? `<span class="admin-pill">Filed ${relativeTimeString(d.chez_filed_at)}</span>` : "";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(d.filename || "(no filename)")}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}${filed}
+          <span class="admin-pill admin-pill--note">${escapeHtml(d.category || "Document")}</span>
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Type</label><strong>${escapeHtml(d.mime_type || "—")}</strong></div>
+        <div><label>Expiration</label><strong>${d.expiration_date ? formatDateOnly(d.expiration_date) : "—"}</strong></div>
+      </section>
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="mark_filed" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Mark filed</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="share_with_vendor" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Share with vendor</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${d.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+        </div>
+      </section>
+    </article>
+  `;
+}
+
+function renderFocusedUtilityHtml(u, wb) {
+  const ownedBadge = u.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml(u.provider_name || u.account_name || "(utility)")}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          <span class="admin-pill admin-pill--note">${escapeHtml(u.utility_type || u.provider_type || "Bill")}</span>
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>Account</label><strong>${escapeHtml(u.account_number || "—")}</strong></div>
+        <div><label>Plan</label><strong>${escapeHtml(u.plan_name || "—")}</strong></div>
+        <div><label>Monthly</label><strong>${u.monthly_cost ? "$" + formatCompact(u.monthly_cost) : "—"}</strong></div>
+        <div><label>Phone</label><strong>${escapeHtml(u.phone || "—")}</strong></div>
+        <div><label>Website</label><strong>${escapeHtml(u.website || "—")}</strong></div>
+      </section>
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="audit_bill" data-entity-type="utility" data-entity-id="${escapeHtml(u.id)}">Audit bill</button>
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="draft_negotiation" data-entity-type="utility" data-entity-id="${escapeHtml(u.id)}">Draft negotiation</button>
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${u.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+        </div>
+      </section>
+    </article>
+  `;
+}
+
+function renderFocusedVehicleHtml(v, wb, rel) {
+  const ownedBadge = v.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const recalls = rel.recalls || [];
+  const openRecalls = recalls.filter((r) => !r.is_resolved);
+  const linkedTasks = (wb.tasks || []).filter((t) => t.vehicle_id === v.id && !t.is_archived);
+  return `
+    <article class="admin-focused__entity">
+      <header class="admin-focused__entity-head">
+        <h2>${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" "))}</h2>
+        <div class="admin-focused__entity-meta">
+          ${ownedBadge}
+          ${v.license_plate ? `<span class="admin-pill admin-pill--note">${escapeHtml(v.license_plate)}</span>` : ""}
+          ${openRecalls.length > 0 ? `<span class="admin-pill admin-pill--warning">${openRecalls.length} open recall${openRecalls.length === 1 ? "" : "s"}</span>` : ""}
+        </div>
+      </header>
+      <section class="admin-focused__field-grid">
+        <div><label>VIN</label><strong>${escapeHtml(v.vin || "—")}</strong></div>
+        <div><label>Mileage</label><strong>${v.current_mileage ? formatCompact(v.current_mileage) + " mi" : "—"}</strong></div>
+        <div><label>Reg expires</label><strong>${v.registration_expiry ? formatDateOnly(v.registration_expiry) : "—"}</strong></div>
+        <div><label>Insurance expires</label><strong>${v.insurance_expiry ? formatDateOnly(v.insurance_expiry) : "—"}</strong></div>
+      </section>
+      <section class="admin-focused__actions">
+        <h3>Actions</h3>
+        <div class="admin-focused__action-row">
+          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_service" data-entity-type="vehicle" data-entity-id="${escapeHtml(v.id)}">Schedule service</button>
+          ${openRecalls.length > 0 ? `<button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="handle_recall" data-entity-type="vehicle" data-entity-id="${escapeHtml(v.id)}">Handle recall</button>` : ""}
+          <button type="button" class="admin-pill" data-focused-toggle-owned>${v.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+        </div>
+      </section>
+      ${openRecalls.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Open recalls · ${openRecalls.length}</h3>
+          ${openRecalls.map((r) => `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>${escapeHtml(r.component || r.summary || "Recall")}</strong><span class="admin-muted">${escapeHtml(r.campaign_number || "")}</span></div></div>`).join("")}
+        </section>` : ""}
+      ${linkedTasks.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Vehicle tasks · ${linkedTasks.length}</h3>
+          ${linkedTasks.slice(0, 8).map((t) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(t.title)}</strong><span class="admin-muted">${t.next_due_date ? "due " + formatDateOnly(t.next_due_date) : ""}</span></div></div>`).join("")}
+        </section>` : ""}
+    </article>
+  `;
+}
+
+// =============================================================================
+// Phase 85 PR 5C — Message homeowner modal
+// =============================================================================
+
+function openMessageHomeownerModal({ requestId, entityType, entityId, householdId }) {
+  const overlay = document.createElement("div");
+  overlay.className = "admin-modal-overlay";
+  const isReply = !!requestId;
+  overlay.innerHTML = `
+    <div class="admin-modal admin-modal--sm">
+      <header class="admin-modal__head">
+        <h2>${isReply ? "Message homeowner" : "Start a new conversation"}</h2>
+        <button type="button" class="admin-modal__close" aria-label="Close">&times;</button>
+      </header>
+      <form class="admin-modal__body admin-modal__form" data-message-form>
+        ${isReply ? "" : `
+          <label class="admin-modal__field">
+            <span>Summary <span class="admin-required">*</span></span>
+            <input type="text" name="summary" required class="admin-input" placeholder="One-line summary visible in the homeowner's inbox" />
+          </label>
+        `}
+        <label class="admin-modal__field">
+          <span>Message <span class="admin-required">*</span></span>
+          <textarea name="message" rows="5" required class="admin-input"></textarea>
+        </label>
+        <label class="admin-modal__field admin-modal__field--inline">
+          <input type="checkbox" name="acknowledgement_required" />
+          <span>Mark as needs-action (lands in Needs Attention inbox tab)</span>
+        </label>
+        <p class="admin-modal__error admin-error" data-error hidden></p>
+        <div class="admin-modal__buttons">
+          <button type="button" class="admin-pill" data-cancel>Cancel</button>
+          <button type="submit" class="admin-pill admin-pill--action">Send</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector(".admin-modal__close").addEventListener("click", close);
+  overlay.querySelector("[data-cancel]").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector("[data-message-form]").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = overlay.querySelector('button[type="submit"]');
+    const errorEl = overlay.querySelector("[data-error]");
+    errorEl.hidden = true;
+    const fd = new FormData(e.currentTarget);
+    const message = String(fd.get("message") || "").trim();
+    const ack = !!fd.get("acknowledgement_required");
+    if (!message) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending…";
+    try {
+      if (isReply) {
+        await callChezConcierge({
+          action: "reply",
+          request_id: requestId,
+          message,
+          acknowledgement_required: ack,
+        });
+      } else {
+        const summary = String(fd.get("summary") || "").trim() || `Chez has an update on your ${entityType}`;
+        await callChezConcierge({
+          action: "admin_submit",
+          household_id: householdId,
+          category: "general",
+          summary,
+          initial_message: message,
+          context: { entity_type: entityType, entity_id: entityId, source: "focused_message_modal" },
+        });
+      }
+      close();
+      alert("Message sent.");
+    } catch (err) {
+      errorEl.textContent = `Failed: ${err.message || err}`;
+      errorEl.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send";
+    }
+  });
+  setTimeout(() => overlay.querySelector("textarea")?.focus(), 0);
+}
+
+// =============================================================================
+// Phase 85 PR 5E — Workbench action payload modal
+//
+// Every action button on the Households workbench routes through here.
+// The modal renders the right form per actionId, awaits submit, fires
+// the workbench_action Edge Function call, and resolves true/false.
+// =============================================================================
+
+const WORKBENCH_ACTION_FIELD_SETS = {
+  schedule_visit: {
+    title: "Schedule next visit", submit: "Schedule",
+    fields: [
+      { key: "scheduled_date", label: "Visit date", type: "date", required: true },
+      { key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "Brief context for the homeowner-side activity feed entry." },
+    ],
+  },
+  log_visit: {
+    title: "Log a visit", submit: "Log it",
+    fields: [
+      { key: "occurred_at", label: "Visit date", type: "date", required: true, defaultToToday: true },
+      { key: "actual_cost_cents", label: "Cost (cents)", type: "number", placeholder: "e.g. 18500 for $185" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  log_service: {
+    title: "Log service on this system", submit: "Log it",
+    fields: [
+      { key: "occurred_at", label: "Service date", type: "date", required: true, defaultToToday: true },
+      { key: "service_type", label: "Service type", type: "text", placeholder: "e.g. annual tune-up", required: true },
+      { key: "description", label: "Description", type: "textarea", placeholder: "What was done.", required: true },
+      { key: "cost_cents", label: "Cost (cents)", type: "number" },
+      { key: "contractor_id", label: "Vendor (optional UUID)", type: "text" },
+    ],
+  },
+  schedule_maintenance: {
+    title: "Schedule maintenance", submit: "Schedule",
+    fields: [
+      { key: "title", label: "Task title", type: "text", required: true },
+      { key: "scheduled_date", label: "Scheduled date", type: "date", required: true },
+      { key: "frequency", label: "Frequency", type: "text", placeholder: "e.g. annual / once / quarterly" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  schedule: {
+    title: "Schedule task", submit: "Schedule",
+    fields: [{ key: "scheduled_date", label: "Scheduled date", type: "date", required: true }],
+  },
+  complete_on_behalf: {
+    title: "Complete on behalf of homeowner", submit: "Mark complete",
+    fields: [
+      { key: "completed_at", label: "Completed on", type: "date", required: true, defaultToToday: true },
+      { key: "notes", label: "Notes (optional)", type: "textarea" },
+    ],
+  },
+  snooze: {
+    title: "Snooze task", submit: "Snooze",
+    fields: [{ key: "days", label: "Push out by (days)", type: "number", required: true, defaultValue: 7 }],
+  },
+  log_call: {
+    title: "Log a vendor call", submit: "Log it",
+    fields: [
+      { key: "channel", label: "Channel", type: "select", required: true, defaultValue: "call",
+        options: [
+          { value: "call", label: "Call" }, { value: "email", label: "Email" },
+          { value: "text", label: "Text" }, { value: "visit", label: "On-site visit" },
+          { value: "note", label: "Internal note" },
+        ] },
+      { key: "direction", label: "Direction", type: "select", required: true, defaultValue: "outbound",
+        options: [{ value: "outbound", label: "Chez → Vendor" }, { value: "inbound", label: "Vendor → Chez" }] },
+      { key: "subject", label: "Subject", type: "text" },
+      { key: "notes", label: "Notes", type: "textarea", required: true },
+      { key: "duration_seconds", label: "Duration (seconds, optional)", type: "number" },
+    ],
+  },
+  send_message: {
+    title: "Record outbound vendor message", submit: "Record",
+    fields: [
+      { key: "channel", label: "Channel", type: "select", required: true, defaultValue: "email",
+        options: [
+          { value: "email", label: "Email" }, { value: "text", label: "Text" },
+          { value: "call", label: "Call (voicemail/notes)" },
+        ] },
+      { key: "subject", label: "Subject", type: "text" },
+      { key: "body", label: "Message body", type: "textarea", required: true },
+    ],
+  },
+  mark_filed: {
+    title: "Mark document as filed", submit: "Mark filed",
+    fields: [{ key: "notes", label: "Filing notes (optional)", type: "textarea" }],
+  },
+  share_with_vendor: {
+    title: "Share with vendor", submit: "Record share",
+    fields: [
+      { key: "contractor_id", label: "Vendor UUID (optional)", type: "text" },
+      { key: "email", label: "Vendor email", type: "text" },
+      { key: "share_url", label: "Signed link (optional)", type: "text" },
+      { key: "expires_at", label: "Link expires", type: "date" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  audit_bill: {
+    title: "Audit utility bill", submit: "Save audit",
+    fields: [
+      { key: "bill_period_start", label: "Bill period start", type: "date" },
+      { key: "bill_period_end", label: "Bill period end", type: "date" },
+      { key: "bill_amount_cents", label: "Bill amount (cents)", type: "number", required: true },
+      { key: "prior_amount_cents", label: "Prior amount (cents)", type: "number" },
+      { key: "variance_cents", label: "Variance (cents, optional override)", type: "number" },
+      { key: "finding", label: "Finding (drives homeowner activity feed)", type: "textarea", placeholder: "e.g. Found $34 overcharge — drafted dispute email" },
+      { key: "notes", label: "Internal notes", type: "textarea" },
+    ],
+  },
+  draft_negotiation: {
+    title: "Draft negotiation email", submit: "Record draft",
+    fields: [{ key: "notes", label: "What you're going to negotiate", type: "textarea", required: true }],
+  },
+  schedule_service: {
+    title: "Schedule vehicle service", submit: "Schedule",
+    fields: [
+      { key: "title", label: "Service title", type: "text", required: true },
+      { key: "scheduled_date", label: "Scheduled date", type: "date", required: true },
+      { key: "cost_cents", label: "Estimated cost (cents)", type: "number" },
+      { key: "frequency", label: "Frequency", type: "text", defaultValue: "once" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  handle_recall: {
+    title: "Handle recall", submit: "Mark resolved",
+    fields: [
+      { key: "recall_id", label: "Recall UUID (optional — leave blank to resolve all open recalls on this vehicle)", type: "text" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  admin_note: {
+    title: "Add admin note", submit: "Save note",
+    fields: [
+      { key: "note", label: "Note (only Chez sees this; lands in audit trail)", type: "textarea", required: true },
+    ],
+  },
+};
+
+function openWorkbenchActionModal({ actionId, entityType, entityId, householdId }) {
+  const def = WORKBENCH_ACTION_FIELD_SETS[actionId];
+  if (!def) {
+    return callChezConcierge({
+      action: "workbench_action",
+      household_id: householdId,
+      entity_type: entityType,
+      entity_id: entityId,
+      action_type: actionId,
+      payload: {},
+    }).then(() => true).catch(() => false);
+  }
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "admin-modal-overlay";
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const fieldsHtml = def.fields.map((f) => {
+      const id = `wb-act-${f.key}`;
+      const required = f.required ? "required" : "";
+      const placeholder = f.placeholder ? ` placeholder="${escapeHtml(f.placeholder)}"` : "";
+      let initialValue = "";
+      if (f.defaultToToday) initialValue = todayIso;
+      else if (f.defaultValue !== undefined) initialValue = String(f.defaultValue);
+      const reqMark = f.required ? ' <span class="admin-required">*</span>' : "";
+      if (f.type === "textarea") {
+        return `
+          <label class="admin-modal__field" for="${id}">
+            <span>${escapeHtml(f.label)}${reqMark}</span>
+            <textarea id="${id}" name="${escapeHtml(f.key)}" rows="3" ${required}${placeholder} class="admin-input">${escapeHtml(initialValue)}</textarea>
+          </label>
+        `;
+      }
+      if (f.type === "select") {
+        return `
+          <label class="admin-modal__field" for="${id}">
+            <span>${escapeHtml(f.label)}${reqMark}</span>
+            <select id="${id}" name="${escapeHtml(f.key)}" ${required} class="admin-input">
+              ${f.options.map((o) => `<option value="${escapeHtml(o.value)}" ${o.value === initialValue ? "selected" : ""}>${escapeHtml(o.label)}</option>`).join("")}
+            </select>
+          </label>
+        `;
+      }
+      const inputType = f.type === "number" ? "number" : f.type === "date" ? "date" : "text";
+      return `
+        <label class="admin-modal__field" for="${id}">
+          <span>${escapeHtml(f.label)}${reqMark}</span>
+          <input type="${inputType}" id="${id}" name="${escapeHtml(f.key)}" value="${escapeHtml(initialValue)}" ${required}${placeholder} class="admin-input" />
+        </label>
+      `;
+    }).join("");
+    overlay.innerHTML = `
+      <div class="admin-modal admin-modal--sm">
+        <header class="admin-modal__head">
+          <h2>${escapeHtml(def.title)}</h2>
+          <button type="button" class="admin-modal__close" aria-label="Close">&times;</button>
+        </header>
+        <form class="admin-modal__body admin-modal__form" data-workbench-action-form>
+          ${fieldsHtml}
+          <p class="admin-modal__error admin-error" data-error hidden></p>
+          <div class="admin-modal__buttons">
+            <button type="button" class="admin-pill" data-cancel>Cancel</button>
+            <button type="submit" class="admin-pill admin-pill--action">${escapeHtml(def.submit)}</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelector(".admin-modal__close").addEventListener("click", () => close(false));
+    overlay.querySelector("[data-cancel]").addEventListener("click", () => close(false));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+    overlay.querySelector("[data-workbench-action-form]").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = overlay.querySelector('button[type="submit"]');
+      const errorEl = overlay.querySelector("[data-error]");
+      errorEl.hidden = true;
+      const formData = new FormData(e.currentTarget);
+      const payload = {};
+      for (const f of def.fields) {
+        const raw = formData.get(f.key);
+        if (raw === null || raw === "") continue;
+        if (f.type === "number") {
+          const n = Number(raw);
+          if (!Number.isFinite(n)) {
+            errorEl.textContent = `${f.label} must be a number.`;
+            errorEl.hidden = false;
+            return;
+          }
+          payload[f.key] = n;
+        } else {
+          payload[f.key] = String(raw).trim();
+        }
+      }
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving…";
+      try {
+        await callChezConcierge({
+          action: "workbench_action",
+          household_id: householdId,
+          entity_type: entityType,
+          entity_id: entityId,
+          action_type: actionId,
+          payload,
+        });
+        close(true);
+      } catch (err) {
+        errorEl.textContent = `Failed: ${err.message || err}`;
+        errorEl.hidden = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = def.submit;
+      }
+    });
+    setTimeout(() => overlay.querySelector("input, textarea, select")?.focus(), 0);
+  });
+}
+
 function renderHouseholdWorkbenchHtml(wb, tab) {
   const household = wb.household ?? {};
   const homeownerName = primaryHomeownerLabel({ users: wb.users, family_members: wb.family_members, household: wb.household });
   const property = (wb.properties || [])[0] || null;
 
-  const ownedRoutines = (wb.routines || []).filter((r) => r.chez_owned);
-  const ownedSystems = (wb.home_systems || []).filter((s) => s.chez_owned);
-  const ownedVendors = (wb.contractors || []).filter((c) => c.chez_owned);
-  const ownedTasks = (wb.tasks || []).filter((t) => t.chez_owned);
-  const ownedProjects = (wb.projects || []).filter((p) => p.chez_owned);
-  const ownedDocuments = (wb.documents || []).filter((d) => d.chez_owned);
-  const ownedUtilities = (wb.utility_accounts || []).filter((u) => u.chez_owned);
-  const ownedVehicles = (wb.vehicles || []).filter((v) => v.chez_owned);
+  // Phase 85 PR 5B — show ALL entities, not just chez_owned. Owned
+  // status renders as a small inline badge. The owned-only filter
+  // becomes a per-tab toggle chip, default off.
+  const allRoutines = wb.routines || [];
+  const allSystems = wb.home_systems || [];
+  const allVendors = wb.contractors || [];
+  const allTasks = wb.tasks || [];
+  const allProjects = wb.projects || [];
+  const allDocuments = wb.documents || [];
+  const allUtilities = wb.utility_accounts || [];
+  const allVehicles = wb.vehicles || [];
   const openCases = wb.open_cases || [];
   const reminders = wb.reminders || [];
   const recentActions = wb.workbench_actions || [];
 
+  const ownedOnly = !!state.households.workbenchOwnedOnly;
+  const query = (state.households.workbenchQuery || "").trim().toLowerCase();
+  const matchOwned = (x) => !ownedOnly || x.chez_owned === true;
+  const matchQuery = (...fields) => {
+    if (!query) return true;
+    return fields.some((f) => typeof f === "string" && f.toLowerCase().includes(query));
+  };
+
   const tabs = [
-    { id: "routines", label: "Routines", count: ownedRoutines.length },
-    { id: "systems", label: "Systems", count: ownedSystems.length },
-    { id: "vendors", label: "Vendors", count: ownedVendors.length },
-    { id: "tasks", label: "Tasks", count: ownedTasks.length },
-    { id: "projects", label: "Projects", count: ownedProjects.length },
-    { id: "documents", label: "Documents", count: ownedDocuments.length },
-    { id: "utilities", label: "Bills", count: ownedUtilities.length },
-    { id: "vehicles", label: "Vehicles", count: ownedVehicles.length },
-    { id: "cases", label: "Open cases", count: openCases.length },
+    { id: "routines", label: "Routines", count: allRoutines.length, owned: allRoutines.filter((r) => r.chez_owned).length },
+    { id: "systems", label: "Systems", count: allSystems.length, owned: allSystems.filter((s) => s.chez_owned).length },
+    { id: "vendors", label: "Vendors", count: allVendors.length, owned: allVendors.filter((c) => c.chez_owned).length },
+    { id: "tasks", label: "Tasks", count: allTasks.length, owned: allTasks.filter((t) => t.chez_owned).length },
+    { id: "projects", label: "Projects", count: allProjects.length, owned: allProjects.filter((p) => p.chez_owned).length },
+    { id: "documents", label: "Documents", count: allDocuments.length, owned: allDocuments.filter((d) => d.chez_owned).length },
+    { id: "utilities", label: "Bills", count: allUtilities.length, owned: allUtilities.filter((u) => u.chez_owned).length },
+    { id: "vehicles", label: "Vehicles", count: allVehicles.length, owned: allVehicles.filter((v) => v.chez_owned).length },
+    { id: "cases", label: "Open cases", count: openCases.length, owned: 0 },
   ];
 
   const tabBody = (() => {
     switch (tab) {
-      case "routines": return renderWorkbenchListHtml(ownedRoutines, "No routines owned by Chez yet.", (r) => ({
-        title: r.label || r.routine_kind, sub: `${r.cadence_type || ""}${r.vendor_id ? " · vendor on file" : ""}`,
-        meta: r.next_visit_date ? `Next ${formatDateOnly(r.next_visit_date)}` : "",
-        actions: [
-          { id: "schedule_visit", label: "Schedule next visit", entityType: "routine", entityId: r.id },
-          { id: "log_visit", label: "Log a visit", entityType: "routine", entityId: r.id },
-        ],
-      }));
-      case "systems": return renderWorkbenchListHtml(ownedSystems, "No systems owned by Chez yet.", (s) => ({
-        title: s.name || s.category, sub: `${s.category}${s.manufacturer ? " · " + s.manufacturer : ""}${s.model ? " · " + s.model : ""}`,
-        meta: s.last_service_date ? `Last service ${formatDateOnly(s.last_service_date)}` : "",
-        actions: [
-          { id: "log_service", label: "Log service", entityType: "system", entityId: s.id },
-          { id: "schedule_maintenance", label: "Schedule maintenance", entityType: "system", entityId: s.id },
-        ],
-      }));
-      case "vendors": return renderWorkbenchListHtml(ownedVendors, "No vendors owned by Chez yet.", (c) => ({
-        title: c.company_name, sub: `${c.category || ""}${c.phone ? " · " + c.phone : ""}`,
-        meta: c.chez_recommended_at ? "Sourced by Chez" : "",
-        actions: [
-          { id: "log_call", label: "Log a call", entityType: "contractor", entityId: c.id },
-          { id: "send_message", label: "Send message", entityType: "contractor", entityId: c.id },
-        ],
-      }));
-      case "tasks": return renderWorkbenchListHtml(ownedTasks, "No tasks owned by Chez yet.", (t) => ({
-        title: t.title, sub: `${t.assignment_type || "task"}${t.frequency ? " · " + t.frequency : ""}`,
-        meta: t.next_due_date ? `Due ${formatDateOnly(t.next_due_date)}` : "",
-        actions: [
-          { id: "schedule", label: "Schedule", entityType: "task", entityId: t.id },
-          { id: "complete_on_behalf", label: "Complete on behalf", entityType: "task", entityId: t.id },
-          { id: "snooze", label: "Snooze 7d", entityType: "task", entityId: t.id },
-        ],
-      }));
-      case "projects": return renderWorkbenchListHtml(ownedProjects, "No projects owned by Chez yet.", (p) => ({
-        title: p.name, sub: `${p.status || ""}${p.estimated_budget ? " · est. $" + formatCompact(p.estimated_budget) : ""}`,
-        meta: "",
-        actions: [
-          { id: "open_project_workbench", label: "Open negotiation pane", entityType: "project", entityId: p.id },
-        ],
-      }));
-      case "documents": return renderWorkbenchListHtml(ownedDocuments, "No documents owned by Chez yet.", (d) => ({
-        title: d.filename, sub: d.category || "Document",
-        meta: d.expiration_date ? `Expires ${formatDateOnly(d.expiration_date)}` : "",
-        actions: [
-          { id: "mark_filed", label: "Mark filed", entityType: "document", entityId: d.id },
-          { id: "share_with_vendor", label: "Share with vendor", entityType: "document", entityId: d.id },
-        ],
-      }));
-      case "utilities": return renderWorkbenchListHtml(ownedUtilities, "No utility accounts owned by Chez yet.", (u) => ({
-        title: u.provider_name || u.account_name || "Utility", sub: u.utility_type || "",
-        meta: u.estimated_monthly_cost ? `~$${u.estimated_monthly_cost}/mo` : "",
-        actions: [
-          { id: "audit_bill", label: "Audit bill", entityType: "utility", entityId: u.id },
-          { id: "draft_negotiation", label: "Draft negotiation email", entityType: "utility", entityId: u.id },
-        ],
-      }));
-      case "vehicles": return renderWorkbenchListHtml(ownedVehicles, "No vehicles owned by Chez yet.", (v) => ({
-        title: [v.year, v.make, v.model].filter(Boolean).join(" "), sub: v.license_plate || "",
-        meta: v.registration_expiry ? `Reg expires ${formatDateOnly(v.registration_expiry)}` : "",
-        actions: [
-          { id: "schedule_service", label: "Schedule service", entityType: "vehicle", entityId: v.id },
-          { id: "handle_recall", label: "Handle recall", entityType: "vehicle", entityId: v.id },
-        ],
-      }));
+      case "routines": {
+        const rows = allRoutines.filter(matchOwned).filter((r) => matchQuery(r.label, r.routine_kind));
+        return renderWorkbenchListHtml(rows, "No routines match.", (r) => ({
+          title: r.label || r.routine_kind,
+          sub: `${r.cadence_type || ""}${r.vendor_id ? " · vendor on file" : ""}`,
+          meta: r.next_visit_date ? `Next ${formatDateOnly(r.next_visit_date)}` : "",
+          isOwned: !!r.chez_owned,
+          drillIn: { entityType: "routine", entityId: r.id },
+          actions: [
+            { id: "schedule_visit", label: "Schedule next visit", entityType: "routine", entityId: r.id },
+            { id: "log_visit", label: "Log a visit", entityType: "routine", entityId: r.id },
+          ],
+        }));
+      }
+      case "systems": {
+        const rows = allSystems.filter(matchOwned).filter((s) => matchQuery(s.name, s.category, s.manufacturer, s.model_number || s.model));
+        return renderWorkbenchListHtml(rows, "No systems match.", (s) => ({
+          title: s.name || s.category,
+          sub: `${s.category}${s.manufacturer ? " · " + s.manufacturer : ""}${s.model_number || s.model ? " · " + (s.model_number || s.model) : ""}`,
+          meta: s.last_service_date ? `Last service ${formatDateOnly(s.last_service_date)}` : "",
+          isOwned: !!s.chez_owned,
+          drillIn: { entityType: "system", entityId: s.id },
+          actions: [
+            { id: "log_service", label: "Log service", entityType: "system", entityId: s.id },
+            { id: "schedule_maintenance", label: "Schedule maintenance", entityType: "system", entityId: s.id },
+          ],
+        }));
+      }
+      case "vendors": {
+        const rows = allVendors.filter(matchOwned).filter((c) => matchQuery(c.company_name, c.category, c.phone));
+        return renderWorkbenchListHtml(rows, "No vendors match.", (c) => ({
+          title: c.company_name,
+          sub: `${c.category || ""}${c.phone ? " · " + c.phone : ""}`,
+          meta: c.chez_recommended_at ? "Sourced by Chez" : "",
+          isOwned: !!c.chez_owned,
+          drillIn: { entityType: "contractor", entityId: c.id },
+          actions: [
+            { id: "log_call", label: "Log a call", entityType: "contractor", entityId: c.id },
+            { id: "send_message", label: "Send message", entityType: "contractor", entityId: c.id },
+          ],
+        }));
+      }
+      case "tasks": {
+        const rows = allTasks.filter(matchOwned).filter((t) => matchQuery(t.title, t.assignment_type, t.frequency));
+        return renderWorkbenchListHtml(rows, "No tasks match.", (t) => ({
+          title: t.title,
+          sub: `${t.assignment_type || "task"}${t.frequency ? " · " + t.frequency : ""}`,
+          meta: t.next_due_date ? `Due ${formatDateOnly(t.next_due_date)}` : "",
+          isOwned: !!t.chez_owned,
+          drillIn: { entityType: "task", entityId: t.id },
+          actions: [
+            { id: "schedule", label: "Schedule", entityType: "task", entityId: t.id },
+            { id: "complete_on_behalf", label: "Complete on behalf", entityType: "task", entityId: t.id },
+            { id: "snooze", label: "Snooze 7d", entityType: "task", entityId: t.id },
+          ],
+        }));
+      }
+      case "projects": {
+        const rows = allProjects.filter(matchOwned).filter((p) => matchQuery(p.name, p.status));
+        return renderWorkbenchListHtml(rows, "No projects match.", (p) => ({
+          title: p.name,
+          sub: `${p.status || ""}${p.estimated_budget ? " · est. $" + formatCompact(p.estimated_budget) : ""}`,
+          meta: "",
+          isOwned: !!p.chez_owned,
+          drillIn: { entityType: "project", entityId: p.id },
+          actions: [
+            { id: "open_project_workbench", label: "Open negotiation pane", entityType: "project", entityId: p.id },
+          ],
+        }));
+      }
+      case "documents": {
+        const rows = allDocuments.filter(matchOwned).filter((d) => matchQuery(d.filename, d.category));
+        return renderWorkbenchListHtml(rows, "No documents match.", (d) => ({
+          title: d.filename,
+          sub: d.category || "Document",
+          meta: d.expiration_date ? `Expires ${formatDateOnly(d.expiration_date)}` : "",
+          isOwned: !!d.chez_owned,
+          drillIn: { entityType: "document", entityId: d.id },
+          actions: [
+            { id: "mark_filed", label: "Mark filed", entityType: "document", entityId: d.id },
+            { id: "share_with_vendor", label: "Share with vendor", entityType: "document", entityId: d.id },
+          ],
+        }));
+      }
+      case "utilities": {
+        const rows = allUtilities.filter(matchOwned).filter((u) => matchQuery(u.provider_name, u.account_name, u.utility_type));
+        return renderWorkbenchListHtml(rows, "No utility accounts match.", (u) => ({
+          title: u.provider_name || u.account_name || "Utility",
+          sub: u.utility_type || u.provider_type || "",
+          meta: u.monthly_cost ? `~$${u.monthly_cost}/mo` : "",
+          isOwned: !!u.chez_owned,
+          drillIn: { entityType: "utility", entityId: u.id },
+          actions: [
+            { id: "audit_bill", label: "Audit bill", entityType: "utility", entityId: u.id },
+            { id: "draft_negotiation", label: "Draft negotiation email", entityType: "utility", entityId: u.id },
+          ],
+        }));
+      }
+      case "vehicles": {
+        const rows = allVehicles.filter(matchOwned).filter((v) => matchQuery(v.make, v.model, v.license_plate, String(v.year || "")));
+        return renderWorkbenchListHtml(rows, "No vehicles match.", (v) => ({
+          title: [v.year, v.make, v.model].filter(Boolean).join(" "),
+          sub: v.license_plate || "",
+          meta: v.registration_expiry ? `Reg expires ${formatDateOnly(v.registration_expiry)}` : "",
+          isOwned: !!v.chez_owned,
+          drillIn: { entityType: "vehicle", entityId: v.id },
+          actions: [
+            { id: "schedule_service", label: "Schedule service", entityType: "vehicle", entityId: v.id },
+            { id: "handle_recall", label: "Handle recall", entityType: "vehicle", entityId: v.id },
+          ],
+        }));
+      }
       case "cases": return openCases.length === 0
         ? `<p class="admin-muted">No open cases for this household.</p>`
         : openCases.map((c) => `
@@ -17561,10 +18666,28 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
       <div class="admin-households__tabs">
         ${tabs.map((t) => `
           <button type="button" class="admin-households__tab ${tab === t.id ? "is-active" : ""}" data-workbench-tab="${escapeHtml(t.id)}">
-            ${escapeHtml(t.label)}<span class="admin-households__tab-count">${t.count}</span>
+            ${escapeHtml(t.label)}<span class="admin-households__tab-count">${t.count}${t.owned > 0 ? ` <span class="admin-households__tab-owned">★ ${t.owned}</span>` : ""}</span>
           </button>
         `).join("")}
       </div>
+
+      ${tab !== "cases" ? `
+        <div class="admin-households__toolbar">
+          <input
+            type="search"
+            class="admin-households__search"
+            placeholder="Search this tab…"
+            value="${escapeHtml(state.households.workbenchQuery || "")}"
+            data-workbench-search
+          />
+          <button type="button"
+            class="admin-pill admin-pill--toggle ${ownedOnly ? "is-active" : ""}"
+            data-workbench-owned-toggle
+            title="${ownedOnly ? "Showing only Chez-owned. Click for all." : "Showing all entities. Click to filter Chez-owned only."}">
+            ★ Chez owns ${ownedOnly ? "✓" : ""}
+          </button>
+        </div>
+      ` : ""}
 
       <div class="admin-households__panel">
         ${tabBody || `<p class="admin-muted">Nothing here yet.</p>`}
@@ -17603,10 +18726,18 @@ function renderWorkbenchListHtml(items, emptyCopy, formatter) {
   }
   return items.map((it) => {
     const f = formatter(it);
-    // Phase 84 PR 4 — every workbench row gets per-entity action
-    // buttons. Each button fires `workbench_action` (or, for project,
-    // opens the negotiation pane modal). Buttons stamp the entity
-    // type + id via data-* attrs which the click handler reads.
+    // Phase 85 PR 5C — every entity row drills into a focused-detail
+    // panel via data-drill-entity-* attrs. Action buttons inside still
+    // e.stopPropagation so clicking a button doesn't also fire the
+    // row drill-in.
+    const drillAttrs = f.drillIn
+      ? ` data-drill-entity-type="${escapeHtml(f.drillIn.entityType)}" data-drill-entity-id="${escapeHtml(f.drillIn.entityId)}"`
+      : "";
+    const drillClass = f.drillIn ? " is-clickable" : "";
+    // Phase 85 PR 5B — owned badge replaces the old owned-only filter.
+    const ownedBadge = f.isOwned
+      ? `<span class="admin-households__owned-badge" title="Chez owns this">★ Chez</span>`
+      : "";
     const actionsHtml = (Array.isArray(f.actions) && f.actions.length > 0)
       ? `<div class="admin-households__entity-actions">
           ${f.actions.map((a) => `
@@ -17622,9 +18753,9 @@ function renderWorkbenchListHtml(items, emptyCopy, formatter) {
         </div>`
       : "";
     return `
-      <div class="admin-households__entity-row">
+      <div class="admin-households__entity-row${drillClass}"${drillAttrs}>
         <div class="admin-households__entity-main">
-          <strong>${escapeHtml(f.title || "(unnamed)")}</strong>
+          <strong>${ownedBadge}${escapeHtml(f.title || "(unnamed)")}</strong>
           ${f.sub ? `<span class="admin-muted">${escapeHtml(f.sub)}</span>` : ""}
         </div>
         ${f.meta ? `<span class="admin-households__entity-meta">${escapeHtml(f.meta)}</span>` : ""}
@@ -17790,10 +18921,22 @@ async function renderUpcomingView() {
         }
         return;
       }
-      // Phase 84.1 — maintenance task / handyman bucket / routine visit /
-      // documents / vehicles all route to the household workbench. The
-      // workbench already groups entities by type so the right tab opens
-      // when state.households.workbenchTab is set.
+      // Phase 85 PR 5D — Upcoming row click now opens the focused
+      // entity detail panel (where the operator can review the entity,
+      // message the homeowner, send suggestions, fire workbench actions)
+      // instead of just landing on the household's workbench list. The
+      // workbench list is still reachable via the back button.
+      // Phase 85 PR 5D — only items that map to a single concrete entity
+      // open a focused-detail panel. handyman_punch is a per-household
+      // summary row (entity_id is the household id), so it falls through
+      // to the workbench tasks list.
+      const drillTypeByItem = {
+        maintenance_task: { type: "task", idKey: "entity_id" },
+        routine_visit: { type: "routine", idKey: "entity_id" },
+        document_expiring: { type: "document", idKey: "entity_id" },
+        vehicle_registration: { type: "vehicle", idKey: "entity_id" },
+        vehicle_insurance: { type: "vehicle", idKey: "entity_id" },
+      };
       const tabByType = {
         maintenance_task: "tasks",
         handyman_punch: "tasks",
@@ -17807,8 +18950,22 @@ async function renderUpcomingView() {
       if (tabByType[item.type]) {
         state.households.workbenchTab = tabByType[item.type];
       }
+      // Load the household first so lookupFocusedEntity can find the row.
       await loadHouseholdWorkbench(item.household_id);
       render();
+      const drill = drillTypeByItem[item.type];
+      if (drill) {
+        const entityId = item[drill.idKey];
+        if (entityId) {
+          // Defer one tick so renderHouseholdsView's right-pane swap
+          // settles before we override it with the focused-detail
+          // panel. Without this, the workbench detail render runs
+          // after our focused render and clobbers it.
+          setTimeout(() => {
+            openFocusedEntityDetail(drill.type, entityId);
+          }, 0);
+        }
+      }
     });
   });
   // Add-reminder button.
