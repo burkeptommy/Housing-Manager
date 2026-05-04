@@ -397,13 +397,32 @@ struct AddVehicleView: View {
                 ))
             }
 
-            // Create maintenance tasks from AI-generated schedule
+            // Create maintenance tasks from AI-generated schedule.
+            //
+            // Due-date math (Phase 95 / audit gap #77): months interval wins
+            // when present. Otherwise we convert the mileage interval to a
+            // days estimate using the user's current mileage as the
+            // baseline and ~33 mi/day (12K mi/year) as the average driving
+            // rate. Without this, a "every 5,000 miles" task with no
+            // months interval would silently land 12 months out — wrong
+            // for both heavy and light drivers. The MileageUpdateSheet
+            // also re-runs this math via VehicleMileageScheduler whenever
+            // the odometer changes.
             let taskDateFormatter = DateFormatter()
             taskDateFormatter.dateFormat = "yyyy-MM-dd"
+            taskDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            taskDateFormatter.timeZone = TimeZone(identifier: "UTC")
             for interval in maintenanceSchedule {
                 guard interval.intervalMiles != nil || interval.intervalMonths != nil else { continue }
-                let monthsOut = interval.intervalMonths ?? 12
-                let nextDue = Calendar.current.date(byAdding: .month, value: monthsOut, to: Date()) ?? Date()
+                let nextDue: Date
+                if let months = interval.intervalMonths {
+                    nextDue = Calendar.current.date(byAdding: .month, value: months, to: Date()) ?? Date()
+                } else if let intervalMiles = interval.intervalMiles, intervalMiles > 0 {
+                    let daysOut = max(0, Int(ceil(Double(intervalMiles) / 33.0)))
+                    nextDue = Calendar.current.date(byAdding: .day, value: daysOut, to: Date()) ?? Date()
+                } else {
+                    nextDue = Date()
+                }
                 _ = try? await db.createMaintenanceTask(MaintenanceTaskInsert(
                     vehicleId: vehicle.id,
                     householdId: householdId,

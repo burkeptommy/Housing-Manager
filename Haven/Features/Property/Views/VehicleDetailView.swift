@@ -2485,6 +2485,24 @@ struct MileageUpdateSheet: View {
             VehicleUpdate(currentMileage: value)
         )
         Analytics.track(.mileageUpdated, ["vehicle_id": vehicleId.uuidString, "mileage": value])
+
+        // Phase 95 (gap #77) — recompute due dates on every mileage-triggered
+        // task so oil-change / tire-rotation cadences track real driving
+        // instead of freezing at the date the task was created. Fire-and-
+        // forget after the vehicle row commits; the scheduler is idempotent
+        // and skips tasks whose date doesn't change.
+        let recalcCount = await VehicleMileageScheduler.recalculateDueDates(
+            vehicleId: vehicleId,
+            newMileage: value
+        )
+        if recalcCount > 0 {
+            Analytics.track(.mileageTasksRecalced, [
+                "vehicle_id": vehicleId.uuidString,
+                "tasks": recalcCount
+            ])
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+
         Haptics.success()
         onSave?()
         dismiss()

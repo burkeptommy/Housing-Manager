@@ -404,6 +404,11 @@ enum AnalyticsEvent: String {
     case mechanicLinked = "mechanic_linked"
     case mechanicRemoved = "mechanic_removed"
     case mileageUpdated = "mileage_updated"
+    /// Phase 95 (gap #77) — fired when a mileage update recomputes
+    /// `next_due_date` on at least one vehicle task. `tasks` payload key
+    /// holds the recalc count so we can spot-check whether per-mile
+    /// cadences are getting bumped at the rate we'd expect.
+    case mileageTasksRecalced = "mileage_tasks_recalced"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

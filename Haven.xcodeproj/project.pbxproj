@@ -791,6 +791,7 @@
 		E706EDC98BE7D860C86995B5 /* InboxItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56810297D7D51BAE3CBBFECB /* InboxItemDetailView.swift */; };
 		E7627B10E1380740DE422203 /* HouseholdStaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C82F8F17DB61DE2C6A48C79 /* HouseholdStaffView.swift */; };
 		E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */; };
+		E7BA2D890A9D866DE8CE9275 /* VehicleMileageScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F13092318CF6C77B67C12FD /* VehicleMileageScheduler.swift */; };
 		E7F7874F63DC447893D3DF47 /* Q38HandymanPunchListBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7469C5E2107D7848DE8EF580 /* Q38HandymanPunchListBody.swift */; };
 		E844B3B782B687101D043825 /* AlfredLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */; };
 		E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAE3950BF1A95CC45D9C55B /* PushNotificationService.swift */; };
@@ -843,6 +844,7 @@
 		F4095A55172FA4167A6A4E29 /* StandingAppointmentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F228322E3862BDCF63DF52C3 /* StandingAppointmentViewModel.swift */; };
 		F4584A06AA2A1E2FE8B921C6 /* RoutingPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD4E4211AA57C9D18E978A /* RoutingPreference.swift */; };
 		F46EC30ABE284A456FA48F37 /* HouseQuizQuestionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */; };
+		F47C8FEA534B5EC53FEBB176 /* VehicleMileageScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F13092318CF6C77B67C12FD /* VehicleMileageScheduler.swift */; };
 		F4A1527C8FC311F332B7E5F5 /* ChezOwnershipHeroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EC1DA8C3DA0964D619E71D /* ChezOwnershipHeroCard.swift */; };
 		F51ECF5E04C7BADB5CD09CB0 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3AAB2BFCB6E921B9BE9C459 /* LoadingView.swift */; };
 		F52507EB3AA830122241C680 /* HavenButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */; };
@@ -1090,6 +1092,7 @@
 		6D454019B1D9DF0E175C34AB /* AddressAutocompleteField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressAutocompleteField.swift; sourceTree = "<group>"; };
 		6DF7A5BC749EE76956FF9449 /* UtilityAccountsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityAccountsSection.swift; sourceTree = "<group>"; };
 		6E60CB5AC78EAFC4C067A93E /* CertificatePinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
+		6F13092318CF6C77B67C12FD /* VehicleMileageScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleMileageScheduler.swift; sourceTree = "<group>"; };
 		6F63E60DF583540D084B910B /* PersonalQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalQuizView.swift; sourceTree = "<group>"; };
 		711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewArrivalChecklist.swift; sourceTree = "<group>"; };
 		71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizInsightOverlay.swift; sourceTree = "<group>"; };
@@ -1733,6 +1736,7 @@
 				6CCBA5BF67CFBB211C35F6F5 /* UtilityContractorMirror.swift */,
 				901435EF475F88C576845DA9 /* ValuationRange.swift */,
 				9D44F4D6FC19F4CE5475D905 /* VehicleLookupService.swift */,
+				6F13092318CF6C77B67C12FD /* VehicleMileageScheduler.swift */,
 				263A6340D75E45C5C76CC9DB /* VendorTaskGrouping.swift */,
 			);
 			path = Services;
@@ -2953,6 +2957,7 @@
 				26043ACF0D900C38B606A985 /* VehicleDetailView.swift in Sources */,
 				53ABF776341026EA7DAD20C3 /* VehicleDetailViewModel.swift in Sources */,
 				353BDE111D27138F76DFEC06 /* VehicleLookupService.swift in Sources */,
+				F47C8FEA534B5EC53FEBB176 /* VehicleMileageScheduler.swift in Sources */,
 				CE906811F6BDAE0BB0DAE413 /* VehicleProgramSetupSheet.swift in Sources */,
 				635FEA32AD3A53DF6F89A1A8 /* VendorCoveragePickerSheet.swift in Sources */,
 				05407F100AA750C7E5A913AF /* VendorCoverageSheet.swift in Sources */,
@@ -3399,6 +3404,7 @@
 				599DE6D8496746E9CE5C6FF0 /* VehicleDetailView.swift in Sources */,
 				45865C8E7404E0EF866DCCA3 /* VehicleDetailViewModel.swift in Sources */,
 				16C9F768435B98AE2B44E73B /* VehicleLookupService.swift in Sources */,
+				E7BA2D890A9D866DE8CE9275 /* VehicleMileageScheduler.swift in Sources */,
 				FD04BBC2896676CDFED3EB20 /* VehicleProgramSetupSheet.swift in Sources */,
 				66E08B4193617FCF10669BBB /* VendorCoveragePickerSheet.swift in Sources */,
 				938DF2F2D42C348D384BD413 /* VendorCoverageSheet.swift in Sources */,
