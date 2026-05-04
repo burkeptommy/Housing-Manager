@@ -12,13 +12,21 @@ final class VehicleLookupService {
         let vinDecoded: Bool?
         let error: String?
         let extractedText: String?
+        /// Phase 95 (gap #76): license plate captured from the same
+        /// vision pass that extracts the VIN. Set whenever the photo
+        /// includes a readable plate, regardless of whether a VIN was
+        /// also found. iOS pre-fills `AddVehicleView.licensePlate`
+        /// from this so a plate-only scan still seeds the form.
+        let plate: String?
+        let plateState: String?
 
         enum CodingKeys: String, CodingKey {
-            case vehicle, recalls, error
+            case vehicle, recalls, error, plate
             case recallCount = "recall_count"
             case maintenanceSchedule = "maintenance_schedule"
             case vinDecoded = "vin_decoded"
             case extractedText = "extracted_text"
+            case plateState = "plate_state"
         }
     }
 

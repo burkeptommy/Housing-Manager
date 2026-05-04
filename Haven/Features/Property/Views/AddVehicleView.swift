@@ -327,8 +327,22 @@ struct AddVehicleView: View {
                 name = [v.make, v.model].compactMap { $0 }.joined(separator: " ")
                 if name.isEmpty { name = "My Vehicle" }
             }
+            // Phase 95 (gap #76) — license-plate carry-through from the
+            // vision pass. Pre-fill the plate field whenever the edge
+            // function captured one, but only when the user hasn't
+            // already typed one to avoid clobbering manual input.
+            if let scannedPlate = response.plate, licensePlate.isEmpty {
+                licensePlate = scannedPlate
+            }
             recallsToSave = response.recalls ?? []
             maintenanceSchedule = response.maintenanceSchedule ?? []
+            // Plate-only scan: surface a friendly hint so the user knows
+            // why the make/model fields didn't populate. Without this,
+            // the picker silently lands on the manual-entry form with no
+            // explanation when only the plate was visible.
+            if response.vinDecoded == false, response.plate != nil {
+                lookupError = "Got the plate. Type the VIN to pull year/make/model from NHTSA."
+            }
         } catch {
             lookupError = error.localizedDescription
         }

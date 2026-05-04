@@ -47,6 +47,12 @@ serve(async (req: Request) => {
     const body = await req.json();
     let vin: string | null = (body.vin ?? "").trim().toUpperCase() || null;
     const imageBase64: string | null = body.image_base64 ?? null;
+    // Phase 95 (audit gap #76) — license plate carry-through. The vision
+    // pass below extracts a plate from the image whenever one is visible
+    // even if a VIN was also captured, so the user's AddVehicleView form
+    // gets pre-filled with everything the photo had to give.
+    let plate: string | null = null;
+    let plateState: string | null = null;
 
     // -------------------------------------------------------------------
     // Step 1: If image provided, extract VIN via Claude Vision
@@ -78,22 +84,26 @@ serve(async (req: Request) => {
                 },
                 {
                   type: "text",
-                  text: `You are analyzing a photo of a vehicle VIN sticker, VIN plate, registration document, or any document/label containing a Vehicle Identification Number (VIN).
+                  text: `You are analyzing a photo of a vehicle, license plate, VIN sticker, VIN plate, registration document, or any image that contains either a Vehicle Identification Number (VIN) or a license plate.
 
-Extract the 17-character VIN from this image. A VIN is exactly 17 characters long, containing uppercase letters (except I, O, Q) and digits.
+Extract whichever of the two is visible — preferably both if the photo shows both. A VIN is exactly 17 characters of uppercase letters (no I, O, or Q) and digits. A license plate varies by region: usually 4-8 letters/digits with optional dashes/spaces. If you can identify the plate's issuing US state, return its 2-letter code (e.g. "NY", "CT", "MA"). If unsure, leave plate_state null.
 
 Respond with ONLY valid JSON:
 {
   "found": true,
-  "vin": "THE17CHARVIN12345",
-  "confidence": "high" or "medium" or "low",
-  "source": "where on the image you found it"
+  "vin": "THE17CHARVIN12345" | null,
+  "plate": "ABC-1234" | null,
+  "plate_state": "NY" | null,
+  "confidence": "high" | "medium" | "low",
+  "source": "short note about which surface(s) you read from"
 }
 
-If no VIN is visible or readable, respond:
+Return found = true if EITHER vin or plate is readable. Return found = false only when neither is visible:
 {
   "found": false,
   "vin": null,
+  "plate": null,
+  "plate_state": null,
   "confidence": null,
   "source": null
 }`,
@@ -132,15 +142,47 @@ If no VIN is visible or readable, respond:
         }
       }
 
-      if (!visionData.found || !visionData.vin) {
+      if (!visionData.found || (!visionData.vin && !visionData.plate)) {
         return new Response(
-          JSON.stringify({ error: "No VIN found in the provided image" }),
+          JSON.stringify({ error: "No VIN or license plate found in the provided image" }),
           { status: 422, headers }
         );
       }
 
-      vin = visionData.vin.toUpperCase();
-      console.log(`[vehicle-lookup] Extracted VIN from image: ${vin} (confidence: ${visionData.confidence})`);
+      // Capture plate even when VIN is also present so the homeowner's
+      // AddVehicleView form gets both fields pre-filled in one shot.
+      if (typeof visionData.plate === "string" && visionData.plate.trim() !== "") {
+        plate = visionData.plate.trim().toUpperCase();
+      }
+      if (typeof visionData.plate_state === "string" && /^[A-Z]{2}$/i.test(visionData.plate_state.trim())) {
+        plateState = visionData.plate_state.trim().toUpperCase();
+      }
+
+      if (visionData.vin) {
+        vin = visionData.vin.toUpperCase();
+        console.log(`[vehicle-lookup] Extracted VIN from image: ${vin} (confidence: ${visionData.confidence})`);
+      }
+
+      // Plate-only path. Without a VIN the NHTSA decode + recall lookup
+      // can't run, so we short-circuit here and let iOS pre-fill the
+      // license plate field, then prompt the user to add the VIN
+      // manually. Better than failing the scan entirely when only the
+      // plate was visible in the shot.
+      if (!vin && plate) {
+        console.log(`[vehicle-lookup] Plate-only result: ${plate} (${plateState ?? "no state"})`);
+        return new Response(
+          JSON.stringify({
+            vehicle: { vin: null },
+            recalls: [],
+            recall_count: 0,
+            maintenance_schedule: null,
+            vin_decoded: false,
+            plate,
+            plate_state: plateState,
+          }),
+          { status: 200, headers }
+        );
+      }
     }
 
     // Validate we have a VIN at this point
@@ -313,6 +355,11 @@ Return ONLY the JSON array.`,
       recall_count: recallCount,
       maintenance_schedule: maintenanceSchedule,
       vin_decoded: true,
+      // Phase 95 (gap #76): plate carry-through. Null on typed-VIN
+      // requests; populated when the same vision pass that decoded the
+      // VIN also picked up a plate from the image.
+      plate,
+      plate_state: plateState,
     };
 
     console.log(`[vehicle-lookup] Success for VIN ${vin}`);
