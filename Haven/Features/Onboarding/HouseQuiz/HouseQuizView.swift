@@ -170,6 +170,17 @@ struct HouseQuizView: View {
     @State private var contractorChipsProviders: [String: UtilityProviderRow] = [:]
     @State private var contractorChipsVendors: [String: HavenSupabase.LocalVendorResult] = [:]
     @State private var contractorChipsManualNames: [String: String] = [:]
+    /// Phase 95 (audit gap #11) — extra vendors per chip, captured by
+    /// re-opening the picker after a primary vendor is already
+    /// committed. The single-value dicts above hold the primary pick
+    /// (the one rendered as the chip's attached name); these arrays
+    /// hold every additional vendor the user added on top. The
+    /// encoder flattens both layers into the customEntries list, and
+    /// the answer mapper already handles arbitrary entry counts per
+    /// chip (one ContractorInsert per entry). Cleared via
+    /// resetEntryState() like every other Q15b dict.
+    @State private var contractorChipsExtraVendors: [String: [HavenSupabase.LocalVendorResult]] = [:]
+    @State private var contractorChipsExtraManualNames: [String: [String]] = [:]
     @State private var contractorChipsExpanded: String? = nil
 
     /// Build 84 — Q17 forwarding-email milestone "Copied" badge state. The
@@ -3507,6 +3518,8 @@ struct HouseQuizView: View {
                         contractorChipsProviders.removeAll()
                         contractorChipsVendors.removeAll()
                         contractorChipsManualNames.removeAll()
+                        contractorChipsExtraVendors.removeAll()
+                        contractorChipsExtraManualNames.removeAll()
                         contractorChipsExpanded = nil
                     }
                 }
@@ -3530,8 +3543,10 @@ struct HouseQuizView: View {
     private func encodedContractorChipsEntries() -> [String] {
         var entries: [String] = []
 
-        for (chipId, vendor) in contractorChipsVendors {
-            let parts: [String] = [
+        // Inline encoder for a single Places-sourced vendor so the
+        // primary + extras paths share the same shape exactly.
+        func encodeVendor(_ chipId: String, _ vendor: HavenSupabase.LocalVendorResult) -> String {
+            [
                 chipId,
                 vendor.name,
                 vendor.rating.map { String(format: "%.1f", $0) } ?? "",
@@ -3539,12 +3554,30 @@ struct HouseQuizView: View {
                 vendor.phone ?? "",
                 vendor.website ?? "",
                 vendor.isTopRated ? "top_rated" : "",
-            ]
-            entries.append(parts.joined(separator: "|"))
+            ].joined(separator: "|")
+        }
+
+        for (chipId, vendor) in contractorChipsVendors {
+            entries.append(encodeVendor(chipId, vendor))
         }
 
         for (chipId, name) in contractorChipsManualNames {
             entries.append("\(chipId)|\(name)")
+        }
+
+        // Phase 95 (gap #11) — flatten extra-vendor arrays. The
+        // mapper iterates customEntries and inserts one contractor
+        // per entry, so this is the only place the per-chip
+        // multiplicity has to be expressed.
+        for (chipId, vendors) in contractorChipsExtraVendors {
+            for vendor in vendors {
+                entries.append(encodeVendor(chipId, vendor))
+            }
+        }
+        for (chipId, names) in contractorChipsExtraManualNames {
+            for name in names {
+                entries.append("\(chipId)|\(name)")
+            }
         }
 
         // Legacy catalog path — still encoded so previously-persisted answers
@@ -3695,6 +3728,9 @@ struct HouseQuizView: View {
                     contractorChipsProviders.removeValue(forKey: option.id)
                     contractorChipsVendors.removeValue(forKey: option.id)
                     contractorChipsManualNames.removeValue(forKey: option.id)
+                    // Phase 95 (gap #11): full deselect also drops extras.
+                    contractorChipsExtraVendors.removeValue(forKey: option.id)
+                    contractorChipsExtraManualNames.removeValue(forKey: option.id)
                     if isExpanded { contractorChipsExpanded = nil }
                 } else {
                     contractorChipsSelected.insert(option.id)
@@ -3808,12 +3844,25 @@ struct HouseQuizView: View {
                     searchFirst: true,
                     preSelected: preSelectedContractor,
                     onSelect: { vendor in
-                        // Selecting a Google Places vendor wins; clear any
-                        // legacy or manual entry on the same chip so the
-                        // encoder picks the freshest source.
-                        contractorChipsVendors[option.id] = vendor
-                        contractorChipsManualNames.removeValue(forKey: option.id)
-                        contractorChipsProviders.removeValue(forKey: option.id)
+                        // Phase 95 (gap #11) — multi-vendor capture.
+                        // First pick lands as the primary (rendered
+                        // as the chip's attached name); subsequent
+                        // picks append to the extras array. Manual
+                        // names and legacy provider rows on the same
+                        // chip are kept since the encoder flattens
+                        // every source into the customEntries list.
+                        let hasPrimary = contractorChipsVendors[option.id] != nil
+                        if hasPrimary {
+                            var existing = contractorChipsExtraVendors[option.id] ?? []
+                            // Skip adds that exactly equal the primary or an existing extra.
+                            if existing.contains(where: { $0.name.lowercased() == vendor.name.lowercased() }) == false,
+                               contractorChipsVendors[option.id]?.name.lowercased() != vendor.name.lowercased() {
+                                existing.append(vendor)
+                                contractorChipsExtraVendors[option.id] = existing
+                            }
+                        } else {
+                            contractorChipsVendors[option.id] = vendor
+                        }
                         withAnimation(HavenTheme.animationStandard) {
                             contractorChipsExpanded = nil
                         }
@@ -3821,12 +3870,22 @@ struct HouseQuizView: View {
                             "chip_id": option.id,
                             "source": "find_local_vendors",
                             "top_rated": vendor.isTopRated,
+                            "is_extra": hasPrimary,
                         ])
                     },
                     onManualAdd: { name in
-                        contractorChipsManualNames[option.id] = name
-                        contractorChipsVendors.removeValue(forKey: option.id)
-                        contractorChipsProviders.removeValue(forKey: option.id)
+                        let hasPrimary = contractorChipsVendors[option.id] != nil
+                            || contractorChipsManualNames[option.id] != nil
+                        if hasPrimary {
+                            var existing = contractorChipsExtraManualNames[option.id] ?? []
+                            if existing.contains(where: { $0.lowercased() == name.lowercased() }) == false,
+                               contractorChipsManualNames[option.id]?.lowercased() != name.lowercased() {
+                                existing.append(name)
+                                contractorChipsExtraManualNames[option.id] = existing
+                            }
+                        } else {
+                            contractorChipsManualNames[option.id] = name
+                        }
                         withAnimation(HavenTheme.animationStandard) {
                             contractorChipsExpanded = nil
                         }
@@ -3834,6 +3893,7 @@ struct HouseQuizView: View {
                             "chip_id": option.id,
                             "source": "manual",
                             "top_rated": false,
+                            "is_extra": hasPrimary,
                         ])
                     },
                     // Build 85 polish: tap-the-pin path. Clears all three
@@ -3841,16 +3901,129 @@ struct HouseQuizView: View {
                     // with the full list. The chip itself stays in
                     // `contractorChipsSelected` because the user still
                     // wants this category, they're just swapping vendors.
+                    //
+                    // Phase 95 (gap #11) — also clear extras so the
+                    // user gets a clean slate when they tap the
+                    // pinned card. Otherwise extras would persist
+                    // while the primary disappears, leaving an
+                    // orphan list with no anchor.
                     onDeselect: {
                         contractorChipsVendors.removeValue(forKey: option.id)
                         contractorChipsManualNames.removeValue(forKey: option.id)
                         contractorChipsProviders.removeValue(forKey: option.id)
+                        contractorChipsExtraVendors.removeValue(forKey: option.id)
+                        contractorChipsExtraManualNames.removeValue(forKey: option.id)
                     }
                 )
                 .id("q15b_local_picker_\(option.id)")
                 .padding(.top, HavenTheme.spacing8)
                 .transition(.opacity)
             }
+
+            // Phase 95 (gap #11) — extras list + "Add another"
+            // affordance. Renders only when the chip is selected,
+            // the picker is collapsed, AND the user has committed at
+            // least one primary vendor for this chip. Each extra row
+            // shows a small "Remove" button so users can drop one
+            // without nuking the whole chip.
+            if isSelected,
+               !isExpanded,
+               (contractorChipsVendors[option.id] != nil
+                || contractorChipsManualNames[option.id] != nil
+                || contractorChipsProviders[option.id] != nil) {
+                contractorChipExtrasFooter(for: option)
+                    .padding(.leading, 36)
+                    .padding(.trailing, HavenTheme.spacing16)
+                    .padding(.top, HavenTheme.spacing8)
+            }
+        }
+    }
+
+    /// Phase 95 (gap #11) — renders the per-chip "extras" tail.
+    /// Lists every additional vendor the user has captured for this
+    /// chip (each removable) plus a "+ Add another {label}" link
+    /// that re-opens the picker. The picker's `onSelect` /
+    /// `onManualAdd` route the new pick into the extras dicts since
+    /// the chip already has a primary at this point.
+    @ViewBuilder
+    private func contractorChipExtrasFooter(for option: AnswerOption) -> some View {
+        let extraVendors = contractorChipsExtraVendors[option.id] ?? []
+        let extraNames = contractorChipsExtraManualNames[option.id] ?? []
+
+        VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
+            ForEach(Array(extraVendors.enumerated()), id: \.offset) { index, vendor in
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text(vendor.name)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Button {
+                        Haptics.light()
+                        var next = contractorChipsExtraVendors[option.id] ?? []
+                        if next.indices.contains(index) {
+                            next.remove(at: index)
+                        }
+                        if next.isEmpty {
+                            contractorChipsExtraVendors.removeValue(forKey: option.id)
+                        } else {
+                            contractorChipsExtraVendors[option.id] = next
+                        }
+                    } label: {
+                        Text("Remove")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            ForEach(Array(extraNames.enumerated()), id: \.offset) { index, name in
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text(name)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Button {
+                        Haptics.light()
+                        var next = contractorChipsExtraManualNames[option.id] ?? []
+                        if next.indices.contains(index) {
+                            next.remove(at: index)
+                        }
+                        if next.isEmpty {
+                            contractorChipsExtraManualNames.removeValue(forKey: option.id)
+                        } else {
+                            contractorChipsExtraManualNames[option.id] = next
+                        }
+                    } label: {
+                        Text("Remove")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(HavenTheme.animationStandard) {
+                    contractorChipsExpanded = option.id
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Add another \(option.label.lowercased())")
+                        .font(HavenTypography.uiCaption)
+                }
+                .foregroundStyle(HavenColors.navy700)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -5067,6 +5240,9 @@ struct HouseQuizView: View {
         contractorChipsProviders.removeAll()
         contractorChipsVendors.removeAll()
         contractorChipsManualNames.removeAll()
+        // Phase 95 (gap #11): also clear extra-vendor arrays.
+        contractorChipsExtraVendors.removeAll()
+        contractorChipsExtraManualNames.removeAll()
         contractorChipsExpanded = nil
         // Phase 67D — reset progressive-disclosure state so each
         // progressive-kind visit lands clean.
