@@ -163,6 +163,7 @@
 		2BA6D9D473C408FD57DEF781 /* MaintenanceTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */; };
 		2BD0160AB07BD43712C92536 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4133F95C44CFE69A35383806 /* EmptyStateView.swift */; };
 		2BFCEFA989E915765784C248 /* SecurityDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA558B3CCF8FD03A1DB1B36 /* SecurityDashboardView.swift */; };
+		2C0B67117D3816E3662CA961 /* RecommendedSystemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673C13C7EF8406BB271DA144 /* RecommendedSystemsView.swift */; };
 		2C0D368F7BC8413BA2E46C82 /* StandingAppointmentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F228322E3862BDCF63DF52C3 /* StandingAppointmentViewModel.swift */; };
 		2C255BAD0460F323FD6169A6 /* FlexibleValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A915078B738003E23B34AE01 /* FlexibleValue.swift */; };
 		2C3EA6BDFF97D26791669866 /* ChezRequestRowCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 369C161B6C44E4A1318499AB /* ChezRequestRowCard.swift */; };
@@ -797,6 +798,7 @@
 		E5A3E3DABCEA06E5F3F3AA5D /* HandymanQuoteReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FED03016D07CE267F7DBB2 /* HandymanQuoteReviewSheet.swift */; };
 		E5AF16A4290A3538D1F98F23 /* ChezActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C934EDF5C190828B77B510A /* ChezActivityView.swift */; };
 		E6D820656455B8F6F0A8A6A6 /* HavenTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109CDCA81D4910C03E8C92C1 /* HavenTypography.swift */; };
+		E6E52F739DF40D86482D7536 /* RecommendedSystemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673C13C7EF8406BB271DA144 /* RecommendedSystemsView.swift */; };
 		E706EDC98BE7D860C86995B5 /* InboxItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56810297D7D51BAE3CBBFECB /* InboxItemDetailView.swift */; };
 		E7627B10E1380740DE422203 /* HouseholdStaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C82F8F17DB61DE2C6A48C79 /* HouseholdStaffView.swift */; };
 		E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */; };
@@ -1090,6 +1092,7 @@
 		64034CFB7BF6DD7FBF01B1BA /* MaintenanceHubSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceHubSections.swift; sourceTree = "<group>"; };
 		6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentCardView.swift; sourceTree = "<group>"; };
 		6723E0CE09CC17C68336D66E /* MaintenanceOperationalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceOperationalViews.swift; sourceTree = "<group>"; };
+		673C13C7EF8406BB271DA144 /* RecommendedSystemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedSystemsView.swift; sourceTree = "<group>"; };
 		68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredLogoView.swift; sourceTree = "<group>"; };
 		693871EEED4A9EE08752B6C7 /* ServiceHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceHistoryView.swift; sourceTree = "<group>"; };
 		69676563E2133ED3DADAC982 /* AccountCreationStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCreationStep.swift; sourceTree = "<group>"; };
@@ -2184,6 +2187,7 @@
 				D00F7EDA80AB205933D1E68E /* QuoteDetailView.swift */,
 				10139172E62AA11089521520 /* QuoteUploadEntryView.swift */,
 				1651D3CEF3409A68FA7202EE /* RecommendedServicesView.swift */,
+				673C13C7EF8406BB271DA144 /* RecommendedSystemsView.swift */,
 				168915F51136FFCD45ECA6E8 /* RoutineDetailView.swift */,
 				49355CE5CE47932E71D7ED0A /* RoutineEditSheet.swift */,
 				33118261443612A48EF3D105 /* RoutineOccurrenceRow.swift */,
@@ -2904,6 +2908,7 @@
 				DACC08101E8BA7738FA2A002 /* RealtimeService.swift in Sources */,
 				B4155C91AD6A8AF79CABE5C3 /* RecentActivityFeed.swift in Sources */,
 				DE27802A7827953DF55AA4AC /* RecommendedServicesView.swift in Sources */,
+				E6E52F739DF40D86482D7536 /* RecommendedSystemsView.swift in Sources */,
 				602E9646248523990734BE70 /* RegionalPack.swift in Sources */,
 				80873D0EE67C45AE0FE9A7D3 /* RemoteConfig.swift in Sources */,
 				859215987971D6716E999BB9 /* RequestAssessmentView.swift in Sources */,
@@ -3356,6 +3361,7 @@
 				19F6C732CE8159C807EF763C /* RealtimeService.swift in Sources */,
 				5573C5EC725CF72690D3A1A9 /* RecentActivityFeed.swift in Sources */,
 				4CEE857764CED0021F511244 /* RecommendedServicesView.swift in Sources */,
+				2C0B67117D3816E3662CA961 /* RecommendedSystemsView.swift in Sources */,
 				5B4C8F854BF0956F23975B1D /* RegionalPack.swift in Sources */,
 				9AE925AFF003DC7043082FBF /* RemoteConfig.swift in Sources */,
 				4246CB931169C3A75FCC2574 /* RequestAssessmentView.swift in Sources */,

@@ -451,6 +451,11 @@ enum AnalyticsEvent: String {
     /// path complete event so we can track usage of the
     /// post-onboarding revise path.
     case foundationalAnswersRevised = "foundational_answers_revised"
+    /// Phase 95 (gap #40) — fired when the homeowner taps a
+    /// category in `RecommendedSystemsView`. `category` payload
+    /// holds the canonical category key, `tier` is universal /
+    /// conditional / specialty.
+    case recommendedSystemTapped = "recommended_system_tapped"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

@@ -2,11 +2,16 @@ import SwiftUI
 
 struct AddSystemView: View {
     let propertyID: UUID
+    /// Phase 95 (gap #40) — when set, the form opens with this
+    /// category preselected. Used by `RecommendedSystemsView` so a
+    /// user tapping "Pool" lands on the form already on the right
+    /// category instead of needing to pick from the dropdown.
+    var prefilledCategory: String? = nil
     var onComplete: ((HomeSystemRow) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
-    @State private var category = "HVAC"
+    @State private var category: String
     @State private var manufacturer = ""
     @State private var modelNumber = ""
     @State private var serialNumber = ""
@@ -40,6 +45,21 @@ struct AddSystemView: View {
     @State private var warrantyCoverage = ""
     @State private var warrantyClaimPhone = ""
     @State private var warrantyPolicyNumber = ""
+
+    init(
+        propertyID: UUID,
+        prefilledCategory: String? = nil,
+        onComplete: ((HomeSystemRow) -> Void)? = nil
+    ) {
+        self.propertyID = propertyID
+        self.prefilledCategory = prefilledCategory
+        self.onComplete = onComplete
+        // Phase 95 (gap #40) — open the picker on the prefilled
+        // category when one was passed, otherwise keep the legacy
+        // "HVAC" default so the standalone "+ Add System" entry
+        // opens unchanged.
+        self._category = State(initialValue: prefilledCategory ?? "HVAC")
+    }
 
     /// Alphabetized for the picker, with "Other" pinned to the bottom as the
     /// catch-all so it never lands between real categories. The default

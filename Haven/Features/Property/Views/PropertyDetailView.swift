@@ -146,6 +146,12 @@ struct PropertyDetailView: View {
 
     /// Phase 54C.3: "Recommended for your home" entry-point state.
     @State private var showRecommendedServices = false
+    /// Phase 95 (gap #40) — drives the systems-browse surface that
+    /// fronts AddSystemView with category-tier groupings of
+    /// SystemCategoryRegistry's universal / conditional / specialty
+    /// entries. Distinct from `showRecommendedServices` which is
+    /// the value-preservation maintenance-templates picker.
+    @State private var showRecommendedSystems = false
 
     /// Phase 55.3: Routines row state. Count loaded on appear so the
     /// row badge stays in sync. Bootstrap entry point — without this
@@ -276,6 +282,18 @@ struct PropertyDetailView: View {
             }
             .navigationDestination(isPresented: $showRecommendedServices) {
                 recommendedServicesDestination
+            }
+            // Phase 95 (gap #40) — sheet for the systems browse
+            // surface. Sheet rather than nav destination because
+            // the user typically taps once, adds a system, and
+            // lands back on Property Detail with the new system
+            // reflected.
+            .sheet(isPresented: $showRecommendedSystems) {
+                if let propId = viewModel.property?.id {
+                    RecommendedSystemsView(propertyId: propId) {
+                        Task { await viewModel.loadProperty(id: propId) }
+                    }
+                }
             }
     }
 
@@ -4091,6 +4109,18 @@ struct PropertyDetailView: View {
                     ) {
                         showRecommendedServices = true
                     }
+                    maintenanceRecordDivider
+                    // Phase 95 (gap #40) — companion entry to the
+                    // services row. Routes to RecommendedSystemsView
+                    // so users can opt into specialty system
+                    // categories the quiz didn't capture.
+                    maintenanceRecordRow(
+                        icon: "rectangle.stack.fill.badge.plus",
+                        title: "Add what we missed",
+                        subtitle: "Browse systems by tier and add anything we don't have on file"
+                    ) {
+                        showRecommendedSystems = true
+                    }
                 }
             }
         }
@@ -5046,6 +5076,58 @@ struct PropertyDetailView: View {
     }
 
     // MARK: - Phase 54C.3: Recommended for your home row
+
+    /// Phase 95 (gap #40) — recommended-SYSTEMS row. Sits below the
+    /// recommended-services row; same low-key chrome but routes to
+    /// `RecommendedSystemsView`. Renders a sheet because the entry
+    /// is purely additive — users typically tap, add a system,
+    /// land back on Property Detail with the new system reflected.
+    @ViewBuilder
+    private var recommendedSystemsRow: some View {
+        if viewModel.property?.id != nil {
+            Button {
+                Haptics.light()
+                showRecommendedSystems = true
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    Image(systemName: "rectangle.stack.fill.badge.plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 36, height: 36)
+                        .background(HavenColors.beige200)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Add what we missed")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("Browse systems by tier and add what we don't have on file yet")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .stroke(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showRecommendedSystems) {
+                if let propId = viewModel.property?.id {
+                    RecommendedSystemsView(propertyId: propId) {
+                        Task { await viewModel.loadProperty(id: propId) }
+                    }
+                }
+            }
+        }
+    }
 
     /// Low-key entry point into the "Recommended for your home"
     /// browsing surface. Always visible (no badge count) because the
