@@ -483,6 +483,10 @@ struct ContractorDetailView: View {
     @State private var showEditSheet = false
     /// Phase 95 (gap #24) — drives the "Schedule a visit" sheet.
     @State private var showScheduleVisitSheet = false
+    /// Phase 95 (gap #46) — drives the soft-inquiry composer for
+    /// handyman contractors. Lets the homeowner send a pre-visit
+    /// question without first scheduling a visit.
+    @State private var showSoftInquirySheet = false
     /// Phase 95 (gap #24) — properties / systems / vehicles loaded once
     /// for the AddMaintenanceTaskSheet so it can render its existing
     /// target picker. Kept lazy-async; nil while loading.
@@ -835,6 +839,20 @@ struct ContractorDetailView: View {
                 )
             }
         }
+        // Phase 95 (gap #46) — pre-visit soft-inquiry composer. Only
+        // attached when the contractor is a handyman. Submits a
+        // `handyman_requests` row with `request_type = "question"` and
+        // no `visit_task_id` so the field PWA queue picks it up
+        // alongside scheduled visits.
+        .sheet(isPresented: $showSoftInquirySheet) {
+            HandymanSoftInquirySheet(
+                contractor: contractor,
+                householdId: contractor.householdId,
+                onSubmitted: {
+                    showSoftInquirySheet = false
+                }
+            )
+        }
         .task(id: showScheduleVisitSheet) {
             // Lazy-load context the moment the sheet is about to present
             // so we don't pay the round-trip on every detail-view appear.
@@ -1146,7 +1164,44 @@ struct ContractorDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
             }
             .buttonStyle(.plain)
+
+            // Phase 95 (gap #46) — pre-visit soft-inquiry CTA. Only
+            // renders for handyman contractors because the
+            // handyman_requests pipeline is what powers the field PWA
+            // queue. Other vendor categories don't have an equivalent
+            // direct-message lane today (gap #47 — separate work).
+            // Lets the homeowner ask "any availability for X this
+            // month?" without first scheduling a visit.
+            if isHandymanContractor {
+                Button {
+                    Haptics.medium()
+                    showSoftInquirySheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "message.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Ask a question")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(HavenColors.navy700.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .buttonStyle(.plain)
+            }
         }
+    }
+
+    /// Phase 95 (gap #46) — true when the saved contractor is the
+    /// homeowner's handyman. Drives whether the soft-inquiry CTA
+    /// renders. Match is case-insensitive on canonical category and
+    /// also covers "General Handyman" / "Handyman Service" variants
+    /// that Q15b sometimes stamps.
+    private var isHandymanContractor: Bool {
+        let raw = (contractor.category ?? "").lowercased()
+        return raw.contains("handyman")
     }
 
     private var routinesSection: some View {

@@ -11,6 +11,7 @@
 		00A0340E512F43534C4C8B56 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26631A2D75332163B5BFE02 /* SupabaseClient.swift */; };
 		00BC4D74081CF73A03358B39 /* UnifiedAttentionList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64DDA1DC7F83423F9AE6361 /* UnifiedAttentionList.swift */; };
 		00FF37BE764C46D33B3A5678 /* MaintenanceScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */; };
+		01D4E57F0AA741467D0C350D /* HandymanSoftInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */; };
 		01E25C479437E1B85C451E5D /* OnboardingAddressStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */; };
 		02013B6C18B57EAE2AEEBB6C /* ChezConciergeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C3E85C92E536C944040AD6 /* ChezConciergeService.swift */; };
 		026702FC665EE46F861C2F1B /* MaintenanceTaskDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECABA5A62CDCC5C4011D813 /* MaintenanceTaskDetailSheet.swift */; };
@@ -273,6 +274,7 @@
 		4CCB0A06E26AE9B0A56C6D75 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBB22847F627EF293537880 /* ProjectDetailView.swift */; };
 		4CEE857764CED0021F511244 /* RecommendedServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1651D3CEF3409A68FA7202EE /* RecommendedServicesView.swift */; };
 		4D4AF011A7684BE5C4C30DFE /* ExpirationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB1E595AC46EC435723506 /* ExpirationBadge.swift */; };
+		4D85F4FAB25681AFE17537CD /* HandymanSoftInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */; };
 		4DB84E3EB1AF0C36E06B6955 /* QuoteUploadEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10139172E62AA11089521520 /* QuoteUploadEntryView.swift */; };
 		4DFFFA19A2E1B68F46D65D36 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC48B643D7B2E4D11B2A7853 /* View+Extensions.swift */; };
 		4E4773F655E522928563E75D /* RoutineGroupingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7DA5A4040EA8102CE628ED /* RoutineGroupingEngine.swift */; };
@@ -924,6 +926,7 @@
 		0EE909F83D728399C6776DEA /* PropertyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDetailView.swift; sourceTree = "<group>"; };
 		0F5239A1D6C6A2839467DD32 /* TaskRoutingPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRoutingPicker.swift; sourceTree = "<group>"; };
 		0F6BD638B995FF43509A8B8B /* ThisWeekSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThisWeekSection.swift; sourceTree = "<group>"; };
+		100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanSoftInquirySheet.swift; sourceTree = "<group>"; };
 		10139172E62AA11089521520 /* QuoteUploadEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteUploadEntryView.swift; sourceTree = "<group>"; };
 		109CDCA81D4910C03E8C92C1 /* HavenTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenTypography.swift; sourceTree = "<group>"; };
 		1116E73ADB489337FCC2E264 /* HandymanHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanHubView.swift; sourceTree = "<group>"; };
@@ -2131,6 +2134,7 @@
 				C2DA5F5AB2791F09EBCA125F /* FindLocalVendorSheet.swift */,
 				E8097FAE3CDDC7B7D6B43462 /* FrequencyPickerSheet.swift */,
 				5A740417CB34B9B5F709C29F /* HandymanPunchListView.swift */,
+				100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */,
 				88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */,
 				AAB60FB496A805EE82863BA6 /* HandymanVisitReportView.swift */,
 				C6FCDD629C244BCB68D9914E /* LegacyTasksView.swift */,
@@ -2710,6 +2714,7 @@
 				907DF6DB46C7079D4741BF74 /* HandymanPunchListView.swift in Sources */,
 				9B58C999BD24633286E60B0F /* HandymanQuoteReviewSheet.swift in Sources */,
 				86458F2D5232F30C22A6108B /* HandymanSeasonalReminderCard.swift in Sources */,
+				01D4E57F0AA741467D0C350D /* HandymanSoftInquirySheet.swift in Sources */,
 				A8DE9719896D1D2D896D4C7A /* HandymanTabView.swift in Sources */,
 				43C0530CF21C157A6D977B84 /* HandymanTrustProfile.swift in Sources */,
 				E7B717F5CA860AA5EC5599D2 /* HandymanVisitDetailSheet.swift in Sources */,
@@ -3157,6 +3162,7 @@
 				E234FE712D979F9C446A21A5 /* HandymanPunchListView.swift in Sources */,
 				E5A3E3DABCEA06E5F3F3AA5D /* HandymanQuoteReviewSheet.swift in Sources */,
 				A561CE338FFA31C6296FC5C3 /* HandymanSeasonalReminderCard.swift in Sources */,
+				4D85F4FAB25681AFE17537CD /* HandymanSoftInquirySheet.swift in Sources */,
 				389EEB9E5E8E29628C9AAA6E /* HandymanTabView.swift in Sources */,
 				B7DDEF21FEE0C33E6F01E951 /* HandymanTrustProfile.swift in Sources */,
 				93BF5F19C8AF1B75885CA745 /* HandymanVisitDetailSheet.swift in Sources */,

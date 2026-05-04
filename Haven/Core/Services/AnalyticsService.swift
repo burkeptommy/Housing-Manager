@@ -162,6 +162,11 @@ enum AnalyticsEvent: String {
     /// field-PWA invite. `channel` payload key holds "sms" or "email".
     /// Used to instrument invite-send → portal-open funnel.
     case handymanInviteSent = "handyman_invite_sent"
+    /// Phase 95 (gap #46) — fired when the homeowner submits a
+    /// pre-visit soft inquiry from `ContractorDetailView`. Powers
+    /// the "did the soft-inquiry channel get used" funnel
+    /// alongside scheduled-visit conversions.
+    case handymanSoftInquirySent = "handyman_soft_inquiry_sent"
     /// Phase 73 sub-phase A — bidirectional visit-time scheduling.
     case handymanVisitTimeProposed = "handyman_visit_time_proposed"
     case handymanVisitTimeAccepted = "handyman_visit_time_accepted"
