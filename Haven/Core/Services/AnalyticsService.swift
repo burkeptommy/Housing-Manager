@@ -167,6 +167,14 @@ enum AnalyticsEvent: String {
     /// the "did the soft-inquiry channel get used" funnel
     /// alongside scheduled-visit conversions.
     case handymanSoftInquirySent = "handyman_soft_inquiry_sent"
+    /// Phase 95 (gap #42) — fired when the homeowner runs a bulk
+    /// snooze from `MaintenanceScheduleView`. `count` is the number
+    /// of tasks affected; `days` is the snooze interval (7 or 30).
+    case bulkTasksSnoozed = "bulk_tasks_snoozed"
+    /// Phase 95 (gap #42) — fired when the homeowner runs a bulk
+    /// completion from `MaintenanceScheduleView`. `count` is the
+    /// number of tasks marked complete in one pass.
+    case bulkTasksCompleted = "bulk_tasks_completed"
     /// Phase 73 sub-phase A — bidirectional visit-time scheduling.
     case handymanVisitTimeProposed = "handyman_visit_time_proposed"
     case handymanVisitTimeAccepted = "handyman_visit_time_accepted"

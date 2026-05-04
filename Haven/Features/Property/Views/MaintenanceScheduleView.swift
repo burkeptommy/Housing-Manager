@@ -144,6 +144,16 @@ struct MaintenanceScheduleView: View {
     /// `maintenance.bucket.<propertyId>.vendor.collapsed`.
     @State private var personalBucketCollapsed: Bool = false
     @State private var vendorBucketCollapsed: Bool = false
+    /// Phase 95 (gap #42) — bulk-select state. Toggled via the toolbar
+    /// "Select" button. While `selectionMode == true`, tapping a task
+    /// row toggles its membership in `selectedTaskIds` and opens
+    /// nothing. The bottom inset action bar surfaces actions
+    /// (Snooze 7d, Snooze 30d, Mark complete) that fan out across
+    /// the set. Selection state is session-only — exiting the view
+    /// resets it.
+    @State private var selectionMode: Bool = false
+    @State private var selectedTaskIds: Set<UUID> = []
+    @State private var bulkBusy: Bool = false
 
     /// Phase 56.4: Time-window filter applied by tapping a stats pill.
     /// Nil = no filter (full list). Not persisted — resets per session so
@@ -292,6 +302,12 @@ struct MaintenanceScheduleView: View {
         .toolbar { toolbarContent }
         .refreshable {
             await viewModel.loadTasks()
+        }
+        // Phase 95 (gap #42): bulk-action bar pinned to bottom while
+        // in selection mode. `safeAreaInset` pushes content above the
+        // bar so nothing overlaps and the system tab bar stays visible.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bulkActionBar
         }
         .overlay(alignment: .bottom) {
             if let toast = viewModel.completionToast {
@@ -574,10 +590,199 @@ struct MaintenanceScheduleView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             HStack(spacing: 16) {
-                layoutMenu
-                filterMenu
-                addMenu
+                if selectionMode {
+                    Button("Done") {
+                        Haptics.light()
+                        withAnimation(HavenTheme.animationStandard) {
+                            selectionMode = false
+                            selectedTaskIds.removeAll()
+                        }
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textPrimary)
+                } else {
+                    layoutMenu
+                    filterMenu
+                    selectButton
+                    addMenu
+                }
             }
+        }
+    }
+
+    /// Phase 95 (gap #42) — toolbar entry point for bulk-select mode.
+    /// Hidden when there are zero tasks (nothing to select).
+    private var selectButton: some View {
+        Button {
+            Haptics.light()
+            withAnimation(HavenTheme.animationStandard) {
+                selectionMode = true
+            }
+        } label: {
+            Image(systemName: "checkmark.circle")
+                .foregroundStyle(HavenColors.textPrimary)
+        }
+        .disabled(viewModel.tasks.isEmpty)
+    }
+
+    /// Phase 95 (gap #42) — bottom action bar for bulk operations.
+    /// Renders only in selection mode. Each action loops the
+    /// selected set on the existing single-task DatabaseService API
+    /// — no new backend surface needed.
+    @ViewBuilder
+    private var bulkActionBar: some View {
+        if selectionMode {
+            HStack(spacing: 12) {
+                Text("\(selectedTaskIds.count) selected")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Menu {
+                    Button {
+                        Task { await bulkSnooze(days: 7) }
+                    } label: {
+                        Label("Snooze 7 days", systemImage: "moon.zzz")
+                    }
+                    Button {
+                        Task { await bulkSnooze(days: 30) }
+                    } label: {
+                        Label("Snooze 30 days", systemImage: "moon.zzz.fill")
+                    }
+                    Divider()
+                    Button {
+                        Task { await bulkComplete() }
+                    } label: {
+                        Label("Mark complete", systemImage: "checkmark.circle.fill")
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if bulkBusy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        Text("Actions")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .background(selectedTaskIds.isEmpty ? HavenColors.beige200 : HavenColors.action)
+                    .foregroundStyle(selectedTaskIds.isEmpty ? HavenColors.textTertiary : HavenColors.textOnAction)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous))
+                }
+                .disabled(selectedTaskIds.isEmpty || bulkBusy)
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .padding(.vertical, HavenTheme.spacing12)
+            .background(HavenColors.surface)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(HavenColors.beige200)
+                    .frame(height: 0.5)
+            }
+        }
+    }
+
+    @MainActor
+    private func bulkSnooze(days: Int) async {
+        guard !selectedTaskIds.isEmpty else { return }
+        bulkBusy = true
+        defer { bulkBusy = false }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        let calendar = Calendar(identifier: .gregorian)
+
+        let taskMap = Dictionary(uniqueKeysWithValues: viewModel.tasks.map { ($0.id, $0) })
+        var changed = 0
+        for id in selectedTaskIds {
+            guard let task = taskMap[id] else { continue }
+            // Anchor against the existing nextDueDate so chained
+            // snoozes accumulate rather than collapsing to today + N.
+            let anchor = formatter.date(from: task.nextDueDate) ?? Date()
+            let pushed = calendar.date(byAdding: .day, value: days, to: anchor) ?? anchor
+            do {
+                _ = try await DatabaseService.shared.updateMaintenanceTask(
+                    id: id,
+                    MaintenanceTaskUpdate(nextDueDate: formatter.string(from: pushed))
+                )
+                changed += 1
+            } catch { continue }
+        }
+
+        Analytics.track(.bulkTasksSnoozed, [
+            "count": changed,
+            "days": days
+        ])
+        Haptics.success()
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        withAnimation(HavenTheme.animationStandard) {
+            selectionMode = false
+            selectedTaskIds.removeAll()
+        }
+        await viewModel.loadTasks()
+    }
+
+    @MainActor
+    private func bulkComplete() async {
+        guard !selectedTaskIds.isEmpty else { return }
+        bulkBusy = true
+        defer { bulkBusy = false }
+
+        let taskMap = Dictionary(uniqueKeysWithValues: viewModel.tasks.map { ($0.id, $0) })
+        var changed = 0
+        for id in selectedTaskIds {
+            guard let task = taskMap[id] else { continue }
+            await viewModel.completeTask(task)
+            changed += 1
+        }
+        Analytics.track(.bulkTasksCompleted, ["count": changed])
+        Haptics.success()
+        withAnimation(HavenTheme.animationStandard) {
+            selectionMode = false
+            selectedTaskIds.removeAll()
+        }
+    }
+
+    /// Phase 95 (gap #42) — overlay applied to every task card
+    /// renderer in selection mode. When `selectionMode == true`:
+    ///   • Disables the underlying card's hit testing so taps don't
+    ///     open detail sheets, sub-flows, or contractor pickers.
+    ///   • Renders a 22pt circle / filled-checkmark on the leading
+    ///     edge that visually reflects membership.
+    ///   • A whole-row tap toggles membership in `selectedTaskIds`.
+    /// No-op when selection mode is off.
+    @ViewBuilder
+    private func selectionOverlay<Content: View>(
+        for task: MaintenanceTaskDBRow,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if selectionMode {
+            HStack(spacing: HavenTheme.spacing8) {
+                Image(systemName: selectedTaskIds.contains(task.id)
+                      ? "checkmark.circle.fill"
+                      : "circle")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(selectedTaskIds.contains(task.id)
+                                     ? HavenColors.action
+                                     : HavenColors.beige300)
+                content()
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Haptics.selection()
+                if selectedTaskIds.contains(task.id) {
+                    selectedTaskIds.remove(task.id)
+                } else {
+                    selectedTaskIds.insert(task.id)
+                }
+            }
+        } else {
+            content()
         }
     }
 
@@ -3011,10 +3216,17 @@ struct MaintenanceScheduleView: View {
         // Bypasses the generic UnifiedTaskCard so the homeowner stops
         // seeing "two tasks with super long notes" and starts seeing
         // the underlying visit as a first-class entity.
-        if isHandymanVisit(task) {
-            handymanVisitRow(task)
-        } else {
-            standardMaintenanceRow(task)
+        //
+        // Phase 95 (gap #42): wrapped in `selectionOverlay` so bulk-
+        // select mode renders a leading checkmark + intercepts taps
+        // to toggle membership instead of opening detail / firing
+        // the visit checklist.
+        selectionOverlay(for: task) {
+            if isHandymanVisit(task) {
+                handymanVisitRow(task)
+            } else {
+                standardMaintenanceRow(task)
+            }
         }
     }
 
