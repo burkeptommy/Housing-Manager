@@ -839,14 +839,15 @@ struct HandymanVisitDetailView: View {
                 Button {
                     openPostVisitIssueComposer()
                 } label: {
-                    HStack(spacing: HavenTheme.spacing4) {
+                    HStack(spacing: HavenTheme.spacing8) {
                         Image(systemName: "paperplane.fill")
                             .font(.system(size: 12, weight: .semibold))
                         Text("Report an issue")
                             .font(HavenTypography.uiButton)
                     }
-                    .padding(.horizontal, HavenTheme.spacing16)
-                    .padding(.vertical, HavenTheme.spacing8)
+                    .padding(.horizontal, HavenTheme.spacing20)
+                    .padding(.vertical, HavenTheme.spacing12)
+                    .frame(minHeight: 44)
                     .background(HavenColors.action)
                     .foregroundStyle(HavenColors.textOnAction)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous))
@@ -2059,7 +2060,7 @@ struct HandymanVisitDetailView: View {
         guard coordinationRequest != nil else { return }
         requestMessageComposerConfiguration = RequestMessageComposerConfiguration(
             title: "Report an issue",
-            introText: "Tell your handyman what's not right — a photo helps. They'll get notified and Chez can step in if needed.",
+            introText: "Tell your handyman what's not right. A photo helps. They'll get notified and Chez can step in if needed.",
             placeholder: "What's not right with the visit? Be as specific as you can.",
             defaultStatusOnReply: .sentToHandyman,
             metadataEvent: "homeowner_visit_issue"

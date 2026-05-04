@@ -143,7 +143,7 @@ struct OnboardingModeForkView: View {
 
     private var footerCopy: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("You can always change your mind later in Settings. Both paths land at the same Chez app — same Tasks, Routines, Vendors, and Projects.")
+            Text("You can always change your mind later in Settings. Both paths land at the same Chez app, with the same Tasks, Routines, Vendors, and Projects.")
                 .font(HavenTypography.uiLabelSmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.leading)

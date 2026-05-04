@@ -3952,60 +3952,30 @@ struct HouseQuizView: View {
 
         VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
             ForEach(Array(extraVendors.enumerated()), id: \.offset) { index, vendor in
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Text(vendor.name)
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textSecondary)
-                    Spacer()
-                    Button {
-                        Haptics.light()
-                        var next = contractorChipsExtraVendors[option.id] ?? []
-                        if next.indices.contains(index) {
-                            next.remove(at: index)
-                        }
-                        if next.isEmpty {
-                            contractorChipsExtraVendors.removeValue(forKey: option.id)
-                        } else {
-                            contractorChipsExtraVendors[option.id] = next
-                        }
-                    } label: {
-                        Text("Remove")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
+                extraVendorRow(name: vendor.name) {
+                    var next = contractorChipsExtraVendors[option.id] ?? []
+                    if next.indices.contains(index) {
+                        next.remove(at: index)
                     }
-                    .buttonStyle(.plain)
+                    if next.isEmpty {
+                        contractorChipsExtraVendors.removeValue(forKey: option.id)
+                    } else {
+                        contractorChipsExtraVendors[option.id] = next
+                    }
                 }
             }
 
             ForEach(Array(extraNames.enumerated()), id: \.offset) { index, name in
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Text(name)
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textSecondary)
-                    Spacer()
-                    Button {
-                        Haptics.light()
-                        var next = contractorChipsExtraManualNames[option.id] ?? []
-                        if next.indices.contains(index) {
-                            next.remove(at: index)
-                        }
-                        if next.isEmpty {
-                            contractorChipsExtraManualNames.removeValue(forKey: option.id)
-                        } else {
-                            contractorChipsExtraManualNames[option.id] = next
-                        }
-                    } label: {
-                        Text("Remove")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
+                extraVendorRow(name: name) {
+                    var next = contractorChipsExtraManualNames[option.id] ?? []
+                    if next.indices.contains(index) {
+                        next.remove(at: index)
                     }
-                    .buttonStyle(.plain)
+                    if next.isEmpty {
+                        contractorChipsExtraManualNames.removeValue(forKey: option.id)
+                    } else {
+                        contractorChipsExtraManualNames[option.id] = next
+                    }
                 }
             }
 
@@ -4015,16 +3985,54 @@ struct HouseQuizView: View {
                     contractorChipsExpanded = option.id
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: HavenTheme.spacing4) {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .semibold))
                     Text("Add another \(option.label.lowercased())")
                         .font(HavenTypography.uiCaption)
                 }
                 .foregroundStyle(HavenColors.navy700)
+                // Bigger hit target than the visible text — Apple HIG
+                // recommends 44pt minimum, and the caption text only
+                // gives ~16pt vertical on its own.
+                .padding(.vertical, HavenTheme.spacing8)
+                .frame(minHeight: 36)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// Phase 95 (gap #11) — single extras row used for both vendor
+    /// and manual-name lists. Centralized so both paths share the
+    /// same padding / hit target / haptic / typography conventions.
+    @ViewBuilder
+    private func extraVendorRow(name: String, onRemove: @escaping () -> Void) -> some View {
+        HStack(spacing: HavenTheme.spacing8) {
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(HavenColors.textTertiary)
+            Text(name)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textSecondary)
+            Spacer()
+            Button {
+                Haptics.light()
+                onRemove()
+            } label: {
+                Text("Remove")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    // Hit-target padding so the text isn't a 12pt
+                    // tap target. Visible chrome stays minimal —
+                    // padding is invisible until the tap registers.
+                    .padding(.horizontal, HavenTheme.spacing8)
+                    .padding(.vertical, HavenTheme.spacing4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, HavenTheme.spacing4)
     }
 
     // MARK: - Caretakers (Q28)

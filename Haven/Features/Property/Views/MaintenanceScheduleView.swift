@@ -632,7 +632,7 @@ struct MaintenanceScheduleView: View {
     @ViewBuilder
     private var bulkActionBar: some View {
         if selectionMode {
-            HStack(spacing: 12) {
+            HStack(spacing: HavenTheme.spacing12) {
                 Text("\(selectedTaskIds.count) selected")
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textSecondary)
@@ -655,7 +655,7 @@ struct MaintenanceScheduleView: View {
                         Label("Mark complete", systemImage: "checkmark.circle.fill")
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: HavenTheme.spacing8) {
                         if bulkBusy {
                             ProgressView().controlSize(.small)
                         } else {
@@ -665,8 +665,12 @@ struct MaintenanceScheduleView: View {
                         Text("Actions")
                             .font(HavenTypography.uiButton)
                     }
-                    .padding(.horizontal, HavenTheme.spacing16)
-                    .padding(.vertical, HavenTheme.spacing8)
+                    .padding(.horizontal, HavenTheme.spacing20)
+                    // Min touch target: 44pt (HIG). 12+12 vertical
+                    // padding plus the 18pt label font lands ~42pt;
+                    // .frame(minHeight: 44) bumps to spec.
+                    .padding(.vertical, HavenTheme.spacing12)
+                    .frame(minHeight: 44)
                     .background(selectedTaskIds.isEmpty ? HavenColors.beige200 : HavenColors.action)
                     .foregroundStyle(selectedTaskIds.isEmpty ? HavenColors.textTertiary : HavenColors.textOnAction)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous))

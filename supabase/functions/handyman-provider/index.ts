@@ -5170,7 +5170,7 @@ async function submitAssessmentData(
       .eq("household_id", fresh.household_id);
     const userIds = ((householdUsers as Array<{ id: string }> | null) ?? []).map((u) => u.id);
     if (userIds.length > 0) {
-      await sendAssessmentPush(serviceUrl, serviceRoleKey, userIds, "Your home is set up", "Your Chez handyman finished — open Chez to see what we captured.", {
+      await sendAssessmentPush(serviceUrl, serviceRoleKey, userIds, "Your home is set up", "Your Chez handyman finished. Open Chez to see what we captured.", {
         type: "chez_assessment_complete",
         assessment_id: assessmentId,
       });
