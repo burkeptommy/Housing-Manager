@@ -66,6 +66,15 @@ final class MaintenanceViewModel: ObservableObject {
     }
 
     private let db = DatabaseService.shared
+    /// Phase 95 (gap #94) — Realtime subscription for cross-device
+    /// task sync. Stays nil until `startRealtimeIfNeeded()` resolves
+    /// the household, then survives until the view model's deinit.
+    /// On INSERT/UPDATE the local `tasks` array merges in place; on
+    /// DELETE the row is removed. Drives "Spouse A completes a
+    /// task → Spouse B's open Tasks tab updates within seconds"
+    /// without manual refresh.
+    private var realtime: MaintenanceRealtimeSubscription?
+    private var realtimeHouseholdId: UUID?
 
     enum TaskFilterStatus: String, CaseIterable {
         case all = "All"
@@ -281,10 +290,58 @@ final class MaintenanceViewModel: ObservableObject {
             } else {
                 preferredHandyman = nil
             }
+
+            // Phase 95 (gap #94) — start (or refresh) the Realtime
+            // subscription using the resolved household. The
+            // subscription is idempotent: re-calling start() against
+            // the same household no-ops, while a household switch
+            // tears down + re-subscribes on the new id.
+            if let primary = p.first {
+                await startRealtimeIfNeeded(householdId: primary.householdId)
+            }
         } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Phase 95 (gap #94) — opens the Realtime subscription for
+    /// `maintenance_tasks` filtered by household. Wired into the
+    /// initial `loadTasks` pass so the channel is live by the
+    /// time the user reaches the Maintenance tab. The subscription
+    /// merges live INSERT / UPDATE / DELETE events into the local
+    /// `tasks` array on the main actor.
+    private func startRealtimeIfNeeded(householdId: UUID) async {
+        if realtimeHouseholdId == householdId, realtime != nil { return }
+
+        // Tear down any prior subscription (household switch).
+        if let prior = realtime {
+            await prior.stop()
+        }
+
+        let subscription = MaintenanceRealtimeSubscription(householdId: householdId)
+        subscription.onInsert = { [weak self] row in
+            guard let self else { return }
+            if !self.tasks.contains(where: { $0.id == row.id }) {
+                self.tasks.append(row)
+            }
+        }
+        subscription.onUpdate = { [weak self] row in
+            guard let self else { return }
+            if let idx = self.tasks.firstIndex(where: { $0.id == row.id }) {
+                self.tasks[idx] = row
+            } else {
+                self.tasks.append(row)
+            }
+        }
+        subscription.onDelete = { [weak self] taskId in
+            guard let self else { return }
+            self.tasks.removeAll { $0.id == taskId }
+        }
+
+        realtime = subscription
+        realtimeHouseholdId = householdId
+        await subscription.start()
     }
 
     func propertyName(for id: UUID) -> String {

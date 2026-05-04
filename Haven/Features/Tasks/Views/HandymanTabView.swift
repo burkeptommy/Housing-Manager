@@ -2215,7 +2215,12 @@ final class HandymanRequestCoordinator: ObservableObject {
     }()
 }
 
-private extension JSONDecoder.DateDecodingStrategy {
+/// Phase 95 (gap #94) — promoted from `private` to `internal` so
+/// the new `MaintenanceRealtimeSubscription` can share the same
+/// fractional-seconds decoder strategy as the handyman-message
+/// path. Both paths receive Postgres timestamps with microsecond
+/// precision in their Realtime payloads.
+extension JSONDecoder.DateDecodingStrategy {
     /// Postgres timestamps in Realtime payloads come back with microsecond
     /// precision (e.g. `2026-04-27T15:42:01.123456+00:00`). The default
     /// `.iso8601` strategy only handles seconds. This decoder accepts
