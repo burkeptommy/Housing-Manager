@@ -102,6 +102,11 @@ final class DashboardViewModel: ObservableObject {
     /// or explicitly dismisses.
     @Published var unviewedMonthlySummary: ChezMonthlySummaryRow?
 
+    /// Phase 85 — Trust profile for the assigned handyman on the active
+    /// home_assessment. HomeAssessmentPendingCard prefers this over the
+    /// compact firstName/photo slots when present.
+    @Published var assignedHandymanProfile: HandymanTrustProfile?
+
     /// Phase 84.5 — Active home_assessments row for the primary
     /// property. Non-nil when the homeowner picked "Have Chez handle it"
     /// at signup AND status NOT IN (completed, cancelled). The dashboard
@@ -949,6 +954,7 @@ final class DashboardViewModel: ObservableObject {
     func loadHomeAssessment() async {
         guard let propertyId = primaryPropertyId else {
             homeAssessment = nil
+            assignedHandymanProfile = nil
             return
         }
         do {
@@ -961,12 +967,23 @@ final class DashboardViewModel: ObservableObject {
             // reviewed.
             if let r = row, !r.status.isActive {
                 homeAssessment = nil
+                assignedHandymanProfile = nil
             } else {
                 homeAssessment = row
+                // Phase 85 — fetch the trust profile when a handyman has
+                // been assigned. Soft-fail; the card falls back to the
+                // compact handymanRow when nil.
+                if let memberId = row?.handymanMemberId {
+                    assignedHandymanProfile = try? await DatabaseService.shared
+                        .fetchHandymanTrustProfile(memberId: memberId)
+                } else {
+                    assignedHandymanProfile = nil
+                }
             }
         } catch {
             print("[Dashboard] loadHomeAssessment failed: \(error)")
             homeAssessment = nil
+            assignedHandymanProfile = nil
         }
     }
 
