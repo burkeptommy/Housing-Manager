@@ -9,6 +9,10 @@ import SwiftUI
 struct ChezRequestsListView: View {
     @StateObject private var viewModel = ChezRequestsViewModel()
     @State private var showResolved: Bool = false
+    /// Phase 95 (gap #61) — drives the lightweight quick-question
+    /// composer. Distinct from the full `.openChezRequestComposer`
+    /// notification path which opens the multi-section form.
+    @State private var showQuickQuestion: Bool = false
 
     var body: some View {
         Group {
@@ -26,6 +30,12 @@ struct ChezRequestsListView: View {
             Task { await viewModel.load() }
         }
         .trackScreen("ChezRequestsListView")
+        .sheet(isPresented: $showQuickQuestion) {
+            ChezQuickQuestionSheet {
+                Task { await viewModel.load() }
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 
     // MARK: - List
@@ -48,24 +58,47 @@ struct ChezRequestsListView: View {
     }
 
     private var heroIntro: some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(HavenColors.action.opacity(0.14))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "person.fill.questionmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(HavenColors.action)
+        VStack(spacing: HavenTheme.spacing8) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.action.opacity(0.14))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "person.fill.questionmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Chez Home Manager")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Your concierge for vendors, quotes, and follow-ups.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Chez Home Manager")
-                    .font(HavenTypography.headline)
-                    .foregroundStyle(HavenColors.textPrimary)
-                Text("Your concierge for vendors, quotes, and follow-ups.")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.textSecondary)
+            // Phase 95 (gap #61) — quick-question entry. Distinct
+            // from the multi-section "+" composer; one tap → one
+            // textarea → send. Keeps the formal request thread
+            // infrastructure underneath but feels like a chat.
+            Button {
+                Haptics.selection()
+                showQuickQuestion = true
+            } label: {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Ask a quick question")
+                        .font(HavenTypography.uiButton)
+                }
+                .foregroundStyle(HavenColors.textOnAction)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, HavenTheme.spacing12)
+                .background(HavenColors.action)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous))
             }
-            Spacer()
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

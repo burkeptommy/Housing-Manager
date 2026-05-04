@@ -456,6 +456,11 @@ enum AnalyticsEvent: String {
     /// holds the canonical category key, `tier` is universal /
     /// conditional / specialty.
     case recommendedSystemTapped = "recommended_system_tapped"
+    /// Phase 95 (gap #61) — fired when the homeowner sends a
+    /// message via the lightweight `ChezQuickQuestionSheet`.
+    /// Differentiated from `chezRequestSubmitted` so we can
+    /// see how often the quick path is used vs the full form.
+    case chezQuickQuestionSent = "chez_quick_question_sent"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

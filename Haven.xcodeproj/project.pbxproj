@@ -180,6 +180,7 @@
 		30A31977F96A68E07024A093 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216CE36DEDB939EEC1D458C2 /* AppConfig.swift */; };
 		30A774AE804F91A02028AF2C /* HandymanVisitReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB60FB496A805EE82863BA6 /* HandymanVisitReportView.swift */; };
 		30CD88306D8038E7601B6625 /* BiometricAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B06503ADB172DFB9879D8B8 /* BiometricAuthView.swift */; };
+		31BFCFC126FB679920EAEA06 /* ChezQuickQuestionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E8328FB5ED10D6AFDBE7F0 /* ChezQuickQuestionSheet.swift */; };
 		321AB702B57067AC3DF1D438 /* HomeAssessment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09A1B078B7DD6DD4F56FBD6F /* HomeAssessment.swift */; };
 		32CFAEB544A5BB04360A9F7C /* InstallDatePrefiller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6249BFC2EEC544EF640144E4 /* InstallDatePrefiller.swift */; };
 		3321A61A0D8BD22506EC0D8C /* AddBundleSubitemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9431B2C64E36476E92CBAB /* AddBundleSubitemSheet.swift */; };
@@ -538,6 +539,7 @@
 		9929B978E52190525B3E7A06 /* DocumentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B9EEC0AD9698228EA20EFFC /* DocumentStatus.swift */; };
 		99DCC3ABBF555807797A5AE6 /* MaintenanceTaskReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C493B8E4060D2DFD40A230 /* MaintenanceTaskReconciler.swift */; };
 		9A0EBD5E235B70DC914483D3 /* PropertyHeroHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2954C058A9CF516AFE40C2A8 /* PropertyHeroHeader.swift */; };
+		9A419CFE5283A423574B0F26 /* ChezQuickQuestionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E8328FB5ED10D6AFDBE7F0 /* ChezQuickQuestionSheet.swift */; };
 		9A74F9F2F8CA9F6CF700987E /* MaintenancePreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80AFE03CC0595186E4E4DC0 /* MaintenancePreferencesView.swift */; };
 		9AB8E07CFCDAECA953661AC4 /* SystemSubtypePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFF252E761E38911656477 /* SystemSubtypePicker.swift */; };
 		9AE925AFF003DC7043082FBF /* RemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB71385C28F23E329C0C7C38 /* RemoteConfig.swift */; };
@@ -1147,6 +1149,7 @@
 		8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAddressStep.swift; sourceTree = "<group>"; };
 		88CB1E595AC46EC435723506 /* ExpirationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpirationBadge.swift; sourceTree = "<group>"; };
 		88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanVisitDetailView.swift; sourceTree = "<group>"; };
+		88E8328FB5ED10D6AFDBE7F0 /* ChezQuickQuestionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezQuickQuestionSheet.swift; sourceTree = "<group>"; };
 		898D3AEC29B0E076E61AA176 /* HavenTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HavenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A79F1CBC5C229985B274954 /* VINScannerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VINScannerSheet.swift; sourceTree = "<group>"; };
 		8AA28167AD30616B817ACECE /* VersionCheckService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCheckService.swift; sourceTree = "<group>"; };
@@ -2215,6 +2218,7 @@
 				7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */,
 				C5063724524EF041433C138C /* ChezOwnershipView.swift */,
 				B87D4673244F2FAD9E17D739 /* ChezProfileView.swift */,
+				88E8328FB5ED10D6AFDBE7F0 /* ChezQuickQuestionSheet.swift */,
 				C843C1750297B5F7B5273571 /* ChezRequestComposeSheet.swift */,
 				9EF6A66BC91FF4036AF43285 /* ChezRequestDetailView.swift */,
 				5EF8E248ACA297AB5000C82D /* ChezRequestsListView.swift */,
@@ -2651,6 +2655,7 @@
 				9885658B44DE36104BB375D2 /* ChezProfileView.swift in Sources */,
 				C93C99518366164CC4FC5215 /* ChezProfileViewModel.swift in Sources */,
 				CF00A608E9E39BB7C132EC68 /* ChezProposalCard.swift in Sources */,
+				31BFCFC126FB679920EAEA06 /* ChezQuickQuestionSheet.swift in Sources */,
 				88EF3B5CBC7AB85221EB059D /* ChezRequest.swift in Sources */,
 				52D1C3DA5552E4E44F9261EE /* ChezRequestComposeSheet.swift in Sources */,
 				9305A9A5ED5EC53675B0B734 /* ChezRequestComposeViewModel.swift in Sources */,
@@ -3104,6 +3109,7 @@
 				50C4A51312571813E87BD37E /* ChezProfileView.swift in Sources */,
 				24E660EFB67FE63A756190B6 /* ChezProfileViewModel.swift in Sources */,
 				0AFD62B9E9761D1862B0A179 /* ChezProposalCard.swift in Sources */,
+				9A419CFE5283A423574B0F26 /* ChezQuickQuestionSheet.swift in Sources */,
 				F70F5AA7A789D17522B34CF2 /* ChezRequest.swift in Sources */,
 				713DB3B5A775408EAA100E85 /* ChezRequestComposeSheet.swift in Sources */,
 				F1050517A2BB78D26DA5CF74 /* ChezRequestComposeViewModel.swift in Sources */,
