@@ -464,17 +464,53 @@ CREATE POLICY "household_documents_select"
         )
     );
 
-CREATE POLICY "Users can insert household documents"
+-- Phase 95 / gap #57: home-manager-aware INSERT/UPDATE/DELETE.
+-- Staff (member_type IN ('home_manager', 'staff')) can only modify
+-- or delete documents already visible to them, and cannot insert
+-- new ones with visible_to_home_managers = false (hiding work from
+-- the homeowner). Family members and unlinked users on the
+-- household are unaffected.
+CREATE POLICY "household_documents_insert"
     ON documents FOR INSERT
-    WITH CHECK (household_id = public.get_my_household_id());
+    WITH CHECK (
+        household_id = public.get_my_household_id()
+        AND (
+            NOT EXISTS (
+                SELECT 1 FROM family_members
+                WHERE family_members.linked_user_id = auth.uid()
+                  AND family_members.member_type IN ('home_manager', 'staff')
+            )
+            OR COALESCE(visible_to_home_managers, true) = true
+        )
+    );
 
-CREATE POLICY "Users can update household documents"
+CREATE POLICY "household_documents_update"
     ON documents FOR UPDATE
-    USING (household_id = public.get_my_household_id());
+    USING (
+        household_id = public.get_my_household_id()
+        AND (
+            visible_to_home_managers = true
+            OR NOT EXISTS (
+                SELECT 1 FROM family_members
+                WHERE family_members.linked_user_id = auth.uid()
+                  AND family_members.member_type IN ('home_manager', 'staff')
+            )
+        )
+    );
 
-CREATE POLICY "Users can delete household documents"
+CREATE POLICY "household_documents_delete"
     ON documents FOR DELETE
-    USING (household_id = public.get_my_household_id());
+    USING (
+        household_id = public.get_my_household_id()
+        AND (
+            visible_to_home_managers = true
+            OR NOT EXISTS (
+                SELECT 1 FROM family_members
+                WHERE family_members.linked_user_id = auth.uid()
+                  AND family_members.member_type IN ('home_manager', 'staff')
+            )
+        )
+    );
 
 -- ----------------------------------------------------------------------------
 -- document_family_members (junction table — access via document's household)
