@@ -130,6 +130,20 @@ const VIEWS = [
     liveSource: "quiz-questions",
   },
   {
+    // Phase 85 — Walk-through capture templates. Per-category forms
+    // that drive the iOS WalkthroughView (self-serve detail capture)
+    // AND the operations SPA AssessmentWalkthrough (handyman field
+    // mode). Composer reads applies_when to decide which templates
+    // render based on the homeowner's intake answers.
+    id: "walkthrough",
+    label: "Walk-through",
+    type: "walkthrough_template",
+    group: "catalog",
+    title: "Walk-through Templates",
+    eyebrow: "Per-category capture forms · 15 seeded",
+    subtitle: "What the walk-through asks for each system category — manufacturer, model, install year, condition, photos. Same templates drive iOS self-serve capture AND the handyman ops SPA. Edit field schema via SQL for v1; admin editor coming in Phase 86.",
+  },
+  {
     id: "tasks",
     label: "Tasks",
     type: "task",
