@@ -789,6 +789,53 @@ struct HandymanVisitDetailView: View {
                 parentVisitTitle: activeParentTask.title,
                 providerName: preferredHandyman?.companyName
             )
+
+            postVisitIssueCard
+        }
+    }
+
+    /// Phase 95 (audit gap #28) — homeowner-initiated visit report. The
+    /// after-visit report above is technician-authored. This card gives
+    /// the homeowner a dedicated path to flag something the tech missed
+    /// or a problem that surfaced post-visit (leak came back two days
+    /// later, hardware doesn't match the invoice, etc.). It pre-configures
+    /// the existing handyman-request composer with copy framed for
+    /// after-the-fact reporting and a `homeowner_visit_issue` metadata
+    /// event so the message lands on the same thread the tech reads,
+    /// gets routed to Chez when status flips to "follow_up_recommended,"
+    /// and shows up distinctly in analytics.
+    private var postVisitIssueCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "exclamationmark.bubble.fill")
+                        .foregroundStyle(HavenColors.action)
+                    Text("Notice something off?")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+                Text("Send your handyman a follow-up note. Mention what changed since the visit, photos help. Chez gets a copy and can step in if it doesn't get resolved.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    openPostVisitIssueComposer()
+                } label: {
+                    HStack(spacing: HavenTheme.spacing4) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Report an issue")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .background(HavenColors.action)
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(coordinationRequest == nil)
+            }
         }
     }
 
@@ -1980,6 +2027,24 @@ struct HandymanVisitDetailView: View {
             placeholder: "Ask about a line item, timing, or any detail you want clarified.",
             defaultStatusOnReply: .sentToHandyman,
             metadataEvent: "quote_question"
+        )
+        showRequestMessageComposer = true
+    }
+
+    /// Phase 95 (gap #28) — pre-configures the shared message composer
+    /// for a post-visit issue report. Defaults the request status to
+    /// `sent_to_handyman` so the tech is paged on send, and stamps a
+    /// distinctive `metadataEvent` so analytics + future Chez routing
+    /// can tell post-visit issues apart from generic homeowner replies.
+    @MainActor
+    private func openPostVisitIssueComposer() {
+        guard coordinationRequest != nil else { return }
+        requestMessageComposerConfiguration = RequestMessageComposerConfiguration(
+            title: "Report an issue",
+            introText: "Tell your handyman what's not right — a photo helps. They'll get notified and Chez can step in if needed.",
+            placeholder: "What's not right with the visit? Be as specific as you can.",
+            defaultStatusOnReply: .sentToHandyman,
+            metadataEvent: "homeowner_visit_issue"
         )
         showRequestMessageComposer = true
     }
