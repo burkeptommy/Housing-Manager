@@ -392,8 +392,71 @@ struct AddHandymanPunchItemSheet: View {
         ("1 hr", 60),
     ]
 
+    /// Phase 95 (gap #43): library of typical handyman items so the user
+    /// doesn't start at a blank text field every time. Tapping a chip
+    /// prefills title / description / effort estimate; the user can
+    /// then tweak before saving. Items chosen for HNW Westchester
+    /// audience: not-quite-emergency annoyances that pile up between
+    /// seasonal visits. Keep the list ~12 long so the chip strip fits
+    /// without scrolling for ages.
+    private struct LibraryItem: Hashable {
+        let title: String
+        let description: String
+        let minutes: Int
+    }
+    private let library: [LibraryItem] = [
+        LibraryItem(title: "Replace porch light bulb", description: "Standard replacement, no fixture work.", minutes: 15),
+        LibraryItem(title: "Fix dripping faucet", description: "Sink or tub. Likely a worn washer or cartridge.", minutes: 30),
+        LibraryItem(title: "Caulk around tub or shower", description: "Old caulk pulled, surface dried, fresh bead applied.", minutes: 60),
+        LibraryItem(title: "Tighten loose cabinet door / drawer", description: "Hinge realignment or replacement.", minutes: 15),
+        LibraryItem(title: "Patch and paint nail hole", description: "Spackle, sand, touch-up paint.", minutes: 30),
+        LibraryItem(title: "Re-hang fallen curtain rod", description: "Re-anchor with proper hardware.", minutes: 30),
+        LibraryItem(title: "Replace HVAC filters", description: "All return registers. Bring sizes.", minutes: 30),
+        LibraryItem(title: "Test and replace smoke detector batteries", description: "Every floor + bedroom area.", minutes: 30),
+        LibraryItem(title: "Adjust sticking interior door", description: "Plane the edge or shim the hinges.", minutes: 30),
+        LibraryItem(title: "Tighten loose toilet seat / handle", description: "Bolts, brackets, or replacement.", minutes: 15),
+        LibraryItem(title: "Reseat loose deck board / handrail screw", description: "Visual check and tighten loose hardware.", minutes: 30),
+        LibraryItem(title: "Replace dryer vent hood / lint screen", description: "External flap or interior screen as needed.", minutes: 30),
+    ]
+
     var body: some View {
         Form {
+            // Phase 95 (gap #43) — library chip rail. Hidden once the
+            // user starts typing so it doesn't compete with their words.
+            if title.isEmpty {
+                Section {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(library, id: \.self) { item in
+                                Button {
+                                    Haptics.selection()
+                                    title = item.title
+                                    description = item.description
+                                    estimatedMinutes = item.minutes
+                                } label: {
+                                    Text(item.title)
+                                        .font(HavenTypography.uiLabelSmall)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                        .lineLimit(1)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(HavenColors.beige200)
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                } header: {
+                    Text("Common items")
+                } footer: {
+                    Text("Tap to prefill. You can edit before saving.")
+                        .font(HavenTypography.caption)
+                }
+            }
+
             Section {
                 TextField("What needs fixing?", text: $title)
                     .font(HavenTypography.body)
