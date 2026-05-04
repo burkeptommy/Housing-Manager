@@ -77,6 +77,80 @@
       <p class="offline-note">This page keeps working offline after the first load. Changes are saved on the device and sync when the connection returns.</p>
     </section>
 
+    <!-- Phase 84.5 — Home Assessment banner + fallback capture form. Shown
+         only when the loaded visit has visit_type='home_assessment'. -->
+    <section class="surface-card" id="assessment-mode-banner" style="display: none; border: 1px solid #ED6955; background: #FEF7F5; padding: 16px;">
+      <div class="section-header">
+        <div>
+          <p class="section-eyebrow" style="color: #ED6955;">Free home assessment</p>
+          <h2>This visit is a Chez home assessment</h2>
+        </div>
+      </div>
+      <p class="hero-copy compact-copy">
+        You're walking through the homeowner's systems, vendors, recurring services, and documents to populate their app. The full guided wizard lives in the Chez Field iOS app — strongly recommended for this visit type.
+      </p>
+      <div class="button-row">
+        <a class="primary-button small-button" href="https://apps.apple.com/app/chez-field" target="_blank" rel="noopener">Open Chez Field app</a>
+        <button class="secondary-button small-button" type="button" id="assessment-fallback-toggle">Use this page instead</button>
+      </div>
+
+      <div id="assessment-fallback-form" style="display: none; margin-top: 16px;">
+        <p class="task-subtitle compact-eyebrow">Fallback capture — autosaves to the assessment as you add items.</p>
+
+        <details open style="margin-top: 12px;">
+          <summary style="cursor: pointer; font-weight: 600;">Add a system</summary>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+            <input type="text" id="assess-sys-category" placeholder="Category (e.g. HVAC)" />
+            <input type="text" id="assess-sys-manufacturer" placeholder="Manufacturer" />
+            <input type="text" id="assess-sys-model" placeholder="Model number" />
+            <input type="number" id="assess-sys-year" placeholder="Install year" />
+          </div>
+          <textarea id="assess-sys-notes" rows="2" placeholder="Notes" style="width: 100%; margin-top: 8px;"></textarea>
+          <button class="primary-button small-button" type="button" id="assess-add-system">Add system</button>
+        </details>
+
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; font-weight: 600;">Add a vendor the homeowner uses</summary>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+            <input type="text" id="assess-vendor-name" placeholder="Company name" />
+            <input type="text" id="assess-vendor-category" placeholder="Category" />
+            <input type="tel" id="assess-vendor-phone" placeholder="Phone" />
+          </div>
+          <button class="primary-button small-button" type="button" id="assess-add-vendor">Add vendor</button>
+        </details>
+
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; font-weight: 600;">Add a recurring service</summary>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+            <select id="assess-routine-kind">
+              <option value="landscaping">Landscaping</option>
+              <option value="pool_service">Pool service</option>
+              <option value="pest_control">Pest control</option>
+              <option value="cleaning">Cleaning</option>
+              <option value="snow_removal">Snow removal</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="assess-routine-cadence">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annual">Annual</option>
+            </select>
+            <input type="text" id="assess-routine-vendor" placeholder="Vendor name" />
+            <input type="text" id="assess-routine-label" placeholder="Label (optional)" />
+          </div>
+          <button class="primary-button small-button" type="button" id="assess-add-routine">Add routine</button>
+        </details>
+
+        <p style="margin-top: 16px;">
+          <strong id="assess-captured-summary">0 systems · 0 vendors · 0 routines captured</strong>
+        </p>
+        <button class="primary-button" type="button" id="assess-submit-button">Submit assessment</button>
+        <p id="assess-status" class="task-subtitle compact-eyebrow"></p>
+      </div>
+    </section>
+
     <section class="content-grid">
       <div class="stack-column">
         <article class="surface-card">
@@ -374,5 +448,11 @@
   </template>
 
   <script src="handyman-visit.js?v=30260427-chat1" defer></script>
+  <!-- Phase 84.5 — assessment-mode shared helpers + offline persistence.
+       Loaded unconditionally; handyman-visit.js will only invoke them when
+       the loaded visit's visit_type ∈ ('home_assessment', 'home_assessment_continuation').
+       Safe to load on standard_visit visits — they just don't get called. -->
+  <script src="assessment-shared.js?v=84_5" defer></script>
+  <script src="assessment-offline.js?v=84_5" defer></script>
 </body>
 </html>
