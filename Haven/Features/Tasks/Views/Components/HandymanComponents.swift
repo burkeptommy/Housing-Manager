@@ -16,6 +16,10 @@ struct VendorCard: View {
     }
 
     let state: State
+    /// Phase 85: surface "Chez owns this contact" badge + salmon tint
+    /// when the linked handyman is delegated to Chez (e.g. Chez is the
+    /// homeowner's point of contact for handyman work).
+    var chezOwned: Bool = false
     var onTap: () -> Void = {}                // tap card body
     var onCall: (() -> Void)? = nil           // tap phone button (linked only)
 
@@ -25,19 +29,28 @@ struct VendorCard: View {
             onTap()
         }) {
             HStack(spacing: 12) {
-                IconTile(symbol: "wrench.and.screwdriver.fill", tone: .indigo, size: .large)
+                IconTile(
+                    symbol: "wrench.and.screwdriver.fill",
+                    tone: chezOwned ? .salmon : .indigo,
+                    size: .large
+                )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(eyebrow)
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(0.66)
                         .textCase(.uppercase)
                         .foregroundStyle(HavenColors.textTertiary)
-                    Text(displayName)
-                        .font(HavenTypography.fraunces(size: 17, weight: 600))
-                        .tracking(-0.2)
-                        .foregroundStyle(HavenColors.navy900)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 6) {
+                        Text(displayName)
+                            .font(HavenTypography.fraunces(size: 17, weight: 600))
+                            .tracking(-0.2)
+                            .foregroundStyle(HavenColors.navy900)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        if chezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -46,11 +59,16 @@ struct VendorCard: View {
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(HavenColors.surface)
+                    .fill(chezOwned
+                          ? HavenColors.action.opacity(0.04)
+                          : HavenColors.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(HavenColors.beige200, lineWidth: 1)
+                    .stroke(chezOwned
+                            ? HavenColors.action.opacity(0.25)
+                            : HavenColors.beige200,
+                            lineWidth: 1)
             )
             .shadow(
                 color: TasksV5.cardShadowColor,

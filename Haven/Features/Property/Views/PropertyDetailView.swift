@@ -1412,7 +1412,7 @@ struct PropertyDetailView: View {
     private func overviewChezConciergeAnchor(property: PropertyRow) -> some View {
         var ctx: [String: String] = [
             "property_id": property.id.uuidString,
-            "property_name": property.name ?? property.street ?? "Property",
+            "property_name": property.name,
         ]
         if let town = property.city, !town.isEmpty { ctx["town"] = town }
         if let state = property.state, !state.isEmpty { ctx["state"] = state }
@@ -5483,10 +5483,18 @@ struct PropertyDetailView: View {
             VendorLogoView(contractor: contractor, size: 32)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(displayName(for: contractor))
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(displayName(for: contractor))
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(1)
+                    // Phase 85 — surface "Chez owns this contact" inline so
+                    // the homeowner can scan their contact list and see at a
+                    // glance which vendors Chez is the point of contact for.
+                    if contractor.isChezOwned {
+                        ChezOwnsBadge(compact: true)
+                    }
+                }
                 if let reason {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")

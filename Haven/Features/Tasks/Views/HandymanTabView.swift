@@ -537,6 +537,7 @@ struct HandymanTabView: View {
                         name: handyman.companyName,
                         phoneURL: handymanPhoneURL
                     ),
+                    chezOwned: handyman.isChezOwned,
                     onTap: { presentChat = true },
                     onCall: nil
                 )
@@ -1196,7 +1197,7 @@ struct HandymanTabView: View {
         } catch {
             Haptics.error()
         }
-        await MainActor.run { togglingItemIds.remove(item.id) }
+        await MainActor.run { _ = togglingItemIds.remove(item.id) }
     }
 
     /// Phase 78: refresh the proposals inbox. Pulls handyman-flagged

@@ -155,10 +155,18 @@ struct SystemGroupListView: View {
 
                 // Middle: Name, category, details
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(system.displayName)
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .lineLimit(2)
+                    HStack(spacing: 6) {
+                        Text(system.displayName)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(2)
+                        // Phase 85 — surface "Chez owns this system" inline
+                        // so the homeowner can scan their systems list and
+                        // see at a glance which ones Chez is managing.
+                        if system.isChezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
 
                     if system.manufacturer != nil || system.modelNumber != nil {
                         HStack(spacing: 4) {
