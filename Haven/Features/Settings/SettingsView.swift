@@ -232,6 +232,17 @@ struct SettingsView: View {
                         .font(HavenTypography.body)
                 }
 
+                // Phase 95 (gap #8) — Settings entry to revise the
+                // foundational 7-question answers. Loads what's on file
+                // and routes through the same FoundationalQuestionsForm
+                // + persist path that onboarding uses.
+                NavigationLink {
+                    HomeDetailsView()
+                } label: {
+                    Label("Home details", systemImage: "house")
+                        .font(HavenTypography.body)
+                }
+
                 // Build 87: DIY vs Vendor preference slider, also captured
                 // at the end of the House Quiz (Q36). Mirrored here so users
                 // can adjust later without retaking the quiz. The save flow

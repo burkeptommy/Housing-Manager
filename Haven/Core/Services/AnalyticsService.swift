@@ -445,6 +445,12 @@ enum AnalyticsEvent: String {
     /// whether the caller pre-seeded a category vs. routing
     /// through the picker.
     case contractorBrowseLocalOpened = "contractor_browse_local_opened"
+    /// Phase 95 (gap #8) — fired when the homeowner saves a
+    /// revision to their foundational answers from the Settings
+    /// "Home details" entry. Differentiated from the onboarding-
+    /// path complete event so we can track usage of the
+    /// post-onboarding revise path.
+    case foundationalAnswersRevised = "foundational_answers_revised"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

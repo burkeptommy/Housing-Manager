@@ -16,7 +16,7 @@ import SwiftUI
 /// 6. Top priority (Q30)
 /// 7. DIY-vs-hire tier (Q36)
 struct FoundationalQuestionsForm: View {
-    @State private var answers: FoundationalAnswers = FoundationalAnswers()
+    @State private var answers: FoundationalAnswers
     @State private var stepIndex: Int = 0
     @State private var showSkipConfirm = false
     let onComplete: (FoundationalAnswers) -> Void
@@ -29,9 +29,11 @@ struct FoundationalQuestionsForm: View {
     let onSkip: (() -> Void)?
 
     init(
+        initial: FoundationalAnswers? = nil,
         onComplete: @escaping (FoundationalAnswers) -> Void,
         onSkip: (() -> Void)? = nil
     ) {
+        self._answers = State(initialValue: initial ?? FoundationalAnswers())
         self.onComplete = onComplete
         self.onSkip = onSkip
     }
