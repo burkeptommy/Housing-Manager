@@ -4533,6 +4533,14 @@ struct VehicleRow: Codable, Identifiable {
     /// out; service history reads via direct id keep working.
     let archivedAt: Date?
     let archiveReason: String?
+    /// Phase 95 (gap #78) — insurance policy fields. Mirror the
+    /// registration_expiry pattern so the insurance card has
+    /// dedicated columns instead of being purely document-driven.
+    /// Nil = nothing stamped; the card falls back to reading the
+    /// linked auto-insurance document's metadata.
+    let insuranceExpiry: String?
+    let insurancePolicyNum: String?
+    let insuranceCarrier: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, year, make, model, trim, color, vin, notes
@@ -4566,6 +4574,9 @@ struct VehicleRow: Codable, Identifiable {
         case chargerType = "charger_type"
         case archivedAt = "archived_at"
         case archiveReason = "archive_reason"
+        case insuranceExpiry = "insurance_expiry"
+        case insurancePolicyNum = "insurance_policy_num"
+        case insuranceCarrier = "insurance_carrier"
     }
 
     init(from decoder: Decoder) throws {
@@ -4609,6 +4620,9 @@ struct VehicleRow: Codable, Identifiable {
         chargerType = try? c.decodeIfPresent(String.self, forKey: .chargerType)
         archivedAt = try? c.decodeIfPresent(Date.self, forKey: .archivedAt)
         archiveReason = try? c.decodeIfPresent(String.self, forKey: .archiveReason)
+        insuranceExpiry = try? c.decodeIfPresent(String.self, forKey: .insuranceExpiry)
+        insurancePolicyNum = try? c.decodeIfPresent(String.self, forKey: .insurancePolicyNum)
+        insuranceCarrier = try? c.decodeIfPresent(String.self, forKey: .insuranceCarrier)
     }
 
     /// Phase 84 — convenience getter for delegation status.
@@ -4733,6 +4747,11 @@ struct VehicleUpdate: Codable {
     var isEv: Bool?
     var batteryCapacityKwh: Double?
     var chargerType: String?
+    /// Phase 95 (gap #78) — insurance policy fields. Set via the
+    /// new EditInsuranceSheet on VehicleDetailView's insurance card.
+    var insuranceExpiry: String?
+    var insurancePolicyNum: String?
+    var insuranceCarrier: String?
 
     enum CodingKeys: String, CodingKey {
         case name, year, make, model, trim, color, vin, notes
@@ -4759,6 +4778,9 @@ struct VehicleUpdate: Codable {
         case isEv = "is_ev"
         case batteryCapacityKwh = "battery_capacity_kwh"
         case chargerType = "charger_type"
+        case insuranceExpiry = "insurance_expiry"
+        case insurancePolicyNum = "insurance_policy_num"
+        case insuranceCarrier = "insurance_carrier"
     }
 }
 

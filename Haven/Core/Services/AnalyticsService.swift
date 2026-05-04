@@ -466,6 +466,9 @@ enum AnalyticsEvent: String {
     /// managers are reaching the dashboard and how many engage
     /// with the role-explainer copy before dismissing.
     case homeManagerWelcomeDismissed = "home_manager_welcome_dismissed"
+    /// Phase 95 (gap #78) — fired when the homeowner saves the
+    /// EditInsuranceSheet. Payload reports which fields landed.
+    case vehicleInsuranceEdited = "vehicle_insurance_edited"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

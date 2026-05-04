@@ -27,6 +27,9 @@ struct VehicleDetailView: View {
     /// Phase 84 — local mirror for ChezOwnsToggle's Binding.
     @State private var chezOwnedLocal: Bool = false
     @State private var showInsuranceUpload = false
+    /// Phase 95 (gap #78) — drives the EditInsuranceSheet for
+    /// vehicles that have explicit insurance fields stamped.
+    @State private var showInsuranceEdit = false
     @State private var showPurchaseDatePicker = false
 
     var body: some View {
@@ -176,6 +179,17 @@ struct VehicleDetailView: View {
         .sheet(isPresented: $showInsuranceUpload) {
             DocumentUploadView(preselectedCategory: .autoInsurance) {
                 Task { await viewModel.load(vehicleId: vehicleID) }
+            }
+        }
+        // Phase 95 (gap #78) — explicit insurance editor. Renders
+        // when the user long-presses the card or single-taps when
+        // any of the three insurance columns are stamped.
+        .sheet(isPresented: $showInsuranceEdit) {
+            if let vehicle = viewModel.vehicle {
+                EditInsuranceSheet(vehicle: vehicle) {
+                    Task { await viewModel.load(vehicleId: vehicleID) }
+                }
+                .presentationDetents([.medium])
             }
         }
         .sheet(isPresented: $showPurchaseDatePicker) {
@@ -459,7 +473,17 @@ struct VehicleDetailView: View {
                 // Insurance card
                 Button {
                     Haptics.light()
-                    if insuranceDocId != nil {
+                    // Phase 95 (gap #78) — when explicit insurance
+                    // fields are stamped, single tap opens the
+                    // editor so the user can revise without
+                    // re-uploading. When only a document is on
+                    // file, single tap opens the document. When
+                    // neither, single tap routes to upload.
+                    if vehicle.insuranceExpiry != nil
+                        || vehicle.insurancePolicyNum != nil
+                        || vehicle.insuranceCarrier != nil {
+                        showInsuranceEdit = true
+                    } else if insuranceDocId != nil {
                         showInsuranceDoc = true
                     } else {
                         showInsuranceUpload = true
@@ -468,12 +492,30 @@ struct VehicleDetailView: View {
                     statusCard(
                         icon: "shield.fill",
                         label: "Insurance",
-                        dateStr: insuranceExpirationDate,
-                        emptyText: insuranceDocId != nil ? "On file" : "Upload policy",
-                        isActive: insuranceDocId != nil
+                        dateStr: vehicle.insuranceExpiry ?? insuranceExpirationDate,
+                        emptyText: insuranceCardEmptyText(vehicle),
+                        isActive: insuranceCardIsActive(vehicle)
                     )
                 }
                 .buttonStyle(.plain)
+                // Phase 95 (gap #78) — long-press always opens
+                // the editor so users with a document on file can
+                // also stamp explicit fields without losing the
+                // primary single-tap-opens-doc affordance.
+                .contextMenu {
+                    Button {
+                        showInsuranceEdit = true
+                    } label: {
+                        Label("Edit policy details", systemImage: "pencil")
+                    }
+                    if insuranceDocId == nil {
+                        Button {
+                            showInsuranceUpload = true
+                        } label: {
+                            Label("Upload policy", systemImage: "doc.badge.plus")
+                        }
+                    }
+                }
             }
 
             // Ownership card (full-width)
@@ -500,6 +542,29 @@ struct VehicleDetailView: View {
         viewModel.linkedDocuments
             .first { $0.category.lowercased().contains("insurance") }?
             .expirationDate
+    }
+
+    /// Phase 95 (gap #78) — empty-state copy for the insurance
+    /// card. Branches on whether explicit fields are stamped,
+    /// whether a document is on file, or neither.
+    private func insuranceCardEmptyText(_ vehicle: VehicleRow) -> String {
+        if let carrier = vehicle.insuranceCarrier, !carrier.isEmpty {
+            return carrier
+        }
+        if vehicle.insurancePolicyNum != nil || vehicle.insuranceExpiry != nil {
+            return "On file"
+        }
+        return insuranceDocId != nil ? "On file" : "Add policy"
+    }
+
+    /// Phase 95 (gap #78) — active when ANY signal exists (column
+    /// stamped or document linked). Drives the card's tinted-vs-
+    /// muted visual treatment.
+    private func insuranceCardIsActive(_ vehicle: VehicleRow) -> Bool {
+        return vehicle.insuranceExpiry != nil
+            || vehicle.insurancePolicyNum != nil
+            || vehicle.insuranceCarrier != nil
+            || insuranceDocId != nil
     }
 
     private func ownershipCard(_ vehicle: VehicleRow) -> some View {

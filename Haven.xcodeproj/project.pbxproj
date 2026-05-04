@@ -324,6 +324,7 @@
 		599DE6D8496746E9CE5C6FF0 /* VehicleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97D2B0FAFB54FF91648CA17 /* VehicleDetailView.swift */; };
 		5A1C3093C03B8AFED6788CA1 /* SpecialtySuggestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91EFE100675E01BCBB2021FF /* SpecialtySuggestionCard.swift */; };
 		5A8610597B5105689B0C8B60 /* AccountCreationStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69676563E2133ED3DADAC982 /* AccountCreationStep.swift */; };
+		5B087AE593CCCDB784217D22 /* EditInsuranceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF4A58ECADEA5FBCC6466D2 /* EditInsuranceSheet.swift */; };
 		5B4C8F854BF0956F23975B1D /* RegionalPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8EA77CE5A7578CC91CB9AC /* RegionalPack.swift */; };
 		5B63D7D29BAFEC9EDD25EA44 /* HomeAssessmentRequestSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF1F4FCEB08FFD452589D23 /* HomeAssessmentRequestSheet.swift */; };
 		5BA1CBA380E340EDF996D85B /* Warranty.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCED3F91C128394EBFF7BB27 /* Warranty.swift */; };
@@ -643,6 +644,7 @@
 		B8ABAC6001BED32C14204451 /* ChezActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46FB0312A697ED4EE92D39D4 /* ChezActivityLog.swift */; };
 		B954FBF089BE6E6AB1B2DCE5 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065CD0193255DF7812606891 /* MainTabView.swift */; };
 		B9913B6EEB09589BEED20722 /* SecureLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94383B79DF96D0CFB406B15 /* SecureLogger.swift */; };
+		B9E9CBE0C623CD1603ADBBB9 /* EditInsuranceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF4A58ECADEA5FBCC6466D2 /* EditInsuranceSheet.swift */; };
 		B9EFF05FE27AB5393573B757 /* PropertyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE909F83D728399C6776DEA /* PropertyDetailView.swift */; };
 		BA0458F2C60A8F54B39A6FFB /* OverdueTasksDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E53234F9D430302A1C9755 /* OverdueTasksDetailView.swift */; };
 		BAF2EE4E034110FAA42B515C /* UpdateHomeDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A01411F71C6512A63FA44FC /* UpdateHomeDetailsSheet.swift */; };
@@ -1214,6 +1216,7 @@
 		ADA558B3CCF8FD03A1DB1B36 /* SecurityDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDashboardView.swift; sourceTree = "<group>"; };
 		ADB9AB1A050BE0EC660905BA /* PropertyListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyListViewModel.swift; sourceTree = "<group>"; };
 		AEBD3CEF411D5B294A285315 /* QuizCompletionSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCompletionSummary.swift; sourceTree = "<group>"; };
+		AEF4A58ECADEA5FBCC6466D2 /* EditInsuranceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditInsuranceSheet.swift; sourceTree = "<group>"; };
 		AF47343974F44B306A4C18DE /* MaintenanceTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTaskRow.swift; sourceTree = "<group>"; };
 		B01456C8F7F3E5F6D400BB60 /* ChezProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezProfileViewModel.swift; sourceTree = "<group>"; };
 		B08091D6DD1E18B365AE5940 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
@@ -2158,6 +2161,7 @@
 				6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */,
 				D67356CC4BAAEA3438CCF1E4 /* ContractorPickerSheet.swift */,
 				3270221BA2EADDC793D458F8 /* CoveredDriverPickerSheet.swift */,
+				AEF4A58ECADEA5FBCC6466D2 /* EditInsuranceSheet.swift */,
 				4CEEF4793EF037DC223ABD08 /* EditProjectSheet.swift */,
 				426A351F90CA70BE3D0EF607 /* EditPropertyView.swift */,
 				2F43B13A69A02D0A87ED7FB6 /* EditSystemSheet.swift */,
@@ -2712,6 +2716,7 @@
 				C524CCA7C80E5C5AA342836E /* DuplicateResolutionSheet.swift in Sources */,
 				B4C8969E91831BFFA4075327 /* DuplicateReviewBanner.swift in Sources */,
 				4303838C0B43C2F4CC2405AB /* EditDocumentDetailsView.swift in Sources */,
+				B9E9CBE0C623CD1603ADBBB9 /* EditInsuranceSheet.swift in Sources */,
 				3480D1EF9B0FCD3195E4C9C7 /* EditProjectSheet.swift in Sources */,
 				267E47B88BF7E865259A4ED5 /* EditPropertyView.swift in Sources */,
 				97C0D17F1D2D6231961C08F8 /* EditSystemSheet.swift in Sources */,
@@ -3167,6 +3172,7 @@
 				7DB2DF3F04928974B1CE9EB3 /* DuplicateResolutionSheet.swift in Sources */,
 				F0AF157AD43464C2991E5A6D /* DuplicateReviewBanner.swift in Sources */,
 				44358BA887104ACC2568412D /* EditDocumentDetailsView.swift in Sources */,
+				5B087AE593CCCDB784217D22 /* EditInsuranceSheet.swift in Sources */,
 				0960E433794C56C8BFC2C7E1 /* EditProjectSheet.swift in Sources */,
 				E4C4377248A8C873373B67B0 /* EditPropertyView.swift in Sources */,
 				EEA7F97CFC383875468C3C49 /* EditSystemSheet.swift in Sources */,
