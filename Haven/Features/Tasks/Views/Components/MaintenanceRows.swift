@@ -61,10 +61,16 @@ struct DecisionRow: View {
 
 /// V5 ProgramRow — white row in the "Active programs" section.
 /// Indigo IconTile + name (truncated) + "Next · {date}" + green "ON" pill.
+///
+/// Phase 85: optional `chezOwned` flag adds a salmon "Chez owns" badge
+/// next to the name + tints the row with a subtle salmon left-edge
+/// accent so the homeowner can scan their list and see at a glance
+/// what's already delegated to Chez.
 struct ProgramRow: View {
     let icon: String
     let name: String
     let nextEventLabel: String?            // "Routine grounds maintenance May 8"
+    var chezOwned: Bool = false
     var onTap: () -> Void = {}
 
     var body: some View {
@@ -73,13 +79,18 @@ struct ProgramRow: View {
             onTap()
         }) {
             HStack(spacing: 12) {
-                IconTile(symbol: icon, tone: .indigo)
+                IconTile(symbol: icon, tone: chezOwned ? .salmon : .indigo)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy900)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy900)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if chezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
                     if let nextEventLabel {
                         Text("Next · \(nextEventLabel)")
                             .font(.system(size: 12))
@@ -96,15 +107,19 @@ struct ProgramRow: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(HavenColors.surface)
+                    .fill(chezOwned
+                          ? HavenColors.action.opacity(0.04)
+                          : HavenColors.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(HavenColors.beige200, lineWidth: 1)
+                    .stroke(chezOwned ? HavenColors.action.opacity(0.25) : HavenColors.beige200,
+                            lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(chezOwned ? "\(name), Chez is handling" : name)
     }
 
     private var onPill: some View {

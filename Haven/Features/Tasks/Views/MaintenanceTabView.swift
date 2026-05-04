@@ -58,7 +58,15 @@ struct MaintenanceTabView: View {
                 YearRibbon(
                     activeSeason: $activeSeason,
                     summaries: viewModel.seasonSummaries(activeSeason: currentSeason),
-                    currentSeason: currentSeason
+                    currentSeason: currentSeason,
+                    onTap: { season in
+                        // Tap any tile → push into the Calendar layout
+                        // anchored to that season's first month so the
+                        // homeowner can see the actual items behind the
+                        // count. The MiniHero scoping was a side effect
+                        // that doesn't show the items themselves.
+                        pushTarget = .scheduleViewForSeason(season)
+                    }
                 )
 
                 miniHeroSection
@@ -66,6 +74,11 @@ struct MaintenanceTabView: View {
                 decisionsSection
 
                 programsSection
+
+                // Phase 85 — Chez-handling section. Renders below the
+                // homeowner's own programs and only when chez_owned
+                // routines exist. Empty by default for DIY-default users.
+                chezHandlingSection
 
                 vehiclesSection
 
@@ -189,7 +202,45 @@ struct MaintenanceTabView: View {
                     ProgramRow(
                         icon: routine.resolvedIcon,
                         name: routine.presentationLabel,
-                        nextEventLabel: viewModel.nextEventLabel(for: routine)
+                        nextEventLabel: viewModel.nextEventLabel(for: routine),
+                        chezOwned: routine.chezOwned
+                    ) {
+                        if let householdId {
+                            pushTarget = .routineDetail(routine, householdId)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
+    /// Phase 85 — Chez handling section. Renders below "Active programs"
+    /// when any chez_owned routines exist. Visually distinct from the
+    /// homeowner's own programs: passive observational tone, salmon
+    /// accent, "Chez is handling" subtitle. Tapping still opens the
+    /// routine detail so the homeowner can revoke or review.
+    @ViewBuilder
+    private var chezHandlingSection: some View {
+        let chezPrograms = viewModel.chezHandlingPrograms(scopedTo: scopedSeasonOrNil)
+        if !chezPrograms.isEmpty {
+            SectionLabel(
+                eyebrow: "Chez is handling",
+                sub: "On autopilot · We've got it",
+                action: chezPrograms.count > 4 ? .init(title: "See all", perform: {
+                    pushTarget = .routinesList
+                }) : nil
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            VStack(spacing: TasksV5.rowGap) {
+                ForEach(chezPrograms.prefix(4)) { routine in
+                    ProgramRow(
+                        icon: routine.resolvedIcon,
+                        name: routine.presentationLabel,
+                        nextEventLabel: viewModel.nextEventLabel(for: routine),
+                        chezOwned: true
                     ) {
                         if let householdId {
                             pushTarget = .routineDetail(routine, householdId)
@@ -262,6 +313,7 @@ struct MaintenanceTabView: View {
     enum MaintenancePush: Hashable, Identifiable {
         case routinesList
         case scheduleView
+        case scheduleViewForSeason(Season)
         case recommendedServices
         case vehicle(UUID)
         case routineDetail(RoutineRow, UUID)
@@ -270,6 +322,7 @@ struct MaintenanceTabView: View {
             switch self {
             case .routinesList: return "routines"
             case .scheduleView: return "schedule"
+            case .scheduleViewForSeason(let season): return "schedule-\(season.rawValue)"
             case .recommendedServices: return "recommended"
             case .vehicle(let id): return "vehicle-\(id.uuidString)"
             case .routineDetail(let r, _): return "routine-\(r.id.uuidString)"
@@ -292,6 +345,12 @@ struct MaintenanceTabView: View {
             }
         case .scheduleView:
             MaintenanceScheduleView(filterPropertyId: propertyId)
+        case .scheduleViewForSeason(let season):
+            MaintenanceScheduleView(
+                filterPropertyId: propertyId,
+                initialLayout: .calendar,
+                scrollToSeason: season
+            )
         case .recommendedServices:
             if let householdId, let propertyId {
                 RecommendedServicesView(householdId: householdId, propertyId: propertyId)
@@ -413,6 +472,11 @@ final class MaintenanceTabViewModel: ObservableObject {
         routines.filter { routine in
             routine.typedScope == .property &&
             routine.typedSetupState == .pendingVendor &&
+            // Phase 85 — hide Chez-owned routines from "Needs your decision".
+            // If Chez owns the routine, Chez is making the call, not the
+            // homeowner. They surface in `chezHandlingPrograms` below
+            // instead, in a more passive observational tone.
+            !routine.chezOwned &&
             (season.map { routine.activeMonths.contains(anyOf: $0.months) } ?? true)
         }
     }
@@ -421,6 +485,22 @@ final class MaintenanceTabViewModel: ObservableObject {
         routines.filter { routine in
             routine.typedScope == .property &&
             routine.typedSetupState == .active &&
+            (season.map { routine.activeMonths.contains(anyOf: $0.months) } ?? true)
+        }
+        .sorted { lhs, rhs in
+            (lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending)
+        }
+    }
+
+    /// Phase 85 — Chez-handling section. Surfaces routines that Chez owns
+    /// (whether they're pendingVendor / active / paused) in a passive
+    /// "we're handling this" tone, separate from the homeowner's own
+    /// decision queue. Sorted by label.
+    func chezHandlingPrograms(scopedTo season: Season? = nil) -> [RoutineRow] {
+        routines.filter { routine in
+            routine.typedScope == .property &&
+            routine.chezOwned &&
+            routine.typedSetupState != .archived &&
             (season.map { routine.activeMonths.contains(anyOf: $0.months) } ?? true)
         }
         .sorted { lhs, rhs in
@@ -534,7 +614,34 @@ final class MaintenanceTabViewModel: ObservableObject {
 
     // MARK: Internal
 
+    /// Decide whether a task belongs in `season`'s tile count.
+    ///
+    /// Two semantic rules layered on top of the original month bucket:
+    ///
+    ///   1. Tasks with `parentRoutineId != nil` are routine-managed —
+    ///      the routine itself already contributes to the season's
+    ///      count, and double-counting both the routine and each of
+    ///      its child tasks blew Spring up post-quiz when many monthly
+    ///      cadences seeded fresh tasks dated today.
+    ///   2. When the template's `seasonalTiming` is set ("Spring",
+    ///      "Fall", "Spring/Fall", etc.), prefer it over the raw
+    ///      `scheduledDate` month. Sub-annual cadences anchor at
+    ///      `today + interval`, so right after a quiz they all land
+    ///      in the current season regardless of intent. The seasonal
+    ///      timing is what the template author meant.
+    ///
+    /// Tasks with no template (custom user tasks, AI-generated
+    /// follow-ups) fall through to the original month-based bucket.
     private func isTask(_ task: MaintenanceTaskDBRow, in season: Season) -> Bool {
+        if task.parentRoutineId != nil { return false }
+
+        if let timing = task.seasonalTiming?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !timing.isEmpty {
+            let labels = timing.split(whereSeparator: { $0 == "/" || $0 == "," })
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            return labels.contains(season.rawValue)
+        }
+
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let dateString = task.scheduledDate ?? task.nextDueDate
