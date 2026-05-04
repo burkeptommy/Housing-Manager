@@ -24,6 +24,12 @@ struct AddMaintenanceTaskSheet: View {
     var initialEntryMode: EntryMode? = nil
     var initialPropertyId: UUID? = nil
     var initialVehicleId: UUID? = nil
+    /// Phase 95 (gap #24) — when present, the sheet opens with the
+    /// contractor pre-selected and the kind flipped to `.vendorAppointment`.
+    /// Drives the "Schedule a visit" CTA on ContractorDetailView so
+    /// homeowners can book a one-off vendor visit without manually
+    /// flipping kind / target / contractor.
+    var initialContractorId: UUID? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -399,6 +405,16 @@ struct AddMaintenanceTaskSheet: View {
         if let initialVehicleId {
             targetType = .vehicle
             selectedVehicleId = initialVehicleId
+        }
+
+        // Phase 95 (gap #24) — when opened from ContractorDetailView's
+        // "Schedule a visit" CTA, prefill the contractor + flip kind to
+        // .vendorAppointment so the user only has to pick a date and
+        // describe what's being done.
+        if let initialContractorId {
+            selectedContractorId = initialContractorId
+            taskKind = .vendorAppointment
+            applyDefaults(for: .vendorAppointment)
         }
     }
 

@@ -481,6 +481,14 @@ struct ContractorDetailView: View {
     @State private var serviceRecords: [ServiceRecordRow] = []
     @State private var showDeleteConfirmation = false
     @State private var showEditSheet = false
+    /// Phase 95 (gap #24) — drives the "Schedule a visit" sheet.
+    @State private var showScheduleVisitSheet = false
+    /// Phase 95 (gap #24) — properties / systems / vehicles loaded once
+    /// for the AddMaintenanceTaskSheet so it can render its existing
+    /// target picker. Kept lazy-async; nil while loading.
+    @State private var loadedProperties: [PropertyRow] = []
+    @State private var loadedSystems: [HomeSystemRow] = []
+    @State private var loadedVehiclesForVisit: [VehicleRow] = []
     @Environment(\.dismiss) private var dismiss
 
     // Phase 51: Standing appointment state
@@ -804,6 +812,41 @@ struct ContractorDetailView: View {
                 contractor = updated
             }
         }
+        // Phase 95 (gap #24) — Schedule a visit. Opens the existing
+        // AddMaintenanceTaskSheet pre-configured for a one-off vendor
+        // visit on this contractor. Properties / systems / vehicles
+        // are loaded on first present so the form can render its
+        // standard target picker. The new initialContractorId param on
+        // the sheet handles the prefill.
+        .sheet(isPresented: $showScheduleVisitSheet) {
+            NavigationStack {
+                AddMaintenanceTaskSheet(
+                    properties: loadedProperties,
+                    systems: loadedSystems,
+                    vehicles: loadedVehiclesForVisit,
+                    contractors: [contractor],
+                    onSave: {
+                        Task {
+                            await loadTasks()
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        }
+                    },
+                    initialContractorId: contractor.id
+                )
+            }
+        }
+        .task(id: showScheduleVisitSheet) {
+            // Lazy-load context the moment the sheet is about to present
+            // so we don't pay the round-trip on every detail-view appear.
+            // Concurrent fetches; failures fall through to empty arrays.
+            guard showScheduleVisitSheet, loadedProperties.isEmpty else { return }
+            async let propsTask = DatabaseService.shared.fetchProperties()
+            async let systemsTask = DatabaseService.shared.fetchHomeSystems()
+            async let vehiclesTask = DatabaseService.shared.fetchVehicles()
+            loadedProperties = (try? await propsTask) ?? []
+            loadedSystems = (try? await systemsTask) ?? []
+            loadedVehiclesForVisit = (try? await vehiclesTask) ?? []
+        }
         .confirmationDialog("Delete \(contractor.companyName)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task {
@@ -1064,19 +1107,45 @@ struct ContractorDetailView: View {
     }
 
     private var quickActionsRow: some View {
-        HStack(spacing: 10) {
-            quickActionButton(symbol: "phone.fill", label: "Call",
-                              url: sanitizedPhoneURL(contractor.phone))
-            if let email = contractor.email {
-                quickActionButton(symbol: "envelope.fill", label: "Email",
-                                  url: sanitizedEmailURL(email))
-            } else {
-                quickActionButton(symbol: "envelope.fill", label: "Email", url: nil)
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                quickActionButton(symbol: "phone.fill", label: "Call",
+                                  url: sanitizedPhoneURL(contractor.phone))
+                if let email = contractor.email {
+                    quickActionButton(symbol: "envelope.fill", label: "Email",
+                                      url: sanitizedEmailURL(email))
+                } else {
+                    quickActionButton(symbol: "envelope.fill", label: "Email", url: nil)
+                }
+                quickActionButton(symbol: "message.fill", label: "Text",
+                                  url: contractor.phone.smsURL)
+                quickActionButton(symbol: "globe", label: "Web",
+                                  url: contractor.website.flatMap { urlFromWebsite($0) })
             }
-            quickActionButton(symbol: "message.fill", label: "Text",
-                              url: contractor.phone.smsURL)
-            quickActionButton(symbol: "globe", label: "Web",
-                              url: contractor.website.flatMap { urlFromWebsite($0) })
+
+            // Phase 95 (gap #24) — primary "Schedule a visit" CTA. Opens
+            // AddMaintenanceTaskSheet pre-configured with the contractor
+            // + .vendorAppointment kind so booking a one-off visit is
+            // one tap → date picker, not a manual hunt through the
+            // task-creation form. Routine standing-appointment work
+            // still happens through the dedicated RoutineEditSheet.
+            Button {
+                Haptics.medium()
+                showScheduleVisitSheet = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Schedule a visit")
+                        .font(HavenTypography.uiButton)
+                }
+                .foregroundStyle(HavenColors.textOnAction)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(HavenColors.action)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+            .buttonStyle(.plain)
         }
     }
 
