@@ -2247,6 +2247,50 @@ final class DatabaseService {
     // block below. The `household_cadences` table stays in place on
     // Supabase for rollback safety; a future Phase 55.4 drops it.
 
+    // MARK: - Home Assessments (Phase 84.5)
+
+    /// Fetch the most recent active assessment for a property. RLS scopes
+    /// to the current user's household. Used by the Dashboard pending card
+    /// and the post-visit `AssessmentReviewView`.
+    func fetchActiveHomeAssessment(propertyId: UUID) async throws -> HomeAssessmentRow? {
+        let rows: [HomeAssessmentRow] = try await from("home_assessments")
+            .select()
+            .eq("property_id", value: propertyId.uuidString)
+            .not("status", operator: .in, value: "(completed,cancelled)")
+            .order("created_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Fetch the most recent ingested assessment so AssessmentReviewView
+    /// can fire once on first launch after ingestion.
+    func fetchLastIngestedAssessment(householdId: UUID) async throws -> HomeAssessmentRow? {
+        let rows: [HomeAssessmentRow] = try await from("home_assessments")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .not("ingested_at", operator: .is, value: "null")
+            .order("ingested_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Fetch all recommended tasks for an assessment, ordered with
+    /// urgent items first. Used by AssessmentReviewView and the admin
+    /// portal Pending Tasks dispatch view.
+    func fetchAssessmentRecommendedTasks(assessmentId: UUID) async throws -> [AssessmentRecommendedTaskRow] {
+        return try await from("assessment_recommended_tasks")
+            .select()
+            .eq("assessment_id", value: assessmentId.uuidString)
+            .order("urgency", ascending: true)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
     // MARK: - Routines (Phase 55)
     //
     // Unified recurring-event primitive replacing both household_cadences
@@ -2336,6 +2380,63 @@ final class DatabaseService {
     // removed alongside the legacy CadenceEditSheet. Native writers
     // (RoutineEditSheet) go straight at `routines` via
     // `createRoutine` / `updateRoutine` above.
+
+    // MARK: - Phase 85: Chez Activity Log
+
+    /// Fetch the most-recent chez_activity_log rows for a household.
+    /// Default `daysBack: 7` powers the Dashboard "This week with Chez"
+    /// card; pass a larger window for the full activity history view.
+    /// Set `dashboardOnly` to filter to rows flagged for surfacing.
+    func fetchChezActivity(
+        householdId: UUID,
+        daysBack: Int = 7,
+        dashboardOnly: Bool = false,
+        limit: Int = 50
+    ) async throws -> [ChezActivityLogRow] {
+        let since = ISO8601DateFormatter().string(
+            from: Date().addingTimeInterval(-Double(daysBack) * 24 * 60 * 60)
+        )
+        var query = from("chez_activity_log")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .gte("occurred_at", value: since)
+        if dashboardOnly {
+            query = query.eq("surface_on_dashboard", value: true)
+        }
+        return try await query
+            .order("occurred_at", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
+    /// Phase 85: latest unviewed monthly summary for a household. Returns
+    /// nil if the most recent summary has been viewed already (the
+    /// dashboard card auto-dismisses).
+    func fetchLatestUnviewedMonthlySummary(
+        householdId: UUID
+    ) async throws -> ChezMonthlySummaryRow? {
+        let rows: [ChezMonthlySummaryRow] = try await from("chez_monthly_summaries")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .is("viewed_at", value: nil)
+            .order("period_start", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Marks a monthly summary as viewed. Idempotent.
+    func markMonthlySummaryViewed(id: UUID) async throws {
+        struct ViewedUpdate: Encodable {
+            let viewed_at: String
+        }
+        _ = try await from("chez_monthly_summaries")
+            .update(ViewedUpdate(viewed_at: ISO8601DateFormatter().string(from: Date())))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
 
     // MARK: - Phase 66: Routines as first-class Services
 

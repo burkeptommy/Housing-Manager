@@ -89,6 +89,21 @@ final class DashboardViewModel: ObservableObject {
     @Published var chezActiveGroupCount: Int = 0
     @Published var chezDelegatedItemCount: Int = 0
 
+    /// Phase 85 — "This week with Chez" digest fed by chez_activity_log.
+    /// `chezActivityWeeklyTally` powers the Dashboard ChezActivityCard's
+    /// glanceable counts; `recentChezActivity` is the most-recent N rows
+    /// for the preview line on the same card. Loaded lazily on first
+    /// dashboard load and refreshed when the homeowner pulls to refresh.
+    @Published var chezActivityWeeklyTally: ChezActivityWeeklyTally = .empty
+    @Published var recentChezActivity: [ChezActivityLogRow] = []
+
+    /// Phase 84.5 — Active home_assessments row for the primary
+    /// property. Non-nil when the homeowner picked "Have Chez handle it"
+    /// at signup AND status NOT IN (completed, cancelled). The dashboard
+    /// renders `HomeAssessmentPendingCard` + `HomeAssessmentPrepCard`
+    /// based on this.
+    @Published var homeAssessment: HomeAssessmentRow? = nil
+
     // Phase 50: Registry-aware coverage items for the redesigned sheet
     @Published var uncoveredCoverageItems: [VendorCoverageItem] = []
     @Published var coveredCoverageItems: [VendorCoverageItem] = []
@@ -684,6 +699,15 @@ final class DashboardViewModel: ObservableObject {
                 loadHandymanPunchCount,
                 loadHandymanSeasonalReminder,
                 loadChezOwnershipCounts,
+                // Phase 85 — "This week with Chez" digest powering the
+                // Dashboard ChezActivityCard. Empty for DIY-default
+                // users; populated as ingestion + chez_owned task
+                // completion fire chez_activity_log inserts.
+                loadChezActivity,
+                // Phase 84.5 — fetch the active home_assessments row
+                // (or nil when not in handyman mode). Drives the
+                // HomeAssessmentPendingCard + HomeAssessmentPrepCard.
+                loadHomeAssessment,
             ]
             for method in methods {
                 group.addTask { @MainActor in
@@ -864,6 +888,60 @@ final class DashboardViewModel: ObservableObject {
             chezDelegatedItemCount = routineDel + contractorDel + taskDel
         } catch {
             print("[Dashboard] loadChezOwnershipCounts failed: \(error)")
+        }
+    }
+
+    /// Phase 85 — Load the last 7 days of chez_activity_log for the
+    /// "This week with Chez" Dashboard card. Sets the tally + a
+    /// preview slice for the bottom of the card. Soft-fails: empty
+    /// tally on error so the card simply hides.
+    func loadChezActivity() async {
+        guard let householdId = primaryHouseholdId else {
+            chezActivityWeeklyTally = .empty
+            recentChezActivity = []
+            return
+        }
+        do {
+            let rows = try await DatabaseService.shared.fetchChezActivity(
+                householdId: householdId,
+                daysBack: 7,
+                dashboardOnly: true,
+                limit: 50
+            )
+            chezActivityWeeklyTally = ChezActivityWeeklyTally.from(rows)
+            recentChezActivity = Array(rows.prefix(3))
+        } catch {
+            print("[Dashboard] loadChezActivity failed: \(error)")
+            chezActivityWeeklyTally = .empty
+            recentChezActivity = []
+        }
+    }
+
+    /// Phase 84.5 — Load the active home_assessments row for the
+    /// primary property. Called from `fetchAll`. Sets `homeAssessment`
+    /// to nil when no active row exists; the dashboard then suppresses
+    /// the pending + prep cards.
+    func loadHomeAssessment() async {
+        guard let propertyId = primaryPropertyId else {
+            homeAssessment = nil
+            return
+        }
+        do {
+            let row = try await HavenSupabase.fetchHomeAssessment(
+                assessmentId: nil,
+                propertyId: propertyId
+            )
+            // Suppress on completed/cancelled — those are terminal and
+            // the dashboard shouldn't show the card after the homeowner
+            // reviewed.
+            if let r = row, !r.status.isActive {
+                homeAssessment = nil
+            } else {
+                homeAssessment = row
+            }
+        } catch {
+            print("[Dashboard] loadHomeAssessment failed: \(error)")
+            homeAssessment = nil
         }
     }
 

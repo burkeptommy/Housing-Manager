@@ -27,6 +27,14 @@ struct DashboardView: View {
     @State private var showApplianceSetup = false
     @State private var pendingMergeRequest: [String: Any]?
     @State private var showVendorCoverage = false
+
+    // Phase 84.5 — Home Assessment dashboard sheet/alert state
+    @State private var showAssessmentRescheduleSheet = false
+    @State private var confirmAssessmentCancel = false
+    @State private var showAssessmentPrepNotesSheet = false
+    @State private var showAssessmentPrepPhotosSheet = false
+    @State private var showAssessmentPrepQuizSheet = false
+    @State private var showAssessmentReview = false
     @State private var findVendorSystemName: String?
     @State private var findVendorItem: VendorActionItem?
     @State private var addVendorItem: VendorActionItem?
@@ -105,6 +113,46 @@ struct DashboardView: View {
                         // view. Saves ~32pt vertical.
                         compactGreeting
 
+                        // Phase 84.5 — Assessment pending card (the
+                        // homeowner picked "Have Chez handle it" at
+                        // signup). Renders status-specific copy across
+                        // pending → scheduled → en_route → in_progress →
+                        // submitted → awaiting_review. Suppresses the
+                        // quiz prompt + Coverage Hero while active.
+                        if let assessment = viewModel.homeAssessment {
+                            HomeAssessmentPendingCard(
+                                assessment: assessment,
+                                handymanFirstName: nil,  // Wired post-dispatch from chez_pending_assessments_v
+                                handymanPhotoURL: nil,
+                                scheduledWindowText: nil,
+                                onReviewCaptured: {
+                                    NotificationCenter.default.post(
+                                        name: .openChezAssessmentReview,
+                                        object: nil,
+                                        userInfo: ["assessment_id": assessment.id.uuidString]
+                                    )
+                                },
+                                onReschedule: {
+                                    showAssessmentRescheduleSheet = true
+                                },
+                                onSwitchToDIY: {
+                                    confirmAssessmentCancel = true
+                                }
+                            )
+
+                            // Phase 84.5 — Pre-visit prep card (only
+                            // before the visit starts; hide once handyman
+                            // is en route or beyond).
+                            if assessment.status == .pending || assessment.status == .scheduled {
+                                HomeAssessmentPrepCard(
+                                    assessment: assessment,
+                                    onOpenNotes: { showAssessmentPrepNotesSheet = true },
+                                    onOpenPhotos: { showAssessmentPrepPhotosSheet = true },
+                                    onOpenPrepQuiz: { showAssessmentPrepQuizSheet = true }
+                                )
+                            }
+                        }
+
                         // Phase 66: One-time "We reorganized your
                         // maintenance" card for existing TestFlight
                         // users. Dismisses permanently via @AppStorage.
@@ -157,6 +205,19 @@ struct DashboardView: View {
                             ) {
                                 Haptics.light()
                                 navigationPath.append("chez_ownership")
+                            }
+                        }
+
+                        // Phase 85 — "This week with Chez" digest. Renders
+                        // only when there's been Chez activity in the
+                        // last 7 days; DIY-default users see nothing.
+                        if viewModel.chezActivityWeeklyTally.hasAnything {
+                            ChezActivityCard(
+                                tally: viewModel.chezActivityWeeklyTally,
+                                recentItems: viewModel.recentChezActivity
+                            ) {
+                                Haptics.light()
+                                navigationPath.append("chez_activity")
                             }
                         }
 
@@ -478,6 +539,13 @@ struct DashboardView: View {
                     // picking what Chez handles. Reachable from the
                     // Dashboard hero card AND from Settings.
                     ChezOwnershipView()
+                } else if destination == "chez_activity" {
+                    // Phase 85 — full chronological list of Chez actions
+                    // for the household. Reached from the Dashboard's
+                    // "This week with Chez" card.
+                    if let householdId = viewModel.primaryHouseholdId {
+                        ChezActivityView(householdId: householdId)
+                    }
                 } else if destination == "maintenance" {
                     // Phase 66: Default Maintenance tab lands on the new
                     // 5-section hub (Your Services / Handyman / Vehicles /
@@ -785,6 +853,102 @@ struct DashboardView: View {
                     }
                 )
                 .presentationDetents([.large])
+            }
+            // Phase 84.5 — Home assessment dashboard sheets/dialogs
+            .confirmationDialog(
+                "Switch to managing it yourself?",
+                isPresented: $confirmAssessmentCancel,
+                titleVisibility: .visible
+            ) {
+                Button("Yes, take it back", role: .destructive) {
+                    Task { await cancelHomeAssessment() }
+                }
+                Button("Keep my visit", role: .cancel) {}
+            } message: {
+                Text("We'll cancel your free assessment and bring back the quiz so you can set things up yourself. You can switch back anytime.")
+            }
+            .sheet(isPresented: $showAssessmentRescheduleSheet) {
+                if let assessment = viewModel.homeAssessment {
+                    AssessmentRescheduleSheet(
+                        assessment: assessment,
+                        onSubmit: { notes in
+                            try? await HavenSupabase.requestAssessmentReschedule(
+                                assessmentId: assessment.id, notes: notes, preferredDates: nil)
+                            Analytics.track(.homeAssessmentRescheduleRequested, [:])
+                            await viewModel.loadHomeAssessment()
+                        }
+                    )
+                    .presentationDetents([.medium])
+                }
+            }
+            .sheet(isPresented: $showAssessmentPrepNotesSheet) {
+                if let assessment = viewModel.homeAssessment {
+                    AssessmentPrepNotesSheet(
+                        assessment: assessment,
+                        onSave: { notes in
+                            try? await HavenSupabase.updatePreVisitData(
+                                assessmentId: assessment.id, notes: notes,
+                                photos: nil, attributes: nil)
+                            Analytics.track(.homeAssessmentPreVisitDataUpdated, ["field": "notes"])
+                            await viewModel.loadHomeAssessment()
+                        }
+                    )
+                    .presentationDetents([.medium])
+                }
+            }
+            .sheet(isPresented: $showAssessmentPrepPhotosSheet) {
+                if let assessment = viewModel.homeAssessment {
+                    AssessmentPrepPhotosSheet(
+                        assessment: assessment,
+                        onComplete: {
+                            Analytics.track(.homeAssessmentPreVisitDataUpdated, ["field": "photos"])
+                            await viewModel.loadHomeAssessment()
+                        }
+                    )
+                    .presentationDetents([.large])
+                }
+            }
+            .sheet(isPresented: $showAssessmentPrepQuizSheet) {
+                if let assessment = viewModel.homeAssessment {
+                    AssessmentPrepQuizSheet(
+                        assessment: assessment,
+                        onSave: { attributes in
+                            try? await HavenSupabase.updatePreVisitData(
+                                assessmentId: assessment.id,
+                                notes: nil,
+                                photos: nil,
+                                attributes: attributes
+                            )
+                            Analytics.track(.homeAssessmentPreVisitDataUpdated, ["field": "quiz"])
+                            await viewModel.loadHomeAssessment()
+                        }
+                    )
+                    .presentationDetents([.large])
+                }
+            }
+            .sheet(isPresented: $showAssessmentReview) {
+                if let assessment = viewModel.homeAssessment {
+                    AssessmentReviewView(
+                        assessment: assessment,
+                        onApproved: {
+                            Analytics.track(.homeAssessmentReviewSubmitted, [:])
+                            await viewModel.loadHomeAssessment()
+                        },
+                        onCorrectionsRequested: { items in
+                            try? await HavenSupabase.requestAssessmentCorrections(
+                                assessmentId: assessment.id, items: items)
+                            Analytics.track(.homeAssessmentCorrectionsRequested,
+                                ["count": String(items.count)])
+                            await viewModel.loadHomeAssessment()
+                        }
+                    )
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openChezAssessmentReview)) { _ in
+                showAssessmentReview = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .chezHomeAssessmentChanged)) { _ in
+                Task { await viewModel.loadHomeAssessment() }
             }
             .fullScreenCover(isPresented: $showMergeResolution) {
                 if let preview = mergePreviewResponse,
@@ -1968,6 +2132,23 @@ struct DashboardView: View {
     }
 
     // MARK: - Phase 19l: Re-fire delegation sheet for new contractors
+
+    /// Phase 84.5 — Homeowner switches from Chez-handles-it back to DIY.
+    /// Cancels the in-flight assessment, releases assessment_mode, brings
+    /// back the quiz card.
+    private func cancelHomeAssessment() async {
+        guard let assessment = viewModel.homeAssessment else { return }
+        do {
+            try await HavenSupabase.cancelHomeAssessment(
+                assessmentId: assessment.id, reason: "homeowner_self_serve")
+            Analytics.track(.homeAssessmentCancelled, [:])
+            await viewModel.refresh()
+            Haptics.success()
+        } catch {
+            print("[Dashboard] cancelHomeAssessment failed: \(error)")
+            Haptics.error()
+        }
+    }
 
     /// Compute delegation candidates filtered to a single newly-added
     /// contractor. Mirrors the post-quiz loader in HouseQuizView but only
