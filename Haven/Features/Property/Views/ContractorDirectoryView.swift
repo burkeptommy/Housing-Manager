@@ -1912,7 +1912,7 @@ struct EditContractorSheet: View {
                 }
 
                 if contactType == "Contractor / Service Provider" {
-                    Section("Categories") {
+                    Section {
                         ForEach(VendorCategories.all, id: \.self) { cat in
                             Button {
                                 if selectedSpecialties.contains(cat) {
@@ -1932,6 +1932,21 @@ struct EditContractorSheet: View {
                                 }
                             }
                         }
+                    } header: {
+                        Text("Categories")
+                    } footer: {
+                        // Phase 95 (gap #16): warn that category changes
+                        // ripple beyond the row. Vendor coverage matching
+                        // (PropertyDetailView Contacts hub) and reconciler
+                        // task-to-contractor linking both consume
+                        // `specialties[]` via SystemCategoryRegistry's
+                        // canonical lookup. Dropping a category here
+                        // un-links any tasks the reconciler had matched
+                        // by it, and adds a category re-runs matching on
+                        // the next reconcile pass.
+                        Text("Changing categories updates which systems and tasks this vendor is matched to. Past service history stays put.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
 
