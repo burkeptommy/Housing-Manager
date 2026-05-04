@@ -29,6 +29,27 @@ enum AnalyticsEvent: String {
     case onboardingStepCompleted = "onboarding_step_completed"
     case onboardingCompleted = "onboarding_completed"
     case onboardingSkipped = "onboarding_skipped"
+    /// Phase 84.5 — 3-mode chooser at signup.
+    case onboardingModeDIY = "onboarding_mode_diy"
+    case onboardingModeBlended = "onboarding_mode_blended"
+    case onboardingModeHandyman = "onboarding_mode_handyman"
+    case homeAssessmentRequested = "home_assessment_requested"
+    case homeAssessmentCancelled = "home_assessment_cancelled"
+    case homeAssessmentRescheduleRequested = "home_assessment_reschedule_requested"
+    case homeAssessmentReviewSubmitted = "home_assessment_review_submitted"
+    case homeAssessmentCorrectionsRequested = "home_assessment_corrections_requested"
+    case homeAssessmentPreVisitDataUpdated = "home_assessment_pre_visit_data_updated"
+    /// Phase 84.5 round 2 — bifurcated onboarding events
+    case onboardingFoundationalCompleted = "onboarding_foundational_completed"
+    case onboardingModeForkSelfQuiz = "onboarding_mode_fork_self_quiz"
+    case onboardingModeForkHandyman = "onboarding_mode_fork_handyman"
+    case onboardingCoverageWaitlistJoined = "onboarding_coverage_waitlist_joined"
+    case homeAssessmentUrgentFinding = "home_assessment_urgent_finding"
+    case homeAssessmentSystemDecommissioned = "home_assessment_system_decommissioned"
+    case homeAssessmentRecommendationApproved = "home_assessment_recommendation_approved"
+    case homeAssessmentRecommendationDeclined = "home_assessment_recommendation_declined"
+    case homeAssessmentRecommendationDisputed = "home_assessment_recommendation_disputed"
+    case homeAssessmentRecommendationHandled = "home_assessment_recommendation_handled"
 
     // MARK: - House Quiz
     case quizStarted = "quiz_started"
@@ -43,6 +64,10 @@ enum AnalyticsEvent: String {
     case quizSavedAndExited = "quiz_saved_and_exited"
     case quizSaveAndExitFailed = "quiz_save_and_exit_failed"
     case quizPersistFailed = "quiz_persist_failed"
+    // Phase 85: intake → walk-through split + path-decision flow
+    case quizPathChosen = "quiz_path_chosen"
+    case quizWalkthroughCompleted = "quiz_walkthrough_completed"
+    case quizAssessmentRequested = "quiz_assessment_requested"
     // Build 83 (Apr 7, 2026): Quiz UX trust pass
     case quizCurrencyPrefilled = "quiz_currency_prefilled"
     case quizContractorChipExpanded = "quiz_contractor_chip_expanded"

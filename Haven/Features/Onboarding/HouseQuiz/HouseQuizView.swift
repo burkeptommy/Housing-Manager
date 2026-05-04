@@ -265,6 +265,10 @@ struct HouseQuizView: View {
 
                 if viewModel.isComplete {
                     completionView
+                } else if viewModel.shouldShowPathDecision {
+                    // Phase 85 — intake complete, homeowner needs to pick
+                    // self-serve walkthrough vs handyman home assessment.
+                    pathDecisionScreen
                 } else if viewModel.showSavedReviewScreen {
                     // Build 85: saved-for-later review list. Toggled by
                     // the trailing toolbar pill or auto-shown by
@@ -717,6 +721,33 @@ struct HouseQuizView: View {
               let current = viewModel.currentQuestion
         else { return false }
         return !viewModel.shownChapterIntros.contains(current.chapter)
+    }
+
+    /// Phase 85: the path-decision screen renders after intake completes.
+    /// User picks self-serve walkthrough or handyman home assessment.
+    /// Both choices end the quiz session — self-serve dismisses to the
+    /// dashboard where the WalkthroughView is reachable from the property
+    /// detail; handyman assessment dismisses to the dashboard where
+    /// HomeAssessmentPendingCard now renders the trust card + countdown.
+    private var pathDecisionScreen: some View {
+        PathDecisionView(
+            viewModel: viewModel,
+            onChooseSelfServe: {
+                // PR 1: route to dashboard. PR 2 will push WalkthroughView
+                // directly. For now, the homeowner can resume detail
+                // capture from the property detail's "Add detail" CTA
+                // that PR 2 introduces.
+                NotificationCenter.default.post(name: .popToRoot, object: nil, userInfo: ["tab": 0])
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+            },
+            onAssessmentBooked: {
+                // Same — dismiss to dashboard. The HomeAssessmentPendingCard
+                // (Phase 84.5) already renders there once the assessment
+                // row exists.
+                NotificationCenter.default.post(name: .popToRoot, object: nil, userInfo: ["tab": 0])
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+            }
+        )
     }
 
     /// Phase 60.3: the pause-between-sections card. Auto-advances after

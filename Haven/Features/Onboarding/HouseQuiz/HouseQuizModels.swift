@@ -4,9 +4,36 @@ import Foundation
 
 /// Per-property quiz state stored as JSONB on the properties row.
 /// Tracks every question in one of three buckets: answered, saved-for-later, skipped.
+///
+/// Phase 85 — split completion into two milestones:
+///   - `intakeCompletedAt`: all 28 quiz questions resolved (the homeowner has
+///     given Chez everything Chez needs to do a pre-visit briefing)
+///   - `walkthroughCompletedAt`: per-system detail capture done — either by
+///     the homeowner walking the property themselves, or by a handyman doing
+///     it during a free home assessment visit (via the chez-concierge
+///     ingestion pipeline). Cinematic reveal fires here, NOT at intake.
+///
+/// `completedAt` is preserved for backward compatibility — older rows that
+/// pre-date the split read `completedAt` as a synonym for both new fields.
 struct HouseQuizState: Codable, Equatable {
     var startedAt: Date?
     var completedAt: Date?
+    /// Phase 85: flips when all intake questions are resolved.
+    var intakeCompletedAt: Date?
+    /// Phase 85: flips when the walk-through (self-serve or handyman-led)
+    /// finishes. For self-serve, set when the user finishes their per-
+    /// system capture pass. For handyman path, set by the chez-concierge
+    /// ingestion pipeline after the homeowner approves the assessment.
+    var walkthroughCompletedAt: Date?
+    /// Phase 85: which path the homeowner chose at the path-decision screen.
+    /// "self" = continue walking through systems themselves.
+    /// "handyman" = scheduled a Chez handyman home assessment.
+    /// nil = haven't reached the decision yet.
+    var chosenPath: String?
+    /// Phase 85: walk-through render mode.
+    /// "self_serve" = iOS WalkthroughView.
+    /// "handyman_assessment" = handyman captures via operations SPA.
+    var walkthroughMode: String?
     var answers: [String: HouseQuizAnswer]
     var savedForLater: [String]
     var skipped: [String]
@@ -14,6 +41,10 @@ struct HouseQuizState: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case startedAt = "started_at"
         case completedAt = "completed_at"
+        case intakeCompletedAt = "intake_completed_at"
+        case walkthroughCompletedAt = "walkthrough_completed_at"
+        case chosenPath = "chosen_path"
+        case walkthroughMode = "walkthrough_mode"
         case answers
         case savedForLater = "saved_for_later"
         case skipped
@@ -22,18 +53,94 @@ struct HouseQuizState: Codable, Equatable {
     init(
         startedAt: Date? = nil,
         completedAt: Date? = nil,
+        intakeCompletedAt: Date? = nil,
+        walkthroughCompletedAt: Date? = nil,
+        chosenPath: String? = nil,
+        walkthroughMode: String? = nil,
         answers: [String: HouseQuizAnswer] = [:],
         savedForLater: [String] = [],
         skipped: [String] = []
     ) {
         self.startedAt = startedAt
         self.completedAt = completedAt
+        self.intakeCompletedAt = intakeCompletedAt
+        self.walkthroughCompletedAt = walkthroughCompletedAt
+        self.chosenPath = chosenPath
+        self.walkthroughMode = walkthroughMode
         self.answers = answers
         self.savedForLater = savedForLater
         self.skipped = skipped
     }
 
+    /// Resilient decoder per CLAUDE.md rule for externally-fed Codable types.
+    /// Pre-Phase-85 rows (rows that pre-date the intake/walkthrough split)
+    /// only have `completed_at` set. Treat that as a back-compat signal —
+    /// if `intake_completed_at` is missing but `completed_at` is present,
+    /// assume both intake and walkthrough completed when `completed_at`
+    /// flipped (the old single-completion semantic).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.startedAt = try? c.decodeIfPresent(Date.self, forKey: .startedAt)
+        self.completedAt = try? c.decodeIfPresent(Date.self, forKey: .completedAt)
+        self.intakeCompletedAt = try? c.decodeIfPresent(Date.self, forKey: .intakeCompletedAt)
+        self.walkthroughCompletedAt = try? c.decodeIfPresent(Date.self, forKey: .walkthroughCompletedAt)
+        self.chosenPath = try? c.decodeIfPresent(String.self, forKey: .chosenPath)
+        self.walkthroughMode = try? c.decodeIfPresent(String.self, forKey: .walkthroughMode)
+        self.answers = (try? c.decodeIfPresent([String: HouseQuizAnswer].self, forKey: .answers)) ?? [:]
+        self.savedForLater = (try? c.decodeIfPresent([String].self, forKey: .savedForLater)) ?? []
+        self.skipped = (try? c.decodeIfPresent([String].self, forKey: .skipped)) ?? []
+
+        // Back-compat: pre-Phase-85 rows only have completedAt. If the new
+        // intake/walkthrough fields are nil but completedAt is set, fill
+        // both forward so the path-decision screen doesn't re-fire for
+        // a homeowner who already finished the old single-pass quiz.
+        if completedAt != nil && intakeCompletedAt == nil {
+            self.intakeCompletedAt = completedAt
+        }
+        if completedAt != nil && walkthroughCompletedAt == nil {
+            self.walkthroughCompletedAt = completedAt
+        }
+    }
+
     static let empty = HouseQuizState()
+}
+
+// MARK: - Phase 85 path/mode enums (string-typed via JSONB but exposed as
+// strongly-typed convenience accessors for the view model + view layer)
+
+enum HouseQuizPath: String, Codable {
+    case selfServe = "self"
+    case handyman = "handyman"
+}
+
+enum HouseQuizWalkthroughMode: String, Codable {
+    case selfServe = "self_serve"
+    case handymanAssessment = "handyman_assessment"
+}
+
+extension HouseQuizState {
+    /// Strongly-typed access to `chosenPath`. Reads/writes the underlying
+    /// String so the JSONB representation stays human-readable.
+    var typedChosenPath: HouseQuizPath? {
+        get { chosenPath.flatMap(HouseQuizPath.init(rawValue:)) }
+        set { chosenPath = newValue?.rawValue }
+    }
+
+    var typedWalkthroughMode: HouseQuizWalkthroughMode? {
+        get { walkthroughMode.flatMap(HouseQuizWalkthroughMode.init(rawValue:)) }
+        set { walkthroughMode = newValue?.rawValue }
+    }
+
+    /// Phase 85 derived flags used throughout the view model + view.
+    var isIntakeComplete: Bool { intakeCompletedAt != nil }
+    var isWalkthroughComplete: Bool { walkthroughCompletedAt != nil }
+    var hasChosenPath: Bool { chosenPath != nil }
+    /// The path-decision screen renders when intake is complete but the
+    /// homeowner hasn't picked a path yet AND the walkthrough hasn't
+    /// already finished (defensive against weird state).
+    var shouldShowPathDecision: Bool {
+        isIntakeComplete && !hasChosenPath && !isWalkthroughComplete
+    }
 }
 
 /// A single recorded answer. `answerId` is the option key the user picked;

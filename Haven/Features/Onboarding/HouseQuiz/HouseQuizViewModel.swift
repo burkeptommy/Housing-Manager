@@ -601,8 +601,26 @@ final class HouseQuizViewModel: ObservableObject {
         HouseQuizQuestionLibrary.milestoneIndices.contains(currentIndex - 1)
     }
 
+    /// Phase 85 (back-compat): "isComplete" historically meant "the quiz is
+    /// fully done" and gated the cinematic reveal. With the intake/walk-
+    /// through split, the cinematic only fires when the WALK-THROUGH
+    /// completes — not at intake. So `isComplete` now reflects that
+    /// stricter milestone. Surfaces that want the older "all questions
+    /// answered" semantic should read `state.isIntakeComplete` instead.
     var isComplete: Bool {
-        state.completedAt != nil
+        state.isWalkthroughComplete
+    }
+
+    /// Phase 85: every intake question answered (or skipped). Kept
+    /// separately from `isComplete` so the path-decision screen can
+    /// render after intake without triggering the cinematic.
+    var isIntakeComplete: Bool {
+        state.isIntakeComplete
+    }
+
+    /// Phase 85: should the path-decision screen render right now?
+    var shouldShowPathDecision: Bool {
+        state.shouldShowPathDecision
     }
 
     // MARK: - Actions
@@ -1127,15 +1145,53 @@ final class HouseQuizViewModel: ObservableObject {
     private func persistStateThrowing() async throws {
         let total = allQuestions.count - state.skipped.count
         let hasUnresolvedSaved = state.savedForLater.contains { state.answers[$0] == nil }
-        if state.answers.count >= total, total > 0, !hasUnresolvedSaved, state.completedAt == nil {
-            state.completedAt = Date()
-            Analytics.track(.quizCompleted)
+
+        // Phase 85: when all intake questions are resolved, flip
+        // intakeCompletedAt. The legacy `completedAt` field stays nil
+        // until the WALKTHROUGH completes (per the new two-phase model)
+        // — that's what gates the cinematic reveal.
+        //
+        // Back-compat: pre-Phase-85 rows have completedAt populated and
+        // intakeCompletedAt copied forward by the model's resilient
+        // decoder, so the quiz won't appear to "regress" for users who
+        // already finished the old single-pass quiz.
+        if state.answers.count >= total, total > 0, !hasUnresolvedSaved, state.intakeCompletedAt == nil {
+            state.intakeCompletedAt = Date()
+            Analytics.track(.quizCompleted)  // existing event — fires at intake completion
         }
 
         var update = PropertyUpdate()
         update.houseQuizState = state
         _ = try await db.updateProperty(id: property.id, update)
         NotificationCenter.default.post(name: .propertyChanged, object: nil)
+    }
+
+    // MARK: - Phase 85 path-decision API
+
+    /// Records the homeowner's choice of path after intake completes.
+    /// Persists the state immediately; subsequent UI routing decisions
+    /// read `state.typedChosenPath`.
+    func choosePath(_ path: HouseQuizPath) async {
+        state.typedChosenPath = path
+        state.typedWalkthroughMode = path == .selfServe ? .selfServe : .handymanAssessment
+        Analytics.track(.quizPathChosen, ["path": path.rawValue])
+        await persistState()
+    }
+
+    /// Marks the walk-through completed (self-serve path only — the
+    /// handyman path flips this from the chez-concierge ingestion
+    /// pipeline server-side). Also sets `completedAt` for back-compat
+    /// with surfaces that still read the old field.
+    func markWalkthroughComplete() async {
+        guard state.walkthroughCompletedAt == nil else { return }
+        state.walkthroughCompletedAt = Date()
+        if state.completedAt == nil {
+            state.completedAt = state.walkthroughCompletedAt
+        }
+        Analytics.track(.quizWalkthroughCompleted, [
+            "mode": state.walkthroughMode ?? "unknown",
+        ])
+        await persistState()
     }
 
     /// Backwards-compatible wrapper used by the per-answer auto-save path.
