@@ -132,9 +132,29 @@ struct MainTabView: View {
                 PropertyListView()
                     .tag(1)
 
-                TasksHubView()
-                    .environmentObject(appState)
-                    .tag(2)
+                // Phase 95 (gap #41): wrap the Tasks hub render in a
+                // feature-flag check so we have a rollback path if the
+                // V5 redesign hits an issue post-launch. The flag
+                // defaults to true (V5 is the shipping path) and can be
+                // flipped to false via UserDefaults to fall back to the
+                // pre-V5 MaintenanceHubView. Reads at view init time so
+                // the first launch after a flag flip picks up the
+                // change without an app restart.
+                Group {
+                    if UserDefaults.standard.object(forKey: "tasksHubV5Enabled") as? Bool ?? true {
+                        TasksHubView()
+                    } else {
+                        // Pre-V5 fallback: route directly into
+                        // MaintenanceHubView the same way PropertyDetailView
+                        // does. Keeps the surface usable while we debug
+                        // any V5-specific regressions.
+                        NavigationStack {
+                            MaintenanceHubView(filterPropertyId: nil)
+                        }
+                    }
+                }
+                .environmentObject(appState)
+                .tag(2)
 
                 ChatView()
                     .tag(3)
