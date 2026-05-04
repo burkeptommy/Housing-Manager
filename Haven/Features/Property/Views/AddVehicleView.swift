@@ -36,6 +36,15 @@ struct AddVehicleView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var photoImage: UIImage?
 
+    // Phase 95 (gap #91) — EV-specific fields. The toggle gates whether
+    // the battery + connector inputs render; ICE / hybrid / unsure flows
+    // see neither so the form stays compact for the common case. Unsure
+    // = leave the toggle off; we'll persist nil.
+    @State private var isEv = false
+    @State private var batteryCapacityKwhInput = ""
+    @State private var chargerType = "tesla"
+    private let chargerTypes = ["tesla", "nacs", "ccs", "j1772", "chademo"]
+
     // Relationships
     @State private var familyMembers: [FamilyMemberRow] = []
     @State private var selectedDriverId: UUID?
@@ -256,6 +265,39 @@ struct AddVehicleView: View {
                 }
             }
 
+            // Phase 95 (gap #91) — EV section. Toggle defaults off for
+            // the ICE/hybrid common case; flipping on reveals battery
+            // capacity + connector type so the rest of the app can
+            // skip ICE-only maintenance templates and surface the
+            // charger compatibility check on properties with
+            // `has_ev_charger`.
+            Section {
+                Toggle("Electric vehicle", isOn: $isEv)
+                if isEv {
+                    HStack {
+                        Text("Battery (kWh)")
+                        Spacer()
+                        TextField("e.g. 75", text: $batteryCapacityKwhInput)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    Picker("Connector", selection: $chargerType) {
+                        Text("Tesla / NACS").tag("tesla")
+                        Text("CCS").tag("ccs")
+                        Text("J1772").tag("j1772")
+                        Text("CHAdeMO").tag("chademo")
+                    }
+                }
+            } header: {
+                Text("Powertrain")
+            } footer: {
+                if isEv {
+                    Text("We'll skip oil changes and other ICE-only items from your maintenance schedule.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+
             Section("Key Dates") {
                 Toggle("Registration Expiry", isOn: $hasRegistrationExpiry)
                 if hasRegistrationExpiry {
@@ -300,6 +342,27 @@ struct AddVehicleView: View {
                 photoImage = image
             }
         }
+    }
+
+    /// Phase 95 (gap #91) — interval types that don't apply to
+    /// fully-electric vehicles. EVs have no engine oil, transmission
+    /// fluid (single-speed reduction gearbox), spark plugs, fuel
+    /// filter, or timing belt. Brake fluid, coolant (battery loop),
+    /// tire rotation, and cabin air filter still apply, so we keep
+    /// those.
+    private static let iceOnlyIntervalTypes: Set<String> = [
+        "oil_change",
+        "transmission_fluid",
+        "transmission_flush",
+        "differential_fluid",
+        "fuel_filter",
+        "spark_plugs",
+        "timing_belt",
+        "engine_air_filter",
+    ]
+
+    private static func isIceOnlyIntervalType(_ type: String) -> Bool {
+        iceOnlyIntervalTypes.contains(type.lowercased())
     }
 
     // MARK: - VIN Lookup
@@ -382,6 +445,15 @@ struct AddVehicleView: View {
             insert.preferredMechanicId = selectedMechanicId
             insert.maintenanceSchedule = maintenanceSchedule.isEmpty ? nil : maintenanceSchedule
             insert.notes = notes.isEmpty ? nil : notes
+            // Phase 95 (gap #91) — only persist EV signals when the
+            // toggle is on. Off means "ICE / hybrid / not sure" and
+            // we leave the columns null so the regional EV gate fails
+            // closed rather than mis-classifying ICE vehicles.
+            if isEv {
+                insert.isEv = true
+                insert.batteryCapacityKwh = Double(batteryCapacityKwhInput.trimmingCharacters(in: .whitespaces))
+                insert.chargerType = chargerType
+            }
 
             let vehicle = try await db.createVehicle(insert)
 
@@ -428,6 +500,14 @@ struct AddVehicleView: View {
             taskDateFormatter.timeZone = TimeZone(identifier: "UTC")
             for interval in maintenanceSchedule {
                 guard interval.intervalMiles != nil || interval.intervalMonths != nil else { continue }
+                // Phase 95 (gap #91) — drop ICE-only intervals for
+                // electric vehicles. The AI schedule emits these by
+                // default whether or not the vehicle is electric;
+                // without this filter an EV homeowner sees "Oil change"
+                // and "Transmission flush" tasks they can't action.
+                if isEv && Self.isIceOnlyIntervalType(interval.type) {
+                    continue
+                }
                 let nextDue: Date
                 if let months = interval.intervalMonths {
                     nextDue = Calendar.current.date(byAdding: .month, value: months, to: Date()) ?? Date()

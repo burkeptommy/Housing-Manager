@@ -4521,6 +4521,13 @@ struct VehicleRow: Codable, Identifiable {
     /// registration, insurance).
     let chezOwned: Bool?
     let chezOwnedAt: Date?
+    /// Phase 95 (gap #91) — EV-specific signals. `isEv` is the
+    /// authoritative flag the maintenance template gates check; the
+    /// other two are descriptive. All nullable so legacy ICE-only rows
+    /// decode without touching anything.
+    let isEv: Bool?
+    let batteryCapacityKwh: Double?
+    let chargerType: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, year, make, model, trim, color, vin, notes
@@ -4549,6 +4556,9 @@ struct VehicleRow: Codable, Identifiable {
         case estimatedValueSource = "estimated_value_source"
         case chezOwned = "chez_owned"
         case chezOwnedAt = "chez_owned_at"
+        case isEv = "is_ev"
+        case batteryCapacityKwh = "battery_capacity_kwh"
+        case chargerType = "charger_type"
     }
 
     init(from decoder: Decoder) throws {
@@ -4587,10 +4597,17 @@ struct VehicleRow: Codable, Identifiable {
         estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
         chezOwned = try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)
         chezOwnedAt = try? c.decodeIfPresent(Date.self, forKey: .chezOwnedAt)
+        isEv = try? c.decodeIfPresent(Bool.self, forKey: .isEv)
+        batteryCapacityKwh = try? c.decodeIfPresent(Double.self, forKey: .batteryCapacityKwh)
+        chargerType = try? c.decodeIfPresent(String.self, forKey: .chargerType)
     }
 
     /// Phase 84 — convenience getter for delegation status.
     var isChezOwned: Bool { chezOwned ?? false }
+
+    /// Phase 95 (gap #91) — convenience getter for the EV flag. Treats
+    /// nil as false so callers can branch without unwrapping.
+    var isElectric: Bool { isEv ?? false }
 
     var displayName: String {
         [year.map { String($0) }, make, model].compactMap { $0 }.joined(separator: " ")
@@ -4642,6 +4659,10 @@ struct VehicleInsert: Codable {
     var maintenanceSchedule: [VehicleMaintenanceInterval]?
     var photoPath: String?
     var notes: String?
+    /// Phase 95 (gap #91) — EV-specific signals.
+    var isEv: Bool?
+    var batteryCapacityKwh: Double?
+    var chargerType: String?
 
     enum CodingKeys: String, CodingKey {
         case name, year, make, model, trim, color, vin, notes
@@ -4661,6 +4682,9 @@ struct VehicleInsert: Codable {
         case coveredDriverIds = "covered_driver_ids"
         case maintenanceSchedule = "maintenance_schedule"
         case photoPath = "photo_path"
+        case isEv = "is_ev"
+        case batteryCapacityKwh = "battery_capacity_kwh"
+        case chargerType = "charger_type"
     }
 }
 
@@ -4693,6 +4717,10 @@ struct VehicleUpdate: Codable {
     var estimatedValueHigh: Double?
     var estimatedValueUpdatedAt: Date?
     var estimatedValueSource: String?
+    /// Phase 95 (gap #91) — EV-specific signals.
+    var isEv: Bool?
+    var batteryCapacityKwh: Double?
+    var chargerType: String?
 
     enum CodingKeys: String, CodingKey {
         case name, year, make, model, trim, color, vin, notes
@@ -4716,6 +4744,9 @@ struct VehicleUpdate: Codable {
         case estimatedValueHigh = "estimated_value_high"
         case estimatedValueUpdatedAt = "estimated_value_updated_at"
         case estimatedValueSource = "estimated_value_source"
+        case isEv = "is_ev"
+        case batteryCapacityKwh = "battery_capacity_kwh"
+        case chargerType = "charger_type"
     }
 }
 
