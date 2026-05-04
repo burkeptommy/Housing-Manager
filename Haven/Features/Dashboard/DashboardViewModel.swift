@@ -97,6 +97,11 @@ final class DashboardViewModel: ObservableObject {
     @Published var chezActivityWeeklyTally: ChezActivityWeeklyTally = .empty
     @Published var recentChezActivity: [ChezActivityLogRow] = []
 
+    /// Phase 85 — Latest unviewed monthly summary. Renders MonthlySummaryCard
+    /// when non-nil; flips to nil after the homeowner taps it (mark-viewed)
+    /// or explicitly dismisses.
+    @Published var unviewedMonthlySummary: ChezMonthlySummaryRow?
+
     /// Phase 84.5 — Active home_assessments row for the primary
     /// property. Non-nil when the homeowner picked "Have Chez handle it"
     /// at signup AND status NOT IN (completed, cancelled). The dashboard
@@ -899,22 +904,42 @@ final class DashboardViewModel: ObservableObject {
         guard let householdId = primaryHouseholdId else {
             chezActivityWeeklyTally = .empty
             recentChezActivity = []
+            unviewedMonthlySummary = nil
             return
         }
         do {
-            let rows = try await DatabaseService.shared.fetchChezActivity(
+            async let rowsReq = DatabaseService.shared.fetchChezActivity(
                 householdId: householdId,
                 daysBack: 7,
                 dashboardOnly: true,
                 limit: 50
             )
+            async let summaryReq = DatabaseService.shared.fetchLatestUnviewedMonthlySummary(
+                householdId: householdId
+            )
+            let rows = try await rowsReq
             chezActivityWeeklyTally = ChezActivityWeeklyTally.from(rows)
             recentChezActivity = Array(rows.prefix(3))
+            unviewedMonthlySummary = try? await summaryReq
         } catch {
             print("[Dashboard] loadChezActivity failed: \(error)")
             chezActivityWeeklyTally = .empty
             recentChezActivity = []
+            unviewedMonthlySummary = nil
         }
+    }
+
+    /// Phase 85 — flip the monthly summary's viewed_at and clear from
+    /// dashboard. Called when the user taps the card OR explicitly
+    /// dismisses it.
+    func dismissMonthlySummary() async {
+        guard let summary = unviewedMonthlySummary else { return }
+        do {
+            try await DatabaseService.shared.markMonthlySummaryViewed(id: summary.id)
+        } catch {
+            print("[Dashboard] markMonthlySummaryViewed failed: \(error)")
+        }
+        unviewedMonthlySummary = nil
     }
 
     /// Phase 84.5 — Load the active home_assessments row for the
