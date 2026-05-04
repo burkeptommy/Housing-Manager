@@ -7,6 +7,9 @@ struct HouseQuizView: View {
     @StateObject var viewModel: HouseQuizViewModel
     @Environment(\.dismiss) private var dismiss
 
+    /// Phase 85: drives the WalkthroughView fullScreenCover when the
+    /// homeowner picks "Keep going" on the path-decision screen.
+    @State private var showWalkthrough: Bool = false
     @State private var currencyText: String = ""
     /// Phase 16f: tracks whether we've already populated `currencyText` from
     /// the property's existing purchase price. We only want to do this once
@@ -515,6 +518,21 @@ struct HouseQuizView: View {
                     )
                 }
             }
+            // Phase 85 — Self-serve walk-through full-screen cover.
+            // Triggered from the path-decision screen's "Keep going"
+            // tap target. On dismiss, the walk-through view marks
+            // walkthroughCompletedAt so the cinematic reveal can fire.
+            .fullScreenCover(isPresented: $showWalkthrough) {
+                if let householdId = viewModel.property.householdId {
+                    NavigationStack {
+                        WalkthroughView(
+                            propertyId: viewModel.property.id,
+                            householdId: householdId,
+                            quizViewModel: viewModel
+                        )
+                    }
+                }
+            }
             // Phase 60.1 — edit sheet for the recap card's tap-to-correct
             // affordance. `.sheet(item:)` presents on non-nil field.
             .sheet(item: $editingRecapField) { field in
@@ -725,25 +743,16 @@ struct HouseQuizView: View {
 
     /// Phase 85: the path-decision screen renders after intake completes.
     /// User picks self-serve walkthrough or handyman home assessment.
-    /// Both choices end the quiz session — self-serve dismisses to the
-    /// dashboard where the WalkthroughView is reachable from the property
-    /// detail; handyman assessment dismisses to the dashboard where
-    /// HomeAssessmentPendingCard now renders the trust card + countdown.
+    /// Self-serve pushes WalkthroughView; handyman dismisses to the
+    /// dashboard where HomeAssessmentPendingCard renders the trust
+    /// card + countdown.
     private var pathDecisionScreen: some View {
         PathDecisionView(
             viewModel: viewModel,
             onChooseSelfServe: {
-                // PR 1: route to dashboard. PR 2 will push WalkthroughView
-                // directly. For now, the homeowner can resume detail
-                // capture from the property detail's "Add detail" CTA
-                // that PR 2 introduces.
-                NotificationCenter.default.post(name: .popToRoot, object: nil, userInfo: ["tab": 0])
-                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+                showWalkthrough = true
             },
             onAssessmentBooked: {
-                // Same — dismiss to dashboard. The HomeAssessmentPendingCard
-                // (Phase 84.5) already renders there once the assessment
-                // row exists.
                 NotificationCenter.default.post(name: .popToRoot, object: nil, userInfo: ["tab": 0])
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
             }
