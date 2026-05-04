@@ -93,6 +93,7 @@
 		15B763B2FCDFF742CECA451C /* HouseholdStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 312B0AF8C491CCA685866EA9 /* HouseholdStrip.swift */; };
 		161CAD0F055970046B554D10 /* SeasonCompletionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED6CAAD17D48E19486CB0690 /* SeasonCompletionBanner.swift */; };
 		16C9F768435B98AE2B44E73B /* VehicleLookupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D44F4D6FC19F4CE5475D905 /* VehicleLookupService.swift */; };
+		16D484CB09F646479303E41F /* HouseholdRealtimeSubscriptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB37FB78AC0C52A0181AFDCB /* HouseholdRealtimeSubscriptions.swift */; };
 		16E2F812F32E89F2F6D69566 /* ApplianceSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B47929756A10E295F62AB0 /* ApplianceSetupSheet.swift */; };
 		17013B333D3AA5AD8A986E3F /* ServiceHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693871EEED4A9EE08752B6C7 /* ServiceHistoryView.swift */; };
 		1727DD69EF5192BD4283B37D /* TaskRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E087517E8F19247E9153D7 /* TaskRoutingTests.swift */; };
@@ -674,6 +675,7 @@
 		C0231E1BF065772CA8723B0B /* QuizKidsInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */; };
 		C05BFF1A06A535C280008996 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46905EFC24FB1AD4C663EE7E /* APIClient.swift */; };
 		C061FC706B3BE981D6817564 /* MonthlySummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02693F1FDCD87FE7BF7B3F8 /* MonthlySummaryCard.swift */; };
+		C06A2D0992B79CA399719DA5 /* HouseholdRealtimeSubscriptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB37FB78AC0C52A0181AFDCB /* HouseholdRealtimeSubscriptions.swift */; };
 		C0CE5CBBF9AF16614D96D4DA /* UpcomingExpirations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A986D427111507813E0C8B5 /* UpcomingExpirations.swift */; };
 		C13F2ECD5395964B7086A509 /* ChezRequestsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF8E248ACA297AB5000C82D /* ChezRequestsListView.swift */; };
 		C15DACFCD429E56514E433F3 /* UpdateHomeDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A01411F71C6512A63FA44FC /* UpdateHomeDetailsSheet.swift */; };
@@ -1298,6 +1300,7 @@
 		D9B96EE37657BD097DB98878 /* ChezDirectoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezDirectoryService.swift; sourceTree = "<group>"; };
 		DB2C3C183F8B5FB668ADBCC4 /* DocumentUploadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUploadManager.swift; sourceTree = "<group>"; };
 		DB35F3710C0269686BE2C4E4 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
+		DB37FB78AC0C52A0181AFDCB /* HouseholdRealtimeSubscriptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdRealtimeSubscriptions.swift; sourceTree = "<group>"; };
 		DB71385C28F23E329C0C7C38 /* RemoteConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfig.swift; sourceTree = "<group>"; };
 		DBC7CA202538BC2C257BA508 /* ChatDocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDocumentCard.swift; sourceTree = "<group>"; };
 		DDCCEE76628155483DFF9776 /* HouseholdStaffStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdStaffStrip.swift; sourceTree = "<group>"; };
@@ -1766,6 +1769,7 @@
 				303DA8C75FD4DBAD4CB347A3 /* Day1TaskCurator.swift */,
 				F38C3FA8CB5030ACD24929E9 /* DefaultSystemsService.swift */,
 				ABC10FD2223F1E84DF985A90 /* HandymanVisitService.swift */,
+				DB37FB78AC0C52A0181AFDCB /* HouseholdRealtimeSubscriptions.swift */,
 				6249BFC2EEC544EF640144E4 /* InstallDatePrefiller.swift */,
 				1CBD1C9343A32403E54998C1 /* MaintenanceRealtimeSubscription.swift */,
 				97C493B8E4060D2DFD40A230 /* MaintenanceTaskReconciler.swift */,
@@ -2808,6 +2812,7 @@
 				A9DA3C7B503FE8D32F5F7BB2 /* HouseQuizViewModel.swift in Sources */,
 				795A2B009D0479EC87A76069 /* HouseholdAccessView.swift in Sources */,
 				E0998A70606273CC5A4F7D6F /* HouseholdInviteCoordinator.swift in Sources */,
+				16D484CB09F646479303E41F /* HouseholdRealtimeSubscriptions.swift in Sources */,
 				35D9FE2D2B0A467EA2F7A045 /* HouseholdStaffStrip.swift in Sources */,
 				E7627B10E1380740DE422203 /* HouseholdStaffView.swift in Sources */,
 				15B763B2FCDFF742CECA451C /* HouseholdStrip.swift in Sources */,
@@ -3266,6 +3271,7 @@
 				DCAAFDDCDB26EC2D57E63F61 /* HouseQuizViewModel.swift in Sources */,
 				2B121EE907CC6006D36A44E1 /* HouseholdAccessView.swift in Sources */,
 				2127D2892BDA1A6EC8CAAEDB /* HouseholdInviteCoordinator.swift in Sources */,
+				C06A2D0992B79CA399719DA5 /* HouseholdRealtimeSubscriptions.swift in Sources */,
 				350E1A0D0315F5E1B95D789B /* HouseholdStaffStrip.swift in Sources */,
 				06FFE6A9FE463530C20FFA4C /* HouseholdStaffView.swift in Sources */,
 				8DFB2EECDA73CC3ADACA196B /* HouseholdStrip.swift in Sources */,

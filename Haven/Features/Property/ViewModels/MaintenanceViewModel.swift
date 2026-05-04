@@ -74,6 +74,8 @@ final class MaintenanceViewModel: ObservableObject {
     /// task → Spouse B's open Tasks tab updates within seconds"
     /// without manual refresh.
     private var realtime: MaintenanceRealtimeSubscription?
+    private var systemsRealtime: HomeSystemRealtimeSubscription?
+    private var contractorsRealtime: ContractorRealtimeSubscription?
     private var realtimeHouseholdId: UUID?
 
     enum TaskFilterStatus: String, CaseIterable {
@@ -312,21 +314,25 @@ final class MaintenanceViewModel: ObservableObject {
     /// merges live INSERT / UPDATE / DELETE events into the local
     /// `tasks` array on the main actor.
     private func startRealtimeIfNeeded(householdId: UUID) async {
-        if realtimeHouseholdId == householdId, realtime != nil { return }
+        if realtimeHouseholdId == householdId,
+           realtime != nil,
+           systemsRealtime != nil,
+           contractorsRealtime != nil { return }
 
-        // Tear down any prior subscription (household switch).
-        if let prior = realtime {
-            await prior.stop()
-        }
+        // Tear down any prior subscriptions (household switch).
+        if let prior = realtime { await prior.stop() }
+        if let prior = systemsRealtime { await prior.stop() }
+        if let prior = contractorsRealtime { await prior.stop() }
 
-        let subscription = MaintenanceRealtimeSubscription(householdId: householdId)
-        subscription.onInsert = { [weak self] row in
+        // --- Tasks
+        let taskSub = MaintenanceRealtimeSubscription(householdId: householdId)
+        taskSub.onInsert = { [weak self] row in
             guard let self else { return }
             if !self.tasks.contains(where: { $0.id == row.id }) {
                 self.tasks.append(row)
             }
         }
-        subscription.onUpdate = { [weak self] row in
+        taskSub.onUpdate = { [weak self] row in
             guard let self else { return }
             if let idx = self.tasks.firstIndex(where: { $0.id == row.id }) {
                 self.tasks[idx] = row
@@ -334,14 +340,61 @@ final class MaintenanceViewModel: ObservableObject {
                 self.tasks.append(row)
             }
         }
-        subscription.onDelete = { [weak self] taskId in
+        taskSub.onDelete = { [weak self] taskId in
             guard let self else { return }
             self.tasks.removeAll { $0.id == taskId }
         }
 
-        realtime = subscription
+        // --- Home systems (PR 45)
+        let systemSub = HomeSystemRealtimeSubscription(householdId: householdId)
+        systemSub.onInsert = { [weak self] row in
+            guard let self else { return }
+            if !self.systems.contains(where: { $0.id == row.id }) {
+                self.systems.append(row)
+            }
+        }
+        systemSub.onUpdate = { [weak self] row in
+            guard let self else { return }
+            if let idx = self.systems.firstIndex(where: { $0.id == row.id }) {
+                self.systems[idx] = row
+            } else {
+                self.systems.append(row)
+            }
+        }
+        systemSub.onDelete = { [weak self] systemId in
+            guard let self else { return }
+            self.systems.removeAll { $0.id == systemId }
+        }
+
+        // --- Contractors (PR 45)
+        let contractorSub = ContractorRealtimeSubscription(householdId: householdId)
+        contractorSub.onInsert = { [weak self] row in
+            guard let self else { return }
+            if !self.contractors.contains(where: { $0.id == row.id }) {
+                self.contractors.append(row)
+            }
+        }
+        contractorSub.onUpdate = { [weak self] row in
+            guard let self else { return }
+            if let idx = self.contractors.firstIndex(where: { $0.id == row.id }) {
+                self.contractors[idx] = row
+            } else {
+                self.contractors.append(row)
+            }
+        }
+        contractorSub.onDelete = { [weak self] contractorId in
+            guard let self else { return }
+            self.contractors.removeAll { $0.id == contractorId }
+        }
+
+        realtime = taskSub
+        systemsRealtime = systemSub
+        contractorsRealtime = contractorSub
         realtimeHouseholdId = householdId
-        await subscription.start()
+
+        await taskSub.start()
+        await systemSub.start()
+        await contractorSub.start()
     }
 
     func propertyName(for id: UUID) -> String {
