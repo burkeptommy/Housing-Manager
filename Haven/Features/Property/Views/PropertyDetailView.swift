@@ -491,6 +491,7 @@ struct PropertyDetailView: View {
                     InvestmentSummaryCard(
                         property: property,
                         totalProjectSpend: viewModel.totalProjectSpend,
+                        inFlightProjectSpend: viewModel.inFlightProjectSpend,
                         onValuesUpdated: { update in
                             await viewModel.applyPropertyUpdate(update)
                         },
@@ -1415,6 +1416,7 @@ struct PropertyDetailView: View {
             InvestmentSummaryCard(
                 property: property,
                 totalProjectSpend: viewModel.totalProjectSpend,
+                inFlightProjectSpend: viewModel.inFlightProjectSpend,
                 onValuesUpdated: { update in
                     await viewModel.applyPropertyUpdate(update)
                 },

@@ -7,6 +7,12 @@ import SwiftUI
 struct InvestmentSummaryCard: View {
     let property: PropertyRow
     let totalProjectSpend: Double
+    /// Phase 95 (gap #50) — estimated spend on in-flight projects
+    /// (planning / in_progress with budget but no actualSpend).
+    /// Surfaces in the waterfall as a secondary line so users
+    /// see the FULL picture, not just completed projects. Defaults
+    /// 0 so existing callers compile without change.
+    var inFlightProjectSpend: Double = 0
     var onValuesUpdated: ((PropertyUpdate) async -> Void)? = nil
     /// Build 84 — async callback wired to
     /// `PropertyDetailViewModel.refreshFromPublicRecords` so the empty-state
@@ -533,6 +539,21 @@ struct InvestmentSummaryCard: View {
             if totalProjectSpend > 0 {
                 dashedConnector
                 flowItem(label: "+ Project spend", value: formatCurrency(totalProjectSpend), barColor: HavenColors.navy800.opacity(0.5))
+            }
+
+            // Phase 95 (gap #50) — in-flight project estimates as a
+            // secondary line. Excluded from `totalInvested` because
+            // budgets aren't actual spend yet, but the homeowner
+            // wants to see what's coming. Color-tinted differently
+            // (warning amber) so it reads as "estimated" not
+            // "actual."
+            if inFlightProjectSpend > 0 {
+                dashedConnector
+                flowItem(
+                    label: "+ In-flight estimates",
+                    value: formatCurrency(inFlightProjectSpend),
+                    barColor: HavenColors.warning.opacity(0.6)
+                )
             }
 
             dashedConnector
