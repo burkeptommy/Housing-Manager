@@ -128,6 +128,25 @@ struct QuoteAnalysisView: View {
             overallCard(assessment)
         }
 
+        // Phase 95 (gap #33) — line-item breakdown. The
+        // `analyze-quote` Edge Function extracts every line item
+        // with quantity, unit, fair-market range, and per-item
+        // good/fair/overpriced rating; previously the data lived
+        // in the response but never rendered. Without this the
+        // user only saw the overall assessment + tips and had no
+        // way to see WHY the rating landed where it did.
+        if let items = analysis.lineItems, !items.isEmpty {
+            lineItemsSection(items)
+        }
+
+        // Phase 95 (gap #33) — DIY alternative. Edge function
+        // emits this on every quote; previously hidden so users
+        // missed the "could you do this yourself for $X" framing
+        // entirely.
+        if let diy = analysis.suggestedDiyAlternative {
+            diyCard(diy)
+        }
+
         // Negotiation tips (prioritize itemized quote tip)
         let allTips = buildTips(analysis)
         if !allTips.isEmpty {
