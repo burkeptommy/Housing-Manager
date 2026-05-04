@@ -192,7 +192,7 @@ struct AssessmentPendingCard: View {
         case .inProgress:
             return "Capturing every system, vendor, and document. We'll notify you when they're done."
         case .submitted:
-            return "Setting up your home in Haven now."
+            return "Setting up your home in Chez now."
         case .ingestionFailed:
             return "Something went wrong on our end. Chez has been notified — we'll reach out shortly."
         default:

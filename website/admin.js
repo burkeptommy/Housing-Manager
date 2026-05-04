@@ -150,7 +150,7 @@ const VIEWS = [
     group: "catalog",
     title: "Maintenance Templates",
     eyebrow: "MaintenanceTemplates.swift",
-    subtitle: "Every template Haven seeds — full field set, lint warnings, bundle membership.",
+    subtitle: "Every template Chez seeds — full field set, lint warnings, bundle membership.",
     liveSource: "templates",
   },
   {
@@ -2220,7 +2220,7 @@ function renderTasksTabExplainer(allItems) {
       </div>
       <p>
         Each row below is a <strong>recipe</strong> for a maintenance task. When a homeowner finishes the quiz,
-        Haven looks at their house — what systems they have, what they told us — and turns the matching recipes
+        Chez looks at their house — what systems they have, what they told us — and turns the matching recipes
         into actual tasks on their schedule. Most homeowners end up with around <strong>30 tasks</strong> from
         ${totalPhrase}, because not every recipe applies to every house.
       </p>
@@ -11906,7 +11906,7 @@ function decisivePickFor(item, value) {
         currentValue: title,
         suggestedValue: fixed,
       },
-      recommendation: `Title starts with "Professional X" — Haven's voice rule says use "Annual X" instead. Click below to rename in one shot.`,
+      recommendation: `Title starts with "Professional X" — Chez's voice rule says use "Annual X" instead. Click below to rename in one shot.`,
     };
   }
   // Phase 5z+22 — Tom: "Bleed Radiators" is FINE — 2-word action-
@@ -12152,7 +12152,7 @@ async function handleFocusedAuditAction(finding, action) {
       scopeType: "general",
       scopeId: null,
       scopeTitle: `Don't add ${data.name} as a vendor`,
-      body: `Audit suggested adding "${data.name}" as a vendor type. Decision: skip — not relevant to Haven's audience right now.\n\nThe audit's HNW gap list is hardcoded in admin.js (COMMON_HNW_VENDOR_GAPS), so this finding will keep surfacing until we either add the vendor or strip the entry from that list.\n\n(Drafted from the Audit tab.)`,
+      body: `Audit suggested adding "${data.name}" as a vendor type. Decision: skip — not relevant to Chez's audience right now.\n\nThe audit's HNW gap list is hardcoded in admin.js (COMMON_HNW_VENDOR_GAPS), so this finding will keep surfacing until we either add the vendor or strip the entry from that list.\n\n(Drafted from the Audit tab.)`,
       intent: "feedback",
       target: "claude",
       snapshot: { name: data.name, source: "audit_missing_vendor_skip" },
@@ -12173,7 +12173,7 @@ async function handleFocusedAuditAction(finding, action) {
       scopeType: "general",
       scopeId: null,
       scopeTitle: `Don't add ${data.name} as a routine`,
-      body: `Audit suggested adding "${data.name}" as a routine. Decision: skip — not relevant to Haven's audience right now.\n\nThe audit's HNW routine gap list is hardcoded in admin.js (COMMON_HNW_ROUTINE_GAPS).\n\n(Drafted from the Audit tab.)`,
+      body: `Audit suggested adding "${data.name}" as a routine. Decision: skip — not relevant to Chez's audience right now.\n\nThe audit's HNW routine gap list is hardcoded in admin.js (COMMON_HNW_ROUTINE_GAPS).\n\n(Drafted from the Audit tab.)`,
       intent: "feedback",
       target: "claude",
       snapshot: { name: data.name, source: "audit_missing_routine_skip" },
@@ -12987,7 +12987,7 @@ function decisionSubtitle(decision) {
   return ({
     question: "Tom is waiting on an answer. Reply first; no code changes until you both agree.",
     proposal: "A pending change is sitting on this entity. Apply it, defer it, or revert it.",
-    lint: "The text breaks one of Haven's voice rules (em-dashes, 'Professional X', long answer chips, etc.). Suggested fix is below.",
+    lint: "The text breaks one of Chez's voice rules (em-dashes, 'Professional X', long answer chips, etc.). Suggested fix is below.",
     impact: "This entity affects a lot of households. Worth a careful review before it ships to TestFlight.",
   })[decision.severity] || "";
 }
@@ -13150,7 +13150,7 @@ function renderFocusedDecisionPanelHtml(decision) {
     } else {
       whatHappensHtml = `
         <ul>
-          <li><strong>Approve + lock</strong> tells Haven this entity is final. It stops surfacing here.</li>
+          <li><strong>Approve + lock</strong> tells Chez this entity is final. It stops surfacing here.</li>
           <li><strong>Open to edit</strong> brings up the entity's full detail panel so you can change fields.</li>
           <li><strong>Cut entity</strong> removes it. Existing households keep what they already have, but new households won't see it.</li>
         </ul>
@@ -15737,7 +15737,7 @@ function describeQuizImpactPlainEnglish(q, impact) {
     vehicleAdd: "Walks the homeowner through adding a vehicle (VIN decode, AI maintenance schedule).",
     vehicleCount: "Sets up how many vehicles the next steps capture.",
     yesNoLender: "Captures lender-specific data (insurance / mortgage routing).",
-    providerSearch: "Picks a utility / advisor / vendor from Haven's directory and links them to the household.",
+    providerSearch: "Picks a utility / advisor / vendor from Chez's directory and links them to the household.",
     caretakers: "Captures spouse + kids + home-manager profile so the right people get invited and assigned.",
     generatorAdd: "Captures generator type + fuel + supplier so the right service templates seed.",
     householdContractors: "Q15b — captures every recurring vendor the household already has on retainer.",

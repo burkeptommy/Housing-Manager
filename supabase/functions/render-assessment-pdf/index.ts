@@ -150,7 +150,7 @@ serve(async (req: Request) => {
           body: JSON.stringify({
             user_ids: userIds,
             title: "Your assessment report is ready",
-            body: "Open Haven to download a copy of your home assessment.",
+            body: "Open Chez to download a copy of your home assessment.",
             data: { type: "chez_assessment_pdf_ready", assessment_id: assessmentId },
           }),
         });

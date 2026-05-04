@@ -259,7 +259,7 @@ export const OBJECT_MAP = [
       { label: "first_name / last_name / dob", desc: "Identity. DOB drives is_minor for kids." },
       { label: "relationship", desc: "Spouse / Child / Parent / etc." },
       { label: "member_type", desc: "family / home_manager / staff. Drives document visibility + UI placement." },
-      { label: "linked_user_id", desc: "Set when the person has their own Haven account." },
+      { label: "linked_user_id", desc: "Set when the person has their own Chez account." },
       { label: "school", desc: "For kids — drives school-pickup routine context." },
       { label: "is_expecting / expected_date", desc: "Pregnancy tracking from the quiz." },
     ],

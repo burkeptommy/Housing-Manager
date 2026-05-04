@@ -72,7 +72,7 @@ struct ChezOwnershipView: View {
 
     private var threeModesHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Three ways to use Haven")
+            Text("Three ways to use Chez")
                 .font(HavenTypography.uiSectionHeader)
                 .foregroundStyle(HavenColors.textSecondary)
             Text("Pick what fits — switch anytime.")
@@ -310,7 +310,7 @@ struct ChezOwnershipView: View {
                 .font(HavenTypography.uiSectionHeader)
                 .foregroundStyle(HavenColors.textSecondary)
                 .padding(.top, 8)
-            Text("Tap any item in Haven and use its \"Have Chez handle this\" toggle. Common surfaces:")
+            Text("Tap any item in Chez and use its \"Have Chez handle this\" toggle. Common surfaces:")
                 .font(HavenTypography.caption)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
