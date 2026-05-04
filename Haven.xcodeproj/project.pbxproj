@@ -14,6 +14,7 @@
 		01D4E57F0AA741467D0C350D /* HandymanSoftInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */; };
 		01E25C479437E1B85C451E5D /* OnboardingAddressStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */; };
 		02013B6C18B57EAE2AEEBB6C /* ChezConciergeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C3E85C92E536C944040AD6 /* ChezConciergeService.swift */; };
+		0257FA0A5B99C61BBE1631B8 /* NegotiationEmailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 310D7138F2DC79554232A4C5 /* NegotiationEmailSheet.swift */; };
 		026702FC665EE46F861C2F1B /* MaintenanceTaskDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECABA5A62CDCC5C4011D813 /* MaintenanceTaskDetailSheet.swift */; };
 		027097D17D1F1EDE5EB9260F /* LinkDocumentToProjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1077727F8CD1C7CEC052D32 /* LinkDocumentToProjectSheet.swift */; };
 		02935B2A817263AC30F598FD /* ChezOwnershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5063724524EF041433C138C /* ChezOwnershipView.swift */; };
@@ -291,6 +292,7 @@
 		50C4A51312571813E87BD37E /* ChezProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87D4673244F2FAD9E17D739 /* ChezProfileView.swift */; };
 		510229707C6AD12008FECF8B /* FindLocalVendorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DA5F5AB2791F09EBCA125F /* FindLocalVendorSheet.swift */; };
 		510D6FB445E81EB3F2E748EC /* SeasonCompletionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED6CAAD17D48E19486CB0690 /* SeasonCompletionBanner.swift */; };
+		51EA7CCD856995A4D16CBAF2 /* NegotiationEmailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 310D7138F2DC79554232A4C5 /* NegotiationEmailSheet.swift */; };
 		523F184C4BAE3D8EAC2CC5FC /* PropertyEnhancedSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C672B6C7481ED4AF2D5B384 /* PropertyEnhancedSections.swift */; };
 		52500B903E69235AE72CFA7A /* BrowseSpecialtySystemsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA51D001CCECE0998970343 /* BrowseSpecialtySystemsSheet.swift */; };
 		5297B4580E0104A35011AA2E /* MissingDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B8A0845461986DFF0AB15 /* MissingDocumentsView.swift */; };
@@ -997,6 +999,7 @@
 		2F404802C9E338E592601FED /* VendorLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorLogoView.swift; sourceTree = "<group>"; };
 		2F43B13A69A02D0A87ED7FB6 /* EditSystemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSystemSheet.swift; sourceTree = "<group>"; };
 		303DA8C75FD4DBAD4CB347A3 /* Day1TaskCurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Day1TaskCurator.swift; sourceTree = "<group>"; };
+		310D7138F2DC79554232A4C5 /* NegotiationEmailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NegotiationEmailSheet.swift; sourceTree = "<group>"; };
 		312B0AF8C491CCA685866EA9 /* HouseholdStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdStrip.swift; sourceTree = "<group>"; };
 		3135C2D3680384C7C3589245 /* Bundle+Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bundle+Version.swift"; sourceTree = "<group>"; };
 		31F09CBF8599B165363539A3 /* HouseQuizModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizModels.swift; sourceTree = "<group>"; };
@@ -2182,6 +2185,7 @@
 				01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */,
 				8ECABA5A62CDCC5C4011D813 /* MaintenanceTaskDetailSheet.swift */,
 				778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */,
+				310D7138F2DC79554232A4C5 /* NegotiationEmailSheet.swift */,
 				023E3D28374E39856E2661A0 /* NewProjectView.swift */,
 				12E53234F9D430302A1C9755 /* OverdueTasksDetailView.swift */,
 				F85FDEA4F5E833F18CD0012A /* PauseAppointmentSheet.swift */,
@@ -2851,6 +2855,7 @@
 				7821054DBA37A7EC0AE98E53 /* MessageComposeView.swift in Sources */,
 				5297B4580E0104A35011AA2E /* MissingDocumentsView.swift in Sources */,
 				6E70BE8EF05A78D434966973 /* MonthlySummaryCard.swift in Sources */,
+				0257FA0A5B99C61BBE1631B8 /* NegotiationEmailSheet.swift in Sources */,
 				BB0D79DB28BC9757BB5218DF /* NewArrivalChecklist.swift in Sources */,
 				8FD68D2E5CD959C8229DD664 /* NewProjectView.swift in Sources */,
 				B695D54280B5938B173BE84E /* NotificationPreferences.swift in Sources */,
@@ -3307,6 +3312,7 @@
 				EFE85A212793C291596D38DB /* MessageComposeView.swift in Sources */,
 				54BFC9A34EB626D692079A73 /* MissingDocumentsView.swift in Sources */,
 				C061FC706B3BE981D6817564 /* MonthlySummaryCard.swift in Sources */,
+				51EA7CCD856995A4D16CBAF2 /* NegotiationEmailSheet.swift in Sources */,
 				2B9C87B65454C99D00D903F4 /* NewArrivalChecklist.swift in Sources */,
 				0F1F1DDDD0FCD8617D64E24F /* NewProjectView.swift in Sources */,
 				FC034E28EF0FE70F3D23C6F4 /* NotificationPreferences.swift in Sources */,

@@ -469,6 +469,14 @@ enum AnalyticsEvent: String {
     /// Phase 95 (gap #78) — fired when the homeowner saves the
     /// EditInsuranceSheet. Payload reports which fields landed.
     case vehicleInsuranceEdited = "vehicle_insurance_edited"
+    /// Phase 95 (gap #37) — fired when the negotiation-email
+    /// drafting Edge Function returns a body. Doesn't mean the
+    /// email was sent yet; pairs with `negotiationEmailSent`
+    /// for the full funnel.
+    case negotiationEmailDrafted = "negotiation_email_drafted"
+    /// Phase 95 (gap #37) — fired when the homeowner taps Send
+    /// in the iOS Mail composer for a drafted negotiation email.
+    case negotiationEmailSent = "negotiation_email_sent"
     case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
     case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 

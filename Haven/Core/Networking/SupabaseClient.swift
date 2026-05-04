@@ -729,6 +729,56 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "analyze-quote", body: body, timeoutSeconds: 120)
     }
 
+    // MARK: - Phase 95 (gap #37) — draft-negotiation-email
+
+    struct DraftNegotiationItem: Encodable {
+        let description: String
+        let quoted_price: Double
+        let market_price: Double
+        let rating_reason: String
+    }
+
+    struct DraftNegotiationRequest: Encodable {
+        let vendor_name: String
+        let vendor_email: String?
+        let homeowner_name: String?
+        let project_type: String?
+        let quote_total: Double
+        let estimated_fair_total: Double
+        let potential_savings: Double
+        let overpriced_items: [DraftNegotiationItem]
+        let negotiation_tips: [String]
+        let property_location: String?
+    }
+
+    struct DraftNegotiationResponse: Decodable {
+        struct Email: Decodable {
+            let subject: String
+            let body: String
+            let to: String?
+            let savings: Double?
+        }
+        let success: Bool?
+        let email: Email?
+        let error: String?
+    }
+
+    /// Phase 95 (gap #37) — wraps the `draft-negotiation-email`
+    /// Edge Function so QuoteAnalysisView can hand the parsed
+    /// quote off and get back a Claude-drafted email body the
+    /// homeowner can review, edit, and send via the iOS Mail
+    /// composer.
+    static func draftNegotiationEmail(
+        request: DraftNegotiationRequest
+    ) async throws -> DraftNegotiationResponse {
+        let data = try await callEdgeFunction(
+            name: "draft-negotiation-email",
+            body: request,
+            timeoutSeconds: 60
+        )
+        return try JSONDecoder().decode(DraftNegotiationResponse.self, from: data)
+    }
+
     // MARK: - Property Lookup
 
     struct PropertyLookupRequest: Encodable {

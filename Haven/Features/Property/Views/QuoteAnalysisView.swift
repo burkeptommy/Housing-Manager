@@ -16,6 +16,10 @@ struct QuoteAnalysisView: View {
     @State private var analysis: QuoteAnalysis?
     @State private var error: String?
     @State private var quoteSaved = false
+    /// Phase 95 (gap #37) — drives the negotiation-email composer
+    /// sheet. Only renders when at least one line item is rated
+    /// `overpriced`, since that's what the Edge Function needs.
+    @State private var showNegotiationEmail = false
 
     var body: some View {
         NavigationStack {
@@ -52,6 +56,15 @@ struct QuoteAnalysisView: View {
                     Task { await handleFileSelection(url) }
                 case .failure(let err):
                     error = err.localizedDescription
+                }
+            }
+            // Phase 95 (gap #37) — negotiation-email composer.
+            // Reads the in-flight `analysis` payload to seed the
+            // `draft-negotiation-email` request.
+            .sheet(isPresented: $showNegotiationEmail) {
+                if let analysis {
+                    NegotiationEmailSheet(analysis: analysis, project: project)
+                        .presentationDetents([.large])
                 }
             }
         }
@@ -164,9 +177,28 @@ struct QuoteAnalysisView: View {
             }
         }
 
+        // Phase 95 (gap #37) — draft-negotiation-email entry.
+        // Renders only when the analysis flagged overpriced line
+        // items (the Edge Function rejects requests without
+        // them). Tap → open NegotiationEmailSheet which calls
+        // `draft-negotiation-email`, lets the user review/edit
+        // the body, and hands off to the iOS Mail composer.
+        if hasOverpricedItems(analysis) {
+            HavenButton(
+                title: "Draft a negotiation email",
+                action: {
+                    Haptics.medium()
+                    showNegotiationEmail = true
+                },
+                style: .secondary,
+                icon: "envelope.fill"
+            )
+            .padding(.top, HavenTheme.spacing8)
+        }
+
         // Phase 80 — Chez Concierge entry. Once the user has the AI's
         // analysis on screen, they often want a second opinion or want
-        // Tom to negotiate / find a comparison quote. This pill is the
+        // Chez to negotiate / find a comparison quote. This pill is the
         // canonical handoff for that.
         ChezEntryButton(
             category: .getQuote,
@@ -175,6 +207,13 @@ struct QuoteAnalysisView: View {
             context: chezQuoteContext(analysis)
         )
         .padding(.top, HavenTheme.spacing12)
+    }
+
+    /// Phase 95 (gap #37) — true when at least one analyzed
+    /// line item is rated `overpriced`. Drives the "Draft a
+    /// negotiation email" CTA's visibility.
+    private func hasOverpricedItems(_ analysis: QuoteAnalysis) -> Bool {
+        (analysis.lineItems ?? []).contains { ($0.rating ?? "") == "overpriced" }
     }
 
     /// Phase 80 — context for the Chez handoff. Includes vendor name,
