@@ -907,8 +907,22 @@ final class OnboardingViewModel: ObservableObject {
                 "5": "thu", "6": "fri", "7": "sat"
             ]
             let stringDayIds = answers.trashPickupDays.compactMap { dayIds[String($0)] }
+            // 2026-05-05 Phase 95.1 fix: previous version wrote `answerId: "captured"`
+            // here, but the quiz's `trashWithDaysBody` only renders the day picker when
+            // `progressiveTrashService` resolves to "municipal" or "private" (line 1720)
+            // — "captured" gates that to false, so the day chips were hidden even though
+            // `selectedIds` hydrated correctly. ALSO `firstUnresolvedIndex()` only
+            // treats q18_trash as resolved when the answerId matches a real option ID
+            // ("municipal" / "private" / "not_sure"), so "captured" left the question
+            // unresolved and the user landed on it with their days invisible.
+            //
+            // Default to "municipal" — vast majority of US households are on municipal
+            // pickup; private-hauler users can edit via the quiz's normal flow if they
+            // resume mid-quiz, or via Settings → Home Details after onboarding. This
+            // assumption produces a CORRECT pre-fill for the most common case rather
+            // than a silent-fail for everyone.
             existingAnswers["q18_trash"] = HouseQuizAnswer(
-                answerId: "captured",
+                answerId: "municipal",
                 selectedIds: stringDayIds
             )
         }
