@@ -564,6 +564,7 @@ struct AddMaintenanceTaskSheet: View {
 
             if let vm = viewModel {
                 await vm.createTask(insert)
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                 onSave?()
                 dismiss()
             } else {
@@ -571,6 +572,11 @@ struct AddMaintenanceTaskSheet: View {
                 do {
                     _ = try await ServiceOrchestrator.createCustomService(insert)
                     Haptics.success()
+                    // Phase 95 audit fix — without this post, custom one-off
+                    // service tasks save successfully but never appear on
+                    // MaintenanceScheduleView until manual refresh. Same
+                    // pattern as the .handymanItem branch below.
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                     onSave?()
                     dismiss()
                 } catch {

@@ -466,6 +466,29 @@ enum HavenSupabase {
         )
     }
 
+    // MARK: - Phase 95 (gap #47) — service vendor inquiries
+
+    private struct SendVendorInquiryRequest: Encodable {
+        let inquiry_id: String
+    }
+
+    /// Phase 95 (audit gap #47) — deliver a service-vendor inquiry over
+    /// SendGrid. Caller already inserted the
+    /// `service_vendor_inquiries` row and passes its id; the Edge
+    /// Function looks up contractor email + sender name + reply-to,
+    /// renders the message, sends via SendGrid, and stamps
+    /// delivery_status / sent_at. Fire-and-forget — the iOS sheet
+    /// dismisses on row insert and the Edge Function runs in the
+    /// background.
+    static func sendVendorInquiry(inquiryId: UUID) async throws -> Data {
+        let body = SendVendorInquiryRequest(inquiry_id: inquiryId.uuidString)
+        return try await callEdgeFunction(
+            name: "send-vendor-inquiry",
+            body: body,
+            timeoutSeconds: 15
+        )
+    }
+
     // MARK: - Phase 84.5: Home Assessment (free Chez handyman onboarding)
 
     /// Homeowner-side: create the pending assessment after the foundational
@@ -479,6 +502,11 @@ enum HavenSupabase {
         let homeownerPresent: Bool
         let homeownerAccessNotes: String?
         let isExistingUserSupplement: Bool
+        // Phase 95 / gap #4: optional preferred-window fields. iOS booking
+        // sheet writes these so the operator schedules within the
+        // homeowner's range. Server stores them on `home_assessments`.
+        let preferredWindowStart: String?
+        let preferredTimeOfDay: String?
     }
 
     static func requestHomeAssessment(
@@ -487,7 +515,9 @@ enum HavenSupabase {
         homeownerConcerns: String? = nil,
         homeownerPresent: Bool = true,
         homeownerAccessNotes: String? = nil,
-        isExistingUserSupplement: Bool = false
+        isExistingUserSupplement: Bool = false,
+        preferredWindowStart: String? = nil,
+        preferredTimeOfDay: String? = nil
     ) async throws -> Data {
         let body = RequestHomeAssessmentRequest(
             propertyId: propertyId,
@@ -495,7 +525,9 @@ enum HavenSupabase {
             homeownerConcerns: homeownerConcerns,
             homeownerPresent: homeownerPresent,
             homeownerAccessNotes: homeownerAccessNotes,
-            isExistingUserSupplement: isExistingUserSupplement
+            isExistingUserSupplement: isExistingUserSupplement,
+            preferredWindowStart: preferredWindowStart,
+            preferredTimeOfDay: preferredTimeOfDay
         )
         return try await callEdgeFunction(name: "handyman-provider", body: body, timeoutSeconds: 20)
     }
@@ -1152,14 +1184,28 @@ enum HavenSupabase {
     }
 
     // MARK: - Catalog Request
+    //
+    // Phase 4 of the equipment catalog expansion (plan: i-tried-to-add-reactive-boole.md):
+    // dual-writes a row to equipment_catalog_requests AND emails tom@getchez.com.
+    // Two trigger surfaces: photo-ID partial match (EquipmentIdentifySheet) and
+    // text-search escape hatch (CatalogRequestSheet). Source field discriminates.
 
     struct CatalogRequestBody: Encodable {
-        let brand: String
-        let systemType: String
+        let brand: String?
+        let systemType: String?      // Maps to submitted_product_type on the server
         let modelNumber: String?
+        let serialNumber: String?    // Phase 4 — extracted by Claude Vision
         let notes: String?
+        let source: String?          // "photo_label" / "text_search" / "manual"
+        let imagePath: String?       // Phase 4 — Storage path of label photo
+        let homeSystemId: String?    // Phase 4 — link to home_systems row that prompted this
         let userId: String?
         let householdId: String?
+    }
+
+    struct CatalogRequestResponse: Decodable {
+        let success: Bool?
+        let request_id: String?
     }
 
     static func sendCatalogRequest(
@@ -1175,11 +1221,48 @@ enum HavenSupabase {
             brand: brand,
             systemType: systemType,
             modelNumber: modelNumber,
+            serialNumber: nil,
             notes: notes,
+            source: "text_search",
+            imagePath: nil,
+            homeSystemId: nil,
             userId: currentUserId,
             householdId: user?.householdId?.uuidString
         )
         _ = try await callEdgeFunction(name: "send-catalog-request", body: body, timeoutSeconds: 15)
+    }
+
+    /// Phase 4 — submit a "Have Chez add this" request from the photo-ID
+    /// partial-match flow. Claude Vision extracted brand/model/serial from
+    /// the user's label photo but our catalog doesn't have that exact SKU.
+    /// Returns the request_id so the caller can show "We're researching..." UX.
+    static func submitPhotoCatalogRequest(
+        brand: String?,
+        modelNumber: String?,
+        serialNumber: String?,
+        productType: String?,
+        imagePath: String? = nil,
+        homeSystemId: String? = nil,
+        notes: String? = nil
+    ) async throws -> String? {
+        let currentUserId = try? await client.auth.session.user.id.uuidString
+        let user = try? await DatabaseService.shared.fetchCurrentUser()
+
+        let body = CatalogRequestBody(
+            brand: brand,
+            systemType: productType,
+            modelNumber: modelNumber,
+            serialNumber: serialNumber,
+            notes: notes,
+            source: "photo_label",
+            imagePath: imagePath,
+            homeSystemId: homeSystemId,
+            userId: currentUserId,
+            householdId: user?.householdId?.uuidString
+        )
+        let data = try await callEdgeFunction(name: "send-catalog-request", body: body, timeoutSeconds: 15)
+        let decoded = try? JSONDecoder().decode(CatalogRequestResponse.self, from: data)
+        return decoded?.request_id
     }
 
     // MARK: - Process Invoice

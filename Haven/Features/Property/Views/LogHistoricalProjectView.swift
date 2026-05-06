@@ -210,6 +210,11 @@ struct LogHistoricalProjectView: View {
 
                 _ = try await viewModel.createProject(insert)
                 Haptics.success()
+                // Phase 95 audit fix — PropertyProjectsView listens for
+                // `.projectChanged`. Without this, the historical project
+                // saves but doesn't appear in the project list until
+                // a manual refresh.
+                NotificationCenter.default.post(name: .projectChanged, object: nil)
                 dismiss()
             } catch {
                 print("[LogHistorical] Save failed: \(error)")

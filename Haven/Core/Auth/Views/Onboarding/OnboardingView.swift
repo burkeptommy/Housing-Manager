@@ -16,6 +16,11 @@ struct OnboardingView: View {
     /// session is wedged in a way that even our timeouts can't catch.
     @State private var showEscapeHatch = false
     @State private var escapeHatchTimer: Task<Void, Never>?
+    /// Phase 95 (gaps #4 + #5) — the booking-window picker shown after
+    /// the homeowner taps "Send a Chez handyman" but before
+    /// `applyModeChoice` fires. Captures preferred date + time-of-day so
+    /// the operator can schedule within range.
+    @State private var showHandymanWindowSheet = false
 
     var body: some View {
         NavigationStack {
@@ -48,9 +53,14 @@ struct OnboardingView: View {
                             }
                         },
                         onSelectHandyman: {
-                            Task {
-                                await viewModel.applyModeChoice(.handyman, authService: appState.authService)
-                            }
+                            // Phase 95 (gaps #4 + #5) — open the
+                            // booking-window picker first; applyModeChoice
+                            // fires from the sheet's onSubmit callback so
+                            // the captured window/time-of-day get
+                            // persisted to home_assessments alongside
+                            // the request.
+                            Haptics.medium()
+                            showHandymanWindowSheet = true
                         },
                         onJoinWaitlist: {
                             Task {
@@ -76,6 +86,26 @@ struct OnboardingView: View {
                 }
             }
             .animation(HavenTheme.animationStandard, value: viewModel.showHandymanBookingConfirmation)
+            // Phase 95 (gaps #4 + #5) — date/time-of-day picker.
+            // Presents from the OnboardingModeForkView handyman tap.
+            .sheet(isPresented: $showHandymanWindowSheet) {
+                BookHandymanWindowSheet(
+                    onSubmit: { windowStart, timeOfDay in
+                        showHandymanWindowSheet = false
+                        Task {
+                            await viewModel.applyModeChoice(
+                                .handyman,
+                                authService: appState.authService,
+                                preferredWindowStart: windowStart,
+                                preferredTimeOfDay: timeOfDay
+                            )
+                        }
+                    },
+                    onCancel: {
+                        showHandymanWindowSheet = false
+                    }
+                )
+            }
         }
         .trackScreen("OnboardingView")
         .task {

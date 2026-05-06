@@ -9,6 +9,7 @@ import SwiftUI
 /// opens `AddHouseholdStaffSheet` (the dedicated entry point — the
 /// dashboard chooser sheet stays family-only by design).
 struct HouseholdStaffView: View {
+    @EnvironmentObject var appState: AppState
     @State private var staff: [FamilyMemberRow] = []
     @State private var isLoading = true
     @State private var showAddSheet = false
@@ -25,12 +26,17 @@ struct HouseholdStaffView: View {
                 } description: {
                     Text("Home managers, property managers, or other staff who help run your household.")
                 } actions: {
-                    Button("Add your first staff member") {
-                        Haptics.light()
-                        showAddSheet = true
+                    // Phase 95 (gap #55) — staff users can't invite
+                    // additional staff. Only the homeowner manages the
+                    // staff roster.
+                    if !appState.isStaffUser {
+                        Button("Add your first staff member") {
+                            Haptics.light()
+                            showAddSheet = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(HavenColors.action)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(HavenColors.action)
                 }
             } else {
                 staffList
@@ -39,13 +45,17 @@ struct HouseholdStaffView: View {
         .navigationTitle("Household Staff")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Haptics.light()
-                    showAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundStyle(HavenColors.textPrimary)
+            // Phase 95 (gap #55) — only the homeowner can invite staff.
+            // Home managers and staff don't see the "+" button.
+            if !appState.isStaffUser {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Haptics.light()
+                        showAddSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(HavenColors.textPrimary)
+                    }
                 }
             }
         }

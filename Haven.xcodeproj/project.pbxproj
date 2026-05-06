@@ -58,6 +58,7 @@
 		0C952ADEE8CECACC2AE14384 /* PickupDayBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A74778C203DC3788BCBE65C /* PickupDayBanner.swift */; };
 		0D15EA5FFC86A659709CBFE7 /* ChezDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B96EE37657BD097DB98878 /* ChezDirectoryService.swift */; };
 		0D4FCA19890236EE25EADC05 /* InviteResultConfirmationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB386522CE4AF7EE8845F7F /* InviteResultConfirmationCard.swift */; };
+		0D5FE5529D59154E9C865A35 /* ServiceVendorInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EB11D57E1E1F2AF761331B /* ServiceVendorInquirySheet.swift */; };
 		0E18DAC5A34E8DE3D4847614 /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 92FA1BB2ACAD067BEEE1857A /* CLAUDE.md */; };
 		0E1B140D96F6075D860380D5 /* BrandColors.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A4D29A1CB91EBA42DFC0519 /* BrandColors.json */; };
 		0E71FADFFA9696BBA2485BDC /* Font+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E819F4A1BD46D5CE48E9E1A /* Font+Haven.swift */; };
@@ -253,6 +254,7 @@
 		44358BA887104ACC2568412D /* EditDocumentDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A0A0D08A5DF798B9BBADB8 /* EditDocumentDetailsView.swift */; };
 		444A7ADC42BE3E2D7F3A4005 /* HavenCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE9985852925517B2A00C06 /* HavenCard.swift */; };
 		44CF3A62191CA77871A8F7A6 /* ScenarioResultContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64F05BDA19678526107F59C /* ScenarioResultContainerView.swift */; };
+		44EB5048BEF79C65ADF21581 /* BookHandymanWindowSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72BB4DA6BDC4D2E1D9A07B45 /* BookHandymanWindowSheet.swift */; };
 		45228D490EDC7004FB0510DF /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46905EFC24FB1AD4C663EE7E /* APIClient.swift */; };
 		4550EB5F38871B3BA494F826 /* FrequencyPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8097FAE3CDDC7B7D6B43462 /* FrequencyPickerSheet.swift */; };
 		455D7D69148AB515F3689EB7 /* SecureStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB86217778DF5F0F55AB58 /* SecureStorageService.swift */; };
@@ -323,6 +325,7 @@
 		586E0E719204AEF989FF9DA7 /* ContractorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */; };
 		5877FD51E29C4B180983AF20 /* WarrantyTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6966723A75149E0AA831822 /* WarrantyTrackerView.swift */; };
 		588CDB8226FB78E6B524F663 /* ChezDelegationsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */; };
+		58C19E07D79A6A4F9208D21D /* HouseholdSpendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463EFEB136D6441AA225D99E /* HouseholdSpendView.swift */; };
 		58C28F10A232847437333053 /* PickupDayBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A74778C203DC3788BCBE65C /* PickupDayBanner.swift */; };
 		5931E0623E891998A620F46B /* ContractorPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D67356CC4BAAEA3438CCF1E4 /* ContractorPickerSheet.swift */; };
 		599DE6D8496746E9CE5C6FF0 /* VehicleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97D2B0FAFB54FF91648CA17 /* VehicleDetailView.swift */; };
@@ -414,6 +417,7 @@
 		73DCFB5867CF9D3F3EE0F51E /* ActivityLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECE835BCE77ED8E444413FFC /* ActivityLogView.swift */; };
 		73F578310CDA4553B2078C6F /* HomeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D64EAE4435181BE7303600 /* HomeSystem.swift */; };
 		7401FC4CC4050A880B3E96D0 /* MaintenanceDuplicateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A46A1590730B5E301E1EA8B /* MaintenanceDuplicateSheet.swift */; };
+		74C1C34077F5D1A83928C289 /* BookHandymanWindowSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72BB4DA6BDC4D2E1D9A07B45 /* BookHandymanWindowSheet.swift */; };
 		74DB510E121B0A373C8B0155 /* OnboardingSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0451B033C02044D1EDA105 /* OnboardingSteps.swift */; };
 		75B121761B4AF6B62B2D8DC5 /* WebsiteImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0B114520C474E97EDD2DE8 /* WebsiteImportView.swift */; };
 		75BD3FB577D0D7B504B4FA5C /* HouseQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97135115B8421E956EDF488 /* HouseQuizView.swift */; };
@@ -442,6 +446,7 @@
 		7BACE6B65B5D6388FF66E313 /* AdminCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A089E995B8C1F11C65BFCB /* AdminCatalogService.swift */; };
 		7C36017D8225844EB0016483 /* RoutingPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD4E4211AA57C9D18E978A /* RoutingPreference.swift */; };
 		7C7A69EF7465DB1B8250C8EF /* QuoteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00F7EDA80AB205933D1E68E /* QuoteDetailView.swift */; };
+		7D48397D30517BEBA61EA3FB /* RequestChezSlotSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CC147F5015259C65FA8863 /* RequestChezSlotSheet.swift */; };
 		7D66ECAFD4708FD25D8BFA4B /* MaintenanceTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */; };
 		7DB2DF3F04928974B1CE9EB3 /* DuplicateResolutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 575CB0AF41CFC5F58F8CD3D8 /* DuplicateResolutionSheet.swift */; };
 		7DFB64B6B486F8D8CC0939E7 /* SecurityDashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0C215834C24160D4CF4FB7 /* SecurityDashboardViewModel.swift */; };
@@ -528,6 +533,7 @@
 		94ABEC553C961C0F36CBC601 /* DocumentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AADE9042AEE29A1723D203 /* DocumentCard.swift */; };
 		94CCD34E65CA07E27E2BCD8E /* CertificatePinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E60CB5AC78EAFC4C067A93E /* CertificatePinning.swift */; };
 		9536B356AF288DF62D1D5A15 /* HandymanHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1116E73ADB489337FCC2E264 /* HandymanHubView.swift */; };
+		955416FE204FE0E98AB0287F /* HouseholdSpendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463EFEB136D6441AA225D99E /* HouseholdSpendView.swift */; };
 		955995EC1C69BA5FA32F53DB /* MaintenanceTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = A989A9100FAC81E52C371763 /* MaintenanceTask.swift */; };
 		9606112A8C6D9C3A0F7C0350 /* WarrantyExpirationAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51DC3662A89CDDA0D7B4BA94 /* WarrantyExpirationAlert.swift */; };
 		97022D92CC03D26DBE4F6665 /* AddMaintenanceTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2E1B748857647CA39441A4 /* AddMaintenanceTaskSheet.swift */; };
@@ -636,6 +642,7 @@
 		B5816C122201999EBA84312D /* BrandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACB86E8385B0978B65C548D /* BrandTheme.swift */; };
 		B5C48CED9EDB3BB1E2F009FF /* AddFamilyMemberChooserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CFDDBAA7BC86FCFD08E19DE /* AddFamilyMemberChooserSheet.swift */; };
 		B6639066B6C54D157EDD8580 /* HomeDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C046219115C06827109ABD70 /* HomeDetailsView.swift */; };
+		B68172C66F282CD9FCBE44C6 /* ReBookChezHandymanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF95AD2500F28695B6944E1 /* ReBookChezHandymanCard.swift */; };
 		B68594F57018C7B2A8DA1EDB /* HandymanHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1116E73ADB489337FCC2E264 /* HandymanHubView.swift */; };
 		B695D54280B5938B173BE84E /* NotificationPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 379FFAF6339B329B4272E557 /* NotificationPreferences.swift */; };
 		B6A02EBC9FBACC866051F4E2 /* RoutineEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49355CE5CE47932E71D7ED0A /* RoutineEditSheet.swift */; };
@@ -647,6 +654,7 @@
 		B885422296F917644A3F238C /* AppliancesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3AE3F7AF466829498D26D39 /* AppliancesListView.swift */; };
 		B8ABAC6001BED32C14204451 /* ChezActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46FB0312A697ED4EE92D39D4 /* ChezActivityLog.swift */; };
 		B954FBF089BE6E6AB1B2DCE5 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065CD0193255DF7812606891 /* MainTabView.swift */; };
+		B981A17C43C7B8320F76F25D /* RequestChezSlotSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CC147F5015259C65FA8863 /* RequestChezSlotSheet.swift */; };
 		B9913B6EEB09589BEED20722 /* SecureLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94383B79DF96D0CFB406B15 /* SecureLogger.swift */; };
 		B9E9CBE0C623CD1603ADBBB9 /* EditInsuranceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF4A58ECADEA5FBCC6466D2 /* EditInsuranceSheet.swift */; };
 		B9EFF05FE27AB5393573B757 /* PropertyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE909F83D728399C6776DEA /* PropertyDetailView.swift */; };
@@ -821,6 +829,7 @@
 		E8C6AB41CEB3FDA4FAD2B438 /* HandymanVisitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */; };
 		E8C6BCB762E6405D19B09BEB /* DatabaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECE7A0C3DA1835717111C67 /* DatabaseModels.swift */; };
 		E8D9DE977462730A5C637EDF /* PropertyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */; };
+		E928DC6DA425315A8A35198F /* ReBookChezHandymanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF95AD2500F28695B6944E1 /* ReBookChezHandymanCard.swift */; };
 		E94F05549E0C8276D54AE19A /* RoutineSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6C3D46692851751F6A5572 /* RoutineSeeder.swift */; };
 		E9D74841D67AEA6E14554262 /* HavenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32EA73709C3E322D4BD3954 /* HavenApp.swift */; };
 		EA1B8A078E31DA26613CDD91 /* VINScannerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A79F1CBC5C229985B274954 /* VINScannerSheet.swift */; };
@@ -831,6 +840,7 @@
 		EB0EBB3ADC12A81A14A0D3F4 /* DuplicateDismissalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233D55DE28A313B5BEEAF39C /* DuplicateDismissalStore.swift */; };
 		EB22EDA04BB6C850BE4DD36A /* InvoiceReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0972BEE391C1FC6F3F7291C7 /* InvoiceReviewSheet.swift */; };
 		EBF4EA3F7931586FD8D7E071 /* SmartRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69721BE038945C484C8A8DF /* SmartRecommendations.swift */; };
+		EBFF47E7410595960A999A9B /* ServiceVendorInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EB11D57E1E1F2AF761331B /* ServiceVendorInquirySheet.swift */; };
 		EC52833359759E303C9D4271 /* ContractorDirectoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */; };
 		EC6DD40732FFA00D1575701D /* Validators.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7272D05EEB647B08773166 /* Validators.swift */; };
 		EC73C445B6C97AD868431B0A /* SeasonTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A955FF9D764D006FB078B6A /* SeasonTasksSheet.swift */; };
@@ -942,6 +952,7 @@
 		0B20FA7ACAE749FF43F297F5 /* BundledInsuranceSuggestionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledInsuranceSuggestionCard.swift; sourceTree = "<group>"; };
 		0BD48C672798798C77079E4B /* HouseQuizValueMeter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizValueMeter.swift; sourceTree = "<group>"; };
 		0BE9985852925517B2A00C06 /* HavenCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenCard.swift; sourceTree = "<group>"; };
+		0BF95AD2500F28695B6944E1 /* ReBookChezHandymanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReBookChezHandymanCard.swift; sourceTree = "<group>"; };
 		0C974A2E1B5CDD0A6A822DD8 /* SubscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionView.swift; sourceTree = "<group>"; };
 		0D0451B033C02044D1EDA105 /* OnboardingSteps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSteps.swift; sourceTree = "<group>"; };
 		0DB386522CE4AF7EE8845F7F /* InviteResultConfirmationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteResultConfirmationCard.swift; sourceTree = "<group>"; };
@@ -964,6 +975,7 @@
 		168915F51136FFCD45ECA6E8 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		16A8DBA13310387EB6AB2594 /* PropertyCreationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyCreationService.swift; sourceTree = "<group>"; };
 		17B1BB4C90A506E3389C3CA8 /* SectionLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionLabel.swift; sourceTree = "<group>"; };
+		18EB11D57E1E1F2AF761331B /* ServiceVendorInquirySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceVendorInquirySheet.swift; sourceTree = "<group>"; };
 		19007347F794F82E4E1932D1 /* DocumentScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentScannerView.swift; sourceTree = "<group>"; };
 		1A66B9EE954A529D243341EF /* VendorVisitCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorVisitCard.swift; sourceTree = "<group>"; };
 		1AD5377254AFED79D10F0B50 /* EquipmentSearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentSearchResult.swift; sourceTree = "<group>"; };
@@ -1045,6 +1057,7 @@
 		4627906C9156C09924700848 /* QuizCinematicReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCinematicReveal.swift; sourceTree = "<group>"; };
 		462B12BCD21D4F9270B6BF25 /* FamilyAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAvatarView.swift; sourceTree = "<group>"; };
 		463255AA4F73B60AC3C7ED12 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		463EFEB136D6441AA225D99E /* HouseholdSpendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSpendView.swift; sourceTree = "<group>"; };
 		46905EFC24FB1AD4C663EE7E /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		46FB0312A697ED4EE92D39D4 /* ChezActivityLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezActivityLog.swift; sourceTree = "<group>"; };
 		489B2A7C6A61B8D82B6DEA2B /* PropertyDecisionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDecisionSheets.swift; sourceTree = "<group>"; };
@@ -1127,6 +1140,7 @@
 		711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewArrivalChecklist.swift; sourceTree = "<group>"; };
 		71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizInsightOverlay.swift; sourceTree = "<group>"; };
 		715AA20065124665D9D16D60 /* AvatarPhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPhotoService.swift; sourceTree = "<group>"; };
+		72BB4DA6BDC4D2E1D9A07B45 /* BookHandymanWindowSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookHandymanWindowSheet.swift; sourceTree = "<group>"; };
 		733F8443471C1E4864CEDDEC /* ArchiveVehicleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveVehicleSheet.swift; sourceTree = "<group>"; };
 		740A04DEF46264975B1D1273 /* HavenFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenFieldView.swift; sourceTree = "<group>"; };
 		742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioView.swift; sourceTree = "<group>"; };
@@ -1237,6 +1251,7 @@
 		B409D6403804C601F92361B9 /* UtilityProviderSearchPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityProviderSearchPicker.swift; sourceTree = "<group>"; };
 		B5CB7D3968D655AD81168BCE /* MaintenanceReorganizedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceReorganizedCard.swift; sourceTree = "<group>"; };
 		B72099A773FF58C359B24FE2 /* ChezProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezProfile.swift; sourceTree = "<group>"; };
+		B7CC147F5015259C65FA8863 /* RequestChezSlotSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestChezSlotSheet.swift; sourceTree = "<group>"; };
 		B87D4673244F2FAD9E17D739 /* ChezProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezProfileView.swift; sourceTree = "<group>"; };
 		B8FB53B9002A2303DA43673A /* ATTOMHelloCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATTOMHelloCard.swift; sourceTree = "<group>"; };
 		B92329D9EE51D7AA3B3E28F4 /* HomeAssessmentPendingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAssessmentPendingCard.swift; sourceTree = "<group>"; };
@@ -1731,6 +1746,7 @@
 			isa = PBXGroup;
 			children = (
 				7D8D097C2BF6F956A8DA7876 /* AssessmentPendingCard.swift */,
+				72BB4DA6BDC4D2E1D9A07B45 /* BookHandymanWindowSheet.swift */,
 				44520D6D47B1B4566AC5B001 /* FoundationalQuestionsForm.swift */,
 				8FC52489911DAC6E057713BA /* OnboardingModeForkView.swift */,
 			);
@@ -2185,6 +2201,7 @@
 				100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */,
 				88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */,
 				AAB60FB496A805EE82863BA6 /* HandymanVisitReportView.swift */,
+				463EFEB136D6441AA225D99E /* HouseholdSpendView.swift */,
 				C6FCDD629C244BCB68D9914E /* LegacyTasksView.swift */,
 				E1077727F8CD1C7CEC052D32 /* LinkDocumentToProjectSheet.swift */,
 				8D23A1E29045F54B58096BB6 /* LogHistoricalProjectView.swift */,
@@ -2216,6 +2233,7 @@
 				B226FE8C4A4BA9B47699F359 /* RoutinesListView.swift */,
 				39BBBECCAD064C3B2991A6C5 /* SeasonalTasksDetailView.swift */,
 				693871EEED4A9EE08752B6C7 /* ServiceHistoryView.swift */,
+				18EB11D57E1E1F2AF761331B /* ServiceVendorInquirySheet.swift */,
 				3A2AE232E0E45B0EA76E3134 /* SystemCoverageFlow.swift */,
 				9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */,
 				2E439AEF8C499A45C6D1C722 /* SystemGroupListView.swift */,
@@ -2241,6 +2259,7 @@
 				C843C1750297B5F7B5273571 /* ChezRequestComposeSheet.swift */,
 				9EF6A66BC91FF4036AF43285 /* ChezRequestDetailView.swift */,
 				5EF8E248ACA297AB5000C82D /* ChezRequestsListView.swift */,
+				B7CC147F5015259C65FA8863 /* RequestChezSlotSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -2281,6 +2300,7 @@
 				6A74778C203DC3788BCBE65C /* PickupDayBanner.swift */,
 				90D7D8CB37718374CFD958AA /* QuickActions.swift */,
 				A988816972C9D7C48992B598 /* QuickActionsRow.swift */,
+				0BF95AD2500F28695B6944E1 /* ReBookChezHandymanCard.swift */,
 				F6C1C3312E21F2AAE74B7007 /* RecentActivityFeed.swift */,
 				F4C4293076703BBB693DB832 /* ServiceContractSheet.swift */,
 				0F6BD638B995FF43509A8B8B /* ThisWeekSection.swift */,
@@ -2642,6 +2662,7 @@
 				2B225520A59F0E01640D17F4 /* AuthViewModel.swift in Sources */,
 				6153590275165EDCC18E1F58 /* AvatarPhotoService.swift in Sources */,
 				30CD88306D8038E7601B6625 /* BiometricAuthView.swift in Sources */,
+				74C1C34077F5D1A83928C289 /* BookHandymanWindowSheet.swift in Sources */,
 				B5816C122201999EBA84312D /* BrandTheme.swift in Sources */,
 				14E7EE9FFE768968487AE2B2 /* BrowseSpecialtySystemsSheet.swift in Sources */,
 				4BCF7D44E08CD47DC286A24C /* Bundle+Version.swift in Sources */,
@@ -2813,6 +2834,7 @@
 				795A2B009D0479EC87A76069 /* HouseholdAccessView.swift in Sources */,
 				E0998A70606273CC5A4F7D6F /* HouseholdInviteCoordinator.swift in Sources */,
 				16D484CB09F646479303E41F /* HouseholdRealtimeSubscriptions.swift in Sources */,
+				58C19E07D79A6A4F9208D21D /* HouseholdSpendView.swift in Sources */,
 				35D9FE2D2B0A467EA2F7A045 /* HouseholdStaffStrip.swift in Sources */,
 				E7627B10E1380740DE422203 /* HouseholdStaffView.swift in Sources */,
 				15B763B2FCDFF742CECA451C /* HouseholdStrip.swift in Sources */,
@@ -2935,6 +2957,7 @@
 				6EA0E5FC7D3DA704C7EFDA09 /* QuoteComparisonView.swift in Sources */,
 				4C44F16712BB5B3D126F98D4 /* QuoteDetailView.swift in Sources */,
 				4DB84E3EB1AF0C36E06B6955 /* QuoteUploadEntryView.swift in Sources */,
+				B68172C66F282CD9FCBE44C6 /* ReBookChezHandymanCard.swift in Sources */,
 				DACC08101E8BA7738FA2A002 /* RealtimeService.swift in Sources */,
 				B4155C91AD6A8AF79CABE5C3 /* RecentActivityFeed.swift in Sources */,
 				DE27802A7827953DF55AA4AC /* RecommendedServicesView.swift in Sources */,
@@ -2942,6 +2965,7 @@
 				602E9646248523990734BE70 /* RegionalPack.swift in Sources */,
 				80873D0EE67C45AE0FE9A7D3 /* RemoteConfig.swift in Sources */,
 				859215987971D6716E999BB9 /* RequestAssessmentView.swift in Sources */,
+				7D48397D30517BEBA61EA3FB /* RequestChezSlotSheet.swift in Sources */,
 				D12D311A8B216DF6AB4A29DE /* Routine.swift in Sources */,
 				102F013F9D54AF97DD2FEE36 /* RoutineDetailView.swift in Sources */,
 				34164E0D96AE73EEBBBB6D4E /* RoutineEditSheet.swift in Sources */,
@@ -2980,6 +3004,7 @@
 				F56158AD8F13451724292623 /* ServiceLibrary.swift in Sources */,
 				CFDB01EE280ACF649D549187 /* ServiceOrchestrator.swift in Sources */,
 				DA4DD863BD063D561DEBC803 /* ServiceRecord.swift in Sources */,
+				EBFF47E7410595960A999A9B /* ServiceVendorInquirySheet.swift in Sources */,
 				09F7F49D0CD1D0C1266B9DB5 /* SessionManager.swift in Sources */,
 				2738C79DC803C870810040CF /* SettingsView.swift in Sources */,
 				A50832A03C6A3975D16E74CE /* SignUpView.swift in Sources */,
@@ -3101,6 +3126,7 @@
 				634261CB61D9A6668D0CD72C /* AuthViewModel.swift in Sources */,
 				4EE3114C02815A56D1077AC2 /* AvatarPhotoService.swift in Sources */,
 				179B09CCFB130BEC985F01A2 /* BiometricAuthView.swift in Sources */,
+				44EB5048BEF79C65ADF21581 /* BookHandymanWindowSheet.swift in Sources */,
 				70D8D72E70C320D147AD6BE9 /* BrandTheme.swift in Sources */,
 				52500B903E69235AE72CFA7A /* BrowseSpecialtySystemsSheet.swift in Sources */,
 				1019ACE80005550642D8FC35 /* Bundle+Version.swift in Sources */,
@@ -3272,6 +3298,7 @@
 				2B121EE907CC6006D36A44E1 /* HouseholdAccessView.swift in Sources */,
 				2127D2892BDA1A6EC8CAAEDB /* HouseholdInviteCoordinator.swift in Sources */,
 				C06A2D0992B79CA399719DA5 /* HouseholdRealtimeSubscriptions.swift in Sources */,
+				955416FE204FE0E98AB0287F /* HouseholdSpendView.swift in Sources */,
 				350E1A0D0315F5E1B95D789B /* HouseholdStaffStrip.swift in Sources */,
 				06FFE6A9FE463530C20FFA4C /* HouseholdStaffView.swift in Sources */,
 				8DFB2EECDA73CC3ADACA196B /* HouseholdStrip.swift in Sources */,
@@ -3394,6 +3421,7 @@
 				836B591EE6E6EDDD59FE88FE /* QuoteComparisonView.swift in Sources */,
 				7C7A69EF7465DB1B8250C8EF /* QuoteDetailView.swift in Sources */,
 				7940DDF72AD75BEAE062431A /* QuoteUploadEntryView.swift in Sources */,
+				E928DC6DA425315A8A35198F /* ReBookChezHandymanCard.swift in Sources */,
 				19F6C732CE8159C807EF763C /* RealtimeService.swift in Sources */,
 				5573C5EC725CF72690D3A1A9 /* RecentActivityFeed.swift in Sources */,
 				4CEE857764CED0021F511244 /* RecommendedServicesView.swift in Sources */,
@@ -3401,6 +3429,7 @@
 				5B4C8F854BF0956F23975B1D /* RegionalPack.swift in Sources */,
 				9AE925AFF003DC7043082FBF /* RemoteConfig.swift in Sources */,
 				4246CB931169C3A75FCC2574 /* RequestAssessmentView.swift in Sources */,
+				B981A17C43C7B8320F76F25D /* RequestChezSlotSheet.swift in Sources */,
 				6196D0DC4CB089EAEBE2BEE5 /* Routine.swift in Sources */,
 				D915AC0B9E76B379DC4D8C62 /* RoutineDetailView.swift in Sources */,
 				B6A02EBC9FBACC866051F4E2 /* RoutineEditSheet.swift in Sources */,
@@ -3439,6 +3468,7 @@
 				734530E7AE2F9ACB9AE76FE6 /* ServiceLibrary.swift in Sources */,
 				D9B6D964F0ADFDE51B9697DF /* ServiceOrchestrator.swift in Sources */,
 				8EC8D0D9405AF0BFAC30CBB5 /* ServiceRecord.swift in Sources */,
+				0D5FE5529D59154E9C865A35 /* ServiceVendorInquirySheet.swift in Sources */,
 				46E3323BB9520F6C165ACDBB /* SessionManager.swift in Sources */,
 				687B7212295486F83C32AD19 /* SettingsView.swift in Sources */,
 				4F92664E9E3BED84774FCF65 /* SignUpView.swift in Sources */,

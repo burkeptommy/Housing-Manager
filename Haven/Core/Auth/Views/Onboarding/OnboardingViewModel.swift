@@ -777,8 +777,23 @@ final class OnboardingViewModel: ObservableObject {
     /// Phase 84.5 — called by FoundationalQuestionsForm when the user
     /// completes all 7 questions. Stores the answers + transitions to
     /// the mode-fork screen.
+    ///
+    /// Phase 95 audit fix — persist the answers BEFORE flipping the
+    /// state flag. Previously the answers only lived in `@Published`
+    /// state until `applyModeChoice` ran (which only fires after the
+    /// user picks a mode). A user who answered all 7 Q's, then crashed
+    /// or backgrounded the app on the fork screen, lost everything.
     func completeFoundationalQuestions(_ answers: FoundationalAnswers) {
         foundationalAnswers = answers
+        // Persist immediately to properties.house_quiz_state.answers so
+        // a crash between fork render and mode tap doesn't lose the
+        // 7 answers we just collected. Best-effort — applyModeChoice
+        // re-persists later as a belt-and-suspenders pass.
+        if let pid = stampedPropertyIdForMode {
+            Task.detached { [weak self] in
+                await self?.persistFoundationalAnswers(answers, propertyId: pid)
+            }
+        }
         needsFoundationalQuestions = false
         needsModeChoice = true
         Analytics.track(.onboardingFoundationalCompleted, [:])
@@ -788,11 +803,43 @@ final class OnboardingViewModel: ObservableObject {
     /// onto a waitlist row + apply the .diy mode so they self-onboard.
     /// They can still use Haven; we'll notify them when Chez expands.
     ///
-    /// V1 ships with `resolveCoverageAvailability` returning `true` for
-    /// every signup, so this code path is dormant. The waitlist insert
-    /// will land alongside the address-to-zip region matcher.
+    /// Phase 95 audit fix — actually insert the waitlist row. The
+    /// `chez_assessment_waitlist` table exists (migration 20261210)
+    /// but no caller wrote into it. When the address-to-zip matcher
+    /// goes live, this is the only path that prevents silently auto-
+    /// enrolling out-of-area users into DIY without knowing they
+    /// asked to be notified about expansion.
     func joinCoverageWaitlist(authService: AuthService) async {
         Analytics.track(.onboardingCoverageWaitlistJoined, [:])
+        if let pid = stampedPropertyIdForMode,
+           let hid = stampedHouseholdIdForMode {
+            do {
+                let session = await HavenSupabase.safeSession(timeout: 3.0)
+                let userId = session?.user.id
+                let prop = try? await DatabaseService.shared.fetchProperty(id: pid)
+                let addressFull: String? = {
+                    let parts = [prop?.street, prop?.city, prop?.state, prop?.zipCode]
+                        .compactMap { $0 }
+                        .filter { !$0.isEmpty }
+                    return parts.isEmpty ? nil : parts.joined(separator: ", ")
+                }()
+                if let userId {
+                    _ = try await DatabaseService.shared.insertChezAssessmentWaitlist(
+                        propertyId: pid,
+                        householdId: hid,
+                        userId: userId,
+                        addressFull: addressFull,
+                        state: prop?.state,
+                        zip: prop?.zipCode
+                    )
+                }
+            } catch {
+                // Best-effort — failure here means the user lands on
+                // DIY and we miss the waitlist. Logged for ops; the
+                // user is still functional.
+                print("[Onboarding] Waitlist insert failed: \(error)")
+            }
+        }
         await applyModeChoice(.diy, authService: authService)
     }
 
@@ -884,7 +931,12 @@ final class OnboardingViewModel: ObservableObject {
     /// must NEVER trap the user on the chooser screen. The dashboard
     /// can re-check / re-retry; what matters is that the user gets
     /// dropped into the app.
-    func applyModeChoice(_ mode: AssessmentMode, authService: AuthService) async {
+    func applyModeChoice(
+        _ mode: AssessmentMode,
+        authService: AuthService,
+        preferredWindowStart: String? = nil,
+        preferredTimeOfDay: String? = nil
+    ) async {
         isApplyingMode = true
         defer { isApplyingMode = false }
         chosenMode = mode
@@ -935,9 +987,22 @@ final class OnboardingViewModel: ObservableObject {
                         homeownerConcerns: nil,
                         homeownerPresent: homeownerPresent,
                         homeownerAccessNotes: accessNotes,
-                        isExistingUserSupplement: false
+                        isExistingUserSupplement: false,
+                        preferredWindowStart: preferredWindowStart,
+                        preferredTimeOfDay: preferredTimeOfDay
                     )
                     Analytics.track(.homeAssessmentRequested, [:])
+                    // Phase 95 / gap #5: schedule a local "morning of"
+                    // reminder once we know the request landed. The
+                    // server-side SendGrid email is the immediate
+                    // confirmation; the local push is the persistent
+                    // reminder. If the user picked a date, anchor it
+                    // there; otherwise schedule a generic "we're working
+                    // on it" reminder for tomorrow morning.
+                    NotificationScheduler.scheduleHomeAssessmentBookingConfirmation(
+                        preferredWindowStart: preferredWindowStart,
+                        preferredTimeOfDay: preferredTimeOfDay
+                    )
                 } catch {
                     // Soft-fail. The assessment_mode attribute is stamped
                     // (or attempted), so the dashboard pending card

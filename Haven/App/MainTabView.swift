@@ -32,6 +32,25 @@ extension Notification.Name {
     static let routineChanged = Notification.Name("routineChanged")
     static let inboxItemUpdated = Notification.Name("inboxItemUpdated")
     static let navigateToVehicle = Notification.Name("navigateToVehicle")
+    /// Phase 95 audit: posted whenever a vehicle row is created, updated,
+    /// or archived. PropertyListView's "Your Garage" + the Maintenance
+    /// hub's Vehicles section both observe this so the homeowner doesn't
+    /// have to kill the app to see a freshly-added or sold vehicle.
+    /// `userInfo["vehicle_id"]` carries the row's UUID when applicable.
+    static let vehicleChanged = Notification.Name("vehicleChanged")
+    /// Phase 95 audit: posted whenever a family member or staff row is
+    /// created, updated, or removed (Settings → Household Staff,
+    /// Settings → Family Members, Q28 quiz steps, accept invitation).
+    /// Dashboard's HouseholdStrip + HouseholdStaffStrip both observe
+    /// this so newly-invited spouses / kids / home managers appear
+    /// without a tab switch.
+    static let householdMemberChanged = Notification.Name("householdMemberChanged")
+    /// Phase 95 audit: posted by Dashboard when the homeowner taps
+    /// "Hand off everything" on the ChezOwnershipHeroCard. Picked up
+    /// by ChezOwnershipView once it mounts, which auto-arms the
+    /// "hand off everything" confirmation dialog so the user lands on
+    /// a confirmation modal rather than the explainer screen.
+    static let triggerChezFullMode = Notification.Name("triggerChezFullMode")
     static let navigateToInboxItem = Notification.Name("navigateToInboxItem")
     static let navigateToPropertySection = Notification.Name("navigateToPropertySection")
 

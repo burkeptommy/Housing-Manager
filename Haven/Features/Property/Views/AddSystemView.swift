@@ -387,8 +387,15 @@ struct AddSystemView: View {
                     confirmedSubtype: subtype,
                     fuelType: selectedCatalogResult?.specs.fuelType
                 )
-                if result.totalChanged > 0 {
-                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                // Phase 95 audit fix — always post the notification when
+                // the user opted into templates, even if the reconciler
+                // returned 0 changes. Without this, a system add where
+                // every template was already covered (dedupe hit) skipped
+                // the post and downstream surfaces could miss adjacent
+                // updates (e.g. the system row itself appearing).
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                if result.totalChanged == 0 {
+                    print("[AddSystem] Reconciler returned 0 changes for \(category) — already covered or no matching templates.")
                 }
 
                 // Check if the reconciler linked a vendor — if so, offer

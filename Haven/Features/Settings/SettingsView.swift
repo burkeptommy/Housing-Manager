@@ -338,20 +338,28 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity)
                 }
 
-                Button(role: .destructive) {
-                    showDeleteAccountStep1 = true
-                } label: {
-                    if isDeletingAccount {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Label("Delete My Account", systemImage: "trash.fill")
-                            .font(HavenTypography.body)
-                            .foregroundStyle(HavenColors.critical)
-                            .frame(maxWidth: .infinity)
+                // Phase 95 (gap #55) — Delete My Account is destructive
+                // and household-wide; home managers and staff don't get
+                // this affordance. They can sign out, but the homeowner
+                // is the only one who can delete the household. RLS
+                // would block the actual delete server-side; suppressing
+                // the button here matches the role boundary.
+                if !appState.isStaffUser {
+                    Button(role: .destructive) {
+                        showDeleteAccountStep1 = true
+                    } label: {
+                        if isDeletingAccount {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Label("Delete My Account", systemImage: "trash.fill")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.critical)
+                                .frame(maxWidth: .infinity)
+                        }
                     }
+                    .disabled(isDeletingAccount)
                 }
-                .disabled(isDeletingAccount)
             }
         }
         .scrollContentBackground(.hidden)

@@ -127,6 +127,12 @@ struct PropertyListView: View {
                     navigationPath.append(first.id)
                 }
             }
+            // Phase 95 audit fix — refresh the garage strip when a vehicle
+            // is added, edited, or sold/totaled. Previously the user had
+            // to switch tabs and come back to see new rows.
+            .onReceive(NotificationCenter.default.publisher(for: .vehicleChanged)) { _ in
+                Task { await viewModel.loadProperties() }
+            }
             .navigationDestination(for: UUID.self) { propertyId in
                 PropertyDetailView(propertyID: propertyId)
             }

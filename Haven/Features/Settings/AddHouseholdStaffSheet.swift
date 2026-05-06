@@ -182,6 +182,15 @@ struct AddHouseholdStaffSheet: View {
             }
 
             Haptics.success()
+            // Phase 95 audit fix — Dashboard HouseholdStrip +
+            // HouseholdStaffStrip both observe this so the new home
+            // manager appears immediately without a tab switch /
+            // pull-to-refresh.
+            NotificationCenter.default.post(
+                name: .householdMemberChanged,
+                object: nil,
+                userInfo: ["member_type": "home_manager"]
+            )
             onComplete?()
             dismiss()
         } catch {

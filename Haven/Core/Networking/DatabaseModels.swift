@@ -5564,3 +5564,65 @@ struct AssessmentCorrectionItem: Codable, Hashable {
         case entityId = "entity_id"
     }
 }
+
+// MARK: - Phase 95 (gap #47) — Service vendor inquiries
+
+/// Outbound inquiry from the homeowner to a service-vendor contractor
+/// (HVAC, plumber, electrician, roofer, septic, well, chimney, tree).
+/// Persisted alongside the SendGrid email send so the contractor
+/// detail view can show outreach history without poking the email
+/// pipeline directly.
+struct ServiceVendorInquiryRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let contractorId: UUID
+    let senderUserId: UUID
+    let subject: String
+    let body: String
+    let deliveryStatus: String
+    let deliveryError: String?
+    let sentAt: Date?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, subject, body
+        case householdId = "household_id"
+        case contractorId = "contractor_id"
+        case senderUserId = "sender_user_id"
+        case deliveryStatus = "delivery_status"
+        case deliveryError = "delivery_error"
+        case sentAt = "sent_at"
+        case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        householdId = (try? c.decode(UUID.self, forKey: .householdId)) ?? UUID()
+        contractorId = (try? c.decode(UUID.self, forKey: .contractorId)) ?? UUID()
+        senderUserId = (try? c.decode(UUID.self, forKey: .senderUserId)) ?? UUID()
+        subject = (try? c.decodeIfPresent(String.self, forKey: .subject)) ?? ""
+        body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? ""
+        deliveryStatus = (try? c.decodeIfPresent(String.self, forKey: .deliveryStatus)) ?? "pending"
+        deliveryError = try? c.decodeIfPresent(String.self, forKey: .deliveryError)
+        sentAt = try? c.decodeIfPresent(Date.self, forKey: .sentAt)
+        createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
+    }
+}
+
+struct ServiceVendorInquiryInsert: Codable {
+    let householdId: UUID
+    let contractorId: UUID
+    let senderUserId: UUID
+    let subject: String
+    let body: String
+    var deliveryStatus: String = "pending"
+
+    enum CodingKeys: String, CodingKey {
+        case subject, body
+        case householdId = "household_id"
+        case contractorId = "contractor_id"
+        case senderUserId = "sender_user_id"
+        case deliveryStatus = "delivery_status"
+    }
+}

@@ -167,6 +167,14 @@ enum AnalyticsEvent: String {
     /// the "did the soft-inquiry channel get used" funnel
     /// alongside scheduled-visit conversions.
     case handymanSoftInquirySent = "handyman_soft_inquiry_sent"
+    /// Phase 95 (gap #47) — fired when the homeowner sends a direct
+    /// inquiry to a non-handyman service vendor (HVAC, plumber, etc.).
+    /// `category` differentiates trades for funnel slicing.
+    case serviceVendorInquirySent = "service_vendor_inquiry_sent"
+    /// Phase 95 audit (Wave 5c) — fired when the homeowner taps
+    /// "Request a window" on a Chez-owned task or routine. `source`
+    /// payload distinguishes "task" vs "routine".
+    case chezSlotRequested = "chez_slot_requested"
     /// Phase 95 (gap #42) — fired when the homeowner runs a bulk
     /// snooze from `MaintenanceScheduleView`. `count` is the number
     /// of tasks affected; `days` is the snooze interval (7 or 30).
@@ -522,6 +530,7 @@ enum AnalyticsEvent: String {
     case equipmentPhotoIdentifyStarted = "equipment_photo_identify_started"
     case equipmentPhotoIdentifyCompleted = "equipment_photo_identify_completed"
     case equipmentCatalogRequestSent = "equipment_catalog_request_sent"
+    case equipmentChezSourceRequestSent = "equipment_chez_source_request_sent"  // Phase 4 — photo-ID partial match → "Have Chez add this"
 
     // MARK: - Money
     case moneyTabViewed = "money_tab_viewed"

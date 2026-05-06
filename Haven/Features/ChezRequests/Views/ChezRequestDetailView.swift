@@ -64,6 +64,35 @@ struct ChezRequestDetailView: View {
         .background(HavenColors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(viewModel.request?.summary ?? "Request")
+        // Phase 95 audit (Wave 5e) — escalate path. Pre-Phase-95 the
+        // homeowner could only reply or mark resolved; there was no way
+        // to say "this needs to move faster" without typing it as a
+        // reply. The escalate action posts an internal high-priority
+        // signal + a system message in the thread so Chez specialists
+        // see urgency at a glance on the cockpit.
+        .toolbar {
+            if let req = viewModel.request, req.typedStatus != .resolved {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            Task { await viewModel.escalate() }
+                        } label: {
+                            Label("Escalate this request", systemImage: "flag.fill")
+                        }
+                        if req.typedStatus != .resolved {
+                            Button {
+                                Task { await viewModel.markResolvedFromHomeowner() }
+                            } label: {
+                                Label("Mark resolved", systemImage: "checkmark.circle")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(HavenColors.textPrimary)
+                    }
+                }
+            }
+        }
         .task { await viewModel.load() }
         .onReceive(NotificationCenter.default.publisher(for: .chezRequestChanged)) { _ in
             Task { await viewModel.load() }

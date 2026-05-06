@@ -530,6 +530,14 @@ struct AddVehicleView: View {
                 ))
             }
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            // Phase 95 audit fix — fresh vehicles need to surface in the
+            // Garage strip + Maintenance hub Vehicles section without
+            // forcing a tab switch / app restart.
+            NotificationCenter.default.post(
+                name: .vehicleChanged,
+                object: nil,
+                userInfo: ["vehicle_id": vehicle.id.uuidString]
+            )
 
             Analytics.track(.vehicleCreated, [
                 "has_vin": !vin.isEmpty,

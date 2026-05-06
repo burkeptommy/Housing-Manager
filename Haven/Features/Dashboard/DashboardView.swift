@@ -31,6 +31,10 @@ struct DashboardView: View {
     // Phase 84.5 — Home Assessment dashboard sheet/alert state
     @State private var showAssessmentRescheduleSheet = false
     @State private var confirmAssessmentCancel = false
+    /// Phase 95 (audit gap #9) — booking sheet for the dashboard re-book
+    /// affordance. Shows when the homeowner taps the "Want Chez to handle
+    /// setup instead?" card after they cancelled or originally chose DIY.
+    @State private var showRebookHandymanSheet = false
     @State private var showAssessmentPrepNotesSheet = false
     @State private var showAssessmentPrepPhotosSheet = false
     @State private var showAssessmentPrepQuizSheet = false
@@ -201,6 +205,22 @@ struct DashboardView: View {
                             gettingStartedCard
                         }
 
+                        // Phase 95 (audit gap #9) — re-book affordance
+                        // for the homeowner who cancelled their Chez
+                        // handyman visit OR originally chose the DIY
+                        // path and has changed their mind. Lives right
+                        // under the quiz hero so it's the natural
+                        // "actually, can someone else do this?" exit.
+                        // Hidden once an assessment is active (the
+                        // pending card above absorbs the slot).
+                        if viewModel.hasProperty
+                            && viewModel.homeAssessment == nil
+                            && !viewModel.hasCompletedAnyQuiz {
+                            ReBookChezHandymanCard {
+                                showRebookHandymanSheet = true
+                            }
+                        }
+
                         // 2.5 Incomplete address banner
                         if let property = viewModel.propertyNeedsAddress {
                             incompleteAddressBanner(property)
@@ -219,11 +239,25 @@ struct DashboardView: View {
                         if viewModel.hasCompletedAnyQuiz {
                             ChezOwnershipHeroCard(
                                 activeGroupCount: viewModel.chezActiveGroupCount,
-                                delegatedItemCount: viewModel.chezDelegatedItemCount
-                            ) {
-                                Haptics.light()
-                                navigationPath.append("chez_ownership")
-                            }
+                                delegatedItemCount: viewModel.chezDelegatedItemCount,
+                                onTap: {
+                                    Haptics.light()
+                                    navigationPath.append("chez_ownership")
+                                },
+                                onHandOffEverything: {
+                                    // Phase 95 audit fix — direct shortcut
+                                    // into ChezOwnershipView with the
+                                    // "hand off everything" confirmation
+                                    // dialog already armed. UserInfo flag
+                                    // is read by ChezOwnershipView's
+                                    // .task to surface the modal.
+                                    NotificationCenter.default.post(
+                                        name: .triggerChezFullMode,
+                                        object: nil
+                                    )
+                                    navigationPath.append("chez_ownership")
+                                }
+                            )
                         }
 
                         // Phase 85 — Monthly summary card. Renders when
@@ -863,6 +897,12 @@ struct DashboardView: View {
                     await loadDelegationCandidatesForContractor(contractorId)
                 }
             }
+            // Phase 95 audit fix — refresh the family + staff strips
+            // when a member is added/removed via Settings or the quiz.
+            // viewModel.refresh() already loads both lists.
+            .onReceive(NotificationCenter.default.publisher(for: .householdMemberChanged)) { _ in
+                Task { await viewModel.refresh() }
+            }
             .sheet(isPresented: $showDashboardDelegationSheet) {
                 PostQuizVendorDelegationSheet(
                     candidates: dashboardDelegationCandidates,
@@ -899,6 +939,28 @@ struct DashboardView: View {
                 Button("Keep my visit", role: .cancel) {}
             } message: {
                 Text("We'll cancel your free assessment and bring back the quiz so you can set things up yourself. You can switch back anytime.")
+            }
+            // Phase 95 (audit gap #9) — re-book Chez handyman from the
+            // dashboard. Reuses the BookHandymanWindowSheet from
+            // onboarding so the booking experience is identical no
+            // matter which entry point the homeowner used. On submit,
+            // fires requestHomeAssessment + schedules the local
+            // confirmation reminder; the dashboard's
+            // HomeAssessmentPendingCard then takes over as the
+            // status surface.
+            .sheet(isPresented: $showRebookHandymanSheet) {
+                BookHandymanWindowSheet(
+                    onSubmit: { windowStart, timeOfDay in
+                        showRebookHandymanSheet = false
+                        Task { await rebookHomeAssessment(
+                            preferredWindowStart: windowStart,
+                            preferredTimeOfDay: timeOfDay
+                        ) }
+                    },
+                    onCancel: {
+                        showRebookHandymanSheet = false
+                    }
+                )
             }
             .sheet(isPresented: $showAssessmentRescheduleSheet) {
                 if let assessment = viewModel.homeAssessment {
@@ -2179,6 +2241,45 @@ struct DashboardView: View {
             Haptics.success()
         } catch {
             print("[Dashboard] cancelHomeAssessment failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Phase 95 (audit gap #9) — re-book a Chez handyman onboarding
+    /// visit from the dashboard. Same Edge Function call as the
+    /// onboarding fork, plus the local-notification scheduler that
+    /// pairs with the SendGrid email backstop. After success,
+    /// loadHomeAssessment refreshes the view model so
+    /// HomeAssessmentPendingCard takes over the slot.
+    private func rebookHomeAssessment(
+        preferredWindowStart: String?,
+        preferredTimeOfDay: String?
+    ) async {
+        guard let property = viewModel.properties.first else {
+            Haptics.error()
+            return
+        }
+        let householdId = property.householdId
+        do {
+            _ = try await HavenSupabase.requestHomeAssessment(
+                propertyId: property.id.uuidString,
+                householdId: householdId.uuidString,
+                homeownerConcerns: nil,
+                homeownerPresent: true,
+                homeownerAccessNotes: nil,
+                isExistingUserSupplement: false,
+                preferredWindowStart: preferredWindowStart,
+                preferredTimeOfDay: preferredTimeOfDay
+            )
+            Analytics.track(.homeAssessmentRequested, ["source": "dashboard_rebook"])
+            NotificationScheduler.scheduleHomeAssessmentBookingConfirmation(
+                preferredWindowStart: preferredWindowStart,
+                preferredTimeOfDay: preferredTimeOfDay
+            )
+            await viewModel.refresh()
+            Haptics.success()
+        } catch {
+            print("[Dashboard] rebookHomeAssessment failed: \(error)")
             Haptics.error()
         }
     }

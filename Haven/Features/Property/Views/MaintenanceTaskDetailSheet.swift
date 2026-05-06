@@ -46,6 +46,9 @@ struct MaintenanceTaskDetailSheet: View {
     /// Phase 80.2 — Local mirror of `task.chezOwned` for the
     /// `ChezOwnsToggle` Binding. Seeded from the task on first appear.
     @State private var localChezOwned: Bool = false
+    /// Phase 95 audit (Wave 5c) — drives the "Request a window" sheet
+    /// for Chez-owned tasks.
+    @State private var showRequestSlotSheet: Bool = false
     @State private var showScheduleChat = false
     @State private var showContractorDirectory = false
     @State private var showHandymanPunchList = false
@@ -274,6 +277,33 @@ struct MaintenanceTaskDetailSheet: View {
                             )
                         }
                     )
+
+                    // Phase 95 audit (Wave 5c) — when the task IS chez-
+                    // owned, surface a "Request a window" CTA. Without
+                    // this, the homeowner has zero agency in WHEN Chez
+                    // schedules the work — Chez just proposes dates.
+                    // This sheet captures preferred date + time-of-day
+                    // and posts a coordinate_task request thread that
+                    // the operator picks up on the cockpit.
+                    if localChezOwned {
+                        Button {
+                            Haptics.medium()
+                            showRequestSlotSheet = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "calendar.badge.plus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Request a window")
+                                    .font(HavenTypography.uiButton)
+                            }
+                            .foregroundStyle(HavenColors.action)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(HavenColors.action.opacity(0.10))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 // Details
@@ -444,6 +474,18 @@ struct MaintenanceTaskDetailSheet: View {
                     initialPrompt: "Please schedule \(task.title) with \(assignedContractor?.companyName ?? "my vendor"). It's due \(task.nextDueDate.havenDateFormatted)."
                 )
             }
+        }
+        // Phase 95 audit (Wave 5c) — homeowner-initiated slot request
+        // for a Chez-owned task. Captures preferred date + time-of-day
+        // and posts a coordinate_task chez_request thread.
+        .sheet(isPresented: $showRequestSlotSheet) {
+            RequestChezSlotSheet(
+                source: .task(task),
+                householdId: task.householdId,
+                onSubmitted: {
+                    showRequestSlotSheet = false
+                }
+            )
         }
         .sheet(isPresented: $showContractorDirectory) {
             NavigationStack {

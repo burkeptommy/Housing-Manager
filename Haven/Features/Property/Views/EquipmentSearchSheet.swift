@@ -165,6 +165,19 @@ struct EquipmentSearchSheet: View {
     @ViewBuilder
     private func equipmentRow(_ result: EquipmentSearchResult) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Phase 5 — "Best match" pill above the row when ranking confidence
+            // is high (3+ query signals aligned with the row's specs).
+            if result.isBestMatch == true {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("BEST MATCH FOR YOUR SEARCH")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.5)
+                }
+                .foregroundStyle(HavenColors.action)
+                .padding(.bottom, 2)
+            }
             HStack {
                 Text(result.displayName)
                     .font(HavenTypography.headline)
@@ -235,15 +248,15 @@ struct EquipmentSearchSheet: View {
             showCatalogRequest = true
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "envelope.badge.shield.half.filled")
+                Image(systemName: "sparkles")
                     .font(.system(size: 16))
-                    .foregroundStyle(HavenColors.textPrimary)
+                    .foregroundStyle(HavenColors.action)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Don't see your system?")
+                    Text("Have Chez add yours")
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.navy700)
-                    Text("Let us know and we'll add it to our database")
+                    Text("Our team will research and add it within 3-4 hours")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textTertiary)
                 }
@@ -255,11 +268,11 @@ struct EquipmentSearchSheet: View {
                     .foregroundStyle(HavenColors.textTertiary)
             }
             .padding(HavenTheme.spacing12)
-            .background(HavenColors.navy.opacity(0.04))
+            .background(HavenColors.action.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
             .overlay {
                 RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                    .strokeBorder(HavenColors.navy.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(HavenColors.action.opacity(0.18), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)

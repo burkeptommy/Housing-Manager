@@ -5878,6 +5878,14 @@ async function requestHomeAssessment(
     return { ok: true, assessment: existing, was_existing: true };
   }
 
+  // Phase 95 / gap #4: optional preferred-window fields. Picker on the
+  // iOS booking sheet lets the homeowner say "any time after May 12,
+  // mornings preferred." Cockpit uses these when assigning a handyman
+  // so the visit lands inside the window instead of being silently
+  // scheduled by the dispatcher.
+  const preferredWindowStart = compactString(body.preferred_window_start);
+  const preferredTimeOfDay = compactString(body.preferred_time_of_day);
+
   const { data: created, error } = await service
     .from("home_assessments")
     .insert({
@@ -5888,12 +5896,109 @@ async function requestHomeAssessment(
       homeowner_present: body.homeowner_present !== false,
       homeowner_access_notes: compactString(body.homeowner_access_notes) || null,
       is_existing_user_supplement: body.is_existing_user_supplement === true,
+      preferred_window_start: preferredWindowStart || null,
+      preferred_time_of_day: preferredTimeOfDay || null,
     })
     .select("*")
     .single();
   if (error || !created) throw new Error(`failed to create assessment: ${error?.message}`);
 
+  // Phase 95 / gap #5: confirmation email via SendGrid so the homeowner
+  // has something in writing the moment the request lands. Push fires
+  // separately from iOS via UNUserNotification — handled client-side
+  // because that's a local notification, not a remote one.
+  try {
+    await sendAssessmentRequestConfirmationEmail(service, householdId, {
+      preferredWindowStart,
+      preferredTimeOfDay,
+    });
+  } catch (e) {
+    console.error("[chez-assessment-confirmation] email failed:", e);
+    // never break the request flow on email failure
+  }
+
   return { ok: true, assessment: created, was_existing: false };
+}
+
+/** Phase 95 / gap #5 — email backstop the moment a homeowner books a
+ *  Chez handyman onboarding visit. Brand-voiced as Chez (per the
+ *  audit's #74 brand sweep). Sends to every household admin's email. */
+async function sendAssessmentRequestConfirmationEmail(
+  service: ServiceClient,
+  householdId: string,
+  details: { preferredWindowStart?: string; preferredTimeOfDay?: string }
+): Promise<void> {
+  const sendgridKey = Deno.env.get("SENDGRID_API_KEY");
+  if (!sendgridKey) return;
+
+  const { data: members } = await service
+    .from("household_members")
+    .select("user_id, role")
+    .eq("household_id", householdId)
+    .in("role", ["owner", "admin"]);
+  const memberIds = ((members as Array<{ user_id: string }> | null) ?? [])
+    .map((m) => m.user_id)
+    .filter(Boolean);
+  if (memberIds.length === 0) return;
+
+  const { data: users } = await service
+    .from("users")
+    .select("email, full_name")
+    .in("id", memberIds);
+  const recipients = ((users as Array<{ email: string; full_name?: string }> | null) ?? [])
+    .filter((u) => !!u.email);
+  if (recipients.length === 0) return;
+
+  const windowSummary = (() => {
+    if (!details.preferredWindowStart && !details.preferredTimeOfDay) {
+      return "We'll be in touch shortly with a date and time that works for you.";
+    }
+    const parts: string[] = [];
+    if (details.preferredWindowStart) {
+      parts.push(`earliest date you're available: ${details.preferredWindowStart}`);
+    }
+    if (details.preferredTimeOfDay) {
+      parts.push(`time of day preference: ${details.preferredTimeOfDay}`);
+    }
+    return `We've noted your preferences (${parts.join(", ")}) and will reach out to confirm a slot.`;
+  })();
+
+  const subject = "Your Chez handyman onboarding visit is being scheduled";
+  const text = `Hi,
+
+Your request for a Chez handyman onboarding visit has been received.
+
+${windowSummary}
+
+A member of the Chez team will reach out within one business day to confirm the date and time.
+
+Thanks for trusting us with your home,
+The Chez team`;
+
+  const html = `<p>Hi,</p>
+<p>Your request for a Chez handyman onboarding visit has been received.</p>
+<p>${windowSummary}</p>
+<p>A member of the Chez team will reach out within one business day to confirm the date and time.</p>
+<p>Thanks for trusting us with your home,<br/>The Chez team</p>`;
+
+  await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${sendgridKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: recipients.map((r) => ({
+        to: [{ email: r.email, name: r.full_name ?? undefined }],
+      })),
+      from: { email: "hello@getchez.com", name: "Chez" },
+      subject,
+      content: [
+        { type: "text/plain", value: text },
+        { type: "text/html", value: html },
+      ],
+    }),
+  });
 }
 
 /** Handyman captures a recommendation during the visit. (G18, G19, G20, G45) */

@@ -132,9 +132,18 @@ struct RoutinesListView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(routine.presentationLabel)
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
+                    HStack(spacing: 8) {
+                        Text(routine.presentationLabel)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        // Phase 95 audit fix — surface Chez ownership at
+                        // the row level, not buried inside the edit sheet.
+                        // Homeowners need to see at a glance which
+                        // routines Chez is running.
+                        if routine.chezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
                     if let vendor = linkedVendor {
                         Text(vendor.companyName)
                             .font(HavenTypography.caption)

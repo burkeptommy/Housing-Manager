@@ -17,6 +17,11 @@ struct EquipmentIdentifySheet: View {
     @State private var identifyResult: EquipmentIdentifyResponse?
     @State private var identifyError: String?
 
+    // Phase 4 — Chez concierge submission state for photo-ID partial matches.
+    @State private var isSubmittingChezRequest = false
+    @State private var chezRequestId: String?
+    @State private var chezRequestError: String?
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
@@ -253,62 +258,182 @@ struct EquipmentIdentifySheet: View {
                 }
                 .padding(.horizontal, HavenTheme.pageMargin)
 
+            } else if chezRequestId != nil {
+                // Phase 4 — Chez request submitted, show confirmation
+                chezConfirmationView(result)
             } else {
-                // Extracted info but no catalog match
-                VStack(spacing: 12) {
-                    Image(systemName: "info.circle.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(HavenColors.warning)
-                    Text("Partially Identified")
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        if let mfg = result.manufacturer {
-                            detailRow("Brand", mfg)
-                        }
-                        if let model = result.modelNumber {
-                            detailRow("Model", model)
-                        }
-                        if let serial = result.serialNumber {
-                            detailRow("Serial", serial)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(HavenColors.beige100)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                    Text("Not found in our catalog. Try searching by name instead.")
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textSecondary)
-                }
-                .padding(.horizontal, HavenTheme.pageMargin)
-
-                Button {
-                    Haptics.light()
-                    // Pre-fill search with extracted brand
-                    showSearchSheet = true
-                } label: {
-                    Text("Search Catalog Instead")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy700)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(HavenColors.navy.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .padding(.horizontal, HavenTheme.pageMargin)
+                // Phase 4 — Chez concierge flow for partial photo matches.
+                // Replaces the legacy "Partially Identified" dead-end with a
+                // premium service framing: "Our team will add this within
+                // 3-4 hours and let you know the moment it's ready." Same
+                // tone as the rest of the Chez concierge UX.
+                chezSourcingPromptView(result)
             }
 
             // Try again button
             Button {
                 identifyResult = nil
                 identifyError = nil
+                chezRequestError = nil
             } label: {
-                Text("Try Again")
+                Text("Try a different photo")
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+    }
+
+    // Phase 4 — pre-submit prompt: Chez can source unique systems within 3-4 hours
+    @ViewBuilder
+    private func chezSourcingPromptView(_ result: EquipmentIdentifyResponse) -> some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 36))
+                    .foregroundStyle(HavenColors.action)
+                Text("Your system is unique")
+                    .font(HavenTypography.fraunces(size: 20, weight: 700))
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    if let mfg = result.manufacturer {
+                        detailRow("Brand", mfg)
+                    }
+                    if let model = result.modelNumber {
+                        detailRow("Model", model)
+                    }
+                    if let serial = result.serialNumber {
+                        detailRow("Serial", serial)
+                    }
+                    if let type = result.productType {
+                        detailRow("Type", type.capitalized)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(HavenColors.beige200.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                Text("We don't have this exact model in our database yet. Our team will research it and add it to your home within the next 3-4 hours. We'll let you know the moment it's ready.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+
+            Button {
+                Haptics.medium()
+                submitChezRequest(result: result)
+            } label: {
+                HStack(spacing: 8) {
+                    if isSubmittingChezRequest {
+                        ProgressView().tint(HavenColors.textOnAction)
+                    }
+                    Text(isSubmittingChezRequest ? "Sending to Chez..." : "Have Chez add this for me")
+                        .font(HavenTypography.uiButton)
+                        .foregroundStyle(HavenColors.textOnAction)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(HavenColors.action)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+            .disabled(isSubmittingChezRequest)
+            .padding(.horizontal, HavenTheme.pageMargin)
+
+            Button {
+                Haptics.light()
+                showSearchSheet = true
+            } label: {
+                Text("I'll search by name instead")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+
+            if let err = chezRequestError {
+                Text(err)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, HavenTheme.pageMargin)
+            }
+        }
+    }
+
+    // Phase 4 — confirmation screen after submitting to Chez
+    @ViewBuilder
+    private func chezConfirmationView(_ result: EquipmentIdentifyResponse) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(HavenColors.action)
+
+            Text("Chez is on it")
+                .font(HavenTypography.fraunces(size: 22, weight: 700))
+                .foregroundStyle(HavenColors.textPrimary)
+
+            VStack(spacing: 8) {
+                Text("We'll research your \(result.manufacturer ?? "system") and add it to your home within the next 3-4 hours.")
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                Text("You'll get a notification the moment it's ready.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+
+            Button {
+                Haptics.success()
+                dismiss()
+            } label: {
+                Text("Done")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textOnNavy)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(HavenColors.navy)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+        }
+        .padding(.top, 24)
+    }
+
+    // Phase 4 — submit the Vision-extracted brand/model/serial to send-catalog-request
+    private func submitChezRequest(result: EquipmentIdentifyResponse) {
+        isSubmittingChezRequest = true
+        chezRequestError = nil
+        Analytics.track(.equipmentChezSourceRequestSent, [
+            "brand": result.manufacturer ?? "",
+            "model": result.modelNumber ?? "",
+            "category": systemCategory ?? ""
+        ])
+
+        Task {
+            do {
+                let id = try await HavenSupabase.submitPhotoCatalogRequest(
+                    brand: result.manufacturer,
+                    modelNumber: result.modelNumber,
+                    serialNumber: result.serialNumber,
+                    productType: result.productType ?? systemCategory,
+                    imagePath: nil,
+                    homeSystemId: nil,
+                    notes: nil
+                )
+                await MainActor.run {
+                    isSubmittingChezRequest = false
+                    chezRequestId = id ?? "submitted"
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmittingChezRequest = false
+                    chezRequestError = "We couldn't send that to Chez. Please try again."
+                    print("[EquipmentIdentifySheet] submitChezRequest error: \(error)")
+                }
             }
         }
     }

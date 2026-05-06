@@ -319,7 +319,18 @@ struct VendorReviewForm: View {
                 systems = allSystems
                 showSystemAssignment = true
             } else {
-                // No systems — just complete
+                // No systems — just complete. Phase 95 audit fix:
+                // we still need to fire .contractorChanged + .contractorAdded
+                // so PropertyDetailView's Contacts tab and the dashboard
+                // delegation re-fire path see the new vendor without a
+                // restart. The system-assignment branch posts these from
+                // assignSystems() — this branch was previously silent.
+                NotificationCenter.default.post(name: .contractorChanged, object: nil)
+                NotificationCenter.default.post(
+                    name: .contractorAdded,
+                    object: nil,
+                    userInfo: ["contractor_id": contractor.id.uuidString]
+                )
                 onSave?()
                 dismiss()
             }

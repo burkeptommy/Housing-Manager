@@ -1,12 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <!-- Mirror of the iOS AppIcon.appiconset/AppIcon-1024.png design.
        Indigo rounded square, uppercase serif "C" centered slightly low,
        small salmon roof chevron above (like a ^ accent on Ĉ). -->
-  <!-- Full-edge indigo. No rounded corners — matches the iOS app icon
-       SOURCE PNG (Apple adds the rounded corner mask at display time).
-       Otherwise the transparent corners bleed the white tab background
-       through, creating an unwanted white box around the favicon. -->
-  <rect width="100" height="100" fill="#453A70"/>
+  <!-- Full-edge indigo. The rect bleeds 2 units past the viewBox on every
+       side so sub-pixel anti-aliasing at small favicon sizes (16/32px in
+       browser tabs) has solid indigo to sample at the edges, instead of
+       fading to transparent and letting the tab background show as a
+       white halo around the icon. No explicit width/height so browsers
+       scale purely from the viewBox. -->
+  <rect x="-2" y="-2" width="104" height="104" fill="#453A70"/>
   <!-- Salmon chevron — small, sits above the C. Coords keep the chevron
        clear of the C's top edge. -->
   <path d="M55 28 L66 18 L77 28"

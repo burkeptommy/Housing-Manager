@@ -30,6 +30,17 @@ struct FindLocalVendorSheet: View {
     let categoryDisplayName: String
     var onComplete: (() -> Void)?
     var onAdoptedVendor: ((ContractorRow) -> Void)? = nil
+    /// Phase 95 audit (Wave 5f) — empty-state escape hatch. When the
+    /// "no vendors found" state shows, the homeowner can tap "Add my
+    /// own vendor" to dismiss this sheet and open `AddVendorSheet`
+    /// pre-filled with the category. Caller wires it to whatever
+    /// vendor-add flow makes sense for the surface.
+    var onAddManuallyFromEmpty: (() -> Void)? = nil
+    /// Phase 95 audit (Wave 5f) — secondary escape hatch. When no
+    /// local vendors are in our directory yet, the homeowner can ask
+    /// Chez to source one for them. Routes to the existing concierge
+    /// composer with the category + town/state context pre-filled.
+    var onAskChezToFindOne: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -266,17 +277,70 @@ struct FindLocalVendorSheet: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: HavenTheme.spacing12) {
+        VStack(spacing: HavenTheme.spacing16) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32))
                 .foregroundStyle(HavenColors.textTertiary)
-            Text("No vendors found yet")
-                .font(HavenTypography.headline)
-                .foregroundStyle(HavenColors.textPrimary)
-            Text("We couldn't surface a strong local match. Add your own vendor below and Chez will use it for future tasks.")
-                .font(HavenTypography.bodySmall)
-                .foregroundStyle(HavenColors.textSecondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 6) {
+                Text("No vendors found yet")
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("We couldn't surface a strong local match for \(categoryDisplayName) in \(town), \(state).")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Phase 95 audit (Wave 5f) — two affordances on no-results
+            // so the user is never stuck staring at "no vendors found"
+            // without a next step. (1) Ask Chez to find one — taps the
+            // existing concierge flow. (2) Add your own — opens
+            // AddVendorSheet with category prefilled.
+            VStack(spacing: 10) {
+                if let onAskChezToFindOne {
+                    Button {
+                        Haptics.medium()
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            onAskChezToFindOne()
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Have Chez find one for me")
+                                .font(HavenTypography.uiButton)
+                        }
+                        .foregroundStyle(HavenColors.textOnAction)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(HavenColors.action)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let onAddManuallyFromEmpty {
+                    Button {
+                        Haptics.light()
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            onAddManuallyFromEmpty()
+                        }
+                    } label: {
+                        Text("Add my own vendor")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(HavenColors.navy700.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, HavenTheme.spacing24)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, HavenTheme.spacing32)

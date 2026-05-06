@@ -23,6 +23,9 @@ struct RoutineDetailView: View {
     @State private var showDocumentUpload = false
     @State private var uploadCategory: DocumentCategory = .homeBillInvoice
     @State private var showVisitLogger = false
+    /// Phase 95 audit (Wave 5c) — drives the "Request a window" sheet
+    /// for Chez-owned routines.
+    @State private var showRequestSlotSheet = false
 
     private let db = DatabaseService.shared
 
@@ -112,6 +115,17 @@ struct RoutineDetailView: View {
                     Task { await load() }
                 }
             }
+        }
+        // Phase 95 audit (Wave 5c) — homeowner-initiated slot request
+        // for a Chez-owned routine. Same picker as the task version.
+        .sheet(isPresented: $showRequestSlotSheet) {
+            RequestChezSlotSheet(
+                source: .routine(routine),
+                householdId: householdId,
+                onSubmitted: {
+                    showRequestSlotSheet = false
+                }
+            )
         }
     }
 
@@ -406,6 +420,22 @@ struct RoutineDetailView: View {
                 Text("ACTIONS")
                     .font(HavenTypography.uiSectionHeader)
                     .foregroundStyle(HavenColors.textSecondary)
+
+                // Phase 95 audit (Wave 5c) — when Chez owns this routine,
+                // surface "Request a window" so the homeowner can nudge
+                // a preferred date / time-of-day. Without this, Chez
+                // schedules silently and the homeowner has no agency.
+                if routine.chezOwned {
+                    Button {
+                        Haptics.medium()
+                        showRequestSlotSheet = true
+                    } label: {
+                        Label("Request a window", systemImage: "calendar.badge.plus")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(HavenColors.action)
+                }
 
                 Button {
                     isEditing = true

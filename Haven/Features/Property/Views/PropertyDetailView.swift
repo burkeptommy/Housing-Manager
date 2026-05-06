@@ -146,6 +146,9 @@ struct PropertyDetailView: View {
 
     /// Phase 54C.3: "Recommended for your home" entry-point state.
     @State private var showRecommendedServices = false
+    /// Phase 95 audit (Wave 5d) — drives navigation into the new
+    /// HouseholdSpendView, opened from the InvestmentSummaryCard.
+    @State private var showHouseholdSpend = false
     /// Phase 95 (gap #40) — drives the systems-browse surface that
     /// fronts AddSystemView with category-tier groupings of
     /// SystemCategoryRegistry's universal / conditional / specialty
@@ -282,6 +285,12 @@ struct PropertyDetailView: View {
             }
             .navigationDestination(isPresented: $showRecommendedServices) {
                 recommendedServicesDestination
+            }
+            // Phase 95 audit (Wave 5d) — household-level spend rollup
+            // pushed from the InvestmentSummaryCard's "View home spend →"
+            // link.
+            .navigationDestination(isPresented: $showHouseholdSpend) {
+                HouseholdSpendView()
             }
             // Phase 95 (gap #40) — sheet for the systems browse
             // surface. Sheet rather than nav destination because
@@ -1424,6 +1433,40 @@ struct PropertyDetailView: View {
                     await viewModel.refreshFromPublicRecords(appState: appState)
                 }
             )
+            .padding(.horizontal, HavenTheme.pageMargin)
+
+            // Phase 95 audit (Wave 5d) — household-level spend rollup.
+            // Aggregates invoices + service records across every vendor
+            // so the homeowner can see "what did I spend on home this
+            // year" by vendor or by category. Per-vendor breakdown only
+            // existed on ContractorDetailView pre-Phase-95.
+            Button {
+                Haptics.light()
+                showHouseholdSpend = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("View home spend this year")
+                        .font(HavenTypography.uiButton)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .foregroundStyle(HavenColors.textPrimary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                        .fill(HavenColors.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                        .stroke(HavenColors.border, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
             .padding(.horizontal, HavenTheme.pageMargin)
         }
     }

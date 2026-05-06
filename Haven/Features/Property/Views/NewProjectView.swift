@@ -234,6 +234,12 @@ struct NewProjectView: View {
                 }
 
                 Haptics.success()
+                // Phase 95 audit fix — PropertyProjectsView and the
+                // dashboard project surfaces both observe `.projectChanged`
+                // to know when to reload. Without this post, a user who
+                // creates a project sees no row appear until they kill
+                // and relaunch.
+                NotificationCenter.default.post(name: .projectChanged, object: nil)
                 dismiss()
             } catch {
                 self.error = error.localizedDescription

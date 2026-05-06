@@ -14,46 +14,79 @@ struct ChezOwnershipHeroCard: View {
     let activeGroupCount: Int
     let delegatedItemCount: Int
     let onTap: () -> Void
+    /// Phase 95 audit fix — direct shortcut into Full Mode when the user
+    /// has zero delegation today. Renders alongside the existing tap-
+    /// the-card affordance; lets a homeowner one-tap "have Chez run my
+    /// entire home" without first having to read the explainer.
+    var onHandOffEverything: (() -> Void)? = nil
+
+    private var isFreshDIY: Bool {
+        activeGroupCount == 0 && delegatedItemCount == 0
+    }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(HavenColors.action.opacity(0.14))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "person.fill.questionmark")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(HavenColors.action)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(headline)
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .multilineTextAlignment(.leading)
-                    Text(subtitle)
-                        .font(HavenTypography.caption)
+        VStack(spacing: 12) {
+            Button(action: onTap) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(HavenColors.action.opacity(0.14))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(headline)
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .multilineTextAlignment(.leading)
+                        Text(subtitle)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(HavenColors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(HavenColors.textSecondary)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(HavenColors.action.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(HavenColors.action.opacity(0.18), lineWidth: 1)
-            )
+            .buttonStyle(.plain)
+
+            if isFreshDIY, let onHandOffEverything {
+                Button {
+                    Haptics.medium()
+                    onHandOffEverything()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Hand off everything")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+            }
         }
-        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.action.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(HavenColors.action.opacity(0.18), lineWidth: 1)
+        )
         .padding(.horizontal, HavenTheme.spacing20)
     }
 

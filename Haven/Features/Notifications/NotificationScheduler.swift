@@ -397,6 +397,76 @@ final class NotificationScheduler {
         }
     }
 
+    // MARK: - Phase 95 / gap #5+#6 — Booking confirmation reminder
+
+    /// Local notification scheduled when a homeowner books their free
+    /// Chez handyman onboarding visit. Two-fold purpose:
+    ///   1. Persistent reminder of the upcoming visit (gap #6 — homeowner
+    ///      no longer has to re-open the dashboard to verify their
+    ///      request landed).
+    ///   2. Confirmation surface (gap #5 — pairs with the SendGrid email
+    ///      backstop fired server-side).
+    ///
+    /// If the user picked a preferred-window-start date, fire the reminder
+    /// the morning before. Otherwise, fire 24 hours from now as a
+    /// generic "Chez is on it" follow-up.
+    static func scheduleHomeAssessmentBookingConfirmation(
+        preferredWindowStart: String?,
+        preferredTimeOfDay: String?
+    ) {
+        let center = UNUserNotificationCenter.current()
+        let identifier = "chez-handyman-booking-confirmation"
+
+        // Replace any existing pending reminder so re-booking after a
+        // cancel doesn't fire two notifications.
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+
+        let cal = Calendar.current
+
+        // Resolve the fire-date. Prefer "morning before windowStart at
+        // 9 AM"; fall back to "tomorrow at 9 AM" if no window was picked.
+        var fireDate: Date
+        if let raw = preferredWindowStart {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = TimeZone.current
+            if let parsed = formatter.date(from: raw),
+               let dayBefore = cal.date(byAdding: .day, value: -1, to: parsed),
+               let morning = cal.date(bySettingHour: 9, minute: 0, second: 0, of: dayBefore),
+               morning > .now {
+                fireDate = morning
+            } else if let tomorrow = cal.date(byAdding: .day, value: 1, to: .now),
+                      let morning = cal.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) {
+                fireDate = morning
+            } else {
+                fireDate = .now.addingTimeInterval(60 * 60 * 24)
+            }
+        } else if let tomorrow = cal.date(byAdding: .day, value: 1, to: .now),
+                  let morning = cal.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) {
+            fireDate = morning
+        } else {
+            fireDate = .now.addingTimeInterval(60 * 60 * 24)
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Your Chez handyman visit is on the calendar"
+        if let preferredTimeOfDay, !preferredTimeOfDay.isEmpty {
+            content.body = "We'll confirm a \(preferredTimeOfDay) slot. Tap to see your booking status."
+        } else {
+            content.body = "We'll confirm a window with you shortly. Tap to see your booking status."
+        }
+        content.sound = .default
+        content.categoryIdentifier = "chez_assessment_booking_confirmation"
+        content.userInfo = [
+            "type": "chez_assessment_booking_confirmation"
+        ]
+
+        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        center.add(request) { _ in }
+    }
+
     private func scheduleHandymanReminder(id: String, title: String, body: String, fireDate: Date, season: String) {
         let content = UNMutableNotificationContent()
         content.title = title

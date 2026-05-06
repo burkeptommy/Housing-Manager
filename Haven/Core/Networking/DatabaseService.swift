@@ -568,6 +568,50 @@ final class DatabaseService {
             .value
     }
 
+    /// Phase 95 audit (Wave 3) — insert into `chez_assessment_waitlist`
+    /// when a homeowner picks the waitlist tile on the mode-fork screen.
+    /// Idempotent via the unique (property_id) constraint — re-running
+    /// for the same property is a no-op.
+    @discardableResult
+    func insertChezAssessmentWaitlist(
+        propertyId: UUID,
+        householdId: UUID,
+        userId: UUID,
+        addressFull: String?,
+        state: String?,
+        zip: String?
+    ) async throws -> [String: AnyJSON] {
+        struct WaitlistInsert: Encodable {
+            let propertyId: String
+            let householdId: String
+            let userId: String
+            let addressFull: String?
+            let state: String?
+            let zip: String?
+            enum CodingKeys: String, CodingKey {
+                case propertyId = "property_id"
+                case householdId = "household_id"
+                case userId = "user_id"
+                case addressFull = "address_full"
+                case state, zip
+            }
+        }
+        let body = WaitlistInsert(
+            propertyId: propertyId.uuidString,
+            householdId: householdId.uuidString,
+            userId: userId.uuidString,
+            addressFull: addressFull,
+            state: state,
+            zip: zip
+        )
+        return try await from("chez_assessment_waitlist")
+            .upsert(body, onConflict: "property_id")
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
     func createProperty(_ property: PropertyInsert) async throws -> PropertyRow {
         try await from("properties")
             .insert(property)
@@ -1866,6 +1910,31 @@ final class DatabaseService {
             .insert(insert, returning: .representation)
             .select()
             .single()
+            .execute()
+            .value
+    }
+
+    // MARK: - Phase 95 (gap #47) — Service vendor inquiries
+
+    /// Insert a homeowner-to-service-vendor inquiry. Returns the saved
+    /// row so the caller can stamp `delivery_status` after the
+    /// SendGrid send finishes.
+    func createServiceVendorInquiry(_ insert: ServiceVendorInquiryInsert) async throws -> ServiceVendorInquiryRow {
+        try await from("service_vendor_inquiries")
+            .insert(insert, returning: .representation)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    /// Outreach history scoped to a single contractor. Most-recent first.
+    /// Used by `ContractorDetailView` to show "Last contacted: X days ago".
+    func fetchServiceVendorInquiries(contractorId: UUID) async throws -> [ServiceVendorInquiryRow] {
+        try await from("service_vendor_inquiries")
+            .select()
+            .eq("contractor_id", value: contractorId.uuidString)
+            .order("created_at", ascending: false)
             .execute()
             .value
     }

@@ -49,6 +49,13 @@ struct ChezOwnershipView: View {
         .onReceive(NotificationCenter.default.publisher(for: .chezOwnershipGroupsChanged)) { _ in
             Task { await viewModel.load() }
         }
+        // Phase 95 audit fix — Dashboard's "Hand off everything" CTA
+        // posts this notification before pushing this view. We pick it
+        // up on first render and auto-open the confirmation dialog so
+        // the homeowner doesn't have to find the Full mode button.
+        .onReceive(NotificationCenter.default.publisher(for: .triggerChezFullMode)) { _ in
+            viewModel.confirmingFullMode = true
+        }
         .alert("Hand off everything?", isPresented: $viewModel.confirmingFullMode) {
             Button("Hand off all", role: .none) {
                 Task { await viewModel.applyFullMode() }
@@ -249,10 +256,25 @@ struct ChezOwnershipView: View {
 
     private var inventorySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("What Chez is handling for you")
-                .font(HavenTypography.uiSectionHeader)
-                .foregroundStyle(HavenColors.textSecondary)
-                .padding(.top, 8)
+            HStack(alignment: .firstTextBaseline) {
+                Text("What Chez is handling for you")
+                    .font(HavenTypography.uiSectionHeader)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                // Phase 95 audit fix — direct link from the ownership
+                // inventory to the activity log so users can see WHAT
+                // Chez has been doing for them, not just WHAT'S delegated.
+                if let householdId = viewModel.householdId {
+                    NavigationLink {
+                        ChezActivityView(householdId: householdId)
+                    } label: {
+                        Text("View activity →")
+                            .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                            .foregroundStyle(HavenColors.action)
+                    }
+                }
+            }
+            .padding(.top, 8)
             VStack(spacing: 8) {
                 ForEach(viewModel.delegations, id: \.id) { item in
                     inventoryRow(item)
@@ -452,6 +474,11 @@ final class ChezOwnershipViewModel: ObservableObject {
     @Published var confirmingFullMode: Bool = false
     @Published var confirmingDIYMode: Bool = false
     @Published var errorMessage: String?
+
+    /// Phase 95 audit fix — exposed for the inventory section's
+    /// "View activity →" deep-link into ChezActivityView. The household
+    /// id is set during `load()` once we resolve the user.
+    var householdId: UUID? { household?.id }
 
     var activeGroupCount: Int {
         ChezOwnershipGroup.allCases.filter { isGroupOn($0) }.count

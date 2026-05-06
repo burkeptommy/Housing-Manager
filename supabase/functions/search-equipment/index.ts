@@ -44,6 +44,13 @@ serve(async (req: Request) => {
     // Parse the query into components
     const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 1);
 
+    // Phase 5 — spec-signal extraction. Pulls capacity, fuel, finish, and
+    // installation hints out of the query so we can rank results that align
+    // with what the user actually typed. Used only by Strategy 1 (brand +
+    // category) where multiple matches need a tiebreaker; other strategies
+    // are already narrow enough.
+    const querySignals = extractQuerySignals(query.toLowerCase());
+
     // Common category aliases people might type
     const categoryAliases: Record<string, string[]> = {
       stove: ["range", "cooktop", "range-gas", "range-electric", "range-dual-fuel", "range-induction", "range-pro", "cooktop-gas", "cooktop-electric", "cooktop-induction"],
@@ -58,13 +65,21 @@ serve(async (req: Request) => {
       boiler: ["hvac-boiler"],
       "mini split": ["hvac-mini-split"],
       induction: ["range-induction", "cooktop-induction"],
-      "heat pump": ["hvac-heat-pump", "dryer-heat-pump"],
+      // Note: "heat pump" maps to multiple categories. Phase 5 ranking uses
+      // brand context — when query contains a water-heater brand (AO Smith,
+      // Rheem, Bradford White) + "hybrid"/"gallon", water-heater-heat-pump
+      // wins via the disambiguation in resolveCategoryByBrandContext below.
+      "heat pump": ["hvac-heat-pump", "dryer-heat-pump", "water-heater-heat-pump"],
       toilet: ["toilet"],
       faucet: ["bathroom-faucet"],
       shower: ["shower-system"],
       tub: ["bathtub"],
-      "water heater": ["water-heater", "water-heater-tank-gas", "water-heater-tank-electric", "water-heater-tankless-gas"],
+      "water heater": ["water-heater", "water-heater-tank-gas", "water-heater-tank-electric", "water-heater-tankless-gas", "water-heater-heat-pump"],
       tankless: ["water-heater-tankless-gas", "water-heater-tankless-electric"],
+      hybrid: ["water-heater-heat-pump"],
+      "hybrid water heater": ["water-heater-heat-pump"],
+      "heat pump water heater": ["water-heater-heat-pump"],
+      "hpwh": ["water-heater-heat-pump"],
       "sump pump": ["sump-pump", "sump-pump-submersible"],
       generator: ["generator", "generator-portable", "generator-inverter", "generator-standby-gas"],
       pool: ["pool-pump", "pool-filter", "pool-heater", "salt-chlorine-generator", "pool-cleaner"],
@@ -78,6 +93,30 @@ serve(async (req: Request) => {
       disposal: ["garbage-disposal"],
       wine: ["wine-cooler", "wine-cellar-cooling"],
     };
+
+    // Phase 5 — words that describe specs/units, never brands. Catches
+    // "gallon"/"hybrid"/"electric" leaking into the brand-pattern when the
+    // query has both a brand and spec descriptors ("AO Smith 80 gallon
+    // hybrid heat pump"). Without this, brand matching tries to find a
+    // brand named "ao smith gallon hybrid" and fails.
+    const SPEC_STOPWORDS = new Set([
+      "gallon", "gallons", "gal", "liter", "liters", "ltr",
+      "ton", "tons",
+      "cu", "ft", "cubic", "feet", "foot",
+      "btu", "btus", "kbtu",
+      "dba", "decibel",
+      "watt", "watts", "kw", "amp", "amps", "volt", "volts", "voltage",
+      "gpm",
+      "inch", "inches",
+      "hybrid", "dual", "fuel",
+      "electric", "gas", "propane", "natural", "ng", "lp", "oil",
+      "induction", "convection", "radiant", "solar",
+      "year", "years",
+      "current", "model", "discontinued",
+      "size", "capacity",
+      "wifi", "smart", "connected",
+      "energy", "star",
+    ]);
 
     // Detect if any word is a category alias
     let detectedCategorySlugs: string[] = [];
@@ -112,6 +151,9 @@ serve(async (req: Request) => {
           consumedIndices.add(i);
         } else if (/\d/.test(word)) {
           otherWords.push(word); // Model number, series number, or spec (e.g., "800", "RF29DB")
+        } else if (SPEC_STOPWORDS.has(word)) {
+          // Phase 5 — spec descriptor. Don't poison the brand pool.
+          consumedIndices.add(i);
         } else {
           brandWords.push(word); // Likely brand name (e.g., "bosch", "samsung")
         }
@@ -122,16 +164,23 @@ serve(async (req: Request) => {
 
     let results: any[] = [];
 
-    // First, resolve brand words to manufacturer IDs
+    // First, resolve brand words to manufacturer IDs.
+    // Phase 5 — match against normalized name (strip ., -, _, spaces) so
+    // queries like "AO Smith" match stored "A.O. Smith". Fetches all 456
+    // brands once per request (small, cheap) and filters in JS.
     let matchedManufacturerIds: string[] = [];
     if (brandWords.length > 0) {
-      const brandPattern = `%${brandWords.join("%")}%`;
-      const { data: mfgs } = await supabase
+      const queryBrandToken = brandWords.join("").replace(/[\s\.\-_]/g, "").toLowerCase();
+      const { data: allMfgs } = await supabase
         .from("equipment_manufacturers")
-        .select("id")
-        .ilike("name", brandPattern);
-      if (mfgs && mfgs.length > 0) {
-        matchedManufacturerIds = mfgs.map((m: any) => m.id);
+        .select("id, name, slug");
+      if (allMfgs && allMfgs.length > 0) {
+        const matches = allMfgs.filter((m: any) => {
+          const normName = String(m.name).replace(/[\s\.\-_&]/g, "").toLowerCase();
+          const normSlug = String(m.slug).replace(/[\s\.\-_]/g, "").toLowerCase();
+          return normName.includes(queryBrandToken) || normSlug.includes(queryBrandToken);
+        });
+        matchedManufacturerIds = matches.map((m: any) => m.id);
       }
     }
 
@@ -140,6 +189,7 @@ serve(async (req: Request) => {
       installation_type, capacity_value, capacity_unit,
       msrp_usd, expected_lifespan_years, key_features,
       is_current_model, width_inches, specs,
+      popularity_rank, verification_status,
       equipment_manufacturers!inner (id, name, slug, tier, reliability_score, score_summary),
       equipment_categories!inner (id, name, slug, room)
     `;
@@ -161,28 +211,51 @@ serve(async (req: Request) => {
     );
 
     // Strategy 1: Brand + category (e.g., "bosch stove", "bosch 800 induction")
+    // Phase 5 — once results return, score each by how many spec signals
+    // from the query (capacity / fuel / installation) align with the row.
+    // Sort by signal_match DESC, then popularity_rank ASC NULLS LAST, then
+    // is_current_model DESC so the best-aligned + most-popular + still-sold
+    // model surfaces first.
     if (matchedCategoryIds.length > 0 && matchedManufacturerIds.length > 0) {
       const { data } = await supabase
         .from("equipment_catalog")
         .select(selectFields)
         .in("manufacturer_id", matchedManufacturerIds)
         .in("category_id", matchedCategoryIds)
-        .order("is_current_model", { ascending: false })
-        .limit(100); // Fetch more, then filter client-side for leftover words
+        // Don't pre-order on SQL side — JS sort below combines signal score
+        // + popularity_rank and SQL doesn't have the signal score.
+        .limit(200); // Fetch wider pool so signal-ranking can find the best fit
 
       if (data && data.length > 0) {
-        // If there are leftover words (e.g., "800"), narrow results by matching
-        // them anywhere in series, model_name, or model_number
+        // Apply unmatched-word filter first (e.g. "800" series narrowing)
+        let candidates = data;
         if (unmatchedWords.length > 0) {
           const filtered = data.filter((r: any) => {
             const haystack = [r.series, r.model_name, r.model_number]
               .filter(Boolean).join(" ").toLowerCase();
             return unmatchedWords.every(w => haystack.includes(w.toLowerCase()));
           });
-          results = filtered.length > 0 ? filtered.slice(0, limit) : data.slice(0, limit);
-        } else {
-          results = data.slice(0, limit);
+          if (filtered.length > 0) candidates = filtered;
         }
+
+        // Phase 5 — rank by spec-signal alignment + popularity + currency
+        candidates = candidates
+          .map((r: any) => ({ row: r, score: scoreRowAgainstSignals(r, querySignals) }))
+          .sort((a, b) => {
+            // 1. Higher signal score wins
+            if (a.score !== b.score) return b.score - a.score;
+            // 2. Lower popularity_rank wins (NULL last)
+            const pa = a.row.popularity_rank ?? 9999;
+            const pb = b.row.popularity_rank ?? 9999;
+            if (pa !== pb) return pa - pb;
+            // 3. Current models above discontinued
+            const ca = a.row.is_current_model ? 1 : 0;
+            const cb = b.row.is_current_model ? 1 : 0;
+            return cb - ca;
+          })
+          .map((x) => ({ ...x.row, _match_score: x.score, _signal_count: querySignals.signalCount }));
+
+        results = candidates.slice(0, limit);
       }
     }
 
@@ -297,6 +370,11 @@ serve(async (req: Request) => {
           r.fuel_type ? r.fuel_type.replace(/-/g, " ") : null,
           r.width_inches ? `${r.width_inches}"` : null,
         ].filter(Boolean).join(" · "),
+        // Phase 5 — match score + flag for "Best match" pill in iOS
+        match_score: r._match_score ?? null,
+        is_best_match: (r._match_score ?? 0) >= 3 && (r._signal_count ?? 0) >= 3,
+        popularity_rank: r.popularity_rank ?? null,
+        verification_status: r.verification_status ?? null,
         manufacturer: {
           id: mfg.id,
           name: mfg.name,
@@ -335,6 +413,15 @@ serve(async (req: Request) => {
       JSON.stringify({
         query,
         count: formatted.length,
+        // Phase 5 — surface what we extracted so iOS can show "Showing
+        // matches for 80 gal · electric · heat pump"
+        signals: querySignals.signalCount > 0 ? {
+          capacity_value: querySignals.capacityValue,
+          capacity_unit: querySignals.capacityUnit,
+          fuel_type: querySignals.fuelType,
+          installation_type: querySignals.installationType,
+          signal_count: querySignals.signalCount,
+        } : null,
         results: formatted,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -351,3 +438,118 @@ serve(async (req: Request) => {
     );
   }
 });
+
+// Phase 5 — extract spec signals from a free-text query so we can rank
+// catalog results by alignment. Returns a tiny struct with capacity, fuel,
+// and installation hints. Only what we extract counts toward signal_count.
+//
+// Examples:
+//   "AO Smith 80 gallon hybrid heat pump"
+//     → { capacityValue: 80, capacityUnit: "gal", fuelType: "electric",
+//         installationType: "freestanding", signalCount: 4 }
+//   "Bosch 800 series 36 inch french door"
+//     → { widthInches: 36, signalCount: 1 }
+//   "Trane 3 ton heat pump"
+//     → { capacityValue: 3, capacityUnit: "tons", fuelType: "electric",
+//         installationType: "ducted", signalCount: 4 }
+function extractQuerySignals(q: string): {
+  capacityValue: number | null;
+  capacityUnit: string | null;
+  fuelType: string | null;
+  installationType: string | null;
+  widthInches: number | null;
+  signalCount: number;
+} {
+  let capacityValue: number | null = null;
+  let capacityUnit: string | null = null;
+  let fuelType: string | null = null;
+  let installationType: string | null = null;
+  let widthInches: number | null = null;
+
+  // Capacity — "80 gallon", "44 dBA", "5.0 cu ft", "24000 btu", "3 ton"
+  const gallonMatch = q.match(/(\d+)\s*(gallon|gal\b)/);
+  if (gallonMatch) { capacityValue = parseInt(gallonMatch[1]); capacityUnit = "gal"; }
+
+  const cuFtMatch = q.match(/(\d+(?:\.\d+)?)\s*(cu\s*\.?\s*ft|cubic\s*feet?)/);
+  if (cuFtMatch) { capacityValue = parseFloat(cuFtMatch[1]); capacityUnit = "cu_ft"; }
+
+  const btuMatch = q.match(/(\d{4,6})\s*btu/);
+  if (btuMatch) { capacityValue = parseInt(btuMatch[1]); capacityUnit = "btu"; }
+
+  const tonMatch = q.match(/(\d+(?:\.\d+)?)\s*ton/);
+  if (tonMatch) { capacityValue = parseFloat(tonMatch[1]); capacityUnit = "tons"; }
+
+  const dbaMatch = q.match(/(\d{2,3})\s*dba/);
+  if (dbaMatch) { capacityValue = parseInt(dbaMatch[1]); capacityUnit = "dba"; }
+
+  // Width — "36 inch", "30\""
+  const widthMatch = q.match(/(\d{2,3})\s*(?:inch|inches|"|in\b)/);
+  if (widthMatch) widthInches = parseInt(widthMatch[1]);
+
+  // Fuel — explicit type wins, then implied
+  if (/\b(natural\s*gas|\bng\b|propane|\blp\b|gas)\b/.test(q)) fuelType = "gas";
+  else if (/\belectric|hybrid|heat\s*pump|induction\b/.test(q)) fuelType = "electric";
+  else if (/\boil\b|fuel\s*oil/.test(q)) fuelType = "oil";
+  else if (/\bdual[-\s]?fuel\b/.test(q)) fuelType = "dual-fuel";
+
+  // Installation type — heat pump implies ducted, mini-split called out, built-in vs freestanding
+  if (/mini[-\s]?split|ductless/.test(q)) installationType = "mini-split";
+  else if (/heat\s*pump\b/.test(q) && installationType === null) installationType = "freestanding";
+  else if (/built[-\s]?in\b/.test(q)) installationType = "built-in";
+  else if (/free[-\s]?standing|countertop|portable/.test(q)) installationType = "freestanding";
+  else if (/under[-\s]?counter\b/.test(q)) installationType = "under-counter";
+  else if (/wall[-\s]?mount/.test(q)) installationType = "wall-mount";
+
+  let signalCount = 0;
+  if (capacityValue !== null) signalCount++;
+  if (fuelType !== null) signalCount++;
+  if (installationType !== null) signalCount++;
+  if (widthInches !== null) signalCount++;
+
+  return { capacityValue, capacityUnit, fuelType, installationType, widthInches, signalCount };
+}
+
+// Phase 5 — score a catalog row against extracted query signals. Each
+// matching signal contributes +1 to the score. Capacity match is fuzzy
+// (within 5% for numeric capacities), fuel/installation are exact-match.
+function scoreRowAgainstSignals(
+  row: any,
+  s: ReturnType<typeof extractQuerySignals>
+): number {
+  let score = 0;
+
+  // Capacity alignment — within 5% counts as a match (handles 80 gal vs
+  // 80 gallons stored as 80.0)
+  if (s.capacityValue !== null && row.capacity_value !== null && row.capacity_value !== undefined) {
+    const sUnit = (s.capacityUnit ?? "").toLowerCase();
+    const rUnit = (row.capacity_unit ?? "").toLowerCase();
+    if (!sUnit || !rUnit || sUnit === rUnit) {
+      const diff = Math.abs(Number(row.capacity_value) - s.capacityValue);
+      const tolerance = Math.max(s.capacityValue * 0.05, 0.5);
+      if (diff <= tolerance) score++;
+    }
+  }
+
+  // Width — within 1 inch
+  if (s.widthInches !== null && row.width_inches !== null && row.width_inches !== undefined) {
+    if (Math.abs(Number(row.width_inches) - s.widthInches) <= 1) score++;
+  }
+
+  // Fuel — exact match (and "electric" matches "induction" since induction is electric)
+  if (s.fuelType && row.fuel_type) {
+    const a = String(row.fuel_type).toLowerCase();
+    const b = s.fuelType.toLowerCase();
+    if (a === b) score++;
+    else if (b === "electric" && a === "induction") score++;
+    else if (b === "gas" && a.includes("gas")) score++;
+  }
+
+  // Installation type — exact match
+  if (s.installationType && row.installation_type) {
+    if (String(row.installation_type).toLowerCase() === s.installationType.toLowerCase()) {
+      score++;
+    }
+  }
+
+  return score;
+}

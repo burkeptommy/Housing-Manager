@@ -487,6 +487,10 @@ struct ContractorDetailView: View {
     /// handyman contractors. Lets the homeowner send a pre-visit
     /// question without first scheduling a visit.
     @State private var showSoftInquirySheet = false
+    /// Phase 95 (gap #47) — drives the service-vendor inquiry composer
+    /// for non-handyman contractors. Writes to
+    /// `service_vendor_inquiries` and fires an email via SendGrid.
+    @State private var showServiceVendorInquirySheet = false
     /// Phase 95 (gap #24) — properties / systems / vehicles loaded once
     /// for the AddMaintenanceTaskSheet so it can render its existing
     /// target picker. Kept lazy-async; nil while loading.
@@ -853,6 +857,19 @@ struct ContractorDetailView: View {
                 }
             )
         }
+        // Phase 95 (gap #47) — service-vendor inquiry composer.
+        // Same affordance as the handyman version above, but writes
+        // to `service_vendor_inquiries` and emails the contractor via
+        // SendGrid because they don't have an app.
+        .sheet(isPresented: $showServiceVendorInquirySheet) {
+            ServiceVendorInquirySheet(
+                contractor: contractor,
+                householdId: contractor.householdId,
+                onSubmitted: {
+                    showServiceVendorInquirySheet = false
+                }
+            )
+        }
         .task(id: showScheduleVisitSheet) {
             // Lazy-load context the moment the sheet is about to present
             // so we don't pay the round-trip on every detail-view appear.
@@ -1165,13 +1182,19 @@ struct ContractorDetailView: View {
             }
             .buttonStyle(.plain)
 
-            // Phase 95 (gap #46) — pre-visit soft-inquiry CTA. Only
-            // renders for handyman contractors because the
-            // handyman_requests pipeline is what powers the field PWA
-            // queue. Other vendor categories don't have an equivalent
-            // direct-message lane today (gap #47 — separate work).
-            // Lets the homeowner ask "any availability for X this
-            // month?" without first scheduling a visit.
+            // Phase 95 (gap #46) — pre-visit soft-inquiry CTA for
+            // handyman contractors. Writes to handyman_requests so the
+            // field PWA queue picks it up.
+            //
+            // Phase 95 (gap #47) — every other vendor category gets a
+            // parallel "Ask a question" lane that writes to
+            // service_vendor_inquiries + fires a SendGrid email. Same
+            // user-facing affordance, different delivery path because
+            // service vendors don't have an app yet.
+            //
+            // Both paths follow the audit's in-app-first + email-
+            // fallback rule (NO SMS). Only render the button when the
+            // contractor has the data we need to actually send.
             if isHandymanContractor {
                 Button {
                     Haptics.medium()
@@ -1179,6 +1202,24 @@ struct ContractorDetailView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "message.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Ask a question")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(HavenColors.navy700.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    Haptics.medium()
+                    showServiceVendorInquirySheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "envelope.fill")
                             .font(.system(size: 14, weight: .semibold))
                         Text("Ask a question")
                             .font(HavenTypography.uiButton)
