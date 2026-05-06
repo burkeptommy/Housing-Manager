@@ -55,13 +55,19 @@ struct SettingsView: View {
                     ChezProfileView()
                 } label: {
                     HStack(spacing: 12) {
+                        // Phase 95.1 fix: was salmon icon + salmon-tinted
+                        // background. The bulk Settings tint override
+                        // (line ~373) handles every other Label-based row
+                        // in the list, but this row uses a custom HStack
+                        // composition that opted out. Caught by smoke
+                        // test re-verification post the global fix.
                         ZStack {
                             Circle()
-                                .fill(HavenColors.action.opacity(0.14))
+                                .fill(HavenColors.navy800.opacity(0.10))
                                 .frame(width: 28, height: 28)
                             Image(systemName: "person.fill.questionmark")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(HavenColors.action)
+                                .foregroundStyle(HavenColors.navy800)
                         }
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Your Chez profile")
