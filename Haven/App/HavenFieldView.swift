@@ -3739,7 +3739,7 @@ private struct HavenFieldVisitWorkspaceView: View {
         let window = [viewModel.visit.assignment?.windowStartTime, viewModel.visit.assignment?.windowEndTime]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
-            .joined(separator: " – ")
+            .joined(separator: " to ")
         return [date, window.isEmpty ? nil : window].compactMap { $0 }.joined(separator: " • ").nonEmpty ?? "TBD"
     }
 }
@@ -5567,7 +5567,7 @@ private struct FieldVisitRow: View {
     private var routeWindow: String? {
         let start = visit.assignment?.windowStartTime?.trimmedOrNil
         let end = visit.assignment?.windowEndTime?.trimmedOrNil
-        if let start, let end { return "\(start) – \(end)" }
+        if let start, let end { return "\(start) to \(end)" }
         return start ?? end
     }
 }

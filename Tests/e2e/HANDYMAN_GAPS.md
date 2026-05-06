@@ -68,6 +68,38 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **`GuidedAssessmentView.swift` is dead code (740 lines).** The whole guided assessment wizard was built but never wired into HavenFieldView — confirmed via grep. **Suggested fix:** decide whether to (a) wire it up by adding a navigation entry from a new Assessments tab, or (b) delete it entirely. Either way, the current state is ambiguous and bloats the binary. **Estimated effort:** small (delete) → medium (wire up). (Wave 2a)
 
+### Section 5c — Vendor capture (Wave 2b)
+
+- **5.25** [`gap_found`] No "Add vendor" affordance on Customer Home detail / Visit detail / Settings. Dead-code `VendorCaptureForm` exists in `GuidedAssessmentView.swift:489-531` but is unreachable. **Suggested fix:** ship a focused `VendorCaptureSheet` with company name + phone + category picker (using `SystemCategoryRegistry.canonical`) on Customer Home detail. **Estimated effort:** medium. **Tied to value prop:** Section 5c is the on-behalf-of vendor capture story — the "speed promise" hinges on this. (Wave 2b)
+
+- **5.26 / 5.27** [`gap_found`] No camera-OCR for vendor business cards or stickers. **Suggested fix:** defer until 5.25 ships; then add cameraButton to AddVendorSheet routing through a new `extract-vendor-card` Edge Function (Claude Vision wrapper). **Estimated effort:** high. (Wave 2b)
+
+- **5.28** [`gap_found`] No `confirmed: Bool` field on `HomeAssessmentContractorEntry` schema. **Suggested fix:** add `confirmed: Bool? + confirmed_at: timestamptz` to the captured-contractor JSON shape. (Wave 2b)
+
+- **5.29** [`gap_found`] Surface doesn't exist; once 5.25 ships, no UI signaling for primary vs backup vendors per category. **Suggested fix:** optional `tier: 'primary' | 'backup' | nil` on captured-contractor. **Estimated effort:** small once 5.25 lands. (Wave 2b)
+
+- **5.30** [`gap_found`] No notes / rating / reliability field. **Suggested fix:** add `notes: String?` to captured-contractor entry. (Wave 2b)
+
+### Section 5d — Routine capture (Wave 2b)
+
+- **5.31** [`gap_found`] No `+ Add routine` affordance anywhere in wired field app. Dead-code `RoutineCaptureForm` is missing cost + active months UI even though schema supports them. `HomeAssessmentRoutineEntry` is missing `cost / cost_unit / chez_owned / notes / start_date / time_of_day` fields. **Suggested fix:** build `RoutineCaptureSheet` modeled on homeowner-side `RoutineEditSheet.swift`. Reuse `ActiveMonthsPicker` component verbatim. **Estimated effort:** high. **Tied to value prop:** Section 5d is the heart of the recurring-services value prop. (Wave 2b)
+
+- **5.32** [`gap_found`] No 'access_notes' field on routines schema (entry instructions like 'Key under the mat, code 1234'). **Suggested fix:** add `notes: String?` to `HomeAssessmentRoutineEntry`. (Wave 2b)
+
+- **5.33-5.35** [`gap_found`] Same gap as 5.31 — surface doesn't exist. Each kind has specific UX expectations (pool: Apr-Oct default; snow: Dec-Apr default + per-storm cost-unit; pest: termite-bond notes). **Suggested fix:** kind-specific defaults in the future RoutineCaptureSheet. (Wave 2b)
+
+- **5.36** [`gap_found`] Schema's `dayOfWeek: Int?` only supports a single day; trash + recycling on different days needs multi-day support OR multiple routine rows per cadence. **Suggested fix:** change `dayOfWeek: Int?` to `daysOfWeek: [Int]?` or document multi-row pattern. (Wave 2b)
+
+- **5.37** [`gap_found`] Single cadence per row at schema level. **Suggested fix:** UX hint 'Two patterns? Add a second routine.' (acceptable given homeowner-side schema also single-cadence). (Wave 2b)
+
+- **5.38** [`gap_found`] No `chez_owned: Bool` on `HomeAssessmentContractorEntry` or `HomeAssessmentRoutineEntry` — homeowner Phase 80.1 has the columns but the assessment ingest path doesn't propagate. **Suggested fix:** add `chezOwned: Bool? = false` to both entries; ingest reviewer calls `chez-concierge` `delegate_routine` / `delegate_contractor`. **Estimated effort:** medium. **Tied to value prop:** highest-value HNW concierge moment — handyman offers "want Chez to handle this for you?" live. (Wave 2b)
+
+### Section 5 UI quality (Wave 2b)
+
+- **B1** [`ui_quality_finding`] Salmon RadialGradient on top-right corner of brand hero card bleeds visually toward the iOS status bar. **Suggested fix:** audit hero card `.background` ZStack — likely needs `.ignoresSafeArea(.container, edges: .top)` removed or a navy-anchored extension above. **Severity:** minor. (Wave 2b)
+
+- **B1** [`ui_quality_finding`] "Cancelled" status pill renders salmon — destructive/negative status should be critical-red or muted gray. **Suggested fix:** swap salmon for `HavenColors.critical.opacity(0.1)` background + `HavenColors.critical` text. **Severity:** minor. (Wave 2b)
+
 ## UI quality findings
 
 ### Severity: major
