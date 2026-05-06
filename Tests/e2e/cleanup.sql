@@ -17,7 +17,7 @@ BEGIN;
 -- 1. Identify the e2e test users by email pattern.
 WITH e2e_users AS (
   SELECT id, email FROM auth.users
-  WHERE email LIKE 'e2e-test-%@havenhome.test'
+  WHERE email LIKE 'e2e-%@havenhome.test'
 ),
 -- 2. The households those users belong to (transitively, via public.users).
 e2e_households AS (
@@ -37,77 +37,77 @@ SELECT
 DELETE FROM public.maintenance_tasks
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.handyman_punch_items
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.routines
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.contractors
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.utility_accounts
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.home_systems
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.vehicles
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.family_members
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.concierge_messages
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.chez_requests
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.inbox_items
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
@@ -115,27 +115,27 @@ DELETE FROM public.inbox_items
 DELETE FROM public.home_assessments
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 DELETE FROM public.properties
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
 -- 4. Detach public.users from their households (don't delete the user yet —
 --    we delete via auth.users which cascades).
 UPDATE public.users SET household_id = NULL
-  WHERE id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test');
+  WHERE id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test');
 
 -- 5. Delete the households (no rows reference them now).
 DELETE FROM public.households
   WHERE id IN (
     SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test')
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
       AND u.household_id IS NOT NULL
   );
 
@@ -143,16 +143,16 @@ DELETE FROM public.households
 --    cascade to identities/sessions/etc. but public.users is its own table
 --    and may not cascade — wipe explicitly).
 DELETE FROM public.users
-  WHERE id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test');
+  WHERE id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test');
 
 -- 7. Finally drop the auth.users rows (cascades to identities, sessions,
 --    refresh_tokens, mfa_*).
 DELETE FROM auth.users
-  WHERE email LIKE 'e2e-test-%@havenhome.test';
+  WHERE email LIKE 'e2e-%@havenhome.test';
 
 COMMIT;
 
 -- Post-cleanup verification — every row should be 0.
-SELECT 'auth.users remaining'   AS check, count(*) AS n FROM auth.users WHERE email LIKE 'e2e-test-%@havenhome.test'
-UNION ALL SELECT 'public.users remaining', count(*) FROM public.users WHERE email LIKE 'e2e-test-%@havenhome.test'
-UNION ALL SELECT 'households orphaned', count(*) FROM public.households WHERE name LIKE 'The E2E%';
+SELECT 'auth.users remaining'   AS check, count(*) AS n FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test'
+UNION ALL SELECT 'public.users remaining', count(*) FROM public.users WHERE email LIKE 'e2e-%@havenhome.test'
+UNION ALL SELECT 'households orphaned', count(*) FROM public.households WHERE name LIKE 'The E2E%' OR name LIKE 'The UI%';

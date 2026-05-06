@@ -109,6 +109,20 @@ final class AuthService: ObservableObject {
             pendingLastName = trimmedLast
             pendingFullName = fullName.isEmpty ? nil : fullName
             needsOnboarding = true
+
+            // Defensive: explicitly mark the session authenticated in-memory.
+            // supabase-swift's authStateChanges stream reliably fires .signedIn
+            // after signIn(email:password:) but does NOT consistently fire it
+            // after signUp(email:password:) — leaving currentUserId / isAuthenticated
+            // unset here means HavenApp's root view stays on AddressHookView even
+            // though the server-side session exists. The .signedIn listener (line ~50)
+            // will set the same values if it does eventually fire — idempotent. The
+            // E2E onboarding test (Tests/e2e UI Wave 1 Subagent 1) caught this as a
+            // critical regression where every email signup got bounced back to the
+            // address screen and had to manually sign in to recover.
+            currentUserId = result.user.id
+            isAuthenticated = true
+            pendingConfirmation = false
         } else {
             // Email confirmation required — store name for later, show confirmation UI
             pendingFirstName = trimmedFirst
