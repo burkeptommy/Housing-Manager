@@ -151,10 +151,10 @@ struct FoundationalQuestionsForm: View {
         case 0: return ("Who lives here?", "We tailor recommendations and tasks based on your household.")
         case 1: return ("Any pets?", "Pet households get specific routines (yard cleanup, pet-area treatments).")
         case 2: return ("What do you drive?", "We'll track maintenance for each vehicle alongside the home.")
-        case 3: return ("Insurance carriers", "Optional — helps us flag policy renewals and coverage gaps.")
+        case 3: return ("Insurance carriers", "Optional. Helps us flag policy renewals and coverage gaps.")
         case 4: return ("Trash & recycling", "We'll remind you the day before each pickup.")
         case 5: return ("What matters most to you?", "Drives how we prioritize recommendations.")
-        case 6: return ("How do you like to handle work?", "We use this to route every task — DIY-able vs hire-out vendor.")
+        case 6: return ("How do you like to handle work?", "We use this to route every task: DIY-able vs hire-out vendor.")
         case 7: return ("If a Chez handyman visits...", "Helps the field team know what to expect on day one.")
         default: return ("", "")
         }
@@ -218,7 +218,7 @@ struct FoundationalQuestionsForm: View {
                         .fill(HavenColors.action.opacity(0.1))
                 )
             }
-            Text("You can add more later — these stay attached to your household.")
+            Text("You can add more later. They stay attached to your household.")
                 .font(HavenTypography.uiLabelSmall)
                 .foregroundStyle(HavenColors.textSecondary)
         }
@@ -307,7 +307,7 @@ struct FoundationalQuestionsForm: View {
                 ))
                 .textFieldStyle(HavenInputFieldStyle())
             }
-            Text("Skip if you don't remember — we can capture this later.")
+            Text("Skip if you don't remember. We can capture this later.")
                 .font(HavenTypography.uiLabelSmall)
                 .foregroundStyle(HavenColors.textSecondary)
         }
@@ -362,7 +362,7 @@ struct FoundationalQuestionsForm: View {
     private var priorityStep: some View {
         let options: [(String, String, String)] = [
             ("financial", "Protecting my investment", "Maximize home value, prevent expensive failures."),
-            ("safety", "Safety & peace of mind", "Catch hazards early — gas, electrical, structural."),
+            ("safety", "Safety & peace of mind", "Catch hazards early: gas, electrical, structural."),
             ("aesthetic", "Looking and feeling great", "Keep the home presenting at its best."),
             ("minimal_effort", "Minimal effort from me", "Hand off as much as possible to professionals.")
         ]
@@ -423,7 +423,7 @@ struct FoundationalQuestionsForm: View {
     private var tierStep: some View {
         let options: [(String, String, String)] = [
             ("diy", "I handle it", "I prefer to do most home tasks myself."),
-            ("mixed", "Mix of both", "Some I'll do — bigger jobs I want a pro."),
+            ("mixed", "Mix of both", "Some I'll do, bigger jobs I want a pro."),
             ("hire_out", "Hire it out", "I'd rather have professionals handle everything.")
         ]
         VStack(spacing: 12) {
@@ -487,7 +487,7 @@ struct FoundationalQuestionsForm: View {
                         RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                             .stroke(HavenColors.border, lineWidth: 1)
                     )
-                    Text("Gate code, lockbox location, dog in the yard, where to park — anything we should know before arriving.")
+                    Text("Gate code, lockbox location, dog in the yard, where to park, anything we should know before arriving.")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textTertiary)
                 }
