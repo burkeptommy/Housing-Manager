@@ -3692,7 +3692,7 @@ async function createAdHocVisit(
 
   const { data: property, error: propertyError } = await service
     .from("properties")
-    .select("id, household_id, name, street, city, state, zip_code, property_type, square_feet, year_built")
+    .select("id, household_id, name, street, city, state, zip_code, property_type, square_footage, year_built")
     .eq("id", propertyId)
     .limit(1)
     .maybeSingle();

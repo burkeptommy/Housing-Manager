@@ -2469,7 +2469,7 @@ private struct HavenFieldVisitsTab: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Create a confirmed visit for a connected home, or create a pairing request for a home that has not joined Chez yet.")
+            Text("Create a confirmed visit for a connected home, or create a pairing request for a home that hasn't joined Chez yet.")
         }
         .sheet(isPresented: $showAdHocComposer) {
             HavenFieldAdHocVisitComposer(
@@ -3947,6 +3947,10 @@ private struct HavenFieldMessageThreadView: View {
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationTitle(thread.propertyName ?? thread.title)
         .navigationBarTitleDisplayMode(.inline)
+        // Hide the floating tab bar while reading or composing in a thread —
+        // pre-Wave-1b the bar overlapped the message composer so the Send
+        // affordance was clipped and the textarea was barely usable.
+        .toolbar(.hidden, for: .tabBar)
         .task {
             await subscribeToRealtime()
         }
@@ -4166,11 +4170,16 @@ private struct FieldChatBubble: View {
     }
 
     private var bubbleBackground: Color {
-        isFromVendor ? HavenColors.action : HavenColors.surface
+        // Vendor-side (You) bubbles use navy ink to keep salmon reserved
+        // for primary CTAs per CLAUDE.md hard rule (B1 salmon discipline).
+        // Pre-Wave 1b this rendered as HavenColors.action which made every
+        // own-side message feel like a CTA and diluted the FAB / Send-button
+        // hierarchy.
+        isFromVendor ? HavenColors.navy800 : HavenColors.surface
     }
 
     private var bubbleForeground: Color {
-        isFromVendor ? HavenColors.textOnAction : HavenColors.textPrimary
+        isFromVendor ? Color.white : HavenColors.textPrimary
     }
 
     private var timestampLabel: String {
@@ -4459,7 +4468,7 @@ private struct HavenFieldAdHocVisitComposer: View {
                         FieldSectionCard(kicker: "Need a home", title: "No connected homes yet") {
                             FieldEmptyState(
                                 title: "Connect a home before you add a field visit",
-                                subtitle: "Use the pairing request flow from Visits to connect a home that has not joined Chez yet."
+                                subtitle: "Use the pairing request flow from Visits to connect a home that hasn't joined Chez yet."
                             )
                         }
                     } else {
@@ -4595,7 +4604,21 @@ private struct HavenFieldAdHocVisitComposer: View {
             await onCreated()
             dismiss()
         } catch {
-            feedback = error.localizedDescription
+            // Pre-Wave-1b this surfaced raw JSON like
+            // {"error":"column properties.square_feet does not exist (42703)"}
+            // to the user. Now it falls back to a friendly message and logs
+            // the actual error for engineering. The Wave 1b square_feet bug
+            // is fixed in handyman-provider edge function but other server
+            // errors still need a graceful surface.
+            print("[HavenFieldAdHocVisitComposer] createVisit failed: \(error)")
+            let raw = error.localizedDescription.lowercased()
+            if raw.contains("does not exist") || raw.contains("42703") || raw.contains("internal") {
+                feedback = "Could not create the visit. Please try again or refresh."
+            } else if raw.contains("network") || raw.contains("offline") {
+                feedback = "Network error. Please check your connection."
+            } else {
+                feedback = "Could not create the visit. Please try again."
+            }
         }
     }
 }
@@ -6241,6 +6264,7 @@ private struct HavenFieldCameraPicker: UIViewControllerRepresentable {
 
 private struct FieldPrimaryButtonStyle: ButtonStyle {
     var compact: Bool = false
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -6249,8 +6273,17 @@ private struct FieldPrimaryButtonStyle: ButtonStyle {
             .padding(.vertical, compact ? 10 : 12)
             .padding(.horizontal, compact ? 14 : 18)
             .frame(maxWidth: compact ? nil : .infinity)
-            .background(configuration.isPressed ? HavenColors.actionPressed : HavenColors.action)
+            .background(
+                isEnabled
+                    ? (configuration.isPressed ? HavenColors.actionPressed : HavenColors.action)
+                    : HavenColors.action.opacity(0.35)
+            )
             .clipShape(RoundedRectangle(cornerRadius: compact ? 16 : 18))
+            // Disabled state: dimmed bg + de-emphasized label so users see
+            // the button isn't yet actionable. Pre-Wave-1b the disabled
+            // state was indistinguishable from active and users tapped a
+            // dead button repeatedly.
+            .opacity(isEnabled ? 1.0 : 0.85)
     }
 }
 
