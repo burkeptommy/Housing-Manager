@@ -368,16 +368,34 @@ struct FoundationalQuestionsForm: View {
         ]
         VStack(spacing: 12) {
             ForEach(options, id: \.0) { (key, label, blurb) in
-                priorityRow(key: key, label: label, blurb: blurb)
+                selectableRow(
+                    label: label,
+                    blurb: blurb,
+                    isSelected: answers.topPriority == key,
+                    onTap: { answers.topPriority = key }
+                )
             }
         }
     }
 
-    private func priorityRow(key: String, label: String, blurb: String) -> some View {
-        let isSelected = answers.topPriority == key
-        return Button {
-            answers.topPriority = key
-        } label: {
+    /// Pre-2026-05-05 this was `priorityRow` and it was hardcoded to read
+    /// and write `answers.topPriority`. Step 7 (`tierStep`) tried to layer
+    /// `.onTapGesture` on top to redirect taps into `preferenceTier`, but
+    /// the inner `Button` consumed every tap before `.onTapGesture` could
+    /// fire — so step 7 never set `preferenceTier`, the Next button stayed
+    /// disabled forever, AND tapping step 7 silently overwrote the step 6
+    /// answer the user had already made. Caught driving the FoundationalQuestionsForm
+    /// in the simulator with the same address used by the backend E2E test.
+    /// Now the helper takes its selection state and tap handler as inputs
+    /// so step 6 and step 7 can share the visual treatment without sharing
+    /// the binding.
+    private func selectableRow(
+        label: String,
+        blurb: String,
+        isSelected: Bool,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button(action: onTap) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(label)
                     .font(HavenTypography.headline)
@@ -410,23 +428,13 @@ struct FoundationalQuestionsForm: View {
         ]
         VStack(spacing: 12) {
             ForEach(options, id: \.0) { (key, label, blurb) in
-                priorityRow(key: key, label: label, blurb: blurb)
-                    .onTapGesture { answers.preferenceTier = key }
-                    .overlay(
-                        priorityOverlay(forTier: key)
-                            .allowsHitTesting(false)
-                    )
+                selectableRow(
+                    label: label,
+                    blurb: blurb,
+                    isSelected: answers.preferenceTier == key,
+                    onTap: { answers.preferenceTier = key }
+                )
             }
-        }
-    }
-
-    @ViewBuilder
-    private func priorityOverlay(forTier tier: String) -> some View {
-        if answers.preferenceTier == tier {
-            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                .stroke(HavenColors.action, lineWidth: 2)
-        } else {
-            EmptyView()
         }
     }
 

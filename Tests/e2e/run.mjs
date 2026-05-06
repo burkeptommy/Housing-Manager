@@ -645,6 +645,167 @@ class E2ERunner {
       this.recordSuccess("phase5", "handyman flow reachable, won't be used for the rest of the run");
     }
 
+    // 5a' — Convention drift contract audit (Phase 95 follow-up,
+    // 2026-05-05). The handyman-provider edge function reads each of
+    // these actions' bodies as snake_case via `compactString(body.X)`,
+    // but the iOS structs (in SupabaseClient.swift) historically went on
+    // the wire as camelCase because the default `JSONEncoder()` has no
+    // `keyEncodingStrategy`. Three structs were already fixed
+    // (Request/Cancel/RescheduleAssessment); this block exercises the
+    // remaining four (add_recommended_task, update_recommended_task,
+    // mark_task_fixed_during_visit, decommission_system) end-to-end
+    // against the edge function so any future regression surfaces here
+    // instead of in TestFlight.
+    //
+    // Three of the four are operator-facing (gated on workspace
+    // membership). For those we send a snake_case payload and assert
+    // the failure mode is the AUTH/LOAD path, not "X required" — that
+    // signals the body parser saw the field. The fourth
+    // (decommission_system) is homeowner-callable and verified
+    // round-trip against home_systems.is_active.
+    if (this.state.assessmentId && this.state.homeSystemIds?.HVAC) {
+      logStep("Phase 95 follow-up contract audit: exercising 4 fixed actions");
+
+      // 1. decommission_system — homeowner-facing, expect 200 + is_active=false
+      const targetSystemId = this.state.homeSystemIds.Plumbing;
+      const decommission = await callEdgeFunction(
+        "handyman-provider",
+        {
+          action: "decommission_system",
+          system_id: targetSystemId,
+          reason: "E2E contract audit — snake_case wire format check",
+        },
+        this.state.jwt
+      );
+      if (!decommission.ok) {
+        this.recordIssue(
+          "phase5",
+          `decommission_system snake_case failed (${decommission.status})`,
+          decommission.body
+        );
+      } else {
+        // Re-read the row to confirm is_active flipped to false.
+        const verify = await rest(
+          `home_systems?id=eq.${targetSystemId}&select=is_active,decommissioned_reason`,
+          { method: "GET" },
+          this.state.jwt
+        );
+        const row = verify.body?.[0];
+        if (row?.is_active === false) {
+          logOk("decommission_system end-to-end", `is_active=false reason=${row.decommissioned_reason ?? "?"}`);
+          this.recordSuccess("phase5", "decommission_system snake_case wire format works (round-trip)");
+        } else {
+          this.recordIssue(
+            "phase5",
+            "decommission_system returned 200 but is_active not flipped",
+            row
+          );
+        }
+      }
+
+      // Helper: a "passes the parser" assertion. Snake_case payloads
+      // should fail with auth/load errors, not "X required" parse errors.
+      const expectParserPassed = (label, res, parseRequiredHints) => {
+        const errMsg = (res.body?.error ?? "").toString().toLowerCase();
+        const isParseError = parseRequiredHints.some((h) => errMsg.includes(h.toLowerCase()));
+        if (isParseError) {
+          this.recordIssue(
+            "phase5",
+            `${label}: snake_case payload still hit parse-required error`,
+            res.body
+          );
+        } else {
+          logOk(`${label} parser passed`, `status=${res.status} err="${(res.body?.error ?? "ok").toString().slice(0, 60)}"`);
+        }
+      };
+
+      // 2. add_recommended_task — operator-facing. Homeowner JWT will
+      //    fail at assertHandymanCanWrite, but with snake_case the
+      //    parser must read assessment_id + title first. If the parser
+      //    fails, error is "title required" or "assessment_id required".
+      //    If the parser succeeds, error is "not authorized" or
+      //    "assessment has no dispatched visit yet".
+      const addRec = await callEdgeFunction(
+        "handyman-provider",
+        {
+          action: "add_recommended_task",
+          assessment_id: this.state.assessmentId,
+          title: "E2E contract audit — should fail at auth, not at parse",
+          urgency: "soon",
+          recommended_owner: "chez_vendor",
+          observation_source: "handyman_observed",
+          needs_verification: false,
+        },
+        this.state.jwt
+      );
+      expectParserPassed("add_recommended_task", addRec, ["title required", "assessment_id required"]);
+
+      // 3. update_recommended_task — operator-facing in spirit, but
+      //    function has no caller auth check. With only task_id and no
+      //    other allowed fields, returns { ok: true, no_changes: true }.
+      //    That's the cleanest parser-pass signal.
+      const updRec = await callEdgeFunction(
+        "handyman-provider",
+        {
+          action: "update_recommended_task",
+          task_id: "00000000-0000-0000-0000-000000000000",
+        },
+        this.state.jwt
+      );
+      if (updRec.ok && updRec.body?.no_changes === true) {
+        logOk("update_recommended_task parser passed", "no_changes=true (expected for empty allowed-set)");
+      } else {
+        // If we got an error other than "task_id required", parser still
+        // passed — accept "failed" / "PGRST" / "not found" but reject the
+        // explicit parse-required hint.
+        expectParserPassed("update_recommended_task", updRec, ["task_id required"]);
+      }
+
+      // 4. mark_task_fixed_during_visit — load step fails with
+      //    "recommended task not found" when task_id parses correctly.
+      //    Fails with "task_id required" if the parser dropped the field.
+      const markFixed = await callEdgeFunction(
+        "handyman-provider",
+        {
+          action: "mark_task_fixed_during_visit",
+          task_id: "00000000-0000-0000-0000-000000000000",
+          cost_cents: 0,
+        },
+        this.state.jwt
+      );
+      expectParserPassed("mark_task_fixed_during_visit", markFixed, ["task_id required"]);
+
+      // 5. Negative regression guard. Sending camelCase to
+      //    mark_task_fixed_during_visit MUST still fail with
+      //    "task_id required" — that's the contract this whole audit
+      //    block exists to defend. If someone re-introduces the
+      //    convention drift on the iOS side (drops CodingKeys), the
+      //    above #4 check would still pass against deployed snake-case
+      //    edge function unless we ALSO assert the camelCase shape
+      //    fails. This is the canary.
+      const negCamel = await callEdgeFunction(
+        "handyman-provider",
+        {
+          action: "mark_task_fixed_during_visit",
+          taskId: "00000000-0000-0000-0000-000000000000", // intentionally wrong
+          costCents: 0,
+        },
+        this.state.jwt
+      );
+      const negErr = (negCamel.body?.error ?? "").toString().toLowerCase();
+      if (!negErr.includes("task_id required")) {
+        this.recordIssue(
+          "phase5",
+          "regression canary: camelCase taskId did NOT trigger 'task_id required' — edge function may have shifted to snake-or-camel handling, audit block needs re-thinking",
+          negCamel.body
+        );
+      } else {
+        logOk("regression canary intact", "camelCase taskId correctly rejected");
+      }
+    } else {
+      logWarn("Phase 95 follow-up contract audit skipped — no assessmentId or home_system available");
+    }
+
     // 5b — Pick DIY: stamp assessment_mode on properties.attributes
     logStep("stamping assessment_mode=diy on the property (DIY path)");
     const update = await rest(
