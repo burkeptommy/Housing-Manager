@@ -7630,7 +7630,10 @@ serve(async (req) => {
       const details = compactString(err.details);
       const hint = compactString(err.hint);
       const code = compactString(err.code);
-      message = [msg, details, hint, code ? `(${code})` : ""].filter(Boolean).join(" — ") || "Internal error";
+      // Joined with " · " (middle-dot) per CLAUDE.md "no em dashes in
+      // user-facing copy" — this string can leak to the iOS field app
+      // through error.localizedDescription on a 5xx response.
+      message = [msg, details, hint, code ? `(${code})` : ""].filter(Boolean).join(" · ") || "Internal error";
     }
     return json({ error: message }, 500);
   }

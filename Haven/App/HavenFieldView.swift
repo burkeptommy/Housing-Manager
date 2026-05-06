@@ -1813,7 +1813,7 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             await onCoordinated?()
             NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = friendlyServerError(from: error, fallback: "Couldn’t update the visit. Please try again.")
         }
     }
 
@@ -1841,7 +1841,7 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             store(draft, message: "System identified from label photo")
             await sync(draft: draft, message: "System synced")
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = friendlyServerError(from: error, fallback: "Couldn’t identify the equipment. Please try again or enter manually.")
         }
     }
 
@@ -1863,7 +1863,7 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             store(draft, message: "System added")
             await sync(draft: draft, message: "System synced")
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = friendlyServerError(from: error, fallback: "Couldn’t add the system. Please try again or enter manually.")
         }
     }
 
@@ -1943,6 +1943,29 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             photoCapturedAt: ISO8601DateFormatter().string(from: Date())
         )
     }
+}
+
+/// Maps NSURL / Supabase / generic errors to user-friendly copy.
+/// Pre-Wave-2a, several Field-app surfaces (visit confirm, system identify,
+/// add-system) surfaced raw NSURLErrorDomain strings to users. This is the
+/// single place to keep server-error UI strings honest. Real errors still
+/// log via `print` for engineering follow-up.
+private func friendlyServerError(from error: Error, fallback: String = "Something went wrong. Please try again.") -> String {
+    print("[HavenFieldService] error: \(error)")
+    let raw = error.localizedDescription.lowercased()
+    if raw.contains("network") || raw.contains("offline") || raw.contains("internet") || raw.contains("-1009") || raw.contains("-1011") {
+        return "Network error. Please check your connection and try again."
+    }
+    if raw.contains("does not exist") || raw.contains("42703") || raw.contains("internal") || raw.contains("500") {
+        return fallback
+    }
+    if raw.contains("not authenticated") || raw.contains("jwt") || raw.contains("401") {
+        return "Your session expired. Please sign in again."
+    }
+    if raw.contains("permission") || raw.contains("403") {
+        return "You don’t have permission to do this."
+    }
+    return fallback
 }
 
 struct HavenFieldRootView: View {

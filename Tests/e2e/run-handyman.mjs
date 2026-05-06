@@ -697,7 +697,7 @@ class HandymanE2ERunner {
           contractor_id: this.state.contractorIds[i] ?? null,
           request_type: sc.request_type,
           source: "homeowner",
-          title: `${sc.request_type.replace(/_/g, " ")} — Customer ${i + 1}`,
+          title: `${sc.request_type.replace(/_/g, " ")}: Customer ${i + 1}`,
           details: `Auto-seeded ${sc.request_type} for E2E test`,
           urgency: sc.urgency,
           status: sc.status,

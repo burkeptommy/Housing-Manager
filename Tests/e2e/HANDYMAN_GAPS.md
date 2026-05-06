@@ -1,0 +1,103 @@
+# Handyman field-app gaps + UI quality + persistence findings
+
+Aggregated findings from the overnight handyman E2E pass. Grouped by
+category, then severity (critical → minor), then matrix section.
+
+`verification` failures with `severity == critical` were auto-fixed
+during the run and committed; they appear in
+`HANDYMAN_OVERNIGHT_E2E_REPORT.md` instead of here.
+
+This file is the sink for **gaps** (features absent and should exist),
+**ui_quality_finding** (feature exists but design rule violated), and
+**persistence_finding** (saves don't survive lifecycle). Plus any
+`verification` failures triaged as architectural / non-mechanical.
+
+---
+
+## Gaps (features absent, deferred to product)
+
+### Section 1 — Account creation + workspace setup
+
+- **1.3** [`gap_found`] Workspace creation captures only company name + phone + optional website. Matrix expects logo upload + service area (ZIP codes / radius) + trade selection. iOS-as-thin-client design intent confirmed via on-screen copy "Use desktop for setup and quoting." **Suggested fix:** add a 4-step iOS workspace wizard mirroring desktop, OR surface a "Complete on desktop" card for owners with empty `service_zip_codes` / `categories`. **Estimated effort:** medium. **Tied to value prop:** new handyman signs up via iOS first → hits friction immediately when they need to fire up desktop just to set service area.
+
+- **1.4** [`gap_found`] Workspace customization (brand color / hourly rate / business hours) entirely absent from iOS Settings — only "Open desktop command center" link + "Sign out". **Suggested fix:** Phase 1 surface read-only rows under WORKSPACE > Branding; Phase 2 add brand-color picker + hourly-rate field. Business-hours editor stays desktop. **Estimated effort:** small (read-only) → medium (edit). **Tied to value prop:** brand color propagates to quotes + customer-facing emails per matrix.
+
+- **1.5** [`gap_found`] No invite-redemption affordance anywhere. Tested fresh signup with new email → landed straight on "Finish your field workspace" with no way to enter an invite code or accept an invitation. Blocks crew onboarding entirely. **Suggested fix:** "Have an invite code?" link beneath "Sign in to Chez Field" → opens InviteRedemptionSheet → server validates against `provider_workspace_members.invite_token`, links the auth user to the existing pending member row instead of creating a new workspace. Universal Link handler for `chez-field://join?token=...` should route to the same sheet. **Estimated effort:** medium. **Tied to value prop:** without invite acceptance, every new field user lands as workspace owner — there's no way for a crew member to join from iOS.
+
+- **1.7** [`gap_found`] Multi-workspace switcher absent. Settings sheet hero shows the single workspace name with no chevron; top-of-app handyman header is non-interactive. **Suggested fix:** make the avatar + workspace name header tappable → opens WorkspaceSwitcherSheet listing all `provider_workspace_members` rows where `user_id=current_user.id` and `status='active'`. **Estimated effort:** medium. **Tied to value prop:** subcontractor handymen working across multiple companies have to sign-out / sign-in to switch — premium app should not require account juggling.
+
+(populated by Wave 1a — 2026-05-06)
+
+### Section 2 — CRM linking + quoting + scheduling
+
+- **2.1** [`gap_found`] No "Add customer" affordance on Homes tab — only entry to add a customer is via Visits → New visit → Start pairing for a home, which is the brand-new-pair path (2.3), not the existing-account-search path. **Suggested fix:** add an "Add customer" button to Homes header that opens an address-search picker (Google Places + Chez household lookup); if existing → send link request via `provider_contractor_links` flow; if not → fall through to pair-a-home. **Estimated effort:** medium. (Wave 1b)
+
+- **2.10** [`gap_found`] No revoke / "End relationship" affordance from handyman side. Tapping a customer home opens read-only detail. **Suggested fix:** "Manage relationship" row in customer-home detail under a kebab/cog. Defer the actual revoke action to desktop if needed but at minimum show relationship state pill. **Estimated effort:** small. (Wave 1b)
+
+- **2.12-2.27** [`gap_found`] No quote builder in iOS (single-line / multi-line / draft / send / duplicate / sign). Onboarding card explicitly says "Use desktop for setup and quoting" — design intent. **Suggested fix:** mark 2.12-2.27 as Web in the matrix and add an iOS-only row covering "View quote sent from desktop in chat thread + customer accepts in-app", OR ship a minimal iOS quote viewer. (Wave 1b)
+
+- **2.36-2.38** [`gap_found`] No week / month / list calendar views. Visits tab shows only a single "Confirmed route" card (in-progress visit) + non-tappable "Upcoming N scheduled" stat tile. **Suggested fix:** make the stat tile tappable → push a chronological list of upcoming visits sorted by `scheduled_date`. Defer week/month grids to v2. **Estimated effort:** small (list view) → medium (grid views). (Wave 1b)
+
+- **Pending pair invitations visibility** [`gap_found`] After creating a pair invite (`status='pending_homeowner'`), the pair doesn't appear anywhere — handyman has no way to (a) see what invites are outstanding, (b) re-share the access code, (c) cancel the invite. **Suggested fix:** "Pending invites" strip above Homes search bar with re-share / cancel actions per row. **Estimated effort:** small. (Wave 1b)
+
+### Section 5 — On-behalf-of assessment (the biggest gap surface)
+
+- **5.1 / 5.21** [`gap_found`] No "Home assessment" visit type on the New Visit form (chips: Standard / Small repair / Install / Quote). Handyman cannot create an in-app assessment from scratch. **Suggested fix:** add `home_assessment` chip; on selection swap title for assessment-specific fields (concerns, present, access notes, preferred time). On save, dispatch `dispatch_home_assessment` action. **Estimated effort:** medium. (Wave 2a)
+
+- **5.2** [`gap_found`] No assessment list / queue UI anywhere. `home_assessments` rows are invisible. **Suggested fix:** add a 4th nav tab "Assessments" OR a "Pending assessments" section on Visits tab. Wire `handyman-provider` `dashboard.assessments[]` and use existing dead-code `GuidedAssessmentView` (740 lines built, never instantiated). **Estimated effort:** large. **Tied to value prop:** on-behalf-of is the highest-leverage Field flow. (Wave 2a)
+
+- **5.3** [`gap_found`] No assessment-detail surface. The visit-detail surface (HavenFieldVisitWorkspaceView) doesn't show customer phone, ATTOM facts, foundational answers, `homeowner_concerns`, or `homeowner_access_notes` — meaning gate codes and dog warnings never reach the field. **Suggested fix:** AssessmentDetailView component surfacing the access-notes prominently. **Estimated effort:** medium. **Tied to value prop:** without access notes the handyman walks into the home cold. (Wave 2a)
+
+- **5.4** [`gap_found`] No tap-to-call. Phone number isn't even rendered anywhere in the field app. **Suggested fix:** add phone row via `tel://` URL after confirming `handyman-provider` returns customer phone in dashboard payload. **Estimated effort:** small. (Wave 2a)
+
+- **5.5** [`gap_found`] Address renders as plain Text — tap does nothing. **Suggested fix:** wrap in Link to `https://maps.apple.com/?q=<encoded-address>` with a chevron / location-icon to communicate tappability. **Estimated effort:** small. (Wave 2a)
+
+- **5.6** [`gap_found`] No "Start visit" check-in button. Edge function HAS `start_assessment_visit` action wired but iOS UI never invokes it. The "Execute the visit" tab is gated on check-in but check-in doesn't exist — entire tab inert. **Suggested fix:** add salmon "Start visit" CTA to visit-detail header → calls `start_assessment_visit` + grabs CLLocationManager fix. **Estimated effort:** medium. (Wave 2a)
+
+- **5.7** [`gap_found`] Setup prompts are wired in handyman-provider (`setupPrompts: [...]`) and have a SwiftUI render branch but never surface in testing. Gated on `viewModel.payload?.session.seedPayload.firstVisit==true` AND requires portal session loaded. **Suggested fix:** for assessment visits, surface setup prompts unconditionally (the assessment is a first visit by definition). Audit why portal payload isn't loading. **Estimated effort:** small. (Wave 2a)
+
+- **5.15 / 5.16** [`gap_found`] "Add system from label photo" launches camera directly with no library or manual fallback. If permission denied or camera fails, handyman is stuck. **Suggested fix:** Menu with 3 options: Take photo / Choose from library / Enter manually. Reuse existing add-system form for manual entry. **Estimated effort:** small. (Wave 2a)
+
+- **5.19** [`gap_found`] Existing-system detail sheet is read-only — no edit affordance. Handyman cannot fill in missing manufacturer/model/serial on partially-detected systems. The only path is "Add new" → duplicate row. A4 edit-no-duplicate fails by impossibility. **CRITICAL.** **Suggested fix:** Add Edit affordance to system-detail sheet that PATCHes the row by id. Add "Replace existing" branch in identify-equipment edge function for capture-from-photo on existing rows. **Estimated effort:** medium. (Wave 2a)
+
+- **5.20** [`gap_found`] No "Mark decommissioned" UI. The action exists (`decommissionHomeSystem` in SupabaseClient.swift, `decommission_system` in edge function, `home_systems.decommissioned_at` column) but no UI calls it. **Suggested fix:** Destructive-style "Mark decommissioned" button on system-detail sheet with optional reason TextField. Decommissioned rows render greyed in a separate section, not deleted. **Estimated effort:** small. (Wave 2a)
+
+- **5.23** [`gap_found`] No "Mark for follow-up" affordance on systems. **Suggested fix:** add `followup_required` boolean + `followup_reason` text on assessment-system entry. When `submit_assessment_data` is called, create a `start_continuation_visit`-style flag for the next visit. **Estimated effort:** medium. (Wave 2a)
+
+### Architectural
+
+- **`GuidedAssessmentView.swift` is dead code (740 lines).** The whole guided assessment wizard was built but never wired into HavenFieldView — confirmed via grep. **Suggested fix:** decide whether to (a) wire it up by adding a navigation entry from a new Assessments tab, or (b) delete it entirely. Either way, the current state is ambiguous and bloats the binary. **Estimated effort:** small (delete) → medium (wire up). (Wave 2a)
+
+## UI quality findings
+
+### Severity: major
+
+(populated as Wave 1+ runs land)
+
+### Severity: moderate
+
+(populated as Wave 1+ runs land)
+
+### Severity: minor
+
+- **1.1, 1.3, 1.11** [B1 salmon discipline] Salmon used as small body text on tertiary navigation links: "Create it here" / "Sign in instead" / "Cancel" link in Reset Password sheet. Per CLAUDE.md "Salmon is for actions only — never for small body text (only 3:1 contrast on white)." **Suggested fix:** demote to `HavenColors.navy800` underlined; keep salmon for primary CTAs only. Likely affects `HavenFieldApp.swift` AND `LoginView.swift`. (Wave 1a)
+
+- **1.1, 1.3** [C1 stale validation] Inline validation messages don't clear after the user fills the field. Stale red message keeps rendering. **Suggested fix:** attach `.onChange(of: field)` that clears validation error when field becomes valid. **Note:** partially addressed in Wave 1a fix commit for the reset-password sheet specifically; the broader sign-in / sign-up forms still have this. (Wave 1a)
+
+- **1.9** [A7 destructive action confirmation] Sign out fires immediately with no confirmation. **Suggested fix:** wrap in `.alert("Sign out?", message: "You'll need your password to sign in again.")` with Cancel + Sign out destructive actions. (Wave 1a)
+
+- **1.1** [C1 validation completeness] Empty Create Account submit shows only "Please enter your email." — first/last/password/confirm errors are masked until email is filled. **Suggested fix:** refactor validation to show per-field errors below each input OR collect all empty fields into a single message. (Wave 1a)
+
+---
+
+## Persistence findings
+
+### Severity: critical
+
+(none yet)
+
+### Severity: major
+
+- **1.11** [A3 password reset never reaches Supabase Auth] Tested with `e2e-handyman-w1-owner-1.1-1778103827@havenhome.test` — `auth.users.recovery_sent_at` stays null after Send Reset Link tap. **Root cause:** Supabase auth rejects `.havenhome.test` emails as `email_address_invalid` (test-only artifact, not a real-user bug). **Status:** addressed in Wave 1a commit `eeecefde` — `friendlyError` now maps `email_address_invalid` to a clear user-facing message. **Note:** real `.com` emails work; this finding is informational. (Wave 1a)
+
+- **1.11** [B9 error layer] Reset password sheet rendered errors on the parent SignInView BEHIND the sheet, not inside the sheet. User dismissed the sheet to see the error and lost their input. **FIXED** in Wave 1a commit `eeecefde` — split `resetPasswordError` from `errorMessage`, render inside sheet body, clear on field change. (Wave 1a)
