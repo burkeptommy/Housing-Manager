@@ -687,6 +687,19 @@ struct DashboardView: View {
     /// skeleton-vs-content gate; this property holds the actual feed.
     @ViewBuilder
     private var dashboardContent: some View {
+        // Phase 95.2 (CI fix): the dashboard content is split into
+        // three sub-properties so the macos-15 type-checker doesn't
+        // walk through one large @ViewBuilder expression and trip
+        // the "unable to type-check in reasonable time" timeout.
+        // See split_dashboard_content.py for the rationale.
+        dashboardSetupBanners
+        dashboardCoverageStack
+        dashboardActivityStack
+    }
+
+    /// Phase 95.2 — banners + greeting + assessment + Day-0 quiz hero.
+    @ViewBuilder
+    private var dashboardSetupBanners: some View {
         // 0. Optional update banner (Phase 13). Session-only
         // dismissal so it reappears on next launch until the
         // user actually updates.
@@ -823,7 +836,11 @@ struct DashboardView: View {
         if let merge = pendingMergeRequest {
             mergeRequestBanner(merge)
         }
+    }
 
+    /// Phase 95.2 — Chez ownership hero, monthly summary, weekly tally, Home Coverage Hero, seasonal reminder, this week + upcoming + quick actions.
+    @ViewBuilder
+    private var dashboardCoverageStack: some View {
         // Phase 84 — Chez ownership hero card. Surfaces
         // "what % of your house Chez is running" and
         // routes to the new What Chez Handles page where
@@ -953,7 +970,11 @@ struct DashboardView: View {
                 }
             )
         }
+    }
 
+    /// Phase 95.2 — What's New, legacy tasks, cadence suggestion, pickup banner, recent activity, Chez entry pill, make-it-yours, expecting members.
+    @ViewBuilder
+    private var dashboardActivityStack: some View {
         // Phase 57: "What's New" card surfaces the new
         // HNW routines to existing users. Only renders for
         // properties created before the release cutoff and
@@ -1082,6 +1103,7 @@ struct DashboardView: View {
             .buttonStyle(.plain)
         }
     }
+
 
     private var vehicleAlertsCard: some View {
         NavigationLink(value: "vehicles") {
