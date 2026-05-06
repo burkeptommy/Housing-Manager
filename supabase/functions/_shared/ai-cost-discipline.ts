@@ -64,6 +64,12 @@ const PRICE_PER_1M_INPUT_USD: Record<string, number> = {
   "claude-haiku-3-5": 0.8,
   "claude-sonnet-4-6": 3.0,
   "claude-opus-4-5": 15.0,
+  // Opus 4.6 — premium reasoning model. Reserved for high-stakes
+  // calls (analyze_quote) where accuracy >> per-call cost. ~5×
+  // sonnet, ~15× haiku on input. The budget cap will refuse to
+  // fire it once the daily total exceeds CHEZ_AI_DAILY_BUDGET_USD,
+  // so even a runaway opus loop is bounded.
+  "claude-opus-4-6": 15.0,
 };
 const PRICE_PER_1M_OUTPUT_USD: Record<string, number> = {
   "claude-haiku-4-5": 5.0,
@@ -71,6 +77,7 @@ const PRICE_PER_1M_OUTPUT_USD: Record<string, number> = {
   "claude-haiku-3-5": 4.0,
   "claude-sonnet-4-6": 15.0,
   "claude-opus-4-5": 75.0,
+  "claude-opus-4-6": 75.0,
 };
 
 export interface AiCallOptions {

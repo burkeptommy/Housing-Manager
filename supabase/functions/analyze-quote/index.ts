@@ -230,17 +230,18 @@ LOCAL PRICE RANGE (localPriceRange) — REQUIRED for every line item:
       });
     }
 
-    // Phase 95 — route through cost-discipline helper. The previous
-    // configuration was the single biggest cost vampire in the entire
-    // app: opus-4-6 (premium reasoning model, ~$15/$75 per M tokens)
-    // at 16K max_tokens. For document-parsing work (extracting line
-    // items from a quote), haiku is plenty. Switching defaults gives
-    // ~25× cost reduction per call. Sonnet stays in the fallback
-    // ladder for resilience.
+    // Phase 95 — route through cost-discipline helper, but keep opus
+    // as the default model for quote analysis. Tom's call: this is
+    // the single highest-value AI feature in the app (catching
+    // overpriced line items can save the homeowner thousands per
+    // quote), so reasoning quality matters more than per-call cost.
+    // We still get the kill-switch + daily budget cap + telemetry +
+    // automatic fallback to sonnet/haiku if opus is rate-limited or
+    // overloaded.
     //
-    // Also dropped the hand-rolled retry loop — the helper handles
-    // model fallback on 429/529/5xx. max_tokens 4096 still leaves
-    // ~3K tokens of slack for line-item-heavy quotes.
+    // max_tokens stays at 8K (down from 16K). Real outputs typically
+    // run 3-5K; 8K gives slack for line-item-heavy quotes without
+    // being wastefully open-ended.
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabaseClient = supabaseUrl && serviceRoleKey
@@ -250,7 +251,12 @@ LOCAL PRICE RANGE (localPriceRange) — REQUIRED for every line item:
       supabase: supabaseClient,
       apiKey: anthropicApiKey,
       tag: "analyze_quote",
-      max_tokens: 4096,
+      max_tokens: 8192,
+      // Opus first — Tom's instruction: quote analysis is the biggest
+      // value-add and accuracy matters. Sonnet fallback for opus rate
+      // limits / overload. Haiku as last resort so we never fail to
+      // return something rather than silently dropping the analysis.
+      models: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
       system: systemPrompt,
       messages: messages as Array<{ role: "user" | "assistant"; content: unknown }>,
     });
