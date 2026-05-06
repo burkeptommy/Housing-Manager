@@ -72,7 +72,7 @@ struct Q37RoutinesGridBody: View {
 
                 section(
                     title: "ANYTHING ELSE",
-                    subtitle: "Housekeeper, nanny, personal trainer, dog walker, recurring deliveries — anything that comes on a schedule."
+                    subtitle: "Housekeeper, nanny, personal trainer, dog walker, recurring deliveries. Anything that comes on a schedule."
                 ) {
                     Button {
                         newRoutineKindSeed = .otherService
@@ -86,7 +86,7 @@ struct Q37RoutinesGridBody: View {
                                 Text("Add a custom routine")
                                     .font(HavenTypography.headline)
                                     .foregroundColor(HavenColors.textPrimary)
-                                Text("Free text — name it whatever you call it.")
+                                Text("Free text. Name it whatever you call it.")
                                     .font(HavenTypography.caption)
                                     .foregroundColor(HavenColors.textSecondary)
                             }
@@ -276,7 +276,7 @@ struct Q37RoutinesGridBody: View {
                             .font(HavenTypography.bodySmall)
                             .foregroundColor(HavenColors.textSecondary)
                     } else if isPending {
-                        Text("No vendor yet — we'll help you find one.")
+                        Text("No vendor yet. We'll help you find one.")
                             .font(HavenTypography.bodySmall)
                             .foregroundColor(HavenColors.action)
                     }

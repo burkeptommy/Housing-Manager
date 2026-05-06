@@ -733,7 +733,7 @@ struct HandymanTabView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(HavenColors.navy900)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Added after the visit was locked — handyman needs to confirm")
+                    Text("Added after the visit was locked. Handyman needs to confirm")
                         .font(.system(size: 12))
                         .foregroundStyle(HavenColors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1069,7 +1069,7 @@ struct HandymanTabView: View {
 
     private var emptyPunchListCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Inbox zero — nothing on your handyman's plate")
+            Text("Inbox zero. Nothing on your handyman's plate")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(HavenColors.navy900)
             Text("As Chez learns your home, small jobs land here. Add one yourself any time.")

@@ -94,14 +94,14 @@ struct GuidedAssessmentView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Welcome to \(propertyAddress.isEmpty ? "the home" : propertyAddress)")
                 .font(HavenTypography.title2)
-            Text("Walk through systems, vendors, recurring services, and documents the homeowner shows you. Capture as you go — autosave is on.")
+            Text("Walk through systems, vendors, recurring services, and documents the homeowner shows you. Capture as you go. Autosave is on.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 8) {
-                bullet("Photograph equipment plates — Claude Vision extracts make/model")
-                bullet("Tap to add a vendor — phone, category, anything they tell you")
+                bullet("Photograph equipment plates. Claude Vision extracts make/model")
+                bullet("Tap to add a vendor. Phone, category, anything they tell you")
                 bullet("Routines = lawn cut, pool service, cleaning, snow")
                 bullet("Documents = warranties, manuals, invoices the homeowner shows you")
             }
@@ -135,7 +135,7 @@ struct GuidedAssessmentView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Vendors the homeowner uses")
                 .font(HavenTypography.title2)
-            Text("Add the people they already have on speed-dial — landscaping, pool, plumber, etc.")
+            Text("Add the people they already have on speed-dial. Landscaping, pool, plumber, etc.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 
@@ -160,7 +160,7 @@ struct GuidedAssessmentView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Recurring services")
                 .font(HavenTypography.title2)
-            Text("Lawn cut, pool service, pest control, cleaning, snow plowing — whatever runs on a schedule.")
+            Text("Lawn cut, pool service, pest control, cleaning, snow plowing. Whatever runs on a schedule.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 
@@ -224,7 +224,7 @@ struct GuidedAssessmentView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Final review")
                 .font(HavenTypography.title2)
-            Text("Make sure nothing's missing — when you submit, the homeowner gets a notification their app is ready.")
+            Text("Make sure nothing's missing. When you submit, the homeowner gets a notification their app is ready.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 

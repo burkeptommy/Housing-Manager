@@ -32,7 +32,7 @@ enum ScenarioCategory: String, CaseIterable, Identifiable {
         switch self {
         case .estate: return "What happens to your family, assets, and plans if the unexpected occurs"
         case .tax: return "Find hidden deductions, credits, and strategies that could save thousands"
-        case .home: return "Refinance, sell, renovate, or rent — see the real numbers"
+        case .home: return "Refinance, sell, renovate, or rent. See the real numbers"
         case .wealth: return "Business structures, trusts, and wealth-building strategies"
         case .kids: return "Education funding, 529 plans, and planning for their future"
         case .insurance: return "Are you covered? See what happens when you need your safety net"
@@ -80,7 +80,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "estate_both_die",
             title: "If we were both gone tomorrow",
-            teaser: "Full estate flow — who gets what, what's protected, what's at risk",
+            teaser: "Full estate flow. Who gets what, what's protected, what's at risk",
             icon: "person.2.slash",
             category: .estate,
             requiresParams: false,
@@ -116,7 +116,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "estate_probate",
             title: "What does probate look like for my estate?",
-            teaser: "What's in the trust vs. what isn't — cost and timeline of probate",
+            teaser: "What's in the trust vs. what isn't. Cost and timeline of probate",
             icon: "building.columns",
             category: .estate,
             requiresParams: false,
@@ -169,7 +169,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "tax_roth_conversion",
             title: "What if I converted my Traditional IRA to Roth?",
-            teaser: "Tax hit now vs. tax-free growth later — the break-even point",
+            teaser: "Tax hit now vs. tax-free growth later. The break-even point",
             icon: "arrow.triangle.swap",
             category: .tax,
             requiresParams: false,
@@ -187,7 +187,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "tax_cost_segregation",
             title: "What if I did a cost segregation study?",
-            teaser: "Accelerated depreciation on your property — potential huge deduction",
+            teaser: "Accelerated depreciation on your property. Potential huge deduction",
             icon: "chart.bar.doc.horizontal",
             category: .tax,
             requiresParams: false,
@@ -214,7 +214,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "tax_home_office",
             title: "What if I took the home office deduction?",
-            teaser: "Square footage method vs. simplified — which saves more",
+            teaser: "Square footage method vs. simplified. Which saves more",
             icon: "desktopcomputer",
             category: .tax,
             requiresParams: false,
@@ -405,7 +405,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "kids_superfund_529",
             title: "What if I superfunded the 529s?",
-            teaser: "5-year gift tax election — front-load $90K per child",
+            teaser: "5-year gift tax election. Front-load $90K per child",
             icon: "arrow.up.right",
             category: .kids,
             requiresParams: false,
@@ -473,7 +473,7 @@ struct ScenarioDefinition: Identifiable {
         ScenarioDefinition(
             id: "insurance_life_not_enough",
             title: "What if my life insurance wasn't enough?",
-            teaser: "Coverage gap calculator — income replacement, debts, education",
+            teaser: "Coverage gap calculator. Income replacement, debts, education",
             icon: "chart.bar.xaxis.ascending.badge.clock",
             category: .insurance,
             requiresParams: false,

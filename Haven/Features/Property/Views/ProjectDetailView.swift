@@ -168,7 +168,7 @@ struct ProjectDetailView: View {
                         let t = $0.tradeName.lowercased()
                         return t == tradeLower || t.contains(tradeLower) || tradeLower.contains(t)
                     }
-                    QuoteComparisonView(quotes: tradeQuotes, projectName: "\(liveProject.name) — \(trade)")
+                    QuoteComparisonView(quotes: tradeQuotes, projectName: "\(liveProject.name). \(trade)")
                 } else {
                     QuoteComparisonView(quotes: viewModel.quotes, projectName: liveProject.name)
                 }

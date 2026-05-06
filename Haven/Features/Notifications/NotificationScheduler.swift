@@ -90,7 +90,7 @@ final class NotificationScheduler {
 
                             scheduleNotification(
                                 id: "maint-\(task.id)-\(daysBefore)",
-                                title: "Maintenance Due — \(propertyName)",
+                                title: "Maintenance Due. \(propertyName)",
                                 body: "\(task.title) is due \(daysText).\(task.isDiy == true ? " This is a DIY task." : "")",
                                 date: alertDate,
                                 category: "maintenance_due"
@@ -103,7 +103,7 @@ final class NotificationScheduler {
                         dayOfComponents.minute = 0
                         scheduleNotification(
                             id: "maint-dayof-\(task.id)",
-                            title: "Maintenance Due — \(propertyName)",
+                            title: "Maintenance Due. \(propertyName)",
                             body: "\(task.title) is due today.",
                             dateComponents: dayOfComponents,
                             category: "maintenance_due"
@@ -119,7 +119,7 @@ final class NotificationScheduler {
 
                         scheduleNotification(
                             id: "maint-overdue-\(task.id)",
-                            title: "Overdue — \(propertyName)",
+                            title: "Overdue. \(propertyName)",
                             body: "\(task.title) is overdue. Mark complete or reschedule.",
                             dateComponents: tomorrow,
                             category: "maintenance_overdue"
@@ -272,7 +272,7 @@ final class NotificationScheduler {
 
             scheduleNotification(
                 id: "maint-\(task.id)-\(daysBefore)",
-                title: "Maintenance Due — \(propertyName)",
+                title: "Maintenance Due. \(propertyName)",
                 body: "\(task.title) is due \(daysText).",
                 date: alertDate,
                 category: "maintenance_due"
@@ -309,9 +309,9 @@ final class NotificationScheduler {
 
         let seasons: [(name: String, month: Int, day: Int, message: String)] = [
             ("Spring", 3, 15, "Spring maintenance season is here! Time to prep your home."),
-            ("Summer", 6, 15, "Summer maintenance check — keep your home running cool."),
+            ("Summer", 6, 15, "Summer maintenance check. Keep your home running cool."),
             ("Fall", 9, 15, "Time to prepare for winter. Check your fall maintenance tasks."),
-            ("Winter", 12, 15, "Winter maintenance check — protect your home from the cold."),
+            ("Winter", 12, 15, "Winter maintenance check. Protect your home from the cold."),
         ]
 
         for season in seasons {

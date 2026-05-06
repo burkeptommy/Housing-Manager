@@ -204,18 +204,18 @@ final class OnboardingViewModel: ObservableObject {
     func autoCompleteIfReady(authService: AuthService, appState: AppState? = nil) async {
         print("[Onboarding] autoCompleteIfReady: ENTER hasAutoCompleted=\(hasAutoCompleted) pendingInvitation=\(pendingInvitation != nil) canProceed=\(canProceed) firstName='\(primaryFirstName)' lastName='\(primaryLastName)'")
         guard !hasAutoCompleted else {
-            print("[Onboarding] autoCompleteIfReady: SKIP — already completed")
+            print("[Onboarding] autoCompleteIfReady: SKIP. Already completed")
             return
         }
         guard pendingInvitation == nil else {
-            print("[Onboarding] autoCompleteIfReady: SKIP — pending invitation")
+            print("[Onboarding] autoCompleteIfReady: SKIP. Pending invitation")
             return
         }
         guard canProceed else {
-            print("[Onboarding] autoCompleteIfReady: SKIP — names not ready, expecting nameFallbackView to show")
+            print("[Onboarding] autoCompleteIfReady: SKIP. Names not ready, expecting nameFallbackView to show")
             return
         }
-        print("[Onboarding] autoCompleteIfReady: PROCEED — calling complete()")
+        print("[Onboarding] autoCompleteIfReady: PROCEED. Calling complete()")
         hasAutoCompleted = true
         await complete(authService: authService, appState: appState)
     }
@@ -552,7 +552,7 @@ final class OnboardingViewModel: ObservableObject {
                 try await self.runComplete(authService: authService, appState: appState)
             }
         } catch is OnboardingDeadlineError {
-            errorMessage = "Setup is taking too long. Tap Try Again to retry — your account is safe and we'll pick up where we left off."
+            errorMessage = "Setup is taking too long. Tap Try Again to retry. Your account is safe and we'll pick up where we left off."
             print("[Onboarding] complete() exceeded 30-second deadline at step: \(setupProgress)")
         } catch {
             errorMessage = "We hit a snag setting up your home. \(error.localizedDescription)"

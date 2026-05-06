@@ -72,7 +72,7 @@ struct AssessmentReviewView: View {
             Text("Your home is set up")
                 .font(HavenTypography.title)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Here's what your Chez handyman captured during the visit. Take a quick look — anything wrong, just flag it and we'll come back.")
+            Text("Here's what your Chez handyman captured during the visit. Take a quick look. Anything wrong, just flag it and we'll come back.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -89,7 +89,7 @@ struct AssessmentReviewView: View {
                     sectionRow(
                         title: [system.manufacturer, system.model].compactMap { $0 }.joined(separator: " ").isEmpty
                             ? system.category
-                            : "\(system.category) — \([system.manufacturer, system.model].compactMap { $0 }.joined(separator: " "))",
+                            : "\(system.category). \([system.manufacturer, system.model].compactMap { $0 }.joined(separator: " "))",
                         subtitle: system.installYear.map { "Installed \($0)" } ?? "",
                         section: "system",
                         entityId: nil
@@ -208,7 +208,7 @@ struct AssessmentReviewView: View {
             } label: {
                 HStack {
                     if isSubmittingApproval { ProgressView().tint(HavenColors.textOnAction) }
-                    Text("Looks great — I'm all set")
+                    Text("Looks great. I'm all set")
                         .font(HavenTypography.uiButton)
                         .foregroundStyle(HavenColors.textOnAction)
                 }

@@ -64,7 +64,7 @@ struct NeedsVendorTasksSheet: View {
             Text("\(groups.count) vendor\(groups.count == 1 ? "" : "s") cover all of these")
                 .font(HavenTypography.headline)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("One pro per category covers every task in that group. Tap Find a pro to handle them all in one shot — or tap a task to drill in.")
+            Text("One pro per category covers every task in that group. Tap Find a pro to handle them all in one shot. Or tap a task to drill in.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
         }
@@ -160,7 +160,7 @@ struct NeedsVendorTasksSheet: View {
                             }
                         }
                         if group.tasks.count > preview.count {
-                            Text("+ \(group.tasks.count - preview.count) more — tap to see all")
+                            Text("+ \(group.tasks.count - preview.count) more. Tap to see all")
                                 .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textTertiary)
                                 .padding(.top, 2)
@@ -237,7 +237,7 @@ struct SystemsMissingProfileSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                    Text("Each system below is missing a few details Chez needs to plan service. Tap one to fill it in — we only ask for fields that make sense for that system.")
+                    Text("Each system below is missing a few details Chez needs to plan service. Tap one to fill it in. We only ask for fields that make sense for that system.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .padding(.horizontal, HavenTheme.pageMargin)

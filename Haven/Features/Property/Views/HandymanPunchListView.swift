@@ -152,7 +152,7 @@ struct HandymanPunchListView: View {
                 editingItem = nil
             }
         } message: {
-            Text("What needs fixing? Keep it short — the handyman reads this on the day of the visit.")
+            Text("What needs fixing? Keep it short. The handyman reads this on the day of the visit.")
         }
         .overlay(alignment: .top) {
             if let toast = viewModel.toast {
@@ -895,7 +895,7 @@ final class HandymanPunchListViewModel: ObservableObject {
         combined.append(contentsOf: sortedTasks.map(HandymanPunchEntry.task))
         entries = combined
 
-        print("[HandymanPunchListViewModel] load complete — manual=\(dedupPunchItems.count) tasks=\(filteredTasks.count) total=\(combined.count)")
+        print("[HandymanPunchListViewModel] load complete. Manual=\(dedupPunchItems.count) tasks=\(filteredTasks.count) total=\(combined.count)")
     }
 
     private static func isCancellation(_ error: Error) -> Bool {
@@ -1191,7 +1191,7 @@ final class HandymanPunchListViewModel: ObservableObject {
             justScheduledTask = created
         } catch {
             print("[HandymanPunchListViewModel] ad-hoc schedule failed: \(error)")
-            showToast("Couldn't schedule — please try again.")
+            showToast("Couldn't schedule. Please try again.")
         }
     }
 
@@ -1243,7 +1243,7 @@ final class HandymanPunchListViewModel: ObservableObject {
             }
         } catch {
             print("[HandymanPunchListViewModel] schedule failed: \(error)")
-            showToast("Couldn't schedule — please try again.")
+            showToast("Couldn't schedule. Please try again.")
         }
     }
 

@@ -105,7 +105,7 @@ struct ChezOwnershipHeroCard: View {
 
     private var subtitle: String {
         if activeGroupCount == 0 && delegatedItemCount == 0 {
-            return "Free Home Manager service. Hand off as much or as little as you want — anytime."
+            return "Free Home Manager service. Hand off as much or as little as you want. Anytime."
         }
         if activeGroupCount >= 8 {
             return "Chez is managing your routines, systems, vendors, projects, bills, documents, insurance, and vehicles."

@@ -414,7 +414,7 @@ struct HavenFieldPunchItem: Codable, Identifiable, Hashable {
         }()
     }
 
-    /// Display label for the system link chip ("Linked: Boiler — basement").
+    /// Display label for the system link chip ("Linked: Boiler. Basement").
     /// Prefers the live system name (would require a join client-side, omitted
     /// here) and falls back to the snapshot taken at delegate-time.
     var systemDisplayLabel: String? {
@@ -1760,7 +1760,7 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
     /// new status propagates back to the visits list.
     func performCoordination(type: String, message: String?, proposedDate: String?) async {
         guard let workspaceId, !workspaceId.isEmpty else {
-            errorMessage = "Workspace not loaded yet — try again in a moment."
+            errorMessage = "Workspace not loaded yet. Try again in a moment."
             return
         }
         let requestId = visit.requestId
@@ -3445,7 +3445,7 @@ private struct HavenFieldVisitWorkspaceView: View {
                                 }
                             }
                         }
-                        Text("Tap an item to mark it done — Chez updates the homeowner instantly and stamps the system's last-serviced date.")
+                        Text("Tap an item to mark it done. Chez updates the homeowner instantly and stamps the system's last-serviced date.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)

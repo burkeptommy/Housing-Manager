@@ -30,7 +30,7 @@ struct HomeAssessmentPrepCard: View {
                 Spacer()
             }
 
-            Text("Make the visit faster — share anything that helps us prepare.")
+            Text("Make the visit faster. Share anything that helps us prepare.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 

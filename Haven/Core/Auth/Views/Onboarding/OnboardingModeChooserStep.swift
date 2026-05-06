@@ -45,12 +45,12 @@ struct OnboardingModeChooserStep: View {
                              emoji: "🤝",
                              title: "Blend",
                              tagline: "Mix & match",
-                             body: "Take care of what you know — let Chez handle the rest. After your quick quiz, we'll suggest categories worth handing off (vendors, scheduling, bill audits).")
+                             body: "Take care of what you know. Let Chez handle the rest. After your quick quiz, we'll suggest categories worth handing off (vendors, scheduling, bill audits).")
                     modeCard(.handyman,
                              emoji: "✨",
                              title: "Have Chez handle it",
                              tagline: "Free handyman setup",
-                             body: "Skip the quiz. A Chez handyman comes to your home — free — and captures your systems, vendors, routines, and documents. You wake up to a fully-set-up home.")
+                             body: "Skip the quiz. A Chez handyman comes to your home. Free. And captures your systems, vendors, routines, and documents. You wake up to a fully-set-up home.")
                 }
 
                 continueButton

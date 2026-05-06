@@ -473,7 +473,7 @@ final class ChatViewModel: ObservableObject {
         var lines: [String] = []
         lines.append("**Document uploaded and analyzed!**")
         lines.append("")
-        lines.append("**\(result.title)** — *\(result.category)*")
+        lines.append("**\(result.title)**. *\(result.category)*")
         lines.append("")
 
         if !result.summary.isEmpty {

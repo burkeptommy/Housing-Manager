@@ -115,7 +115,7 @@ struct OnboardingModeForkView: View {
                         Text("Chez handyman isn't in your area yet")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Join the waitlist — we'll notify you when we expand.")
+                        Text("Join the waitlist. We'll notify you when we expand.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -153,7 +153,7 @@ struct OnboardingModeForkView: View {
                     Haptics.light()
                     onDecideLater()
                 } label: {
-                    Text("Decide later — let me explore the app first")
+                    Text("Decide later. Let me explore the app first")
                         .font(HavenTypography.uiLabelSmall)
                         .foregroundStyle(HavenColors.textTertiary)
                         .underline()

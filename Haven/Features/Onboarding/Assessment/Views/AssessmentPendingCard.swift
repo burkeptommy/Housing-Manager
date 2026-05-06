@@ -122,7 +122,7 @@ struct AssessmentPendingCard: View {
                 Spacer()
             }
             if verificationCode != nil {
-                Text("Ask your handyman for this code at the door — it's how you know they're with Chez.")
+                Text("Ask your handyman for this code at the door. It's how you know they're with Chez.")
                     .font(HavenTypography.uiLabelSmall)
                     .foregroundStyle(HavenColors.textSecondary)
             }
@@ -173,7 +173,7 @@ struct AssessmentPendingCard: View {
         case .inProgress:
             return "Your handyman is at your home"
         case .submitted:
-            return "Visit complete — finalizing"
+            return "Visit complete. Finalizing"
         case .ingestionFailed:
             return "Setup hit a snag"
         default:
@@ -194,7 +194,7 @@ struct AssessmentPendingCard: View {
         case .submitted:
             return "Setting up your home in Chez now."
         case .ingestionFailed:
-            return "Something went wrong on our end. Chez has been notified — we'll reach out shortly."
+            return "Something went wrong on our end. Chez has been notified. We'll reach out shortly."
         default:
             return ""
         }

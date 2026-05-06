@@ -100,7 +100,7 @@ struct HomeAssessmentRequestSheet: View {
             Toggle("I'll be at home for the visit", isOn: $homeownerPresent)
                 .tint(HavenColors.action)
             if !homeownerPresent {
-                Text("That's fine — we'll coordinate access with you. Add any notes below (gate code, lockbox, contact, etc.).")
+                Text("That's fine. We'll coordinate access with you. Add any notes below (gate code, lockbox, contact, etc.).")
                     .font(HavenTypography.caption)
                     .foregroundColor(HavenColors.textSecondary)
             }

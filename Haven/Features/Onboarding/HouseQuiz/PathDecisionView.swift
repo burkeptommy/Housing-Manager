@@ -77,7 +77,7 @@ struct PathDecisionView: View {
                 .font(HavenTypography.title)
                 .foregroundColor(HavenColors.textPrimary)
                 .lineLimit(3)
-            Text("You've given us everything we need to know what's at your home. The next step is capturing the details — model numbers, photos, condition. You can do that yourself, or have a Chez handyman do it for you.")
+            Text("You've given us everything we need to know what's at your home. The next step is capturing the details. Model numbers, photos, condition. You can do that yourself, or have a Chez handyman do it for you.")
                 .font(HavenTypography.body)
                 .foregroundColor(HavenColors.textSecondary)
                 .padding(.top, 4)

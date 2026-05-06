@@ -204,7 +204,7 @@ struct HouseholdSpendView: View {
             Text("No spend tracked yet")
                 .font(HavenTypography.title3)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Forward bills and invoices to your Chez inbox — we'll extract the amount and tally it here automatically.")
+            Text("Forward bills and invoices to your Chez inbox. We'll extract the amount and tally it here automatically.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)

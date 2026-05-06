@@ -1393,7 +1393,7 @@ struct MaintenanceScheduleView: View {
     /// list. Filters by `nextDueDate` against the appropriate time window.
     /// Phase 95 (gap #14): footnote text under the stats pills. Surfaces
     /// the routine-owned task count so users discover where Phase 66
-    /// hiding sent their tasks ("they're on the routine — tap to view").
+    /// hiding sent their tasks ("they're on the routine. Tap to view").
     /// Falls back to the legacy `+ N recurring` shape when there are no
     /// child tasks to expose.
     private func footnoteText(activeRoutineCount: Int, hiddenTaskCount: Int) -> String {

@@ -55,7 +55,7 @@ struct WhatsNewPhase57Card: View {
         let regional = regionalPack == .northeast
             ? " including Northeast-specific routines like radon testing and humidifier service"
             : ""
-        return "Chez now tracks 10+ additional vendor routines\(regional). Review your home to add what applies — we'll only schedule what you confirm."
+        return "Chez now tracks 10+ additional vendor routines\(regional). Review your home to add what applies. We'll only schedule what you confirm."
     }
 
     var body: some View {

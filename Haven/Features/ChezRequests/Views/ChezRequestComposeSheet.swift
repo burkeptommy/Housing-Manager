@@ -475,7 +475,7 @@ struct ChezRequestComposeSheet: View {
         case .scheduleVisit:
             return "Tell Chez what needs scheduling and your preferred dates / windows."
         case .coordinateTask:
-            return "Hand off context — Chez runs the back-and-forth with the vendor."
+            return "Hand off context. Chez runs the back-and-forth with the vendor."
         case .findHandyman:
             return "Walk through what's on the punch list. Photos help."
         case .general:

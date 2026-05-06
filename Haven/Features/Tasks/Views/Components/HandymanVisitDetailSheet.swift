@@ -339,7 +339,7 @@ struct HandymanVisitDetailSheet: View {
     }
 
     private var emptyPunchListPlaceholder: some View {
-        Text("Nothing on the punch list yet — add items so your handyman knows what's on the docket.")
+        Text("Nothing on the punch list yet. Add items so your handyman knows what's on the docket.")
             .font(.system(size: 13))
             .foregroundStyle(HavenColors.textSecondary)
             .padding(14)

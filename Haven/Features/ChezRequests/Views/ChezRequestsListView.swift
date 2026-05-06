@@ -190,7 +190,7 @@ struct ChezRequestsListView: View {
                 Text("Need a hand?")
                     .font(HavenTypography.title3)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Whenever you're finding a vendor, getting a quote, scheduling a visit, or coordinating a task — tap the \"Have Chez handle this\" button anywhere in the app, and Chez takes it from there.")
+                Text("Whenever you're finding a vendor, getting a quote, scheduling a visit, or coordinating a task. Tap the \"Have Chez handle this\" button anywhere in the app, and Chez takes it from there.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)

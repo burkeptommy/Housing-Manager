@@ -1100,7 +1100,7 @@ struct PropertyDetailView: View {
                 Text("Snap a model number")
                     .font(HavenTypography.fraunces(size: 22, weight: 700))
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Take a photo of the label on any system — appliance, furnace, water heater, generator. Chez reads the model number and adds the system with brand, model, and serial filled in.")
+                Text("Take a photo of the label on any system. Appliance, furnace, water heater, generator. Chez reads the model number and adds the system with brand, model, and serial filled in.")
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -1487,7 +1487,7 @@ struct PropertyDetailView: View {
         return ChezEntryButton(
             category: .general,
             label: "Have Chez handle anything for you",
-            caption: "Vendor finds, scheduling, quotes, follow-ups — Chez owns it.",
+            caption: "Vendor finds, scheduling, quotes, follow-ups. Chez owns it.",
             context: ctx
         )
     }
@@ -1575,7 +1575,7 @@ struct PropertyDetailView: View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
             PropertyEditorialBlurb(
                 title: "Big work, kept together.",
-                copy: "Quotes, contractors, photos, warranties — Chez files them under one project so you can find them when it matters."
+                copy: "Quotes, contractors, photos, warranties. Chez files them under one project so you can find them when it matters."
             )
 
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
@@ -1931,7 +1931,7 @@ struct PropertyDetailView: View {
                         Text("No services on this property yet.")
                             .font(HavenTypography.body)
                             .foregroundStyle(HavenColors.textSecondary)
-                        Text("Lawn care, cleaning, pest control, snow removal, pool service — anything that comes on a schedule with a vendor.")
+                        Text("Lawn care, cleaning, pest control, snow removal, pool service. Anything that comes on a schedule with a vendor.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSoft)
                         HavenButton(

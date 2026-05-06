@@ -240,7 +240,7 @@ struct OnboardingFamilyStep: View {
                         .foregroundStyle(HavenColors.textPrimary)
                     Text("Family Members")
                         .font(HavenTypography.title2)
-                    Text("Add the people who live in or rely on your home — partners, children, parents, or other family members. Chez will match them when you upload documents.")
+                    Text("Add the people who live in or rely on your home. Partners, children, parents, or other family members. Chez will match them when you upload documents.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)

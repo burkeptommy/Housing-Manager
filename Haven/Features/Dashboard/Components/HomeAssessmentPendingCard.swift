@@ -254,7 +254,7 @@ struct HomeAssessmentPendingCard: View {
         case .pending:
             return "We'll text you the morning of your visit. Free of charge."
         case .scheduled:
-            return "We'll text you the morning of. No prep needed — just be home."
+            return "We'll text you the morning of. No prep needed. Just be home."
         case .enRoute:
             return "ETA shortly. They'll capture your systems, vendors, and routines."
         case .inProgress:

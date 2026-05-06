@@ -141,7 +141,7 @@ struct WalkthroughView: View {
             Text("Add details to each system")
                 .font(HavenTypography.title)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Walk room to room. Tap each system to add the manufacturer, model number, install year, and a few photos. You can skip what you don't know — we'll keep nudging.")
+            Text("Walk room to room. Tap each system to add the manufacturer, model number, install year, and a few photos. You can skip what you don't know. We'll keep nudging.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .padding(.top, 2)
@@ -265,7 +265,7 @@ struct WalkthroughView: View {
             HStack {
                 Spacer()
                 Text(viewModel.captured == viewModel.total
-                     ? "All set — finish setup"
+                     ? "All set. Finish setup"
                      : "I'm done for now")
                     .font(HavenTypography.uiButton)
                     .foregroundStyle(HavenColors.textOnAction)

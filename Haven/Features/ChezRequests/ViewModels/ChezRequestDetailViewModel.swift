@@ -202,7 +202,7 @@ final class ChezRequestDetailViewModel: ObservableObject {
         do {
             try await HavenSupabase.replyToChezRequest(
                 requestId: requestId,
-                content: "[HOMEOWNER RESOLVED] Closing this out — no further action needed.",
+                content: "[HOMEOWNER RESOLVED] Closing this out. No further action needed.",
                 attachments: nil
             )
             // Optimistically reflect status change client-side; the

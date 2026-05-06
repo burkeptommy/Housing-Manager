@@ -142,7 +142,7 @@ final class HouseQuizViewModel: ObservableObject {
             let questions = n == 1 ? "question" : "questions"
             switch reason {
             case .attomKnowsIt:
-                return "Skipped \(n) \(questions) — your property records already cover this."
+                return "Skipped \(n) \(questions). Your property records already cover this."
             case .previousAnswerMakesItIrrelevant:
                 return "Skipped \(n) \(questions) based on your earlier answers."
             case .chipNotApplicable:
@@ -1122,7 +1122,7 @@ final class HouseQuizViewModel: ObservableObject {
             // dashboard refreshes.
             let priorId: String = priorAnswer?.answerId ?? "nil"
             let newId: String = answer.answerId ?? "nil"
-            print("[HouseQuiz] Answer changed for \(question.id) (\(priorId) → \(newId)) — running reconciler")
+            print("[HouseQuiz] Answer changed for \(question.id) (\(priorId) → \(newId)). Running reconciler")
             let propId = property.id
             let hhId = property.householdId
             Task.detached(priority: .utility) {

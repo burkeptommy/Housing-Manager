@@ -830,7 +830,7 @@ struct HomeSystemRow: Identifiable {
     let installDateUnknownAt: Date?
     /// True when ATTOM (or another public-records source) pre-filled
     /// this system's install date. The coverage flow shows these as
-    /// "estimated from public records — confirm or correct".
+    /// "estimated from public records. Confirm or correct".
     let installDateAttomPrefilled: Bool?
     /// Set when the user has confirmed an ATTOM pre-fill (or otherwise
     /// signed off). Lets us distinguish "user hasn't reviewed" from

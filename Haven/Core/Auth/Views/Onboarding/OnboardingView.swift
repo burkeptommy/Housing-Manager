@@ -156,7 +156,7 @@ struct OnboardingView: View {
             // Only show the escape hatch if we're STILL on the splash
             // (no error, no name fallback, no progress yet).
             if !viewModel.hasFinishedPrefill {
-                print("[Onboarding] escape hatch timer fired — forcing hasFinishedPrefill=true so user can proceed manually")
+                print("[Onboarding] escape hatch timer fired. Forcing hasFinishedPrefill=true so user can proceed manually")
                 showEscapeHatch = true
                 viewModel.hasFinishedPrefill = true
             }
@@ -444,7 +444,7 @@ struct OnboardingView: View {
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textPrimary)
             }
-            Text("This invitation was sent to **\(invitedEmail)**, but you're signed in as **\(sessionEmail)**. You can still join this household — just confirm it's the right one.")
+            Text("This invitation was sent to **\(invitedEmail)**, but you're signed in as **\(sessionEmail)**. You can still join this household. Just confirm it's the right one.")
                 .font(HavenTypography.caption)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

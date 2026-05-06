@@ -560,7 +560,7 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// Whether the user can upload a document instead of answering.
     let documentUploadCategory: DocumentCategory?
     /// Whether this question expects a follow-up provider capture step
-    /// when the user picks a "yes — pro service" answer.
+    /// when the user picks a "yes. Pro service" answer.
     let providerFollowUpAnswerIds: Set<String>
     /// One or more utility provider_type tokens fed into the search picker.
     /// These must match the values in `utility_providers.provider_type`

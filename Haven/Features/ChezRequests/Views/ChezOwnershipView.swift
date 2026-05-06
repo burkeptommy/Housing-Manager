@@ -62,7 +62,7 @@ struct ChezOwnershipView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Chez will take over every category — routines, systems, vendors, projects, bills, documents, insurance, vehicles. You can revoke any of them anytime.")
+            Text("Chez will take over every category. Routines, systems, vendors, projects, bills, documents, insurance, vehicles. You can revoke any of them anytime.")
         }
         .alert("Take it all back?", isPresented: $viewModel.confirmingDIYMode) {
             Button("Take it back") {
@@ -70,7 +70,7 @@ struct ChezOwnershipView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This turns OFF every group toggle. Existing per-entity ownership stays — you'll need to revoke individual items separately.")
+            Text("This turns OFF every group toggle. Existing per-entity ownership stays. You'll need to revoke individual items separately.")
         }
         .trackScreen("ChezOwnershipView")
     }
@@ -82,7 +82,7 @@ struct ChezOwnershipView: View {
             Text("Three ways to use Chez")
                 .font(HavenTypography.uiSectionHeader)
                 .foregroundStyle(HavenColors.textSecondary)
-            Text("Pick what fits — switch anytime.")
+            Text("Pick what fits. Switch anytime.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 
@@ -433,7 +433,7 @@ enum ChezOwnershipGroup: String, CaseIterable {
         case (.allRoutines, true): return "Owning every recurring service end-to-end."
         case (.allSystems, false): return "HVAC, plumbing, electrical, roof, etc. Service scheduling, warranty, parts."
         case (.allSystems, true): return "Tracking every system's service + warranty + maintenance."
-        case (.allVendors, false): return "Every contractor relationship — Chez is the point of contact."
+        case (.allVendors, false): return "Every contractor relationship. Chez is the point of contact."
         case (.allVendors, true): return "Handling every vendor relationship for you."
         case (.allProjects, false): return "Quote sourcing, negotiation, budget tracking, timeline."
         case (.allProjects, true): return "Running every project from sourcing to completion."
@@ -443,7 +443,7 @@ enum ChezOwnershipGroup: String, CaseIterable {
         case (.allDocuments, true): return "Filing every document for you."
         case (.allInsurance, false): return "Claims filing, coverage audits, renewal shopping."
         case (.allInsurance, true): return "Managing every insurance policy for you."
-        case (.allVehicles, false): return "Service scheduling, recalls, registration, insurance — full vehicle lifecycle."
+        case (.allVehicles, false): return "Service scheduling, recalls, registration, insurance. Full vehicle lifecycle."
         case (.allVehicles, true): return "Owning every vehicle end-to-end."
         }
     }
@@ -539,7 +539,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "routine:\(r.id.uuidString)",
                     icon: "calendar.badge.clock",
                     title: r.label,
-                    subtitle: "Routine — Chez owns scheduling",
+                    subtitle: "Routine. Chez owns scheduling",
                     revokeKind: .routine(id: r.id),
                     sortDate: r.chezOwnedAt
                 ))
@@ -549,7 +549,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "contractor:\(c.id.uuidString)",
                     icon: "person.2.fill",
                     title: c.companyName,
-                    subtitle: "Vendor — Chez is point of contact",
+                    subtitle: "Vendor. Chez is point of contact",
                     revokeKind: .contractor(id: c.id),
                     sortDate: c.chezOwnedAt
                 ))
@@ -559,7 +559,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "task:\(t.id.uuidString)",
                     icon: "checkmark.square",
                     title: t.title,
-                    subtitle: "Task — Chez owns coordination",
+                    subtitle: "Task. Chez owns coordination",
                     revokeKind: .task(id: t.id),
                     sortDate: t.chezOwnedAt
                 ))
@@ -569,7 +569,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "system:\(s.id.uuidString)",
                     icon: "wrench.and.screwdriver.fill",
                     title: s.displayName,
-                    subtitle: "System — Chez handles service + warranty",
+                    subtitle: "System. Chez handles service + warranty",
                     revokeKind: .system(id: s.id),
                     sortDate: s.chezOwnedAt
                 ))
@@ -579,7 +579,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "project:\(p.id.uuidString)",
                     icon: "hammer.fill",
                     title: p.name,
-                    subtitle: "Project — Chez owns sourcing + budget",
+                    subtitle: "Project. Chez owns sourcing + budget",
                     revokeKind: .project(id: p.id),
                     sortDate: p.chezOwnedAt
                 ))
@@ -589,7 +589,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "document:\(d.id.uuidString)",
                     icon: "doc.fill",
                     title: d.title,
-                    subtitle: "Document — Chez files + organizes",
+                    subtitle: "Document. Chez files + organizes",
                     revokeKind: .document(id: d.id),
                     sortDate: d.chezOwnedAt
                 ))
@@ -599,7 +599,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "utility:\(u.id.uuidString)",
                     icon: u.typeIcon,
                     title: u.providerName,
-                    subtitle: "\(u.typeLabel) — Chez audits + negotiates",
+                    subtitle: "\(u.typeLabel). Chez audits + negotiates",
                     revokeKind: .utility(id: u.id),
                     sortDate: u.chezOwnedAt
                 ))
@@ -609,7 +609,7 @@ final class ChezOwnershipViewModel: ObservableObject {
                     id: "vehicle:\(v.id.uuidString)",
                     icon: "car.fill",
                     title: v.displayName.isEmpty ? v.name : v.displayName,
-                    subtitle: "Vehicle — Chez handles service + recalls + registration",
+                    subtitle: "Vehicle. Chez handles service + recalls + registration",
                     revokeKind: .vehicle(id: v.id),
                     sortDate: v.chezOwnedAt
                 ))

@@ -395,7 +395,7 @@ struct AddSystemView: View {
                 // updates (e.g. the system row itself appearing).
                 NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                 if result.totalChanged == 0 {
-                    print("[AddSystem] Reconciler returned 0 changes for \(category) — already covered or no matching templates.")
+                    print("[AddSystem] Reconciler returned 0 changes for \(category). Already covered or no matching templates.")
                 }
 
                 // Check if the reconciler linked a vendor — if so, offer

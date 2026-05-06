@@ -995,7 +995,7 @@ struct MaintenanceHubView: View {
                             Text("Browse seasonal services")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.textPrimary)
-                            Text("Pressure washing, chimney sweeping, deck staining, tree service — add what your home needs.")
+                            Text("Pressure washing, chimney sweeping, deck staining, tree service. Add what your home needs.")
                                 .font(HavenTypography.bodySmall)
                                 .foregroundStyle(HavenColors.textSecondary)
                                 .lineLimit(2)

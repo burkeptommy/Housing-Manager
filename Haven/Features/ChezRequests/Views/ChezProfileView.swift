@@ -122,7 +122,7 @@ struct ChezProfileView: View {
             )
             .overlay(alignment: .topLeading) {
                 if (viewModel.profile.aboutUs ?? "").isEmpty {
-                    Text("e.g. Family of 4 in Bedford. Two dogs. Old colonial — vendors should expect quirky plumbing. We host every other weekend so book vendors weekday mornings when possible.")
+                    Text("e.g. Family of 4 in Bedford. Two dogs. Old colonial. Vendors should expect quirky plumbing. We host every other weekend so book vendors weekday mornings when possible.")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textSecondary.opacity(0.6))
                         .padding(.horizontal, 14)
@@ -138,7 +138,7 @@ struct ChezProfileView: View {
     private var spendingTiersSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionLabel("SPENDING AUTHORITY")
-            captionText("How much can Chez spend on your behalf without asking? Defaults are conservative — adjust to your taste.")
+            captionText("How much can Chez spend on your behalf without asking? Defaults are conservative. Adjust to your taste.")
             tierStepper(
                 label: "Auto-approve under",
                 amount: Binding(
@@ -163,7 +163,7 @@ struct ChezProfileView: View {
                     }
                 ),
                 step: 50, range: 0...5000,
-                hint: "Chez sends a quick heads-up before booking — usually a 1-tap approve."
+                hint: "Chez sends a quick heads-up before booking. Usually a 1-tap approve."
             )
             tierStepper(
                 label: "Always ask above",
@@ -259,7 +259,7 @@ struct ChezProfileView: View {
 
             if viewModel.profile.communication?.vacationMode == true {
                 TextField(
-                    "Trip notes (optional) — dates, anyone with key access, etc.",
+                    "Trip notes (optional). Dates, anyone with key access, etc.",
                     text: Binding(
                         get: { viewModel.profile.communication?.vacationNotes ?? "" },
                         set: { newVal in
@@ -458,7 +458,7 @@ struct ChezProfileView: View {
     private var standingEngagementsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("STANDING ENGAGEMENTS")
-            captionText("Everything you've handed off to Chez — routines, vendor relationships, and individual tasks.")
+            captionText("Everything you've handed off to Chez. Routines, vendor relationships, and individual tasks.")
             NavigationLink {
                 ChezDelegationsListView()
             } label: {

@@ -2838,7 +2838,7 @@ final class DatabaseService {
             throw NSError(
                 domain: "DatabaseService",
                 code: 66,
-                userInfo: [NSLocalizedDescriptionKey: "Task has no property — can't route to handyman"]
+                userInfo: [NSLocalizedDescriptionKey: "Task has no property. Can't route to handyman"]
             )
         }
         let routine = try await fetchOrCreateHandymanRoutine(
@@ -2913,7 +2913,7 @@ final class DatabaseService {
             .execute()
             .value
         if response.isEmpty {
-            print("[Push] WARNING: Upsert returned 0 rows — RLS may be blocking the insert for user \(userId)")
+            print("[Push] WARNING: Upsert returned 0 rows. RLS may be blocking the insert for user \(userId)")
         } else {
             print("[Push] Token upsert confirmed: \(response.count) row(s)")
         }

@@ -13,7 +13,7 @@ import Foundation
 ///      to year-built — skip those.
 ///   3. Stamp `install_date_source = 'estimated'` and
 ///      `install_date_attom_prefilled = true` so the gamified coverage
-///      flow reads "estimated from public records — confirm or correct".
+///      flow reads "estimated from public records. Confirm or correct".
 ///      User confirmation flips `install_date_confirmed_at`.
 enum InstallDatePrefiller {
     /// Categories where year-built is a sensible default — structural
@@ -72,7 +72,7 @@ enum InstallDatePrefiller {
     ///
     /// All pre-filled rows land with `source = 'estimated'` and
     /// `attom_prefilled = true`, so the gamified coverage flow shows
-    /// them as "Estimated from public records — confirm or correct"
+    /// them as "Estimated from public records. Confirm or correct"
     /// with a one-tap accept.
     @discardableResult
     static func prefill(

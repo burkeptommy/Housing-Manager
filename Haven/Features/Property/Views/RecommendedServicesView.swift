@@ -323,7 +323,7 @@ struct RecommendedServicesView: View {
             ])
         } else {
             Haptics.error()
-            showToast("Couldn't schedule — please try again")
+            showToast("Couldn't schedule. Please try again")
         }
     }
 

@@ -21,13 +21,13 @@ struct RequestAssessmentView: View {
     var body: some View {
         Form {
             Section {
-                Text("A Chez handyman comes to your home for free, walks every system, captures vendors and routines, and flags any work needed. We'll merge what they find with what you already have — nothing existing is removed.")
+                Text("A Chez handyman comes to your home for free, walks every system, captures vendors and routines, and flags any work needed. We'll merge what they find with what you already have. Nothing existing is removed.")
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textSecondary)
             }
 
             Section("What concerns you most?") {
-                TextField("Optional — anything specific to look at", text: $concerns, axis: .vertical)
+                TextField("Optional. Anything specific to look at", text: $concerns, axis: .vertical)
                     .lineLimit(3...6)
             }
 
@@ -41,7 +41,7 @@ struct RequestAssessmentView: View {
 
             if didSubmit {
                 Section {
-                    Label("Request received — we'll text you when scheduled.", systemImage: "checkmark.circle.fill")
+                    Label("Request received. We'll text you when scheduled.", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(HavenColors.action)
                 }
             } else if let err = submitError {

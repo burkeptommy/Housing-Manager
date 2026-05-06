@@ -73,7 +73,7 @@ struct ChezOwnsToggle: View {
             case .task(_, let title, _):
                 return "Chez owns coordination for \(title). You'll see updates inside the request thread."
             case .system(_, let name):
-                return "Chez owns \(name) end-to-end — service scheduling, warranty, parts, history."
+                return "Chez owns \(name) end-to-end. Service scheduling, warranty, parts, history."
             case .project(_, let name):
                 return "Chez is running \(name): vendor sourcing, negotiation, budget, timeline."
             case .document(_, let filename):
@@ -81,9 +81,9 @@ struct ChezOwnsToggle: View {
             case .utility(_, let providerName):
                 return "Chez audits your \(providerName) bills and shops better rates when they appear."
             case .vehicle(_, let label):
-                return "Chez owns \(label) — service scheduling, recalls, registration, insurance claims."
+                return "Chez owns \(label). Service scheduling, recalls, registration, insurance claims."
             case .insurance(_, _, let label):
-                return "Chez handles your \(label) — claims, coverage audits, renewal shopping."
+                return "Chez handles your \(label). Claims, coverage audits, renewal shopping."
             }
         }
         switch target {
@@ -98,13 +98,13 @@ struct ChezOwnsToggle: View {
         case .system:
             return "Chez schedules maintenance, tracks warranty, orders parts, logs service so you don't think about it."
         case .project:
-            return "Chez runs the project end-to-end — sources vendors, negotiates pricing, tracks budget + timeline."
+            return "Chez runs the project end-to-end. Sources vendors, negotiates pricing, tracks budget + timeline."
         case .document:
             return "Chez files this for you, organizes it, and shares with vendors when relevant."
         case .utility:
             return "Chez audits bills for errors, negotiates rates, and switches providers if a better deal appears."
         case .vehicle:
-            return "Chez owns the whole vehicle — service, recalls, registration, insurance — you just drive it."
+            return "Chez owns the whole vehicle. Service, recalls, registration, insurance. You just drive it."
         case .insurance:
             return "Chez files claims, audits coverage against your home value, and shops renewals."
         }
@@ -205,9 +205,9 @@ struct ChezOwnsToggle: View {
             case .utility(_, let providerName):
                 Text("Chez will audit \(providerName) bills, negotiate rates, and switch providers if better deals come up.")
             case .vehicle(_, let label):
-                Text("Chez will own the whole vehicle (\(label)) — service, recalls, registration, insurance.")
+                Text("Chez will own the whole vehicle (\(label)). Service, recalls, registration, insurance.")
             case .insurance(_, _, let label):
-                Text("Chez will manage your \(label) — claims, coverage audits, renewal shopping.")
+                Text("Chez will manage your \(label). Claims, coverage audits, renewal shopping.")
             }
         }
     }

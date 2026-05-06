@@ -209,7 +209,7 @@ final class DocumentAnalysisService {
             }
             // Large PDF: extract text via PDFKit as fallback
             if let text = extractPDFText(from: data), text.count >= 50 {
-                print("[QuotePrep] Large PDF (\(data.count / 1_048_576)MB) — using extracted text (\(text.count) chars)")
+                print("[QuotePrep] Large PDF (\(data.count / 1_048_576)MB). Using extracted text (\(text.count) chars)")
                 return (nil, text, nil)
             }
             // PDF too large and text extraction failed

@@ -345,7 +345,7 @@ final class ProjectsViewModel: ObservableObject {
             let projectType: String
             if category == "Other" || category.lowercased() == "other" {
                 let parts = [projectName, description].compactMap { $0 }.filter { !$0.isEmpty }
-                projectType = parts.joined(separator: " — ")
+                projectType = parts.joined(separator: ". ")
             } else {
                 projectType = "\(category): \(projectName)"
             }

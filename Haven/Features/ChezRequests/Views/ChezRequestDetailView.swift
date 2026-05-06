@@ -222,7 +222,7 @@ struct ChezRequestDetailView: View {
                             case .vendor:
                                 return "I'd rather not go with \(proposal.vendor?.name ?? "this vendor"). Can you propose another option?"
                             case .dateSlot:
-                                return "These times don't work — could we look at "
+                                return "These times don't work. Could we look at "
                             case .cost:
                                 return "That cost is higher than I expected. Is there room to negotiate or a leaner scope?"
                             case .quote:

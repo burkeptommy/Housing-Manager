@@ -350,7 +350,7 @@ private struct SystemCoverageCardView: View {
                         .font(HavenTypography.uiLabel.weight(.semibold))
                         .foregroundStyle(HavenColors.textPrimary)
                 }
-                Text("Public records suggest \(year). Confirm if this matches what you know — or pick a more accurate year below.")
+                Text("Public records suggest \(year). Confirm if this matches what you know. Or pick a more accurate year below.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                 HavenButton(
@@ -404,7 +404,7 @@ private struct SystemCoverageCardView: View {
             )
             optionButton(
                 title: "I don't know",
-                subtitle: "Skip for now — Chez will ask again later",
+                subtitle: "Skip for now. Chez will ask again later",
                 icon: "minus.circle",
                 tint: HavenColors.textTertiary,
                 action: {

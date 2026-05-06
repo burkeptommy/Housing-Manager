@@ -95,7 +95,7 @@ struct NewArrivalChecklist {
             NewArrivalChecklistItem(
                 id: "birth_certificate",
                 title: "Apply for birth certificate",
-                subtitle: "Usually started at the hospital — upload when received",
+                subtitle: "Usually started at the hospital. Upload when received",
                 icon: "doc.text.fill",
                 phase: .firstWeek,
                 documentCategory: "Birth Certificate"
@@ -147,7 +147,7 @@ struct NewArrivalChecklist {
             NewArrivalChecklistItem(
                 id: "passport",
                 title: "Get \(name)'s passport",
-                subtitle: "Required for international travel — both parents must be present",
+                subtitle: "Required for international travel. Both parents must be present",
                 icon: "airplane",
                 phase: .firstYear,
                 documentCategory: "Passport"

@@ -157,7 +157,7 @@ struct AssessmentPrepPhotosSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Photos for your handyman")
                     .font(HavenTypography.title2)
-                Text("Snap photos of any rooms or systems you want them to focus on. Optional — they'll capture everything during the visit.")
+                Text("Snap photos of any rooms or systems you want them to focus on. Optional. They'll capture everything during the visit.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
 
@@ -261,7 +261,7 @@ struct AssessmentPrepQuizSheet: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("A quick 5-question prep")
                         .font(HavenTypography.title2)
-                    Text("Helps your handyman move fast — all optional.")
+                    Text("Helps your handyman move fast. All optional.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
 

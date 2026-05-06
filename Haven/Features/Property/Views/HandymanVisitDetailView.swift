@@ -1793,7 +1793,7 @@ struct HandymanVisitDetailView: View {
                 message: message,
                 icon: "doc.text.fill",
                 tint: HavenColors.action,
-                headline: "Sent a quote — open the chat to review"
+                headline: "Sent a quote. Open the chat to review"
             )
         case .text:
             coordinationTextMessageRow(message)

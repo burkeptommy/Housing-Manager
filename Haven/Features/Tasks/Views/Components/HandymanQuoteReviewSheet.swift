@@ -725,7 +725,7 @@ struct QuoteVersionHistorySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Each row is one version of this quote — tap any to view its line items in detail.")
+                    Text("Each row is one version of this quote. Tap any to view its line items in detail.")
                         .font(.system(size: 13))
                         .foregroundStyle(HavenColors.textSecondary)
                         .lineSpacing(2)
@@ -951,7 +951,7 @@ struct LineItemCommentSheet: View {
             ForEach(pendingForLine) { pending in
                 commentBubble(
                     body: pending.body,
-                    when: "draft — not sent yet",
+                    when: "draft. Not sent yet",
                     isHomeowner: true,
                     isPending: true,
                     pendingId: pending.id
@@ -1066,7 +1066,7 @@ struct LineItemCommentSheet: View {
             .buttonStyle(.plain)
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-            Text("Add as many as you want — they all send together when you tap “Send to handyman.”")
+            Text("Add as many as you want. They all send together when you tap “Send to handyman.”")
                 .font(.system(size: 11.5))
                 .foregroundStyle(HavenColors.textSecondary)
                 .padding(.top, 2)

@@ -83,7 +83,7 @@ struct AddMaintenanceTaskSheet: View {
             switch self {
             case .maintenance: return "A standard maintenance task on a recurring schedule."
             case .vendorAppointment: return "A one-time vendor visit (estimate, install, repair). Defaults to vendor-managed."
-            case .followUp: return "A vendor follow-up — extra check-in tied to a recent service visit."
+            case .followUp: return "A vendor follow-up. Extra check-in tied to a recent service visit."
             }
         }
     }

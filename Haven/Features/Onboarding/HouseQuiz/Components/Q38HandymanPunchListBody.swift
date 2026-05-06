@@ -164,7 +164,7 @@ struct Q38HandymanPunchListBody: View {
                         description: "Spray lubricant on noisy hinges, sliding door tracks, and drawer rails.",
                         estimatedMinutes: 15),
             DefaultItem(id: "paint_touchups", title: "Touch up paint scuffs",
-                        description: "Paint over scuffs and dings on walls and trim — bring up the matching paint cans.",
+                        description: "Paint over scuffs and dings on walls and trim. Bring up the matching paint cans.",
                         estimatedMinutes: 45)
         ]
         // HVAC filter — drop for boiler/radiant homes (no forced air).

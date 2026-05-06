@@ -697,7 +697,7 @@ struct HandymanHubView: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                 Text("Anything been bugging you?")
                     .font(HavenTypography.headline)
-                Text("Add small repairs, dryer-vent cleaning, a squeaky door — we'll hand the whole list to your handyman on the next visit.")
+                Text("Add small repairs, dryer-vent cleaning, a squeaky door. We'll hand the whole list to your handyman on the next visit.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                 HavenButton(

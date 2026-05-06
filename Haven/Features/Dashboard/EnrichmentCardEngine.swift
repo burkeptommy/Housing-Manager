@@ -179,7 +179,7 @@ struct EnrichmentEngine {
             questions.append(EnrichmentQuestion(
                 id: "deck_material",
                 title: "Do you have a deck or patio?",
-                subtitle: "Wood decks need regular staining — we'll track it",
+                subtitle: "Wood decks need regular staining. We'll track it",
                 icon: "rectangle.split.3x3",
                 priority: 40,
                 inputType: .singleChoice([
@@ -196,7 +196,7 @@ struct EnrichmentEngine {
             questions.append(EnrichmentQuestion(
                 id: "fence_material",
                 title: "Do you have a fence?",
-                subtitle: "Wood fences need staining — metal and vinyl don't",
+                subtitle: "Wood fences need staining. Metal and vinyl don't",
                 icon: "square.grid.3x3.topleft.filled",
                 priority: 41,
                 inputType: .singleChoice([
