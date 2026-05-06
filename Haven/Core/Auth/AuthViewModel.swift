@@ -12,6 +12,7 @@ final class AuthViewModel: ObservableObject {
     @Published var showSignUp = false
     @Published var showForgotPassword = false
     @Published var resetEmailSent = false
+    @Published var resetPasswordError: String?
     @Published var confirmationEmailSent = false
 
     func signIn(authService: AuthService) async {
@@ -48,18 +49,22 @@ final class AuthViewModel: ObservableObject {
     }
 
     func resetPassword(authService: AuthService) async {
+        // Reset-password errors render INSIDE the sheet via resetPasswordError,
+        // not on the parent view's errorMessage. The two were colliding on the
+        // SignInView when the sheet was up — error text rendered behind the sheet
+        // and the user only saw it after dismissing (losing their input).
         guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
-            errorMessage = "Please enter your email address."
+            resetPasswordError = "Please enter your email address."
             return
         }
         isLoading = true
-        errorMessage = nil
+        resetPasswordError = nil
         defer { isLoading = false }
         do {
             try await authService.resetPassword(email: email.trimmingCharacters(in: .whitespaces))
             resetEmailSent = true
         } catch {
-            errorMessage = friendlyError(error)
+            resetPasswordError = friendlyError(error)
         }
     }
 
@@ -105,6 +110,9 @@ final class AuthViewModel: ObservableObject {
         }
         if desc.contains("email not confirmed") {
             return "Please check your email and confirm your account first."
+        }
+        if desc.contains("email_address_invalid") || desc.contains("email address") {
+            return "That email address is not valid. Please check and try again."
         }
         if desc.contains("network") || desc.contains("offline") {
             return "Network error. Please check your connection."

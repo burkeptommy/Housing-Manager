@@ -5964,7 +5964,7 @@ private struct HavenFieldRescheduleSheet: View {
                             .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textSecondary)
                         TextField(
-                            "e.g. \"Running long on a job — earliest I can swing by is 2 PM\"",
+                            "e.g. \"Running long on a job. Earliest I can swing by is 2 PM.\"",
                             text: $note,
                             axis: .vertical
                         )

@@ -409,7 +409,10 @@ private struct HavenFieldSignInView: View {
                     .foregroundStyle(HavenColors.textPrimary)
                 }
             }
-            .sheet(isPresented: $viewModel.showForgotPassword) {
+            .sheet(isPresented: $viewModel.showForgotPassword, onDismiss: {
+                // Drop any stale error so re-opening the sheet starts clean.
+                viewModel.resetPasswordError = nil
+            }) {
                 NavigationStack {
                     VStack(spacing: 24) {
                         VStack(spacing: 8) {
@@ -429,13 +432,27 @@ private struct HavenFieldSignInView: View {
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
                             .textInputAutocapitalization(.never)
+                            .onChange(of: viewModel.email) { _, newValue in
+                                // Clear stale validation error once the user starts typing.
+                                if !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                                    viewModel.resetPasswordError = nil
+                                }
+                            }
 
-                        HavenButton(title: "Send Reset Link") {
+                        if let resetError = viewModel.resetPasswordError, !resetError.isEmpty {
+                            Text(resetError)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.critical)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        HavenButton(title: viewModel.isLoading ? "Sending..." : "Send Reset Link") {
                             Task { await viewModel.resetPassword(authService: appState.authService) }
                         }
+                        .disabled(viewModel.isLoading)
                     }
                     .padding()
-                    .presentationDetents([.height(360)])
+                    .presentationDetents([.height(380)])
                     .navigationTitle("Reset Password")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
