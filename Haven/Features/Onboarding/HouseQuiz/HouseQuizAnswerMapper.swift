@@ -188,10 +188,18 @@ final class HouseQuizAnswerMapper {
                         value: basementSelections.joined(separator: ",")
                     )
                 }
-                // Sump pump only matters when there's an actual basement (not
-                // a crawl-space-only or slab home).
-                if basementSelections.contains("finished_basement")
-                    || basementSelections.contains("unfinished_basement") {
+                // Sump pump is only auto-created when the user EXPLICITLY
+                // ticks the sump_pump checkbox. Phase 95.1 fix: previously
+                // any basement (finished or unfinished) auto-created a Sump
+                // Pump system even when the user did NOT select the sump
+                // pump option, which was a false positive for the
+                // ~50% of basement homes that don't have one. Caught by
+                // overnight E2E (Tests/e2e UI Wave 1 Subagent 3). The
+                // sump_pump option in q9_basement is a separate selectable
+                // ID alongside finished_basement / unfinished_basement /
+                // crawl_space / slab — basement type and sump-pump
+                // presence are independent facts.
+                if basementSelections.contains("sump_pump") {
                     try await ensureHomeSystem(name: "Sump Pump", category: "Sump Pump")
                 }
                 if basementSelections.contains("crawl_space") {

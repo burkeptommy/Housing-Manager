@@ -73,7 +73,7 @@ enum FoundationalAnswersStore {
         var existingAnswers = quizState.answers
         if let householdType = answers.householdType {
             existingAnswers["q28_household"] = HouseQuizAnswer(answerId: householdType, payload: [
-                "has_pets": answers.hasPets ? "yes" : "no",
+                "has_pets": answers.hasPets == true ? "yes" : "no",
                 "expecting": answers.expecting ? "yes" : "no"
             ])
         }
@@ -106,7 +106,7 @@ enum FoundationalAnswersStore {
             PropertyUpdate(houseQuizState: quizState)
         )
 
-        if answers.hasPets {
+        if answers.hasPets == true {
             _ = try? await DatabaseService.shared.updatePropertyAttribute(
                 propertyId: propertyId,
                 key: "has_pets",

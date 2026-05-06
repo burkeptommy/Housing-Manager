@@ -185,10 +185,10 @@ struct FoundationalQuestionsForm: View {
     @ViewBuilder
     private var petsStep: some View {
         VStack(spacing: 12) {
-            singleChoiceRow(label: "Yes, we have pets", isSelected: answers.hasPets) {
+            singleChoiceRow(label: "Yes, we have pets", isSelected: answers.hasPets == true) {
                 answers.hasPets = true
             }
-            singleChoiceRow(label: "No pets", isSelected: !answers.hasPets) {
+            singleChoiceRow(label: "No pets", isSelected: answers.hasPets == false) {
                 answers.hasPets = false
             }
         }
@@ -558,7 +558,7 @@ struct FoundationalQuestionsForm: View {
     private var canAdvance: Bool {
         switch stepIndex {
         case 0: return answers.householdType != nil
-        case 1: return true   // either yes or no is valid; hasPets default false
+        case 1: return answers.hasPets != nil   // user must explicitly pick yes or no
         case 2: return true   // vehicles optional
         case 3: return true   // insurance optional
         case 4: return true   // trash days optional

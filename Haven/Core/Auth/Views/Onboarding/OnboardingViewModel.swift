@@ -715,6 +715,37 @@ final class OnboardingViewModel: ObservableObject {
                     }
                 }
 
+                // Phase 95.1 fix: persist bedrooms / bathrooms / lot_size
+                // from the ATTOM lookup result to property.attributes so
+                // PropertyRecapCard can render them on first quiz appear.
+                // Previously these facts were displayed on PropertyHookView
+                // page 2 directly from `propertyLookupResult` but never
+                // persisted, so the recap card immediately following showed
+                // "Not on file" for the same data the user just saw —
+                // a trust-killer first impression. Caught by overnight E2E
+                // (W1S3 + W1S4 + W4S16 PropertyRecapCard observations).
+                if let beds = propertyLookupResult?.bedrooms {
+                    _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                        propertyId: property.id,
+                        key: "bedrooms",
+                        value: .string(String(beds))
+                    )
+                }
+                if let baths = propertyLookupResult?.bathrooms {
+                    _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                        propertyId: property.id,
+                        key: "bathrooms",
+                        value: .string(String(baths))
+                    )
+                }
+                if let lot = propertyLookupResult?.lotSize {
+                    _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                        propertyId: property.id,
+                        key: "lot_size",
+                        value: .string(String(lot))
+                    )
+                }
+
                 // Build 89: Pre-quiz task creation removed. Tasks are now
                 // created exclusively by the MaintenanceTaskReconciler during
                 // and after quiz completion, ensuring proper assignmentType,
@@ -869,7 +900,7 @@ final class OnboardingViewModel: ObservableObject {
         // Q28 household composition
         if let householdType = answers.householdType {
             existingAnswers["q28_household"] = HouseQuizAnswer(answerId: householdType, payload: [
-                "has_pets": answers.hasPets ? "yes" : "no",
+                "has_pets": answers.hasPets == true ? "yes" : "no",
                 "expecting": answers.expecting ? "yes" : "no"
             ])
         }
@@ -938,7 +969,7 @@ final class OnboardingViewModel: ObservableObject {
 
         // Stamp pet-presence onto property attributes so reconciler
         // gating fires before the quiz/handyman finishes.
-        if answers.hasPets {
+        if answers.hasPets == true {
             _ = try? await DatabaseService.shared.updatePropertyAttribute(
                 propertyId: propertyId,
                 key: "has_pets",

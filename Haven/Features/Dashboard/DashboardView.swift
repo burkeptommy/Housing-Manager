@@ -842,11 +842,19 @@ struct DashboardView: View {
         // Phase 66: One-time "We reorganized your
         // maintenance" card for existing TestFlight
         // users. Dismisses permanently via @AppStorage.
-        // Gated on hasCompletedAnyQuiz so fresh signups
-        // (who land on the new hub from the start) don't
-        // see a "we reorganized" message about a tab
-        // they've never seen the old version of.
-        if viewModel.hasCompletedAnyQuiz {
+        //
+        // Phase 95.1 fix: gate on accountCreatedAt < phase66ReleaseDate
+        // in addition to hasCompletedAnyQuiz, so brand-new signups (who
+        // never saw the old layout) don't see a "we reorganized" message
+        // about a tab they've never seen the old version of. Mirrors the
+        // WhatsNewPhase57Card pattern documented in CLAUDE.md. Caught by
+        // overnight E2E (W4S16 — card was dominating first-launch
+        // viewport on the seeded test user, who was created after
+        // Phase 66 shipped).
+        let phase66ReleaseDate = ISO8601DateFormatter().date(from: "2026-04-20T00:00:00Z") ?? Date.distantPast
+        if viewModel.hasCompletedAnyQuiz,
+           let accountCreated = viewModel.accountCreatedAt,
+           accountCreated < phase66ReleaseDate {
             MaintenanceReorganizedCard(
                 onLearnMore: {
                     NotificationCenter.default.post(
@@ -1378,7 +1386,18 @@ struct DashboardView: View {
 
                 Button(action: {
                     Haptics.light()
-                    navigationPath.append("maintenance")
+                    // Phase 95.1 fix: 'View schedule' should land on the
+                    // calendar / timeline (MaintenanceScheduleView with
+                    // initialLayout: .calendar), not the categorized
+                    // maintenance hub. CLAUDE.md "Dashboard Architecture"
+                    // explicitly says: 'View full schedule entry point
+                    // (Phase 54A): The link under "Up Next" now pushes
+                    // navigationPath.append("maintenance_calendar")'. The
+                    // destination handler at line ~227 already wires
+                    // "maintenance_calendar" to MaintenanceScheduleView
+                    // (initialLayout: .calendar). Caught by overnight E2E
+                    // (W4S16 Dashboard usefulness review).
+                    navigationPath.append("maintenance_calendar")
                 }) {
                     Text("View schedule")
                         .font(HavenTypography.uiLabel)

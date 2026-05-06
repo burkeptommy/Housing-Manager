@@ -856,9 +856,16 @@ struct HouseQuizView: View {
               !viewModel.showSavedReviewScreen,
               !shouldShowRecap,
               !viewModel.showMilestoneCard,
-              let current = viewModel.currentQuestion
+              viewModel.currentQuestion != nil
         else { return false }
-        return !viewModel.shownChapterIntros.contains(current.chapter)
+        // Phase 95.1 fix: read from viewModel.currentChapter (the same
+        // property that chapterIntroScreen.onContinue WRITES to) instead
+        // of current.chapter. They're computed from the same source but
+        // making the read/write sites use the literal same property
+        // eliminates the possibility of a stale-Question vs fresh-VM
+        // mismatch causing the conditional to be evaluated against a
+        // different chapter than the one the Insert closure modifies.
+        return !viewModel.shownChapterIntros.contains(viewModel.currentChapter)
     }
 
     /// Phase 85: the path-decision screen renders after intake completes.

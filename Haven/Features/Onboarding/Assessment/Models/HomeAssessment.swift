@@ -159,7 +159,13 @@ struct FoundationalAnswers: Codable, Equatable {
     var spouseFirstName: String?
     var spouseLastName: String?
     var children: [FoundationalChild]
-    var hasPets: Bool
+    /// Phase 95.1 fix: changed from `Bool` to `Bool?` so the petsStep
+    /// renders BOTH chips unselected on first appear. Previously
+    /// `hasPets: Bool = false` made "No pets" pre-selected with a salmon
+    /// outline before the user picked, silently recording an unintended
+    /// answer for users who tapped Next without re-examining. Caught by
+    /// overnight E2E (Tests/e2e UI Wave 1 Subagent 2).
+    var hasPets: Bool?
     var expecting: Bool
 
     /// Q30 priorities — one of: financial / safety / aesthetic / minimal_effort
@@ -187,7 +193,7 @@ struct FoundationalAnswers: Codable, Equatable {
         self.spouseFirstName = nil
         self.spouseLastName = nil
         self.children = []
-        self.hasPets = false
+        self.hasPets = nil
         self.expecting = false
         self.topPriority = nil
         self.preferenceTier = nil

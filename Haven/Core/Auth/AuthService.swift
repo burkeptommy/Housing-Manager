@@ -48,15 +48,57 @@ final class AuthService: ObservableObject {
                     }
 
                 case .signedIn:
-                    currentUserId = session?.user.id
-                    isAuthenticated = session != nil
-                    pendingConfirmation = false
+                    // Phase 95.1 fix: monotonic-true contract. Once
+                    // isAuthenticated flips true (here OR via the
+                    // defensive in-memory set inside signUp at line ~123),
+                    // ONLY the explicit .signedOut event can clear it.
+                    // Previously this case set `isAuthenticated = session != nil`
+                    // unconditionally — if the SDK ever fired .signedIn with
+                    // a momentarily-nil session during the signUp →
+                    // auth.update(user:) sequence, it would clobber the
+                    // defensive in-memory set back to false and bounce
+                    // the user to AddressHookView. The bug was intermittent
+                    // because the SDK only sometimes fires events with nil
+                    // session in that window. Caught by overnight E2E
+                    // (Tests/e2e UI Wave 1 Subagent 3 / 4 / 5).
                     if let session {
+                        currentUserId = session.user.id
+                        isAuthenticated = true
+                        pendingConfirmation = false
                         await ensureUserRecord(session: session)
                         await checkOnboardingStatus()
-                        // Identify user for analytics
                         let user = try? await DatabaseService.shared.fetchCurrentUser()
                         Analytics.identify(userId: session.user.id, householdId: user?.householdId)
+                    }
+                    // No-op when session is nil — let the explicit
+                    // .signedOut path do clearing.
+
+                case .tokenRefreshed:
+                    // Phase 95.1 fix: handle token refresh events that
+                    // fire during the signUp → auth.update(user:) sequence.
+                    // Previously these fell into the `default: break` arm,
+                    // leaving isAuthenticated unset for the brief window
+                    // between signUp returning and our defensive set
+                    // running. Now we treat .tokenRefreshed identically
+                    // to .signedIn: monotonic-true under any non-nil
+                    // session, no-op on nil session.
+                    if let session {
+                        currentUserId = session.user.id
+                        isAuthenticated = true
+                        pendingConfirmation = false
+                    }
+
+                case .userUpdated:
+                    // Phase 95.1 fix: same monotonic-true treatment.
+                    // auth.update(user:) called from signUp() to stamp
+                    // first_name/last_name/full_name onto user metadata
+                    // fires this event with a session (the just-signed-up
+                    // user), so it's a legitimate signal that we're in a
+                    // valid authenticated state.
+                    if let session {
+                        currentUserId = session.user.id
+                        isAuthenticated = true
+                        pendingConfirmation = false
                     }
 
                 case .signedOut:
