@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -335,90 +336,31 @@ IMPORTANT:
       messageContent = userPrompt;
     }
 
-    let claudeResponse: Response;
-    try {
-      claudeResponse = await fetch(
-        "https://api.anthropic.com/v1/messages",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": anthropicApiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 16384,
-            system: systemPrompt,
-            messages: [
-              {
-                role: "user",
-                content: messageContent,
-              },
-            ],
-          }),
-        }
-      );
-    } catch (fetchErr) {
-      console.error(`[research-project] Fetch to Claude failed:`, fetchErr);
+    // Phase 95 — route through cost-discipline helper.
+    // Old defaults: sonnet-4-6 + max_tokens 16384.
+    // New defaults: haiku-4-5 (5× cheaper) + max_tokens 4096 (still
+    // generous for the structured JSON output, which averages ~2-3K
+    // tokens). The biggest single cost reduction in onboarding flows.
+    const supabaseClient = createClient(supabaseUrl, serviceRoleKey);
+    const aiResult = await callClaudeWithDiscipline({
+      supabase: supabaseClient,
+      apiKey: anthropicApiKey,
+      tag: "research_project",
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: "user", content: messageContent }],
+    });
+    if (!aiResult) {
       return new Response(
         JSON.stringify({
-          error: "Failed to connect to AI service",
-          detail: String(fetchErr),
+          error: "AI service unavailable",
+          error_code: "ai_unavailable",
+          detail: "Either disabled by kill-switch, daily budget exhausted, or all model fallbacks failed.",
         }),
         { status: 502, headers }
       );
     }
-
-    if (!claudeResponse.ok) {
-      const errText = await claudeResponse.text();
-      console.error(
-        `[research-project] Claude API error (${claudeResponse.status}): ${errText}`
-      );
-
-      // Parse specific error types for better client messaging
-      let errorMessage = "AI service error";
-      let errorCode = "ai_error";
-      try {
-        const errJson = JSON.parse(errText);
-        const errType = errJson?.error?.type ?? "";
-        const errMsg = errJson?.error?.message ?? "";
-
-        if (claudeResponse.status === 401) {
-          errorMessage = "AI service authentication failed";
-          errorCode = "auth_error";
-        } else if (claudeResponse.status === 429) {
-          errorMessage = "AI service is rate limited. Please wait a moment and try again.";
-          errorCode = "rate_limited";
-        } else if (errType === "not_found_error" || errMsg.includes("model")) {
-          errorMessage = "AI model configuration error";
-          errorCode = "model_error";
-          console.error(`[research-project] Model error — check model ID is valid`);
-        } else if (claudeResponse.status === 400) {
-          errorMessage = "AI request was invalid";
-          errorCode = "bad_request";
-        } else if (claudeResponse.status >= 500) {
-          errorMessage = "AI service is temporarily unavailable";
-          errorCode = "ai_unavailable";
-        }
-        console.error(`[research-project] Parsed error type: ${errType}, message: ${errMsg}`);
-      } catch {
-        // errText was not JSON
-      }
-
-      return new Response(
-        JSON.stringify({
-          error: errorMessage,
-          error_code: errorCode,
-          detail: errText.substring(0, 500),
-        }),
-        { status: 502, headers }
-      );
-    }
-
-    const claudeData = await claudeResponse.json();
-    const aiText =
-      claudeData?.content?.[0]?.text ?? '{"error": "No response from AI"}';
+    const aiText = aiResult.text || '{"error": "No response from AI"}';
 
     // Extract JSON from response
     let research: Record<string, unknown>;

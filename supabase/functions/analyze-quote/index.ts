@@ -3,6 +3,8 @@
 // then compares each item to fair market pricing.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -228,73 +230,38 @@ LOCAL PRICE RANGE (localPriceRange) — REQUIRED for every line item:
       });
     }
 
-    // --- CALL CLAUDE WITH RETRY ---
-    const maxAttempts = 2;
-    let claudeData: Record<string, unknown> | null = null;
-    let lastError = "";
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      console.log(`[analyze-quote] Calling Claude (attempt ${attempt}/${maxAttempts})`);
-
-      try {
-        const claudeResponse = await fetch(
-          "https://api.anthropic.com/v1/messages",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": anthropicApiKey,
-              "anthropic-version": "2023-06-01",
-            },
-            body: JSON.stringify({
-              model: "claude-opus-4-6",
-              max_tokens: 16384,
-              system: systemPrompt,
-              messages,
-            }),
-          }
-        );
-
-        if (claudeResponse.ok) {
-          claudeData = await claudeResponse.json();
-          break;
-        }
-
-        const errText = await claudeResponse.text();
-        lastError = `${claudeResponse.status}: ${errText.substring(0, 300)}`;
-        console.error(`[analyze-quote] Claude error (attempt ${attempt}): ${lastError}`);
-
-        // Don't retry on 4xx client errors (bad request, auth, etc.)
-        if (claudeResponse.status >= 400 && claudeResponse.status < 500) {
-          return new Response(
-            JSON.stringify({ error: "AI analysis failed", detail: errText.substring(0, 500) }),
-            { status: 502, headers }
-          );
-        }
-
-        // Wait before retry
-        if (attempt < maxAttempts) {
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      } catch (fetchErr) {
-        lastError = String(fetchErr);
-        console.error(`[analyze-quote] Fetch error (attempt ${attempt}): ${lastError}`);
-        if (attempt < maxAttempts) {
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-    }
-
-    if (!claudeData) {
+    // Phase 95 — route through cost-discipline helper. The previous
+    // configuration was the single biggest cost vampire in the entire
+    // app: opus-4-6 (premium reasoning model, ~$15/$75 per M tokens)
+    // at 16K max_tokens. For document-parsing work (extracting line
+    // items from a quote), haiku is plenty. Switching defaults gives
+    // ~25× cost reduction per call. Sonnet stays in the fallback
+    // ladder for resilience.
+    //
+    // Also dropped the hand-rolled retry loop — the helper handles
+    // model fallback on 429/529/5xx. max_tokens 4096 still leaves
+    // ~3K tokens of slack for line-item-heavy quotes.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabaseClient = supabaseUrl && serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey)
+      : null;
+    const aiResult = await callClaudeWithDiscipline({
+      supabase: supabaseClient,
+      apiKey: anthropicApiKey,
+      tag: "analyze_quote",
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: messages as Array<{ role: "user" | "assistant"; content: unknown }>,
+    });
+    if (!aiResult) {
       return new Response(
-        JSON.stringify({ error: "AI analysis failed after retries", detail: lastError.substring(0, 300) }),
+        JSON.stringify({ error: "AI analysis failed", detail: "Disabled by kill-switch, daily budget exhausted, or all model fallbacks failed." }),
         { status: 502, headers }
       );
     }
-
-    const aiText =
-      (claudeData as any)?.content?.[0]?.text ?? '{"error": "No response from AI"}';
-    const stopReason = (claudeData as any)?.stop_reason ?? "unknown";
+    const aiText = aiResult.text || '{"error": "No response from AI"}';
+    const stopReason = "end_turn"; // legacy logging — helper doesn't surface this
 
     console.log(`[analyze-quote] Claude response: ${aiText.length} chars, stop_reason=${stopReason}`);
 

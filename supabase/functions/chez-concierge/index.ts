@@ -31,6 +31,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1725,32 +1726,18 @@ Voice rules:
 
 Return ONLY the recommendation copy. No preamble, no quotes, no markdown.`;
 
-  try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 200,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.warn("[suggest_vendor_framing] Claude error:", resp.status, text.slice(0, 300));
-      return json({ framing: "" });
-    }
-    const data = await resp.json() as { content?: Array<{ text?: string }> };
-    const framing = data.content?.[0]?.text?.trim() ?? "";
-    return json({ framing });
-  } catch (e) {
-    console.warn("[suggest_vendor_framing] exception:", e);
-    return json({ framing: "" });
-  }
+  // Phase 95 — route through the shared cost-discipline helper.
+  // Default model ladder is haiku-first; sonnet only on fallback.
+  // max_tokens 200 is plenty for a 2-3 sentence framing polish.
+  const result = await callClaudeWithDiscipline({
+    supabase: service,
+    apiKey,
+    tag: "suggest_vendor_framing",
+    max_tokens: 200,
+    messages: [{ role: "user", content: userPrompt }],
+    user_id: user.id,
+  });
+  return json({ framing: result?.text ?? "" });
 }
 
 // ============================================================================
@@ -1772,6 +1759,10 @@ Return ONLY the recommendation copy. No preamble, no quotes, no markdown.`;
 
 interface AnalyzeRequestPayload {
   request_id: string;
+  /// Phase 95 — when true, bypass the server-side cache and re-run
+  /// Claude even if a fresh result exists. Operator presses this via
+  /// the "↻ Re-run" button on the brief panel.
+  force?: boolean;
 }
 
 async function handleAnalyzeRequest(
@@ -1793,7 +1784,29 @@ async function handleAnalyzeRequest(
     .eq("id", requestId)
     .maybeSingle();
   if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
-  const request = requestRow as ConciergeRequestRow;
+  const request = requestRow as ConciergeRequestRow & {
+    analysis_cache?: Record<string, unknown> | null;
+    analysis_cache_at?: string | null;
+  };
+
+  // Phase 95 — server-side cache. Skip the entire downstream work
+  // (Claude call + dossier fetch + Places lookup) when:
+  //   - the operator didn't force a re-run
+  //   - a cached analysis exists
+  //   - no new homeowner messages have arrived since the cache was
+  //     written (so the situation hasn't changed)
+  // This is the biggest single cost reduction in the cockpit because
+  // the previous behavior fired Claude on every browser refresh.
+  if (!payload.force && request.analysis_cache && request.analysis_cache_at) {
+    const cacheTime = new Date(request.analysis_cache_at).getTime();
+    const lastMessageTime = request.last_message_at
+      ? new Date(request.last_message_at).getTime()
+      : 0;
+    if (lastMessageTime <= cacheTime) {
+      console.log(`[analyze] cache hit for ${requestId} (saved 1 Claude call)`);
+      return json(request.analysis_cache);
+    }
+  }
 
   // 2. Pull household dossier in parallel — we need property location +
   //    vendors + standing instructions for the AI prompt.
@@ -1862,35 +1875,27 @@ ${contractors.length === 0 ? "(none)" : contractors.map((c) => `- ${c.company_na
 
 Return ONLY the JSON. No preamble.`;
 
-    try {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json() as { content?: Array<{ text?: string }> };
-        const text = data.content?.[0]?.text?.trim() ?? "";
-        try {
-          // Claude sometimes wraps JSON in fences despite instructions.
-          const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-          analysis = { ...analysis, ...JSON.parse(cleaned) };
-        } catch (parseErr) {
-          console.warn("[analyze] JSON parse failed; raw:", text.slice(0, 400));
-        }
-      } else {
-        console.warn("[analyze] Claude error:", resp.status, await resp.text());
+    // Phase 95 — route through cost-discipline helper.
+    // - Default model is haiku-4-5 (sonnet ladder fallback only).
+    // - max_tokens dropped from 1500 → 800. The structured JSON output
+    //   averages ~600 tokens; 800 leaves slack without being wasteful.
+    const result = await callClaudeWithDiscipline({
+      supabase: service,
+      apiKey,
+      tag: "analyze_request",
+      max_tokens: 800,
+      messages: [{ role: "user", content: userPrompt }],
+      request_id: requestId,
+      household_id: request.household_id,
+      user_id: user.id,
+    });
+    if (result?.text) {
+      try {
+        const cleaned = result.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+        analysis = { ...analysis, ...JSON.parse(cleaned) };
+      } catch (parseErr) {
+        console.warn("[analyze] JSON parse failed; raw:", result.text.slice(0, 400));
       }
-    } catch (e) {
-      console.warn("[analyze] exception:", e);
     }
   }
 
@@ -1936,12 +1941,28 @@ Return ONLY the JSON. No preamble.`;
     }
   }
 
-  return json({
+  const responsePayload = {
     analysis,
     existing_vendors: existingMatches,
     places_candidates: placesCandidates,
     property_location: { city: property.city ?? "", state: property.state ?? "" },
-  });
+  };
+
+  // Phase 95 — stash in chez_requests so future opens skip Claude
+  // when no new messages have arrived. Fire-and-forget; cache write
+  // failure shouldn't block the response.
+  service
+    .from("chez_requests")
+    .update({
+      analysis_cache: responsePayload,
+      analysis_cache_at: new Date().toISOString(),
+    })
+    .eq("id", requestId)
+    .then(({ error }) => {
+      if (error) console.warn("[analyze] cache write failed:", error.message);
+    });
+
+  return json(responsePayload);
 }
 
 interface AnalysisResult {
@@ -2312,18 +2333,27 @@ async function handleAskAlfred(
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json({ answer: "Alfred is offline (no API key configured). Try again in a moment." });
 
-  const systemPrompt = `You are Alfred, the case-scoped AI co-pilot for Chez Concierge agents. You have full context on a homeowner case and answer the agent's questions directly. You're talking to a human operator (an experienced agent), not the homeowner.
+  // Phase 95 — Combine the static voice rules + case dossier into one
+  // cached system prompt. Cached blocks live in Anthropic's prompt
+  // cache for 5 minutes; subsequent turns within that window only
+  // re-bill the (small) user message + thread, not the (large) dossier.
+  // Cache-eligible content must be ≥1024 tokens; the dossier almost
+  // always clears that threshold once any household has data.
+  //
+  // The thread + question stay in the user message because they change
+  // every turn. The dossier stays stable across turns of the same case.
+  const systemPrompt = `You are Alfred, the case-scoped AI co-pilot for Chez Concierge agents. You answer the agent's questions directly. You're talking to a human operator, not the homeowner.
 
 Voice rules:
-- Concise, professional, no fluff. 1-3 sentences when the question is direct; up to 5-6 when the question needs reasoning.
+- Concise, professional, no fluff. 1-3 sentences when direct; up to 5-6 when reasoning is needed.
 - Reference SPECIFIC facts from the case context when they're relevant (year of home, vendor names, past cases, profile preferences). Don't invent.
-- If the agent asks about cost, vendor selection, or precedent, look at PAST CASES + EXISTING VENDORS first before generalizing.
-- Never give legal / regulatory advice — defer to "verify with a licensed pro" when the question touches code, permits, or insurance.
-- If the answer requires data you don't have, say so plainly + suggest where the agent could find it (the homeowner profile, the past-case archive, etc.).
+- For cost / vendor / precedent questions, check PAST CASES + EXISTING VENDORS first before generalizing.
+- Never give legal / regulatory advice — defer to "verify with a licensed pro" for code, permits, insurance.
+- If the answer requires data you don't have, say so + point at where to find it.
 
-The agent's question is below. Return ONLY the answer text — no preamble, no markdown headers, no quotes.`;
+Return ONLY the answer text — no preamble, no markdown headers, no quotes.
 
-  const userPrompt = `# CASE CONTEXT
+# CASE CONTEXT (static across this conversation)
 
 ## Active request
 ID: ${request.id}
@@ -2347,42 +2377,33 @@ ${contractorsLines || "(none)"}
 ## Active routines (${routines.length})
 ${routinesLines || "(none)"}
 
-## Recent thread (most recent ${Math.min(messages.length, 12)} messages)
-${threadLines || "(no messages yet)"}
-
 ## Past Chez cases for this homeowner
-${pastRequestLines || "(none)"}
+${pastRequestLines || "(none)"}`;
+
+  // The thread + question go in the user message because they change
+  // turn-by-turn. Don't pollute the cached system block with these.
+  const userPrompt = `# Recent thread (most recent ${Math.min(messages.length, 12)} messages)
+${threadLines || "(no messages yet)"}
 
 # AGENT QUESTION
 ${question}`;
 
-  try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 600,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.warn("[ask_alfred] Claude error:", resp.status, text.slice(0, 300));
-      return json({ answer: "Alfred had trouble reaching the model. Try once more in a moment." });
-    }
-    const data = await resp.json() as { content?: Array<{ text?: string }> };
-    const answer = data.content?.[0]?.text?.trim() ?? "(empty response)";
-    return json({ answer });
-  } catch (e) {
-    console.warn("[ask_alfred] exception:", e);
-    return json({ answer: "I couldn't reach the model. The case context is loaded; try once more." });
+  const result = await callClaudeWithDiscipline({
+    supabase: service,
+    apiKey,
+    tag: "ask_alfred",
+    max_tokens: 400,           // dropped from 600. answers are 1-6 sentences.
+    system: systemPrompt,
+    cache_system: true,        // 5-min ephemeral cache. ~90% input savings on multi-turn.
+    messages: [{ role: "user", content: userPrompt }],
+    request_id: request.id,
+    household_id: request.household_id,
+    user_id: user.id,
+  });
+  if (!result?.text) {
+    return json({ answer: "Alfred is unavailable right now. Try again in a moment." });
   }
+  return json({ answer: result.text });
 }
 
 // ============================================================================

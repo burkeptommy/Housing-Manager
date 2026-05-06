@@ -6,6 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 // CORS headers for all responses
 const corsHeaders = {
@@ -153,65 +154,36 @@ serve(async (req: Request) => {
     // Call Claude API
     console.log("Calling Claude API for chat with model claude-sonnet-4-6...");
 
-    let claudeResponse: Response;
-    try {
-      claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicApiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 2048,
-          system: finalSystemPrompt,
-          messages,
-        }),
-        signal: AbortSignal.timeout(60000),
-      });
-    } catch (fetchError) {
-      const isTimeout = fetchError.name === "TimeoutError" || fetchError.name === "AbortError";
-      console.error("Fetch to Claude API failed:", fetchError.name, fetchError.message);
+    // Phase 95 — route through cost-discipline helper. Alfred is the
+    // most likely repeat-fire offender in the iOS app (multi-turn chat
+    // re-sends the full household context every turn). Switching to
+    // haiku-4-5 default + cache_system: true (5-min ephemeral cache
+    // for the dossier injection) cuts per-turn input cost ~90% in
+    // multi-turn conversations.
+    //
+    // max_tokens dropped from 2048 → 1024. Most Alfred answers are
+    // 1-3 short paragraphs; 1024 is plenty.
+    const aiResult = await callClaudeWithDiscipline({
+      supabase,
+      apiKey: anthropicApiKey,
+      tag: "chat",
+      max_tokens: 1024,
+      system: finalSystemPrompt,
+      cache_system: true,
+      messages,
+      household_id: body.household_id,
+      user_id: userId ?? null,
+    });
+    if (!aiResult) {
       return new Response(
         JSON.stringify({
-          error: isTimeout ? "AI response timed out. Please try again." : "Failed to reach AI service",
-          detail: fetchError.message,
+          error: "AI chat unavailable",
+          detail: "Disabled by kill-switch, daily budget exhausted, or all model fallbacks failed.",
         }),
-        { status: isTimeout ? 504 : 502, headers: responseHeaders }
-      );
-    }
-
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      console.error(`Claude API returned ${claudeResponse.status}: ${errorText}`);
-
-      let errorDetail = "AI chat failed";
-      switch (claudeResponse.status) {
-        case 401:
-          errorDetail = "AI service authentication failed. Check ANTHROPIC_API_KEY.";
-          break;
-        case 429:
-          errorDetail = "Too many requests. Please wait a moment and try again.";
-          break;
-        case 529:
-          errorDetail = "AI service temporarily overloaded. Please try again in a few minutes.";
-          break;
-        default:
-          try {
-            const parsed = JSON.parse(errorText);
-            if (parsed.error?.message) errorDetail = parsed.error.message;
-          } catch {}
-      }
-
-      return new Response(
-        JSON.stringify({ error: errorDetail, claude_status: claudeResponse.status }),
         { status: 502, headers: responseHeaders }
       );
     }
-
-    const claudeData = await claudeResponse.json();
-    const reply = claudeData.content?.[0]?.text ?? "I apologize, but I wasn't able to generate a response. Please try again.";
+    const reply = aiResult.text || "I apologize, but I wasn't able to generate a response. Please try again.";
 
     // Persist both messages to chat_messages table (encrypted at rest if key provided)
     const now = new Date().toISOString();

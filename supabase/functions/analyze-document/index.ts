@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
+import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -170,13 +171,16 @@ serve(async (req: Request) => {
     }
 
     // --- CALL CLAUDE WITH RETRY ---
+    // Phase 95 — analyze-document fires on EVERY document upload + every
+    // forwarded email attachment. It was the most likely contributor to
+    // the May 6 onboarding spike. Switched from sonnet-4-6 (16K → 4096
+    // → 2048 max_tokens) to haiku-4-5 default. Document classification
+    // + extraction is well within haiku's wheelhouse; sonnet stays in
+    // the fallback ladder for reliability.
     console.log("[analyze] Calling Claude API...");
     const t0 = Date.now();
 
-    const claudeRequestBody = JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system: `You are a document analysis assistant for a home management and estate planning app. Return ONLY valid JSON with these fields:
+    const aqSystemPrompt = `You are a document analysis assistant for a home management and estate planning app. Return ONLY valid JSON with these fields:
 {
   "summary": "2-3 sentence summary",
   "category_suggestion": "one of: ${VALID_CATEGORIES.join(", ")}",
@@ -246,58 +250,33 @@ CLASSIFICATION RULES (follow strictly):
 - Any document NOT directly relevant to home management, estate planning, insurance, financial records, property, or personal identification → "Other Personal Documents" with an info flag.
 
 If analyzing an image, also include "extracted_text" with all readable text.
-Return ONLY JSON. No markdown. No explanation.`,
+Return ONLY JSON. No markdown. No explanation.`;
+
+    // Phase 95 — route through cost-discipline helper. analyze-document
+    // fires on every document upload AND every email-forwarded
+    // attachment, so it's a high-frequency call. Switching from
+    // sonnet-4-6 (4096 max_tokens) to haiku-4-5 (2048 max_tokens) cuts
+    // per-call cost ~5×. The helper handles fallback to sonnet on 429.
+    const aiResult = await callClaudeWithDiscipline({
+      supabase,
+      apiKey: anthropicApiKey,
+      tag: "analyze_document",
+      max_tokens: 2048,
+      system: aqSystemPrompt,
       messages: [{ role: "user", content: messages_content }],
+      household_id,
     });
-
-    let claudeData: Record<string, unknown> | null = null;
-    let lastClaudeError = "";
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": anthropicApiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: claudeRequestBody,
-        });
-
-        console.log(`[analyze] Claude responded in ${Date.now() - t0}ms with status ${claudeRes.status} (attempt ${attempt})`);
-
-        if (claudeRes.ok) {
-          claudeData = await claudeRes.json();
-          break;
-        }
-
-        const errText = await claudeRes.text();
-        lastClaudeError = `${claudeRes.status}: ${errText.substring(0, 300)}`;
-        console.error(`[analyze] Claude error (attempt ${attempt}): ${lastClaudeError}`);
-
-        // Don't retry on 4xx client errors
-        if (claudeRes.status >= 400 && claudeRes.status < 500) break;
-
-        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
-      } catch (fetchErr) {
-        lastClaudeError = String(fetchErr);
-        console.error(`[analyze] Fetch error (attempt ${attempt}): ${lastClaudeError}`);
-        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
-      }
-    }
-
-    if (!claudeData) {
+    if (!aiResult) {
       return new Response(
         JSON.stringify({
           error: `Claude API error`,
-          detail: lastClaudeError.substring(0, 200),
+          detail: "Disabled by kill-switch, daily budget exhausted, or all model fallbacks failed.",
         }),
         { status: 502, headers }
       );
     }
-
-    const rawText = (claudeData as any).content?.[0]?.text ?? "";
+    console.log(`[analyze] Claude responded in ${Date.now() - t0}ms via ${aiResult.model_used}`);
+    const rawText = aiResult.text ?? "";
 
     // --- PARSE RESPONSE ---
     let analysis: Record<string, unknown>;
