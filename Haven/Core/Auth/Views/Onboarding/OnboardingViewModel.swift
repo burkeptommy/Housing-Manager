@@ -891,11 +891,25 @@ final class OnboardingViewModel: ObservableObject {
                 ]
             )
         }
-        // Q18 trash days
+        // Q18 trash days. The foundational form uses numeric day IDs
+        // (1=Sun … 7=Sat to match Apple's `Calendar.weekday` 1-indexing
+        // from Sunday). The quiz uses string IDs ("sun"…"sat") and
+        // hydrates from `selectedIds`. Without the conversion, the
+        // foundational answer round-trips through `house_quiz_state` but
+        // the quiz never reads it (caught driving the simulator on
+        // 2026-05-05: Wednesday picked in foundational form, day buttons
+        // all rendered un-selected at q18_trash). Map numeric → string
+        // here so the quiz hydration sees a `selectedIds` that matches its
+        // own ID space.
         if !answers.trashPickupDays.isEmpty {
+            let dayIds: [String: String] = [
+                "1": "sun", "2": "mon", "3": "tue", "4": "wed",
+                "5": "thu", "6": "fri", "7": "sat"
+            ]
+            let stringDayIds = answers.trashPickupDays.compactMap { dayIds[String($0)] }
             existingAnswers["q18_trash"] = HouseQuizAnswer(
                 answerId: "captured",
-                payload: ["days": answers.trashPickupDays.map(String.init).joined(separator: ",")]
+                selectedIds: stringDayIds
             )
         }
 

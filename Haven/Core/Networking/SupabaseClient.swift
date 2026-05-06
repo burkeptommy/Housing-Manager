@@ -612,6 +612,24 @@ enum HavenSupabase {
         let handymanNotes: String?
         let homeownerVisibleNotes: String?
         let photos: [String]?
+
+        // See RequestHomeAssessmentRequest. Edge function reads snake_case
+        // (`body.assessment_id`, `body.system_id`, `body.recommended_owner`,
+        // etc.). Without these, urgency-tagged recommendations from the
+        // handyman during a visit fail with the server's "<field> required"
+        // errors. Caught by the Phase 95 audit on 2026-05-05.
+        enum CodingKeys: String, CodingKey {
+            case action, zone, title, description, category, urgency, photos
+            case assessmentId = "assessment_id"
+            case systemId = "system_id"
+            case recommendedOwner = "recommended_owner"
+            case recommendedTemplateKey = "recommended_template_key"
+            case observationSource = "observation_source"
+            case needsVerification = "needs_verification"
+            case estimatedCostCents = "estimated_cost_cents"
+            case handymanNotes = "handyman_notes"
+            case homeownerVisibleNotes = "homeowner_visible_notes"
+        }
     }
 
     static func addAssessmentRecommendedTask(
@@ -663,6 +681,16 @@ enum HavenSupabase {
         let disputed: Bool?
         let urgency: String?
         let estimatedCostCents: Int?
+
+        // See RequestHomeAssessmentRequest. Edge function reads snake_case.
+        enum CodingKeys: String, CodingKey {
+            case action, disputed, urgency
+            case taskId = "task_id"
+            case homeownerResponse = "homeowner_response"
+            case homeownerHandledScheduledFor = "homeowner_handled_scheduled_for"
+            case homeownerHandledVendor = "homeowner_handled_vendor"
+            case estimatedCostCents = "estimated_cost_cents"
+        }
     }
 
     static func updateAssessmentRecommendedTask(
@@ -692,6 +720,13 @@ enum HavenSupabase {
         let action = "mark_task_fixed_during_visit"
         let taskId: String
         let costCents: Int
+
+        // See RequestHomeAssessmentRequest. Edge function reads snake_case.
+        enum CodingKeys: String, CodingKey {
+            case action
+            case taskId = "task_id"
+            case costCents = "cost_cents"
+        }
     }
 
     static func markAssessmentTaskFixedDuringVisit(taskId: String, costCents: Int = 0) async throws -> Data {
@@ -704,6 +739,12 @@ enum HavenSupabase {
         let action = "decommission_system"
         let systemId: String
         let reason: String?
+
+        // See RequestHomeAssessmentRequest. Edge function reads snake_case.
+        enum CodingKeys: String, CodingKey {
+            case action, reason
+            case systemId = "system_id"
+        }
     }
 
     static func decommissionHomeSystem(systemId: String, reason: String? = nil) async throws -> Data {

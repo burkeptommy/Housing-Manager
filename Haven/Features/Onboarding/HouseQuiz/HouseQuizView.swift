@@ -1796,10 +1796,26 @@ struct HouseQuizView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Continue
+            // Continue. Validates BOTH the service kind and (when the kind
+            // is municipal/private) at least one pickup day. Pre-2026-05-05
+            // the button was enabled the moment a service kind was set, so
+            // a user could advance without a pickup day — and the
+            // dashboard's pickup-day banner had nothing to surface. The
+            // "not_sure" service kind doesn't gate on days because the
+            // homeowner can't tell us what they don't know.
             QuizContinueButton(
                 title: "Continue",
-                disabledReason: progressiveTrashService == nil ? "Pick how trash is handled." : nil,
+                disabledReason: {
+                    if progressiveTrashService == nil {
+                        return "Pick how trash is handled."
+                    }
+                    let requiresDays = progressiveTrashService == "municipal"
+                        || progressiveTrashService == "private"
+                    if requiresDays && progressiveTrashDays.isEmpty {
+                        return "Pick at least one pickup day."
+                    }
+                    return nil
+                }(),
                 action: {
                     commitTrashWithDays()
                 }
@@ -5470,7 +5486,29 @@ struct HouseQuizView: View {
         case .trashWithDays:
             progressiveTrashService = prior.answerId
             if let ids = prior.selectedIds {
+                // New format (post-2026-05-05 fix): string day IDs already
+                // mapped ("sun"…"sat"), straight from the quiz or from the
+                // foundational write path which now does the numeric→string
+                // mapping at write time.
                 progressiveTrashDays = Set(ids)
+            } else if let payloadDays = prior.payload?["days"] {
+                // Backward-compat: pre-2026-05-05 foundational answers persisted
+                // numeric day IDs ("1"…"7") in `payload["days"]` instead of the
+                // quiz's string IDs in `selectedIds`. Map them here so a user
+                // who completed the foundational form before the fix landed
+                // still sees their pickup day pre-filled when they reach
+                // q18_trash. Can be deleted once we're confident no
+                // pre-fix-shipped saved-state rows remain in production.
+                let dayIds: [String: String] = [
+                    "1": "sun", "2": "mon", "3": "tue", "4": "wed",
+                    "5": "thu", "6": "fri", "7": "sat"
+                ]
+                let stringDayIds = payloadDays
+                    .split(separator: ",")
+                    .compactMap { dayIds[String($0).trimmingCharacters(in: .whitespacesAndNewlines)] }
+                if !stringDayIds.isEmpty {
+                    progressiveTrashDays = Set(stringDayIds)
+                }
             }
             if let custom = prior.customText {
                 progressiveTrashHaulerName = custom
