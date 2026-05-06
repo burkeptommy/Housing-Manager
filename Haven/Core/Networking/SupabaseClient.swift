@@ -507,6 +507,25 @@ enum HavenSupabase {
         // homeowner's range. Server stores them on `home_assessments`.
         let preferredWindowStart: String?
         let preferredTimeOfDay: String?
+
+        // Phase 95 follow-up: the edge function (handyman-provider) parses
+        // the request body as snake_case. The default `JSONEncoder()` we
+        // use in `callEdgeFunction` has no `keyEncodingStrategy`, so we
+        // need explicit CodingKeys to land on the wire as snake_case.
+        // Without these, requests fail with
+        // "property_id + household_id required" on the server. Caught by
+        // the E2E onboarding test on 2026-05-05.
+        enum CodingKeys: String, CodingKey {
+            case action
+            case propertyId = "property_id"
+            case householdId = "household_id"
+            case homeownerConcerns = "homeowner_concerns"
+            case homeownerPresent = "homeowner_present"
+            case homeownerAccessNotes = "homeowner_access_notes"
+            case isExistingUserSupplement = "is_existing_user_supplement"
+            case preferredWindowStart = "preferred_window_start"
+            case preferredTimeOfDay = "preferred_time_of_day"
+        }
     }
 
     static func requestHomeAssessment(
@@ -537,6 +556,13 @@ enum HavenSupabase {
         let action = "cancel_assessment"
         let assessmentId: String
         let reason: String?
+
+        // See RequestHomeAssessmentRequest for the snake_case-on-the-wire
+        // rationale. The edge function reads `body.assessment_id`.
+        enum CodingKeys: String, CodingKey {
+            case action, reason
+            case assessmentId = "assessment_id"
+        }
     }
 
     static func cancelHomeAssessment(assessmentId: String, reason: String? = nil) async throws -> Data {
@@ -553,6 +579,13 @@ enum HavenSupabase {
         let action = "reschedule_assessment"
         let assessmentId: String
         let notes: String?
+
+        // See RequestHomeAssessmentRequest. Edge function reads
+        // `body.assessment_id`.
+        enum CodingKeys: String, CodingKey {
+            case action, notes
+            case assessmentId = "assessment_id"
+        }
     }
 
     static func rescheduleHomeAssessment(assessmentId: String, notes: String? = nil) async throws -> Data {
