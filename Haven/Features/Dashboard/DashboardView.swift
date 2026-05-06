@@ -82,91 +82,222 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ScrollView {
-                VStack(spacing: HavenTheme.spacing16) {
-                    // Phase 56.2: the 32pt in-content "Chez" title was
-                    // removed so the hero/greeting sit higher in the
-                    // viewport. Brand identity lives in the nav bar's
-                    // principal toolbar item below.
+            // Phase 95.3 (CI fix): the modifier chain that used to live
+            // here (~35 chained modifiers — toolbar, sheets, navigation
+            // destination, lifecycle, dialogs) is split across multiple
+            // `<V: View>(to content: V) -> some View` methods so each
+            // is an independently-type-checkable opaque-return unit.
+            // Without this, the macos-15 runner times out walking the
+            // chain at body line 83. See extract_dashboard_modifiers.py.
+            applyAssessmentModifiers(
+                to: applyDialogsAndLifecycle(
+                    to: applyVendorContextSheets(
+                        to: applyPrimarySheets(to: scrollViewBase)
+                    )
+                )
+            )
+        }
+    }
 
-                    if viewModel.isLoading && !hasAppeared {
-                        SkeletonScorecard()
-                        SkeletonCard(lineCount: 2)
-                        SkeletonCard(lineCount: 3)
-                    } else {
-                        dashboardContent
-                    }
+    /// Phase 95.3 — extracted from body so the modifier chain can be
+    /// composed via `apply*` methods without bloating body's expression.
+    @ViewBuilder
+    private var scrollViewBase: some View {
+        ScrollView {
+            VStack(spacing: HavenTheme.spacing16) {
+                // Phase 56.2: the 32pt in-content "Chez" title was
+                // removed so the hero/greeting sit higher in the
+                // viewport. Brand identity lives in the nav bar's
+                // principal toolbar item below.
+
+                if viewModel.isLoading && !hasAppeared {
+                    SkeletonScorecard()
+                    SkeletonCard(lineCount: 2)
+                    SkeletonCard(lineCount: 3)
+                } else {
+                    dashboardContent
                 }
-                .padding(.horizontal, HavenTheme.pageMargin)
-                .padding(.top, HavenTheme.spacing4)
-                .padding(.bottom, 100)
             }
-            .background(HavenColors.background)
-            .navigationTitle("Chez")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    // Phase 56.2: small brand wordmark in the nav bar
-                    // replaces the 32pt in-content title. Serif, navy,
-                    // never competing with the hero for vertical space.
-                    Text("Chez")
-                        .font(HavenTypography.fraunces(size: 18, weight: 700))
-                        .foregroundStyle(HavenColors.textPrimary)
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Haptics.light()
-                        Analytics.track(.dashboardSecurityTapped)
-                        navigationPath.append("security")
-                    } label: {
-                        Image(systemName: "lock.shield.fill")
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .padding(.top, HavenTheme.spacing4)
+            .padding(.bottom, 100)
+        }
+        .background(HavenColors.background)
+        .navigationTitle("Chez")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { dashboardToolbar }
+    }
+
+    /// Phase 95.3 — toolbar content moved out of the body's modifier
+    /// chain and into a `@ToolbarContentBuilder` property.
+    @ToolbarContentBuilder
+    private var dashboardToolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            // Phase 56.2: small brand wordmark in the nav bar
+            // replaces the 32pt in-content title. Serif, navy,
+            // never competing with the hero for vertical space.
+            Text("Chez")
+                .font(HavenTypography.fraunces(size: 18, weight: 700))
+                .foregroundStyle(HavenColors.textPrimary)
+        }
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                Haptics.light()
+                Analytics.track(.dashboardSecurityTapped)
+                navigationPath.append("security")
+            } label: {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+            .accessibilityLabel("Security")
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 12) {
+                // (Quick-add "+" menu removed — Upload Document was a
+                // duplicate entry point, View Tasks is reachable from
+                // the Needs Your Attention list and the Maintenance
+                // tab. Trailing toolbar collapses to Inbox + Settings.)
+
+                NavigationLink(value: "inbox") {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "tray.fill")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(HavenColors.textPrimary)
-                    }
-                    .accessibilityLabel("Security")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        // (Quick-add "+" menu removed — Upload Document was a
-                        // duplicate entry point, View Tasks is reachable from
-                        // the Needs Your Attention list and the Maintenance
-                        // tab. Trailing toolbar collapses to Inbox + Settings.)
 
-                        NavigationLink(value: "inbox") {
-                            ZStack(alignment: .topTrailing) {
-                                Image(systemName: "tray.fill")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(HavenColors.textPrimary)
-
-                                let pendingCount = viewModel.inboxItems.filter { $0.isPending }.count
-                                if pendingCount > 0 {
-                                    Text("\(pendingCount)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 16, height: 16)
-                                        .background(HavenColors.warning)
-                                        .clipShape(Circle())
-                                        .offset(x: 6, y: -6)
-                                }
-                            }
+                        let pendingCount = viewModel.inboxItems.filter { $0.isPending }.count
+                        if pendingCount > 0 {
+                            Text("\(pendingCount)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 16, height: 16)
+                                .background(HavenColors.warning)
+                                .clipShape(Circle())
+                                .offset(x: 6, y: -6)
                         }
-                        .accessibilityLabel("Inbox")
-                        .accessibilityHint("View forwarded emails")
-
-                        Button {
-                            Haptics.light()
-                            Analytics.track(.settingsViewed)
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(HavenColors.textPrimary)
-                        }
-                        .accessibilityLabel("Settings")
-                        .accessibilityHint("Open app settings")
                     }
                 }
+                .accessibilityLabel("Inbox")
+                .accessibilityHint("View forwarded emails")
+
+                Button {
+                    Haptics.light()
+                    Analytics.track(.settingsViewed)
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+                .accessibilityLabel("Settings")
+                .accessibilityHint("Open app settings")
             }
+        }
+    }
+
+    /// Phase 95.3 — navigation destination's switch lifted out of
+    /// the body's modifier chain into its own method so it is
+    /// independently type-checked.
+    @ViewBuilder
+    private func dashboardDestinationView(for destination: String) -> some View {
+        if destination == "inbox" {
+            InboxView()
+        } else if destination == "security" {
+            SecurityDashboardView()
+        } else if destination == "chez_ownership" {
+            // Phase 84 — homeowner-facing primary surface for
+            // picking what Chez handles. Reachable from the
+            // Dashboard hero card AND from Settings.
+            ChezOwnershipView()
+        } else if destination == "chez_activity" {
+            // Phase 85 — full chronological list of Chez actions
+            // for the household. Reached from the Dashboard's
+            // "This week with Chez" card.
+            if let householdId = viewModel.primaryHouseholdId {
+                ChezActivityView(householdId: householdId)
+            }
+        } else if destination == "maintenance" {
+            // Phase 66: Default Maintenance tab lands on the new
+            // 5-section hub (Your Services / Handyman / Vehicles /
+            // This Season / Upcoming Scheduled). The older
+            // MaintenanceScheduleView is the Timeline push
+            // destination accessed via "See full year ↗" inside
+            // the hub.
+            MaintenanceHubView()
+        } else if destination == "maintenance_calendar" {
+            // Phase 54A: "View full schedule" on the dashboard
+            // lands users in the Calendar layout of the canonical
+            // maintenance view — no more parallel ScheduleCalendarView.
+            // Phase 66: kept as the Timeline push destination.
+            MaintenanceScheduleView(initialLayout: .calendar)
+        } else if destination == "recommended_services" {
+            // Phase 54C.3: Dashboard "Discover more" link.
+            if let property = viewModel.properties.first {
+                RecommendedServicesView(
+                    householdId: property.householdId,
+                    propertyId: property.id
+                )
+            }
+        } else if destination == "routines" {
+            // Phase 55.3: Pickup day banner tap / edit opens
+            // the unified routines list. Replaces the
+            // Phase 54D.3 "household_cadences" destination.
+            if let householdId = viewModel.primaryHouseholdId {
+                RoutinesListView(
+                    householdId: householdId,
+                    propertyId: viewModel.properties.first?.id
+                )
+            }
+        } else if destination == "email_forwarding" {
+            ProjectEmailView()
+        } else if destination == "vehicles" {
+            if let firstVehicle = viewModel.vehicles.first {
+                VehicleDetailView(vehicleID: firstVehicle.id)
+            } else {
+                PropertyListView()
+            }
+        } else if destination.hasPrefix("inbox_item_"),
+                  let itemId = UUID(uuidString: String(destination.dropFirst("inbox_item_".count))),
+                  let item = viewModel.inboxItems.first(where: { $0.id == itemId }) {
+            InboxItemDetailView(
+                item: item,
+                properties: viewModel.properties,
+                onProcess: { propertyId, action, category, vehicleId in
+                    Task {
+                        await viewModel.processInboxItem(item, propertyId: propertyId, action: action, category: category)
+                    }
+                },
+                onDismiss: {
+                    viewModel.dismissInboxItem(item)
+                },
+                onDelete: {
+                    viewModel.inboxItems.removeAll { $0.id == item.id }
+                    Haptics.success()
+                    Task {
+                        try? await DatabaseService.shared.deleteInboxItem(id: item.id)
+                    }
+                }
+            )
+        } else if destination == "activity_log" {
+            ActivityLogView(
+                events: viewModel.allActivityEvents,
+                onTap: { event in
+                    handleActivityTap(event)
+                }
+            )
+        } else if destination.hasPrefix("expecting_"),
+                  let memberId = UUID(uuidString: String(destination.dropFirst("expecting_".count))),
+                  let member = viewModel.expectingMembers.first(where: { $0.id == memberId }) {
+            NewArrivalChecklistView(member: member, documents: viewModel.allDocuments)
+        } else {
+            EmptyView()
+        }
+    }
+
+    /// Phase 95.3 — primary sheets (settings, legacy tasks, upload, add vendor, add property, task detail) + the navigation-destination dispatcher.
+    @ViewBuilder
+    private func applyPrimarySheets<V: View>(to content: V) -> some View {
+        content
             .sheet(isPresented: $showSettings) {
                 NavigationStack {
                     SettingsView()
@@ -204,99 +335,14 @@ struct DashboardView: View {
                 .presentationDetents([.medium, .large])
             }
             .navigationDestination(for: String.self) { destination in
-                if destination == "inbox" {
-                    InboxView()
-                } else if destination == "security" {
-                    SecurityDashboardView()
-                } else if destination == "chez_ownership" {
-                    // Phase 84 — homeowner-facing primary surface for
-                    // picking what Chez handles. Reachable from the
-                    // Dashboard hero card AND from Settings.
-                    ChezOwnershipView()
-                } else if destination == "chez_activity" {
-                    // Phase 85 — full chronological list of Chez actions
-                    // for the household. Reached from the Dashboard's
-                    // "This week with Chez" card.
-                    if let householdId = viewModel.primaryHouseholdId {
-                        ChezActivityView(householdId: householdId)
-                    }
-                } else if destination == "maintenance" {
-                    // Phase 66: Default Maintenance tab lands on the new
-                    // 5-section hub (Your Services / Handyman / Vehicles /
-                    // This Season / Upcoming Scheduled). The older
-                    // MaintenanceScheduleView is the Timeline push
-                    // destination accessed via "See full year ↗" inside
-                    // the hub.
-                    MaintenanceHubView()
-                } else if destination == "maintenance_calendar" {
-                    // Phase 54A: "View full schedule" on the dashboard
-                    // lands users in the Calendar layout of the canonical
-                    // maintenance view — no more parallel ScheduleCalendarView.
-                    // Phase 66: kept as the Timeline push destination.
-                    MaintenanceScheduleView(initialLayout: .calendar)
-                } else if destination == "recommended_services" {
-                    // Phase 54C.3: Dashboard "Discover more" link.
-                    if let property = viewModel.properties.first {
-                        RecommendedServicesView(
-                            householdId: property.householdId,
-                            propertyId: property.id
-                        )
-                    }
-                } else if destination == "routines" {
-                    // Phase 55.3: Pickup day banner tap / edit opens
-                    // the unified routines list. Replaces the
-                    // Phase 54D.3 "household_cadences" destination.
-                    if let householdId = viewModel.primaryHouseholdId {
-                        RoutinesListView(
-                            householdId: householdId,
-                            propertyId: viewModel.properties.first?.id
-                        )
-                    }
-                } else if destination == "email_forwarding" {
-                    ProjectEmailView()
-                } else if destination == "vehicles" {
-                    if let firstVehicle = viewModel.vehicles.first {
-                        VehicleDetailView(vehicleID: firstVehicle.id)
-                    } else {
-                        PropertyListView()
-                    }
-                } else if destination.hasPrefix("inbox_item_"),
-                          let itemId = UUID(uuidString: String(destination.dropFirst("inbox_item_".count))),
-                          let item = viewModel.inboxItems.first(where: { $0.id == itemId }) {
-                    InboxItemDetailView(
-                        item: item,
-                        properties: viewModel.properties,
-                        onProcess: { propertyId, action, category, vehicleId in
-                            Task {
-                                await viewModel.processInboxItem(item, propertyId: propertyId, action: action, category: category)
-                            }
-                        },
-                        onDismiss: {
-                            viewModel.dismissInboxItem(item)
-                        },
-                        onDelete: {
-                            viewModel.inboxItems.removeAll { $0.id == item.id }
-                            Haptics.success()
-                            Task {
-                                try? await DatabaseService.shared.deleteInboxItem(id: item.id)
-                            }
-                        }
-                    )
-                } else if destination == "activity_log" {
-                    ActivityLogView(
-                        events: viewModel.allActivityEvents,
-                        onTap: { event in
-                            handleActivityTap(event)
-                        }
-                    )
-                } else if destination.hasPrefix("expecting_"),
-                          let memberId = UUID(uuidString: String(destination.dropFirst("expecting_".count))),
-                          let member = viewModel.expectingMembers.first(where: { $0.id == memberId }) {
-                    NewArrivalChecklistView(member: member, documents: viewModel.allDocuments)
-                } else {
-                    EmptyView()
-                }
+                dashboardDestinationView(for: destination)
             }
+    }
+
+    /// Phase 95.3 — vendor / project / quiz related sheets and full-screen covers.
+    @ViewBuilder
+    private func applyVendorContextSheets<V: View>(to content: V) -> some View {
+        content
             .sheet(isPresented: $showVendorCoverage) {
                 vendorCoverageSheetContent
             }
@@ -408,6 +454,12 @@ struct DashboardView: View {
             .sheet(isPresented: $showPersonalQuiz) {
                 PersonalQuizView()
             }
+    }
+
+    /// Phase 95.3 — skip-quiz dialog + screen tracking + lifecycle (refreshable, task, onReceive×5) + delegation sheet.
+    @ViewBuilder
+    private func applyDialogsAndLifecycle<V: View>(to content: V) -> some View {
+        content
             .confirmationDialog("Skip the House Quiz?", isPresented: $showQuizSkipDialog, titleVisibility: .visible) {
                 Button("Skip for now") {
                     // Just dismisses the card for this session — re-shows next launch.
@@ -535,6 +587,12 @@ struct DashboardView: View {
                 .presentationDetents([.large])
             }
             // Phase 84.5 — Home assessment dashboard sheets/dialogs
+    }
+
+    /// Phase 95.3 — assessment cancel dialog + 6 assessment sheets + 2 onReceive + merge-resolution full-screen cover.
+    @ViewBuilder
+    private func applyAssessmentModifiers<V: View>(to content: V) -> some View {
+        content
             .confirmationDialog(
                 "Switch to managing it yourself?",
                 isPresented: $confirmAssessmentCancel,
@@ -668,8 +726,8 @@ struct DashboardView: View {
                     }
                 }
             }
-        }
     }
+
 
     // MARK: - Greeting
 
