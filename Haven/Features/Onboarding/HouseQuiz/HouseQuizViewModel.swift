@@ -285,13 +285,23 @@ final class HouseQuizViewModel: ObservableObject {
         // here rather than synthesizing a `PropertyLookupResult` since
         // the struct now has a custom `init(from:)` that suppresses the
         // memberwise initializer.
-        if let value = property.currentEstimatedValue, value > 0 {
+        //
+        // Phase 95.1 fix: re-fetch the property here because
+        // `currentEstimatedValue` is written by the property-lookup edge
+        // function asynchronously after the onboarding initial property
+        // insert. The `property` snapshot held by the view model is taken
+        // at quiz-init time and may pre-date the ATTOM write — leaving
+        // currentEstimatedValue nil and the cinematic reveal showing $0
+        // for the entire HNW audience the reveal exists to delight.
+        // Caught by overnight E2E test (Tests/e2e UI Wave 1 Subagent 5).
+        let freshProperty = (try? await db.fetchProperty(id: property.id)) ?? property
+        if let value = freshProperty.currentEstimatedValue, value > 0 {
             totals.projectedValueProtected = value * 0.12
-        } else if let salePrice = property.purchasePrice, salePrice > 0 {
+        } else if let salePrice = freshProperty.purchasePrice, salePrice > 0 {
             // Fallback: project the last sale price forward at ~5%
             // appreciation/year when the canonical AVM is missing.
             // Matches the ladder in `computeValueProtection(from:)`.
-            let yearsHeld = Self.yearsSince(property.purchaseDate) ?? 0
+            let yearsHeld = Self.yearsSince(freshProperty.purchaseDate) ?? 0
             let projected = salePrice * pow(1.05, Double(yearsHeld))
             totals.projectedValueProtected = projected * 0.12
         }

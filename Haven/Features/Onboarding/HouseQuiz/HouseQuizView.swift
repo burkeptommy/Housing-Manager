@@ -4860,10 +4860,20 @@ struct HouseQuizView: View {
                 QuizCompletionSummary(
                     totals: viewModel.finaleTotals,
                     onContinue: {
-                        // Dismiss the quiz. Dashboard is the parent view
-                        // — ContentView routes there once onboarding is
-                        // complete and `pendingQuizProperty` is cleared
-                        // by MainTabView / AppState.
+                        // Phase 95.1 fix: tapping "Take me to my dashboard"
+                        // MUST flip walkthroughCompletedAt (and its back-compat
+                        // sibling completedAt) so the dashboard exits pre-quiz
+                        // mode. The previous version only called dismiss(),
+                        // which left state.completedAt = nil and the dashboard
+                        // stuck on "Continue Quiz 27 of 28 done" forever even
+                        // though the user reached the cinematic reveal. Caught
+                        // by overnight E2E test (Tests/e2e UI Wave 1 Subagent
+                        // 5). Fire-and-forget Task wrap is fine — markWalkthrough
+                        // Complete is idempotent and persistState catches its
+                        // own throws via the wrapper.
+                        Task {
+                            await viewModel.markWalkthroughComplete()
+                        }
                         dismiss()
                     }
                 )
