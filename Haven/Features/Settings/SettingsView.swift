@@ -362,6 +362,19 @@ struct SettingsView: View {
                 }
             }
         }
+        // 2026-05-06 Phase 95.1 fix: HavenApp sets the global SwiftUI tint to
+        // HavenColors.action (salmon) so primary CTAs render correctly without
+        // per-button styling. The side effect is that every Form/List `Label`
+        // here inherits the salmon tint on its inactive systemImage icon —
+        // ~13 row icons across Settings. CLAUDE.md hard rule: "Salmon should
+        // NEVER appear as decoration, body text, icon tint on inactive
+        // controls, or background washes." Override the tint locally to navy
+        // so list-row icons read as ink/structure rather than action. The
+        // primary CTA inside this List (Sign Out → red `.role(.destructive)`)
+        // is unaffected; the biometric Toggle has its own explicit `.tint`
+        // (line 193) for the same reason.
+        // Caught by overnight E2E design audit (Tests/e2e UI Wave 5 Subagent 17).
+        .tint(HavenColors.textPrimary)
         .scrollContentBackground(.hidden)
         .background(HavenColors.cream)
         .navigationTitle("Settings")
