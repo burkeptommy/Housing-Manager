@@ -6,6 +6,20 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## CI Fix: DashboardView type-checker timeout (2026-05-05)
+
+The `Admin Apply Validate` workflow had been failing on every push to `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` (latest run [25410326911](https://github.com/burkeptommy/Housing-Manager/actions/runs/25410326911), exit code 65). Root cause: `DashboardView.swift:83` triggered Swift's "the compiler is unable to type-check this expression in reasonable time" error. The dashboard's `body` was a single ~400-line expression with skeleton placeholders + ~30 conditional branches. Apple-silicon Xcode chewed through it; the macos-15 GitHub runner blew the type-checker's budget.
+
+**Fix:** extracted the body's `else` branch (the post-loading content) into a `@ViewBuilder private var dashboardContent: some View` computed property. The body is now a small `if isLoading { skeletons } else { dashboardContent }` gate, and the type-checker has two smaller expressions to chew on instead of one giant one.
+
+Mechanics in [scripts/extract_dashboard_content.py](scripts/extract_dashboard_content.py) — idempotent, bails if `dashboardContent` already exists. Verified locally with the same xcodebuild invocation CI uses: `xcodebuild -scheme Chez -destination "generic/platform=iOS Simulator" -configuration Debug build`. Diff is +409/-394 (extracted 394 lines, added a 410-line property with docstring + closing brace).
+
+Pattern for next time the runner trips this: SwiftUI bodies that exceed ~300 lines of `if`/`ForEach` branches inside a single `VStack` should be split into one or more `@ViewBuilder` properties. The runner's type-checker timeout is noticeably tighter than Apple silicon's.
+
+Side observations from the run logs (not failing today, worth tracking):
+- Node 20 deprecation warning on `actions/checkout@v4` + `actions/setup-node@v4` (forced to Node 24 from June 2nd, 2026 — bump action versions when a maintenance window opens).
+- `SUPABASE_SERVICE_ROLE_KEY` secret unset → "Post validation status to Supabase" step skips the post-back to flag `admin_codex_notes` rows. Workflow handles this gracefully via `exit 0` warning.
+
 ## Phase 83: Concierge Cockpit — 4-pane customer service desktop (2026-05-01)
 
 Tom asked us to turn the "Chez Requests" admin tab into a real customer-service cockpit per a fresh design handoff. The deliverable: not just UI — every button, click, and step has to be wired end-to-end.

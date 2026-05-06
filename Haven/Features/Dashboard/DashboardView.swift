@@ -94,400 +94,7 @@ struct DashboardView: View {
                         SkeletonCard(lineCount: 2)
                         SkeletonCard(lineCount: 3)
                     } else {
-                        // 0. Optional update banner (Phase 13). Session-only
-                        // dismissal so it reappears on next launch until the
-                        // user actually updates.
-                        if !appState.optionalUpdateDismissedThisSession,
-                           let latest = appState.optionalUpdateLatestVersion,
-                           let message = appState.optionalUpdateMessage {
-                            OptionalUpdateBanner(
-                                latestVersion: latest,
-                                message: message,
-                                appStoreURL: appState.forceUpdateAppStoreURL
-                                    ?? URL(string: "https://apps.apple.com/app/id6757167606")!,
-                                onDismiss: {
-                                    appState.optionalUpdateDismissedThisSession = true
-                                }
-                            )
-                        }
-
-                        // Phase 56.2: compact greeting — single line
-                        // + optional seasonal context tip. Replaces
-                        // the two-line "Good evening" / weekday-date
-                        // view. Saves ~32pt vertical.
-                        compactGreeting
-
-                        // Phase 95 (gap #56) — first-launch welcome
-                        // for users signed in as a home manager.
-                        // Renders only for staff member_types and
-                        // self-dismisses via @AppStorage keyed per
-                        // user, so the homeowner / spouse / family
-                        // members never see it.
-                        if viewModel.isHomeManagerUser, let userId = viewModel.signedInUserId {
-                            // Household-name source isn't published
-                            // on DashboardViewModel today; passing
-                            // nil falls back to a generic "Welcome
-                            // to Chez" headline. Wiring in the real
-                            // household label is future work.
-                            HomeManagerWelcomeCard(
-                                userId: userId,
-                                householdName: nil
-                            )
-                        }
-
-                        // Phase 84.5 — Assessment pending card (the
-                        // homeowner picked "Have Chez handle it" at
-                        // signup). Renders status-specific copy across
-                        // pending → scheduled → en_route → in_progress →
-                        // submitted → awaiting_review. Suppresses the
-                        // quiz prompt + Coverage Hero while active.
-                        if let assessment = viewModel.homeAssessment {
-                            HomeAssessmentPendingCard(
-                                assessment: assessment,
-                                handymanFirstName: nil,  // Wired post-dispatch from chez_pending_assessments_v
-                                handymanPhotoURL: nil,
-                                scheduledWindowText: nil,
-                                onReviewCaptured: {
-                                    NotificationCenter.default.post(
-                                        name: .openChezAssessmentReview,
-                                        object: nil,
-                                        userInfo: ["assessment_id": assessment.id.uuidString]
-                                    )
-                                },
-                                onReschedule: {
-                                    showAssessmentRescheduleSheet = true
-                                },
-                                onSwitchToDIY: {
-                                    confirmAssessmentCancel = true
-                                }
-                            )
-
-                            // Phase 84.5 — Pre-visit prep card (only
-                            // before the visit starts; hide once handyman
-                            // is en route or beyond).
-                            if assessment.status == .pending || assessment.status == .scheduled {
-                                HomeAssessmentPrepCard(
-                                    assessment: assessment,
-                                    onOpenNotes: { showAssessmentPrepNotesSheet = true },
-                                    onOpenPhotos: { showAssessmentPrepPhotosSheet = true },
-                                    onOpenPrepQuiz: { showAssessmentPrepQuizSheet = true }
-                                )
-                            }
-                        }
-
-                        // Phase 66: One-time "We reorganized your
-                        // maintenance" card for existing TestFlight
-                        // users. Dismisses permanently via @AppStorage.
-                        // Gated on hasCompletedAnyQuiz so fresh signups
-                        // (who land on the new hub from the start) don't
-                        // see a "we reorganized" message about a tab
-                        // they've never seen the old version of.
-                        if viewModel.hasCompletedAnyQuiz {
-                            MaintenanceReorganizedCard(
-                                onLearnMore: {
-                                    NotificationCenter.default.post(
-                                        name: .switchToTab,
-                                        object: nil,
-                                        userInfo: ["tab": 1]
-                                    )
-                                },
-                                onDismiss: {}
-                            )
-                        }
-
-                        // 2. Getting Started / Quiz hero — Day 0 focal point.
-                        // Phase 50 (sub-phase B first-login): only renders
-                        // when no property exists OR no property's quiz is
-                        // complete. Once any quiz finishes, this disappears
-                        // entirely and the YOUR HOME section below takes
-                        // over as the primary CTA.
-                        if viewModel.showGettingStarted {
-                            gettingStartedCard
-                        }
-
-                        // Phase 95 (audit gap #9) — re-book affordance
-                        // for the homeowner who cancelled their Chez
-                        // handyman visit OR originally chose the DIY
-                        // path and has changed their mind. Lives right
-                        // under the quiz hero so it's the natural
-                        // "actually, can someone else do this?" exit.
-                        // Hidden once an assessment is active (the
-                        // pending card above absorbs the slot).
-                        if viewModel.hasProperty
-                            && viewModel.homeAssessment == nil
-                            && !viewModel.hasCompletedAnyQuiz {
-                            ReBookChezHandymanCard {
-                                showRebookHandymanSheet = true
-                            }
-                        }
-
-                        // 2.5 Incomplete address banner
-                        if let property = viewModel.propertyNeedsAddress {
-                            incompleteAddressBanner(property)
-                        }
-
-                        // 2.6 Pending merge request banner
-                        if let merge = pendingMergeRequest {
-                            mergeRequestBanner(merge)
-                        }
-
-                        // Phase 84 — Chez ownership hero card. Surfaces
-                        // "what % of your house Chez is running" and
-                        // routes to the new What Chez Handles page where
-                        // the homeowner can flip group toggles or browse
-                        // their inventory of delegated entities.
-                        if viewModel.hasCompletedAnyQuiz {
-                            ChezOwnershipHeroCard(
-                                activeGroupCount: viewModel.chezActiveGroupCount,
-                                delegatedItemCount: viewModel.chezDelegatedItemCount,
-                                onTap: {
-                                    Haptics.light()
-                                    navigationPath.append("chez_ownership")
-                                },
-                                onHandOffEverything: {
-                                    // Phase 95 audit fix — direct shortcut
-                                    // into ChezOwnershipView with the
-                                    // "hand off everything" confirmation
-                                    // dialog already armed. UserInfo flag
-                                    // is read by ChezOwnershipView's
-                                    // .task to surface the modal.
-                                    NotificationCenter.default.post(
-                                        name: .triggerChezFullMode,
-                                        object: nil
-                                    )
-                                    navigationPath.append("chez_ownership")
-                                }
-                            )
-                        }
-
-                        // Phase 85 — Monthly summary card. Renders when
-                        // an unviewed summary exists (1st of each month
-                        // for the previous month, generated by the
-                        // chez-monthly-summary scheduled fn). Auto-
-                        // dismisses on tap (mark-viewed) or via the
-                        // explicit dismiss X.
-                        if let summary = viewModel.unviewedMonthlySummary {
-                            MonthlySummaryCard(
-                                summary: summary,
-                                onTap: {
-                                    Task { await viewModel.dismissMonthlySummary() }
-                                    navigationPath.append("chez_activity")
-                                },
-                                onDismiss: {
-                                    Task { await viewModel.dismissMonthlySummary() }
-                                }
-                            )
-                        }
-
-                        // Phase 85 — "This week with Chez" digest. Renders
-                        // only when there's been Chez activity in the
-                        // last 7 days; DIY-default users see nothing.
-                        if viewModel.chezActivityWeeklyTally.hasAnything {
-                            ChezActivityCard(
-                                tally: viewModel.chezActivityWeeklyTally,
-                                recentItems: viewModel.recentChezActivity
-                            ) {
-                                Haptics.light()
-                                navigationPath.append("chez_activity")
-                            }
-                        }
-
-                        if viewModel.hasCompletedAnyQuiz {
-                            HomeCoverageHero(
-                                propertyName: viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId })?.name
-                                    ?? viewModel.properties.first?.name,
-                                coveredCount: viewModel.coveredCoverageItems.count,
-                                totalCount: viewModel.coveredCoverageItems.count + viewModel.uncoveredCoverageItems.count,
-                                activeVendorCount: viewModel.activeVendorCount,
-                                nextVisit: viewModel.nextScheduledService,
-                                uncoveredSystemNames: viewModel.uncoveredCoverageItems.map(\.systemName),
-                                onTap: {
-                                    Haptics.light()
-                                    navigationPath.append("maintenance")
-                                },
-                                onFindVendor: {
-                                    Haptics.medium()
-                                    showVendorCoverage = true
-                                }
-                            )
-                        }
-
-                        // Phase 67 (G1): seasonal "Time to book your handyman"
-                        // reminder. Computed from the singleton handyman_recurring
-                        // routine + pending punch items + ±14 days of the
-                        // April / October anchor. Placed above Up Next so the
-                        // homeowner sees the seasonal nudge before they wade
-                        // into the task list.
-                        if viewModel.hasCompletedAnyQuiz,
-                           let reminder = viewModel.handymanSeasonalReminder {
-                            HandymanSeasonalReminderCard(reminder: reminder) {
-                                NotificationCenter.default.post(
-                                    name: .switchToTab, object: nil, userInfo: ["tab": 2]
-                                )
-                                NotificationCenter.default.post(
-                                    name: .handymanModeRequested, object: nil
-                                )
-                            }
-                            .padding(.horizontal, HavenTheme.spacing20)
-                        }
-
-                        if viewModel.hasCompletedAnyQuiz {
-                            thisWeekSection
-                        }
-
-                        if viewModel.hasCompletedAnyQuiz,
-                           (!viewModel.upcomingVendorVisits.isEmpty || viewModel.nextStandingVisit != nil) {
-                            upcomingScheduledSection
-                        }
-
-                        // Chez v1: HandymanSuggestionCard moved to Tasks → Handyman.
-                        // Punch list is the single source of truth there.
-
-                        if viewModel.hasCompletedAnyQuiz {
-                            QuickActionsRow(
-                                onAskAlfred: {
-                                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3])
-                                },
-                                onUploadDoc: {
-                                    showUploadDocument = true
-                                },
-                                onScenarioStudio: {
-                                    showScenarioStudio = true
-                                    Analytics.track(.scenarioStudioOpened, ["source": "dashboard_quick_action"])
-                                },
-                                onAddVendor: {
-                                    showDashboardAddVendor = true
-                                }
-                            )
-                        }
-
-                        // Phase 57: "What's New" card surfaces the new
-                        // HNW routines to existing users. Only renders for
-                        // properties created before the release cutoff and
-                        // stays dismissed once the user closes it. Opens
-                        // `UpdateHomeDetailsSheet` for opt-in review.
-                        if viewModel.hasCompletedAnyQuiz,
-                           let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
-                            WhatsNewPhase57Card(
-                                property: primaryProperty,
-                                onReviewComplete: {
-                                    Task { await viewModel.refresh() }
-                                }
-                            )
-                        }
-
-                        // Phase 61: Legacy task cleanup notification.
-                        // Renders only when the household has archived tasks
-                        // AND the user hasn't dismissed. Tapping opens the
-                        // LegacyTasksView sheet directly from the Dashboard.
-                        if viewModel.hasCompletedAnyQuiz {
-                            LegacyTasksNotificationCard(
-                                legacyCount: viewModel.legacyTaskCount,
-                                onViewDetails: { showLegacyTasks = true }
-                            )
-                        }
-
-                        // Chez v1: FindHandymanCard moved to Tasks → Handyman
-                        // hero ("Find a handyman" CTA). One canonical entry
-                        // point so users always know where the handyman lives.
-
-                        // 3.5 Cadence suggestion (inline, event-driven)
-                        if let suggestion = cadenceCoordinator.current {
-                            CadenceSuggestionCard(
-                                suggestion: suggestion,
-                                onAccept: {
-                                    Task {
-                                        let ok = await cadenceCoordinator.apply(suggestion)
-                                        if ok {
-                                            Haptics.success()
-                                            await viewModel.refresh()
-                                        } else {
-                                            Haptics.error()
-                                        }
-                                    }
-                                },
-                                onDismiss: {
-                                    cadenceCoordinator.dismiss()
-                                    Haptics.light()
-                                }
-                            )
-                        }
-
-                        // 3.4 Phase 54D.3: Pickup day banner (trash /
-                        // recycling / school dropoff). Renders only
-                        // inside the banner's own surfacing window
-                        // (after 6pm for tomorrow, before 10am for
-                        // today) so the dashboard stays quiet the
-                        // rest of the day.
-                        if viewModel.hasCompletedAnyQuiz,
-                           let householdId = viewModel.primaryHouseholdId {
-                            PickupDayBanner(
-                                householdId: householdId,
-                                onTap: {
-                                    navigationPath.append("routines")
-                                },
-                                onEdit: {
-                                    navigationPath.append("routines")
-                                }
-                            )
-                        }
-
-                        // 5. Recent Activity feed — Phase 56.2: feed
-                        // uses `dashboardActivityEvents`, which filters
-                        // onboarding "X added" noise after Day 7 so the
-                        // card stays useful beyond the setup week. The
-                        // full unfiltered list is still reachable via
-                        // "View all activity" → ActivityLogView.
-                        if viewModel.hasCompletedAnyQuiz && !viewModel.dashboardActivityEvents.isEmpty {
-                            RecentActivityFeed(
-                                events: Array(viewModel.dashboardActivityEvents.prefix(3)),
-                                totalEventCount: viewModel.allActivityEvents.count,
-                                onTap: { event in
-                                    handleActivityTap(event)
-                                },
-                                onViewAll: {
-                                    navigationPath.append("activity_log")
-                                }
-                            )
-                        }
-
-                        // Phase 56.2: "Discover more services for your
-                        // home" orphan link removed. Accessible from
-                        // Property → Maintenance → Recommended row and
-                        // from Contacts → Add or discover, so three
-                        // entry points remain without the dashboard
-                        // clutter.
-
-                        // Phase 80 — Chez Concierge entry. Subtle
-                        // "Need help with anything? Ask Chez" pill
-                        // anchored near the bottom of the dashboard.
-                        // Gated on `hasCompletedAnyQuiz` so first-day
-                        // users aren't pulled away from the quiz CTA;
-                        // post-quiz it's the universal escape hatch.
-                        if viewModel.hasCompletedAnyQuiz {
-                            ChezEntryButton(
-                                category: .general,
-                                label: "Need help? Ask Chez",
-                                caption: "Chez replies within 1 business day.",
-                                context: [:]
-                            )
-                            .padding(.top, HavenTheme.spacing4)
-                        }
-
-                        // ── Conditional sections ──
-
-                        // "Make it Yours" hero card for invitees
-                        if needsPersonalQuiz {
-                            makeItYoursHeroCard
-                        }
-
-                        // Expecting members
-                        ForEach(viewModel.expectingMembers) { member in
-                            NavigationLink(value: "expecting_\(member.id.uuidString)") {
-                                expectingCard(member: member)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        dashboardContent
                     }
                 }
                 .padding(.horizontal, HavenTheme.pageMargin)
@@ -1067,6 +674,414 @@ struct DashboardView: View {
     // MARK: - Greeting
 
     // MARK: - Inbox Section
+
+    /// Phase 95.1 — Admin Apply Validate fix.
+    ///
+    /// The dashboard body used to be a single ~400-line expression
+    /// (skeleton placeholders + ~30 conditional branches). Apple-silicon
+    /// Xcode could type-check it, but the macos-15 CI runner blew the
+    /// type-checker timeout ("unable to type-check this expression in
+    /// reasonable time" at DashboardView.swift:83). Splitting the post-
+    /// loading content into its own `@ViewBuilder` property halves the
+    /// type-checker's largest expression — body becomes a small
+    /// skeleton-vs-content gate; this property holds the actual feed.
+    @ViewBuilder
+    private var dashboardContent: some View {
+        // 0. Optional update banner (Phase 13). Session-only
+        // dismissal so it reappears on next launch until the
+        // user actually updates.
+        if !appState.optionalUpdateDismissedThisSession,
+           let latest = appState.optionalUpdateLatestVersion,
+           let message = appState.optionalUpdateMessage {
+            OptionalUpdateBanner(
+                latestVersion: latest,
+                message: message,
+                appStoreURL: appState.forceUpdateAppStoreURL
+                    ?? URL(string: "https://apps.apple.com/app/id6757167606")!,
+                onDismiss: {
+                    appState.optionalUpdateDismissedThisSession = true
+                }
+            )
+        }
+
+        // Phase 56.2: compact greeting — single line
+        // + optional seasonal context tip. Replaces
+        // the two-line "Good evening" / weekday-date
+        // view. Saves ~32pt vertical.
+        compactGreeting
+
+        // Phase 95 (gap #56) — first-launch welcome
+        // for users signed in as a home manager.
+        // Renders only for staff member_types and
+        // self-dismisses via @AppStorage keyed per
+        // user, so the homeowner / spouse / family
+        // members never see it.
+        if viewModel.isHomeManagerUser, let userId = viewModel.signedInUserId {
+            // Household-name source isn't published
+            // on DashboardViewModel today; passing
+            // nil falls back to a generic "Welcome
+            // to Chez" headline. Wiring in the real
+            // household label is future work.
+            HomeManagerWelcomeCard(
+                userId: userId,
+                householdName: nil
+            )
+        }
+
+        // Phase 84.5 — Assessment pending card (the
+        // homeowner picked "Have Chez handle it" at
+        // signup). Renders status-specific copy across
+        // pending → scheduled → en_route → in_progress →
+        // submitted → awaiting_review. Suppresses the
+        // quiz prompt + Coverage Hero while active.
+        if let assessment = viewModel.homeAssessment {
+            HomeAssessmentPendingCard(
+                assessment: assessment,
+                handymanFirstName: nil,  // Wired post-dispatch from chez_pending_assessments_v
+                handymanPhotoURL: nil,
+                scheduledWindowText: nil,
+                onReviewCaptured: {
+                    NotificationCenter.default.post(
+                        name: .openChezAssessmentReview,
+                        object: nil,
+                        userInfo: ["assessment_id": assessment.id.uuidString]
+                    )
+                },
+                onReschedule: {
+                    showAssessmentRescheduleSheet = true
+                },
+                onSwitchToDIY: {
+                    confirmAssessmentCancel = true
+                }
+            )
+
+            // Phase 84.5 — Pre-visit prep card (only
+            // before the visit starts; hide once handyman
+            // is en route or beyond).
+            if assessment.status == .pending || assessment.status == .scheduled {
+                HomeAssessmentPrepCard(
+                    assessment: assessment,
+                    onOpenNotes: { showAssessmentPrepNotesSheet = true },
+                    onOpenPhotos: { showAssessmentPrepPhotosSheet = true },
+                    onOpenPrepQuiz: { showAssessmentPrepQuizSheet = true }
+                )
+            }
+        }
+
+        // Phase 66: One-time "We reorganized your
+        // maintenance" card for existing TestFlight
+        // users. Dismisses permanently via @AppStorage.
+        // Gated on hasCompletedAnyQuiz so fresh signups
+        // (who land on the new hub from the start) don't
+        // see a "we reorganized" message about a tab
+        // they've never seen the old version of.
+        if viewModel.hasCompletedAnyQuiz {
+            MaintenanceReorganizedCard(
+                onLearnMore: {
+                    NotificationCenter.default.post(
+                        name: .switchToTab,
+                        object: nil,
+                        userInfo: ["tab": 1]
+                    )
+                },
+                onDismiss: {}
+            )
+        }
+
+        // 2. Getting Started / Quiz hero — Day 0 focal point.
+        // Phase 50 (sub-phase B first-login): only renders
+        // when no property exists OR no property's quiz is
+        // complete. Once any quiz finishes, this disappears
+        // entirely and the YOUR HOME section below takes
+        // over as the primary CTA.
+        if viewModel.showGettingStarted {
+            gettingStartedCard
+        }
+
+        // Phase 95 (audit gap #9) — re-book affordance
+        // for the homeowner who cancelled their Chez
+        // handyman visit OR originally chose the DIY
+        // path and has changed their mind. Lives right
+        // under the quiz hero so it's the natural
+        // "actually, can someone else do this?" exit.
+        // Hidden once an assessment is active (the
+        // pending card above absorbs the slot).
+        if viewModel.hasProperty
+            && viewModel.homeAssessment == nil
+            && !viewModel.hasCompletedAnyQuiz {
+            ReBookChezHandymanCard {
+                showRebookHandymanSheet = true
+            }
+        }
+
+        // 2.5 Incomplete address banner
+        if let property = viewModel.propertyNeedsAddress {
+            incompleteAddressBanner(property)
+        }
+
+        // 2.6 Pending merge request banner
+        if let merge = pendingMergeRequest {
+            mergeRequestBanner(merge)
+        }
+
+        // Phase 84 — Chez ownership hero card. Surfaces
+        // "what % of your house Chez is running" and
+        // routes to the new What Chez Handles page where
+        // the homeowner can flip group toggles or browse
+        // their inventory of delegated entities.
+        if viewModel.hasCompletedAnyQuiz {
+            ChezOwnershipHeroCard(
+                activeGroupCount: viewModel.chezActiveGroupCount,
+                delegatedItemCount: viewModel.chezDelegatedItemCount,
+                onTap: {
+                    Haptics.light()
+                    navigationPath.append("chez_ownership")
+                },
+                onHandOffEverything: {
+                    // Phase 95 audit fix — direct shortcut
+                    // into ChezOwnershipView with the
+                    // "hand off everything" confirmation
+                    // dialog already armed. UserInfo flag
+                    // is read by ChezOwnershipView's
+                    // .task to surface the modal.
+                    NotificationCenter.default.post(
+                        name: .triggerChezFullMode,
+                        object: nil
+                    )
+                    navigationPath.append("chez_ownership")
+                }
+            )
+        }
+
+        // Phase 85 — Monthly summary card. Renders when
+        // an unviewed summary exists (1st of each month
+        // for the previous month, generated by the
+        // chez-monthly-summary scheduled fn). Auto-
+        // dismisses on tap (mark-viewed) or via the
+        // explicit dismiss X.
+        if let summary = viewModel.unviewedMonthlySummary {
+            MonthlySummaryCard(
+                summary: summary,
+                onTap: {
+                    Task { await viewModel.dismissMonthlySummary() }
+                    navigationPath.append("chez_activity")
+                },
+                onDismiss: {
+                    Task { await viewModel.dismissMonthlySummary() }
+                }
+            )
+        }
+
+        // Phase 85 — "This week with Chez" digest. Renders
+        // only when there's been Chez activity in the
+        // last 7 days; DIY-default users see nothing.
+        if viewModel.chezActivityWeeklyTally.hasAnything {
+            ChezActivityCard(
+                tally: viewModel.chezActivityWeeklyTally,
+                recentItems: viewModel.recentChezActivity
+            ) {
+                Haptics.light()
+                navigationPath.append("chez_activity")
+            }
+        }
+
+        if viewModel.hasCompletedAnyQuiz {
+            HomeCoverageHero(
+                propertyName: viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId })?.name
+                    ?? viewModel.properties.first?.name,
+                coveredCount: viewModel.coveredCoverageItems.count,
+                totalCount: viewModel.coveredCoverageItems.count + viewModel.uncoveredCoverageItems.count,
+                activeVendorCount: viewModel.activeVendorCount,
+                nextVisit: viewModel.nextScheduledService,
+                uncoveredSystemNames: viewModel.uncoveredCoverageItems.map(\.systemName),
+                onTap: {
+                    Haptics.light()
+                    navigationPath.append("maintenance")
+                },
+                onFindVendor: {
+                    Haptics.medium()
+                    showVendorCoverage = true
+                }
+            )
+        }
+
+        // Phase 67 (G1): seasonal "Time to book your handyman"
+        // reminder. Computed from the singleton handyman_recurring
+        // routine + pending punch items + ±14 days of the
+        // April / October anchor. Placed above Up Next so the
+        // homeowner sees the seasonal nudge before they wade
+        // into the task list.
+        if viewModel.hasCompletedAnyQuiz,
+           let reminder = viewModel.handymanSeasonalReminder {
+            HandymanSeasonalReminderCard(reminder: reminder) {
+                NotificationCenter.default.post(
+                    name: .switchToTab, object: nil, userInfo: ["tab": 2]
+                )
+                NotificationCenter.default.post(
+                    name: .handymanModeRequested, object: nil
+                )
+            }
+            .padding(.horizontal, HavenTheme.spacing20)
+        }
+
+        if viewModel.hasCompletedAnyQuiz {
+            thisWeekSection
+        }
+
+        if viewModel.hasCompletedAnyQuiz,
+           (!viewModel.upcomingVendorVisits.isEmpty || viewModel.nextStandingVisit != nil) {
+            upcomingScheduledSection
+        }
+
+        // Chez v1: HandymanSuggestionCard moved to Tasks → Handyman.
+        // Punch list is the single source of truth there.
+
+        if viewModel.hasCompletedAnyQuiz {
+            QuickActionsRow(
+                onAskAlfred: {
+                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3])
+                },
+                onUploadDoc: {
+                    showUploadDocument = true
+                },
+                onScenarioStudio: {
+                    showScenarioStudio = true
+                    Analytics.track(.scenarioStudioOpened, ["source": "dashboard_quick_action"])
+                },
+                onAddVendor: {
+                    showDashboardAddVendor = true
+                }
+            )
+        }
+
+        // Phase 57: "What's New" card surfaces the new
+        // HNW routines to existing users. Only renders for
+        // properties created before the release cutoff and
+        // stays dismissed once the user closes it. Opens
+        // `UpdateHomeDetailsSheet` for opt-in review.
+        if viewModel.hasCompletedAnyQuiz,
+           let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
+            WhatsNewPhase57Card(
+                property: primaryProperty,
+                onReviewComplete: {
+                    Task { await viewModel.refresh() }
+                }
+            )
+        }
+
+        // Phase 61: Legacy task cleanup notification.
+        // Renders only when the household has archived tasks
+        // AND the user hasn't dismissed. Tapping opens the
+        // LegacyTasksView sheet directly from the Dashboard.
+        if viewModel.hasCompletedAnyQuiz {
+            LegacyTasksNotificationCard(
+                legacyCount: viewModel.legacyTaskCount,
+                onViewDetails: { showLegacyTasks = true }
+            )
+        }
+
+        // Chez v1: FindHandymanCard moved to Tasks → Handyman
+        // hero ("Find a handyman" CTA). One canonical entry
+        // point so users always know where the handyman lives.
+
+        // 3.5 Cadence suggestion (inline, event-driven)
+        if let suggestion = cadenceCoordinator.current {
+            CadenceSuggestionCard(
+                suggestion: suggestion,
+                onAccept: {
+                    Task {
+                        let ok = await cadenceCoordinator.apply(suggestion)
+                        if ok {
+                            Haptics.success()
+                            await viewModel.refresh()
+                        } else {
+                            Haptics.error()
+                        }
+                    }
+                },
+                onDismiss: {
+                    cadenceCoordinator.dismiss()
+                    Haptics.light()
+                }
+            )
+        }
+
+        // 3.4 Phase 54D.3: Pickup day banner (trash /
+        // recycling / school dropoff). Renders only
+        // inside the banner's own surfacing window
+        // (after 6pm for tomorrow, before 10am for
+        // today) so the dashboard stays quiet the
+        // rest of the day.
+        if viewModel.hasCompletedAnyQuiz,
+           let householdId = viewModel.primaryHouseholdId {
+            PickupDayBanner(
+                householdId: householdId,
+                onTap: {
+                    navigationPath.append("routines")
+                },
+                onEdit: {
+                    navigationPath.append("routines")
+                }
+            )
+        }
+
+        // 5. Recent Activity feed — Phase 56.2: feed
+        // uses `dashboardActivityEvents`, which filters
+        // onboarding "X added" noise after Day 7 so the
+        // card stays useful beyond the setup week. The
+        // full unfiltered list is still reachable via
+        // "View all activity" → ActivityLogView.
+        if viewModel.hasCompletedAnyQuiz && !viewModel.dashboardActivityEvents.isEmpty {
+            RecentActivityFeed(
+                events: Array(viewModel.dashboardActivityEvents.prefix(3)),
+                totalEventCount: viewModel.allActivityEvents.count,
+                onTap: { event in
+                    handleActivityTap(event)
+                },
+                onViewAll: {
+                    navigationPath.append("activity_log")
+                }
+            )
+        }
+
+        // Phase 56.2: "Discover more services for your
+        // home" orphan link removed. Accessible from
+        // Property → Maintenance → Recommended row and
+        // from Contacts → Add or discover, so three
+        // entry points remain without the dashboard
+        // clutter.
+
+        // Phase 80 — Chez Concierge entry. Subtle
+        // "Need help with anything? Ask Chez" pill
+        // anchored near the bottom of the dashboard.
+        // Gated on `hasCompletedAnyQuiz` so first-day
+        // users aren't pulled away from the quiz CTA;
+        // post-quiz it's the universal escape hatch.
+        if viewModel.hasCompletedAnyQuiz {
+            ChezEntryButton(
+                category: .general,
+                label: "Need help? Ask Chez",
+                caption: "Chez replies within 1 business day.",
+                context: [:]
+            )
+            .padding(.top, HavenTheme.spacing4)
+        }
+
+        // ── Conditional sections ──
+
+        // "Make it Yours" hero card for invitees
+        if needsPersonalQuiz {
+            makeItYoursHeroCard
+        }
+
+        // Expecting members
+        ForEach(viewModel.expectingMembers) { member in
+            NavigationLink(value: "expecting_\(member.id.uuidString)") {
+                expectingCard(member: member)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 
     private var vehicleAlertsCard: some View {
         NavigationLink(value: "vehicles") {
