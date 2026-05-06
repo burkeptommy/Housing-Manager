@@ -48,12 +48,18 @@ struct ChezEntryButton: View {
             .padding(.vertical, 12)
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Phase 95.1 fix: was a salmon-outlined card. ChezEntryButton
+            // shows up as a footer/secondary card on Dashboard, Inbox,
+            // and other surfaces — it's informational, not a primary
+            // CTA, so it should NOT use salmon decoration. Pure-white
+            // card with a subtle navy border matches the rest of the
+            // Haven card system.
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(HavenColors.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(HavenColors.action.opacity(0.35), lineWidth: 1)
+                            .strokeBorder(HavenColors.beige300, lineWidth: 1)
                     )
             )
         }

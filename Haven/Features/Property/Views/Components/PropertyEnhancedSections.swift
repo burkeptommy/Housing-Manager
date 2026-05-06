@@ -208,8 +208,13 @@ struct PropertySystemsCategoryTile: View {
                         )
 
                     if needsAttention {
+                        // Phase 95.1 fix: was HavenColors.action (salmon).
+                        // Salmon is reserved for primary CTAs, not
+                        // attention-indicator dots. Semantic warning
+                        // (amber) preserves the visual signal without
+                        // the rule violation.
                         Circle()
-                            .fill(HavenColors.action)
+                            .fill(HavenColors.warning)
                             .frame(width: 8, height: 8)
                             .offset(x: 8, y: -4)
                     }

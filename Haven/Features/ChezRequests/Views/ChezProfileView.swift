@@ -180,9 +180,18 @@ struct ChezProfileView: View {
             )
         }
         .padding(14)
+        // Phase 95.1 fix: was a salmon-tinted background covering ~40%
+        // of the screen on the Spending Authority section. The card is
+        // a settings/configuration block, not a CTA — pure-white card
+        // with subtle navy border matches every other section in the
+        // form.
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(HavenColors.action.opacity(0.06))
+                .fill(HavenColors.creamLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                )
         )
     }
 

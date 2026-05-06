@@ -3256,11 +3256,16 @@ struct PropertyDetailView: View {
     }
 
     private var propertyStatusHeroCard: some View {
+        // Phase 95.1 fix: was salmon accent + salmon tint when there were
+        // attention areas. Salmon is reserved for primary CTAs, not for
+        // status decoration on an informational hero card. Use semantic
+        // warning (amber) which preserves the "needs attention" signal
+        // without the rule violation.
         overviewCard(
             title: "Chez brief",
             icon: "house.fill",
-            accent: overviewAttentionAreaCount > 0 ? HavenColors.action : HavenColors.navy700,
-            tint: overviewAttentionAreaCount > 0 ? HavenColors.action.opacity(0.06) : HavenColors.surface,
+            accent: overviewAttentionAreaCount > 0 ? HavenColors.warning : HavenColors.navy700,
+            tint: overviewAttentionAreaCount > 0 ? HavenColors.warning.opacity(0.06) : HavenColors.surface,
             showsAccentRail: overviewAttentionAreaCount > 0
         ) {
             VStack(alignment: .leading, spacing: 10) {

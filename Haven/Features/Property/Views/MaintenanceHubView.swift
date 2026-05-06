@@ -217,15 +217,23 @@ extension MaintenanceSeasonPlan {
     }
 
     var readinessSubheadline: String {
+        // Phase 95.1 fix: relabel "items" → "tasks" to disambiguate from
+        // the Dashboard HomeCoverageHero metric which counts vendor
+        // coverage CATEGORIES (e.g. "5 of 14 systems covered"). Tapping
+        // the dashboard hero lands here and previously showed a wildly
+        // different number ("97 of 124 covered") with the same word
+        // "covered" — read as a contradiction. New copy uses "tasks
+        // scheduled / on track" so it's clearly a different unit.
+        // Caught by overnight E2E (W4S16 Dashboard usefulness review).
         guard totalItemCount > 0 else {
             return "Chez will surface work here as the season fills in."
         }
 
         if openActionCount == 0 {
-            return "\(coveredItemCount) of \(totalItemCount) items are covered and on track."
+            return "\(coveredItemCount) of \(totalItemCount) tasks scheduled and on track."
         }
 
-        return "\(coveredItemCount) of \(totalItemCount) items are covered. \(openActionCount) still need attention."
+        return "\(coveredItemCount) of \(totalItemCount) tasks scheduled. \(openActionCount) still need attention."
     }
 
     var earliestActionDate: String? {

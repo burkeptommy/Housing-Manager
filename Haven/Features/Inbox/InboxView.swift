@@ -231,6 +231,13 @@ struct InboxView: View {
                     .multilineTextAlignment(.center)
             }
 
+            // Phase 95.1 fix: primary CTA was navy-filled while the
+            // secondary "Ask Chez" card was salmon-tinted — inverted
+            // hierarchy. Per design system, primary CTAs are salmon
+            // (HavenColors.action) and secondary affordances are navy
+            // outlined or pure-white cards. ChezEntryButton's salmon
+            // border was also fixed in this same commit so the secondary
+            // surface no longer competes with this primary.
             NavigationLink {
                 ProjectEmailView()
             } label: {
@@ -239,10 +246,10 @@ struct InboxView: View {
                     Text("View Your Chez Email")
                 }
                 .font(HavenTypography.uiButton)
-                .foregroundStyle(.white)
+                .foregroundStyle(HavenColors.textOnAction)
                 .padding(.horizontal, HavenTheme.spacing16)
                 .padding(.vertical, HavenTheme.spacing12)
-                .background(HavenColors.navy)
+                .background(HavenColors.action)
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
             }
 

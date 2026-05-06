@@ -28,13 +28,19 @@ struct ChezOwnershipHeroCard: View {
         VStack(spacing: 12) {
             Button(action: onTap) {
                 HStack(spacing: 14) {
+                    // Phase 95.1 fix: this card is informational ("Chez
+                    // handles N things for you" + chevron to manage). The
+                    // primary CTA inside is the optional "Hand off
+                    // everything" button which keeps salmon. The card
+                    // itself, the icon, and the icon background should
+                    // read as ink/structure, not action.
                     ZStack {
                         Circle()
-                            .fill(HavenColors.action.opacity(0.14))
+                            .fill(HavenColors.navy800.opacity(0.10))
                             .frame(width: 44, height: 44)
                         Image(systemName: "person.fill.questionmark")
                             .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(HavenColors.action)
+                            .foregroundStyle(HavenColors.navy800)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(headline)
@@ -79,13 +85,16 @@ struct ChezOwnershipHeroCard: View {
                 .padding(.bottom, 12)
             }
         }
+        // Phase 95.1 fix: was salmon-tinted background + border. The
+        // card is informational, not a CTA, so it inherits the standard
+        // pure-white card surface with a subtle navy border.
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(HavenColors.action.opacity(0.06))
+                .fill(HavenColors.creamLight)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(HavenColors.action.opacity(0.18), lineWidth: 1)
+                .strokeBorder(HavenColors.beige300, lineWidth: 1)
         )
         .padding(.horizontal, HavenTheme.spacing20)
     }

@@ -24,19 +24,24 @@ struct SystemCoverageCard: View {
             HavenCard(padding: HavenTheme.spacing16) {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     HStack(spacing: HavenTheme.spacing12) {
+                        // Phase 95.1 fix: was HavenColors.action (salmon)
+                        // for in-progress state. CLAUDE.md: salmon is for
+                        // primary CTAs only, not decorative icon tint on
+                        // an inactive informational card. Navy reads as
+                        // structure / ink, which is what this is.
                         Image(systemName: summary.percentComplete == 100
                             ? "checkmark.circle.fill"
                             : "chart.bar.doc.horizontal.fill")
                             .font(.system(size: 22, weight: .semibold))
                             .foregroundStyle(summary.percentComplete == 100
                                 ? HavenColors.success
-                                : HavenColors.action)
+                                : HavenColors.navy800)
                             .frame(width: 44, height: 44)
                             .background(
                                 RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                                     .fill((summary.percentComplete == 100
                                         ? HavenColors.success
-                                        : HavenColors.action).opacity(0.12))
+                                        : HavenColors.navy800).opacity(0.10))
                             )
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -71,9 +76,12 @@ struct SystemCoverageCard: View {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(HavenColors.beige200)
+                // Phase 95.1 fix: was salmon LinearGradient. Navy fill is
+                // the right structural color for a progress bar that's
+                // showing data, not requesting action.
                 RoundedRectangle(cornerRadius: 6)
                     .fill(LinearGradient(
-                        colors: [HavenColors.action, HavenColors.action.opacity(0.7)],
+                        colors: [HavenColors.navy800, HavenColors.navy700],
                         startPoint: .leading,
                         endPoint: .trailing
                     ))
