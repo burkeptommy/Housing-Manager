@@ -250,6 +250,40 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **4.x Decline button visual hierarchy** [`ui_quality_finding`] FieldGhostButtonStyle uses dashed-border outline + secondary-text color — visually reads as DISABLED even though it's enabled. **Suggested fix:** swap to solid 1pt border + textPrimary (or HavenColors.danger.opacity(0.85) for destructive). **Severity:** minor. (Wave 4)
 
+### Section 11 + 12 + 13 + 14 — crew / settings / push / edges (Wave 5)
+
+#### Section 11 — Crew management (entire surface absent in iOS)
+
+- **11.1 / 11.2 / 11.3 / 11.6 / 11.7** [`gap_found`] Zero crew management UI in iOS. The dashboard model has `canManageCrew` Bool but no UI consumes it. Owner has no way to invite team / set roles / remove / reassign visits / chat with crew from iOS. **Suggested fix:** either build crew sheets OR make the desktop boundary explicit in Settings copy. **Estimated effort:** large. (Wave 5)
+
+- **11.4** [`verification`] PASSED — crew tech sees only their assigned visits + customers (server-side scoping works). FIELD TECHNICIAN pill replaces OWNER pill correctly.
+
+#### Section 12 — Profile + Settings (designed-out for iOS)
+
+- **12.1 / 12.2 / 12.3 / 12.4 / 12.5 / 12.7 / 12.8 / 12.10 / 12.12** [`gap_found`] Profile / certifications / service area / specialties / rates / vacation / branding / notifications / delete-account all absent. Settings sheet is workspace hero card + desktop link + sign out. **Suggested fix (lightweight, FIXED IN THIS WAVE):** reword hero subtitle to set expectations correctly: "Profile, rates, branding, team, and notifications all live in the desktop command center. Tap below to open it." (Wave 5)
+
+- **12.x Settings hero email crew-vs-owner bug** [`persistence_finding`] Pre-fix Settings hero displayed `workspace.primaryEmail` regardless of which user signed in. Crew tech opening Settings saw OWNER's email. **FIXED** in commit `<this commit>` — now uses `currentUser.email ?? workspace.primaryEmail`. **Severity (was):** major. (Wave 5)
+
+#### Section 13 — Push notifications (anemic handler)
+
+- **13.1-13.10** [`gap_found`] AppDelegate's `userNotificationCenter(_:didReceive:withCompletionHandler:)` is anemic — does only `NotificationCenter.default.post(name: .inboxItemUpdated)` with no `userInfo['type']` parsing, no deep-linking. APNs registration works (token persists to DB). Push payload routing is missing. **Suggested fix:** define a notification-type schema (visit_scheduled, message_received, quote_accepted) in send-push-notification edge function; switch on `userInfo['type']` in didReceive and post typed deep-link notifications. Mirror the homeowner app's `handyman_seasonal_reminder` handler pattern. **Estimated effort:** medium. (Wave 5)
+
+#### Section 14 — Edge cases
+
+- **14.1 / 14.4** [`gap_found`] Photo capture + identify-equipment fails leak photo bytes if network errors. No retry queue, no local persistence, no 'pending uploads' indicator. Confirms Wave 2c finding 5.56. **Suggested fix:** persist JPEG to FileManager documents on capture; queue upload task; retry on connectivity restored. **Estimated effort:** medium. (Wave 5)
+
+- **14.5** [`verification`] PASSED — N/A. Field app does not use CoreLocation.
+
+- **14.6** [`verification`] PASSED — UIImagePickerController gets OS-managed permission denial; falls back to .photoLibrary if .camera unavailable.
+
+- **14.7** [`verification`] PASSED — Allow path persists token; deny path skips registration cleanly. Deeper push-handler issue is 13.1-13.10.
+
+- **14.9** [`ui_quality_finding`] Dark mode hardcoded OFF via `HavenField-Info.plist` `UIUserInterfaceStyle=Light`. Per CLAUDE.md the homeowner app has full dark mode; the field app explicitly opts out. **Suggested fix:** either document the design decision in CLAUDE.md (e.g. "Field app stays light because outdoor screens are easier to read") OR remove the key + audit HavenColors usages for adaptive Color values. **Severity:** minor (intentional choice). (Wave 5)
+
+- **14.13 / 14.14 / C3** [`verification`] PASSED — long property names truncate with ellipsis in lists, multi-line wrap in detail, foreign chars + apostrophes + emoji + script tags all sanitize and render correctly.
+
+- **14.x B3 em-dash placeholder** [`ui_quality_finding`] `Text("Code: \(request.accessCode ?? "—")")` used em-dash as fallback. **FIXED** in commit `<this commit>` — now `"Not generated"`. **Severity:** minor. (Wave 5)
+
 ### Architectural — parallel tables (Wave 2c)
 
 - **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)

@@ -2254,10 +2254,16 @@ private struct HavenFieldHomeTab: View {
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showSettings) {
+            // Wave 5 finding: pre-fix this passed workspace.primaryEmail /
+            // primaryPhone — meaning a crew tech opening Settings saw the
+            // OWNER's email and phone displayed under their own name.
+            // Now uses the signed-in user's contact info, falling back to
+            // workspace contact only when the user info is missing.
             FieldWorkspaceSettingsSheet(
                 companyName: viewModel.dashboard?.workspace?.companyName ?? "Chez Field",
                 memberName: viewModel.dashboard?.currentUser?.fullName,
-                email: viewModel.dashboard?.workspace?.primaryEmail,
+                email: viewModel.dashboard?.currentUser?.email
+                    ?? viewModel.dashboard?.workspace?.primaryEmail,
                 phone: viewModel.dashboard?.workspace?.primaryPhone,
                 providerURL: viewModel.dashboard?.workspace?.providerURL
             ) {
@@ -4706,7 +4712,7 @@ private struct HavenFieldPairingRequestComposer: View {
                             : "The homeowner can use this code once they download Chez so the home and handyman relationship connect cleanly."
                     ) {
                         if let request = pairingRequest {
-                            Text("Code: \(request.accessCode ?? "—")")
+                            Text("Code: \(request.accessCode ?? "Not generated")")
                                 .font(HavenTypography.title2)
                                 .foregroundStyle(HavenColors.textOnAction)
                         } else {
@@ -5417,7 +5423,7 @@ private struct FieldWorkspaceSettingsSheet: View {
                     FieldBrandHeroCard(
                         kicker: "Settings",
                         title: companyName,
-                        subtitle: "Account, desktop command center, and owner actions stay here so the field flow stays focused."
+                        subtitle: "Profile, rates, branding, team, and notifications all live in the desktop command center. Tap below to open it."
                     ) {
                         VStack(alignment: .leading, spacing: 4) {
                             if let trimmedName = memberName?.nonEmpty {
