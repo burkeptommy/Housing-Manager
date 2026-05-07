@@ -5386,12 +5386,16 @@ private struct FieldScheduledVisitRow: View {
                     }
                     Spacer(minLength: 8)
                     if highlightNext {
+                        // Wave 7 final smoke caught this — same B1 violation
+                        // as the Visits-tab pill, but on the Overview-tab
+                        // 'Scheduled next' card (different render site).
+                        // Now navy-tinted to match.
                         Text("NEXT UP")
                             .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.action)
+                            .foregroundStyle(HavenColors.navy700)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
-                            .background(HavenColors.action50)
+                            .background(HavenColors.navy700.opacity(0.10))
                             .clipShape(Capsule())
                     }
                 }
