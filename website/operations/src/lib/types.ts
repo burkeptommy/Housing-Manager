@@ -406,6 +406,44 @@ export interface SavedQuoteItem {
   sortOrder: number;
 }
 
+// Wave Q (Section 8) — Provider invoices.
+export type InvoiceStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "paid"
+  | "partial"
+  | "overdue"
+  | "void";
+
+export interface Invoice {
+  id: string;
+  workspaceId: string;
+  contractorId: string | null;
+  householdId: string | null;
+  propertyId: string | null;
+  requestId: string | null;
+  sourceQuoteId: string | null;
+  invoiceNumber: string;
+  title: string;
+  status: InvoiceStatus;
+  statusLabel: string;
+  currency: string;
+  lineItems: QuoteLineItem[];
+  scopeNotes: string | null;
+  homeownerMessage: string | null;
+  subtotal: number;
+  taxTotal: number;
+  total: number;
+  amountPaid: number;
+  propertyName: string;
+  dueDate: string | null;
+  sentAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Dashboard {
   needsWorkspace: boolean;
   currentUser: CurrentUser;
@@ -420,4 +458,5 @@ export interface Dashboard {
   teamMembers: TeamMember[];
   quotes: Quote[];
   savedQuoteItems: SavedQuoteItem[];
+  invoices: Invoice[];
 }

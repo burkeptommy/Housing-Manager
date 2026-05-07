@@ -1829,6 +1829,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     sessionsResult,
     quotesResult,
     savedItemsResult,
+    invoicesResult,
   ] = await Promise.all([
     service
       .from("provider_workspace_members")
@@ -1870,6 +1871,13 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       .eq("workspace_id", workspaceId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false }),
+    // Wave Q (Section 8) — provider invoices.
+    service
+      .from("provider_invoices")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("updated_at", { ascending: false })
+      .limit(120),
   ]);
 
   if (teamMembersResult.error) throw teamMembersResult.error;
@@ -1878,6 +1886,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   if (sessionsResult.error) throw sessionsResult.error;
   if (quotesResult.error) throw quotesResult.error;
   if (savedItemsResult.error) throw savedItemsResult.error;
+  if (invoicesResult.error) throw invoicesResult.error;
 
   let teamMembers = (teamMembersResult.data ?? []) as Record<string, unknown>[];
   let assignments = (assignmentsResult.data ?? []) as Record<string, unknown>[];
@@ -1885,6 +1894,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   let sessions = (sessionsResult.data ?? []) as Record<string, unknown>[];
   let quotes = (quotesResult.data ?? []) as Record<string, unknown>[];
   const savedItems = (savedItemsResult.data ?? []) as Record<string, unknown>[];
+  let invoices = (invoicesResult.data ?? []) as Record<string, unknown>[];
   const myMemberId = compactString(membership.id);
 
   let visibleRequests = requests;
@@ -1905,6 +1915,10 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       const requestId = compactString(row.request_id);
       return requestId ? allowedRequestIds.has(requestId) : compactString(row.created_by_user_id) === userId;
     });
+    invoices = invoices.filter((row) => {
+      const requestId = compactString(row.request_id);
+      return requestId ? allowedRequestIds.has(requestId) : compactString(row.created_by_user_id) === userId;
+    });
     teamMembers = teamMembers.filter((row) => compactString(row.id) === myMemberId);
   }
 
@@ -1917,8 +1931,12 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   ];
   const propertyIds = [
     ...new Set(
-      [...visibleRequests.map((row) => compactString(row.property_id)), ...sessions.map((row) => compactString(row.property_id)), ...quotes.map((row) => compactString(row.property_id))]
-        .filter(Boolean),
+      [
+        ...visibleRequests.map((row) => compactString(row.property_id)),
+        ...sessions.map((row) => compactString(row.property_id)),
+        ...quotes.map((row) => compactString(row.property_id)),
+        ...invoices.map((row) => compactString(row.property_id)),
+      ].filter(Boolean),
     ),
   ];
 
@@ -2591,7 +2609,61 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       defaultUnitPrice: numberValue(item.default_unit_price || 0),
       sortOrder: numberValue(item.sort_order),
     })),
+    // Wave Q (Section 8) — provider invoices.
+    invoices: invoices.map((row) => {
+      const property = propertyById.get(compactString(row.property_id));
+      const lineItems = (Array.isArray(row.line_items) ? row.line_items : []).map(mapLineItemForClient);
+      const status = compactString(row.status) || "draft";
+      return {
+        id: compactString(row.id),
+        workspaceId: compactString(row.workspace_id),
+        contractorId: compactString(row.contractor_id) || null,
+        householdId: compactString(row.household_id) || null,
+        propertyId: compactString(row.property_id) || null,
+        requestId: compactString(row.request_id) || null,
+        sourceQuoteId: compactString(row.source_quote_id) || null,
+        invoiceNumber: compactString(row.invoice_number),
+        title: compactString(row.title) || "",
+        status,
+        statusLabel: invoiceStatusLabel(status),
+        currency: compactString(row.currency) || "USD",
+        lineItems,
+        scopeNotes: compactString(row.scope_notes) || null,
+        homeownerMessage: compactString(row.homeowner_message) || null,
+        subtotal: numberValue(row.subtotal),
+        taxTotal: numberValue(row.tax_total),
+        total: numberValue(row.total),
+        amountPaid: numberValue(row.amount_paid),
+        propertyName: compactString(property?.name) || "",
+        dueDate: compactString(row.due_date) || null,
+        sentAt: row.sent_at ?? null,
+        paidAt: row.paid_at ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }),
   };
+}
+
+function invoiceStatusLabel(status: string): string {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "sent":
+      return "Sent";
+    case "viewed":
+      return "Viewed";
+    case "paid":
+      return "Paid";
+    case "partial":
+      return "Partially paid";
+    case "overdue":
+      return "Overdue";
+    case "void":
+      return "Void";
+    default:
+      return status || "Draft";
+  }
 }
 
 /**
@@ -4377,6 +4449,421 @@ async function saveQuoteItem(
   const { data, error } = await mutation;
   if (error || !data) throw error ?? new Error("Failed to save quote item");
   return data;
+}
+
+// ─── Wave Q (Section 8) — Provider invoices ───
+//
+// `saveInvoice` upserts a draft invoice. When `body.send === true`,
+// flips status to "sent" and mirrors the invoice into the homeowner's
+// inbox + (optionally) the request thread, mirroring the quote-send
+// pattern.
+
+function generateInvoiceNumber(): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  // 6-char base36 suffix from a random uint32 — collision risk on a
+  // single workspace is negligible at the volumes we're targeting and
+  // the unique index protects us.
+  const rand = Math.floor(Math.random() * 0xffffff)
+    .toString(36)
+    .toUpperCase()
+    .padStart(6, "0");
+  return `INV-${year}${month}-${rand}`;
+}
+
+function invoiceSummary(lineItems: Array<Record<string, unknown>>) {
+  const subtotal = roundMoney(
+    lineItems.reduce((sum, item) => {
+      const quantity = numberValue(item.quantity || 1);
+      const unitPrice = numberValue(item.unit_price || item.unitPrice || 0);
+      return sum + quantity * unitPrice;
+    }, 0),
+  );
+  return {
+    subtotal,
+    taxTotal: 0,
+    total: subtotal,
+  };
+}
+
+function providerInvoiceMessageBody(
+  title: string,
+  total: number,
+  lineItemCount: number,
+  note?: string,
+) {
+  const summary = `${title} for ${moneyLabel(total)} across ${lineItemCount} line item${lineItemCount === 1 ? "" : "s"}.`;
+  const cleanNote = compactString(note);
+  return cleanNote ? `${summary} ${cleanNote}` : summary;
+}
+
+async function saveInvoice(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  // Reuse the canBuildQuotes permission for invoice authoring; same role
+  // gate (owner / admin) applies and we don't want to mint a new perm
+  // flag for v1.
+  assertPermission(membership, "canBuildQuotes");
+
+  const invoiceId = compactString(body.invoiceId);
+  const existing = invoiceId
+    ? await service
+        .from("provider_invoices")
+        .select("*")
+        .eq("id", invoiceId)
+        .eq("workspace_id", workspaceId)
+        .limit(1)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (existing.error) throw existing.error;
+
+  // Optional: prefill from a source quote when caller passes
+  // sourceQuoteId. We snapshot line items + scope notes + total so
+  // future quote edits don't retroactively mutate the invoice.
+  const sourceQuoteId = compactString(body.sourceQuoteId);
+  let sourceQuote: Record<string, unknown> | null = null;
+  if (sourceQuoteId && !existing.data) {
+    const { data: quoteRow, error: quoteError } = await service
+      .from("provider_quotes")
+      .select("*")
+      .eq("id", sourceQuoteId)
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .maybeSingle();
+    if (quoteError) throw quoteError;
+    sourceQuote = quoteRow as Record<string, unknown> | null;
+  }
+
+  const incomingLineItems = Array.isArray(body.lineItems)
+    ? (body.lineItems as Array<Record<string, unknown>>)
+    : null;
+  const fallbackLineItems = Array.isArray(existing.data?.line_items)
+    ? (existing.data!.line_items as Array<Record<string, unknown>>)
+    : Array.isArray(sourceQuote?.line_items)
+    ? (sourceQuote!.line_items as Array<Record<string, unknown>>)
+    : [];
+  const sourceLineItems = incomingLineItems ?? fallbackLineItems;
+  const lineItems = sourceLineItems
+    .map((item) => ({
+      id: compactString(item.id) || crypto.randomUUID(),
+      name: compactString(item.name),
+      description: compactString(item.description),
+      unit: compactString(item.unit) || "ea",
+      quantity: numberValue(item.quantity || 1),
+      unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+    }))
+    .filter((item) => item.name);
+
+  if (!workspaceId || lineItems.length === 0) {
+    throw new Error("Workspace and at least one line item are required");
+  }
+
+  const totals = invoiceSummary(lineItems);
+  const now = isoNow();
+  const sendNow = Boolean(body.send);
+
+  const householdId =
+    compactString(body.householdId) ||
+    compactString(existing.data?.household_id) ||
+    compactString(sourceQuote?.household_id) ||
+    null;
+  const propertyId =
+    compactString(body.propertyId) ||
+    compactString(existing.data?.property_id) ||
+    compactString(sourceQuote?.property_id) ||
+    null;
+  const requestId =
+    compactString(body.requestId) ||
+    compactString(existing.data?.request_id) ||
+    compactString(sourceQuote?.request_id) ||
+    null;
+  const visitTaskId =
+    compactString(body.visitTaskId) ||
+    compactString(existing.data?.visit_task_id) ||
+    compactString(sourceQuote?.visit_task_id) ||
+    null;
+  const contractorId =
+    compactString(body.contractorId) ||
+    compactString(existing.data?.contractor_id) ||
+    compactString(sourceQuote?.contractor_id) ||
+    null;
+  const title =
+    compactString(body.title) ||
+    compactString(existing.data?.title) ||
+    (sourceQuote ? `Invoice for ${compactString(sourceQuote.title)}` : "Invoice");
+  const scopeNotes =
+    compactString(body.scopeNotes) || compactString(existing.data?.scope_notes) || null;
+  const homeownerMessage =
+    compactString(body.homeownerMessage) ||
+    compactString(existing.data?.homeowner_message) ||
+    null;
+  const dueDate = compactString(body.dueDate) || compactString(existing.data?.due_date) || null;
+
+  const invoiceNumber = compactString(existing.data?.invoice_number) || generateInvoiceNumber();
+
+  const payload = {
+    workspace_id: workspaceId,
+    contractor_id: contractorId,
+    household_id: householdId,
+    property_id: propertyId,
+    request_id: requestId,
+    visit_task_id: visitTaskId,
+    source_quote_id:
+      sourceQuoteId || compactString(existing.data?.source_quote_id) || null,
+    invoice_number: invoiceNumber,
+    title,
+    status: existing.data?.status || "draft",
+    currency: "USD",
+    line_items: lineItems,
+    scope_notes: scopeNotes,
+    homeowner_message: homeownerMessage,
+    subtotal: totals.subtotal,
+    tax_total: totals.taxTotal,
+    total: totals.total,
+    amount_paid: numberValue(existing.data?.amount_paid || 0),
+    due_date: dueDate,
+    updated_at: now,
+  };
+
+  const mutation = existing.data
+    ? service
+        .from("provider_invoices")
+        .update(payload)
+        .eq("id", invoiceId)
+        .select()
+        .single()
+    : service
+        .from("provider_invoices")
+        .insert({
+          ...payload,
+          created_by_user_id: userId,
+        })
+        .select()
+        .single();
+
+  const { data: invoiceRow, error } = await mutation;
+  if (error || !invoiceRow) throw error ?? new Error("Failed to save invoice");
+
+  let invoice = invoiceRow as Record<string, unknown>;
+
+  if (sendNow) {
+    invoice = await deliverInvoice(service, {
+      invoice,
+      lineItems,
+      total: totals.total,
+      title,
+      homeownerMessage: homeownerMessage ?? "",
+      requestId,
+      householdId,
+      userId,
+      providerName:
+        compactString(membership.full_name) || compactString(user.email) || "Your contractor",
+      propertyId,
+    });
+  }
+
+  return { invoice };
+}
+
+async function deliverInvoice(
+  service: ServiceClient,
+  args: {
+    invoice: Record<string, unknown>;
+    lineItems: Array<Record<string, unknown>>;
+    total: number;
+    title: string;
+    homeownerMessage: string;
+    requestId: string | null;
+    householdId: string | null;
+    userId: string;
+    providerName: string;
+    propertyId: string | null;
+  },
+) {
+  const now = isoNow();
+  const invoiceId = compactString(args.invoice.id);
+
+  const { data: sentRow, error } = await service
+    .from("provider_invoices")
+    .update({
+      status: "sent",
+      sent_at: now,
+      updated_at: now,
+    })
+    .eq("id", invoiceId)
+    .select()
+    .single();
+  if (error || !sentRow) throw error ?? new Error("Failed to mark invoice sent");
+
+  const bodyText = providerInvoiceMessageBody(
+    args.title,
+    args.total,
+    args.lineItems.length,
+    args.homeownerMessage,
+  );
+
+  // Mirror the send into the request chat thread so the homeowner's
+  // iOS app surfaces an "Invoice received" entry on the request. Same
+  // pattern as quote-send.
+  if (args.requestId && args.householdId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId: args.requestId,
+      householdId: args.householdId,
+      senderRole: "vendor",
+      body: bodyText,
+      metadata: {
+        kind: "invoice_sent",
+        event: "invoice_sent",
+        invoice_id: invoiceId,
+        invoice_number: compactString(sentRow.invoice_number),
+        total: args.total,
+        line_item_count: args.lineItems.length,
+      },
+    });
+  }
+
+  // Universal inbox row so the invoice always lands in the homeowner's
+  // Needs-Action list, even on ad-hoc invoices not tied to a request.
+  if (args.householdId) {
+    let propertyName = "";
+    if (args.propertyId) {
+      const { data: property } = await service
+        .from("properties")
+        .select("name")
+        .eq("id", args.propertyId)
+        .limit(1)
+        .maybeSingle();
+      propertyName = compactString(property?.name);
+    }
+    try {
+      const summary = `${args.title} · ${moneyLabel(args.total)}`;
+      await service.from("inbox_items").insert({
+        household_id: args.householdId,
+        type: "invoice_received",
+        title: propertyName ? `Invoice for ${propertyName}` : "Invoice received",
+        summary,
+        from_email: args.providerName,
+        seen: false,
+      });
+    } catch (inboxErr) {
+      console.error("[handyman-provider] inbox_items insert failed for invoice", inboxErr);
+    }
+
+    // Push notification — same pattern as quote send.
+    await notifyHomeownersForRequest(service, args.householdId, {
+      title: "Invoice received",
+      body: `${moneyLabel(args.total)} from your contractor. Tap to review.`,
+      requestId: args.requestId || invoiceId,
+      eventType: "handyman_invoice_sent",
+      extra: { invoice_id: invoiceId },
+    });
+  }
+
+  return sentRow as Record<string, unknown>;
+}
+
+async function voidInvoice(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const invoiceId = compactString(body.invoiceId);
+  if (!workspaceId || !invoiceId) throw new Error("workspaceId and invoiceId are required");
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const now = isoNow();
+  const { data, error } = await service
+    .from("provider_invoices")
+    .update({
+      status: "void",
+      voided_at: now,
+      updated_at: now,
+    })
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId)
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to void invoice");
+
+  const requestId = compactString(data.request_id);
+  const householdId = compactString(data.household_id);
+  if (requestId && householdId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body: `Invoice ${compactString(data.invoice_number)} was voided.`,
+      metadata: {
+        kind: "invoice_voided",
+        event: "invoice_voided",
+        invoice_id: invoiceId,
+      },
+    });
+  }
+  return { invoice: data as Record<string, unknown> };
+}
+
+async function markInvoicePaid(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const invoiceId = compactString(body.invoiceId);
+  if (!workspaceId || !invoiceId) throw new Error("workspaceId and invoiceId are required");
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const now = isoNow();
+  const { data: existing } = await service
+    .from("provider_invoices")
+    .select("total")
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId)
+    .limit(1)
+    .maybeSingle();
+  const totalAmount = numberValue(existing?.total || 0);
+
+  const { data, error } = await service
+    .from("provider_invoices")
+    .update({
+      status: "paid",
+      paid_at: now,
+      amount_paid: totalAmount,
+      updated_at: now,
+    })
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId)
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to mark invoice paid");
+
+  const requestId = compactString(data.request_id);
+  const householdId = compactString(data.household_id);
+  if (requestId && householdId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body: `Invoice ${compactString(data.invoice_number)} marked paid.`,
+      metadata: {
+        kind: "invoice_paid",
+        event: "invoice_paid",
+        invoice_id: invoiceId,
+      },
+    });
+  }
+  return { invoice: data as Record<string, unknown> };
 }
 
 async function sendMessage(
@@ -6666,6 +7153,32 @@ serve(async (req) => {
 
       if (action === "send_quote") {
         const result = await saveQuote(service, user as unknown as Record<string, unknown>, body, true);
+        return json(result);
+      }
+
+      // Wave Q (Section 8) — provider invoices.
+      if (action === "save_invoice") {
+        const result = await saveInvoice(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+      if (action === "send_invoice") {
+        const result = await saveInvoice(
+          service,
+          user as unknown as Record<string, unknown>,
+          { ...body, send: true },
+        );
+        return json(result);
+      }
+      if (action === "void_invoice") {
+        const result = await voidInvoice(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+      if (action === "mark_invoice_paid") {
+        const result = await markInvoicePaid(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
         return json(result);
       }
 

@@ -12,10 +12,13 @@ import CrewScreen from "./screens/Crew";
 import HomesScreen from "./screens/Homes";
 import HomeDetailScreen from "./screens/HomeDetail";
 import QuotesScreen from "./screens/Quotes";
+import InvoicesScreen from "./screens/Invoices";
+import InvoiceDetailScreen from "./screens/InvoiceDetail";
 import MessagesScreen from "./screens/Messages";
 import SettingsScreen from "./screens/Settings";
 import { CommandPalette } from "./components/CommandPalette";
 import { NewQuoteModal, NewQuoteProvider, useNewQuoteModal } from "./components/NewQuoteModal";
+import { NewInvoiceModal, NewInvoiceProvider } from "./components/NewInvoiceModal";
 import { AddClientModal } from "./components/AddClientModal";
 import { InviteTeammateSheet } from "./components/InviteTeammateSheet";
 
@@ -23,12 +26,15 @@ export default function App() {
   return (
     <WorkspaceProvider>
       <NewQuoteProvider>
-        <MobileInterstitial />
-        <Shell />
-        <NewQuoteModal />
-        <AddClientModal />
-        <InviteTeammateSheet />
-        <CommandPalette />
+        <NewInvoiceProvider>
+          <MobileInterstitial />
+          <Shell />
+          <NewQuoteModal />
+          <NewInvoiceModal />
+          <AddClientModal />
+          <InviteTeammateSheet />
+          <CommandPalette />
+        </NewInvoiceProvider>
       </NewQuoteProvider>
     </WorkspaceProvider>
   );
@@ -78,6 +84,8 @@ function Shell() {
             <Route path="/homes" element={<HomesScreen />} />
             <Route path="/homes/:propertyId" element={<HomeDetailScreen />} />
             <Route path="/quotes" element={<QuotesScreen />} />
+            <Route path="/invoices" element={<InvoicesScreen />} />
+            <Route path="/invoices/:invoiceId" element={<InvoiceDetailScreen />} />
             <Route path="/messages" element={<MessagesScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />

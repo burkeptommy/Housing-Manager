@@ -46,6 +46,8 @@ const PATHS: Record<string, string> = {
   // Wave P: Settings screen + sidebar entry. 24x24 cog with center hole.
   // Stroke matches every other glyph at 1.8 with round caps/joins.
   gear: "M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM19.4 13.6a7.6 7.6 0 0 0 0-3.2l2-1.5-2-3.4-2.3.9a7.6 7.6 0 0 0-2.8-1.6l-.4-2.4h-3.8l-.4 2.4a7.6 7.6 0 0 0-2.8 1.6l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3.2l-2 1.5 2 3.4 2.3-.9a7.6 7.6 0 0 0 2.8 1.6l.4 2.4h3.8l.4-2.4a7.6 7.6 0 0 0 2.8-1.6l2.3.9 2-3.4z",
+  // Wave Q: Invoices nav entry. Receipt with line items.
+  receipt: "M5 3v18l3-2 3 2 3-2 3 2 3-2V3zM8 8h8M8 12h8M8 16h5",
 };
 
 interface IconProps {

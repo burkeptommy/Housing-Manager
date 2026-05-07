@@ -5,7 +5,7 @@ interface RouteMeta {
   title: string;
   eyebrow?: string;
   breadcrumb?: string;
-  primaryCta?: { label: string; action: "new-quote" | "add-client" | "navigate"; to?: string };
+  primaryCta?: { label: string; action: "new-quote" | "add-client" | "navigate" | "new-invoice"; to?: string };
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
@@ -41,6 +41,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
     breadcrumb: "Pipeline and quote builder",
     primaryCta: { label: "+ New quote", action: "new-quote" },
   },
+  "/invoices": {
+    title: "Invoices",
+    breadcrumb: "Billing pipeline and customer invoice history",
+    primaryCta: { label: "+ New invoice", action: "new-invoice" },
+  },
   "/messages": {
     title: "Messages",
     breadcrumb: "Homeowner conversations",
@@ -59,6 +64,7 @@ export function Topbar() {
     if (ROUTE_META[location.pathname]) return ROUTE_META[location.pathname];
     if (location.pathname.startsWith("/visits/")) return ROUTE_META["/visits"];
     if (location.pathname.startsWith("/homes/")) return ROUTE_META["/homes"];
+    if (location.pathname.startsWith("/invoices/")) return { title: "Invoice", breadcrumb: "Invoice detail" };
     return { title: "Operations" };
   })();
 
@@ -70,6 +76,8 @@ export function Topbar() {
     if (!meta.primaryCta) return;
     if (meta.primaryCta.action === "new-quote") {
       window.dispatchEvent(new CustomEvent("ops:open-new-quote"));
+    } else if (meta.primaryCta.action === "new-invoice") {
+      window.dispatchEvent(new CustomEvent("ops:open-new-invoice"));
     } else if (meta.primaryCta.action === "add-client") {
       window.dispatchEvent(new CustomEvent("ops:open-add-client"));
     } else if (meta.primaryCta.action === "navigate" && meta.primaryCta.to) {

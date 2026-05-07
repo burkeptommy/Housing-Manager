@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/crew", label: "Crew", icon: "crew", crewOnly: true },
   { to: "/homes", label: "Homes", icon: "home" },
   { to: "/quotes", label: "Quotes", icon: "quote" },
+  { to: "/invoices", label: "Invoices", icon: "receipt" },
   { to: "/messages", label: "Messages", icon: "message" },
   { to: "/settings", label: "Settings", icon: "gear", ownerOnly: true },
 ];

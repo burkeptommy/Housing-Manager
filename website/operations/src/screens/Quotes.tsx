@@ -7,6 +7,7 @@ import { useWorkspace } from "../lib/workspace-context";
 import { fetchQuoteComments, formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
 import type { QuoteComment } from "../lib/types";
 import { useNewQuoteModal } from "../components/NewQuoteModal";
+import { useNewInvoiceModal } from "../components/NewInvoiceModal";
 
 const STATUS_TONE: Record<string, PillTone> = {
   draft: "neutral",
@@ -22,6 +23,7 @@ const STATUS_TONE: Record<string, PillTone> = {
 export default function QuotesScreen() {
   const { dashboard, refresh } = useWorkspace();
   const newQuote = useNewQuoteModal();
+  const newInvoice = useNewInvoiceModal();
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [busy, setBusy] = useState<"send" | "delete" | null>(null);
   const [comments, setComments] = useState<QuoteComment[]>([]);
@@ -245,6 +247,14 @@ export default function QuotesScreen() {
               >
                 Edit quote
               </button>
+              {selected.status === "approved" && (
+                <button
+                  className="ops-button ops-button--ghost"
+                  onClick={() => newInvoice.open({ sourceQuoteId: selected.id })}
+                >
+                  Convert to invoice
+                </button>
+              )}
               {selected.status === "draft" && (
                 <button
                   className="ops-button ops-button--ghost"
