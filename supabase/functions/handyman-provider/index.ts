@@ -7503,6 +7503,143 @@ serve(async (req) => {
         return json({ ok: true });
       }
 
+      // Wave O: Either party. Edits an existing punch item's title,
+      // description, estimated minutes, priority, or material flag.
+      // Status / completion / archival flow through dedicated actions.
+      // Used by the contractor SPA inline editor and the iOS app row sheet.
+      if (action === "update_punch_item") {
+        const callerUserId = compactString(user.id);
+        const itemId = compactString(body.itemId);
+        if (!itemId) return json({ error: "itemId is required" }, 400);
+
+        const { data: item } = await service
+          .from("handyman_punch_items")
+          .select("id, household_id, assigned_visit_task_id")
+          .eq("id", itemId)
+          .maybeSingle();
+        if (!item) return json({ error: "Punch item not found" }, 404);
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const isHomeowner = compactString(callerRow?.household_id) === compactString(item.household_id);
+
+        let isHandyman = false;
+        if (!isHomeowner && item.assigned_visit_task_id) {
+          const { data: linkedReq } = await service
+            .from("handyman_requests")
+            .select("contractor_id")
+            .eq("visit_task_id", compactString(item.assigned_visit_task_id))
+            .limit(1)
+            .maybeSingle();
+          if (linkedReq?.contractor_id) {
+            const { data: workspaceLink } = await service
+              .from("provider_contractor_links")
+              .select("workspace_id")
+              .eq("contractor_id", compactString(linkedReq.contractor_id))
+              .limit(1)
+              .maybeSingle();
+            if (workspaceLink?.workspace_id) {
+              try {
+                await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+                isHandyman = true;
+              } catch (_) { /* not a member */ }
+            }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (typeof body.title === "string") {
+          const t = compactString(body.title);
+          if (!t) return json({ error: "title cannot be empty" }, 400);
+          updatePayload.title = t;
+        }
+        if (typeof body.description === "string" || body.description === null) {
+          updatePayload.description = compactString(body.description) || null;
+        }
+        if (body.estimatedMinutes != null) {
+          const n = numberValue(body.estimatedMinutes);
+          if (!Number.isFinite(n) || n < 0) return json({ error: "estimatedMinutes must be >= 0" }, 400);
+          updatePayload.estimated_minutes = n;
+        } else if (body.estimatedMinutes === null) {
+          updatePayload.estimated_minutes = null;
+        }
+        if (typeof body.priority === "string") {
+          const p = compactString(body.priority);
+          if (!["low", "medium", "high", "urgent"].includes(p)) {
+            return json({ error: "Invalid priority" }, 400);
+          }
+          updatePayload.priority = p;
+        }
+        if (body.materialRequired != null) {
+          updatePayload.material_required = Boolean(body.materialRequired);
+        }
+
+        const { error: updErr } = await service
+          .from("handyman_punch_items")
+          .update(updatePayload)
+          .eq("id", itemId);
+        if (updErr) throw updErr;
+
+        return json({ ok: true });
+      }
+
+      // Wave O: Either party. Soft-deletes a punch item by stamping
+      // archived_at. The dashboard query already filters on
+      // archived_at IS NULL so the row drops out of every UI surface
+      // immediately. Recovery is a manual DB operation by design —
+      // homeowners and contractors get a confirm dialog before this fires.
+      if (action === "archive_punch_item") {
+        const callerUserId = compactString(user.id);
+        const itemId = compactString(body.itemId);
+        if (!itemId) return json({ error: "itemId is required" }, 400);
+
+        const { data: item } = await service
+          .from("handyman_punch_items")
+          .select("id, household_id, assigned_visit_task_id")
+          .eq("id", itemId)
+          .maybeSingle();
+        if (!item) return json({ error: "Punch item not found" }, 404);
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const isHomeowner = compactString(callerRow?.household_id) === compactString(item.household_id);
+
+        let isHandyman = false;
+        if (!isHomeowner && item.assigned_visit_task_id) {
+          const { data: linkedReq } = await service
+            .from("handyman_requests")
+            .select("contractor_id")
+            .eq("visit_task_id", compactString(item.assigned_visit_task_id))
+            .limit(1)
+            .maybeSingle();
+          if (linkedReq?.contractor_id) {
+            const { data: workspaceLink } = await service
+              .from("provider_contractor_links")
+              .select("workspace_id")
+              .eq("contractor_id", compactString(linkedReq.contractor_id))
+              .limit(1)
+              .maybeSingle();
+            if (workspaceLink?.workspace_id) {
+              try {
+                await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+                isHandyman = true;
+              } catch (_) { /* not a member */ }
+            }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const now = new Date().toISOString();
+        const { error: updErr } = await service
+          .from("handyman_punch_items")
+          .update({ archived_at: now, updated_at: now })
+          .eq("id", itemId);
+        if (updErr) throw updErr;
+
+        return json({ ok: true });
+      }
+
       // Either party. Soft-cancels a handyman_request and reverts any
       // attached punch items back to wishlist (assigned_visit_task_id=null).
       if (action === "cancel_handyman_request") {

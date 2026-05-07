@@ -41,6 +41,8 @@ const PATHS: Record<string, string> = {
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
   bolt: "M13 2L4 14h7l-1 8 9-12h-7z",
   wrench: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z",
+  edit: "M16 3l5 5-12 12H4v-5z M14 5l5 5",
+  trash: "M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M10 11v7M14 11v7",
 };
 
 interface IconProps {

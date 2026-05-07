@@ -6,7 +6,7 @@ import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { useWorkspace } from "../lib/workspace-context";
 import { categorizePunchList, formatCurrency, formatRelativeTime, formatTime12h, parsePunchList, postProviderAction, type PunchListItem } from "../lib/api";
-import type { RequestStatus, VisitRow } from "../lib/types";
+import type { PunchItem, RequestStatus, VisitRow } from "../lib/types";
 
 export default function VisitDetailScreen() {
   const { requestId } = useParams<{ requestId: string }>();
@@ -40,14 +40,55 @@ export default function VisitDetailScreen() {
 
   const aiTimeEstimate = useMemo(() => estimateVisitTime(visit), [visit]);
 
-  // Punch list parsed from the linked maintenance_task's notes.
-  const punchList = useMemo(() => parsePunchList(visit?.visit?.notes), [visit?.visit?.notes]);
-  // Grouped by physical work zone so the handyman can do all the
+  // Wave O — prefer the structured handyman_punch_items[] returned by
+  // the edge function; fall back to parsing maintenance_task.notes for
+  // legacy data that hasn't been migrated yet. The structured rows are
+  // the canonical source the homeowner iOS app reads, so once the
+  // contractor SPA writes here, both apps see the same checklist.
+  const structuredPunchItems: PunchItem[] = useMemo(
+    () => (visit?.punchItems ?? []).filter((p) => p.status !== "cancelled"),
+    [visit?.punchItems],
+  );
+  const usingStructured = structuredPunchItems.length > 0;
+  const legacyPunchList = useMemo(
+    () => (usingStructured ? [] : parsePunchList(visit?.visit?.notes)),
+    [usingStructured, visit?.visit?.notes],
+  );
+  // Lookup by id so the Done/Edit/Delete handlers can find the source
+  // PunchItem row by its grouped-render id.
+  const structuredById = useMemo(() => {
+    const map = new Map<string, PunchItem>();
+    for (const p of structuredPunchItems) map.set(p.id, p);
+    return map;
+  }, [structuredPunchItems]);
+  // Adapter so categorizePunchList (which expects PunchListItem) sees
+  // structured rows as a flat title+minutes list. The ID stays stable
+  // between the two shapes so handlers can route via structuredById.
+  const punchList: PunchListItem[] = useMemo(() => {
+    if (usingStructured) {
+      return structuredPunchItems.map((p) => ({
+        id: p.id,
+        title: p.title,
+        estimatedMinutes: p.estimatedMinutes ?? null,
+      }));
+    }
+    return legacyPunchList;
+  }, [usingStructured, structuredPunchItems, legacyPunchList]);
+  // Grouped by physical work zone so the contractor can do all the
   // exterior in one pass, all the safety checks in one pass, etc.
   const categorizedPunch = useMemo(() => categorizePunchList(punchList), [punchList]);
   // Long visits are easier to manage as two — surface the split CTA
   // by default at 8+ items.
   const punchIsLong = punchList.length >= 8;
+  // Inline editor / new-item form state for the structured path.
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingMinutes, setEditingMinutes] = useState<string>("");
+  const [savingItem, setSavingItem] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newItemTitle, setNewItemTitle] = useState("");
+  const [newItemMinutes, setNewItemMinutes] = useState<string>("");
+  const [addingItem, setAddingItem] = useState(false);
 
   if (!dashboard) return null;
   if (!visit) {
@@ -178,6 +219,115 @@ export default function VisitDetailScreen() {
     }
   }
 
+  // Wave O — punch item handlers. All four actions hit the
+  // handyman-provider edge function and refresh the dashboard so the
+  // structured punchItems[] reload. Errors surface via alert (existing
+  // pattern in this file).
+  async function togglePunchItemComplete(item: PunchItem) {
+    const next = item.status === "done" ? "in_progress" : "done";
+    try {
+      await postProviderAction("update_punch_item_status", {
+        itemId: item.id,
+        status: next,
+      });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't update item.");
+    }
+  }
+
+  function startEditPunchItem(item: PunchItem) {
+    setEditingItemId(item.id);
+    setEditingTitle(item.title);
+    setEditingMinutes(item.estimatedMinutes != null ? String(item.estimatedMinutes) : "");
+  }
+
+  function cancelEditPunchItem() {
+    setEditingItemId(null);
+    setEditingTitle("");
+    setEditingMinutes("");
+  }
+
+  async function saveEditPunchItem() {
+    if (!editingItemId) return;
+    const title = editingTitle.trim();
+    if (!title) {
+      alert("Title can't be empty.");
+      return;
+    }
+    setSavingItem(true);
+    try {
+      const minutesNumber = editingMinutes.trim() === "" ? null : Number(editingMinutes);
+      const payload: Record<string, unknown> = {
+        itemId: editingItemId,
+        title,
+      };
+      if (editingMinutes.trim() === "") {
+        payload.estimatedMinutes = null;
+      } else if (Number.isFinite(minutesNumber) && minutesNumber != null && minutesNumber >= 0) {
+        payload.estimatedMinutes = minutesNumber;
+      } else {
+        alert("Estimated minutes must be a non-negative number.");
+        setSavingItem(false);
+        return;
+      }
+      await postProviderAction("update_punch_item", payload);
+      cancelEditPunchItem();
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't save the item.");
+    } finally {
+      setSavingItem(false);
+    }
+  }
+
+  async function archivePunchItem(item: PunchItem) {
+    if (!window.confirm(`Remove "${item.title}" from this visit's punch list?`)) return;
+    try {
+      await postProviderAction("archive_punch_item", { itemId: item.id });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't remove the item.");
+    }
+  }
+
+  async function addPunchItem() {
+    if (!visit?.visit?.id) {
+      alert("This visit has no linked task to attach the item to yet. Assign a tech first.");
+      return;
+    }
+    const title = newItemTitle.trim();
+    if (!title) {
+      alert("Give the item a title.");
+      return;
+    }
+    setAddingItem(true);
+    try {
+      const minutesNumber = newItemMinutes.trim() === "" ? null : Number(newItemMinutes);
+      const item: Record<string, unknown> = { title };
+      if (newItemMinutes.trim() !== "") {
+        if (!Number.isFinite(minutesNumber) || minutesNumber == null || minutesNumber < 0) {
+          alert("Estimated minutes must be a non-negative number.");
+          setAddingItem(false);
+          return;
+        }
+        item.estimatedMinutes = minutesNumber;
+      }
+      await postProviderAction("add_punch_items_to_visit", {
+        visitTaskId: visit.visit.id,
+        items: [item],
+      });
+      setNewItemTitle("");
+      setNewItemMinutes("");
+      setShowAddForm(false);
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't add the item.");
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
   return (
     <>
       <div style={{ marginBottom: 16, display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
@@ -304,88 +454,296 @@ export default function VisitDetailScreen() {
             )}
           </Card>
 
-          {/* Punch list — grouped by work zone so the tech doesn't double back. */}
-          {punchList.length > 0 && (
+          {/* Wave O — punch list. Prefers the structured handyman_punch_items[]
+              returned by the edge function; falls back to parsing
+              maintenance_task.notes for legacy data. Once we're rendering
+              structured rows, the contractor can author / edit / complete /
+              delete items directly, and the homeowner iOS app sees the same
+              checklist instantly via the shared DB rows. */}
+          {(punchList.length > 0 || usingStructured || visit.visit?.id) && (
             <Card padding="default">
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
                 <div className="ops-section-label">
-                  Punch list ({punchList.length}) · grouped by zone
+                  {punchList.length > 0
+                    ? `Punch list (${punchList.length}) · grouped by zone`
+                    : "Punch list"}
                 </div>
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => setShowSplit(true)}
-                    style={{
-                      background: "none", border: "none",
-                      color: punchIsLong ? "var(--salmon-dark)" : "var(--indigo)",
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}
-                  >
-                    {punchIsLong ? "↗ Long list. Split into two visits?" : "Split into two visits"}
-                  </button>
-                  <button
-                    onClick={openQuoteForVisit}
-                    style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    + Pre-fill quote from these
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
-                {categorizedPunch.map((group) => (
-                  <div key={group.category.id}>
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      paddingBottom: 6, marginBottom: 6,
-                      borderBottom: "1px solid var(--neutral-200)",
-                    }}>
-                      <div style={{
-                        fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
-                        textTransform: "uppercase", color: "var(--indigo)",
-                      }}>
-                        {group.category.label} · {group.items.length}
-                      </div>
-                      {group.totalMinutes > 0 && (
-                        <div style={{ fontSize: 11, color: "var(--text-soft)", fontWeight: 500 }}>
-                          ~{group.totalMinutes} min total
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {group.items.map((item, i) => (
-                        <div
-                          key={item.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 12,
-                            padding: "8px 0",
-                            borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 22, height: 22, borderRadius: "50%",
-                              border: "1.7px solid var(--neutral-300)", flex: "none",
-                            }}
-                          />
-                          <div style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{item.title}</div>
-                          {item.estimatedMinutes != null && (
-                            <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
-                              ~{item.estimatedMinutes} min
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                {punchList.length > 0 && (
+                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => setShowSplit(true)}
+                      style={{
+                        background: "none", border: "none",
+                        color: punchIsLong ? "var(--salmon-dark)" : "var(--indigo)",
+                        fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      {punchIsLong ? "↗ Long list. Split into two visits?" : "Split into two visits"}
+                    </button>
+                    <button
+                      onClick={openQuoteForVisit}
+                      style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      + Pre-fill quote from these
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
 
-              <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--text-muted)" }}>
-                Items grouped by work zone so you can knock out everything in one area before moving on.
-                Check them off in Chez Field on the day of the visit.
-              </div>
+              {punchList.length === 0 && (
+                <div style={{ marginTop: 12, padding: 14, background: "var(--neutral-50)", borderRadius: 8, fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  No items on the list yet. Add what the visit needs to cover. The homeowner sees these in real time.
+                </div>
+              )}
+
+              {punchList.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
+                  {categorizedPunch.map((group) => (
+                    <div key={group.category.id}>
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        paddingBottom: 6, marginBottom: 6,
+                        borderBottom: "1px solid var(--neutral-200)",
+                      }}>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+                          textTransform: "uppercase", color: "var(--indigo)",
+                        }}>
+                          {group.category.label} · {group.items.length}
+                        </div>
+                        {group.totalMinutes > 0 && (
+                          <div style={{ fontSize: 11, color: "var(--text-soft)", fontWeight: 500 }}>
+                            ~{group.totalMinutes} min total
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {group.items.map((item, i) => {
+                          const structured = structuredById.get(item.id);
+                          const isDone = structured?.status === "done" || structured?.completedAt != null;
+                          const isEditing = editingItemId === item.id;
+                          return (
+                            <div
+                              key={item.id}
+                              style={{
+                                display: "flex",
+                                alignItems: isEditing ? "flex-start" : "center",
+                                gap: 12,
+                                padding: "8px 0",
+                                borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none",
+                              }}
+                            >
+                              {/* Checkbox — interactive when structured, decorative for legacy notes data. */}
+                              {structured ? (
+                                <button
+                                  type="button"
+                                  aria-label={isDone ? "Mark not done" : "Mark done"}
+                                  onClick={() => togglePunchItemComplete(structured)}
+                                  style={{
+                                    width: 22, height: 22, borderRadius: "50%",
+                                    border: isDone ? "1.7px solid var(--salmon)" : "1.7px solid var(--neutral-300)",
+                                    background: isDone ? "var(--salmon)" : "transparent",
+                                    flex: "none",
+                                    padding: 0, cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    marginTop: isEditing ? 4 : 0,
+                                  }}
+                                >
+                                  {isDone && <Icon name="check" size={13} stroke={2.4} />}
+                                </button>
+                              ) : (
+                                <div
+                                  style={{
+                                    width: 22, height: 22, borderRadius: "50%",
+                                    border: "1.7px solid var(--neutral-300)", flex: "none",
+                                  }}
+                                />
+                              )}
+
+                              {isEditing && structured ? (
+                                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <input
+                                    type="text"
+                                    value={editingTitle}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    autoFocus
+                                    style={{
+                                      width: "100%", padding: "6px 8px", border: "1px solid var(--neutral-300)",
+                                      borderRadius: 6, fontSize: 13.5, color: "var(--text)", fontFamily: "var(--sans)",
+                                    }}
+                                  />
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                    <label style={{ fontSize: 11.5, color: "var(--text-muted)" }}>~ minutes</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={5}
+                                      value={editingMinutes}
+                                      onChange={(e) => setEditingMinutes(e.target.value)}
+                                      placeholder=""
+                                      style={{
+                                        width: 80, padding: "4px 6px", border: "1px solid var(--neutral-300)",
+                                        borderRadius: 6, fontSize: 12.5, color: "var(--text)", fontFamily: "var(--sans)",
+                                      }}
+                                    />
+                                    <button
+                                      className="ops-button ops-button--salmon"
+                                      style={{ fontSize: 11.5, padding: "4px 10px" }}
+                                      onClick={saveEditPunchItem}
+                                      disabled={savingItem}
+                                    >
+                                      {savingItem ? "Saving" : "Save"}
+                                    </button>
+                                    <button
+                                      className="ops-button ops-button--ghost"
+                                      style={{ fontSize: 11.5, padding: "4px 10px" }}
+                                      onClick={cancelEditPunchItem}
+                                      disabled={savingItem}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div
+                                    style={{
+                                      flex: 1, fontSize: 13.5,
+                                      color: isDone ? "var(--text-muted)" : "var(--text)",
+                                      textDecoration: isDone ? "line-through" : "none",
+                                    }}
+                                  >
+                                    {item.title}
+                                    {structured && structured.source && structured.source !== "manual" && (
+                                      <span style={{ marginLeft: 8, fontSize: 10.5, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                                        · {sourceLabel(structured.source)}
+                                      </span>
+                                    )}
+                                    {structured?.addedAfterLock && (
+                                      <span style={{ marginLeft: 8, fontSize: 10.5, color: "var(--salmon-dark)", fontWeight: 600 }}>
+                                        · Needs your confirmation
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.estimatedMinutes != null && (
+                                    <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
+                                      ~{item.estimatedMinutes} min
+                                    </span>
+                                  )}
+                                  {structured && (
+                                    <div style={{ display: "flex", gap: 4, flex: "none" }}>
+                                      <button
+                                        type="button"
+                                        aria-label="Edit item"
+                                        onClick={() => startEditPunchItem(structured)}
+                                        style={{
+                                          background: "none", border: "none", padding: 4, cursor: "pointer",
+                                          color: "var(--text-muted)", borderRadius: 6,
+                                        }}
+                                      >
+                                        <Icon name="edit" size={14} stroke={1.9} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label="Remove item"
+                                        onClick={() => archivePunchItem(structured)}
+                                        style={{
+                                          background: "none", border: "none", padding: 4, cursor: "pointer",
+                                          color: "var(--text-muted)", borderRadius: 6,
+                                        }}
+                                      >
+                                        <Icon name="trash" size={14} stroke={1.9} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add-item affordance — only when we have a linked visit task
+                  (the FK target). The edge function rejects without one. */}
+              {visit.visit?.id && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--neutral-200)" }}>
+                  {showAddForm ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <input
+                        type="text"
+                        value={newItemTitle}
+                        onChange={(e) => setNewItemTitle(e.target.value)}
+                        placeholder="What needs doing? e.g. Replace bath caulk"
+                        autoFocus
+                        style={{
+                          width: "100%", padding: "8px 10px", border: "1px solid var(--neutral-300)",
+                          borderRadius: 8, fontSize: 13.5, color: "var(--text)", fontFamily: "var(--sans)",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <label style={{ fontSize: 11.5, color: "var(--text-muted)" }}>~ minutes (optional)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={5}
+                          value={newItemMinutes}
+                          onChange={(e) => setNewItemMinutes(e.target.value)}
+                          placeholder="20"
+                          style={{
+                            width: 80, padding: "4px 6px", border: "1px solid var(--neutral-300)",
+                            borderRadius: 6, fontSize: 12.5, color: "var(--text)", fontFamily: "var(--sans)",
+                          }}
+                        />
+                        <button
+                          className="ops-button ops-button--salmon"
+                          style={{ fontSize: 12, padding: "6px 14px" }}
+                          onClick={addPunchItem}
+                          disabled={addingItem || !newItemTitle.trim()}
+                        >
+                          {addingItem ? "Adding" : "Add to list"}
+                        </button>
+                        <button
+                          className="ops-button ops-button--ghost"
+                          style={{ fontSize: 12, padding: "6px 10px" }}
+                          onClick={() => {
+                            setShowAddForm(false);
+                            setNewItemTitle("");
+                            setNewItemMinutes("");
+                          }}
+                          disabled={addingItem}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(true)}
+                      style={{
+                        background: "none", border: "none",
+                        color: "var(--indigo)", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      + Add punch item
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {punchList.length > 0 && (
+                <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--text-muted)" }}>
+                  Items grouped by work zone so you can knock out everything in one area before moving on.
+                  {usingStructured
+                    ? " Check items off here or in Chez Field. The homeowner sees the same list."
+                    : " Check them off in Chez Field on the day of the visit."}
+                </div>
+              )}
             </Card>
           )}
 
@@ -684,6 +1042,28 @@ function suggestUpsells(systems: { name: string; category: string; manufacturer?
     });
   }
   return out.slice(0, 4);
+}
+
+/// Wave O — short human label for handyman_punch_items.source values.
+/// Renders as a subtle inline annotation on each row so the contractor
+/// can tell where an item came from without opening it.
+function sourceLabel(source: string): string {
+  switch (source) {
+    case "manual":
+      return "Manual";
+    case "template":
+      return "Template";
+    case "recommended":
+      return "Suggested";
+    case "auto_seed_handyman_tier":
+      return "Auto-seeded";
+    case "promoted_from_task":
+      return "From task";
+    case "migrated_from_task":
+      return "From task";
+    default:
+      return source.replace(/_/g, " ");
+  }
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {

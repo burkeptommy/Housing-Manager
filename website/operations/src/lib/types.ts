@@ -141,6 +141,46 @@ export interface VisitQuotePreview {
   publicShareUrl: string;
 }
 
+/// Wave O — structured punch item row from `handyman_punch_items`.
+/// The handyman-provider edge function returns these per visit via
+/// the assigned_visit_task_id FK. Replaces the legacy free-text
+/// parsePunchList(visit.notes) shim. Shape mirrors mapPunchItemForClient
+/// in supabase/functions/handyman-provider/index.ts.
+export interface PunchItem {
+  id: string;
+  householdId: string;
+  propertyId: string | null;
+  assignedVisitTaskId: string | null;
+  systemId: string | null;
+  systemLabelSnapshot: string | null;
+  templateId: string | null;
+  title: string;
+  description: string | null;
+  /// "manual" / "template" / "recommended" / "auto_seed_handyman_tier" /
+  /// "promoted_from_task" / "migrated_from_task" — drives the source pill.
+  source: string;
+  /// "pending" / "assigned" / "in_progress" / "done" / "cancelled".
+  status: string;
+  priority: string;
+  estimatedMinutes: number | null;
+  estimatedCostRange: string | null;
+  materialRequired: boolean;
+  costBasis: string;
+  attachments: unknown[];
+  addedAfterLock: boolean;
+  proposedByRole: string | null;
+  proposedAt: string | null;
+  proposalMessage: string | null;
+  proposalStatus: string;
+  proposalExpiresAt: string | null;
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  declinedReason: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VisitRow {
   requestId: string;
   householdId: string;
@@ -163,6 +203,11 @@ export interface VisitRow {
   assignment: VisitAssignment | null;
   latestMessage: VisitMessagePreview | null;
   quote: VisitQuotePreview | null;
+  /// Wave O — structured punch list. Items already filtered to
+  /// archived_at IS NULL on the server. Empty array when the visit has
+  /// no attached punch items; the SPA falls back to parsePunchList(notes)
+  /// for legacy data while migration completes.
+  punchItems?: PunchItem[];
   /// Phase 84.5 — discriminator on the underlying provider_visit_assignments
   /// row. "standard_visit" / "home_assessment" / "inspection" / "follow_up".
   /// Defaults to "standard_visit" when the column is missing on older rows.
