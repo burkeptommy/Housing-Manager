@@ -3186,6 +3186,51 @@ async function updateRequestStatusForProvider(
     .select()
     .single();
   if (updateError) throw updateError;
+
+  // Cross-app parity: append an audit-trail message to the homeowner's
+  // conversation thread so they see WHEN the contractor flipped the
+  // status and to WHAT. Without this, the homeowner has zero record of
+  // visit completion / cancellation events. The sender_role CHECK
+  // constraint is ('homeowner', 'haven', 'vendor'); we use 'vendor' so
+  // the message renders inline as a contractor-side update with the
+  // existing iOS message-thread layout. The body is a short, neutral
+  // status flip — the homeowner's iOS app already formats sender_role
+  // 'vendor' as the contractor's voice. Failures here do NOT roll back
+  // the status update; the audit message is best-effort.
+  try {
+    const householdId = compactString(updated.household_id);
+    const statusLabel = (() => {
+      switch (status) {
+        case "completed": return "Visit marked complete.";
+        case "in_progress": return "Visit started.";
+        case "on_my_way": return "Tech on the way.";
+        case "checked_in": return "Tech checked in.";
+        case "cancelled": return "Visit cancelled.";
+        case "follow_up_recommended": return "Follow-up recommended after this visit.";
+        case "scheduled": return "Visit scheduled.";
+        case "confirmed": return "Visit confirmed.";
+        case "awaiting_homeowner": return "Awaiting your response.";
+        case "alternate_dates_proposed": return "New time options proposed.";
+        case "submitted": return "Request received.";
+        case "sent_to_handyman": return "Request sent to the contractor.";
+        case "quoted": return "Quote ready for review.";
+        case "declined": return "Request declined.";
+        default: return `Status changed to ${status}.`;
+      }
+    })();
+    if (householdId) {
+      await service.from("handyman_request_messages").insert({
+        request_id: requestId,
+        household_id: householdId,
+        sender_role: "vendor",
+        body: statusLabel,
+        metadata: { kind: "status_change", status },
+      });
+    }
+  } catch (auditErr) {
+    console.error("[handyman-provider] audit-trail message insert failed", auditErr);
+  }
+
   return { request: updated };
 }
 
