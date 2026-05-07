@@ -49,7 +49,7 @@ export default function HomesScreen() {
       <EmptyState
         icon="home"
         title="No homes on your books yet"
-        body="When a homeowner requests a visit from you, their home shows up here. Share your Chez Handyman handle so customers can find you."
+        body="When a homeowner requests a visit from you, their home shows up here. Share your Chez Contractor handle so customers can find you."
       />
     );
   }

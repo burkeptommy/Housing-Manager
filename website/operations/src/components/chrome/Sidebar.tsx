@@ -42,8 +42,9 @@ export function Sidebar() {
 
   return (
     <aside className="ops-sidebar">
-      {/* Brand row — actual Chez Handyman mark, not a CSS letterform */}
-      <a className="ops-sidebar__brand" href="/" aria-label="Chez Handyman">
+      {/* Brand row. The mark filename keeps its legacy "handyman" path
+          for asset compat; only the user-visible strings rebrand. */}
+      <a className="ops-sidebar__brand" href="/" aria-label="Chez Contractor">
         <img
           className="ops-sidebar__brand-mark-img"
           src="/chez-handyman-logo.png"
@@ -51,7 +52,7 @@ export function Sidebar() {
         />
         <div className="ops-sidebar__brand-text">
           <div className="ops-sidebar__brand-name">chez</div>
-          <div className="ops-sidebar__brand-eyebrow">handyman</div>
+          <div className="ops-sidebar__brand-eyebrow">contractor</div>
         </div>
       </a>
 
