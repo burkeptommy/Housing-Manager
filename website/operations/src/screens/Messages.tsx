@@ -127,8 +127,14 @@ export default function MessagesScreen() {
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 14, borderBottom: "1px solid var(--neutral-200)" }}>
               <Avatar initials={initialsFor(selected.propertyName)} size={36} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.propertyName || selected.title}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.propertyName || selected.title}</div>
+                  {/* Section 19c — surface emergency + Chez routing on the
+                      thread header so the dispatcher sees both at a glance. */}
+                  {selectedVisit?.urgency === "urgent" && <Pill tone="critical">Emergency</Pill>}
+                  {selectedVisit?.source === "haven" && <Pill tone="indigo">Routed by Chez</Pill>}
+                </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{selected.title}{selected.propertyAddress ? ` · ${selected.propertyAddress}` : ""}</div>
               </div>
               {selectedVisit && (
@@ -204,7 +210,7 @@ export default function MessagesScreen() {
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type your reply…"
+                  placeholder={selectedVisit?.source === "haven" ? "Reply to Chez. They'll relay to the homeowner." : "Type your reply."}
                   style={{
                     width: "100%",
                     border: "none",

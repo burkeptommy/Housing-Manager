@@ -171,6 +171,15 @@ export interface VisitRow {
   /// when visitType === "home_assessment". The field app uses this to
   /// load the captured_* JSONB and render the GuidedAssessmentView.
   homeAssessmentId?: string | null;
+  /// Section 19a — origin discriminator. "homeowner" when the homeowner
+  /// submitted the request from the iOS app, "haven" when the Chez admin
+  /// routed it on their behalf. Drives the "Routed by Chez" pill so the
+  /// contractor knows the reply path goes through Chez, not the homeowner.
+  source?: string | null;
+  /// Section 19a — urgency surfaced from the underlying handyman_requests
+  /// row so emergency-routing requests render with a critical pill instead
+  /// of a routine indigo one.
+  urgency?: string | null;
 }
 
 export interface HomeSystemPhoto {

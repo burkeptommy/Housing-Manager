@@ -180,13 +180,17 @@ export default function VisitDetailScreen() {
 
       {/* Header card */}
       <Card padding="default" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
           {visit.assignment ? (
             <Pill tone="indigo">Assigned to {visit.assignment.memberName.split(" ")[0]}</Pill>
           ) : (
             <Pill tone="warning">Not assigned</Pill>
           )}
+          {/* Section 19a — surface Chez routing + urgency on the header
+              so the dispatcher sees the reply path and pace at a glance. */}
+          {visit.urgency === "urgent" && <Pill tone="critical">Emergency</Pill>}
+          {visit.source === "haven" && <Pill tone="indigo">Routed by Chez</Pill>}
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-soft)" }}>
             Updated {formatRelativeTime(visit.updatedAt)}
           </span>
@@ -242,12 +246,22 @@ export default function VisitDetailScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Tasks the homeowner asked for */}
+          {/* Tasks the homeowner (or Chez admin) asked for. Section 19a:
+              when source='haven' the request was routed by the Chez admin
+              on the homeowner's behalf, so the framing reads as a Chez
+              brief instead of a direct homeowner ask. */}
           <Card padding="default">
-            <div className="ops-section-label" style={{ marginBottom: 12 }}>What the homeowner is asking for</div>
+            <div className="ops-section-label" style={{ marginBottom: 12 }}>
+              {visit.source === "haven" ? "What Chez is asking for" : "What the homeowner is asking for"}
+            </div>
             <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text)", whiteSpace: "pre-wrap" }}>
               {visit.title}
             </div>
+            {visit.source === "haven" && (
+              <div style={{ marginTop: 10, padding: 10, background: "var(--indigo-50)", borderRadius: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
+                <strong style={{ color: "var(--indigo)" }}>Routed by Chez.</strong> Replies on this thread go to the Chez admin, who relays back to the homeowner.
+              </div>
+            )}
             {visit.preferredTiming && (
               <div style={{ marginTop: 10, padding: 10, background: "var(--indigo-50)", borderRadius: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
                 <strong style={{ color: "var(--indigo)" }}>Preferred timing:</strong> {visit.preferredTiming}
@@ -449,7 +463,7 @@ export default function VisitDetailScreen() {
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Reply to the homeowner…"
+                placeholder={visit.source === "haven" ? "Reply to Chez. They'll relay to the homeowner." : "Reply to the homeowner."}
                 style={{ width: "100%", border: "none", outline: "none", resize: "vertical", fontFamily: "var(--sans)", fontSize: 13, color: "var(--text)", minHeight: 60, background: "transparent" }}
               />
               <div style={{ display: "flex", alignItems: "center", marginTop: 6 }}>

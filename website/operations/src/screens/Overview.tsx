@@ -21,13 +21,21 @@ export default function OverviewScreen() {
   }, [dashboard]);
 
   // The decision queue: requests that need attention from the workspace
-  // owner — needs assignment, awaiting response, urgent, or quoted but
-  // not approved.
+  // owner. Order: emergency first (urgency='urgent'), then Chez-routed
+  // requests (need an explicit ack), then routine. Limit 4 to keep the
+  // panel scannable. Section 19a fix.
   const decisions = useMemo(() => {
     if (!dashboard) return [];
-    return dashboard.visits.filter((v) =>
-      ["submitted", "sent_to_handyman", "alternate_dates_proposed", "awaiting_homeowner", "quoted"].includes(v.status)
-    ).slice(0, 4);
+    return dashboard.visits
+      .filter((v) =>
+        ["submitted", "sent_to_handyman", "alternate_dates_proposed", "awaiting_homeowner", "quoted"].includes(v.status)
+      )
+      .sort((a, b) => {
+        const aPriority = a.urgency === "urgent" ? 0 : a.source === "haven" ? 1 : 2;
+        const bPriority = b.urgency === "urgent" ? 0 : b.source === "haven" ? 1 : 2;
+        return aPriority - bPriority;
+      })
+      .slice(0, 4);
   }, [dashboard]);
 
   if (isLoading) return <LoadingShell />;
@@ -329,13 +337,22 @@ function FieldBoardRow({ visit }: { visit: VisitRow }) {
 
 function DecisionRow({ visit }: { visit: VisitRow }) {
   const sub = visit.preferredTiming || visit.property?.address || formatRelativeTime(visit.updatedAt);
+  // Section 19a — Chez-routed (source='haven') and emergency-urgency
+  // requests get a small marker so the dispatcher knows the reply path
+  // and how fast to act before they click in.
+  const routedByChez = visit.source === "haven";
+  const isEmergency = visit.urgency === "urgent";
   return (
     <Link to={`/visits/${visit.requestId}`} className="ops-row" style={{ borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textDecoration: "none", color: "inherit" }}>
       <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
         <Icon name={iconForRequest(visit.requestType)} size={18} stroke={1.9} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>{visit.title}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 600 }}>{visit.title}</div>
+          {isEmergency && <Pill tone="critical">Emergency</Pill>}
+          {routedByChez && <Pill tone="indigo">Routed by Chez</Pill>}
+        </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
           {visit.property?.name ? `${visit.property.name} · ` : ""}{sub}
         </div>

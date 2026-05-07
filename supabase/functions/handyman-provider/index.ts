@@ -2152,6 +2152,11 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       status: compactString(request.status),
       statusLabel: requestStatusLabel(compactString(request.status)),
       preferredTiming: compactString(request.preferred_timing),
+      // Section 19a — surface origin + urgency so the desktop can render
+      // a "Routed by Chez" pill on requests created by the Chez admin
+      // (source='haven') and an Emergency pill on urgency='urgent' rows.
+      source: compactString(request.source) || null,
+      urgency: compactString(request.urgency) || null,
       proposedVisitAt: request.proposed_visit_at ?? null,
       proposedByRole: compactString(request.proposed_by_role) || null,
       proposedAt: request.proposed_at ?? null,
