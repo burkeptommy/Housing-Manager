@@ -49,7 +49,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const loadDashboard = useCallback(
     async (currentSession: Session | null, isInitial: boolean) => {
       if (!currentSession) {
+        // No session — clear any cached dashboard AND flip isLoading off
+        // so the App-level auth gate's `!isLoading && !session` redirect
+        // can actually fire. Without this flag flip the SPA hangs on
+        // "Loading your workspace…" forever for any unauth'd visitor.
         setDashboard(null);
+        if (isInitial) setIsLoading(false);
         return;
       }
       if (isInitial) setIsLoading(true);
