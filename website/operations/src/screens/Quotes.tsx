@@ -26,6 +26,11 @@ export default function QuotesScreen() {
   const [busy, setBusy] = useState<"send" | "delete" | null>(null);
   const [comments, setComments] = useState<QuoteComment[]>([]);
   const [commentsBusy, setCommentsBusy] = useState(false);
+  const [showSavedForm, setShowSavedForm] = useState(false);
+  const [savedFormBusy, setSavedFormBusy] = useState(false);
+  const [savedFormName, setSavedFormName] = useState("");
+  const [savedFormUnit, setSavedFormUnit] = useState("ea");
+  const [savedFormPrice, setSavedFormPrice] = useState(0);
 
   const quotes = useMemo(() => dashboard?.quotes ?? [], [dashboard]);
   const savedItems = useMemo(() => dashboard?.savedQuoteItems ?? [], [dashboard]);
@@ -70,7 +75,7 @@ export default function QuotesScreen() {
         icon="quote"
         title="No quotes yet"
         body="Send your first quote and the pipeline starts building. You can also seed the saved-items library with the small jobs you bid on most."
-        cta={{ label: "+ Draft a quote", onClick: () => alert("New-quote flow ships next.") }}
+        cta={{ label: "+ Draft a quote", onClick: () => newQuote.open() }}
       />
     );
   }
@@ -133,8 +138,68 @@ export default function QuotesScreen() {
         <Card padding="default">
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
             <div className="ops-section-label">Saved line items</div>
-            <button style={{ fontSize: 12, fontWeight: 600, color: "var(--salmon-dark)", background: "none", border: "none", cursor: "pointer" }}>+ Add new</button>
+            <button
+              onClick={() => setShowSavedForm((v) => !v)}
+              style={{ fontSize: 12, fontWeight: 600, color: "var(--salmon-dark)", background: "none", border: "none", cursor: "pointer" }}
+            >
+              {showSavedForm ? "Cancel" : "+ Add new"}
+            </button>
           </div>
+          {showSavedForm && (
+            <div style={{ padding: 12, marginBottom: 10, border: "1px solid var(--neutral-200)", borderRadius: 10, background: "var(--pearl)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="text"
+                placeholder="Item name (e.g. Light fixture install)"
+                value={savedFormName}
+                onChange={(e) => setSavedFormName(e.target.value)}
+                style={{ padding: "8px 10px", border: "1px solid var(--neutral-200)", borderRadius: 8, background: "#fff", fontSize: 13, fontFamily: "var(--sans)", color: "var(--text)" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="Unit"
+                  value={savedFormUnit}
+                  onChange={(e) => setSavedFormUnit(e.target.value)}
+                  style={{ width: 70, padding: "8px 10px", border: "1px solid var(--neutral-200)", borderRadius: 8, background: "#fff", fontSize: 13, fontFamily: "var(--sans)", color: "var(--text)" }}
+                />
+                <input
+                  type="number"
+                  placeholder="Default price"
+                  value={savedFormPrice || ""}
+                  onChange={(e) => setSavedFormPrice(Number(e.target.value) || 0)}
+                  style={{ flex: 1, padding: "8px 10px", border: "1px solid var(--neutral-200)", borderRadius: 8, background: "#fff", fontSize: 13, fontFamily: "var(--sans)", color: "var(--text)" }}
+                />
+                <button
+                  className="ops-button ops-button--salmon"
+                  disabled={savedFormBusy || !savedFormName.trim()}
+                  onClick={async () => {
+                    if (!savedFormName.trim()) return;
+                    setSavedFormBusy(true);
+                    try {
+                      await postProviderAction("save_quote_item", {
+                        workspaceId: dashboard.workspace.id,
+                        name: savedFormName.trim(),
+                        unit: savedFormUnit.trim() || "ea",
+                        defaultUnitPrice: savedFormPrice,
+                      });
+                      await refresh();
+                      setSavedFormName("");
+                      setSavedFormUnit("ea");
+                      setSavedFormPrice(0);
+                      setShowSavedForm(false);
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "Couldn't save line item.");
+                    } finally {
+                      setSavedFormBusy(false);
+                    }
+                  }}
+                  style={{ minHeight: 36, fontSize: 12 }}
+                >
+                  {savedFormBusy ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          )}
           {savedItems.length === 0 ? (
             <div style={{ padding: 14, fontSize: 13, color: "var(--text-muted)" }}>
               No saved items. Save the small jobs you bid on most so future quotes build in seconds.

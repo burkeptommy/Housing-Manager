@@ -212,7 +212,7 @@ function requestStatusLabel(status: string) {
     case "scheduled":
       return "Scheduled";
     case "sent_to_handyman":
-      return "Sent to handyman";
+      return "Sent to contractor";
     case "alternate_dates_proposed":
       return "Dates proposed";
     case "awaiting_homeowner":
@@ -1324,7 +1324,7 @@ async function sendRequestMessageEmail(
       bodyHtml,
       ctaLabel: params.quoteUrl ? "Review latest quote" : undefined,
       ctaUrl: params.quoteUrl || undefined,
-      footer: "Open Chez to reply or coordinate next steps with your handyman.",
+      footer: "Open Chez to reply or coordinate next steps with your contractor.",
     }),
     text,
     replyToEmail: workspace.primaryEmail || null,
@@ -1719,7 +1719,7 @@ async function fetchInvitePreview(service: ServiceClient, token: string) {
     token,
     providerUrl: providerInviteUrl(token),
     fieldUrl: fieldVisitUrl(token, visitTaskId || null),
-    title: compactString(request?.title) || compactString(session.title) || "Chez Handyman Visit",
+    title: compactString(request?.title) || compactString(session.title) || "Chez Contractor Visit",
     preferredTiming: compactString(request?.preferred_timing) || compactString((session.seed_payload as Record<string, unknown> | undefined)?.scheduledDate),
     requestStatus: compactString(request?.status) || null,
     requestStatusLabel: request ? requestStatusLabel(compactString(request.status)) : null,
@@ -3898,7 +3898,7 @@ function serializePairingRequest(row: Record<string, unknown>, companyName: stri
     homeName,
     homeownerName,
     address: addressLine([row.address_line, row.city, row.state, row.postal_code]),
-    shareText: `Download Chez and use pairing code ${accessCode} to connect ${homeName} with ${companyName}. If you already have Chez, ask support to add this handyman using the code ${accessCode}.`,
+    shareText: `Download Chez and use pairing code ${accessCode} to connect ${homeName} with ${companyName}. If you already have Chez, ask support to add this contractor using the code ${accessCode}.`,
   };
 }
 
@@ -4027,7 +4027,7 @@ async function saveQuote(
   }
 
   const recipientKind = quoteRecipientKind(householdId);
-  title = title || (recipientKind === "prospect" && prospectName ? `Quote for ${prospectName}` : "Handyman quote");
+  title = title || (recipientKind === "prospect" && prospectName ? `Quote for ${prospectName}` : "Untitled quote");
 
   if (!workspaceId || lineItems.length === 0) {
     throw new Error("Workspace and at least one line item are required");
@@ -4188,7 +4188,7 @@ async function saveQuote(
     if (householdId) {
       await notifyHomeownersForRequest(service, householdId, {
         title: `${propertyName ? "Quote ready for " + propertyName : "Quote ready"}`,
-        body: `${moneyLabel(totals.total)} from your handyman. Tap to review.`,
+        body: `${moneyLabel(totals.total)} from your contractor. Tap to review.`,
         requestId: requestId || compactString(quote.id),
         eventType: "handyman_quote_sent",
         extra: { quote_id: compactString(quote.id) },

@@ -57,3 +57,36 @@ gaps** section.
 ### Major
 
 - **`maintenance_tasks` rows updated by handyman do not propagate to the homeowner side** (Wave C corollary). When the handyman flips status of a task or adds a note, the homeowner needs to see this in their iOS Maintenance schedule. Verifying the round-trip is part of Wave K. Until punch items + completion summaries surface, the homeowner has no visibility into what the contractor did during the visit.
+
+## Wave D — Section 7 (Quotes) gaps
+
+### Critical — wired inline this run
+- **7a empty-state CTA dead button** — `Quotes.tsx` line 73 had `onClick: () => alert("New-quote flow ships next.")` despite the modal being live. Fixed: `onClick: () => newQuote.open()`.
+- **7d "+ Add new" saved item button non-functional** — `Quotes.tsx` line 136 had no onClick handler. Wired up an inline form (name + unit + default price) that calls the existing `save_quote_item` action.
+- **Brand voice — quote fallback title "Handyman quote"** — `handyman-provider/index.ts` line 4030 fallback was rendered prominently in the user-facing detail header. Changed to "Untitled quote".
+- **Brand voice — multiple "handyman" user-facing strings** in edge function: line 215 status label "Sent to handyman", line 1327 push footer "your handyman", line 1722 visit title "Chez Handyman Visit", line 3901 share text "this handyman", line 4191 push body "from your handyman". All rebranded to "contractor". Server redeploy required.
+- **Em-dash seed pollution** — `Tests/e2e/run-contractor.mjs` line 463 was seeding 12 quote titles like "Roof repair — Customer 7", and line 468 had a homeowner_message with " — ". Fixed; future fixture runs will be em-dash-clean.
+
+### Major — gaps not yet implemented
+- **7.27 Quote-with-options (good/better/best)** — no UI; line items are flat. Real selling tool for HNW Westchester scope tradeoffs.
+- **7.29 Quote templates** — no save-as-template or load-from-template flow. Saved line items help, but a full template (multi-line preset) doesn't exist.
+- **7.30 Quote duplication** — no "Duplicate this quote" action. Contractor must rebuild every recurring scope.
+- **7.31 Quote PDF export** — no `Download PDF` button. Public share URL exists but no offline artifact for filing/email-attach.
+- **7.32 Quote eSignature** — no inline signature capture for approval. Homeowner approval flow exists DB-side via `status='approved'` but no signature surface.
+- **7.33 Quote → invoice conversion** — no path. Once approved, the contractor must rebuild as a new entity.
+- **7.34 Counter visualization** — Status badge says "Homeowner countered" but the contractor sees the SAME line items as the original quote. There's no "the homeowner countered with these specific changes" diff/redline panel. Edit Quote opens the full builder with no markers indicating what the homeowner changed.
+- **7.35 Multi-round counter history** — no version chain UI. `parent_quote_id` schema exists (migration 20260907_phase73b_quote_negotiation.sql) but Quotes.tsx doesn't render the chain.
+- **7.42 Walk-away point detection** — no "ready to move on?" prompt after N counter rounds.
+- **7.43 Auto-expiration** — no `expires_at` on `provider_quotes`, no "this quote expires in X days" surface, no auto-status-flip from `sent` to `expired`.
+- **7.44 Negotiation history (timeline view)** — no chronological view of who-said-what across the negotiation. Comments panel shows individual questions but no narrative timeline.
+
+### CRITICAL — Cross-app parity
+- **Quote send creates NO homeowner-side audit trail.** Verified via service-role queries:
+  - `inbox_items?household_id=X` — no row created on quote send (cross-app gap)
+  - `handyman_request_messages?household_id=X` — no audit-trail message inserted (gap; visit completion DOES insert one per commit 38485ba8 but quote send does not)
+  - Only path is push notification via `notifyHomeownersForRequest`. Homeowners without iOS push will only discover quotes via the public share URL (which they only learn about from the push they didn't get).
+  - Recommendation: mirror the visit-completion pattern. On quote send, insert a `vendor`-role message into `handyman_request_messages` with `metadata.kind = "quote_sent"` so the iOS chat thread shows it.
+
+### Moderate
+- **C1 validation uses native `alert()`** — `NewQuoteModal.tsx:183` uses `alert("Pick a home, add a title, and include at least one line item.")`. Functional but jarring vs. the rest of the premium UI; should be inline error states under each field.
+
