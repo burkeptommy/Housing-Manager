@@ -49,4 +49,11 @@ gaps** section.
 
 ## Cross-app gaps (Section 21 round-trip findings)
 
-(populated by Wave K)
+### Critical (architectural)
+
+- **`handyman_punch_items` is never read by the contractor SPA** (Wave C, Section 6.19). The DB has 146 rows of seeded punch items joined to `provider_visit_assignments` via `assigned_visit_task_id`. The `handyman-provider` edge function (line 2233) returns `punchItems[]` per visit. But `VisitDetail.tsx:44` calls `parsePunchList(visit.notes)` — parsing free-text out of `maintenance_tasks.notes` instead of consuming the structured list. The SPA's `VisitRow` type has no `punchItems` field. **Result: every fixture's 3-8 punch items are invisible on the contractor side.** The homeowner iOS app reads the proper `handyman_punch_items` rows, the contractor web reads parsed text from a different table — the two sides are not looking at the same data. This breaks the entire punch-list authoring story (Section 6.20–6.32 are all moot until this is wired). Recommendation: extend `VisitRow` with `punchItems: HandymanPunchItem[]`, rewrite `VisitDetail.tsx` punch-list rendering to consume it, add the authoring CRUD flow, and remove the `parsePunchList(visit.notes)` shim.
+- **"Mark complete" inserts no audit-trail message** (Wave C). After flipping `handyman_requests.status = 'completed'`, no `handyman_request_messages` row is appended. The homeowner-side conversation history shows zero record of when the contractor completed the visit, what they did, or any after-action summary. Compare to `chez-concierge` `transition_status` pattern which auto-inserts a system message + fires push. Recommendation: extend `update_request_status` Edge Function action to append a system-role message ("Visit marked complete by [contractor]") + send a push notification to the homeowner.
+
+### Major
+
+- **`maintenance_tasks` rows updated by handyman do not propagate to the homeowner side** (Wave C corollary). When the handyman flips status of a task or adds a note, the homeowner needs to see this in their iOS Maintenance schedule. Verifying the round-trip is part of Wave K. Until punch items + completion summaries surface, the homeowner has no visibility into what the contractor did during the visit.

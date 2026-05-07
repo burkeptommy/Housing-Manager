@@ -574,16 +574,16 @@ function estimateVisitTime(visit: ReturnType<typeof useMemo<any>> extends infer 
   const title = (visit?.title ?? "").toLowerCase();
   let siteMinutes = 60;
   let suggestSplit = false;
-  let reasoning = "Standard handyman visit window.";
+  let reasoning = "Standard contractor visit window.";
   if (title.includes("install") || title.includes("replace")) {
     siteMinutes = 120;
-    reasoning = "Installs and replacements typically run 90–150 min on site.";
+    reasoning = "Installs and replacements typically run 90 to 150 min on site.";
   } else if (title.includes("inspect") || title.includes("diagnose")) {
     siteMinutes = 45;
     reasoning = "Inspection-only visit. Diagnose, document, return with quote.";
   } else if (title.includes("repair") || title.includes("fix")) {
     siteMinutes = 90;
-    reasoning = "Repairs vary; budget 60–120 min on site.";
+    reasoning = "Repairs vary; budget 60 to 120 min on site.";
   } else if (title.includes("punch") || title.includes("bundle") || title.includes("multiple")) {
     siteMinutes = 180;
     suggestSplit = true;
