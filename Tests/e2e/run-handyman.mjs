@@ -723,8 +723,24 @@ class HandymanE2ERunner {
       }
       this.state.requestIds.push(requestId);
 
-      // Create matching provider_visit_assignment
+      // Create matching provider_visit_assignment.
+      // Wave 3b found that the seeder was passing a non-existent column
+      // 'assigned_user_id' + 'status' + 'scheduled_date' + 'request_type'
+      // — the row inserted but assignment was orphaned (assigned_member_id
+      // null). Crew technician saw 0 visits as a result. Real columns:
+      // assigned_member_id (references provider_workspace_members.id),
+      // route_date, window_start_time, window_end_time, visit_type.
       const assignId = randomUUID();
+      // Alternate between crew + owner so the technician role has visible
+      // work AND the owner role gets to see crew visits via dispatch view.
+      const assignedMemberId = i % 2 === 0
+        ? (this.state.crewMembershipId ?? this.state.workspaceMembershipId)
+        : this.state.workspaceMembershipId;
+      // visit_type is constrained to ('standard_visit', 'home_assessment',
+      // 'inspection', 'follow_up') — distinct from handyman_requests.request_type
+      // which is constrained to ('standard_visit', 'quote', 'repair',
+      // 'install', 'assembly', 'question', 'setup'). Don't pass it; the
+      // column has a 'standard_visit' default that's safe for fixtures.
       const assignIns = await restService("provider_visit_assignments", {
         method: "POST",
         headers: { Prefer: "return=representation" },
@@ -732,15 +748,14 @@ class HandymanE2ERunner {
           id: assignId,
           workspace_id: this.state.workspaceId,
           request_id: requestId,
-          assigned_user_id: this.state.crewUserId ?? this.state.ownerUserId,
-          status: sc.status,
-          scheduled_date: isoDateInDays(sc.days),
-          request_type: sc.request_type,
+          assigned_member_id: assignedMemberId,
+          assigned_by_user_id: this.state.ownerUserId,
+          route_date: isoDateInDays(sc.days),
+          stop_order: i + 1,
         }),
       });
       if (!assignIns.ok) {
-        // Workspace_id was the only required field; the rest may be schema-strict.
-        // Try a minimal fallback insert.
+        // Strict-schema fallback — keep workspace_id + request_id only.
         const fallback = await restService("provider_visit_assignments", {
           method: "POST",
           headers: { Prefer: "return=representation" },
@@ -793,7 +808,7 @@ class HandymanE2ERunner {
           request_id: requestId,
           household_id: cust.householdId,
           sender_role: "homeowner",
-          body: `Customer ${i + 1} initial message — please come look at the issue.`,
+          body: `Customer ${i + 1} initial message. Please come look at the issue.`,
           metadata: {},
         }),
       });

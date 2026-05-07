@@ -1742,7 +1742,17 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
     }
 
     func completeVisit() async {
-        guard var draft else { return }
+        guard var draft else {
+            // Pre-Wave-3b this silently returned. A handyman tapping
+            // "Complete visit" on a non-portal-session visit got no
+            // feedback whatsoever. Now we surface the precondition so
+            // the user knows why nothing happened. The deeper issue
+            // (visits without portal sessions can't be completed end-to-end)
+            // is documented as the parallel-tables architectural finding
+            // in HANDYMAN_GAPS.md and needs product input.
+            errorMessage = "This visit isn’t set up for live tracking yet. Tap Sync now first to load the visit checklist."
+            return
+        }
         draft.reportStatus = "completed"
         draft.coordinationStatus = draft.recommendations.contains(where: { $0.createFollowUp ?? false })
             ? HandymanRequestStatus.followUpRecommended.rawValue

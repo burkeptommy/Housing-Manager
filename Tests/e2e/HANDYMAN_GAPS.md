@@ -174,6 +174,34 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **B9** [`ui_quality_finding`] Search empty state echoes 500-char query verbatim, dominating screen. **Suggested fix:** truncate to first 30 chars + ellipsis. **Severity:** minor. (Wave 3a)
 
+### Section 9 — Live visit tracking (Wave 3b)
+
+- **9.1** [`gap_found`] No 'Check in' / 'Start visit' button anywhere on visit detail. Same gap as 5.6 — `start_assessment_visit` action wired server-side, never invoked from iOS. Without check-in, time tracking / on-the-clock GPS / live punch list all have no entry point. **Suggested fix:** salmon 'Check in' CTA on visit-detail header → flips status to in_progress + stamps started_at + reveals live checklist. **Estimated effort:** medium. (Wave 3b)
+
+- **9.2 / 9.3 / 9.4 / 9.5 / 9.6 / 9.7** [`gap_found`] Visit Sub-tab on in_progress visits is empty ('No tasks captured yet') with no '+ Add' button. No per-item photo / voice / materials / time tracking. **Suggested fix:** reuse homeowner-side HandymanPunchListView pattern, scoped by customer household_id. Add inline checkbox + add-item flow. Per-line-item photo / voice / materials / timer affordances. **Estimated effort:** large. **Tied to value prop:** punch list is the workhorse of every handyman visit. Without it, technicians fall back to ad-hoc texting. (Wave 3b)
+
+- **9.10** [`persistence_finding`] 'Complete visit' CTA was a silent no-op when no portal session existed (`guard var draft else { return }` early-returned without feedback). **FIXED** in commit `<this commit>` — now surfaces "This visit isn't set up for live tracking yet. Tap Sync now first to load the visit checklist." The deeper architectural issue (visits without portal sessions can't be completed end-to-end) is the parallel-tables finding. (Wave 3b)
+
+- **9.11 / 9.12 / 9.13** [`gap_found`] No auto-generated visit summary, review screen, or send-to-homeowner flow. **Suggested fix:** after Complete visit, surface SummaryReviewSheet with auto-generated bullet list + editable notes + 'Send' button. **Estimated effort:** large. (Wave 3b)
+
+- **2.x** [`ui_quality_finding`] Confirm visit error 'Network error' is misleading when the underlying cause is a 4xx (precondition: must propose dates first). **Suggested fix:** distinguish 4xx business-rule errors from true network failures via the friendlyServerError helper added in Wave 2a. **Severity:** minor. (Wave 3b)
+
+- **Dashboard counters stale** [`persistence_finding`] After successfully proposing visit dates (status flipped to alternate_dates_proposed), Overview's 'Upcoming 0' / 'Requests 2 need a response' counters did not update on relaunch. **Suggested fix:** audit dashboard counter source — likely a cached snapshot rather than live derivation. **Severity:** major (visible to user as "did my action save?" friction). (Wave 3b)
+
+- **9.13 chat composer missing** [`gap_found`] Tapping a message thread shows bubbles only — NO composer, no text input, no send button. Bottom edge transitions directly to tab bar. Only path to send is the floating '+ New message' modal on Messages list. **Suggested fix:** add ChatComposerView under the bubble ScrollView. Wire Send to handyman_request_messages insert. **Estimated effort:** medium. **Tied to value prop:** mid-visit communication ('I need to swing back tomorrow with a part') is the bread-and-butter of the messages tab. (Wave 3b)
+
+### Section 10 — System identification (Wave 3b)
+
+- **10.1** [`gap_found`] Tapping a system row opens a read-only sheet — no edit, no Add details for missing fields, no camera, no Pull up manual link. Same finding as 5.19 from Wave 2a. (Wave 3b)
+
+- **10.5 / 10.11** [`gap_found`] No '+ Add system' button on Home > Systems list outside of a visit. Customer with no scheduled visit can't have a 6th system added. **Suggested fix:** reuse the AddSystemFromLabelPhotoFlow component; add a header chip on Home > Systems sub-tab. **Estimated effort:** small. (Wave 3b)
+
+- **10.9** [`gap_found`] No 'Pull up manual / spec sheet' link on system detail. `lookup-manual` Edge Function exists per CLAUDE.md but is unwired. **Suggested fix:** wire DatabaseService.getManualForSystem → opens lookup-manual response in PDFKit. Render row only when system has model_number. **Estimated effort:** small. (Wave 3b)
+
+- **10.10** [`gap_found`] No manual entry path with brand auto-complete — only 'Add system from label photo'. **Suggested fix:** add 'Enter manually' link beneath the camera CTA → AddSystemManualView with TypeAhead-style brand picker. **Estimated effort:** medium. (Wave 3b)
+
+- **10.12 / 10.13** [`gap_found`] No warranty / recall metadata or 'Check for recalls' affordance. **Suggested fix:** add warranty_active / recall_pending columns to home_systems + periodic edge function scan. **Estimated effort:** medium. **Tied to value prop:** recall surfacing is a Five-moats AI-creates-intelligence callout per CLAUDE.md. (Wave 3b)
+
 ### Architectural — parallel tables (Wave 2c)
 
 - **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)
