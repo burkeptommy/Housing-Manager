@@ -127,10 +127,10 @@ export default function CrewScreen() {
                 </Pill>
               </div>
               <div style={{ padding: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Detail icon="mail"      label="Email"  value={selected.email || "—"} />
-                <Detail icon="phone"     label="Phone"  value={selected.phone || "—"} />
+                <Detail icon="mail"      label="Email"  value={selected.email || "Not set"} />
+                <Detail icon="phone"     label="Phone"  value={selected.phone || "Not set"} />
                 <Detail icon="briefcase" label="Role"   value={selected.role} />
-                <Detail icon="shield"    label="Last seen" value={selected.lastSeenAt ? formatRelativeTime(selected.lastSeenAt) : "—"} />
+                <Detail icon="shield"    label="Last seen" value={selected.lastSeenAt ? formatRelativeTime(selected.lastSeenAt) : "Never"} />
               </div>
             </Card>
 

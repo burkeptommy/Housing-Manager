@@ -95,7 +95,7 @@ export default function HomesScreen() {
           >
             <HomeArtwork isNew={!home.lastCompletedVisit} />
             <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, color: "var(--text)" }}>{home.name}</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{home.address || "—"}</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{home.address || "No address on file"}</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
               <Stat label="Systems" value={String(home.systemCount)} />
@@ -137,7 +137,7 @@ export default function HomesScreen() {
               {historyForHome.map((row) => (
                 <div key={row.requestId} className="ops-row" style={{ padding: "12px 0" }}>
                   <div style={{ width: 80, fontSize: 12, color: "var(--text-soft)", fontWeight: 600 }}>
-                    {row.routeDate ? new Date(row.routeDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}
+                    {row.routeDate ? new Date(row.routeDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "TBD"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{row.title}</div>

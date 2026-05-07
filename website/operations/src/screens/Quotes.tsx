@@ -166,7 +166,7 @@ export default function QuotesScreen() {
               {selected.audienceLabel}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>
-              {selected.recipientAddress || selected.propertyName || "—"}
+              {selected.recipientAddress || selected.propertyName || "No address on file"}
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
               {selected.publicShareUrl && (

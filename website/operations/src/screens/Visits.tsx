@@ -137,7 +137,7 @@ export default function DispatchScreen() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>{v.title}</div>
                   <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                    {v.property?.name || "—"}
+                    {v.property?.name || "Not set"}
                   </div>
                 </div>
                 {v.assignment && (
@@ -271,7 +271,7 @@ export default function DispatchScreen() {
               {selected.title}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 4 }}>
-              {selected.property?.name || "—"}{selected.property?.address ? ` · ${selected.property.address}` : ""}
+              {selected.property?.name || selected.property?.address || "No address on file"}{selected.property?.name && selected.property?.address ? ` · ${selected.property.address}` : ""}
             </div>
             {selected.preferredTiming && (
               <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>
@@ -386,7 +386,7 @@ function UnassignedCard({ visit, isSelected, onClick }: { visit: VisitRow; isSel
       </div>
       <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{visit.title}</div>
       <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-        {visit.property?.name || "—"}
+        {visit.property?.name || "Not set"}
       </div>
     </button>
   );
@@ -409,12 +409,16 @@ function parseWindow(slot: string): [string, string] {
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";

@@ -132,7 +132,7 @@ export default function RoutesScreen() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{stop.title}</div>
                         <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 4 }}>
-                          {stop.property?.name || "—"}{stop.property?.address ? ` · ${stop.property.address.split(",")[1]?.trim() ?? ""}` : ""}
+                          {stop.property?.name || stop.property?.address || "No address on file"}{stop.property?.name && stop.property?.address ? ` · ${stop.property.address.split(",")[1]?.trim() ?? ""}` : ""}
                         </div>
                         <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-soft)" }}>
                           {stop.assignment?.windowStartTime && (

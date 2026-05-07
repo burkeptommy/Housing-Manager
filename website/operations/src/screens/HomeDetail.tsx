@@ -90,7 +90,7 @@ export default function HomeDetailScreen() {
             <div style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.018em" }}>
               {home.name}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{home.address || "—"}</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{home.address || "No address on file"}</div>
           </div>
           <button className="ops-button ops-button--salmon" onClick={() => setShowSuggest(true)}>
             <Icon name="sparkles" size={14} stroke={1.9} />
@@ -104,7 +104,7 @@ export default function HomeDetailScreen() {
           <Stat label="Systems" value={String(home.systemCount)} />
           <Stat label="Open requests" value={String(home.openRequests)} accent={home.openRequests > 0} />
           <Stat label="Lifetime" value={formatCurrency(lifetime)} />
-          <Stat label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "—"} />
+          <Stat label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "Never"} />
         </div>
       </Card>
 
@@ -721,12 +721,16 @@ function generateAISuggestions(home: { name: string; systems?: HomeSystem[] } | 
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";

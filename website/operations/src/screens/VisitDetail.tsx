@@ -474,9 +474,9 @@ export default function VisitDetailScreen() {
           <Card padding="default">
             <div className="ops-section-label" style={{ marginBottom: 12 }}>Schedule</div>
             <SidebarRow label="Date" value={visit.routeDate ? new Date(visit.routeDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "Not booked"} />
-            <SidebarRow label="Window" value={visit.assignment?.windowStartTime ? `${formatTime12h(visit.assignment.windowStartTime)} – ${formatTime12h(visit.assignment.windowEndTime)}` : "—"} />
+            <SidebarRow label="Window" value={visit.assignment?.windowStartTime ? `${formatTime12h(visit.assignment.windowStartTime)} to ${formatTime12h(visit.assignment.windowEndTime)}` : "Not scheduled"} />
             <SidebarRow label="Tech" value={visit.assignment?.memberName || "Unassigned"} />
-            <SidebarRow label="Stop #" value={visit.assignment?.stopOrder ? String(visit.assignment.stopOrder) : "—"} />
+            <SidebarRow label="Stop #" value={visit.assignment?.stopOrder ? String(visit.assignment.stopOrder) : "Not assigned"} />
           </Card>
 
           {visit.quote ? (
@@ -528,7 +528,7 @@ export default function VisitDetailScreen() {
               <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 6 }}>
                 <SidebarRow label="Systems" value={String(home.systemCount)} />
                 <SidebarRow label="Open requests" value={String(home.openRequests)} />
-                <SidebarRow label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "—"} />
+                <SidebarRow label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "Never"} />
               </div>
               <Link to={`/homes/${home.propertyId}`} className="ops-button ops-button--ghost" style={{ marginTop: 12, width: "100%", textAlign: "center", justifyContent: "center" }}>
                 Open home profile →
@@ -638,12 +638,16 @@ function suggestUpsells(systems: { name: string; category: string; manufacturer?
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";

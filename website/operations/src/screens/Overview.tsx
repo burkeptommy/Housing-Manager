@@ -37,8 +37,12 @@ export default function OverviewScreen() {
   const personHero = mode === "sole";
   const todayDoneCount = dashboard.visits.filter((v) => isToday(v.routeDate) && v.status === "completed").length;
   const todayInProgress = dashboard.visits.filter((v) => isToday(v.routeDate) && ["on_my_way", "in_progress", "checked_in"].includes(v.status)).length;
-  const todayCount = todaysVisits.length;
-  const todayRemaining = Math.max(todayCount - todayDoneCount - todayInProgress, 0);
+  // todaysVisits already filters out completed/cancelled/declined and so
+  // includes both in-progress and to-go visits. The hero count is the
+  // total (all today's visits including done), and remaining = the slice
+  // not yet started.
+  const todayCount = todaysVisits.length + todayDoneCount;
+  const todayRemaining = Math.max(todaysVisits.length - todayInProgress, 0);
 
   return (
     <>
@@ -46,7 +50,7 @@ export default function OverviewScreen() {
         eyebrow={`OPERATIONS · ${formattedDate()}`}
         personHero={personHero}
         firstName={greetName}
-        todayCount={todayCount + todayDoneCount + todayInProgress}
+        todayCount={todayCount}
         todayDone={todayDoneCount}
         todayInProgress={todayInProgress}
         todayRemaining={todayRemaining}
@@ -305,7 +309,7 @@ function FieldBoardRow({ visit }: { visit: VisitRow }) {
           <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-          {visit.property?.name || visit.property?.address || "—"}
+          {visit.property?.name || visit.property?.address || "No address on file"}
         </div>
       </div>
       {visit.assignment && (
@@ -410,12 +414,19 @@ function pipelineTotal(quotes: { status: string; total: number }[]): number {
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      // Truly counter-offered: needs your response to unblock.
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      // Routine inbound. Indigo says "in flight, no action yet."
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      // Gentle attention: ball is in their court.
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";
