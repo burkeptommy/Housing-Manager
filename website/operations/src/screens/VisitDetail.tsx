@@ -271,7 +271,7 @@ export default function VisitDetailScreen() {
                       fontSize: 12, fontWeight: 600, cursor: "pointer",
                     }}
                   >
-                    {punchIsLong ? "↗ Long list — split into two visits?" : "Split into two visits"}
+                    {punchIsLong ? "↗ Long list. Split into two visits?" : "Split into two visits"}
                   </button>
                   <button
                     onClick={openQuoteForVisit}
@@ -371,7 +371,7 @@ export default function VisitDetailScreen() {
             </div>
             {aiTimeEstimate.suggestSplit && (
               <div style={{ marginTop: 12, padding: 12, background: "var(--salmon-50)", border: "1px solid var(--salmon-pale)", borderRadius: 8, fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 }}>
-                <strong style={{ color: "var(--salmon-dark)" }}>Heads-up:</strong> This looks like more work than fits a single window. Consider splitting into 2 visits — one for diagnosis, one for the fix.
+                <strong style={{ color: "var(--salmon-dark)" }}>Heads-up:</strong> This looks like more work than fits a single window. Consider splitting into 2 visits: one for diagnosis, one for the fix.
               </div>
             )}
           </Card>
@@ -580,7 +580,7 @@ function estimateVisitTime(visit: ReturnType<typeof useMemo<any>> extends infer 
     reasoning = "Installs and replacements typically run 90–150 min on site.";
   } else if (title.includes("inspect") || title.includes("diagnose")) {
     siteMinutes = 45;
-    reasoning = "Inspection-only visit — diagnose, document, return with quote.";
+    reasoning = "Inspection-only visit. Diagnose, document, return with quote.";
   } else if (title.includes("repair") || title.includes("fix")) {
     siteMinutes = 90;
     reasoning = "Repairs vary; budget 60–120 min on site.";
@@ -601,7 +601,7 @@ function suggestUpsells(systems: { name: string; category: string; manufacturer?
   if (cats.some((c) => c.includes("hvac")) || names.some((n) => n.includes("furnace") || n.includes("ac"))) {
     out.push({
       title: "Replace HVAC filter while you're here",
-      reason: "Standard HVAC system on file — easy 5-minute add-on.",
+      reason: "Standard HVAC system on file. Easy 5-minute add-on.",
       estimate: "$25",
     });
   }
@@ -762,7 +762,7 @@ function RescheduleModal({
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Quick context for the homeowner — e.g. 'Pushed back because of a delivery delay'."
+              placeholder="Quick context for the homeowner: e.g. 'Pushed back because of a delivery delay'."
               style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--neutral-200)", borderRadius: 10, fontSize: 13, fontFamily: "var(--sans)", minHeight: 80, resize: "vertical" }}
             />
           </label>

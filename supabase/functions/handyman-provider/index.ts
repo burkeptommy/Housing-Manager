@@ -7107,12 +7107,19 @@ serve(async (req) => {
         }
 
         const now = new Date().toISOString();
+        // maintenance_tasks doesn't have an `updated_at` column — only
+        // handyman_punch_items and handyman_requests do. Pre-Wave-6 the
+        // payload included updated_at unconditionally and EVERY accept /
+        // decline of a handyman task proposal returned PGRST204 schema
+        // errors, breaking 100% of homeowner accept-flow on the most
+        // visible Section 5 entry point. Branch on table.
+        const includeUpdatedAt = tableName !== "maintenance_tasks";
         const updatePayload: Record<string, unknown> =
           decision === "accept"
-            ? { proposal_status: "accepted", accepted_by_user_id: callerUserId, accepted_at: now, updated_at: now }
+            ? { proposal_status: "accepted", accepted_by_user_id: callerUserId, accepted_at: now, ...(includeUpdatedAt ? { updated_at: now } : {}) }
             : decision === "decline"
-            ? { proposal_status: "declined", declined_by_user_id: callerUserId, declined_at: now, declined_reason: reason || null, updated_at: now }
-            : { proposal_status: "cancelled", updated_at: now };
+            ? { proposal_status: "declined", declined_by_user_id: callerUserId, declined_at: now, declined_reason: reason || null, ...(includeUpdatedAt ? { updated_at: now } : {}) }
+            : { proposal_status: "cancelled", ...(includeUpdatedAt ? { updated_at: now } : {}) };
 
         const { error: updErr } = await service
           .from(tableName)

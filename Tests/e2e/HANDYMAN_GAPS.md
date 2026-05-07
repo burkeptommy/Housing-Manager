@@ -284,6 +284,44 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **14.x B3 em-dash placeholder** [`ui_quality_finding`] `Text("Code: \(request.accessCode ?? "—")")` used em-dash as fallback. **FIXED** in commit `<this commit>` — now `"Not generated"`. **Severity:** minor. (Wave 5)
 
+### Section 15 — Cross-app round-trips (Wave 6)
+
+#### Critical bug — FIXED
+
+- **15.5 respond_to_proposal updated_at PGRST204** [`persistence_finding`] **CRITICAL — FIXED.** `respond_to_proposal` action with `kind=task` always failed with PGRST204 ("Could not find the 'updated_at' column of 'maintenance_tasks'"). 100% of homeowner-side accept/decline of any handyman task proposal broken. Reproduced via UI ('Couldn't record your decision') AND raw API. **FIXED** in commit `<this commit>` — branched the updatePayload by table; maintenance_tasks branch omits `updated_at` since the table doesn't have that column. Verified: Accept now returns `{ok:true}` and `proposal_status` flips to `accepted` with `accepted_by_user_id` + `accepted_at` stamped. (Wave 6)
+
+#### Architectural gaps (Section 15)
+
+- **15.1** [`gap_found`] When a handyman calls `send_quote` (status draft→sent), NO `inbox_items` row is created on the homeowner side. Homeowner Chez inbox shows 'All caught up!' while a $200 quote sits in the DB addressed to them. The contractor record IS visible under Property→Vendors but pending quotes have ZERO discoverable surface. **Suggested fix:** extend send_quote to insert inbox_items row with type='handyman_quote_received' + metadata + action_type='review_quote'. Or surface 'Pending quotes' on ContractorDetailView. **Estimated effort:** medium. **Tied to value prop:** if homeowner can't see quotes, the entire quote pipeline is silent. (Wave 6)
+
+- **15.4** [`gap_found`] No bridging action between `chez-concierge` (homeowner→Chez) and `handyman-provider` (Chez→handyman). They're entirely separate edge functions with separate tables (chez_requests + concierge_messages vs handyman_requests + provider_visit_assignments). **Suggested fix:** add `delegate_to_handyman_workspace` action to chez-concierge that creates a handyman_requests row with parent_chez_request_id + posts a system message to both threads explaining the handoff. **Estimated effort:** large. **Tied to value prop:** without it, Chez can't act as a real intermediary between homeowner and handyman. (Wave 6)
+
+- **15.6** [`gap_found`] The server-side primitive (`add_punch_items_to_visit` with `added_after_lock=true`) exists but no homeowner-side UI exposes 'Add to this active visit' during a visit-in-progress. **Suggested fix:** ActiveVisitBanner.swift on dashboard / Handyman tab when handyman_requests.status IN ('checked_in','in_progress'). Tap-to-add quick capture. Field app subscribes to realtime channel. **Estimated effort:** medium. (Wave 6)
+
+- **15.7** [`gap_found`] No `finalize_visit` action atomically marks status='completed' + attaches summary photos + pushes homeowner-summary surface + handles deferred punch items. **Suggested fix:** new action with all side effects. Add HandymanVisitSummaryView to homeowner side; 'End visit' button to field app. **Estimated effort:** large. (Wave 6)
+
+#### Verifications passed (Section 15)
+
+- **15.2 Counter quote round-trip** PASSED — homeowner countered, handyman saw the new row, original auto-marked 'superseded' via parent_quote_id chain.
+
+### Section 16 — Operations desk web (Wave 6)
+
+- **16.1, 16.2, 16.4** [`verification`] PASSED via API: `assign_visit`, `send_quote` (draft→sent), `send_message` all work end-to-end and persist correctly.
+
+- **16.3 Dispatch route** [`gap_found`] No multi-stop route action in the handyman-provider edge function. **Suggested fix:** new `assign_route` action that takes [{request_id, route_date, window_start, window_end, stop_order}] in batch. (Wave 6)
+
+- **16.5** [`gap_found`] No 'flag_assessment_for_revision' action. submit_assessment_data has no admin-side override. **Suggested fix:** new admin action with admin auth check via CHEZ_ADMIN_EMAILS. **Severity:** medium. **Tied to value prop:** quality control on assessments is what makes Chez's intermediation valuable. (Wave 6)
+
+- **16.6** [`gap_found`] No admin-approval gate on add_recommended_task. Recommendations go straight to homeowner without Tom seeing. **Suggested fix:** add 'requires_admin_approval' flag + 'approve_handyman_recommendation' / 'reject_handyman_recommendation' admin actions. (Wave 6)
+
+- **16.7** [`ui_quality_finding`] Per-tech revenue / utilization absent from Crew screen. HomeDetail.tsx already computes lifetime spend client-side. **Suggested fix:** extend dashboard endpoint with lifetimeRevenueByMember + thisMonthRevenueByMember; add to Crew.tsx selected-profile panel. **Severity:** minor. (Wave 6)
+
+#### Operations Desk UI quality (Wave 6)
+
+- **B3 em dashes in user-facing copy** [`ui_quality_finding`] 5 em dashes in `website/operations/src/screens/VisitDetail.tsx` user-facing strings: split-CTA button, AI reasoning text, recommendation reasoning, placeholder, heads-up message. **FIXED** in commit `<this commit>` — replaced with periods or colons per CLAUDE.md hard rule. **Severity:** minor. (Wave 6)
+
+- **Property tab counter inconsistency** [`ui_quality_finding`] Customer 2 home shows '49 tasks need a vendor / 49 quotes ready to review' (same number used twice; only 1 quote actually exists in DB). PropertyListView shows '10 systems' on a household with only 3 home_systems rows. **Suggested fix:** audit the count source — likely template-string literal '49' instead of DB-derived. **Severity:** moderate. (Wave 6)
+
 ### Architectural — parallel tables (Wave 2c)
 
 - **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)
