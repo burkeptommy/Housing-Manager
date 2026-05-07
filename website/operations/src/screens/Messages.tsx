@@ -76,7 +76,7 @@ export default function MessagesScreen() {
             <button
               key={c}
               className="ops-button ops-button--ghost"
-              style={{ fontSize: 11, padding: "4px 10px", background: filter === c ? "var(--neutral-200)" : "#fff" }}
+              style={{ fontSize: 11, padding: "8px 12px", background: filter === c ? "var(--neutral-200)" : "#fff", minHeight: 32 }}
               onClick={() => setFilter(c)}
             >
               {c === "all" ? `All · ${threads.length}` : `Awaiting · ${threads.filter((t) => t.senderRole === "homeowner").length}`}

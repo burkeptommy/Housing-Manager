@@ -75,7 +75,7 @@ export default function CrewScreen() {
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
                 Bring on a teammate?
               </div>
-              When you add a second person, the workspace flips into crew mode — Dispatch lanes split by tech, the Calendar gets per-tech filters, and Routes shows side-by-side boards.
+              When you add a second person, the workspace flips into crew mode. Dispatch lanes split by tech, the Calendar gets per-tech filters, and Routes shows side-by-side boards.
             </div>
           </>
         ) : (

@@ -405,7 +405,7 @@ export default function VisitDetailScreen() {
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {upsells.map((u, i) => (
                     <div key={i} className="ops-row" style={{ padding: "10px 0" }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--neutral-200)", color: "var(--text-soft)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                         <Icon name="lightbulb" size={16} stroke={1.9} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>

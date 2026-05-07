@@ -201,9 +201,10 @@ button { font-family: inherit; }
   border: 1px solid rgba(255,255,255,0.14);
   color: rgba(255,255,255,0.7);
   border-radius: 9px;
-  padding: 6px 8px;
+  padding: 8px 12px;
   cursor: pointer;
   font-size: 11px;
+  min-height: 32px;
 }
 .ops-sidebar__footer-button:hover {
   background: rgba(255,255,255,0.08);
@@ -243,6 +244,7 @@ button { font-family: inherit; }
   color: var(--text);
   letter-spacing: -0.018em;
   line-height: 1.1;
+  margin: 0;
 }
 .ops-topbar__breadcrumb {
   font-size: 12px;
@@ -705,5 +707,16 @@ button { font-family: inherit; }
   }
   .ops-hero {
     grid-template-columns: 1fr;
+  }
+}
+
+/* H4 — Honor user preference for reduced motion: disable transitions
+   and animations across the Operations Desk for users who request it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

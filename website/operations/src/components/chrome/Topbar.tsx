@@ -77,7 +77,7 @@ export function Topbar() {
     <header className="ops-topbar">
       <div className="ops-topbar__title-block">
         {meta.eyebrow && <div className="ops-topbar__eyebrow">{meta.eyebrow}</div>}
-        <div className="ops-topbar__title">{meta.title}</div>
+        <h1 className="ops-topbar__title">{meta.title}</h1>
         {meta.breadcrumb && <div className="ops-topbar__breadcrumb">{meta.breadcrumb}</div>}
       </div>
 

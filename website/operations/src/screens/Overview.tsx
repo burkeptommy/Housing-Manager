@@ -237,9 +237,9 @@ function Hero(props: {
     <div className="ops-hero">
       <div>
         <div className="ops-hero__eyebrow">{props.eyebrow}</div>
-        <h1 className="ops-hero__headline">
+        <h2 className="ops-hero__headline">
           {headline.lead}<em>{headline.emphasis}</em>
-        </h1>
+        </h2>
         <div className="ops-hero__cta-row">
           <button className="ops-button ops-button--salmon">Open my day →</button>
           <button className="ops-button ops-button--ghost">New quote</button>
@@ -342,9 +342,14 @@ function DecisionRow({ visit }: { visit: VisitRow }) {
   // and how fast to act before they click in.
   const routedByChez = visit.source === "haven";
   const isEmergency = visit.urgency === "urgent";
+  // Salmon discipline: only emergency or Chez-routed rows get the salmon tile.
+  // Default rows use neutral indigo so the salmon signal stays meaningful.
+  const useSalmonTile = isEmergency || routedByChez;
+  const tileBg = useSalmonTile ? "var(--salmon-pale)" : "var(--neutral-200)";
+  const tileFg = useSalmonTile ? "var(--salmon-dark)" : "var(--text-soft)";
   return (
     <Link to={`/visits/${visit.requestId}`} className="ops-row" style={{ borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textDecoration: "none", color: "inherit" }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: tileBg, color: tileFg, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
         <Icon name={iconForRequest(visit.requestType)} size={18} stroke={1.9} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>

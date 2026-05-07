@@ -158,7 +158,7 @@ export default function HomeDetailScreen() {
                     setShowSuggest(true);
                   }}
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--neutral-200)", color: "var(--text-soft)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                     <Icon name={s.icon} size={16} stroke={1.9} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
