@@ -202,6 +202,54 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **10.12 / 10.13** [`gap_found`] No warranty / recall metadata or 'Check for recalls' affordance. **Suggested fix:** add warranty_active / recall_pending columns to home_systems + periodic edge function scan. **Estimated effort:** medium. **Tied to value prop:** recall surfacing is a Five-moats AI-creates-intelligence callout per CLAUDE.md. (Wave 3b)
 
+### Section 3 + 4 + 7 + 8 — messaging / negotiation / suggestions (Wave 4)
+
+#### Section 3 — Messaging
+
+- **3.1 / 3.2 Composer collision (REGRESSION + FIXED)** [`ui_quality_finding`] Wave 1b's `.toolbar(.hidden, for: .tabBar)` only hid SwiftUI's default tab bar, but the Field app uses a custom `.safeAreaInset(edge: .bottom)` tab bar that ignores per-screen toolbar modifiers. Result: chat composer was still occluded inside thread views. **FIXED** in commit `<this commit>` — added `bottomTabBarHidden` published flag on HavenFieldViewModel, thread view sets/clears via onAppear/onDisappear. (Wave 4)
+
+- **3.6** [`gap_found`] No 'Send quote inline' affordance in the composer. Thread can only LINK to a pre-built quote via thread.quote.publicShareUrl (web link). **Suggested fix:** Attach button → 'Send quote' action → opens saved-line-items library or recent-quote picker. Insert structured proposal bubble. **Estimated effort:** large. (Wave 4)
+
+- **3.7** [`gap_found`] No 'Send visit slots inline' affordance in the composer. Reschedule sheet only reachable from visit detail. **Suggested fix:** Attach → 'Send visit slots' → reuse RescheduleSheet logic in multi-slot variant. **Estimated effort:** medium. (Wave 4)
+
+- **3.8** [`gap_found`] No read receipts. Sent messages show only timestamp ('11m ago') with no Seen/Delivered indicator. handyman_request_messages has no read_at column. **Suggested fix:** add `read_at` timestamp column; flip on inbox-item insert; render 'Seen at [time]' under most-recent vendor bubble. **Estimated effort:** medium. (Wave 4)
+
+- **3.10** [`gap_found`] No APNs push for inbound homeowner messages. Realtime subscription refreshes thread in-app but no out-of-app push. **Suggested fix:** hook send-push-notification into homeowner message-insert path; AppDelegate routes deep link to thread. **Estimated effort:** medium. (Wave 4)
+
+- **3.12** [`gap_found`] Quick-reply chips don't pre-fill body. Status dropdown sets the status flag but body stays empty — handyman has to type 'On my way. ETA 20 min.' from scratch. **Suggested fix:** on status change, pre-fill body with templated string ('On my way. ETA …'). **Estimated effort:** small. (Wave 4)
+
+- **3.13 / 3.14** [`gap_found`] No 3-way Chez mediation surface. handyman_request_messages.sender_role only has 'vendor' and 'homeowner' — no 'concierge'/'chez' role. **Suggested fix:** add 'concierge' enum value; chez-concierge edge function double-writes to both sides; field bubbles render Chez-mediated messages with distinct salmon-tinted background and 'Chez' label, NEVER operator name (B4 hard rule). **Estimated effort:** large. (Wave 4)
+
+- **3.15** [`gap_found`] Magnifier icon top-right of Messages is decorative only — no search field opens. **Suggested fix:** wire to a `@State showSearch` revealing a TextField; debounce into a new search endpoint. **Estimated effort:** medium. (Wave 4)
+
+- **3.17** [`gap_found`] No customer-blocking / escalation surface. Decline-visit is the only adverse-action path. **Suggested fix:** long-press menu on thread row → 'Report this customer' → opens reason picker → flags relationship. **Estimated effort:** medium. (Wave 4)
+
+#### Section 4 — Negotiation (entire surface absent on iOS)
+
+- **4.1 / 4.2 / 4.3 / 4.4 / 4.5 / 4.7 / 4.9** [`gap_found`] No quote negotiation surface on iOS field — quote-builder is desktop-only (Wave 1b). Visit-detail action buttons are Confirm / Reschedule / Ask question / Decline (visit coordination only, not quote line items). **Suggested fix:** Phase 1 read-only quote-line-items panel on visit detail; Phase 2 'Counter price' button → adjustments sheet; Phase 3 structured proposal bubbles in thread. **Estimated effort:** very large. (Wave 4)
+
+- **4.11** [`gap_found`] No `chez_owned` awareness anywhere in field app. Homeowner-side has `chez_owned` flag on routines/contractors/maintenance_tasks but field app doesn't read it. **Suggested fix:** denormalize chez_owned onto handyman_requests; render 'Chez handles scheduling' banner on visit detail. **Estimated effort:** large. (Wave 4)
+
+#### Section 7 — Suggest tasks to homeowners
+
+- **7.1-7.5** [`gap_found`] Recommendations card on visit detail is read-only. The handyman can tick existing pre-canned recommendations (`createFollowUp`) but cannot ADD a new one. No bulk-suggest, no per-task photo, no referral-to-partner option. **Suggested fix:** RecommendationComposerSheet with title/detail/priority/photo/'Suggest visit' checkbox. POST to provider_recommendations table. **Estimated effort:** large. **Tied to value prop:** Section 7 is the 'find more work' upsell engine. Without composer, every observation gets buried in Field notes. (Wave 4)
+
+- **7.4** [`gap_found`] No 'I'll handle it' / 'Refer to partner' chip on recommendations. **Suggested fix:** action chip after recommendation creation. (Wave 4)
+
+- **7.9** [`gap_found`] No conversion analytics in field app. **Suggested fix:** add recommendation_status column; aggregate workspace-level. (Wave 4)
+
+#### Section 8 — Suggest visits
+
+- **8.2** [`gap_found`] HavenFieldRescheduleSheet supports ONE date + ONE time only; no recurrence picker. **Suggested fix:** add 'Repeat' DisclosureGroup with weekly/biweekly/monthly + endDate / count cap. Server-side route to a propose_recurring action that creates a routine row. **Estimated effort:** medium. (Wave 4)
+
+- **8.3** [`gap_found`] Reschedule sheet has no system picker — visits can't be linked to a specific system. **Suggested fix:** Picker<HavenFieldSystem> in reschedule sheet; persist as `linked_system_id` metadata. **Estimated effort:** small. (Wave 4)
+
+- **8.10** [`gap_found`] No weather-driven proactive suggestions. **Suggested fix:** Phase 1 hook OpenWeatherMap into proactive-scan edge function; Phase 2 'Seasonal pulse' card on workspace overview. **Estimated effort:** very large. (Wave 4)
+
+#### UI quality (Wave 4)
+
+- **4.x Decline button visual hierarchy** [`ui_quality_finding`] FieldGhostButtonStyle uses dashed-border outline + secondary-text color — visually reads as DISABLED even though it's enabled. **Suggested fix:** swap to solid 1pt border + textPrimary (or HavenColors.danger.opacity(0.85) for destructive). **Severity:** minor. (Wave 4)
+
 ### Architectural — parallel tables (Wave 2c)
 
 - **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)

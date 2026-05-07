@@ -1605,6 +1605,13 @@ final class HavenFieldViewModel: ObservableObject {
     @Published var selectedTab: RootTab = .home
     @Published var visitsFilter: HavenFieldVisitsFilter = .upcoming
     @Published var messageFilter: HavenFieldMessageFilter = .all
+    /// Set true while a child surface (e.g. message thread) needs the
+    /// floating safe-area-inset tab bar OUT of the way so its own bottom
+    /// composer becomes visible. Wave 1b's `.toolbar(.hidden, for:.tabBar)`
+    /// only hid SwiftUI's default tab bar; the field app's custom bar is
+    /// added via `.safeAreaInset` and ignores per-screen toolbar modifiers.
+    /// Set on `.onAppear`, cleared on `.onDisappear` of the consuming view.
+    @Published var bottomTabBarHidden = false
 
     func load(initialDashboard: HavenFieldDashboard? = nil, force: Bool = false) async {
         if let initialDashboard, dashboard == nil {
@@ -2018,7 +2025,9 @@ struct HavenFieldRootView: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            HavenFieldTabBar(selectedTab: $viewModel.selectedTab)
+            if !viewModel.bottomTabBarHidden {
+                HavenFieldTabBar(selectedTab: $viewModel.selectedTab)
+            }
         }
         .tint(HavenColors.action)
         .background(HavenColors.cream.ignoresSafeArea())
@@ -2949,6 +2958,7 @@ private struct HavenFieldMessagesTab: View {
                                             workspaceId: viewModel.dashboard?.workspace?.id,
                                             relatedVisit: viewModel.dashboard?.visits.first(where: { $0.requestId == thread.requestId }),
                                             relatedHome: viewModel.dashboard?.homes.first(where: { $0.propertyId == thread.propertyId }),
+                                            rootViewModel: viewModel,
                                             onRealtimeUpdate: { [weak viewModel] in
                                                 await viewModel?.refresh()
                                             }
@@ -3910,6 +3920,12 @@ private struct HavenFieldMessageThreadView: View {
     let workspaceId: String?
     let relatedVisit: HavenFieldVisit?
     let relatedHome: HavenFieldHome?
+    /// Optional reference to the parent HavenFieldViewModel so the thread
+    /// can hide the floating bottom tab bar while it owns the screen — its
+    /// own bottom composer needs the safe-area room. Wave 4 found that the
+    /// Wave 1b `.toolbar(.hidden, for:.tabBar)` only suppressed SwiftUI's
+    /// default tab bar, not the field app's custom safe-area-inset bar.
+    var rootViewModel: HavenFieldViewModel? = nil
     /// Called when Realtime sees a new row land on this request's
     /// `handyman_request_messages` so the parent can refresh its
     /// dashboard and re-render the thread with the new messages.
@@ -3981,9 +3997,13 @@ private struct HavenFieldMessageThreadView: View {
         .navigationTitle(thread.propertyName ?? thread.title)
         .navigationBarTitleDisplayMode(.inline)
         // Hide the floating tab bar while reading or composing in a thread —
-        // pre-Wave-1b the bar overlapped the message composer so the Send
-        // affordance was clipped and the textarea was barely usable.
+        // the bar overlaps the message composer so the Send affordance is
+        // clipped. Wave 1b's `.toolbar(.hidden, for:.tabBar)` doesn't
+        // affect the safe-area-inset custom bar; flipping the parent
+        // viewModel's bottomTabBarHidden flag does.
         .toolbar(.hidden, for: .tabBar)
+        .onAppear { rootViewModel?.bottomTabBarHidden = true }
+        .onDisappear { rootViewModel?.bottomTabBarHidden = false }
         .task {
             await subscribeToRealtime()
         }
