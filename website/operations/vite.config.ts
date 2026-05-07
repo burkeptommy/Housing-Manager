@@ -19,11 +19,15 @@ export default defineConfig({
     // `localhost:5173/operations/` is sufficient — this proxy is for
     // when you also want to test the full auth flow.
     proxy: {
-      "^/(handyman|handymen|handyman-quote|handyman-visit|index|chez|styles|verify|terms|privacy|security)\\.(html|css|js)$": {
+      // Proxy patterns must allow an optional query string suffix —
+      // the marketing pages cache-bust their CSS / JS via `?v=...`,
+      // and Vite's regex matches the full request path including the
+      // query, so the trailing `$` would 404 every cache-busted asset.
+      "^/(handyman|handymen|handyman-quote|handyman-visit|index|chez|styles|verify|terms|privacy|security)\\.(html|css|js)(\\?.*)?$": {
         target: "http://localhost:8000",
         changeOrigin: true,
       },
-      "^/(favicon|chez-logo|chez-handyman-logo|og-image)\\.(svg|png)$": {
+      "^/(favicon|chez-logo|chez-handyman-logo|og-image)\\.(svg|png)(\\?.*)?$": {
         target: "http://localhost:8000",
         changeOrigin: true,
       },
