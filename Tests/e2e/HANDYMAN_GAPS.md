@@ -128,6 +128,52 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **5.56** [`gap_found`] No retry queue for failed photo uploads. **Suggested fix:** persist `PendingPhotoUpload` model to UserDefaults; render queue indicator; retry on reconnect. **Estimated effort:** medium. (Wave 2c)
 
+### Section 6 — Review homes (Wave 3a)
+
+#### Section 6a — Multi-household aggregate views
+
+- **6.5** [`gap_found`] No sort affordance on Homes tab. **Suggested fix:** add sort menu to toolbar (next visit / outstanding $ / lifetime value). **Estimated effort:** small. (Wave 3a)
+
+- **6.6 / 6.7** [`gap_found`] Visits tab has REQUESTS / UPCOMING split but no day-bounded filter (Today / This week / This month). **Suggested fix:** replace binary REQUESTS/UPCOMING with 4-state segmented filter. **Estimated effort:** medium. (Wave 3a)
+
+- **6.8** [`gap_found`] No "Outstanding" view aggregating unpaid invoices + expired quotes + open punch items + un-acknowledged messages. Only a numeric count surfaces. **Suggested fix:** new tab section or filter. **Estimated effort:** medium. (Wave 3a)
+
+- **6.9 / 6.10** [`gap_found`] No map view + no route optimization. Visits tab UPCOMING shows 'Confirmed route' label but is a flat list of 1 visit. **Suggested fix:** Phase 1 — map button drops pins for each visit's address in MapKit. Phase 2 — Apple Maps Directions API for optimized stop_order. **Estimated effort:** large. **Tied to value prop:** Housecall Pro / ServiceTitan bake this in; 10% drive-time savings is real money for a Westchester handyman. (Wave 3a)
+
+#### Section 6b — Per-household detail
+
+- **6.11** [`gap_found`] Customer detail header missing photo of home, contact (phone, email), tap-to-call / tap-to-email. **Suggested fix:** augment header with optional `home_photo_url` (lazy AsyncImage) + CONTACT row with `tel:` URL scheme. **Estimated effort:** medium. (Wave 3a)
+
+- **6.13** [`gap_found`] No routines section on home detail. Existing `routines` table queryable. **Suggested fix:** add Routines sub-tab listing recurring services with cadence + next due. **Estimated effort:** small. (Wave 3a)
+
+- **6.14** [`gap_found`] No "All vendors the homeowner uses" surface (mirror of homeowner-side `contractors` list). **Suggested fix:** add Vendors sub-tab. **Estimated effort:** small. (Wave 3a)
+
+- **6.18** [`gap_found`] Outstanding payments are just a numeric count, no breakdown. **Suggested fix:** tap-through to per-quote list with status pills + amounts. **Estimated effort:** small. (Wave 3a)
+
+- **6.19** [`gap_found`] No notes / tags per household ('Has dog — call ahead', 'Side gate code 1234'). **Suggested fix:** add `households.handyman_notes` JSONB or new `provider_household_notes` table. **Estimated effort:** medium. (Wave 3a)
+
+- **6.20** [`gap_found`] No year-over-year revenue per customer (lifetime value pattern). **Suggested fix:** computable from existing `provider_visit_assignments` + invoices. **Estimated effort:** small. (Wave 3a)
+
+- **6.22** [`gap_found`] No read-only display of homeowner's `households.chez_profile` JSONB (about_us, communication, vendor_preferences, logistics, spending_tiers). **Suggested fix:** highest-value lowest-effort gap; existing column, just needs SwiftUI display. **Estimated effort:** small. **Tied to value prop:** saves the handyman from re-asking 'do you prefer email or text?', 'is there anything I should know about pets?'. (Wave 3a)
+
+- **6.16** [`ui_quality_finding`] Visit row in customer-detail Recent section LOOKS tappable but isn't — same data row on Visits tab IS tappable. Inconsistent navigation. **Suggested fix:** wrap in NavigationLink to the same visit-detail destination. **Severity:** moderate. (Wave 3a)
+
+#### Section 6c — Gap-filling view (Tom's high-value callout)
+
+- **6.23** [`gap_found`] **HIGH-VALUE CALLOUT.** Per Tom's brief: "the handyman should be able to see from their app all the systems that home has setup currently, but also all the systems that the handyman could setup for them immediately ie. This home has a furnace as a system, but no model/brand/etc. the handyman should be able to input that or snap a picture to identify the model." TODAY: Customer Home detail / Systems sub-tab is read-only with empty state — no "Add system" button, no "Capture details" affordance. The system-capture flow ('Add system from label photo') exists ONLY on Visit detail / Systems sub-tab, gated behind an active visit. **Suggested fix:** lift the existing CaptureCard to a shared component, render it on home-detail Systems sub-tab when systems list is empty OR when any system has missing brand/model/serial. Add a per-row 'Capture details' button on partial-detail rows. **Estimated effort:** medium. (Wave 3a)
+
+- **6.24 / 6.25 / 6.27** [`gap_found`] No Suggested systems / Suggested vendors / Missing routines proactive prompts on customer detail. The homeowner-side has VendorCoverageSheet; the field app should mirror this. **Suggested fix:** mirror VendorCoverageSheet logic on field side. **Estimated effort:** large. (Wave 3a)
+
+- **6.26** [`gap_found`] No "Stale data" view (last_service_date > N years ago indicator on the systems list). **Suggested fix:** color-code system rows by `last_service_date` recency, surface "5 systems overdue for service" banner. **Estimated effort:** small. (Wave 3a)
+
+- **6.28** [`gap_found`] No "Capture all" sweep mode (camera-first walkthrough). **Suggested fix:** new flow that auto-advances through every system + vendor + routine in one optimized capture flow. **Estimated effort:** large. (Wave 3a)
+
+#### Section 6 UI quality (Wave 3a)
+
+- **B1** [`ui_quality_finding`] '1 upcoming' status pill on Homes list cards uses salmon background + salmon icon + salmon text. Decorative status, not a CTA. **Suggested fix:** swap to navy tint matching the chat counter pill. **Severity:** minor. (Wave 3a)
+
+- **B9** [`ui_quality_finding`] Search empty state echoes 500-char query verbatim, dominating screen. **Suggested fix:** truncate to first 30 chars + ellipsis. **Severity:** minor. (Wave 3a)
+
 ### Architectural — parallel tables (Wave 2c)
 
 - **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)

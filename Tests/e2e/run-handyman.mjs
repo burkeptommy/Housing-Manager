@@ -510,7 +510,10 @@ class HandymanE2ERunner {
         continue;
       }
 
-      // Seed home_systems based on variant
+      // Seed home_systems based on variant. Wave 3a flagged this loop as
+      // silently swallowing failures — `is_essential` was a stale column
+      // name that never existed on the schema. Now we surface insert
+      // failures explicitly so future schema drift is loud.
       const systemIds = [];
       const baselineSystems = ["HVAC", "Water Heater", "Roofing", "Electrical", "Plumbing"];
       for (let s = 0; s < variant.systems; s++) {
@@ -525,12 +528,20 @@ class HandymanE2ERunner {
               property_id: propertyId,
               category: baselineSystems[s],
               name: baselineSystems[s],
-              is_essential: true,
+              status: "active",
             }),
           },
           user.jwt
         );
-        if (sysIns.ok) systemIds.push(sysId);
+        if (sysIns.ok) {
+          systemIds.push(sysId);
+        } else {
+          this.recordIssue(
+            "phase3",
+            `home_system insert failed for customer ${i + 1} (${baselineSystems[s]})`,
+            sysIns.body
+          );
+        }
       }
 
       this.state.customers.push({
@@ -885,6 +896,12 @@ class HandymanE2ERunner {
           this.state.requestIds.length > 0
             ? `handyman_request_messages?request_id=in.(${this.state.requestIds.join(",")})&select=id`
             : `handyman_request_messages?id=eq.00000000-0000-0000-0000-000000000000&select=id`,
+        ],
+        [
+          "home_systems (across all customers)",
+          this.state.customers.length > 0
+            ? `home_systems?household_id=in.(${this.state.customers.map((c) => c.householdId).join(",")})&select=id`
+            : `home_systems?id=eq.00000000-0000-0000-0000-000000000000&select=id`,
         ],
       ].map(async ([name, q]) => {
         const r = await restService(q);
