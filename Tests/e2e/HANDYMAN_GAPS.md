@@ -322,6 +322,45 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **Property tab counter inconsistency** [`ui_quality_finding`] Customer 2 home shows '49 tasks need a vendor / 49 quotes ready to review' (same number used twice; only 1 quote actually exists in DB). PropertyListView shows '10 systems' on a household with only 3 home_systems rows. **Suggested fix:** audit the count source — likely template-string literal '49' instead of DB-derived. **Severity:** moderate. (Wave 6)
 
+### Section 7 — Comprehensive design + a11y audit (Wave 7)
+
+#### Salmon discipline batch — multi-fix shipped this wave
+
+- **Visit row 'NEXT UP' pill, Homes 'X upcoming' badge, visit-row salmon divider line, Sign Out button** [`ui_quality_finding`] All four were salmon-decoration B1 violations. **FIXED** in commit `<this commit>`:
+  - NEXT UP pill → navy text on navy 10% tint background
+  - 'X upcoming' Homes badge → navy tint matching sibling quote/thread badges
+  - Visit-row divider → always neutral border (NEXT UP pill carries the next-up signal)
+  - Sign Out button → critical red outlined button (destructive action visual semantics)
+  **Severity (was):** moderate. (Wave 7)
+
+#### Verifications passed
+
+- **B3 em dashes** [`verification`] PASSED — `grep -nE '"[^"]*—[^"]*"'` against all field-app source files returned ZERO user-facing string hits. Wave 2a + 5 + 6 sweeps held. (Wave 7)
+
+- **B4 brand voice** [`verification`] PASSED — `grep -n '"Tom"\|tom@\|burkep'` returned ZERO hits. 10 'Chez' references all proper brand voice. (Wave 7)
+
+- **Wave 4 chat composer fix** [`verification`] PASSED — composer visible inside thread view, doesn't collide with tab bar (which is hidden via bottomTabBarHidden flag). Wave 4 fix held. (Wave 7)
+
+- **Wave 5 Settings hero email** [`verification`] PASSED — Settings hero shows current user's email + workspace info. Wave 5 fix held. (Wave 7)
+
+#### Remaining minor findings (deferred to product input)
+
+- **Sign-in validation error in salmon** [`ui_quality_finding`] Should use `HavenColors.critical` instead. **Severity:** moderate. (Wave 7)
+- **Sign-in stale validation** [`ui_quality_finding`] Errors don't auto-clear on field edit (already documented Wave 1a; Wave 7 confirmed still present on field-app side). **Severity:** minor. (Wave 7)
+- **Hero metric salmon dots** [`ui_quality_finding`] Three stat-pill prefix dots in salmon on the Overview hero card — decorative. **Severity:** minor. (Wave 7)
+- **'Open home profile' link salmon body text** [`ui_quality_finding`] Body-sized salmon text in visit detail Home sub-tab fails ~3:1 WCAG AA. **Severity:** major. (Wave 7)
+- **Message thread shortcut chips (Visit / Home / Quote) salmon body text** [`ui_quality_finding`] Same H4 contrast issue. **Severity:** major. (Wave 7)
+- **Ad-hoc visit type chips truncation** [`ui_quality_finding`] 4 chips at ~80pt each can't fit 12-char labels. **Severity:** major. (Wave 7)
+- **Disabled CTA pale-pink-on-white** [`ui_quality_finding`] Pair-a-home + new-message disabled buttons read as 'not loaded' rather than 'waiting for input'. **Severity:** minor. (Wave 7)
+- **Decline button dashed-border = disabled-looking** [`ui_quality_finding`] Same finding as Wave 1b. Visual semantics still off. **Severity:** moderate. (Wave 7)
+- **Status update picker salmon body text** [`ui_quality_finding`] Same H4 issue in New Update modal. **Severity:** moderate. (Wave 7)
+- **'New message' → 'New update' verb shift** [`ui_quality_finding`] Mid-flow copy inconsistency. **Severity:** minor. (Wave 7)
+- **Workspace name truncation leaks timestamp** [`ui_quality_finding`] Test seed stamp '1778122666...' truncates into the UI. (Real users won't have this issue.) **Severity:** minor. (Wave 7)
+- **Files sub-tab on customer-home detail empty state** [`ui_quality_finding`] No CTA in the empty state — dead-end-y. **Severity:** minor. (Wave 7)
+- **Composer disabled send button arrow contrast** [`ui_quality_finding`] White arrow on pale-salmon circle is too subtle. **Severity:** minor. (Wave 7)
+
+These are tracked for the next design sprint — too many for this overnight pass to ship every one. Most are 1-2 line tint changes or button-style swaps.
+
 ### Architectural — parallel tables (Wave 2c)
 
 - **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)

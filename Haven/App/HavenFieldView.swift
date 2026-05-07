@@ -2457,12 +2457,16 @@ private struct HavenFieldVisitsTab: View {
                                                     .foregroundStyle(HavenColors.textSecondary)
                                                 Spacer()
                                                 if group.isToday {
+                                                    // Wave 7: was salmon (B1 violation —
+                                                    // pill is decorative status, not an
+                                                    // action). Now navy-tinted to match
+                                                    // the rest of the status pill family.
                                                     Text("NEXT UP")
                                                         .font(HavenTypography.caption)
-                                                        .foregroundStyle(HavenColors.action)
+                                                        .foregroundStyle(HavenColors.navy700)
                                                         .padding(.horizontal, 10)
                                                         .padding(.vertical, 6)
-                                                        .background(HavenColors.action50)
+                                                        .background(HavenColors.navy700.opacity(0.10))
                                                         .clipShape(Capsule())
                                                 }
                                             }
@@ -2822,10 +2826,13 @@ private struct FieldClientRow: View {
 
                 HStack(spacing: 12) {
                     if upcomingVisitCount > 0 {
+                        // Wave 7: was salmon-tinted (B1 violation — pill is
+                        // a status indicator, not an action). Aligned with
+                        // the sibling quote/thread badges which are navy.
                         FieldClientBadge(
                             icon: "calendar.badge.clock",
                             label: "\(upcomingVisitCount) upcoming",
-                            tint: HavenColors.action
+                            tint: HavenColors.navy700
                         )
                     }
                     if openQuoteCount > 0 {
@@ -5360,8 +5367,11 @@ private struct FieldScheduledVisitRow: View {
             }
             .frame(width: 74, alignment: .leading)
 
+            // Wave 7: highlightNext used to flip the divider to salmon
+            // (B1 violation — divider is decorative). The 'NEXT UP' pill
+            // already conveys next-up state; keep this neutral.
             RoundedRectangle(cornerRadius: 1)
-                .fill(highlightNext ? HavenColors.action : HavenColors.border)
+                .fill(HavenColors.border)
                 .frame(width: 2)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -5451,11 +5461,25 @@ private struct FieldWorkspaceSettingsSheet: View {
                                 }
                             }
 
+                            // Wave 7: was salmon FieldPrimaryButtonStyle —
+                            // major B1 violation since Sign Out is destructive,
+                            // not the recommended next step. Now renders as a
+                            // critical-red outlined button that signals 'danger
+                            // zone' without burning the brand-action salmon.
                             Button("Sign out") {
                                 dismiss()
                                 onSignOut()
                             }
-                            .buttonStyle(FieldPrimaryButtonStyle())
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.critical)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 18)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(HavenColors.critical.opacity(0.4), lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
                     }
                 }
