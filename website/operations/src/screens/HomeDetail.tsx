@@ -118,7 +118,7 @@ export default function HomeDetailScreen() {
             </div>
             {!home.systems || home.systems.length === 0 ? (
               <div style={{ padding: 16, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                No systems registered yet for this home. On your first visit, build the home profile in Chez Field — manufacturer + model + serial syncs back to the homeowner's app automatically.
+                No systems registered yet for this home. On your first visit, build the home profile in Chez Field. Manufacturer, model, and serial sync back to the homeowner's app automatically.
               </div>
             ) : (
               <CategorizedSystems systems={home.systems} onEditSystem={setEditingSystem} />
@@ -702,7 +702,7 @@ function generateAISuggestions(home: { name: string; systems?: HomeSystem[] } | 
   if (monthsSinceLast === null || monthsSinceLast > 12) {
     out.push({
       title: "Annual home walk-through",
-      reason: lastVisitDate ? `Last visit was ${monthsSinceLast} months ago.` : "No completed visits on file yet — a walk-through builds the profile and finds easy wins.",
+      reason: lastVisitDate ? `Last visit was ${monthsSinceLast} months ago.` : "No completed visits on file yet. A walk-through builds the profile and finds easy wins.",
       icon: "home",
       priority: "Soon",
       requestType: "standard_visit",
@@ -922,7 +922,7 @@ function SystemEditSheet({
           </Field>
           <Field label="Notes">
             <textarea
-              placeholder="Anything you noticed — corrosion, last service date, recommended replacements…"
+              placeholder="Anything you noticed: corrosion, last service date, recommended replacements…"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               style={{ ...inputStyle2, minHeight: 100, resize: "vertical" }}

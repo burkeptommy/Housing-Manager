@@ -38,9 +38,13 @@ function Shell() {
   // Auth gate. If we're not loading and there's no session, kick the user
   // to the marketing/auth page. Preserve the deep link in `?next=` so a
   // post-login redirect can land them where they wanted to go.
+  // The router base is `/operations`, so `location.pathname` here is the
+  // path *inside* the SPA (e.g. `/homes/{id}`). handyman.js validates that
+  // `next` starts with `/operations`, so we must prepend that prefix.
   useEffect(() => {
     if (!isLoading && !session) {
-      const next = encodeURIComponent(location.pathname + location.search);
+      const fullPath = `/operations${location.pathname}${location.search}`;
+      const next = encodeURIComponent(fullPath);
       window.location.assign(`/handyman.html?next=${next}`);
     }
   }, [isLoading, session, location]);

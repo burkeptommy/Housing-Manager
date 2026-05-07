@@ -3069,7 +3069,7 @@ async function addClientForProvider(
       created_by_user_id: userId,
       request_type: "standard_visit",
       source: "vendor",
-      title: `Initial setup — ${clientName}`,
+      title: `Initial setup: ${clientName}`,
       details: noteParts.join("\n"),
       preferred_timing: null,
       urgency: "routine",
