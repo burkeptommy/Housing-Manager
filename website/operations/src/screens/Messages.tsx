@@ -142,8 +142,38 @@ export default function MessagesScreen() {
                   No replies yet on this thread.
                 </div>
               ) : (
-                selected.recentMessages.map((m) => {
-                  const isUs = m.senderRole === "vendor" || m.senderRole === "haven";
+                // Server returns messages newest-first; chat UX expects oldest-first
+                // (newest at bottom near composer), so reverse before rendering.
+                [...selected.recentMessages].reverse().map((m) => {
+                  const role = m.senderRole;
+                  const isUs = role === "vendor";
+                  // Chez admin messages (haven / chez sender_role) render as a distinct
+                  // 3rd identity, center-aligned, never as "us" or "homeowner". Brand
+                  // voice rule: always shown as "Chez", never an operator name.
+                  const isChez = role === "haven" || role === "chez";
+                  if (isChez) {
+                    return (
+                      <div
+                        key={m.id}
+                        style={{
+                          alignSelf: "center",
+                          maxWidth: "80%",
+                          background: "var(--salmon-50)",
+                          color: "var(--text)",
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          border: "1px solid var(--salmon-pale)",
+                          fontSize: 13,
+                          lineHeight: 1.5,
+                          textAlign: "center",
+                        }}
+                      >
+                        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--salmon)", marginBottom: 4 }}>Chez</div>
+                        {m.body}
+                        <div style={{ marginTop: 6, fontSize: 10.5, color: "var(--text-soft)" }}>{formatRelativeTime(m.createdAt)}</div>
+                      </div>
+                    );
+                  }
                   return (
                     <div
                       key={m.id}

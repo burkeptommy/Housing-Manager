@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Chez Handyman Operations Desk — authenticated web workspace for handyman companies (sole-prop or crew). Eight-screen SPA: Overview, Dispatch, Calendar, Routes, Crew, Homes, Quotes, Messages.",
+  "description": "Chez Contractor Operations Desk — authenticated web workspace for handyman companies (sole-prop or crew). Eight-screen SPA: Overview, Dispatch, Calendar, Routes, Crew, Homes, Quotes, Messages.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
