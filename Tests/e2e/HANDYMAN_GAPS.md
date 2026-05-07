@@ -100,6 +100,38 @@ This file is the sink for **gaps** (features absent and should exist),
 
 - **B1** [`ui_quality_finding`] "Cancelled" status pill renders salmon — destructive/negative status should be critical-red or muted gray. **Suggested fix:** swap salmon for `HavenColors.critical.opacity(0.1)` background + `HavenColors.critical` text. **Severity:** minor. (Wave 2b)
 
+### Section 5e — Observations / safety / code / recommendations (Wave 2c)
+
+- **5.39 / 5.42** [`gap_found`] No "+ Add observation" / "+ Add recommendation" affordance on visit detail. Server-side `add_recommended_task` action exists in handyman-provider edge function; iOS doesn't call it. Recommendations card on the visit detail is read-only (renders pre-seeded items + toggles `createFollowUp`). **Suggested fix:** wire an inline Add button → AddRecommendationSheet (title + detail + category + priority + optional photo) → call `add_recommended_task`. Reuse the existing syncPortal pattern. **Estimated effort:** medium. **Tied to value prop:** without proactive observation capture, the visit detail is a worklist mark-off, not an inventory experience. (Wave 2c)
+
+- **5.40 / 5.41** [`gap_found`] No type discriminator on observation/recommendation entries — safety_concern / code_violation should fire admin push immediately and render with red urgency framing. Today everything is bucketed by regex on title which misses obvious safety/code language. **Suggested fix:** add `kind: observation | safety_concern | code_violation | recommendation` to entry; gate priority badge color; server fires admin push when kind requires immediate action. (Wave 2c)
+
+- **5.43** [`gap_found`] No photo / voice memo / tags on recommendations. **Suggested fix:** add `photo_paths: [String]`, `voice_memo_path: String?`, `tags: [String]` to entry. Route uploads through `upload_assessment_document` (already in edge function). **Estimated effort:** medium. (Wave 2c)
+
+### Section 5f — Submit + handoff to Chez central (Wave 2c)
+
+- **5.44** [`gap_found`] Field app's "Complete visit" writes to `handyman_request_visits` JSONB only. Server-side `submit_assessment_data` action — which fans out captured systems/contractors/routines to homeowner tables AND fires "your home is set up" push — is never invoked. **Suggested fix:** replace completeVisit's portal sync with two-step: call `submit_assessment_data` first → write captured_* JSONB to homeowner tables + fire push, then update visit report. The dead-code `GuidedAssessmentViewModel.swift` already implements `callField(action: 'submit_assessment_data', ...)` — use as starting reference. **Estimated effort:** large. **CRITICAL.** Without this, the entire on-behalf-of value prop is gone. (Wave 2c)
+
+- **5.47** [`gap_found`] No inbound notification handling for "homeowner has reviewed your assessment". Push registration fires but no `assessment_reviewed` route. **Suggested fix:** server fires push with `type: 'assessment_reviewed'` when chez_request flips state; iOS handler routes to visit detail. (Wave 2c)
+
+- **5.48 / 5.49** [`gap_found`] No audit trail / change history for handyman ↔ homeowner edits. **Suggested fix:** server-side `assessment_audit_log` table + RLS; iOS renders an "Activity" tab. **Estimated effort:** large. Defer to a future phase. (Wave 2c)
+
+- **5.50 / 5.51 (multi-day continuation)** [`gap_found`] Server has `start_continuation_visit` action + `home_assessments.session_count` + `assessment_round` columns ready. iOS has zero UI for multi-visit continuation. The local UserDefaults draft cache works for kill→relaunch within the same visit, but no "continue next visit" button. **Suggested fix:** add "Save & continue next visit" button that calls `start_continuation_visit`; on next visit, iOS loads from in-progress assessment and resumes. **Estimated effort:** medium. **Tied to value prop:** CRITICAL for HNW estates — 10,000sqft homes need 2-3 visits to fully capture. (Wave 2c)
+
+### Section 5g — Edge cases (Wave 2c)
+
+- **5.52** [`gap_found`] No `homeowner_present` toggle in iOS UI. Column exists in `home_assessments`. **Suggested fix:** add `HomeownerPresentToggle` to visit detail check-in section. Wire to `update_assessment_progress`. **Estimated effort:** small. (Wave 2c)
+
+- **5.53** [`gap_found`] No camera-permission-denied handler. **Suggested fix:** wrap PhotosPicker / camera with `AVCaptureDevice.authorizationStatus(for: .video)` check; surface `CameraPermissionRequiredSheet` with "Open Settings" + "Choose from library" + "Skip" options. **Severity:** small. (Wave 2c)
+
+- **5.54** [`gap_found`] PARTIAL — local draft cache via `HavenFieldCache.saveDraft` works; sync errors set `syncMessage='Saved offline'`. Missing: visible offline banner, automatic retry on reconnect (NWPathMonitor), pending-write counter. **Suggested fix:** add `NWPathMonitor` observer + `OfflineBanner` overlay + auto-retry. **Estimated effort:** medium. **Tied to value prop:** Westchester estates have notoriously bad cell coverage; mechanical-rooms always do. (Wave 2c)
+
+- **5.56** [`gap_found`] No retry queue for failed photo uploads. **Suggested fix:** persist `PendingPhotoUpload` model to UserDefaults; render queue indicator; retry on reconnect. **Estimated effort:** medium. (Wave 2c)
+
+### Architectural — parallel tables (Wave 2c)
+
+- **`home_assessments` vs `handyman_request_visits` are orphaned from each other.** Server has full assessment-lifecycle actions (`start_assessment_visit`, `update_assessment_progress`, `submit_assessment_data`, `add_recommended_task`, `mark_task_fixed_during_visit`, `start_continuation_visit`, `decommission_system`) wired into `home_assessments`. iOS Field app uses an entirely separate `handyman_request_visits` JSONB via `syncPortal`. The dead-code `GuidedAssessmentView.swift` is the only place that calls the home_assessments actions. **Suggested fix:** pick the canonical source of truth. Either (a) wire iOS Field to use home_assessments via the existing edge function actions (large effort), or (b) explicitly merge handyman_request_visits → home_assessments at submit time (medium effort), or (c) delete home_assessments + actions and consolidate on handyman_request_visits (small effort but loses queryability). The current "two parallel tables" situation guarantees data drift between dispatch and assessment. **Severity:** persistence_finding — major (architectural), needs Tom's design call. (Wave 2c)
+
 ## UI quality findings
 
 ### Severity: major
