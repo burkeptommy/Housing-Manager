@@ -45,6 +45,10 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "Messages",
     breadcrumb: "Homeowner conversations",
   },
+  "/settings": {
+    title: "Settings",
+    breadcrumb: "Workspace branding and service area",
+  },
 };
 
 export function Topbar() {

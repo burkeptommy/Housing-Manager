@@ -2488,6 +2488,21 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       activeMemberCount: activeMembers.length,
       invitedMemberCount: teamMemberRows.filter((row) => row.status === "invited").length,
       providerUrl: PROVIDER_SITE_URL,
+      // Wave P: branding + directory fields the Settings screen reads/writes.
+      // Always serialize (empty string / [] when null) so the SPA never has
+      // to special-case undefined.
+      licenseNumber: compactString(workspace.license_number),
+      serviceState: compactString(workspace.service_state),
+      serviceCity: compactString(workspace.service_city),
+      serviceZipCodes: Array.isArray(workspace.service_zip_codes)
+        ? (workspace.service_zip_codes as unknown[]).map((z) => compactString(z)).filter(Boolean)
+        : [],
+      categories: Array.isArray(workspace.categories)
+        ? (workspace.categories as unknown[]).map((c) => compactString(c)).filter(Boolean)
+        : [],
+      displayBlurb: compactString(workspace.display_blurb),
+      headshotUrl: compactString(workspace.headshot_url),
+      isListedInDirectory: Boolean(workspace.is_listed_in_directory),
     },
     linkedContractors: (contractorLinks ?? []).map((row: Record<string, unknown>) => {
       const contractor = (row.contractors as Record<string, unknown> | undefined) ?? {};
@@ -3444,6 +3459,33 @@ async function updateWorkspaceDirectory(
     updated_at: isoNow(),
   };
 
+  // Wave P: identity fields (company name, primary contact, website,
+  // license). Live alongside the directory fields below — the Settings
+  // screen treats them as one logical save. Each typeof-guarded so a
+  // partial update only writes the fields the caller passed.
+  if (typeof body.companyName !== "undefined") {
+    const name = compactString(body.companyName);
+    if (!name) throw new Error("Company name cannot be blank");
+    updates.company_name = name.slice(0, 200);
+  }
+  if (typeof body.primaryEmail !== "undefined") {
+    const raw = compactString(body.primaryEmail);
+    if (raw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+      throw new Error("Primary email is not a valid email address");
+    }
+    updates.primary_email = raw ? raw.toLowerCase() : null;
+  }
+  if (typeof body.primaryPhone !== "undefined") {
+    updates.primary_phone = compactString(body.primaryPhone) || null;
+  }
+  if (typeof body.website !== "undefined") {
+    updates.website = compactString(body.website) || null;
+  }
+  if (typeof body.licenseNumber !== "undefined") {
+    const raw = compactString(body.licenseNumber);
+    updates.license_number = raw ? raw.slice(0, 80) : null;
+  }
+
   if (typeof body.isListedInDirectory !== "undefined") {
     updates.is_listed_in_directory = Boolean(body.isListedInDirectory);
   }
@@ -3498,7 +3540,7 @@ async function updateWorkspaceDirectory(
     .update(updates)
     .eq("id", workspaceId)
     .select(
-      "id, company_name, is_listed_in_directory, service_state, service_city, service_zip_codes, categories, display_blurb, headshot_url, aggregate_rating, review_count",
+      "id, company_name, primary_email, primary_phone, website, license_number, is_listed_in_directory, service_state, service_city, service_zip_codes, categories, display_blurb, headshot_url, aggregate_rating, review_count",
     )
     .single();
 

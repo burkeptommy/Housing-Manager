@@ -53,7 +53,12 @@ export default function CrewScreen() {
               {isSole ? "Just you for now" : `${members.length} teammate${members.length === 1 ? "" : "s"} · ${dashboard.workspace.invitedMemberCount} pending`}
             </div>
           </div>
-          <button className="ops-button ops-button--salmon">+ Invite teammate</button>
+          <button
+            className="ops-button ops-button--salmon"
+            onClick={() => window.dispatchEvent(new CustomEvent("ops:open-invite-teammate"))}
+          >
+            + Invite teammate
+          </button>
         </div>
 
         {isSole && members.length === 1 ? (

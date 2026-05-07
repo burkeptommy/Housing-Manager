@@ -13,9 +13,11 @@ import HomesScreen from "./screens/Homes";
 import HomeDetailScreen from "./screens/HomeDetail";
 import QuotesScreen from "./screens/Quotes";
 import MessagesScreen from "./screens/Messages";
+import SettingsScreen from "./screens/Settings";
 import { CommandPalette } from "./components/CommandPalette";
 import { NewQuoteModal, NewQuoteProvider, useNewQuoteModal } from "./components/NewQuoteModal";
 import { AddClientModal } from "./components/AddClientModal";
+import { InviteTeammateSheet } from "./components/InviteTeammateSheet";
 
 export default function App() {
   return (
@@ -25,6 +27,7 @@ export default function App() {
         <Shell />
         <NewQuoteModal />
         <AddClientModal />
+        <InviteTeammateSheet />
         <CommandPalette />
       </NewQuoteProvider>
     </WorkspaceProvider>
@@ -76,6 +79,7 @@ function Shell() {
             <Route path="/homes/:propertyId" element={<HomeDetailScreen />} />
             <Route path="/quotes" element={<QuotesScreen />} />
             <Route path="/messages" element={<MessagesScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

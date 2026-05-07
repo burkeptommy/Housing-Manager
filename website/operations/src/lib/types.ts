@@ -45,7 +45,14 @@ export interface Permissions {
   canEditQuotes: boolean;
   canViewMessages: boolean;
   canSendMessages: boolean;
-  canBootstrapWorkspace: boolean;
+  /**
+   * Wave P: source of truth is the Edge Function's rolePermissions().
+   * `canManageWorkspace` is the canonical name; `canBootstrapWorkspace`
+   * is kept as a backward-compat alias because earlier specs and any
+   * legacy SPA call sites may still reference it.
+   */
+  canManageWorkspace: boolean;
+  canBootstrapWorkspace?: boolean;
   isFieldTechnician: boolean;
 }
 
@@ -59,6 +66,17 @@ export interface Workspace {
   activeMemberCount: number;
   invitedMemberCount: number;
   providerUrl: string;
+  // Branding / directory fields. All optional because pre-Wave-P workspaces
+  // landed without them populated. The Settings screen lets the owner fill
+  // them in, and the find-network handymen flow surfaces them downstream.
+  licenseNumber?: string;
+  serviceState?: string;
+  serviceCity?: string;
+  serviceZipCodes?: string[];
+  categories?: string[];
+  displayBlurb?: string;
+  headshotUrl?: string;
+  isListedInDirectory?: boolean;
 }
 
 export interface LinkedContractor {

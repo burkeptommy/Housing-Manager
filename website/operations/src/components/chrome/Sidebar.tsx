@@ -9,6 +9,12 @@ interface NavItem {
   icon: string;
   end?: boolean;
   crewOnly?: boolean;
+  /**
+   * Wave P: gate Settings to roles that can edit the workspace
+   * (owner / admin via canManageWorkspace). Tom does not want
+   * dispatchers / technicians editing branding.
+   */
+  ownerOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -20,14 +26,20 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/homes", label: "Homes", icon: "home" },
   { to: "/quotes", label: "Quotes", icon: "quote" },
   { to: "/messages", label: "Messages", icon: "message" },
+  { to: "/settings", label: "Settings", icon: "gear", ownerOnly: true },
 ];
 
 export function Sidebar() {
   const { dashboard, mode, signOut } = useWorkspace();
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.crewOnly || mode === "crew"
+  const canEditWorkspace = Boolean(
+    dashboard?.permissions.canManageWorkspace ?? dashboard?.permissions.canBootstrapWorkspace,
   );
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.crewOnly && mode !== "crew") return false;
+    if (item.ownerOnly && !canEditWorkspace) return false;
+    return true;
+  });
 
   const memberFullName = dashboard?.currentUser.fullName || dashboard?.currentUser.email || "Operator";
   const memberInitials = initialsFor(memberFullName);
