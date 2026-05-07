@@ -1922,6 +1922,28 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     ),
   ];
 
+  // Section 19d: pull chez_profile for every household in scope so the
+  // contractor sees standing instructions (esp. spending tiers — the
+  // contractor needs to know whether to ping Chez before a $500+
+  // proposal). Phase 80.1 added the JSONB column; this SPA was the
+  // last consumer to wire it in.
+  const householdIds = [
+    ...new Set(
+      [...visibleRequests.map((row) => compactString(row.household_id)), ...quotes.map((row) => compactString(row.household_id))]
+        .filter(Boolean),
+    ),
+  ];
+  const { data: householdsForProfile } = householdIds.length
+    ? await service
+        .from("households")
+        .select("id, chez_profile")
+        .in("id", householdIds)
+    : { data: [] as Record<string, unknown>[] };
+  const chezProfileByHouseholdId = new Map<string, Record<string, unknown> | null>();
+  for (const row of householdsForProfile ?? []) {
+    chezProfileByHouseholdId.set(compactString(row.id), (row.chez_profile as Record<string, unknown>) ?? null);
+  }
+
   const quoteIds = quotes.map((row) => compactString(row.id)).filter(Boolean);
 
   const [messagesResult, reportsResult, propertiesResult, systemsResult, visitTasksResult, quoteMessagesResult, openTasksResult, documentsResult, punchItemsResult] = await Promise.all([
@@ -2264,15 +2286,29 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       .slice(0, 8);
     const homeFiles = (filesByPropertyId.get(propertyId) ?? []).slice(0, 16);
 
+    const homeHouseholdId = compactString(homeVisits[0]?.householdId);
+    const chezProfile = homeHouseholdId ? chezProfileByHouseholdId.get(homeHouseholdId) ?? null : null;
     return {
       propertyId,
-      householdId: compactString(homeVisits[0]?.householdId),
+      householdId: homeHouseholdId,
       name: compactString(property?.name) || "Home",
       address: [property?.street, property?.city, property?.state, property?.zip_code].filter(Boolean).join(", "),
       systemCount: homeSystems.length,
       openRequests: homeVisits.filter((row) => !["completed", "cancelled", "declined"].includes(row.status)).length,
       lastCompletedVisit: completed[0]?.fieldWorkspace?.completedAt ?? null,
       assignedMembers: [...new Set(homeVisits.map((row) => row.assignment?.memberName).filter(Boolean))],
+      // Section 19d: pass-through subset of households.chez_profile so
+      // the contractor SPA can render standing-instructions banners
+      // (spending tier, vendor preferences, logistics). Send only the
+      // contractor-relevant subset — full profile incl. communication
+      // prefs is intentionally not surfaced to the contractor (privacy).
+      chezProfile: chezProfile
+        ? {
+            spendingTiers: (chezProfile as Record<string, unknown>)?.spending_tiers ?? null,
+            vendorPreferences: (chezProfile as Record<string, unknown>)?.vendor_preferences ?? null,
+            logistics: (chezProfile as Record<string, unknown>)?.logistics ?? null,
+          }
+        : null,
       // Sign photos in parallel — bucket is private so the React side
       // needs short-lived signed URLs to display thumbnails.
       systems: await Promise.all(homeSystems.map(async (system) => ({
@@ -4198,6 +4234,32 @@ async function saveQuote(
         eventType: "handyman_quote_sent",
         extra: { quote_id: compactString(quote.id) },
       });
+    }
+
+    // Cross-app parity: when a quote is sent WITHOUT a linked request
+    // (ad-hoc quote to a Chez homeowner, e.g. from the Quotes screen
+    // not tied to an existing visit), the mirrorQuoteMessageToRequestThread
+    // call above no-ops (it requires both requestId and householdId).
+    // Without an inbox row the homeowner has no in-app surface for the
+    // quote — only a push notification, which iOS-less homeowners and
+    // anyone who's missed the push will never see. Drop a best-effort
+    // inbox_items row so the quote appears in their universal inbox.
+    if (householdId && !requestId) {
+      try {
+        const summary = title
+          ? `Quote: ${title} · ${moneyLabel(totals.total)}`
+          : `New quote: ${moneyLabel(totals.total)}`;
+        await service.from("inbox_items").insert({
+          household_id: householdId,
+          type: "handyman_quote_received",
+          title: propertyName ? `Quote ready for ${propertyName}` : "Quote ready",
+          summary,
+          from_email: compactString(user.email),
+          seen: false,
+        });
+      } catch (inboxErr) {
+        console.error("[handyman-provider] inbox_items insert failed for ad-hoc quote", inboxErr);
+      }
     }
 
     // Email is additive — try it but never let a failure roll back

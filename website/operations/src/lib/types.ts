@@ -203,6 +203,20 @@ export interface HomeSystem {
   photos?: HomeSystemPhoto[];
 }
 
+/// Section 19d.21 — subset of households.chez_profile that the
+/// contractor SPA needs. Spending tiers drive a "ping Chez before
+/// quoting above $X" banner; vendor prefs / logistics drive
+/// pre-visit context cards. Phase 80.1 added the underlying JSONB.
+export interface ChezProfileSummary {
+  spendingTiers?: {
+    auto_approve_under?: number | null;
+    ping_under?: number | null;
+    explicit_above?: number | null;
+  } | null;
+  vendorPreferences?: Record<string, unknown> | null;
+  logistics?: Record<string, unknown> | null;
+}
+
 export interface HomeRow {
   propertyId: string;
   householdId: string;
@@ -213,6 +227,9 @@ export interface HomeRow {
   lastCompletedVisit: string | null;
   assignedMembers: string[];
   systems?: HomeSystem[];
+  /// Subset of households.chez_profile relevant to the contractor.
+  /// null when the household hasn't set up Chez profile yet.
+  chezProfile?: ChezProfileSummary | null;
 }
 
 export interface MessageThread {

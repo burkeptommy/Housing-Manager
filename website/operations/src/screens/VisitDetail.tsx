@@ -153,6 +153,31 @@ export default function VisitDetailScreen() {
     }
   }
 
+  /**
+   * Section 19b.7: contractors need a way to decline a routed request
+   * (esp. Chez-routed jobs they can't take). Without this, the only
+   * escape is to ghost the routing. Flips status to 'declined' and
+   * leaves the audit-trail message that update_request_status now
+   * appends server-side.
+   */
+  async function handleDecline() {
+    if (!visit || !dashboard) return;
+    if (!window.confirm("Decline this request? The homeowner will be notified.")) return;
+    setBusy(true);
+    try {
+      await postProviderAction("update_request_status", {
+        workspaceId: dashboard.workspace.id,
+        requestId: visit.requestId,
+        status: "declined",
+      });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't decline. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <div style={{ marginBottom: 16, display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
@@ -222,9 +247,19 @@ export default function VisitDetailScreen() {
           <button className="ops-button ops-button--ghost" onClick={openQuoteForVisit}>
             {visit.quote ? "Edit quote" : "Build a quote"}
           </button>
+          {visit.status !== "completed" && visit.status !== "cancelled" && visit.status !== "declined" && (
+            <button
+              className="ops-button ops-button--ghost"
+              style={{ marginLeft: "auto", color: "var(--critical)" }}
+              onClick={handleDecline}
+              disabled={busy}
+            >
+              Decline
+            </button>
+          )}
           <button
             className="ops-button ops-button--ghost"
-            style={{ marginLeft: "auto" }}
+            style={visit.status !== "completed" && visit.status !== "cancelled" && visit.status !== "declined" ? {} : { marginLeft: "auto" }}
             onClick={handleMarkComplete}
             disabled={busy}
           >
