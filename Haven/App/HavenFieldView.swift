@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 import CoreLocation
+import PhotosUI
+import AVFoundation
 import Supabase
 
 // MARK: - Native Haven Field
@@ -314,6 +316,88 @@ struct HavenFieldVisit: Codable, Identifiable, Hashable {
     }
 }
 
+/// Wave M2 — one entry on `handyman_punch_items.attachments` JSONB array.
+/// Server stamps `path` + `contentType` + optional `caption` + uploader
+/// metadata; the dashboard read also folds in `signedUrl` so the iOS UI
+/// can render the thumbnail without a per-image round-trip. Resilient
+/// decoder so a malformed legacy entry doesn't take down the whole row.
+struct HavenFieldPunchAttachment: Codable, Hashable, Identifiable {
+    /// "photo" today; reserved for "video" / "doc" later. Default 'photo'
+    /// keeps pre-M2 attachments — there shouldn't be any in production
+    /// because attachments was 0% populated before this wave — sane.
+    let kind: String
+    let path: String
+    let contentType: String?
+    let caption: String?
+    let uploadedAt: String?
+    let uploadedBy: String?
+    let signedUrl: String?
+
+    var id: String { path }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, path, contentType, caption, uploadedAt, uploadedBy, signedUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? "photo"
+        path = (try? c.decodeIfPresent(String.self, forKey: .path)) ?? ""
+        contentType = (try? c.decodeIfPresent(String.self, forKey: .contentType)) ?? nil
+        caption = (try? c.decodeIfPresent(String.self, forKey: .caption)) ?? nil
+        uploadedAt = (try? c.decodeIfPresent(String.self, forKey: .uploadedAt)) ?? nil
+        uploadedBy = (try? c.decodeIfPresent(String.self, forKey: .uploadedBy)) ?? nil
+        signedUrl = (try? c.decodeIfPresent(String.self, forKey: .signedUrl)) ?? nil
+    }
+}
+
+/// Wave M2 — one entry on `handyman_punch_items.materials_used` JSONB array.
+/// The contractor desk's invoice convertor consumes the same shape so qty
+/// × unit_cost rolls up directly into "Materials" line items on a draft
+/// invoice. snake_case keys mirror the column convention.
+struct HavenFieldPunchMaterial: Codable, Hashable, Identifiable {
+    let sku: String?
+    let name: String
+    let qty: Double
+    let unitCost: Double
+
+    /// Synthesize a stable id off (sku, name) so SwiftUI's diffing keeps
+    /// rows aligned across save → reload cycles. Non-unique among
+    /// duplicates is fine — order is preserved by the array index.
+    var id: String { (sku.map { "\($0)|" } ?? "") + name }
+
+    private enum CodingKeys: String, CodingKey {
+        case sku, name, qty
+        case unitCost = "unit_cost"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sku = (try? c.decodeIfPresent(String.self, forKey: .sku)) ?? nil
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+        qty = (try? c.decodeIfPresent(Double.self, forKey: .qty)) ?? 0
+        unitCost = (try? c.decodeIfPresent(Double.self, forKey: .unitCost)) ?? 0
+    }
+
+    init(sku: String?, name: String, qty: Double, unitCost: Double) {
+        self.sku = sku
+        self.name = name
+        self.qty = qty
+        self.unitCost = unitCost
+    }
+
+    /// Used by `set_punch_materials` to round-trip back to the server.
+    /// Encodes with snake_case `unit_cost` so the edge function's
+    /// `numberValue(row.unit_cost ?? row.unitCost)` reads either spelling.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(sku, forKey: .sku)
+        try c.encode(name, forKey: .name)
+        try c.encode(qty, forKey: .qty)
+        try c.encode(unitCost, forKey: .unitCost)
+    }
+}
+
 /// Phase 78: structured punch list row matching `handyman_punch_items`.
 /// Mirrors the camelCase shape `mapPunchItemForClient` returns from the
 /// handyman-provider edge function. Resilient decoder so a single bad
@@ -347,6 +431,16 @@ struct HavenFieldPunchItem: Codable, Identifiable, Hashable {
     let completedAt: String?
     let createdAt: String?
     let updatedAt: String?
+    /// Wave M2 — capture depth fields. Photos + materials + per-item time
+    /// + voice. Default empties keep pre-Phase-M2 rows decoding cleanly.
+    let attachments: [HavenFieldPunchAttachment]
+    let materialsUsed: [HavenFieldPunchMaterial]
+    let timeSpentSeconds: Int
+    let voiceNotePath: String?
+    /// Server-signed URL the iOS UI hands to AVAudioPlayer when the user
+    /// taps the voice playback chip. Only set on dashboard hydration +
+    /// after a fresh attach_punch_voice action.
+    let voiceNoteSignedUrl: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, householdId, propertyId, assignedVisitTaskId, systemId, systemLabelSnapshot
@@ -354,6 +448,7 @@ struct HavenFieldPunchItem: Codable, Identifiable, Hashable {
         case estimatedMinutes, estimatedCostRange, materialRequired, costBasis, addedAfterLock
         case proposedByRole, proposedAt, proposalMessage, proposalStatus, proposalExpiresAt
         case acceptedAt, declinedAt, declinedReason, completedAt, createdAt, updatedAt
+        case attachments, materialsUsed, timeSpentSeconds, voiceNotePath, voiceNoteSignedUrl
     }
 
     init(from decoder: Decoder) throws {
@@ -386,6 +481,11 @@ struct HavenFieldPunchItem: Codable, Identifiable, Hashable {
         completedAt = (try? c.decodeIfPresent(String.self, forKey: .completedAt)) ?? nil
         createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
         updatedAt = (try? c.decodeIfPresent(String.self, forKey: .updatedAt)) ?? nil
+        attachments = (try? c.decodeIfPresent([HavenFieldPunchAttachment].self, forKey: .attachments)) ?? []
+        materialsUsed = (try? c.decodeIfPresent([HavenFieldPunchMaterial].self, forKey: .materialsUsed)) ?? []
+        timeSpentSeconds = (try? c.decodeIfPresent(Int.self, forKey: .timeSpentSeconds)) ?? 0
+        voiceNotePath = (try? c.decodeIfPresent(String.self, forKey: .voiceNotePath)) ?? nil
+        voiceNoteSignedUrl = (try? c.decodeIfPresent(String.self, forKey: .voiceNoteSignedUrl)) ?? nil
     }
 
     /// Synthesize an ephemeral, non-persisted punch item from a parsed
@@ -470,6 +570,10 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
     let clockInLat: Double?
     let clockInLng: Double?
     let clockInAccuracyM: Int?
+    /// Wave M6 — count of internal tech notes on this request. Drives
+    /// the small "N notes" badge on the visit row + workspace header so
+    /// a tech walking up to a job knows there's prior context to read.
+    let techNotesCount: Int
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -488,6 +592,7 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         case clockInLat
         case clockInLng
         case clockInAccuracyM
+        case techNotesCount
     }
 
     init(from decoder: Decoder) throws {
@@ -508,6 +613,7 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         clockInLat = (try? c.decodeIfPresent(Double.self, forKey: .clockInLat)) ?? nil
         clockInLng = (try? c.decodeIfPresent(Double.self, forKey: .clockInLng)) ?? nil
         clockInAccuracyM = (try? c.decodeIfPresent(Int.self, forKey: .clockInAccuracyM)) ?? nil
+        techNotesCount = (try? c.decodeIfPresent(Int.self, forKey: .techNotesCount)) ?? 0
     }
 
     init(
@@ -526,7 +632,8 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         pausedSeconds: Int = 0,
         clockInLat: Double? = nil,
         clockInLng: Double? = nil,
-        clockInAccuracyM: Int? = nil
+        clockInAccuracyM: Int? = nil,
+        techNotesCount: Int = 0
     ) {
         self.id = id
         self.memberId = memberId
@@ -544,6 +651,7 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         self.clockInLat = clockInLat
         self.clockInLng = clockInLng
         self.clockInAccuracyM = clockInAccuracyM
+        self.techNotesCount = techNotesCount
     }
 }
 
@@ -551,6 +659,47 @@ struct HavenFieldLatestMessage: Codable, Hashable {
     let senderRole: String?
     let body: String?
     let createdAt: String?
+}
+
+/// Wave M6 — internal tech note row. Distinct from
+/// `HavenFieldLatestMessage` (which is the customer-visible thread). Tech
+/// notes are workspace-only and never surface on the homeowner's iOS app.
+/// Resilient decoder so a single bad row doesn't take down the array.
+struct HavenFieldTechNote: Codable, Identifiable, Hashable {
+    let id: String
+    let requestId: String
+    let authorMemberId: String
+    let authorName: String
+    let body: String
+    let createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case requestId
+        case authorMemberId
+        case authorName
+        case body
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        requestId = (try? c.decodeIfPresent(String.self, forKey: .requestId)) ?? ""
+        authorMemberId = (try? c.decodeIfPresent(String.self, forKey: .authorMemberId)) ?? ""
+        authorName = (try? c.decodeIfPresent(String.self, forKey: .authorName)) ?? "Workspace member"
+        body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? ""
+        createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
+    }
+
+    init(id: String, requestId: String, authorMemberId: String, authorName: String, body: String, createdAt: String?) {
+        self.id = id
+        self.requestId = requestId
+        self.authorMemberId = authorMemberId
+        self.authorName = authorName
+        self.body = body
+        self.createdAt = createdAt
+    }
 }
 
 struct HavenFieldQuoteSummary: Codable, Hashable {
@@ -634,6 +783,12 @@ struct HavenFieldHomeSystem: Codable, Identifiable, Hashable {
     let nextServiceDue: String?
     let totalSpent: Double?
     let cachedManualLinks: [HavenFieldLink]
+    // Wave M3 — system inventory authoring fields.
+    let decommissionedAt: String?
+    let decommissionReason: String?
+    let markedForFollowupAt: String?
+    let followupReason: String?
+    let voiceNotePath: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status, subtype
@@ -650,6 +805,11 @@ struct HavenFieldHomeSystem: Codable, Identifiable, Hashable {
         case nextServiceDue
         case totalSpent
         case cachedManualLinks
+        case decommissionedAt
+        case decommissionReason
+        case markedForFollowupAt
+        case followupReason
+        case voiceNotePath
     }
 
     init(from decoder: Decoder) throws {
@@ -674,6 +834,37 @@ struct HavenFieldHomeSystem: Codable, Identifiable, Hashable {
         nextServiceDue = try container.decodeIfPresent(String.self, forKey: .nextServiceDue)
         totalSpent = try container.decodeIfPresent(Double.self, forKey: .totalSpent)
         cachedManualLinks = try container.decodeIfPresent([HavenFieldLink].self, forKey: .cachedManualLinks) ?? []
+        decommissionedAt = try? container.decodeIfPresent(String.self, forKey: .decommissionedAt)
+        decommissionReason = try? container.decodeIfPresent(String.self, forKey: .decommissionReason)
+        markedForFollowupAt = try? container.decodeIfPresent(String.self, forKey: .markedForFollowupAt)
+        followupReason = try? container.decodeIfPresent(String.self, forKey: .followupReason)
+        voiceNotePath = try? container.decodeIfPresent(String.self, forKey: .voiceNotePath)
+    }
+
+    /// Wave M3 — derived flag the UI uses to dim decommissioned systems
+    /// and surface a "REMOVED" pill. Honors both the explicit timestamp
+    /// and the legacy status string.
+    var isDecommissioned: Bool {
+        if let stamp = decommissionedAt, !stamp.isEmpty { return true }
+        if status?.lowercased() == "decommissioned" { return true }
+        return false
+    }
+
+    /// Wave M3 — true when the model plate fields are missing. Drives the
+    /// "Incomplete systems" gap-fill list at the top of the systems tab.
+    var hasIncompleteIdentity: Bool {
+        let manuf = manufacturer?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let model = modelNumber?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let serial = serialNumber?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return manuf.isEmpty || model.isEmpty || serial.isEmpty
+    }
+
+    /// Wave M3 — true when the tech flagged this system as needing a
+    /// follow-up visit (couldn't access tenant area, breaker locked,
+    /// etc.). Drives the orange "FOLLOW-UP" pill.
+    var needsFollowup: Bool {
+        guard let stamp = markedForFollowupAt else { return false }
+        return !stamp.isEmpty
     }
 }
 
@@ -1487,6 +1678,51 @@ actor HavenFieldService {
         return (response.assignment, response.totalSeconds ?? 0)
     }
 
+    // MARK: - Wave M6 internal tech notes
+
+    /// Wave M6 — append an internal note to this visit. Tech notes are
+    /// workspace-only. Returns the inserted note (with author name baked
+    /// in so the row renders without a follow-up fetch).
+    func addTechNote(workspaceId: String, requestId: String, body: String) async throws -> HavenFieldTechNote {
+        struct Request: Encodable {
+            let action = "add_tech_note"
+            let workspaceId: String
+            let requestId: String
+            let body: String
+        }
+        struct Response: Decodable {
+            let note: HavenFieldTechNote
+        }
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw URLError(.badURL)
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            body: trimmed
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return response.note
+    }
+
+    /// Wave M6 — list all tech notes for a visit, sorted by created_at
+    /// ascending (oldest first; matches the chat-style render). Author
+    /// names join from `provider_workspace_members.full_name`.
+    func listTechNotes(workspaceId: String, requestId: String) async throws -> [HavenFieldTechNote] {
+        struct Request: Encodable {
+            let action = "list_tech_notes"
+            let workspaceId: String
+            let requestId: String
+        }
+        struct Response: Decodable {
+            let notes: [HavenFieldTechNote]
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, requestId: requestId))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return response.notes
+    }
+
     /// Wave M1 — read the open pause window for this assignment, if any.
     /// Used by HavenFieldVisitWorkspaceView's onAppear hydration so a
     /// background → foreground cycle resumes into the right state. Hits
@@ -1518,6 +1754,413 @@ actor HavenFieldService {
             throw URLError(.badServerResponse)
         }
         return try decoder.decode([HavenFieldOpenPause].self, from: data)
+    }
+
+    // MARK: - Wave M3 system inventory authoring
+
+    /// Wave M3 — response shape every system-write action returns. iOS
+    /// UI re-renders the affected row by replacing its model entry with
+    /// the freshly-decoded value the server sends back.
+    struct HavenFieldSystemUpdateResponse: Decodable {
+        let ok: Bool?
+        let system: HavenFieldHomeSystem?
+    }
+
+    /// Wave M3 — response shape attach_system_voice + delete_system_voice
+    /// return. The signed URL lets the iOS UI play back the just-uploaded
+    /// memo without a second round-trip.
+    struct HavenFieldSystemVoiceResponse: Decodable {
+        let ok: Bool?
+        let voicePath: String?
+        let signedUrl: String?
+        let mimeType: String?
+    }
+
+    /// Wave M3 — response shape extract_system_from_photo returns.
+    /// Mirrors the identify-equipment edge function's structured Claude
+    /// Vision JSON. Fields are nullable because the AI returns null when
+    /// the plate is too blurry to read.
+    struct HavenFieldExtractSystemResponse: Decodable {
+        let ok: Bool?
+        let identified: Bool?
+        let manufacturer: String?
+        let modelNumber: String?
+        let serialNumber: String?
+        let productType: String?
+        let additionalSpecs: String?
+        let confidence: String?
+        let rawText: String?
+    }
+
+    /// Wave M3 — flag a system for follow-up on the next visit.
+    /// Optional reason (free-form note: "tenant unavailable", "panel
+    /// locked"). Surfaces on the homeowner's dashboard if material.
+    func markSystemFollowup(
+        workspaceId: String,
+        systemId: String,
+        reason: String?
+    ) async throws -> HavenFieldHomeSystem? {
+        struct Request: Encodable {
+            let action = "mark_system_followup"
+            let workspaceId: String
+            let systemId: String
+            let reason: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            systemId: systemId,
+            reason: reason
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldSystemUpdateResponse.self
+        )
+        return response.system
+    }
+
+    /// Wave M3 — clear the follow-up flag (tech finished the work, or
+    /// explicitly drops it off the next-visit prep list).
+    func clearSystemFollowup(
+        workspaceId: String,
+        systemId: String
+    ) async throws -> HavenFieldHomeSystem? {
+        struct Request: Encodable {
+            let action = "clear_system_followup"
+            let workspaceId: String
+            let systemId: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            systemId: systemId
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldSystemUpdateResponse.self
+        )
+        return response.system
+    }
+
+    /// Wave M3 — mark a system as removed from the home (replaced,
+    /// removed, damaged beyond repair). Server-side this also flips
+    /// is_active=false + status='decommissioned' so the homeowner
+    /// reconciler skips it on the next pass.
+    func decommissionSystem(
+        workspaceId: String,
+        systemId: String,
+        reason: String?
+    ) async throws -> HavenFieldHomeSystem? {
+        struct Request: Encodable {
+            let action = "decommission_system"
+            let workspaceId: String
+            let systemId: String
+            let reason: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            systemId: systemId,
+            reason: reason
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldSystemUpdateResponse.self
+        )
+        return response.system
+    }
+
+    /// Wave M3 — record a voice memo against a system. AVAudioRecorder
+    /// writes m4a; the view reads bytes, base64-encodes, posts. Single
+    /// voice note per system — re-recording overwrites the previous
+    /// file. Returns a fresh signed URL so playback works inline.
+    func attachSystemVoice(
+        workspaceId: String,
+        systemId: String,
+        base64: String,
+        mimeType: String
+    ) async throws -> HavenFieldSystemVoiceResponse {
+        struct Request: Encodable {
+            let action = "attach_system_voice"
+            let workspaceId: String
+            let systemId: String
+            let base64: String
+            let mimeType: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            systemId: systemId,
+            base64: base64,
+            mimeType: mimeType
+        ))
+        return try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldSystemVoiceResponse.self
+        )
+    }
+
+    /// Wave M3 — delete the recorded voice memo for a system.
+    func deleteSystemVoice(
+        workspaceId: String,
+        systemId: String
+    ) async throws {
+        struct Request: Encodable {
+            let action = "delete_system_voice"
+            let workspaceId: String
+            let systemId: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            systemId: systemId
+        ))
+        try await perform(function: "handyman-provider", method: "POST", body: data)
+    }
+
+    /// Wave M3 — fetch a fresh signed URL for an existing voice memo.
+    /// The path is stored on home_systems.voice_note_path; signed URLs
+    /// from the upload response expire after an hour.
+    func signSystemVoiceUrl(path: String) async throws -> URL? {
+        struct Request: Encodable {
+            let action = "sign_system_voice_url"
+            let path: String
+        }
+        struct Response: Decodable { let signedUrl: String? }
+        let data = try JSONEncoder().encode(Request(path: path))
+        let response = try? await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        guard let urlString = response?.signedUrl else { return nil }
+        return URL(string: urlString)
+    }
+
+    /// Wave M3 — forward a model-plate photo to identify-equipment via
+    /// the workspace-authed wrapper. Returns the structured AI shape the
+    /// confirmation card renders before the tech saves it as a system.
+    func extractSystemFromPhoto(
+        workspaceId: String,
+        base64: String,
+        category: String?
+    ) async throws -> HavenFieldExtractSystemResponse {
+        struct Request: Encodable {
+            let action = "extract_system_from_photo"
+            let workspaceId: String
+            let base64: String
+            let category: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            base64: base64,
+            category: category
+        ))
+        return try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldExtractSystemResponse.self
+        )
+    }
+
+    /// Wave M3 — convenience wrapper to insert a freshly-extracted
+    /// system into home_systems via PostgREST. RLS scoped via the
+    /// caller's session JWT; the workspace policy added in
+    /// 20261303_home_system_decommission already permits provider
+    /// workspace members to write systems for households they serve.
+    func createHomeSystem(
+        propertyId: String,
+        householdId: String,
+        name: String,
+        category: String?,
+        manufacturer: String?,
+        modelNumber: String?,
+        serialNumber: String?,
+        notes: String?
+    ) async throws -> HavenFieldHomeSystem? {
+        struct Insert: Encodable {
+            let property_id: String
+            let household_id: String
+            let name: String
+            let category: String?
+            let manufacturer: String?
+            let model_number: String?
+            let serial_number: String?
+            let notes: String?
+            let onboarded_via: String? = "field_visit"
+        }
+        let payload = Insert(
+            property_id: propertyId,
+            household_id: householdId,
+            name: name,
+            category: category,
+            manufacturer: manufacturer,
+            model_number: modelNumber,
+            serial_number: serialNumber,
+            notes: notes
+        )
+        var request = URLRequest(url: URL(string: "\(AppConfig.Supabase.url)/rest/v1/home_systems")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONEncoder().encode([payload])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let preview = String(data: data, encoding: .utf8) ?? ""
+            throw NSError(domain: "ChezField.createHomeSystem", code: (response as? HTTPURLResponse)?.statusCode ?? -1, userInfo: [NSLocalizedDescriptionKey: preview])
+        }
+        let rows = (try? decoder.decode([HavenFieldHomeSystem].self, from: data)) ?? []
+        return rows.first
+    }
+
+    // MARK: - Wave M2 punch capture depth
+
+    /// Wave M2 — partial response shape the four capture-depth actions
+    /// return. Field UI updates the per-item state on success; the
+    /// signed URLs let the iOS app render thumbnails / playback inline
+    /// without a separate fetch round-trip.
+    struct PunchCaptureUpdate: Decodable {
+        struct Item: Decodable {
+            let id: String
+            let attachments: [HavenFieldPunchAttachment]
+            let materialsUsed: [HavenFieldPunchMaterial]
+            let timeSpentSeconds: Int
+            let voiceNotePath: String?
+            let voiceNoteSignedUrl: String?
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+                attachments = (try? c.decodeIfPresent([HavenFieldPunchAttachment].self, forKey: .attachments)) ?? []
+                materialsUsed = (try? c.decodeIfPresent([HavenFieldPunchMaterial].self, forKey: .materialsUsed)) ?? []
+                timeSpentSeconds = (try? c.decodeIfPresent(Int.self, forKey: .timeSpentSeconds)) ?? 0
+                voiceNotePath = (try? c.decodeIfPresent(String.self, forKey: .voiceNotePath)) ?? nil
+                voiceNoteSignedUrl = (try? c.decodeIfPresent(String.self, forKey: .voiceNoteSignedUrl)) ?? nil
+            }
+
+            private enum CodingKeys: String, CodingKey {
+                case id, attachments, materialsUsed, timeSpentSeconds, voiceNotePath, voiceNoteSignedUrl
+            }
+        }
+        let item: Item
+    }
+
+    /// Wave M2 — attach a photo to a punch item. The view layer captures
+    /// a UIImage via PhotosPicker, downsizes (1600px max edge) +
+    /// JPEG-encodes (compression 0.82), and base64-encodes the bytes.
+    /// Server returns the freshly-signed thumbnail URL inline so we can
+    /// render the new tile without a follow-up fetch.
+    func attachPunchPhoto(
+        workspaceId: String,
+        itemId: String,
+        base64: String,
+        contentType: String,
+        caption: String?
+    ) async throws -> PunchCaptureUpdate.Item {
+        struct Request: Encodable {
+            let action = "attach_punch_photo"
+            let workspaceId: String
+            let itemId: String
+            let base64: String
+            let contentType: String
+            let caption: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            itemId: itemId,
+            base64: base64,
+            contentType: contentType,
+            caption: caption
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: PunchCaptureUpdate.self)
+        return response.item
+    }
+
+    /// Wave M2 — attach a voice note. AVAudioRecorder writes m4a/aac to
+    /// a temp URL; the view reads bytes, base64-encodes, posts. Single
+    /// voice note per item — re-recording overwrites the previous file
+    /// in storage server-side.
+    func attachPunchVoice(
+        workspaceId: String,
+        itemId: String,
+        base64: String,
+        mimeType: String
+    ) async throws -> PunchCaptureUpdate.Item {
+        struct Request: Encodable {
+            let action = "attach_punch_voice"
+            let workspaceId: String
+            let itemId: String
+            let base64: String
+            let mimeType: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            itemId: itemId,
+            base64: base64,
+            mimeType: mimeType
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: PunchCaptureUpdate.self)
+        return response.item
+    }
+
+    /// Wave M2 — replace the materials_used array on a punch item.
+    /// The server validates each row (name non-empty, qty/unit_cost
+    /// non-negative) and returns the round-tripped list so the iOS UI
+    /// can render the canonical shape (e.g. server-side rounding).
+    func setPunchMaterials(
+        workspaceId: String,
+        itemId: String,
+        materials: [HavenFieldPunchMaterial]
+    ) async throws -> PunchCaptureUpdate.Item {
+        struct Request: Encodable {
+            let action = "set_punch_materials"
+            let workspaceId: String
+            let itemId: String
+            let materials: [HavenFieldPunchMaterial]
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            itemId: itemId,
+            materials: materials
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: PunchCaptureUpdate.self)
+        return response.item
+    }
+
+    /// Wave M2 — set the per-item elapsed-time counter. The view runs
+    /// the timer in-memory; this writes the final value when the tech
+    /// stops. Negative values are clamped to 0 server-side.
+    func setPunchTimeSpent(
+        workspaceId: String,
+        itemId: String,
+        seconds: Int
+    ) async throws -> PunchCaptureUpdate.Item {
+        struct Request: Encodable {
+            let action = "set_punch_time_spent"
+            let workspaceId: String
+            let itemId: String
+            let seconds: Int
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            itemId: itemId,
+            seconds: seconds
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: PunchCaptureUpdate.self)
+        return response.item
     }
 
     // MARK: - Phase 78 punch list / proposals
@@ -2296,6 +2939,33 @@ private struct HavenFieldHomeTab: View {
         heroVisits.first ?? requestedVisits.first
     }
 
+    /// Wave M6 — route summary stats for today's stops. Drive time is
+    /// estimated (NOT from a real routing engine — see deferred note in
+    /// the wave plan): 15 min between stops. The mileage is a coarse
+    /// proxy at 6 miles per stop, sufficient for the field tech to
+    /// gauge "is this a tight day or a loose one" without GIS calls.
+    /// When 0 stops, returns nil so the card hides cleanly.
+    private struct RouteSummary {
+        let stops: Int
+        let driveMinutes: Int
+        let estimatedMiles: Int
+    }
+
+    private var todayRouteSummary: RouteSummary? {
+        let stops = todayVisits.count
+        guard stops > 0 else { return nil }
+        // Estimate: 15 min driving between consecutive stops, plus 10 min
+        // initial leg. NOT a real routing call — flagged in the JSON
+        // output as `route_summary_uses_stub_drive_time: true`.
+        let driveMinutes = max(0, (stops - 1) * 15) + 10
+        let estimatedMiles = stops * 6
+        return RouteSummary(
+            stops: stops,
+            driveMinutes: driveMinutes,
+            estimatedMiles: estimatedMiles
+        )
+    }
+
     private var recentHomes: [HavenFieldHome] {
         (viewModel.dashboard?.homes ?? [])
             .sorted {
@@ -2376,6 +3046,19 @@ private struct HavenFieldHomeTab: View {
                     }
                 }
 
+                // Wave M6 — route summary card. Pulls today's stops and
+                // surfaces a coarse drive-time estimate so the tech sees
+                // "this is a 4-stop, 47-mile, 3h block" before drilling
+                // in. Hidden when 0 stops; the empty-state Forward
+                // Momentum card already covers that case.
+                if let summary = todayRouteSummary {
+                    FieldRouteSummaryCard(
+                        stops: summary.stops,
+                        driveMinutes: summary.driveMinutes,
+                        estimatedMiles: summary.estimatedMiles
+                    )
+                }
+
                 if routePreviewVisits.isEmpty {
                     FieldForwardMomentumCard(
                         title: "No route is on deck yet",
@@ -2449,7 +3132,7 @@ private struct HavenFieldHomeTab: View {
                         VStack(spacing: 12) {
                             ForEach(Array(recentHomes.prefix(4))) { home in
                                 NavigationLink {
-                                    HavenFieldHomeProfileView(home: home)
+                                    HavenFieldHomeProfileView(home: home, workspaceId: viewModel.dashboard?.workspace?.id)
                                 } label: {
                                     FieldHomeRow(home: home)
                                 }
@@ -2884,7 +3567,7 @@ private struct HavenFieldClientsTab: View {
                     VStack(spacing: 12) {
                         ForEach(filteredHomes) { home in
                             NavigationLink {
-                                HavenFieldHomeProfileView(home: home)
+                                HavenFieldHomeProfileView(home: home, workspaceId: viewModel.dashboard?.workspace?.id)
                             } label: {
                                 FieldClientRow(
                                     home: home,
@@ -2938,75 +3621,774 @@ private struct HavenFieldClientsTab: View {
 /// lock" badge when the homeowner inserted the item after the visit
 /// was confirmed, an estimated-minutes label, and a strikethrough on
 /// done. Renders dimmed while a status mutation is in flight.
+/// Wave M2 — load state for the four capture-depth actions on one row.
+private enum FieldPunchActionInFlight {
+    case none, photo, voice, materials, time
+}
+
 private struct FieldPunchItemRow: View {
     let item: HavenFieldPunchItem
     let isPending: Bool
+    let workspaceId: String?
     let onToggleDone: () -> Void
+    /// Wave M2 — fired after a successful capture-depth save so the
+    /// parent can refresh punchItems from the server.
+    let onItemUpdated: (HavenFieldService.PunchCaptureUpdate.Item) -> Void
 
     private var isDone: Bool { item.status == "done" }
 
+    @State private var pendingAttachments: [HavenFieldPunchAttachment]?
+    @State private var pendingMaterials: [HavenFieldPunchMaterial]?
+    @State private var pendingTimeSeconds: Int?
+    @State private var pendingVoiceUrl: String?
+    @State private var pendingVoicePath: String?
+    @State private var actionInFlight: FieldPunchActionInFlight = .none
+    @State private var captureError: String?
+
+    @State private var photoPickerItem: PhotosPickerItem?
+    @State private var lightboxAttachment: HavenFieldPunchAttachment?
+
+    @StateObject private var voiceRecorder = FieldVoiceRecorder()
+    @State private var voicePlayer: AVAudioPlayer?
+    @State private var isPlayingVoice = false
+
+    @State private var showMaterialsSheet = false
+
+    @State private var timerStart: Date?
+    @State private var timerNow: Date = Date()
+    private let timerTick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    private var attachments: [HavenFieldPunchAttachment] {
+        pendingAttachments ?? item.attachments
+    }
+    private var materials: [HavenFieldPunchMaterial] {
+        pendingMaterials ?? item.materialsUsed
+    }
+    private var totalSeconds: Int {
+        let base = pendingTimeSeconds ?? item.timeSpentSeconds
+        if let start = timerStart {
+            return base + max(0, Int(timerNow.timeIntervalSince(start)))
+        }
+        return base
+    }
+    private var voicePresent: Bool {
+        (pendingVoicePath ?? item.voiceNotePath) != nil
+    }
+    private var voicePlaybackUrl: String? {
+        pendingVoiceUrl ?? item.voiceNoteSignedUrl
+    }
+    private var workspaceIdResolved: String? {
+        guard let id = workspaceId, !id.isEmpty else { return nil }
+        return id
+    }
+
     var body: some View {
-        Button(action: onToggleDone) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isDone ? HavenColors.success : HavenColors.beige400)
-                    .font(.system(size: 22))
-                    .opacity(isPending ? 0.5 : 1)
+        VStack(alignment: .leading, spacing: 10) {
+            Button(action: onToggleDone) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isDone ? HavenColors.success : HavenColors.beige400)
+                        .font(.system(size: 22))
+                        .opacity(isPending ? 0.5 : 1)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.title)
-                        .font(HavenTypography.headline)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .strikethrough(isDone, color: HavenColors.textSecondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(item.title)
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                                .strikethrough(isDone, color: HavenColors.textSecondary)
+                            if timerStart != nil || totalSeconds > 0 {
+                                Text(formatPunchTimeMMSS(totalSeconds))
+                                    .font(HavenTypography.uiLabelSmall.monospacedDigit())
+                                    .foregroundStyle(timerStart != nil ? HavenColors.action : HavenColors.textSecondary)
+                            }
+                        }
 
-                    HStack(spacing: 8) {
-                        if let minutes = item.estimatedMinutes {
-                            Label("~\(minutes) min", systemImage: "clock")
-                                .font(HavenTypography.caption)
-                                .foregroundStyle(HavenColors.textSecondary)
-                                .labelStyle(.titleAndIcon)
+                        HStack(spacing: 8) {
+                            if let minutes = item.estimatedMinutes {
+                                Label("~\(minutes) min", systemImage: "clock")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                    .labelStyle(.titleAndIcon)
+                            }
+                            if let systemLabel = item.systemDisplayLabel {
+                                Label(systemLabel, systemImage: "wrench.and.screwdriver.fill")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.navy700)
+                                    .labelStyle(.titleAndIcon)
+                            }
+                            if item.materialRequired {
+                                Label("Materials", systemImage: "shippingbox.fill")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.action)
+                                    .labelStyle(.titleAndIcon)
+                            }
                         }
-                        if let systemLabel = item.systemDisplayLabel {
-                            Label(systemLabel, systemImage: "wrench.and.screwdriver.fill")
-                                .font(HavenTypography.caption)
-                                .foregroundStyle(HavenColors.navy700)
-                                .labelStyle(.titleAndIcon)
-                        }
-                        if item.materialRequired {
-                            Label("Materials", systemImage: "shippingbox.fill")
+
+                        if item.addedAfterLock {
+                            Label("Added by homeowner after you confirmed", systemImage: "exclamationmark.triangle.fill")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.action)
                                 .labelStyle(.titleAndIcon)
+                                .padding(.top, 2)
                         }
                     }
+                    Spacer(minLength: 8)
 
-                    if item.addedAfterLock {
-                        Label("Added by homeowner after you confirmed", systemImage: "exclamationmark.triangle.fill")
-                            .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.action)
-                            .labelStyle(.titleAndIcon)
-                            .padding(.top, 2)
+                    if isPending {
+                        ProgressView()
+                            .scaleEffect(0.8)
                     }
                 }
-                Spacer(minLength: 8)
+            }
+            .buttonStyle(.plain)
+            .disabled(isPending)
 
-                if isPending {
-                    ProgressView()
-                        .scaleEffect(0.8)
+            if workspaceIdResolved != nil {
+                actionChipBar
+
+                if !attachments.isEmpty {
+                    photoThumbnailStrip
+                }
+
+                if voicePresent {
+                    voicePlaybackChip
+                }
+
+                if !materials.isEmpty {
+                    materialsSummaryLine
+                }
+
+                if let captureError {
+                    Text(captureError)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.action)
+                        .padding(.top, 2)
                 }
             }
-            .padding(14)
-            .background(isDone ? HavenColors.success.opacity(0.05) : HavenColors.surface)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isDone ? HavenColors.success.opacity(0.25) : HavenColors.border, lineWidth: 1)
+        }
+        .padding(14)
+        .background(isDone ? HavenColors.success.opacity(0.05) : HavenColors.surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isDone ? HavenColors.success.opacity(0.25) : HavenColors.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .opacity(isPending ? 0.7 : 1)
+        .onReceive(timerTick) { now in
+            if timerStart != nil { timerNow = now }
+        }
+        .onChange(of: photoPickerItem) { _, newValue in
+            guard let pickItem = newValue else { return }
+            Task { await uploadPickedPhoto(pickItem) }
+        }
+        .sheet(item: $lightboxAttachment) { attachment in
+            FieldPunchPhotoLightbox(attachment: attachment)
+        }
+        .sheet(isPresented: $showMaterialsSheet) {
+            FieldPunchMaterialsSheet(
+                initial: materials,
+                onSave: { rows in
+                    Task { await saveMaterials(rows) }
+                }
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .opacity(isPending ? 0.7 : 1)
+            .presentationDetents([.large])
+        }
+    }
+
+    @ViewBuilder
+    private var actionChipBar: some View {
+        HStack(spacing: 10) {
+            PhotosPicker(
+                selection: $photoPickerItem,
+                matching: .images,
+                preferredItemEncoding: .compatible
+            ) {
+                actionChip(
+                    icon: "camera.fill",
+                    label: attachments.isEmpty ? "Add photo" : "\(attachments.count)",
+                    inFlight: actionInFlight == .photo,
+                    accent: false
+                )
+            }
+            .disabled(actionInFlight != .none)
+
+            Button {
+                Task { await toggleVoiceRecording() }
+            } label: {
+                actionChip(
+                    icon: voiceRecorder.isRecording ? "stop.circle.fill" : "mic.fill",
+                    label: voiceRecorder.isRecording
+                        ? formatPunchTimeMMSS(voiceRecorder.elapsedSeconds)
+                        : (voicePresent ? "Voice" : "Record"),
+                    inFlight: actionInFlight == .voice,
+                    accent: voiceRecorder.isRecording
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(actionInFlight != .none && actionInFlight != .voice)
+
+            Button {
+                showMaterialsSheet = true
+            } label: {
+                actionChip(
+                    icon: "shippingbox.fill",
+                    label: materials.isEmpty ? "Materials" : "\(materials.count)",
+                    inFlight: actionInFlight == .materials,
+                    accent: false
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(actionInFlight != .none)
+
+            Button {
+                Task { await toggleTimer() }
+            } label: {
+                actionChip(
+                    icon: "timer",
+                    label: timerStart != nil ? "Stop" : (totalSeconds > 0 ? formatPunchTimeMMSS(totalSeconds) : "Start"),
+                    inFlight: actionInFlight == .time,
+                    accent: timerStart != nil
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(actionInFlight != .none && actionInFlight != .time)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func actionChip(icon: String, label: String, inFlight: Bool, accent: Bool) -> some View {
+        HStack(spacing: 6) {
+            if inFlight {
+                ProgressView()
+                    .scaleEffect(0.65)
+                    .tint(accent ? .white : HavenColors.navy700)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(accent ? .white : HavenColors.navy700)
+            }
+            Text(label)
+                .font(HavenTypography.uiLabelSmall.monospacedDigit())
+                .foregroundStyle(accent ? .white : HavenColors.navy700)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(minHeight: 44)
+        .background(accent ? HavenColors.action : HavenColors.indigo50)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(accent ? Color.clear : HavenColors.border, lineWidth: 0.5)
+        )
+    }
+
+    @ViewBuilder
+    private var photoThumbnailStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(attachments, id: \.id) { attachment in
+                    Button {
+                        lightboxAttachment = attachment
+                    } label: {
+                        thumbnailTile(for: attachment)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    @ViewBuilder
+    private func thumbnailTile(for attachment: HavenFieldPunchAttachment) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(HavenColors.indigo50)
+            if let urlString = attachment.signedUrl, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView().scaleEffect(0.7)
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    case .failure:
+                        Image(systemName: "photo")
+                            .font(.system(size: 18))
+                            .foregroundStyle(HavenColors.textSecondary)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            } else {
+                Image(systemName: "photo")
+                    .font(.system(size: 18))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+        .frame(width: 80, height: 80)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(HavenColors.border, lineWidth: 0.5)
+        )
+    }
+
+    @ViewBuilder
+    private var voicePlaybackChip: some View {
+        Button {
+            Task { await toggleVoicePlayback() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: isPlayingVoice ? "stop.fill" : "play.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(isPlayingVoice ? "Playing voice note" : "Voice note")
+                    .font(HavenTypography.uiLabelSmall)
+            }
+            .foregroundStyle(HavenColors.navy700)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(minHeight: 44)
+            .background(HavenColors.indigo50)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(HavenColors.border, lineWidth: 0.5))
         }
         .buttonStyle(.plain)
-        .disabled(isPending)
     }
+
+    @ViewBuilder
+    private var materialsSummaryLine: some View {
+        let total = materials.reduce(0.0) { $0 + ($1.qty * $1.unitCost) }
+        HStack(spacing: 6) {
+            Image(systemName: "shippingbox.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(HavenColors.navy700)
+            Text("\(materials.count) material\(materials.count == 1 ? "" : "s") · $\(String(format: "%.2f", total))")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .padding(.top, 2)
+    }
+
+    private func uploadPickedPhoto(_ pickerItem: PhotosPickerItem) async {
+        defer {
+            DispatchQueue.main.async { self.photoPickerItem = nil }
+        }
+        guard let workspaceId = workspaceIdResolved else { return }
+        await MainActor.run {
+            actionInFlight = .photo
+            captureError = nil
+        }
+        defer { Task { @MainActor in actionInFlight = .none } }
+
+        do {
+            guard let raw = try await pickerItem.loadTransferable(type: Data.self) else {
+                throw NSError(domain: "FieldPunch", code: 1, userInfo: [NSLocalizedDescriptionKey: "Couldn't read photo data"])
+            }
+            let downsized = try await Self.downsizeJpeg(rawData: raw, maxEdge: 1600, quality: 0.82)
+            let base64 = downsized.base64EncodedString()
+
+            let updated = try await HavenFieldService.shared.attachPunchPhoto(
+                workspaceId: workspaceId,
+                itemId: item.id,
+                base64: base64,
+                contentType: "image/jpeg",
+                caption: nil
+            )
+            await MainActor.run {
+                pendingAttachments = updated.attachments
+                onItemUpdated(updated)
+            }
+        } catch {
+            await MainActor.run {
+                captureError = "Photo upload failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func toggleVoiceRecording() async {
+        guard let workspaceId = workspaceIdResolved else { return }
+        if voiceRecorder.isRecording {
+            await MainActor.run {
+                actionInFlight = .voice
+                captureError = nil
+            }
+            defer { Task { @MainActor in actionInFlight = .none } }
+            do {
+                guard let url = await voiceRecorder.stopAndReturnFile() else {
+                    throw NSError(domain: "FieldPunch", code: 2, userInfo: [NSLocalizedDescriptionKey: "Couldn't read recording"])
+                }
+                let bytes = try Data(contentsOf: url)
+                let base64 = bytes.base64EncodedString()
+                let updated = try await HavenFieldService.shared.attachPunchVoice(
+                    workspaceId: workspaceId,
+                    itemId: item.id,
+                    base64: base64,
+                    mimeType: "audio/m4a"
+                )
+                await MainActor.run {
+                    pendingVoicePath = updated.voiceNotePath
+                    pendingVoiceUrl = updated.voiceNoteSignedUrl
+                    onItemUpdated(updated)
+                    try? FileManager.default.removeItem(at: url)
+                }
+            } catch {
+                await MainActor.run {
+                    captureError = "Voice upload failed: \(error.localizedDescription)"
+                }
+            }
+        } else {
+            do {
+                try await voiceRecorder.start()
+            } catch {
+                await MainActor.run {
+                    captureError = "Microphone unavailable: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func toggleVoicePlayback() async {
+        guard let urlString = voicePlaybackUrl, let url = URL(string: urlString) else { return }
+        if isPlayingVoice {
+            voicePlayer?.stop()
+            await MainActor.run { isPlayingVoice = false }
+            return
+        }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let player = try AVAudioPlayer(data: data)
+            await MainActor.run {
+                voicePlayer = player
+                isPlayingVoice = true
+            }
+            player.play()
+            Task { [weak player] in
+                while let p = player, p.isPlaying { try? await Task.sleep(nanoseconds: 200_000_000) }
+                await MainActor.run { isPlayingVoice = false }
+            }
+        } catch {
+            await MainActor.run {
+                captureError = "Playback failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func saveMaterials(_ rows: [HavenFieldPunchMaterial]) async {
+        guard let workspaceId = workspaceIdResolved else { return }
+        await MainActor.run {
+            actionInFlight = .materials
+            captureError = nil
+        }
+        defer { Task { @MainActor in actionInFlight = .none } }
+        do {
+            let updated = try await HavenFieldService.shared.setPunchMaterials(
+                workspaceId: workspaceId,
+                itemId: item.id,
+                materials: rows
+            )
+            await MainActor.run {
+                pendingMaterials = updated.materialsUsed
+                onItemUpdated(updated)
+            }
+        } catch {
+            await MainActor.run {
+                captureError = "Couldn't save materials: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func toggleTimer() async {
+        if let start = timerStart {
+            guard let workspaceId = workspaceIdResolved else { return }
+            let runSeconds = max(0, Int(Date().timeIntervalSince(start)))
+            let banked = pendingTimeSeconds ?? item.timeSpentSeconds
+            let total = banked + runSeconds
+            await MainActor.run {
+                actionInFlight = .time
+                captureError = nil
+                timerStart = nil
+            }
+            defer { Task { @MainActor in actionInFlight = .none } }
+            do {
+                let updated = try await HavenFieldService.shared.setPunchTimeSpent(
+                    workspaceId: workspaceId,
+                    itemId: item.id,
+                    seconds: total
+                )
+                await MainActor.run {
+                    pendingTimeSeconds = updated.timeSpentSeconds
+                    onItemUpdated(updated)
+                }
+            } catch {
+                await MainActor.run {
+                    captureError = "Couldn't save time: \(error.localizedDescription)"
+                }
+            }
+        } else {
+            await MainActor.run {
+                timerStart = Date()
+                timerNow = Date()
+            }
+        }
+    }
+
+    private static func downsizeJpeg(rawData: Data, maxEdge: CGFloat, quality: CGFloat) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let image = UIImage(data: rawData) else {
+                    continuation.resume(throwing: NSError(domain: "FieldPunch", code: 3, userInfo: [NSLocalizedDescriptionKey: "Couldn't decode image"]))
+                    return
+                }
+                let size = image.size
+                let longest = max(size.width, size.height)
+                let scale: CGFloat = longest > maxEdge ? (maxEdge / longest) : 1.0
+                let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1.0
+                let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+                let resized = renderer.image { _ in
+                    image.draw(in: CGRect(origin: .zero, size: newSize))
+                }
+                guard let data = resized.jpegData(compressionQuality: quality) else {
+                    continuation.resume(throwing: NSError(domain: "FieldPunch", code: 4, userInfo: [NSLocalizedDescriptionKey: "Couldn't encode JPEG"]))
+                    return
+                }
+                continuation.resume(returning: data)
+            }
+        }
+    }
+}
+
+/// Wave M2 — full-screen lightbox for a tapped punch photo.
+private struct FieldPunchPhotoLightbox: View {
+    let attachment: HavenFieldPunchAttachment
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let urlString = attachment.signedUrl, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFit()
+                    case .empty:
+                        ProgressView().tint(.white)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.white)
+                    @unknown default: EmptyView()
+                    }
+                }
+            } else {
+                Text("Photo unavailable")
+                    .foregroundStyle(.white)
+            }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black.opacity(0.4))
+                            .clipShape(Circle())
+                    }
+                }
+                Spacer()
+                if let caption = attachment.caption, !caption.isEmpty {
+                    Text(caption)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(.white)
+                        .padding()
+                        .background(Color.black.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .padding()
+        }
+    }
+}
+
+/// Wave M2 — sheet for editing the materials_used array on a punch item.
+private struct FieldPunchMaterialsSheet: View {
+    let initial: [HavenFieldPunchMaterial]
+    let onSave: ([HavenFieldPunchMaterial]) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var rows: [Draft]
+
+    private struct Draft: Identifiable {
+        let id = UUID()
+        var name: String
+        var qty: String
+        var unitCost: String
+        init(_ source: HavenFieldPunchMaterial) {
+            self.name = source.name
+            self.qty = source.qty == 0 ? "" : String(format: "%g", source.qty)
+            self.unitCost = source.unitCost == 0 ? "" : String(format: "%.2f", source.unitCost)
+        }
+        init() {
+            self.name = ""
+            self.qty = ""
+            self.unitCost = ""
+        }
+    }
+
+    init(initial: [HavenFieldPunchMaterial], onSave: @escaping ([HavenFieldPunchMaterial]) -> Void) {
+        self.initial = initial
+        self.onSave = onSave
+        _rows = State(initialValue: initial.isEmpty ? [Draft()] : initial.map { Draft($0) })
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach($rows) { $row in
+                        VStack(alignment: .leading, spacing: 6) {
+                            TextField("Material (e.g. Schedule 40 PVC, 1\")", text: $row.name)
+                                .textInputAutocapitalization(.sentences)
+                            HStack(spacing: 8) {
+                                TextField("Qty", text: $row.qty)
+                                    .keyboardType(.decimalPad)
+                                    .frame(maxWidth: 90)
+                                TextField("Unit cost", text: $row.unitCost)
+                                    .keyboardType(.decimalPad)
+                            }
+                            .font(.body.monospacedDigit())
+                        }
+                    }
+                    .onDelete { indices in
+                        rows.remove(atOffsets: indices)
+                        if rows.isEmpty { rows.append(Draft()) }
+                    }
+                    Button {
+                        rows.append(Draft())
+                    } label: {
+                        Label("Add material", systemImage: "plus.circle")
+                    }
+                } header: {
+                    Text("MATERIALS USED")
+                } footer: {
+                    Text("Quantity and unit cost are optional. Save without them to capture just a name.")
+                }
+            }
+            .navigationTitle("Materials")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { commit() }
+                        .bold()
+                }
+            }
+        }
+    }
+
+    private func commit() {
+        let cleaned = rows.compactMap { row -> HavenFieldPunchMaterial? in
+            let name = row.name.trimmingCharacters(in: .whitespaces)
+            if name.isEmpty { return nil }
+            let qty = Double(row.qty) ?? 0
+            let unitCost = Double(row.unitCost) ?? 0
+            return HavenFieldPunchMaterial(sku: nil, name: name, qty: qty, unitCost: unitCost)
+        }
+        onSave(cleaned)
+        dismiss()
+    }
+}
+
+/// Wave M2 — voice recorder helper.
+@MainActor
+final class FieldVoiceRecorder: ObservableObject {
+    @Published private(set) var isRecording = false
+    @Published private(set) var elapsedSeconds: Int = 0
+
+    private var recorder: AVAudioRecorder?
+    private var startedAt: Date?
+    private var tickTask: Task<Void, Never>?
+    private var fileUrl: URL?
+
+    func start() async throws {
+        let session = AVAudioSession.sharedInstance()
+        let granted = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            if #available(iOS 17.0, *) {
+                AVAudioApplication.requestRecordPermission { granted in
+                    cont.resume(returning: granted)
+                }
+            } else {
+                session.requestRecordPermission { granted in
+                    cont.resume(returning: granted)
+                }
+            }
+        }
+        if !granted {
+            throw NSError(domain: "FieldVoice", code: 5, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied"])
+        }
+        try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker])
+        try session.setActive(true)
+
+        let dir = FileManager.default.temporaryDirectory
+        let path = dir.appendingPathComponent("punch-voice-\(UUID().uuidString).m4a")
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 22050,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue,
+        ]
+        let rec = try AVAudioRecorder(url: path, settings: settings)
+        rec.prepareToRecord()
+        rec.record()
+        recorder = rec
+        fileUrl = path
+        startedAt = Date()
+        elapsedSeconds = 0
+        isRecording = true
+        tickTask?.cancel()
+        tickTask = Task { [weak self] in
+            while !(Task.isCancelled) {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await MainActor.run {
+                    guard let self, let started = self.startedAt else { return }
+                    self.elapsedSeconds = Int(Date().timeIntervalSince(started))
+                }
+            }
+        }
+    }
+
+    func stopAndReturnFile() async -> URL? {
+        guard let rec = recorder else { return nil }
+        rec.stop()
+        tickTask?.cancel()
+        tickTask = nil
+        let url = fileUrl
+        recorder = nil
+        startedAt = nil
+        isRecording = false
+        elapsedSeconds = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        return url
+    }
+}
+
+/// Wave M2 — mm:ss formatter shared by timer chip + voice recorder.
+private func formatPunchTimeMMSS(_ seconds: Int) -> String {
+    let mins = min(99, max(0, seconds) / 60)
+    let secs = max(0, seconds) % 60
+    return String(format: "%02d:%02d", mins, secs)
 }
 
 private struct FieldClientRow: View {
@@ -3481,6 +4863,23 @@ private struct HavenFieldVisitWorkspaceView: View {
     @State private var nowTick: Date = Date()
     private let lifecycleTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    // MARK: Wave M6 tech notes state
+
+    /// Loaded list of internal tech notes for this visit. Hydrated from
+    /// `list_tech_notes` on first appear and after every successful add.
+    @State private var techNotes: [HavenFieldTechNote] = []
+    /// Composer text. Cleared after a successful add.
+    @State private var techNoteComposer: String = ""
+    /// True while a tech-note write is in flight. Lets the row render a
+    /// spinner without blocking the rest of the workspace view.
+    @State private var techNotesSubmitting: Bool = false
+    /// Most recent error from the tech notes lane. Surfaces as an inline
+    /// banner inside the section card.
+    @State private var techNotesError: String?
+    /// True after the first list_tech_notes round-trip completes so the
+    /// empty state ("No internal notes yet") doesn't flash on first load.
+    @State private var techNotesLoaded: Bool = false
+
     /// Phase 78: toggles a punch item between pending and done. Hits the
     /// `update_punch_item_status` edge action; on success, posts
     /// `.havenFieldVisitChanged` so the dashboard refreshes and the
@@ -3599,6 +4998,10 @@ private struct HavenFieldVisitWorkspaceView: View {
             // reload the open pause from PostgREST so the right state
             // resumes when the app re-foregrounds.
             await hydrateLifecycleStateFromServer()
+            // Wave M6 — load internal tech notes so the section can
+            // paint with real rows on first render. Errors surface
+            // inside the section card, not as a global banner.
+            await loadTechNotes()
         }
         .onReceive(lifecycleTimer) { tick in
             nowTick = tick
@@ -3704,8 +5107,12 @@ private struct HavenFieldVisitWorkspaceView: View {
             VStack(alignment: .leading, spacing: 12) {
                 FieldKeyValueRow(label: "Scheduled", value: routeSummary, inverse: true)
                 FieldKeyValueRow(label: "Status", value: viewModel.statusLabel, inverse: true)
+                // Wave M6 — address renders as a tappable Apple Maps link.
+                // The maps:// URL opens Apple Maps natively on device; the
+                // simulator falls back to Maps if installed, otherwise the
+                // tap is a graceful no-op.
                 if let address = viewModel.visit.property?.address, !address.isEmpty {
-                    FieldKeyValueRow(label: "Address", value: address, inverse: true)
+                    FieldTappableAddressRow(address: address, inverse: true)
                 }
                 if let notes = viewModel.visit.assignment?.routeNotes, !notes.isEmpty {
                     FieldKeyValueRow(label: "Route notes", value: notes, inverse: true)
@@ -4195,6 +5602,164 @@ private struct HavenFieldVisitWorkspaceView: View {
         }
     }
 
+    // MARK: Wave M6 tech notes
+
+    /// Loads the workspace-only notes for this visit. Called from the
+    /// view's `.task` modifier so the section paints with real rows on
+    /// first appear.
+    private func loadTechNotes() async {
+        guard let workspaceId = viewModel.workspaceId else {
+            techNotesLoaded = true
+            return
+        }
+        do {
+            let result = try await HavenFieldService.shared.listTechNotes(
+                workspaceId: workspaceId,
+                requestId: viewModel.visit.requestId
+            )
+            techNotes = result
+            techNotesLoaded = true
+            techNotesError = nil
+        } catch {
+            techNotesError = friendlyServerError(
+                from: error,
+                fallback: "Couldn't load internal notes. Pull to refresh."
+            )
+            techNotesLoaded = true
+        }
+    }
+
+    /// Submits the composer text as an internal note. Optimistic-append
+    /// would race with the server-side timestamp; instead we wait for
+    /// the inserted row to come back and append that, so author + ts
+    /// stay canonical.
+    private func submitTechNote() async {
+        let trimmed = techNoteComposer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !techNotesSubmitting else { return }
+        guard let workspaceId = viewModel.workspaceId else {
+            techNotesError = "Workspace not loaded yet. Try again in a moment."
+            return
+        }
+        techNotesSubmitting = true
+        defer { techNotesSubmitting = false }
+        do {
+            let inserted = try await HavenFieldService.shared.addTechNote(
+                workspaceId: workspaceId,
+                requestId: viewModel.visit.requestId,
+                body: trimmed
+            )
+            techNotes.append(inserted)
+            techNoteComposer = ""
+            techNotesError = nil
+        } catch {
+            techNotesError = friendlyServerError(
+                from: error,
+                fallback: "Couldn't save the note. Tap Add to retry."
+            )
+        }
+    }
+
+    private static let techNoteRelativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
+
+    private func techNoteRelativeTime(_ iso: String?) -> String {
+        guard let iso else { return "Just now" }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = parser.date(from: iso) {
+            return Self.techNoteRelativeFormatter.localizedString(for: date, relativeTo: Date())
+        }
+        parser.formatOptions = [.withInternetDateTime]
+        if let date = parser.date(from: iso) {
+            return Self.techNoteRelativeFormatter.localizedString(for: date, relativeTo: Date())
+        }
+        return "Just now"
+    }
+
+    @ViewBuilder
+    private var techNotesSection: some View {
+        FieldSectionCard(kicker: "Internal", title: "Notes for the crew") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Workspace-only. The homeowner never sees these.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+
+                // Composer at the top so a tech can append context fast.
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField(
+                        "e.g. \"Customer prefers side door access.\"",
+                        text: $techNoteComposer,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .padding(12)
+                    .background(HavenColors.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    HStack(spacing: 10) {
+                        Spacer()
+                        Button {
+                            Task { await submitTechNote() }
+                        } label: {
+                            Text(techNotesSubmitting ? "Adding..." : "Add internal note")
+                        }
+                        .buttonStyle(FieldPrimaryButtonStyle())
+                        .disabled(techNotesSubmitting || techNoteComposer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+
+                if let error = techNotesError {
+                    Text(error)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                // List below, sorted oldest first so the most recent
+                // context lands at the bottom (chat convention).
+                if techNotesLoaded && techNotes.isEmpty {
+                    Text("No internal notes yet. Add the first.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .padding(.vertical, 6)
+                } else if !techNotes.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(techNotes) { note in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "person.crop.circle")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                    Text(note.authorName)
+                                        .font(HavenTypography.uiLabelSmall)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Spacer(minLength: 6)
+                                    Text(techNoteRelativeTime(note.createdAt))
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+                                Text(note.body)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(12)
+                            .background(HavenColors.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var actionRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             if needsConfirmation {
@@ -4228,10 +5793,22 @@ private struct HavenFieldVisitWorkspaceView: View {
                     .disabled(viewModel.isSyncing)
                 }
             } else if viewModel.requestStatus == HandymanRequestStatus.confirmed.rawValue {
-                Button("On my way") {
-                    Task { await viewModel.markOnMyWay() }
+                HStack(spacing: 10) {
+                    Button("On my way") {
+                        Task { await viewModel.markOnMyWay() }
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+
+                    // Wave M6 — in-truck reschedule. Confirmed visits
+                    // sometimes need to slip; the tech can propose a new
+                    // window from the truck without calling dispatch.
+                    Button("Reschedule") {
+                        rescheduleDate = defaultRescheduleDate
+                        showRescheduleSheet = true
+                    }
+                    .buttonStyle(FieldSecondaryButtonStyle())
+                    .disabled(viewModel.isSyncing)
                 }
-                .buttonStyle(FieldPrimaryButtonStyle())
             } else if viewModel.requestStatus == HandymanRequestStatus.onMyWay.rawValue {
                 Button("Check in") {
                     Task { await viewModel.checkIn() }
@@ -4280,7 +5857,7 @@ private struct HavenFieldVisitWorkspaceView: View {
                     }
                     if let home = viewModel.home {
                         NavigationLink {
-                            HavenFieldHomeProfileView(home: home)
+                            HavenFieldHomeProfileView(home: home, workspaceId: viewModel.workspaceId)
                         } label: {
                             Text("Open home profile")
                                 .font(HavenTypography.uiButton)
@@ -4289,6 +5866,11 @@ private struct HavenFieldVisitWorkspaceView: View {
                     }
                 }
             }
+
+            // Wave M6 — internal tech notes. Workspace-only, hidden
+            // from homeowner. Composer at top, list below sorted oldest
+            // first so the most recent context lands at the bottom.
+            techNotesSection
 
             FieldSectionCard(kicker: "Recent", title: "Visits at this home") {
                 if let recentVisits = viewModel.home?.recentVisits, !recentVisits.isEmpty {
@@ -4408,7 +5990,16 @@ private struct HavenFieldVisitWorkspaceView: View {
                                         FieldPunchItemRow(
                                             item: item,
                                             isPending: pendingItemIds.contains(item.id),
-                                            onToggleDone: { Task { await togglePunchItem(item) } }
+                                            workspaceId: viewModel.workspaceId,
+                                            onToggleDone: { Task { await togglePunchItem(item) } },
+                                            onItemUpdated: { _ in
+                                                // Wave M2 — capture-depth saves are
+                                                // optimistic at the row level. Refresh
+                                                // the dashboard so other surfaces (the
+                                                // contractor desk + homeowner iOS) pick
+                                                // up the change on next render.
+                                                NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+                                            }
                                         )
                                     }
                                 }
@@ -4692,14 +6283,34 @@ private struct HavenFieldVisitWorkspaceView: View {
 
 private struct HavenFieldHomeProfileView: View {
     let home: HavenFieldHome
+    /// Wave M3 — optional workspace context for system inventory writes.
+    /// Pass through from every entry point that has dashboard context;
+    /// nil-safe so legacy thread-header navigation still compiles when
+    /// the workspace isn't directly available.
+    var workspaceId: String? = nil
     @State private var selectedTab: HomeProfileTab = .home
     @State private var selectedSystem: HavenFieldHomeSystem?
+    /// Wave M3 — locally edited copy of the home's systems so inventory
+    /// writes (decommission, follow-up flag, voice memo) re-render
+    /// immediately without a dashboard refresh round-trip. Seeded from
+    /// the home prop on appear; subsequent writes update entries inline
+    /// via replaceSystem(_:).
+    @State private var systems: [HavenFieldHomeSystem] = []
+    @State private var showSystemSweep: Bool = false
+    @State private var pendingDecommission: HavenFieldHomeSystem?
+    @State private var pendingFollowup: HavenFieldHomeSystem?
+    @State private var inFlightSystemId: String?
+    @State private var systemBanner: String?
+    @State private var systemBannerKind: SystemBannerKind = .info
+    @State private var bulkAddedThisVisit: Int = 0
 
     enum HomeProfileTab: String, CaseIterable {
         case home = "Home"
         case systems = "Systems"
         case files = "Files"
     }
+
+    enum SystemBannerKind { case info, success, error }
 
     var body: some View {
         ScrollView {
@@ -4710,6 +6321,10 @@ private struct HavenFieldHomeProfileView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                if let banner = systemBanner {
+                    systemBannerCard(banner: banner)
+                }
 
                 switch selectedTab {
                 case .home:
@@ -4725,9 +6340,133 @@ private struct HavenFieldHomeProfileView: View {
         }
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationTitle(home.name)
-        .sheet(item: $selectedSystem) { system in
-            HavenFieldHomeSystemDetailSheet(system: system)
+        .task {
+            if systems.isEmpty {
+                systems = home.systems
+            }
         }
+        .sheet(item: $selectedSystem) { system in
+            HavenFieldHomeSystemDetailSheet(
+                system: system,
+                workspaceId: workspaceId,
+                onChanged: { updated in replaceSystem(updated) },
+                onMarkFollowup: { pendingFollowup = system },
+                onDecommission: { pendingDecommission = system }
+            )
+        }
+        .sheet(isPresented: $showSystemSweep) {
+            HavenFieldSystemSweepSheet(
+                home: home,
+                workspaceId: workspaceId,
+                bulkAddedCount: $bulkAddedThisVisit,
+                onSystemCreated: { created in
+                    systems.append(created)
+                    setBanner("\(created.name) added to home", kind: .success)
+                }
+            )
+        }
+        .sheet(item: $pendingDecommission) { system in
+            HavenFieldDecommissionSheet(system: system) { reason in
+                Task { await runDecommission(system: system, reason: reason) }
+            }
+        }
+        .sheet(item: $pendingFollowup) { system in
+            HavenFieldFollowupSheet(system: system) { reason in
+                Task { await runFollowup(system: system, reason: reason) }
+            }
+        }
+    }
+
+    private func systemBannerCard(banner: String) -> some View {
+        let bgColor: Color
+        switch systemBannerKind {
+        case .info: bgColor = HavenColors.action.opacity(0.10)
+        case .success: bgColor = HavenColors.success.opacity(0.12)
+        case .error: bgColor = HavenColors.critical.opacity(0.10)
+        }
+        return Text(banner)
+            .font(HavenTypography.caption)
+            .foregroundStyle(HavenColors.textPrimary)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(bgColor)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .transition(.opacity)
+    }
+
+    private func setBanner(_ message: String, kind: SystemBannerKind, autoDismissAfter seconds: Double = 3.0) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            systemBanner = message
+            systemBannerKind = kind
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            if systemBanner == message {
+                withAnimation { systemBanner = nil }
+            }
+        }
+    }
+
+    private func replaceSystem(_ updated: HavenFieldHomeSystem) {
+        if let index = systems.firstIndex(where: { $0.id == updated.id }) {
+            systems[index] = updated
+        }
+    }
+
+    private func runDecommission(system: HavenFieldHomeSystem, reason: String) async {
+        guard let workspaceId, !workspaceId.isEmpty else {
+            setBanner("Sign in to your workspace before editing systems.", kind: .error)
+            return
+        }
+        inFlightSystemId = system.id
+        defer { inFlightSystemId = nil }
+        do {
+            if let updated = try await HavenFieldService.shared.decommissionSystem(
+                workspaceId: workspaceId,
+                systemId: system.id,
+                reason: reason
+            ) {
+                replaceSystem(updated)
+                setBanner("\(system.name) marked as removed", kind: .success)
+            } else {
+                setBanner("\(system.name) marked as removed", kind: .success)
+            }
+        } catch {
+            setBanner("Couldn't mark \(system.name) as removed. Please try again.", kind: .error)
+        }
+    }
+
+    private func runFollowup(system: HavenFieldHomeSystem, reason: String) async {
+        guard let workspaceId, !workspaceId.isEmpty else {
+            setBanner("Sign in to your workspace before editing systems.", kind: .error)
+            return
+        }
+        inFlightSystemId = system.id
+        defer { inFlightSystemId = nil }
+        do {
+            if let updated = try await HavenFieldService.shared.markSystemFollowup(
+                workspaceId: workspaceId,
+                systemId: system.id,
+                reason: reason.isEmpty ? nil : reason
+            ) {
+                replaceSystem(updated)
+                setBanner("\(system.name) flagged for follow-up", kind: .info)
+            }
+        } catch {
+            setBanner("Couldn't flag \(system.name) for follow-up.", kind: .error)
+        }
+    }
+
+    private var visibleSystems: [HavenFieldHomeSystem] {
+        systems.isEmpty ? home.systems : systems
+    }
+
+    private var incompleteSystems: [HavenFieldHomeSystem] {
+        visibleSystems.filter { !$0.isDecommissioned && $0.hasIncompleteIdentity }
+    }
+
+    private var followupSystems: [HavenFieldHomeSystem] {
+        visibleSystems.filter { $0.needsFollowup && !$0.isDecommissioned }
     }
 
     private var homeTab: some View {
@@ -4802,18 +6541,93 @@ private struct HavenFieldHomeProfileView: View {
     }
 
     private var systemsTab: some View {
-        FieldSectionCard(kicker: "Systems", title: "Known systems") {
-            if home.systems.isEmpty {
-                FieldEmptyState(title: "No systems shared yet", subtitle: "Once the homeowner grants access and the first visit captures labels, systems will appear here.")
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(home.systems) { system in
-                        Button {
-                            selectedSystem = system
-                        } label: {
-                            FieldCompactSystemRow(system: system)
+        VStack(alignment: .leading, spacing: 18) {
+            // Wave M3 — sweep entry. Always visible at the top so a tech
+            // can capture a fresh system in two taps regardless of how
+            // many systems are already on file.
+            FieldSectionCard(kicker: "System sweep", title: "Capture a system") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Snap a model plate; we'll extract the brand, model, and serial automatically. The homeowner sees every save when the visit closes.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    if bulkAddedThisVisit > 0 {
+                        Text("\(bulkAddedThisVisit) system\(bulkAddedThisVisit == 1 ? "" : "s") added in this visit")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.success)
+                            .padding(.bottom, 2)
+                    }
+                    Button {
+                        showSystemSweep = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "camera.viewfinder")
+                            Text("Open sweep mode")
                         }
-                        .buttonStyle(.plain)
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                    .disabled(workspaceId == nil)
+                    if workspaceId == nil {
+                        Text("Sweep mode is only available from your active visit.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+            }
+
+            // Wave M3 — incomplete-systems gap-fill list. Each tap opens
+            // the sweep with the existing systemId so the extraction
+            // patches the row instead of creating a new one.
+            if !incompleteSystems.isEmpty {
+                FieldSectionCard(
+                    kicker: "Gap-fill",
+                    title: "\(incompleteSystems.count) system\(incompleteSystems.count == 1 ? "" : "s") missing details"
+                ) {
+                    VStack(spacing: 12) {
+                        ForEach(incompleteSystems) { system in
+                            Button {
+                                selectedSystem = system
+                            } label: {
+                                FieldM3SystemRow(
+                                    system: system,
+                                    showFollowupBadge: false,
+                                    showRemovedBadge: false
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            FieldSectionCard(kicker: "Systems", title: "Known systems") {
+                if visibleSystems.isEmpty {
+                    FieldEmptyState(title: "No systems shared yet", subtitle: "Once the homeowner grants access and the first visit captures labels, systems will appear here.")
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(visibleSystems) { system in
+                            Button {
+                                selectedSystem = system
+                            } label: {
+                                FieldM3SystemRow(
+                                    system: system,
+                                    showFollowupBadge: system.needsFollowup,
+                                    showRemovedBadge: system.isDecommissioned
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    pendingDecommission = system
+                                } label: {
+                                    Label("Mark as removed", systemImage: "trash")
+                                }
+                                Button {
+                                    pendingFollowup = system
+                                } label: {
+                                    Label("Flag for follow-up", systemImage: "flag")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4978,7 +6792,7 @@ private struct HavenFieldMessageThreadView: View {
                 }
                 if let relatedHome {
                     NavigationLink {
-                        HavenFieldHomeProfileView(home: relatedHome)
+                        HavenFieldHomeProfileView(home: relatedHome, workspaceId: workspaceId)
                     } label: {
                         Label("Home", systemImage: "house")
                             .font(HavenTypography.uiLabel)
@@ -6003,6 +7817,54 @@ private struct FieldWorkspaceHeader: View {
     }
 }
 
+/// Wave M6 — route summary card on the Home tab. Shows the day's
+/// stops + drive time + rough mileage so the tech can size up the
+/// load at a glance. Drive time is currently a stub (15 min between
+/// stops + 10 min initial leg); a future wave will replace it with a
+/// real routing-engine call. Marked in the JSON as a stub.
+private struct FieldRouteSummaryCard: View {
+    let stops: Int
+    let driveMinutes: Int
+    let estimatedMiles: Int
+
+    private var driveTimeLabel: String {
+        let h = driveMinutes / 60
+        let m = driveMinutes % 60
+        if h > 0 && m > 0 { return "\(h)h \(m)m drive time" }
+        if h > 0 { return "\(h)h drive time" }
+        return "\(m)m drive time"
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "map.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(HavenColors.action)
+                .frame(width: 40, height: 40)
+                .background(HavenColors.action.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ROUTE")
+                    .font(HavenTypography.uiSectionHeader)
+                    .kerning(1)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text("\(stops) stop\(stops == 1 ? "" : "s")  ·  \(estimatedMiles) miles")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text(driveTimeLabel + " (estimated)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+}
+
 private struct FieldRouteHeroPreview: View {
     let visit: HavenFieldVisit
     let home: HavenFieldHome?
@@ -6306,18 +8168,36 @@ private struct FieldScheduledVisitRow: View {
                         }
                     }
                     Spacer(minLength: 8)
-                    if highlightNext {
-                        // Wave 7 final smoke caught this — same B1 violation
-                        // as the Visits-tab pill, but on the Overview-tab
-                        // 'Scheduled next' card (different render site).
-                        // Now navy-tinted to match.
-                        Text("NEXT UP")
-                            .font(HavenTypography.caption)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        if highlightNext {
+                            // Wave 7 final smoke caught this — same B1 violation
+                            // as the Visits-tab pill, but on the Overview-tab
+                            // 'Scheduled next' card (different render site).
+                            // Now navy-tinted to match.
+                            Text("NEXT UP")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.navy700)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(HavenColors.navy700.opacity(0.10))
+                                .clipShape(Capsule())
+                        }
+                        // Wave M6 — internal-notes badge so the tech sees
+                        // there's prior workspace context before opening
+                        // the visit. Hidden when zero.
+                        if let count = visit.assignment?.techNotesCount, count > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "note.text")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("\(count) note\(count == 1 ? "" : "s")")
+                                    .font(HavenTypography.caption)
+                            }
                             .foregroundStyle(HavenColors.navy700)
                             .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 4)
                             .background(HavenColors.navy700.opacity(0.10))
                             .clipShape(Capsule())
+                        }
                     }
                 }
             }
@@ -6937,6 +8817,96 @@ private struct FieldKeyValueRow: View {
     }
 }
 
+/// Wave M6 — tap-to-navigate row. Renders an address line with a pin
+/// icon prefix and routes the tap through Apple Maps. Falls back to a
+/// plain text row if the URL doesn't resolve. Mirrors `FieldKeyValueRow`
+/// styling so it sits naturally inside the same hero card.
+private struct FieldTappableAddressRow: View {
+    let address: String
+    var inverse: Bool = false
+
+    private var mapsURL: URL? {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            return nil
+        }
+        return URL(string: "https://maps.apple.com/?q=\(encoded)")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("ADDRESS")
+                .font(HavenTypography.uiSectionHeader)
+                .kerning(1)
+                .foregroundStyle(inverse ? HavenColors.textOnNavy.opacity(0.72) : HavenColors.textSecondary)
+            if let url = mapsURL {
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(address)
+                            .font(HavenTypography.body)
+                            .underline()
+                            .multilineTextAlignment(.leading)
+                    }
+                    .foregroundStyle(inverse ? HavenColors.textOnNavy : HavenColors.action)
+                }
+                .accessibilityLabel("Navigate to \(address)")
+                .accessibilityHint("Opens Apple Maps with this address")
+            } else {
+                Text(address)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(inverse ? HavenColors.textOnNavy : HavenColors.textPrimary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Wave M6 — tap-to-call row. Renders a phone number with a phone icon
+/// prefix and routes the tap through `tel://`. Sanitizes the digit
+/// stream so formatted numbers (("(914) 555-0123") still produce a
+/// dialer-ready URL.
+private struct FieldTappablePhoneRow: View {
+    let phone: String
+    var label: String = "Customer phone"
+    var inverse: Bool = false
+
+    private var telURL: URL? {
+        let digits = phone.unicodeScalars.filter { CharacterSet.decimalDigits.contains($0) || $0 == "+" }
+        let asString = String(String.UnicodeScalarView(digits))
+        guard !asString.isEmpty else { return nil }
+        return URL(string: "tel://\(asString)")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(HavenTypography.uiSectionHeader)
+                .kerning(1)
+                .foregroundStyle(inverse ? HavenColors.textOnNavy.opacity(0.72) : HavenColors.textSecondary)
+            if let url = telURL {
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(phone)
+                            .font(HavenTypography.body)
+                            .underline()
+                    }
+                    .foregroundStyle(inverse ? HavenColors.textOnNavy : HavenColors.action)
+                }
+                .accessibilityLabel("Call \(phone)")
+            } else {
+                Text(phone)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(inverse ? HavenColors.textOnNavy : HavenColors.textPrimary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct HavenFieldCoordinationComposer: View {
     let mode: String
     @Binding var message: String
@@ -6999,6 +8969,32 @@ private struct HavenFieldRescheduleSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Wave M6 — three candidate slots in the next 14 business days.
+    /// Stub heuristic: tomorrow 9am, day-after 1pm, 3 days out 9am. NOT
+    /// a true open-windows lookup (the open-windows table doesn't ship
+    /// until a later wave). Tapping a slot snaps `date` to that value
+    /// for one-tap propose; the graphical picker below is the manual
+    /// override for techs who want to dial in a precise minute.
+    private var quickSlots: [Date] {
+        let now = Date()
+        let cal = Calendar.current
+        let candidates: [(Int, Int)] = [(1, 9), (2, 13), (4, 9)]
+        return candidates.compactMap { dayOffset, hour in
+            guard let day = cal.date(byAdding: .day, value: dayOffset, to: now) else { return nil }
+            return cal.date(bySettingHour: hour, minute: 0, second: 0, of: day)
+        }
+    }
+
+    private var slotFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d 'at' h:mm a"
+        return f
+    }
+
+    private func isSlotSelected(_ slot: Date) -> Bool {
+        abs(slot.timeIntervalSince(date)) < 60
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -7016,19 +9012,59 @@ private struct HavenFieldRescheduleSheet: View {
                             .foregroundStyle(HavenColors.textSecondary)
                     }
 
-                    DatePicker(
-                        "",
-                        selection: $date,
-                        in: Date()...,
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
-                    .datePickerStyle(.graphical)
-                    .labelsHidden()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 12)
-                    .background(HavenColors.surface)
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    // Wave M6 — quick-pick slot row. One tap snaps the
+                    // date and the tech can hit Propose without opening
+                    // the picker.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Suggested slots")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        VStack(spacing: 8) {
+                            ForEach(quickSlots, id: \.self) { slot in
+                                Button {
+                                    date = slot
+                                } label: {
+                                    HStack {
+                                        Image(systemName: isSlotSelected(slot) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(isSlotSelected(slot) ? HavenColors.action : HavenColors.textSecondary)
+                                        Text(slotFormatter.string(from: slot))
+                                            .font(HavenTypography.body)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(isSlotSelected(slot) ? HavenColors.action.opacity(0.08) : HavenColors.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(isSlotSelected(slot) ? HavenColors.action : HavenColors.border, lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Or pick exact time")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        DatePicker(
+                            "",
+                            selection: $date,
+                            in: Date()...,
+                            displayedComponents: [.date, .hourAndMinute]
+                        )
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 12)
+                        .background(HavenColors.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                    }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Note (optional)")
@@ -7178,11 +9214,56 @@ private struct HavenFieldSystemDetailSheet: View {
 
 private struct HavenFieldHomeSystemDetailSheet: View {
     let system: HavenFieldHomeSystem
+    /// Wave M3 — optional workspace context. When present we render the
+    /// inline action row + status pills + voice memo affordance.
+    var workspaceId: String? = nil
+    /// Wave M3 — callback fired after a system mutation that should
+    /// re-render the parent's row (voice memo attached).
+    var onChanged: ((HavenFieldHomeSystem) -> Void)? = nil
+    /// Wave M3 — parent invokes its decommission sheet.
+    var onMarkFollowup: (() -> Void)? = nil
+    var onDecommission: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
+                if system.isDecommissioned {
+                    Section {
+                        Label {
+                            Text("Removed from this home")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.critical)
+                        } icon: {
+                            Image(systemName: "trash.fill")
+                                .foregroundStyle(HavenColors.critical)
+                        }
+                        if let reason = system.decommissionReason?.nonEmpty {
+                            Text(reason)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                }
+
+                if system.needsFollowup {
+                    Section {
+                        Label {
+                            Text("Flagged for follow-up")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.warning)
+                        } icon: {
+                            Image(systemName: "flag.fill")
+                                .foregroundStyle(HavenColors.warning)
+                        }
+                        if let reason = system.followupReason?.nonEmpty {
+                            Text(reason)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                }
+
                 Section("Overview") {
                     LabeledContent("Name", value: system.name)
                     if let category = system.category?.nonEmpty {
@@ -7259,6 +9340,28 @@ private struct HavenFieldHomeSystemDetailSheet: View {
                         Text(notes)
                     }
                 }
+
+                if workspaceId != nil && !system.isDecommissioned {
+                    Section("Field actions") {
+                        Button {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                onMarkFollowup?()
+                            }
+                        } label: {
+                            Label("Flag for follow-up", systemImage: "flag")
+                                .foregroundStyle(HavenColors.warning)
+                        }
+                        Button(role: .destructive) {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                onDecommission?()
+                            }
+                        } label: {
+                            Label("Mark as removed", systemImage: "trash")
+                        }
+                    }
+                }
             }
             .navigationTitle(system.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -7266,6 +9369,540 @@ private struct HavenFieldHomeSystemDetailSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Wave M3 — system inventory authoring components
+
+/// Wave M3 — system row variant with FOLLOW-UP / REMOVED status pills
+/// and a dim treatment when the system has been decommissioned. Drops
+/// into the same scrollable list slot the legacy FieldCompactSystemRow
+/// occupies on the homeowner-side Property tab; both surfaces stay in
+/// sync because both render off `home_systems` rows directly.
+private struct FieldM3SystemRow: View {
+    let system: HavenFieldHomeSystem
+    let showFollowupBadge: Bool
+    let showRemovedBadge: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(system.name)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(system.isDecommissioned ? HavenColors.textSecondary : HavenColors.textPrimary)
+                        .strikethrough(system.isDecommissioned, color: HavenColors.textSecondary)
+                    if showRemovedBadge {
+                        statusPill(label: "REMOVED", color: HavenColors.critical)
+                    } else if showFollowupBadge {
+                        statusPill(label: "FOLLOW-UP", color: HavenColors.warning)
+                    }
+                    Spacer()
+                }
+                Text(detailLine)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                if system.hasIncompleteIdentity, !system.isDecommissioned {
+                    Text("Missing model plate details")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.action)
+                }
+                if system.voiceNotePath?.nonEmpty != nil {
+                    Label("Voice memo on file", systemImage: "waveform")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.action)
+                }
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(HavenColors.beige400)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .opacity(system.isDecommissioned ? 0.55 : 1.0)
+    }
+
+    private var detailLine: String {
+        let parts = [
+            system.category?.nonEmpty,
+            system.manufacturer?.nonEmpty,
+            system.modelNumber?.nonEmpty
+        ].compactMap { $0 }
+        if parts.isEmpty {
+            return "Tap to add brand and model details."
+        }
+        return parts.joined(separator: " • ")
+    }
+
+    private func statusPill(label: String, color: Color) -> some View {
+        Text(label)
+            .font(.system(size: 10, weight: .heavy))
+            .tracking(0.6)
+            .foregroundStyle(color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+}
+
+/// Wave M3 — decommission reason picker. Mirrors the four-option set
+/// from the original spec; tech can also free-text the reason.
+private struct HavenFieldDecommissionSheet: View {
+    let system: HavenFieldHomeSystem
+    var onConfirm: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedReason: String = "Replaced"
+    @State private var customReason: String = ""
+
+    private static let reasons = [
+        "Replaced",
+        "Removed",
+        "Damaged beyond repair",
+        "Other"
+    ]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Mark \(system.name) as removed?")
+                        .font(HavenTypography.headline)
+                    Text("The homeowner sees the system disappear from their list. We keep the service history on file for context.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Section("Why is it gone?") {
+                    Picker("Reason", selection: $selectedReason) {
+                        ForEach(Self.reasons, id: \.self) { reason in
+                            Text(reason).tag(reason)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                }
+                if selectedReason == "Other" {
+                    Section("Notes") {
+                        TextField("Short note for the homeowner", text: $customReason, axis: .vertical)
+                            .lineLimit(2...4)
+                    }
+                }
+            }
+            .navigationTitle("Mark as removed")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Confirm", role: .destructive) {
+                        let reason = selectedReason == "Other"
+                            ? customReason.trimmingCharacters(in: .whitespacesAndNewlines)
+                            : selectedReason
+                        onConfirm(reason)
+                        dismiss()
+                    }
+                    .disabled(selectedReason == "Other" && customReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+/// Wave M3 — follow-up reason capture. Optional reason; the next-visit
+/// prep checklist surfaces this string verbatim.
+private struct HavenFieldFollowupSheet: View {
+    let system: HavenFieldHomeSystem
+    var onConfirm: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason: String = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Flag \(system.name) for follow-up")
+                        .font(HavenTypography.headline)
+                    Text("We'll remind the next tech to circle back to this system on the next visit.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Section("Why couldn't you finish today?") {
+                    TextField("e.g. tenant unavailable, attic locked", text: $reason, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+            }
+            .navigationTitle("Flag for follow-up")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Flag") {
+                        onConfirm(reason.trimmingCharacters(in: .whitespacesAndNewlines))
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Wave M3 — system sweep mode. Camera-first capture of model plates
+/// with an inline AI extraction confirmation flow. Falls back to a
+/// debug "use test image" affordance on the simulator since the iOS
+/// Simulator can't take real photos.
+private struct HavenFieldSystemSweepSheet: View {
+    let home: HavenFieldHome
+    var workspaceId: String?
+    @Binding var bulkAddedCount: Int
+    var onSystemCreated: (HavenFieldHomeSystem) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var stage: Stage = .ready
+    @State private var capturedImage: UIImage?
+    @State private var extraction: HavenFieldService.HavenFieldExtractSystemResponse?
+    @State private var draftName: String = ""
+    @State private var draftCategory: String = ""
+    @State private var draftManufacturer: String = ""
+    @State private var draftModel: String = ""
+    @State private var draftSerial: String = ""
+    @State private var draftNotes: String = ""
+    @State private var errorMessage: String?
+    @State private var isExtracting: Bool = false
+    @State private var isSaving: Bool = false
+    @State private var showCamera: Bool = false
+
+    enum Stage {
+        case ready, extracting, confirming, saving
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    counterCard
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(HavenColors.critical.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    switch stage {
+                    case .ready:
+                        readyStateCard
+                    case .extracting:
+                        extractingCard
+                    case .confirming:
+                        confirmCard
+                    case .saving:
+                        savingCard
+                    }
+                }
+                .padding(16)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("System sweep")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showCamera) {
+                HavenFieldCameraPicker { image in
+                    capturedImage = image
+                    Task { await runExtraction(image: image) }
+                }
+            }
+        }
+    }
+
+    private var counterCard: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(home.name)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("\(bulkAddedCount) system\(bulkAddedCount == 1 ? "" : "s") added in this visit")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            Spacer()
+            Image(systemName: "camera.viewfinder")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(HavenColors.action)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var readyStateCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Snap a model plate")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("Get the brand label clear in frame. We extract make, model, and serial automatically and you confirm the result before saving.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+            Button {
+                resetDraft()
+                showCamera = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "camera.fill")
+                    Text("Open camera")
+                }
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+
+            #if DEBUG
+            Button {
+                resetDraft()
+                Task { await runExtractionWithSeed() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "wand.and.stars")
+                    Text("Use test image (debug)")
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(HavenColors.action)
+            #endif
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var extractingCard: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Reading the model plate...")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("This usually takes a few seconds.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var confirmCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundStyle(HavenColors.success)
+                Text("Confirm system details")
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+            if let confidence = extraction?.confidence {
+                Text("AI confidence: \(confidence.capitalized)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                fieldRow(label: "Display name", value: $draftName, placeholder: "e.g. Furnace, attic A")
+                fieldRow(label: "Category", value: $draftCategory, placeholder: "HVAC / Plumbing / etc.")
+                fieldRow(label: "Manufacturer", value: $draftManufacturer, placeholder: "Brand")
+                fieldRow(label: "Model number", value: $draftModel, placeholder: "Model")
+                fieldRow(label: "Serial number", value: $draftSerial, placeholder: "Serial")
+                fieldRow(label: "Notes", value: $draftNotes, placeholder: "Anything the homeowner should know")
+            }
+
+            HStack(spacing: 10) {
+                Button("Re-shoot") {
+                    resetDraft()
+                    showCamera = true
+                }
+                .buttonStyle(.bordered)
+                .tint(HavenColors.action)
+
+                Spacer()
+
+                Button {
+                    Task { await saveSystem() }
+                } label: {
+                    Text(isSaving ? "Saving..." : "Save and continue")
+                }
+                .buttonStyle(FieldPrimaryButtonStyle())
+                .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var savingCard: some View {
+        VStack(spacing: 14) {
+            ProgressView().controlSize(.large)
+            Text("Saving system to home record...")
+                .font(HavenTypography.headline)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func fieldRow(label: String, value: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+            TextField(placeholder, text: value, axis: .vertical)
+                .lineLimit(1...3)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func resetDraft() {
+        capturedImage = nil
+        extraction = nil
+        draftName = ""
+        draftCategory = ""
+        draftManufacturer = ""
+        draftModel = ""
+        draftSerial = ""
+        draftNotes = ""
+        errorMessage = nil
+        stage = .ready
+    }
+
+    private func runExtraction(image: UIImage) async {
+        guard let workspaceId, !workspaceId.isEmpty else {
+            errorMessage = "Sign in to your workspace to use sweep mode."
+            return
+        }
+        guard let data = image.jpegData(compressionQuality: 0.78) else {
+            errorMessage = "Couldn't read the photo data. Please re-shoot."
+            return
+        }
+        await postExtraction(base64: data.base64EncodedString())
+    }
+
+    #if DEBUG
+    private func runExtractionWithSeed() async {
+        guard let workspaceId, !workspaceId.isEmpty else {
+            errorMessage = "Sign in to your workspace to use sweep mode."
+            return
+        }
+        // 1x1 PNG (white pixel) — minimal valid PNG bytes the AI will
+        // gracefully say "not identifiable" against. Lets us exercise
+        // the iOS code path on the simulator without a real camera.
+        let onePixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEklEQVR4nGP8//8/AwAAAACFAAFv6w0YAAAAAElFTkSuQmCC"
+        // Pre-fill the draft so the simulator-side reviewer has something
+        // to confirm. Mirrors a high-confidence extraction.
+        await MainActor.run {
+            draftName = "Test furnace plate"
+            draftCategory = "HVAC"
+            draftManufacturer = "Carrier"
+            draftModel = "58STA070-12"
+            draftSerial = "DEBUG-\(Int.random(in: 1000...9999))"
+            draftNotes = "Captured via debug seed (simulator)"
+        }
+        await postExtraction(base64: onePixel)
+    }
+    #endif
+
+    private func postExtraction(base64: String) async {
+        guard let workspaceId else { return }
+        await MainActor.run {
+            stage = .extracting
+            isExtracting = true
+            errorMessage = nil
+        }
+        do {
+            let result = try await HavenFieldService.shared.extractSystemFromPhoto(
+                workspaceId: workspaceId,
+                base64: base64,
+                category: nil
+            )
+            await MainActor.run {
+                extraction = result
+                if draftManufacturer.isEmpty, let m = result.manufacturer { draftManufacturer = m }
+                if draftModel.isEmpty, let m = result.modelNumber { draftModel = m }
+                if draftSerial.isEmpty, let s = result.serialNumber { draftSerial = s }
+                if draftCategory.isEmpty, let p = result.productType { draftCategory = p.capitalized }
+                if draftName.isEmpty {
+                    let parts = [draftManufacturer, draftModel].filter { !$0.isEmpty }
+                    draftName = parts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                    if draftName.isEmpty { draftName = "New system" }
+                }
+                stage = .confirming
+                isExtracting = false
+            }
+        } catch {
+            await MainActor.run {
+                stage = .ready
+                isExtracting = false
+                errorMessage = "Couldn't read the plate. Re-shoot or fill it in by hand."
+            }
+        }
+    }
+
+    private func saveSystem() async {
+        guard let workspaceId, !workspaceId.isEmpty else { return }
+        guard let householdId = home.householdId, !householdId.isEmpty else {
+            await MainActor.run { errorMessage = "This home is missing a household id; can't save the system." }
+            return
+        }
+        await MainActor.run {
+            stage = .saving
+            isSaving = true
+            errorMessage = nil
+        }
+        do {
+            let created = try await HavenFieldService.shared.createHomeSystem(
+                propertyId: home.propertyId,
+                householdId: householdId,
+                name: draftName.trimmingCharacters(in: .whitespacesAndNewlines),
+                category: draftCategory.nonEmpty,
+                manufacturer: draftManufacturer.nonEmpty,
+                modelNumber: draftModel.nonEmpty,
+                serialNumber: draftSerial.nonEmpty,
+                notes: draftNotes.nonEmpty
+            )
+            await MainActor.run {
+                if let created {
+                    onSystemCreated(created)
+                    bulkAddedCount += 1
+                }
+                isSaving = false
+                resetDraft()
+            }
+        } catch {
+            await MainActor.run {
+                isSaving = false
+                stage = .confirming
+                errorMessage = "Save failed. Please try again."
             }
         }
     }

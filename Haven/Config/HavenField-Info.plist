@@ -58,6 +58,8 @@
     <string>Allow Chez Field to use Face ID for quick technician login.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Chez Field uses your location to support routing, on-the-way updates, and visit coordination.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Chez Field uses the microphone to record voice notes alongside punch list items so you can capture context hands-free during a visit.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Chez Field needs photo access to attach service photos and label captures to visits.</string>
     <key>UILaunchScreen</key>

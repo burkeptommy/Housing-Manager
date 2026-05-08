@@ -293,6 +293,14 @@ function mapPunchItemForClient(item: Record<string, unknown>) {
     materialRequired: Boolean(item.material_required),
     costBasis: compactString(item.cost_basis) || "time_and_materials",
     attachments: Array.isArray(item.attachments) ? item.attachments : [],
+    // Wave M2 — capture depth fields. Field tech writes these via
+    // attach_punch_photo / attach_punch_voice / set_punch_materials /
+    // set_punch_time_spent. Operations Desk + iOS Field both decode this
+    // shape; defaults stay aligned with the column defaults so a brand
+    // new row reads as `[]`/`0`/`null` everywhere.
+    materialsUsed: Array.isArray(item.materials_used) ? item.materials_used : [],
+    timeSpentSeconds: item.time_spent_seconds != null ? numberValue(item.time_spent_seconds) : 0,
+    voiceNotePath: compactString(item.voice_note_path) || null,
     addedAfterLock: Boolean(item.added_after_lock),
     proposedByRole: compactString(item.proposed_by_role) || null,
     proposedAt: item.proposed_at ?? null,
@@ -1653,6 +1661,24 @@ async function createSignedSystemPhotoUrl(service: ServiceClient, path: string) 
 }
 
 /**
+ * Wave M3 — sign a path that lives in home-system-attachments (voice
+ * memos + future field-only attachments). One-hour TTL keeps things
+ * fresh for cross-app playback without round-trips.
+ */
+async function signSystemAttachmentUrl(service: ServiceClient, path: string) {
+  const cleanPath = compactString(path);
+  if (!cleanPath) return null;
+  const { data, error } = await service.storage
+    .from("home-system-attachments")
+    .createSignedUrl(cleanPath, 60 * 60);
+  if (error) {
+    console.warn("[handyman-provider] failed to sign system attachment", cleanPath, error.message);
+    return null;
+  }
+  return compactString(data?.signedUrl);
+}
+
+/**
  * Decode a base64 string (with or without a data: URL prefix) into a
  * Uint8Array suitable for handing to supabase storage.upload.
  */
@@ -2039,7 +2065,7 @@ async function loadDashboard(
 
   const quoteIds = quotes.map((row) => compactString(row.id)).filter(Boolean);
 
-  const [messagesResult, reportsResult, propertiesResult, systemsResult, visitTasksResult, quoteMessagesResult, openTasksResult, documentsResult, punchItemsResult] = await Promise.all([
+  const [messagesResult, reportsResult, propertiesResult, systemsResult, visitTasksResult, quoteMessagesResult, openTasksResult, documentsResult, punchItemsResult, techNotesResult] = await Promise.all([
     requestIds.length
       ? service
           .from("handyman_request_messages")
@@ -2101,10 +2127,21 @@ async function loadDashboard(
     visitIds.length
       ? service
           .from("handyman_punch_items")
-          .select("id, household_id, property_id, assigned_visit_task_id, system_id, system_label_snapshot, template_id, title, description, source, status, priority, estimated_minutes, estimated_cost_range, material_required, cost_basis, attachments, added_after_lock, proposed_by_user_id, proposed_by_role, proposed_at, proposal_message, proposal_status, proposal_expires_at, accepted_by_user_id, accepted_at, declined_by_user_id, declined_at, declined_reason, completed_at, completed_visit_task_id, archived_at, created_at, updated_at")
+          .select("id, household_id, property_id, assigned_visit_task_id, system_id, system_label_snapshot, template_id, title, description, source, status, priority, estimated_minutes, estimated_cost_range, material_required, cost_basis, attachments, materials_used, time_spent_seconds, voice_note_path, added_after_lock, proposed_by_user_id, proposed_by_role, proposed_at, proposal_message, proposal_status, proposal_expires_at, accepted_by_user_id, accepted_at, declined_by_user_id, declined_at, declined_reason, completed_at, completed_visit_task_id, archived_at, created_at, updated_at")
           .in("assigned_visit_task_id", visitIds)
           .is("archived_at", null)
           .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+    // Wave M6 — tech notes count per request. Cheap aggregate so the
+    // visit list rows can show a "3 internal notes" badge without
+    // pulling the full bodies for every visit. List-style fetch lets us
+    // count by request_id locally.
+    requestIds.length
+      ? service
+          .from("provider_visit_tech_notes")
+          .select("request_id")
+          .eq("workspace_id", workspaceId)
+          .in("request_id", requestIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
   ]);
 
@@ -2117,6 +2154,7 @@ async function loadDashboard(
   if (openTasksResult.error) throw openTasksResult.error;
   if (documentsResult.error) throw documentsResult.error;
   if (punchItemsResult.error) throw punchItemsResult.error;
+  if (techNotesResult.error) throw techNotesResult.error;
 
   const messages = (messagesResult.data ?? []) as Record<string, unknown>[];
   const reports = (reportsResult.data ?? []) as Record<string, unknown>[];
@@ -2127,6 +2165,14 @@ async function loadDashboard(
   const openTasks = (openTasksResult.data ?? []) as Record<string, unknown>[];
   const propertyDocuments = (documentsResult.data ?? []) as Record<string, unknown>[];
   const punchItems = (punchItemsResult.data ?? []) as Record<string, unknown>[];
+  // Wave M6 — count tech notes per request for the assignment badge.
+  const techNoteRows = (techNotesResult.data ?? []) as Record<string, unknown>[];
+  const techNotesCountByRequestId = new Map<string, number>();
+  for (const row of techNoteRows) {
+    const requestId = compactString(row.request_id);
+    if (!requestId) continue;
+    techNotesCountByRequestId.set(requestId, (techNotesCountByRequestId.get(requestId) ?? 0) + 1);
+  }
 
   // Phase 78: bucket punch items by their assigned visit so each visit
   // row can carry its own punchItems[] without an N+1 query.
@@ -2233,6 +2279,46 @@ async function loadDashboard(
     quoteMessagesByQuoteId.set(quoteId, bucket);
   }
 
+  // Wave M2 — pre-sign punch-item attachment URLs so iOS / SPA can render
+  // thumbnails inline without a per-image round-trip. Runs once per
+  // dashboard load before the synchronous visit map below.
+  // Pre-Phase-M2 rows have no attachments and skip the signing entirely.
+  const signedAttachmentsByItemId = new Map<string, unknown[]>();
+  const signedVoiceUrlByItemId = new Map<string, string | null>();
+  const allPunchAttachmentSigning: Array<Promise<void>> = [];
+  for (const items of punchItemsByVisitTaskId.values()) {
+    for (const item of items) {
+      const attachments = Array.isArray(item.attachments)
+        ? (item.attachments as Record<string, unknown>[])
+        : [];
+      if (attachments.length > 0) {
+        allPunchAttachmentSigning.push(
+          (async () => {
+            const signed = await Promise.all(
+              attachments.map(async (att) => {
+                const path = compactString(att.path);
+                if (!path) return att;
+                const signedUrl = await createSignedPunchAttachmentUrl(service, path);
+                return { ...att, signedUrl };
+              }),
+            );
+            signedAttachmentsByItemId.set(compactString(item.id), signed);
+          })(),
+        );
+      }
+      const voicePath = compactString(item.voice_note_path);
+      if (voicePath) {
+        allPunchAttachmentSigning.push(
+          (async () => {
+            const signedUrl = await createSignedPunchAttachmentUrl(service, voicePath);
+            signedVoiceUrlByItemId.set(compactString(item.id), signedUrl);
+          })(),
+        );
+      }
+    }
+  }
+  await Promise.all(allPunchAttachmentSigning);
+
   const visitRows = visibleRequests.map((request) => {
     const requestId = compactString(request.id);
     const visitId = compactString(request.visit_task_id);
@@ -2336,6 +2422,10 @@ async function loadDashboard(
             clockInAccuracyM: assignment.clock_in_accuracy_m !== null && assignment.clock_in_accuracy_m !== undefined
               ? Number(assignment.clock_in_accuracy_m)
               : null,
+            // Wave M6 — count of internal tech notes on this request.
+            // Surfaces a "N notes" badge on visit list rows so a tech
+            // walking up to a job knows there's prior context to read.
+            techNotesCount: techNotesCountByRequestId.get(requestId) ?? 0,
           }
         : null,
       latestMessage: message
@@ -2365,7 +2455,22 @@ async function loadDashboard(
       // Phase 78: structured punch list. Replaces the legacy notes-bullet
       // text the field app used to regex-parse. Items already filtered to
       // archived_at IS NULL on the server side.
-      punchItems: (punchItemsByVisitTaskId.get(visitId) ?? []).map(mapPunchItemForClient),
+      // Wave M2 — fold pre-signed attachment + voice URLs into the
+      // payload so the field UI renders thumbnails + audio playback
+      // without a per-asset round-trip.
+      punchItems: (punchItemsByVisitTaskId.get(visitId) ?? []).map((item) => {
+        const mapped = mapPunchItemForClient(item) as Record<string, unknown>;
+        const itemId = compactString(item.id);
+        const signedAttachments = signedAttachmentsByItemId.get(itemId);
+        if (signedAttachments) {
+          mapped.attachments = signedAttachments;
+        }
+        const signedVoiceUrl = signedVoiceUrlByItemId.get(itemId);
+        if (signedVoiceUrl !== undefined) {
+          mapped.voiceNoteSignedUrl = signedVoiceUrl;
+        }
+        return mapped;
+      }),
     };
   }).sort((lhs, rhs) => {
     const leftDate = lhs.routeDate || "9999-12-31";
@@ -2460,6 +2565,18 @@ async function loadDashboard(
               })),
             ).then((photos) => photos.filter((p) => p.path))
           : [],
+        // Wave M3 — system inventory authoring fields. Sign the voice
+        // memo path so the SPA can play it back inline. The decommission
+        // / follow-up timestamps + reasons drive the operator-side
+        // status pills and "next visit prep" surfacing.
+        decommissionedAt: compactString(system.decommissioned_at) || null,
+        decommissionReason: compactString(system.decommissioned_reason) || null,
+        markedForFollowupAt: compactString(system.marked_for_followup_at) || null,
+        followupReason: compactString(system.followup_reason) || null,
+        voiceNotePath: compactString(system.voice_note_path) || null,
+        voiceNoteSignedUrl: compactString(system.voice_note_path)
+          ? await signSystemAttachmentUrl(service, compactString(system.voice_note_path))
+          : null,
       }))),
       openTasks: homeTasks.slice(0, 16).map((task) => ({
         id: compactString(task.id),
@@ -3830,6 +3947,468 @@ async function completeVisitForProvider(
     : 0;
 
   return { assignment: serializeAssignment(updated), totalSeconds };
+}
+
+// MARK: - Wave M6 — internal tech-to-tech notes
+//
+// Distinct from the customer-visible thread on `handyman_request_messages`.
+// Workspace members write notes to coordinate context between techs +
+// dispatch ("Customer prefers side door access" / "Brought wrong fitting,
+// fix on next visit"); the homeowner never sees them. The Operations
+// Desk + iOS field app both render the same rows from this table.
+
+async function addTechNoteForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const noteBody = compactString(body.body);
+  if (!noteBody) throw new Error("body is required");
+  if (noteBody.length > 4000) throw new Error("Note is too long (max 4000 chars)");
+
+  const memberId = compactString(membership.id);
+
+  const { data: inserted, error: insertError } = await service
+    .from("provider_visit_tech_notes")
+    .insert({
+      workspace_id: workspaceId,
+      request_id: requestId,
+      author_member_id: memberId,
+      body: noteBody,
+    })
+    .select()
+    .single();
+
+  if (insertError || !inserted) throw insertError ?? new Error("Failed to add tech note");
+
+  // Return the note with the author name baked in so iOS doesn't need
+  // a second round-trip to render the row. Mirrors list_tech_notes shape.
+  const authorName =
+    compactString(membership.full_name) ||
+    compactString(membership.email) ||
+    "Workspace member";
+
+  return {
+    note: {
+      id: compactString(inserted.id),
+      requestId: compactString(inserted.request_id),
+      authorMemberId: compactString(inserted.author_member_id),
+      authorName,
+      body: compactString(inserted.body),
+      createdAt: inserted.created_at,
+    },
+  };
+}
+
+async function listTechNotesForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const { data: notes, error } = await service
+    .from("provider_visit_tech_notes")
+    .select("id, request_id, author_member_id, body, created_at")
+    .eq("workspace_id", workspaceId)
+    .eq("request_id", requestId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+
+  const memberIds = Array.from(
+    new Set(
+      (notes ?? [])
+        .map((row: Record<string, unknown>) => compactString(row.author_member_id))
+        .filter(Boolean),
+    ),
+  );
+
+  const memberById = new Map<string, Record<string, unknown>>();
+  if (memberIds.length > 0) {
+    const { data: members } = await service
+      .from("provider_workspace_members")
+      .select("id, full_name, email")
+      .in("id", memberIds);
+    for (const member of (members ?? []) as Record<string, unknown>[]) {
+      memberById.set(compactString(member.id), member);
+    }
+  }
+
+  return {
+    notes: (notes ?? []).map((row: Record<string, unknown>) => {
+      const member = memberById.get(compactString(row.author_member_id));
+      return {
+        id: compactString(row.id),
+        requestId: compactString(row.request_id),
+        authorMemberId: compactString(row.author_member_id),
+        authorName:
+          compactString(member?.full_name) ||
+          compactString(member?.email) ||
+          "Workspace member",
+        body: compactString(row.body),
+        createdAt: row.created_at,
+      };
+    }),
+  };
+}
+
+// MARK: - Wave M2 — Punch list capture depth
+//
+// Photos + voice + materials + per-item time on top of the existing
+// handyman_punch_items rows. Auth: caller must be a member of the
+// workspace AND the punch item must belong to a request whose contractor
+// is linked to that workspace. Mirrors the workspace-scoped chain that
+// update_punch_item_status uses to derive the contractor link.
+
+/**
+ * Resolves a punch item to its (household, contractor, workspace) tuple
+ * and asserts the caller has workspace access. Returns the punch item
+ * row + its derived workspace id so the caller can insert / update with
+ * confidence the link is real. Throws on any boundary failure (missing
+ * item, missing contractor link, wrong workspace).
+ */
+async function loadPunchItemForWorkspace(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  workspaceId: string,
+  itemId: string,
+) {
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const { data: item, error: itemErr } = await service
+    .from("handyman_punch_items")
+    .select(
+      "id, household_id, property_id, assigned_visit_task_id, attachments, materials_used, time_spent_seconds, voice_note_path",
+    )
+    .eq("id", itemId)
+    .maybeSingle();
+  if (itemErr) throw itemErr;
+  if (!item) throw new Error("Punch item not found");
+
+  // Resolve the workspace this item lives under via:
+  // punch_item.assigned_visit_task_id
+  //   -> handyman_requests.contractor_id
+  //   -> provider_contractor_links.workspace_id
+  // If any link is missing or points to a different workspace, deny.
+  const visitTaskId = compactString(item.assigned_visit_task_id);
+  if (!visitTaskId) {
+    throw new Error("Punch item not linked to a visit");
+  }
+
+  const { data: linkedReq } = await service
+    .from("handyman_requests")
+    .select("contractor_id")
+    .eq("visit_task_id", visitTaskId)
+    .limit(1)
+    .maybeSingle();
+  const contractorId = compactString(linkedReq?.contractor_id);
+  if (!contractorId) throw new Error("Visit not linked to a contractor");
+
+  const { data: workspaceLink } = await service
+    .from("provider_contractor_links")
+    .select("workspace_id")
+    .eq("contractor_id", contractorId)
+    .limit(1)
+    .maybeSingle();
+  const itemWorkspaceId = compactString(workspaceLink?.workspace_id);
+  if (!itemWorkspaceId || itemWorkspaceId !== workspaceId) {
+    throw new Error("Punch item belongs to a different workspace");
+  }
+
+  return item;
+}
+
+/**
+ * Sign a punch-item-attachments storage path so the iOS app can render
+ * an inline thumbnail. Mirrors createSignedSystemPhotoUrl. 1-hour TTL.
+ */
+async function createSignedPunchAttachmentUrl(service: ServiceClient, path: string) {
+  const cleanPath = compactString(path);
+  if (!cleanPath) return null;
+  const { data, error } = await service.storage
+    .from("punch-item-attachments")
+    .createSignedUrl(cleanPath, 60 * 60);
+  if (error) {
+    console.warn(
+      "[handyman-provider] failed to sign punch attachment",
+      cleanPath,
+      error.message,
+    );
+    return null;
+  }
+  return compactString(data?.signedUrl);
+}
+
+/**
+ * Wave M2 — attach a photo to a punch item. Bytes arrive as base64 from
+ * iOS (PhotosPicker → UIImage → JPEG → base64) or from the desktop SPA
+ * via the same shape. We trust the client to have downsized to a sane
+ * width before send; this function does NOT resize server-side because
+ * Deno doesn't ship sharp / imagemagick and the iOS side already passes
+ * a JPEG at compressionQuality 0.82. Storage path mirrors home-system-photos:
+ * `<household_id>/<item_id>/<timestamp>-<random>.jpg`. Returns the
+ * updated row with signed URLs filled in for every attachment so the
+ * iOS UI can render the new thumbnail without a re-fetch round-trip.
+ */
+async function attachPunchPhotoForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const itemId = compactString(body.itemId);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  if (!itemId) throw new Error("itemId is required");
+
+  const item = await loadPunchItemForWorkspace(service, user, workspaceId, itemId);
+
+  const fileBase64 = compactString(body.base64) || compactString(body.fileBase64);
+  if (!fileBase64) throw new Error("base64 is required");
+  const contentType = compactString(body.contentType) || "image/jpeg";
+  const caption = compactString(body.caption);
+
+  const householdId = compactString(item.household_id);
+  if (!householdId) throw new Error("Punch item has no household");
+
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const ext = contentType.includes("png") ? "png" : "jpg";
+  const path = `${householdId}/${itemId}/${stamp}.${ext}`;
+
+  const bytes = decodeBase64Body(fileBase64);
+  const { error: uploadError } = await service.storage
+    .from("punch-item-attachments")
+    .upload(path, bytes, { contentType, upsert: false });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const now = isoNow();
+  const existing = Array.isArray(item.attachments) ? (item.attachments as unknown[]) : [];
+  const newRecord = {
+    kind: "photo",
+    path,
+    contentType,
+    caption: caption || null,
+    uploadedAt: now,
+    uploadedBy: compactString(user.id) || null,
+  };
+  const nextAttachments = [...existing, newRecord];
+
+  const { data: updated, error: updErr } = await service
+    .from("handyman_punch_items")
+    .update({ attachments: nextAttachments, updated_at: now })
+    .eq("id", itemId)
+    .select(
+      "id, household_id, property_id, assigned_visit_task_id, attachments, materials_used, time_spent_seconds, voice_note_path, status, title",
+    )
+    .single();
+  if (updErr || !updated) throw updErr ?? new Error("Failed to attach photo");
+
+  // Sign every photo path so the iOS app can render thumbnails inline.
+  const signed = await Promise.all(
+    (Array.isArray(updated.attachments) ? (updated.attachments as Record<string, unknown>[]) : []).map(
+      async (att) => {
+        const p = compactString(att.path);
+        if (!p) return att;
+        const signedUrl = await createSignedPunchAttachmentUrl(service, p);
+        return { ...att, signedUrl };
+      },
+    ),
+  );
+
+  return {
+    item: {
+      id: compactString(updated.id),
+      attachments: signed,
+      materialsUsed: Array.isArray(updated.materials_used) ? updated.materials_used : [],
+      timeSpentSeconds: numberValue(updated.time_spent_seconds || 0),
+      voiceNotePath: compactString(updated.voice_note_path) || null,
+    },
+  };
+}
+
+/**
+ * Wave M2 — attach a voice note to a punch item. Bytes arrive as base64
+ * from iOS' AVAudioRecorder (m4a/aac, single track, mono). We overwrite
+ * any prior voice_note_path because the field flow only supports ONE
+ * voice note per item — the tech can re-record but never accumulates a
+ * playlist. The previous file is best-effort removed from storage.
+ */
+async function attachPunchVoiceForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const itemId = compactString(body.itemId);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  if (!itemId) throw new Error("itemId is required");
+
+  const item = await loadPunchItemForWorkspace(service, user, workspaceId, itemId);
+
+  const fileBase64 = compactString(body.base64);
+  if (!fileBase64) throw new Error("base64 is required");
+  const mimeType = compactString(body.mimeType) || "audio/m4a";
+
+  const householdId = compactString(item.household_id);
+  if (!householdId) throw new Error("Punch item has no household");
+
+  // One voice note per item — overwrite if one already exists. Best-effort
+  // remove the old file from storage so we don't leak bytes.
+  const previousPath = compactString(item.voice_note_path);
+  if (previousPath) {
+    await service.storage.from("punch-item-attachments").remove([previousPath]).catch((err) => {
+      console.warn("[handyman-provider] failed to remove prior voice note", previousPath, err);
+    });
+  }
+
+  const ext = mimeType.includes("aac") ? "aac" : "m4a";
+  const path = `${householdId}/${itemId}/voice-${Date.now()}.${ext}`;
+
+  const bytes = decodeBase64Body(fileBase64);
+  const { error: uploadError } = await service.storage
+    .from("punch-item-attachments")
+    .upload(path, bytes, { contentType: mimeType, upsert: true });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const now = isoNow();
+  const { data: updated, error: updErr } = await service
+    .from("handyman_punch_items")
+    .update({ voice_note_path: path, updated_at: now })
+    .eq("id", itemId)
+    .select(
+      "id, household_id, property_id, assigned_visit_task_id, attachments, materials_used, time_spent_seconds, voice_note_path, status, title",
+    )
+    .single();
+  if (updErr || !updated) throw updErr ?? new Error("Failed to attach voice note");
+
+  const signedVoiceUrl = await createSignedPunchAttachmentUrl(service, path);
+
+  return {
+    item: {
+      id: compactString(updated.id),
+      attachments: Array.isArray(updated.attachments) ? updated.attachments : [],
+      materialsUsed: Array.isArray(updated.materials_used) ? updated.materials_used : [],
+      timeSpentSeconds: numberValue(updated.time_spent_seconds || 0),
+      voiceNotePath: compactString(updated.voice_note_path) || null,
+      voiceNoteSignedUrl: signedVoiceUrl,
+    },
+  };
+}
+
+/**
+ * Wave M2 — replace the materials_used JSONB array on a punch item.
+ * Each row is `{ sku?: string, name: string, qty: number, unit_cost: number }`.
+ * The contractor desk consumes the same shape on the post-visit review
+ * surface so per-item materials cost rolls into the invoice convertor.
+ * Validates: name non-empty, qty >= 0, unit_cost >= 0. Rejects the
+ * whole array on any invalid row so the iOS UI can surface a precise
+ * error message.
+ */
+async function setPunchMaterialsForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const itemId = compactString(body.itemId);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  if (!itemId) throw new Error("itemId is required");
+
+  await loadPunchItemForWorkspace(service, user, workspaceId, itemId);
+
+  const raw = Array.isArray(body.materials) ? (body.materials as Record<string, unknown>[]) : [];
+  const cleaned = raw.map((row, idx) => {
+    const name = compactString(row.name);
+    if (!name) throw new Error(`Material ${idx + 1} is missing a name`);
+    const qtyRaw = numberValue(row.qty ?? row.quantity ?? 0);
+    const qty = Number.isFinite(qtyRaw) && qtyRaw >= 0 ? qtyRaw : 0;
+    const unitCostRaw = numberValue(row.unit_cost ?? row.unitCost ?? 0);
+    const unitCost = Number.isFinite(unitCostRaw) && unitCostRaw >= 0 ? unitCostRaw : 0;
+    const sku = compactString(row.sku);
+    return {
+      ...(sku ? { sku } : {}),
+      name,
+      qty,
+      unit_cost: unitCost,
+    };
+  });
+
+  const now = isoNow();
+  const { data: updated, error: updErr } = await service
+    .from("handyman_punch_items")
+    .update({ materials_used: cleaned, updated_at: now })
+    .eq("id", itemId)
+    .select(
+      "id, attachments, materials_used, time_spent_seconds, voice_note_path",
+    )
+    .single();
+  if (updErr || !updated) throw updErr ?? new Error("Failed to save materials");
+
+  return {
+    item: {
+      id: compactString(updated.id),
+      attachments: Array.isArray(updated.attachments) ? updated.attachments : [],
+      materialsUsed: Array.isArray(updated.materials_used) ? updated.materials_used : [],
+      timeSpentSeconds: numberValue(updated.time_spent_seconds || 0),
+      voiceNotePath: compactString(updated.voice_note_path) || null,
+    },
+  };
+}
+
+/**
+ * Wave M2 — set the per-item time-spent counter. The iOS UI runs an
+ * in-memory timer (reset on each toggle) and POSTs the final elapsed
+ * seconds when the tech stops the timer. Server clamps to non-negative
+ * integer; negative or NaN values fall back to 0.
+ */
+async function setPunchTimeSpentForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const itemId = compactString(body.itemId);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  if (!itemId) throw new Error("itemId is required");
+
+  await loadPunchItemForWorkspace(service, user, workspaceId, itemId);
+
+  const raw = numberValue(body.seconds ?? 0);
+  const seconds = Number.isFinite(raw) && raw >= 0 ? Math.round(raw) : 0;
+
+  const now = isoNow();
+  const { data: updated, error: updErr } = await service
+    .from("handyman_punch_items")
+    .update({ time_spent_seconds: seconds, updated_at: now })
+    .eq("id", itemId)
+    .select(
+      "id, attachments, materials_used, time_spent_seconds, voice_note_path",
+    )
+    .single();
+  if (updErr || !updated) throw updErr ?? new Error("Failed to save time spent");
+
+  return {
+    item: {
+      id: compactString(updated.id),
+      attachments: Array.isArray(updated.attachments) ? updated.attachments : [],
+      materialsUsed: Array.isArray(updated.materials_used) ? updated.materials_used : [],
+      timeSpentSeconds: numberValue(updated.time_spent_seconds || 0),
+      voiceNotePath: compactString(updated.voice_note_path) || null,
+    },
+  };
 }
 
 async function assertWorkspaceAccess(service: ServiceClient, userId: string, workspaceId: string) {
@@ -8509,26 +9088,265 @@ async function markTaskFixedDuringVisit(
   return { ok: true, service_record_id: sr ? (sr as { id: string }).id : null };
 }
 
-/** G44 — mark a system inactive without archiving. */
+/**
+ * G44 (legacy) + Wave M3 — mark a system inactive without archiving.
+ * M3 added workspace-member auth + a verification round-trip through
+ * loadSystemForProviderWrite() so a tech can't decommission a system in
+ * a household their workspace doesn't serve. Accepts both the legacy
+ * `system_id` arg name and the M3+ `systemId` shape.
+ */
 async function decommissionSystem(
   service: ServiceClient,
   user: { id: string },
   body: Record<string, unknown>
 ) {
-  const systemId = compactString(body.system_id);
-  const reason = compactString(body.reason) || null;
-  if (!systemId) throw new Error("system_id required");
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  if (workspaceId) {
+    await assertWorkspaceAccess(service, userId, workspaceId);
+  }
 
-  await service
+  const systemId = compactString(body.systemId) || compactString(body.system_id);
+  const reason = compactString(body.reason) || null;
+  if (!systemId) throw new Error("systemId required");
+
+  if (workspaceId) {
+    await loadSystemForProviderWrite(service, workspaceId, systemId);
+  }
+
+  const { data: updated, error: updateError } = await service
     .from("home_systems")
     .update({
       is_active: false,
       decommissioned_at: isoNow(),
       decommissioned_reason: reason,
+      status: "decommissioned",
     })
+    .eq("id", systemId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  return { ok: true, system: updated };
+}
+
+/**
+ * Wave M3 — mark a system for follow-up on the next visit. Tech couldn't
+ * access this system this visit (tenant out, attic locked, breaker
+ * panel buried). Surfaces on the next visit's prep checklist + on the
+ * homeowner's dashboard if material. Workspace-member auth required.
+ */
+async function markSystemFollowupForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  if (!systemId) throw new Error("systemId is required");
+  const reason = compactString(body.reason) || null;
+
+  await loadSystemForProviderWrite(service, workspaceId, systemId);
+
+  const { data: updated, error: updateError } = await service
+    .from("home_systems")
+    .update({
+      marked_for_followup_at: isoNow(),
+      followup_reason: reason,
+    })
+    .eq("id", systemId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  return { ok: true, system: updated };
+}
+
+/**
+ * Wave M3 — clear the follow-up flag on a system. Used when the tech
+ * returns and finishes the work, or marks "Got it" to explicitly drop
+ * it off the next-visit prep list. Workspace-member auth required.
+ */
+async function clearSystemFollowupForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  if (!systemId) throw new Error("systemId is required");
+
+  await loadSystemForProviderWrite(service, workspaceId, systemId);
+
+  const { data: updated, error: updateError } = await service
+    .from("home_systems")
+    .update({
+      marked_for_followup_at: null,
+      followup_reason: null,
+    })
+    .eq("id", systemId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  return { ok: true, system: updated };
+}
+
+/**
+ * Wave M3 — record a voice memo against a system. Bytes land in the
+ * home-system-attachments bucket as
+ * `<household_id>/<system_id>/voice-<stamp>.m4a`, and the canonical
+ * column home_systems.voice_note_path stores the path. The read path
+ * signs short-lived URLs through the same bucket. Setting a fresh memo
+ * overwrites the previous one — single-shot per system in v1.
+ */
+async function attachSystemVoiceForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  if (!systemId) throw new Error("systemId is required");
+  const fileBase64 = compactString(body.base64) || compactString(body.fileBase64);
+  if (!fileBase64) throw new Error("base64 is required");
+  const mimeType = compactString(body.mimeType) || "audio/mp4";
+
+  const system = await loadSystemForProviderWrite(service, workspaceId, systemId);
+  const householdId = compactString(system.household_id);
+  if (!householdId) throw new Error("System has no household");
+
+  const stamp = `${Date.now()}`;
+  const ext = mimeType.includes("mp4") || mimeType.includes("m4a")
+    ? "m4a"
+    : mimeType.includes("wav")
+      ? "wav"
+      : "audio";
+  const path = `${householdId}/${systemId}/voice-${stamp}.${ext}`;
+
+  const bytes = decodeBase64Body(fileBase64);
+  const { error: uploadError } = await service.storage
+    .from("home-system-attachments")
+    .upload(path, bytes, { contentType: mimeType, upsert: false });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const { error: updateError } = await service
+    .from("home_systems")
+    .update({ voice_note_path: path })
     .eq("id", systemId);
+  if (updateError) throw updateError;
+
+  let signedUrl: string | null = null;
+  try {
+    const { data: signed } = await service.storage
+      .from("home-system-attachments")
+      .createSignedUrl(path, 60 * 60);
+    signedUrl = signed?.signedUrl ?? null;
+  } catch (err) {
+    console.warn("[handyman-provider] failed to sign system voice url", err);
+  }
+
+  return { ok: true, voicePath: path, signedUrl, mimeType };
+}
+
+/**
+ * Wave M3 — delete a recorded voice memo for a system. Best-effort
+ * storage cleanup + null out the column so the iOS UI hides the row.
+ */
+async function deleteSystemVoiceForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const systemId = compactString(body.systemId);
+  if (!systemId) throw new Error("systemId is required");
+
+  const system = await loadSystemForProviderWrite(service, workspaceId, systemId);
+  const existingPath = compactString((system as Record<string, unknown>).voice_note_path);
+
+  if (existingPath) {
+    await service.storage
+      .from("home-system-attachments")
+      .remove([existingPath])
+      .catch((err: unknown) => {
+        console.warn("[handyman-provider] failed to remove system voice", existingPath, err);
+      });
+  }
+
+  const { error: updateError } = await service
+    .from("home_systems")
+    .update({ voice_note_path: null })
+    .eq("id", systemId);
+  if (updateError) throw updateError;
 
   return { ok: true };
+}
+
+/**
+ * Wave M3 — wrapper around the existing identify-equipment edge
+ * function. The field iOS app posts a base64 JPEG of a model plate +
+ * optional category; we forward it server-side so the workspace-auth
+ * boundary stays inside handyman-provider and the operator never has to
+ * juggle a second function URL. Returns the structured AI extraction
+ * for the iOS confirmation card to render.
+ */
+async function extractSystemFromPhotoForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const fileBase64 = compactString(body.base64) || compactString(body.fileBase64);
+  if (!fileBase64) throw new Error("base64 is required");
+  const category = compactString(body.category) || null;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const url = `${supabaseUrl}/functions/v1/identify-equipment`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${serviceKey}`,
+      "apikey": serviceKey,
+    },
+    body: JSON.stringify({ image_base64: fileBase64, category }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`identify-equipment failed: ${response.status} ${errText.slice(0, 300)}`);
+  }
+
+  const result = await response.json();
+  return {
+    ok: true,
+    identified: result.identified === true,
+    manufacturer: result.manufacturer ?? null,
+    modelNumber: result.model_number ?? null,
+    serialNumber: result.serial_number ?? null,
+    productType: result.product_type ?? null,
+    additionalSpecs: result.additional_specs ?? null,
+    confidence: result.confidence ?? null,
+    rawText: result.raw_text ?? null,
+    catalogMatch: result.catalog_match ?? null,
+  };
 }
 
 /** G47 — multi-handyman support: add a workspace member to an assessment. */
@@ -9104,6 +9922,64 @@ serve(async (req) => {
 
       if (action === "complete_visit") {
         const result = await completeVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M6 — internal tech notes (workspace-scoped, hidden from
+      // homeowner). Auth is handled in the helper functions via
+      // assertWorkspaceAccess; both functions return camelCase shapes.
+      if (action === "add_tech_note") {
+        const result = await addTechNoteForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "list_tech_notes") {
+        const result = await listTechNotesForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M2 — punch list capture depth.
+      if (action === "attach_punch_photo") {
+        const result = await attachPunchPhotoForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "attach_punch_voice") {
+        const result = await attachPunchVoiceForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "set_punch_materials") {
+        const result = await setPunchMaterialsForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "set_punch_time_spent") {
+        const result = await setPunchTimeSpentForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
@@ -10204,9 +11080,55 @@ serve(async (req) => {
         return json(result);
       }
 
-      // Decommission a system without archiving (G44).
+      // Decommission a system without archiving (G44 + Wave M3).
       if (action === "decommission_system") {
         const result = await decommissionSystem(service, user, body);
+        return json(result);
+      }
+
+      // Wave M3 — system inventory authoring on the field iOS app.
+      if (action === "mark_system_followup") {
+        const result = await markSystemFollowupForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "clear_system_followup") {
+        const result = await clearSystemFollowupForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "attach_system_voice") {
+        const result = await attachSystemVoiceForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "delete_system_voice") {
+        const result = await deleteSystemVoiceForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "extract_system_from_photo") {
+        const result = await extractSystemFromPhotoForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
         return json(result);
       }
 

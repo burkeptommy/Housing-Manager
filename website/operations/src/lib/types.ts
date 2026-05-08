@@ -168,6 +168,31 @@ export interface VisitQuotePreview {
   publicShareUrl: string;
 }
 
+/// Wave M2 — one entry on `handyman_punch_items.attachments` JSONB array.
+/// Camel-case shape mirroring the iOS `HavenFieldPunchAttachment` model.
+/// `signedUrl` is filled in by the dashboard read path + by the
+/// `attach_punch_photo` response so consumers can render thumbnails
+/// without a per-asset round-trip.
+export interface PunchItemAttachment {
+  kind: string;
+  path: string;
+  contentType?: string | null;
+  caption?: string | null;
+  uploadedAt?: string | null;
+  uploadedBy?: string | null;
+  signedUrl?: string | null;
+}
+
+/// Wave M2 — one entry on `handyman_punch_items.materials_used` JSONB array.
+/// snake_case `unit_cost` mirrors the column convention. Per-item
+/// invoice convertor reads `qty * unit_cost` directly into a draft line.
+export interface PunchItemMaterial {
+  sku?: string | null;
+  name: string;
+  qty: number;
+  unit_cost: number;
+}
+
 /// Wave O — structured punch item row from `handyman_punch_items`.
 /// The handyman-provider edge function returns these per visit via
 /// the assigned_visit_task_id FK. Replaces the legacy free-text
@@ -193,7 +218,15 @@ export interface PunchItem {
   estimatedCostRange: string | null;
   materialRequired: boolean;
   costBasis: string;
-  attachments: unknown[];
+  attachments: PunchItemAttachment[];
+  /// Wave M2 — capture-depth fields. Field tech writes via attach_punch_*
+  /// and set_punch_* actions; the contractor desk's VisitDetail review
+  /// section renders the same shape so post-visit invoicing rolls
+  /// per-item materials cost + per-item time straight into draft lines.
+  materialsUsed: PunchItemMaterial[];
+  timeSpentSeconds: number;
+  voiceNotePath: string | null;
+  voiceNoteSignedUrl?: string | null;
   addedAfterLock: boolean;
   proposedByRole: string | null;
   proposedAt: string | null;
@@ -273,6 +306,16 @@ export interface HomeSystem {
   notes?: string;
   installDate?: string;
   photos?: HomeSystemPhoto[];
+  // Wave M3 — system inventory authoring fields written by the field iOS
+  // app. The contractor SPA renders REMOVED / FOLLOW-UP badges + voice
+  // memo playback when these are present so operator + tech share one
+  // view of every home record.
+  decommissionedAt?: string | null;
+  decommissionReason?: string | null;
+  markedForFollowupAt?: string | null;
+  followupReason?: string | null;
+  voiceNotePath?: string | null;
+  voiceNoteSignedUrl?: string | null;
 }
 
 /// Section 19d.21 — subset of households.chez_profile that the

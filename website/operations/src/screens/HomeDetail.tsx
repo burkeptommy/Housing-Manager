@@ -331,6 +331,13 @@ function SystemRow({ system, onClick }: { system: HomeSystem; onClick: () => voi
   const headline = system.manufacturer || system.modelNumber
     ? `${system.manufacturer ?? ""} ${system.modelNumber ?? ""}`.trim()
     : "Manufacturer unknown";
+  // Wave M3 — derived flags rendered as status pills. REMOVED dims the
+  // entire row and strikes through the system name; FOLLOW-UP renders
+  // an amber pill so the operator sees what the next visit needs to
+  // pick up.
+  const isRemoved = Boolean(system.decommissionedAt);
+  const needsFollowup = Boolean(system.markedForFollowupAt);
+  const hasVoiceMemo = Boolean(system.voiceNotePath);
   return (
     <button
       onClick={onClick}
@@ -342,18 +349,45 @@ function SystemRow({ system, onClick }: { system: HomeSystem; onClick: () => voi
         cursor: "pointer",
         textAlign: "left",
         width: "100%",
+        opacity: isRemoved ? 0.55 : 1,
       }}
     >
       <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--indigo-50)", color: "var(--indigo)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
         <Icon name={iconForCategory(system.category)} size={14} stroke={1.9} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{system.name}</div>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--text)",
+            textDecoration: isRemoved ? "line-through" : "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <span>{system.name}</span>
+          {isRemoved && <Pill tone="critical">Removed</Pill>}
+          {!isRemoved && needsFollowup && <Pill tone="warning">Follow-up</Pill>}
+          {hasVoiceMemo && <Pill tone="info">Voice memo</Pill>}
+        </div>
         {headline !== "Manufacturer unknown" && (
           <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{headline}</div>
         )}
+        {isRemoved && system.decommissionReason && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+            {system.decommissionReason}
+          </div>
+        )}
+        {!isRemoved && needsFollowup && system.followupReason && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+            {system.followupReason}
+          </div>
+        )}
       </div>
-      {!system.manufacturer && (
+      {!isRemoved && !system.manufacturer && (
         <Pill tone="warning">Update on next visit</Pill>
       )}
       <Icon name="chevron" size={14} color="var(--text-soft)" stroke={2} />

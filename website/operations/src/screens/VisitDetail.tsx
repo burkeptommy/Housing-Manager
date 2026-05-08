@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Card } from "../components/chrome/Card";
 import { Pill, type PillTone } from "../components/chrome/Pill";
@@ -90,6 +90,23 @@ export default function VisitDetailScreen() {
   const [newItemMinutes, setNewItemMinutes] = useState<string>("");
   const [addingItem, setAddingItem] = useState(false);
 
+  // Wave M6 — internal tech notes (workspace-only, hidden from
+  // homeowner). Lazy-loaded on first paint so the visit detail itself
+  // renders without waiting on the round-trip.
+  type TechNote = {
+    id: string;
+    requestId: string;
+    authorMemberId: string;
+    authorName: string;
+    body: string;
+    createdAt: string | null;
+  };
+  const [techNotes, setTechNotes] = useState<TechNote[]>([]);
+  const [techNotesLoaded, setTechNotesLoaded] = useState(false);
+  const [techNoteDraft, setTechNoteDraft] = useState("");
+  const [techNoteSubmitting, setTechNoteSubmitting] = useState(false);
+  const [techNoteError, setTechNoteError] = useState<string | null>(null);
+
   if (!dashboard) return null;
   if (!visit) {
     return (
@@ -124,6 +141,56 @@ export default function VisitDetailScreen() {
       alert(e instanceof Error ? e.message : "Couldn't send.");
     } finally {
       setSending(false);
+    }
+  }
+
+  // Wave M6 — load + add internal tech notes. Workspace-only; mirrors
+  // the iOS field app's tech notes section. Loaded lazily on first
+  // paint so the visit detail itself renders without waiting.
+  useEffect(() => {
+    let cancelled = false;
+    if (!visit || !dashboard) return;
+    (async () => {
+      try {
+        const result = (await postProviderAction("list_tech_notes", {
+          workspaceId: dashboard.workspace.id,
+          requestId: visit.requestId,
+        })) as { notes: TechNote[] };
+        if (!cancelled) {
+          setTechNotes(result.notes ?? []);
+          setTechNotesLoaded(true);
+          setTechNoteError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setTechNoteError(e instanceof Error ? e.message : "Couldn't load internal notes.");
+          setTechNotesLoaded(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit?.requestId, dashboard?.workspace.id]);
+
+  async function handleAddTechNote() {
+    const trimmed = techNoteDraft.trim();
+    if (!trimmed || !visit || !dashboard || techNoteSubmitting) return;
+    setTechNoteSubmitting(true);
+    setTechNoteError(null);
+    try {
+      const result = (await postProviderAction("add_tech_note", {
+        workspaceId: dashboard.workspace.id,
+        requestId: visit.requestId,
+        body: trimmed,
+      })) as { note: TechNote };
+      setTechNotes((prev) => [...prev, result.note]);
+      setTechNoteDraft("");
+    } catch (e) {
+      setTechNoteError(e instanceof Error ? e.message : "Couldn't save the note.");
+    } finally {
+      setTechNoteSubmitting(false);
     }
   }
 
@@ -538,10 +605,17 @@ export default function VisitDetailScreen() {
                               key={item.id}
                               style={{
                                 display: "flex",
-                                alignItems: isEditing ? "flex-start" : "center",
-                                gap: 12,
+                                flexDirection: "column",
+                                gap: 6,
                                 padding: "8px 0",
                                 borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none",
+                              }}
+                            >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: isEditing ? "flex-start" : "center",
+                                gap: 12,
                               }}
                             >
                               {/* Checkbox — interactive when structured, decorative for legacy notes data. */}
@@ -669,6 +743,14 @@ export default function VisitDetailScreen() {
                                   )}
                                 </>
                               )}
+                            </div>
+                            {/* Wave M2 — capture-depth strip. Renders below
+                                the row when the field tech captured photos /
+                                voice / materials / time. Read-only on the
+                                operator side; the iOS app authors. */}
+                            {structured && !isEditing && (
+                              <PunchCaptureDepthStrip item={structured} />
+                            )}
                             </div>
                           );
                         })}
@@ -968,9 +1050,178 @@ export default function VisitDetailScreen() {
               </Link>
             </Card>
           )}
+
+          {/* Wave M6 — internal tech notes (workspace-only). Renders the
+              same provider_visit_tech_notes rows that the iOS field app
+              writes/reads. The homeowner never sees these; the heading
+              copy makes that visibility-scoping explicit. */}
+          <Card padding="default">
+            <div className="ops-section-label" style={{ marginBottom: 6 }}>Internal Notes (workspace only)</div>
+            <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+              Crew-only notes. The homeowner never sees these. Use for site access details, callbacks, or context the next tech should have.
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              <textarea
+                value={techNoteDraft}
+                onChange={(e) => setTechNoteDraft(e.target.value)}
+                placeholder='e.g. "Customer prefers side door access. Brought wrong fitting, fix on next visit."'
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  fontSize: 13,
+                  fontFamily: "var(--sans)",
+                  border: "1px solid var(--neutral-300)",
+                  borderRadius: 8,
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                  background: "var(--pearl)",
+                  color: "var(--text)",
+                }}
+              />
+              <button
+                className="ops-button ops-button--primary"
+                onClick={handleAddTechNote}
+                disabled={techNoteSubmitting || !techNoteDraft.trim()}
+                style={{ alignSelf: "flex-end" }}
+              >
+                {techNoteSubmitting ? "Adding..." : "Add internal note"}
+              </button>
+            </div>
+
+            {techNoteError && (
+              <div style={{ fontSize: 12, color: "var(--critical)", marginBottom: 10 }}>
+                {techNoteError}
+              </div>
+            )}
+
+            {techNotesLoaded && techNotes.length === 0 && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                No internal notes yet. Add the first.
+              </div>
+            )}
+
+            {techNotes.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {techNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    style={{
+                      padding: 10,
+                      background: "var(--pearl)",
+                      border: "1px solid var(--neutral-200)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
+                        {note.authorName}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--text-soft)" }}>
+                        {note.createdAt ? formatRelativeTime(note.createdAt) : "Just now"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                      {note.body}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
       </div>
     </>
+  );
+}
+
+// Wave M2 — read-only render of the field tech's capture-depth state on
+// a punch item. Photos render as a horizontal thumbnail strip; voice as
+// an audio playback link; materials as a comma-joined list with rolled
+// total; time as an "Hh Mm" stat. The desk doesn't author this — the
+// iOS field app does. The desk consumes it for invoicing decisions.
+function PunchCaptureDepthStrip({ item }: { item: PunchItem }) {
+  const photos = (item.attachments || []).filter((a) => (a as any)?.kind === "photo");
+  const materials = item.materialsUsed || [];
+  const materialsTotal = materials.reduce((sum, m) => sum + (Number(m.qty) || 0) * (Number(m.unit_cost) || 0), 0);
+  const timeMinutes = item.timeSpentSeconds ? Math.round(item.timeSpentSeconds / 60) : 0;
+  const hasAny = photos.length > 0 || materials.length > 0 || timeMinutes > 0 || !!item.voiceNotePath;
+  if (!hasAny) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 12,
+        marginLeft: 34,
+        paddingLeft: 0,
+        paddingTop: 4,
+      }}
+    >
+      {photos.length > 0 && (
+        <div style={{ display: "flex", gap: 6 }}>
+          {photos.slice(0, 5).map((p) => {
+            const att = p as { signedUrl?: string | null; path?: string };
+            const url = att.signedUrl || undefined;
+            return (
+              <a
+                key={att.path || Math.random()}
+                href={url || "#"}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  width: 36, height: 36, borderRadius: 6, overflow: "hidden",
+                  border: "1px solid var(--neutral-200)", background: "var(--neutral-100)",
+                  display: "block",
+                }}
+                aria-label="Open photo"
+              >
+                {url && (
+                  <img
+                    src={url}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
+              </a>
+            );
+          })}
+          {photos.length > 5 && (
+            <span style={{ fontSize: 11, color: "var(--text-muted)", alignSelf: "center" }}>
+              +{photos.length - 5}
+            </span>
+          )}
+        </div>
+      )}
+      {item.voiceNoteSignedUrl && (
+        <audio
+          controls
+          src={item.voiceNoteSignedUrl}
+          style={{ height: 28, maxWidth: 220 }}
+        />
+      )}
+      {materials.length > 0 && (
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <Icon name="wrench" size={11} stroke={2} />
+          {materials.length} material{materials.length === 1 ? "" : "s"} · {formatCurrency(materialsTotal)}
+        </span>
+      )}
+      {timeMinutes > 0 && (
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <Icon name="clock" size={11} stroke={2} />
+          {timeMinutes} min on item
+        </span>
+      )}
+    </div>
   );
 }
 
