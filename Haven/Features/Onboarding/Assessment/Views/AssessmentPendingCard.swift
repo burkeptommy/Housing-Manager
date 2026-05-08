@@ -122,7 +122,7 @@ struct AssessmentPendingCard: View {
                 Spacer()
             }
             if verificationCode != nil {
-                Text("Ask your handyman for this code at the door. It's how you know they're with Chez.")
+                Text("Ask your contractor for this code at the door. It's how you know they're with Chez.")
                     .font(HavenTypography.uiLabelSmall)
                     .foregroundStyle(HavenColors.textSecondary)
             }

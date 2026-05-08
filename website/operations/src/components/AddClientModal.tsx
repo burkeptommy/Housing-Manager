@@ -43,11 +43,25 @@ export function AddClientModal() {
     return () => window.removeEventListener("ops:open-add-client", handler);
   }, []);
 
+  // Escape key closes modal (a11y).
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, submitting]);
+
   if (!open || !dashboard) return null;
 
   async function submit() {
     if (!street.trim() || !name.trim()) {
       alert("Client name and street address are required.");
+      return;
+    }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      alert("Email format looks off. Leave blank or fix it before saving.");
       return;
     }
     setSubmitting(true);
@@ -102,7 +116,7 @@ export function AddClientModal() {
               Bring a homeowner onto your books
             </div>
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
-              They'll show up in Homes immediately. You can build quotes and schedule visits right away — when they sign up later they'll claim the record.
+              They'll show up in Homes immediately. You can build quotes and schedule visits right away. When they sign up later they'll claim the record.
             </div>
           </div>
           <button
@@ -191,7 +205,7 @@ export function AddClientModal() {
 
           <Field label="Notes (internal)">
             <textarea
-              placeholder="Anything to remember — gate code, dog, parking, referral source…"
+              placeholder="Anything to remember: gate code, dog, parking, referral source…"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               style={{ ...inputStyle, minHeight: 70, resize: "vertical" }}

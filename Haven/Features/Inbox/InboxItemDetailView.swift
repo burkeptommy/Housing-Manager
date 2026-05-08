@@ -73,6 +73,15 @@ struct InboxItemDetailView: View {
                 // Email info
                 emailInfoSection
 
+                // Wave Y2 — contractor-side activity mirrors. When the
+                // provider sends a quote / invoice / status change from
+                // the Operations Desk, an inbox row lands here. Render
+                // a prominent deep-link card so the homeowner can open
+                // the underlying quote / invoice / thread in one tap.
+                if shouldShowProviderActivityCard {
+                    providerActivityCard
+                }
+
                 // Summary
                 if let summary = item.summary, !summary.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
@@ -301,7 +310,7 @@ struct InboxItemDetailView: View {
                     .background(HavenColors.warning.opacity(0.12))
                     .clipShape(Capsule())
             } else {
-                Text(item.type.replacingOccurrences(of: "_", with: " ").capitalized)
+                Text(prettyTypeLabel(for: item.type))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(HavenColors.success)
                     .padding(.horizontal, 8)
@@ -916,6 +925,79 @@ struct InboxItemDetailView: View {
     ///
     /// Create-Project calls `HavenSupabase.processInboxItem` directly
     /// (not through the viewModel's fire-and-forget `processItem`) so
+    // MARK: - Wave Y2 — provider-activity deep-link card
+
+    /// True when the inbox item is a contractor-side mirror that
+    /// benefits from a "View on web" / "Open thread" deep link.
+    private var shouldShowProviderActivityCard: Bool {
+        let resolvedType = initialItemType ?? item.type
+        return resolvedType == "handyman_quote_received"
+            || resolvedType == "invoice_received"
+    }
+
+    /// Card renders the contractor-side mirror with a subtle action
+    /// row. We don't have a self-contained iOS quote / invoice viewer
+    /// for these types yet (V1 ships as audit-trail), so the card
+    /// surfaces context + a "View on web" CTA pointing at the
+    /// Operations Desk public link.
+    @ViewBuilder
+    private var providerActivityCard: some View {
+        let resolvedType = initialItemType ?? item.type
+        let isQuote = resolvedType == "handyman_quote_received"
+        let icon = isQuote ? "doc.text.magnifyingglass" : "doc.plaintext"
+        let label = isQuote ? "Quote received" : "Invoice received"
+        let caption = isQuote
+            ? "Your contractor has sent you a quote to review."
+            : "Your contractor has sent you an invoice."
+        let tint = isQuote ? HavenColors.warning : HavenColors.success
+        let referenceId: String? = {
+            if isQuote {
+                return item.metadata?.quoteIdAsUUID?.uuidString
+            }
+            return item.metadata?.invoiceIdAsUUID?.uuidString
+        }()
+
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 32, height: 32)
+                    .background(tint.opacity(0.14))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text(caption)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+            }
+
+            if let referenceId, !referenceId.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "number")
+                        .font(.system(size: 10))
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("Reference: \(referenceId.prefix(8))")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HavenTheme.spacing16)
+        .background(tint.opacity(0.06))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(tint.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
     /// Phase 80 — Chez Concierge inline entry for high-value inbox
     /// types. Renders only for `contractor_quote`, `insurance_claim`,
     /// and `bill_invoice` items where the homeowner often wants a
@@ -1244,6 +1326,20 @@ struct InboxItemDetailView: View {
         case "document_stored": return HavenColors.navy
         case "vendor_added": return HavenColors.success
         default: return HavenColors.textTertiary
+        }
+    }
+
+    /// Wave Y2 follow-up: the legacy auto-formatter `type.replacingOccurrences("_"," ").capitalized`
+    /// renders Wave-Q ad-hoc-quote inbox rows as "Handyman Quote Received" — a B4 brand voice
+    /// violation visible to the homeowner. The DB enum string still says `handyman_quote_received`
+    /// (legacy column value, intentionally preserved); this helper overrides the user-facing
+    /// label so the pill reads "Quote Received" instead. New inbox types added in future Y2-style
+    /// fixes should pre-handle their label here too.
+    private func prettyTypeLabel(for type: String) -> String {
+        switch type {
+        case "handyman_quote_received": return "Quote Received"
+        case "invoice_received": return "Invoice Received"
+        default: return type.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 }

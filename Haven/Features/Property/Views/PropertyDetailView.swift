@@ -4064,9 +4064,9 @@ struct PropertyDetailView: View {
 
                     maintenanceRecordRow(
                         icon: "hammer.fill",
-                        title: "Handyman punch list",
+                        title: "Contractor punch list",
                         subtitle: handymanPunchCount == 0
-                            ? "Add things for your next handyman visit"
+                            ? "Add things for your next contractor visit"
                             : handymanPunchCount == 1
                                 ? "1 small job waiting"
                                 : "\(handymanPunchCount) small jobs ready to bundle",
@@ -4994,11 +4994,11 @@ struct PropertyDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Handyman punch list")
+                        Text("Contractor punch list")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
                         Text(handymanPunchCount == 0
-                             ? "Add things for your next handyman visit"
+                             ? "Add things for your next contractor visit"
                              : handymanPunchCount == 1
                                 ? "1 small job waiting"
                                 : "\(handymanPunchCount) small jobs ready to bundle")

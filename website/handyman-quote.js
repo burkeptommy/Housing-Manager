@@ -137,7 +137,7 @@ function renderQuote() {
     quote.recipient?.email || "",
     quote.recipient?.address || "",
   ].filter(Boolean).join(" · ");
-  dom.quoteCompany.textContent = quote.workspace?.companyName || "Chez Handyman";
+  dom.quoteCompany.textContent = quote.workspace?.companyName || "Chez Contractor";
   dom.quoteProperty.textContent = quote.property?.name
     ? `${quote.property.name}${quote.property.address ? ` · ${quote.property.address}` : ""}`
     : quote.recipient?.address || "Standalone quote";

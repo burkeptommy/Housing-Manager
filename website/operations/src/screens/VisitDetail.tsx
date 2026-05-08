@@ -6,7 +6,7 @@ import { Avatar, initialsFor } from "../components/chrome/Avatar";
 import { Icon } from "../components/chrome/Icon";
 import { useWorkspace } from "../lib/workspace-context";
 import { categorizePunchList, formatCurrency, formatRelativeTime, formatTime12h, parsePunchList, postProviderAction, type PunchListItem } from "../lib/api";
-import type { RequestStatus, VisitRow } from "../lib/types";
+import type { PunchItem, RequestStatus, VisitRow } from "../lib/types";
 
 export default function VisitDetailScreen() {
   const { requestId } = useParams<{ requestId: string }>();
@@ -40,14 +40,55 @@ export default function VisitDetailScreen() {
 
   const aiTimeEstimate = useMemo(() => estimateVisitTime(visit), [visit]);
 
-  // Punch list parsed from the linked maintenance_task's notes.
-  const punchList = useMemo(() => parsePunchList(visit?.visit?.notes), [visit?.visit?.notes]);
-  // Grouped by physical work zone so the handyman can do all the
+  // Wave O — prefer the structured handyman_punch_items[] returned by
+  // the edge function; fall back to parsing maintenance_task.notes for
+  // legacy data that hasn't been migrated yet. The structured rows are
+  // the canonical source the homeowner iOS app reads, so once the
+  // contractor SPA writes here, both apps see the same checklist.
+  const structuredPunchItems: PunchItem[] = useMemo(
+    () => (visit?.punchItems ?? []).filter((p) => p.status !== "cancelled"),
+    [visit?.punchItems],
+  );
+  const usingStructured = structuredPunchItems.length > 0;
+  const legacyPunchList = useMemo(
+    () => (usingStructured ? [] : parsePunchList(visit?.visit?.notes)),
+    [usingStructured, visit?.visit?.notes],
+  );
+  // Lookup by id so the Done/Edit/Delete handlers can find the source
+  // PunchItem row by its grouped-render id.
+  const structuredById = useMemo(() => {
+    const map = new Map<string, PunchItem>();
+    for (const p of structuredPunchItems) map.set(p.id, p);
+    return map;
+  }, [structuredPunchItems]);
+  // Adapter so categorizePunchList (which expects PunchListItem) sees
+  // structured rows as a flat title+minutes list. The ID stays stable
+  // between the two shapes so handlers can route via structuredById.
+  const punchList: PunchListItem[] = useMemo(() => {
+    if (usingStructured) {
+      return structuredPunchItems.map((p) => ({
+        id: p.id,
+        title: p.title,
+        estimatedMinutes: p.estimatedMinutes ?? null,
+      }));
+    }
+    return legacyPunchList;
+  }, [usingStructured, structuredPunchItems, legacyPunchList]);
+  // Grouped by physical work zone so the contractor can do all the
   // exterior in one pass, all the safety checks in one pass, etc.
   const categorizedPunch = useMemo(() => categorizePunchList(punchList), [punchList]);
   // Long visits are easier to manage as two — surface the split CTA
   // by default at 8+ items.
   const punchIsLong = punchList.length >= 8;
+  // Inline editor / new-item form state for the structured path.
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingMinutes, setEditingMinutes] = useState<string>("");
+  const [savingItem, setSavingItem] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newItemTitle, setNewItemTitle] = useState("");
+  const [newItemMinutes, setNewItemMinutes] = useState<string>("");
+  const [addingItem, setAddingItem] = useState(false);
 
   if (!dashboard) return null;
   if (!visit) {
@@ -153,6 +194,140 @@ export default function VisitDetailScreen() {
     }
   }
 
+  /**
+   * Section 19b.7: contractors need a way to decline a routed request
+   * (esp. Chez-routed jobs they can't take). Without this, the only
+   * escape is to ghost the routing. Flips status to 'declined' and
+   * leaves the audit-trail message that update_request_status now
+   * appends server-side.
+   */
+  async function handleDecline() {
+    if (!visit || !dashboard) return;
+    if (!window.confirm("Decline this request? The homeowner will be notified.")) return;
+    setBusy(true);
+    try {
+      await postProviderAction("update_request_status", {
+        workspaceId: dashboard.workspace.id,
+        requestId: visit.requestId,
+        status: "declined",
+      });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't decline. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Wave O — punch item handlers. All four actions hit the
+  // handyman-provider edge function and refresh the dashboard so the
+  // structured punchItems[] reload. Errors surface via alert (existing
+  // pattern in this file).
+  async function togglePunchItemComplete(item: PunchItem) {
+    const next = item.status === "done" ? "in_progress" : "done";
+    try {
+      await postProviderAction("update_punch_item_status", {
+        itemId: item.id,
+        status: next,
+      });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't update item.");
+    }
+  }
+
+  function startEditPunchItem(item: PunchItem) {
+    setEditingItemId(item.id);
+    setEditingTitle(item.title);
+    setEditingMinutes(item.estimatedMinutes != null ? String(item.estimatedMinutes) : "");
+  }
+
+  function cancelEditPunchItem() {
+    setEditingItemId(null);
+    setEditingTitle("");
+    setEditingMinutes("");
+  }
+
+  async function saveEditPunchItem() {
+    if (!editingItemId) return;
+    const title = editingTitle.trim();
+    if (!title) {
+      alert("Title can't be empty.");
+      return;
+    }
+    setSavingItem(true);
+    try {
+      const minutesNumber = editingMinutes.trim() === "" ? null : Number(editingMinutes);
+      const payload: Record<string, unknown> = {
+        itemId: editingItemId,
+        title,
+      };
+      if (editingMinutes.trim() === "") {
+        payload.estimatedMinutes = null;
+      } else if (Number.isFinite(minutesNumber) && minutesNumber != null && minutesNumber >= 0) {
+        payload.estimatedMinutes = minutesNumber;
+      } else {
+        alert("Estimated minutes must be a non-negative number.");
+        setSavingItem(false);
+        return;
+      }
+      await postProviderAction("update_punch_item", payload);
+      cancelEditPunchItem();
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't save the item.");
+    } finally {
+      setSavingItem(false);
+    }
+  }
+
+  async function archivePunchItem(item: PunchItem) {
+    if (!window.confirm(`Remove "${item.title}" from this visit's punch list?`)) return;
+    try {
+      await postProviderAction("archive_punch_item", { itemId: item.id });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't remove the item.");
+    }
+  }
+
+  async function addPunchItem() {
+    if (!visit?.visit?.id) {
+      alert("This visit has no linked task to attach the item to yet. Assign a tech first.");
+      return;
+    }
+    const title = newItemTitle.trim();
+    if (!title) {
+      alert("Give the item a title.");
+      return;
+    }
+    setAddingItem(true);
+    try {
+      const minutesNumber = newItemMinutes.trim() === "" ? null : Number(newItemMinutes);
+      const item: Record<string, unknown> = { title };
+      if (newItemMinutes.trim() !== "") {
+        if (!Number.isFinite(minutesNumber) || minutesNumber == null || minutesNumber < 0) {
+          alert("Estimated minutes must be a non-negative number.");
+          setAddingItem(false);
+          return;
+        }
+        item.estimatedMinutes = minutesNumber;
+      }
+      await postProviderAction("add_punch_items_to_visit", {
+        visitTaskId: visit.visit.id,
+        items: [item],
+      });
+      setNewItemTitle("");
+      setNewItemMinutes("");
+      setShowAddForm(false);
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Couldn't add the item.");
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
   return (
     <>
       <div style={{ marginBottom: 16, display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
@@ -180,13 +355,17 @@ export default function VisitDetailScreen() {
 
       {/* Header card */}
       <Card padding="default" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
           {visit.assignment ? (
             <Pill tone="indigo">Assigned to {visit.assignment.memberName.split(" ")[0]}</Pill>
           ) : (
             <Pill tone="warning">Not assigned</Pill>
           )}
+          {/* Section 19a — surface Chez routing + urgency on the header
+              so the dispatcher sees the reply path and pace at a glance. */}
+          {visit.urgency === "urgent" && <Pill tone="critical">Emergency</Pill>}
+          {visit.source === "haven" && <Pill tone="indigo">Routed by Chez</Pill>}
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-soft)" }}>
             Updated {formatRelativeTime(visit.updatedAt)}
           </span>
@@ -218,9 +397,19 @@ export default function VisitDetailScreen() {
           <button className="ops-button ops-button--ghost" onClick={openQuoteForVisit}>
             {visit.quote ? "Edit quote" : "Build a quote"}
           </button>
+          {visit.status !== "completed" && visit.status !== "cancelled" && visit.status !== "declined" && (
+            <button
+              className="ops-button ops-button--ghost"
+              style={{ marginLeft: "auto", color: "var(--critical)" }}
+              onClick={handleDecline}
+              disabled={busy}
+            >
+              Decline
+            </button>
+          )}
           <button
             className="ops-button ops-button--ghost"
-            style={{ marginLeft: "auto" }}
+            style={visit.status !== "completed" && visit.status !== "cancelled" && visit.status !== "declined" ? {} : { marginLeft: "auto" }}
             onClick={handleMarkComplete}
             disabled={busy}
           >
@@ -242,12 +431,22 @@ export default function VisitDetailScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Tasks the homeowner asked for */}
+          {/* Tasks the homeowner (or Chez admin) asked for. Section 19a:
+              when source='haven' the request was routed by the Chez admin
+              on the homeowner's behalf, so the framing reads as a Chez
+              brief instead of a direct homeowner ask. */}
           <Card padding="default">
-            <div className="ops-section-label" style={{ marginBottom: 12 }}>What the homeowner is asking for</div>
+            <div className="ops-section-label" style={{ marginBottom: 12 }}>
+              {visit.source === "haven" ? "What Chez is asking for" : "What the homeowner is asking for"}
+            </div>
             <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text)", whiteSpace: "pre-wrap" }}>
               {visit.title}
             </div>
+            {visit.source === "haven" && (
+              <div style={{ marginTop: 10, padding: 10, background: "var(--indigo-50)", borderRadius: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
+                <strong style={{ color: "var(--indigo)" }}>Routed by Chez.</strong> Replies on this thread go to the Chez admin, who relays back to the homeowner.
+              </div>
+            )}
             {visit.preferredTiming && (
               <div style={{ marginTop: 10, padding: 10, background: "var(--indigo-50)", borderRadius: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
                 <strong style={{ color: "var(--indigo)" }}>Preferred timing:</strong> {visit.preferredTiming}
@@ -255,88 +454,296 @@ export default function VisitDetailScreen() {
             )}
           </Card>
 
-          {/* Punch list — grouped by work zone so the tech doesn't double back. */}
-          {punchList.length > 0 && (
+          {/* Wave O — punch list. Prefers the structured handyman_punch_items[]
+              returned by the edge function; falls back to parsing
+              maintenance_task.notes for legacy data. Once we're rendering
+              structured rows, the contractor can author / edit / complete /
+              delete items directly, and the homeowner iOS app sees the same
+              checklist instantly via the shared DB rows. */}
+          {(punchList.length > 0 || usingStructured || visit.visit?.id) && (
             <Card padding="default">
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
                 <div className="ops-section-label">
-                  Punch list ({punchList.length}) · grouped by zone
+                  {punchList.length > 0
+                    ? `Punch list (${punchList.length}) · grouped by zone`
+                    : "Punch list"}
                 </div>
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => setShowSplit(true)}
-                    style={{
-                      background: "none", border: "none",
-                      color: punchIsLong ? "var(--salmon-dark)" : "var(--indigo)",
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}
-                  >
-                    {punchIsLong ? "↗ Long list. Split into two visits?" : "Split into two visits"}
-                  </button>
-                  <button
-                    onClick={openQuoteForVisit}
-                    style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    + Pre-fill quote from these
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
-                {categorizedPunch.map((group) => (
-                  <div key={group.category.id}>
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      paddingBottom: 6, marginBottom: 6,
-                      borderBottom: "1px solid var(--neutral-200)",
-                    }}>
-                      <div style={{
-                        fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
-                        textTransform: "uppercase", color: "var(--indigo)",
-                      }}>
-                        {group.category.label} · {group.items.length}
-                      </div>
-                      {group.totalMinutes > 0 && (
-                        <div style={{ fontSize: 11, color: "var(--text-soft)", fontWeight: 500 }}>
-                          ~{group.totalMinutes} min total
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {group.items.map((item, i) => (
-                        <div
-                          key={item.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 12,
-                            padding: "8px 0",
-                            borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 22, height: 22, borderRadius: "50%",
-                              border: "1.7px solid var(--neutral-300)", flex: "none",
-                            }}
-                          />
-                          <div style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{item.title}</div>
-                          {item.estimatedMinutes != null && (
-                            <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
-                              ~{item.estimatedMinutes} min
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                {punchList.length > 0 && (
+                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => setShowSplit(true)}
+                      style={{
+                        background: "none", border: "none",
+                        color: punchIsLong ? "var(--salmon-dark)" : "var(--indigo)",
+                        fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      {punchIsLong ? "↗ Long list. Split into two visits?" : "Split into two visits"}
+                    </button>
+                    <button
+                      onClick={openQuoteForVisit}
+                      style={{ background: "none", border: "none", color: "var(--salmon-dark)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      + Pre-fill quote from these
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
 
-              <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--text-muted)" }}>
-                Items grouped by work zone so you can knock out everything in one area before moving on.
-                Check them off in Chez Field on the day of the visit.
-              </div>
+              {punchList.length === 0 && (
+                <div style={{ marginTop: 12, padding: 14, background: "var(--neutral-50)", borderRadius: 8, fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  No items on the list yet. Add what the visit needs to cover. The homeowner sees these in real time.
+                </div>
+              )}
+
+              {punchList.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
+                  {categorizedPunch.map((group) => (
+                    <div key={group.category.id}>
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        paddingBottom: 6, marginBottom: 6,
+                        borderBottom: "1px solid var(--neutral-200)",
+                      }}>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+                          textTransform: "uppercase", color: "var(--indigo)",
+                        }}>
+                          {group.category.label} · {group.items.length}
+                        </div>
+                        {group.totalMinutes > 0 && (
+                          <div style={{ fontSize: 11, color: "var(--text-soft)", fontWeight: 500 }}>
+                            ~{group.totalMinutes} min total
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {group.items.map((item, i) => {
+                          const structured = structuredById.get(item.id);
+                          const isDone = structured?.status === "done" || structured?.completedAt != null;
+                          const isEditing = editingItemId === item.id;
+                          return (
+                            <div
+                              key={item.id}
+                              style={{
+                                display: "flex",
+                                alignItems: isEditing ? "flex-start" : "center",
+                                gap: 12,
+                                padding: "8px 0",
+                                borderBottom: i < group.items.length - 1 ? "1px solid var(--neutral-200)" : "none",
+                              }}
+                            >
+                              {/* Checkbox — interactive when structured, decorative for legacy notes data. */}
+                              {structured ? (
+                                <button
+                                  type="button"
+                                  aria-label={isDone ? "Mark not done" : "Mark done"}
+                                  onClick={() => togglePunchItemComplete(structured)}
+                                  style={{
+                                    width: 22, height: 22, borderRadius: "50%",
+                                    border: isDone ? "1.7px solid var(--salmon)" : "1.7px solid var(--neutral-300)",
+                                    background: isDone ? "var(--salmon)" : "transparent",
+                                    flex: "none",
+                                    padding: 0, cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    marginTop: isEditing ? 4 : 0,
+                                  }}
+                                >
+                                  {isDone && <Icon name="check" size={13} stroke={2.4} />}
+                                </button>
+                              ) : (
+                                <div
+                                  style={{
+                                    width: 22, height: 22, borderRadius: "50%",
+                                    border: "1.7px solid var(--neutral-300)", flex: "none",
+                                  }}
+                                />
+                              )}
+
+                              {isEditing && structured ? (
+                                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <input
+                                    type="text"
+                                    value={editingTitle}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    autoFocus
+                                    style={{
+                                      width: "100%", padding: "6px 8px", border: "1px solid var(--neutral-300)",
+                                      borderRadius: 6, fontSize: 13.5, color: "var(--text)", fontFamily: "var(--sans)",
+                                    }}
+                                  />
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                    <label style={{ fontSize: 11.5, color: "var(--text-muted)" }}>~ minutes</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={5}
+                                      value={editingMinutes}
+                                      onChange={(e) => setEditingMinutes(e.target.value)}
+                                      placeholder=""
+                                      style={{
+                                        width: 80, padding: "4px 6px", border: "1px solid var(--neutral-300)",
+                                        borderRadius: 6, fontSize: 12.5, color: "var(--text)", fontFamily: "var(--sans)",
+                                      }}
+                                    />
+                                    <button
+                                      className="ops-button ops-button--salmon"
+                                      style={{ fontSize: 11.5, padding: "4px 10px" }}
+                                      onClick={saveEditPunchItem}
+                                      disabled={savingItem}
+                                    >
+                                      {savingItem ? "Saving" : "Save"}
+                                    </button>
+                                    <button
+                                      className="ops-button ops-button--ghost"
+                                      style={{ fontSize: 11.5, padding: "4px 10px" }}
+                                      onClick={cancelEditPunchItem}
+                                      disabled={savingItem}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div
+                                    style={{
+                                      flex: 1, fontSize: 13.5,
+                                      color: isDone ? "var(--text-muted)" : "var(--text)",
+                                      textDecoration: isDone ? "line-through" : "none",
+                                    }}
+                                  >
+                                    {item.title}
+                                    {structured && structured.source && structured.source !== "manual" && (
+                                      <span style={{ marginLeft: 8, fontSize: 10.5, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                                        · {sourceLabel(structured.source)}
+                                      </span>
+                                    )}
+                                    {structured?.addedAfterLock && (
+                                      <span style={{ marginLeft: 8, fontSize: 10.5, color: "var(--salmon-dark)", fontWeight: 600 }}>
+                                        · Needs your confirmation
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.estimatedMinutes != null && (
+                                    <span style={{ fontSize: 11.5, color: "var(--text-soft)", fontWeight: 500 }}>
+                                      ~{item.estimatedMinutes} min
+                                    </span>
+                                  )}
+                                  {structured && (
+                                    <div style={{ display: "flex", gap: 4, flex: "none" }}>
+                                      <button
+                                        type="button"
+                                        aria-label="Edit item"
+                                        onClick={() => startEditPunchItem(structured)}
+                                        style={{
+                                          background: "none", border: "none", padding: 4, cursor: "pointer",
+                                          color: "var(--text-muted)", borderRadius: 6,
+                                        }}
+                                      >
+                                        <Icon name="edit" size={14} stroke={1.9} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label="Remove item"
+                                        onClick={() => archivePunchItem(structured)}
+                                        style={{
+                                          background: "none", border: "none", padding: 4, cursor: "pointer",
+                                          color: "var(--text-muted)", borderRadius: 6,
+                                        }}
+                                      >
+                                        <Icon name="trash" size={14} stroke={1.9} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add-item affordance — only when we have a linked visit task
+                  (the FK target). The edge function rejects without one. */}
+              {visit.visit?.id && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--neutral-200)" }}>
+                  {showAddForm ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <input
+                        type="text"
+                        value={newItemTitle}
+                        onChange={(e) => setNewItemTitle(e.target.value)}
+                        placeholder="What needs doing? e.g. Replace bath caulk"
+                        autoFocus
+                        style={{
+                          width: "100%", padding: "8px 10px", border: "1px solid var(--neutral-300)",
+                          borderRadius: 8, fontSize: 13.5, color: "var(--text)", fontFamily: "var(--sans)",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <label style={{ fontSize: 11.5, color: "var(--text-muted)" }}>~ minutes (optional)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={5}
+                          value={newItemMinutes}
+                          onChange={(e) => setNewItemMinutes(e.target.value)}
+                          placeholder="20"
+                          style={{
+                            width: 80, padding: "4px 6px", border: "1px solid var(--neutral-300)",
+                            borderRadius: 6, fontSize: 12.5, color: "var(--text)", fontFamily: "var(--sans)",
+                          }}
+                        />
+                        <button
+                          className="ops-button ops-button--salmon"
+                          style={{ fontSize: 12, padding: "6px 14px" }}
+                          onClick={addPunchItem}
+                          disabled={addingItem || !newItemTitle.trim()}
+                        >
+                          {addingItem ? "Adding" : "Add to list"}
+                        </button>
+                        <button
+                          className="ops-button ops-button--ghost"
+                          style={{ fontSize: 12, padding: "6px 10px" }}
+                          onClick={() => {
+                            setShowAddForm(false);
+                            setNewItemTitle("");
+                            setNewItemMinutes("");
+                          }}
+                          disabled={addingItem}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(true)}
+                      style={{
+                        background: "none", border: "none",
+                        color: "var(--indigo)", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      + Add punch item
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {punchList.length > 0 && (
+                <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--text-muted)" }}>
+                  Items grouped by work zone so you can knock out everything in one area before moving on.
+                  {usingStructured
+                    ? " Check items off here or in Chez Field. The homeowner sees the same list."
+                    : " Check them off in Chez Field on the day of the visit."}
+                </div>
+              )}
             </Card>
           )}
 
@@ -391,7 +798,7 @@ export default function VisitDetailScreen() {
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {upsells.map((u, i) => (
                     <div key={i} className="ops-row" style={{ padding: "10px 0" }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--neutral-200)", color: "var(--text-soft)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                         <Icon name="lightbulb" size={16} stroke={1.9} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -449,7 +856,7 @@ export default function VisitDetailScreen() {
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Reply to the homeowner…"
+                placeholder={visit.source === "haven" ? "Reply to Chez. They'll relay to the homeowner." : "Reply to the homeowner."}
                 style={{ width: "100%", border: "none", outline: "none", resize: "vertical", fontFamily: "var(--sans)", fontSize: 13, color: "var(--text)", minHeight: 60, background: "transparent" }}
               />
               <div style={{ display: "flex", alignItems: "center", marginTop: 6 }}>
@@ -474,9 +881,9 @@ export default function VisitDetailScreen() {
           <Card padding="default">
             <div className="ops-section-label" style={{ marginBottom: 12 }}>Schedule</div>
             <SidebarRow label="Date" value={visit.routeDate ? new Date(visit.routeDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "Not booked"} />
-            <SidebarRow label="Window" value={visit.assignment?.windowStartTime ? `${formatTime12h(visit.assignment.windowStartTime)} – ${formatTime12h(visit.assignment.windowEndTime)}` : "—"} />
+            <SidebarRow label="Window" value={visit.assignment?.windowStartTime ? `${formatTime12h(visit.assignment.windowStartTime)} to ${formatTime12h(visit.assignment.windowEndTime)}` : "Not scheduled"} />
             <SidebarRow label="Tech" value={visit.assignment?.memberName || "Unassigned"} />
-            <SidebarRow label="Stop #" value={visit.assignment?.stopOrder ? String(visit.assignment.stopOrder) : "—"} />
+            <SidebarRow label="Stop #" value={visit.assignment?.stopOrder ? String(visit.assignment.stopOrder) : "Not assigned"} />
           </Card>
 
           {visit.quote ? (
@@ -528,7 +935,7 @@ export default function VisitDetailScreen() {
               <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 6 }}>
                 <SidebarRow label="Systems" value={String(home.systemCount)} />
                 <SidebarRow label="Open requests" value={String(home.openRequests)} />
-                <SidebarRow label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "—"} />
+                <SidebarRow label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "Never"} />
               </div>
               <Link to={`/homes/${home.propertyId}`} className="ops-button ops-button--ghost" style={{ marginTop: 12, width: "100%", textAlign: "center", justifyContent: "center" }}>
                 Open home profile →
@@ -574,16 +981,16 @@ function estimateVisitTime(visit: ReturnType<typeof useMemo<any>> extends infer 
   const title = (visit?.title ?? "").toLowerCase();
   let siteMinutes = 60;
   let suggestSplit = false;
-  let reasoning = "Standard handyman visit window.";
+  let reasoning = "Standard contractor visit window.";
   if (title.includes("install") || title.includes("replace")) {
     siteMinutes = 120;
-    reasoning = "Installs and replacements typically run 90–150 min on site.";
+    reasoning = "Installs and replacements typically run 90 to 150 min on site.";
   } else if (title.includes("inspect") || title.includes("diagnose")) {
     siteMinutes = 45;
     reasoning = "Inspection-only visit. Diagnose, document, return with quote.";
   } else if (title.includes("repair") || title.includes("fix")) {
     siteMinutes = 90;
-    reasoning = "Repairs vary; budget 60–120 min on site.";
+    reasoning = "Repairs vary; budget 60 to 120 min on site.";
   } else if (title.includes("punch") || title.includes("bundle") || title.includes("multiple")) {
     siteMinutes = 180;
     suggestSplit = true;
@@ -637,13 +1044,39 @@ function suggestUpsells(systems: { name: string; category: string; manufacturer?
   return out.slice(0, 4);
 }
 
+/// Wave O — short human label for handyman_punch_items.source values.
+/// Renders as a subtle inline annotation on each row so the contractor
+/// can tell where an item came from without opening it.
+function sourceLabel(source: string): string {
+  switch (source) {
+    case "manual":
+      return "Manual";
+    case "template":
+      return "Template";
+    case "recommended":
+      return "Suggested";
+    case "auto_seed_handyman_tier":
+      return "Auto-seeded";
+    case "promoted_from_task":
+      return "From task";
+    case "migrated_from_task":
+      return "From task";
+    default:
+      return source.replace(/_/g, " ");
+  }
+}
+
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";

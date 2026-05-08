@@ -435,7 +435,7 @@ enum HouseQuizQuestionLibrary {
             // reflects its primacy in the vendor-orchestration model rather
             // than burying it at position 9.
             answerOptions: [
-                AnswerOption(id: "handyman", label: "Handyman", icon: "wrench.fill"),
+                AnswerOption(id: "handyman", label: "General repair", icon: "wrench.fill"),
                 AnswerOption(id: "cleaning", label: "House cleaner", icon: "sparkles"),
                 AnswerOption(id: "hvac_service", label: "HVAC service", icon: "thermometer.medium"),
                 AnswerOption(id: "plumber", label: "Plumber", icon: "drop.fill"),

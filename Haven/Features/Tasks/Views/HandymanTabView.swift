@@ -226,7 +226,7 @@ struct HandymanTabView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 HeaderSwitcher(
-                    title: "Handyman",
+                    title: "Contractor",
                     onSwitchMode: onSwitchMode,
                     onAdd: { showAddMenu = true }
                 )
@@ -547,7 +547,7 @@ struct HandymanTabView: View {
                 // the assisted-discovery option below the empty card.
                 ChezEntryButton(
                     category: .findHandyman,
-                    label: "Have Chez find me a handyman",
+                    label: "Have Chez find me a contractor",
                     caption: "Chez finds a vetted local pro and books the visit.",
                     context: chezHandymanContext
                 )
@@ -579,7 +579,7 @@ struct HandymanTabView: View {
                     .tracking(1.6)
                     .foregroundStyle(HavenColors.actionPressed)
             }
-            Text("Your handyman will help build out your home profile")
+            Text("Your contractor will help build out your home profile")
                 .font(HavenTypography.fraunces(size: 16, weight: 600))
                 .tracking(-0.2)
                 .foregroundStyle(HavenColors.navy900)
@@ -685,7 +685,7 @@ struct HandymanTabView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(HavenColors.navy900)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Suggested by your handyman")
+                    Text("Suggested by your contractor")
                         .font(.system(size: 12))
                         .foregroundStyle(HavenColors.textSecondary)
                     if let desc = task.description, !desc.isEmpty {
@@ -733,7 +733,7 @@ struct HandymanTabView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(HavenColors.navy900)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Added after the visit was locked. Handyman needs to confirm")
+                    Text("Added after the visit was locked. Contractor needs to confirm")
                         .font(.system(size: 12))
                         .foregroundStyle(HavenColors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -947,7 +947,7 @@ struct HandymanTabView: View {
             Text("No items on this visit yet")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(HavenColors.navy900)
-            Text("Add items so your handyman knows exactly what's on the docket.")
+            Text("Add items so your contractor knows exactly what's on the docket.")
                 .font(.system(size: 12.5))
                 .foregroundStyle(HavenColors.textSecondary)
         }
@@ -1069,7 +1069,7 @@ struct HandymanTabView: View {
 
     private var emptyPunchListCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Inbox zero. Nothing on your handyman's plate")
+            Text("Inbox zero. Nothing on your contractor's plate")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(HavenColors.navy900)
             Text("As Chez learns your home, small jobs land here. Add one yourself any time.")
@@ -1376,7 +1376,7 @@ private struct UpcomingVisitHero: View {
             case .scheduled, .confirmed: return "Confirmed"
             case .alternateDatesProposed: return "Time being discussed"
             case .awaitingHomeowner: return "Awaiting your reply"
-            case .onMyWay: return "Handyman on the way"
+            case .onMyWay: return "Contractor on the way"
             case .checkedIn, .inProgress: return "Visit in progress"
             case .completed: return "Wrapped up"
             case .submitted, .sentToHandyman: return "Request sent"
@@ -1421,7 +1421,7 @@ private struct UpcomingVisitHero: View {
             HStack(spacing: 6) {
                 Image(systemName: statusIcon)
                     .font(.system(size: 11, weight: .semibold))
-                Text("\(vendor?.companyName ?? "Your handyman") · \(statusLabel)")
+                Text("\(vendor?.companyName ?? "Your contractor") · \(statusLabel)")
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundStyle(Color.white.opacity(0.7))
@@ -1465,7 +1465,7 @@ private struct UpcomingVisitHero: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Message handyman")
+                .accessibilityLabel("Message contractor")
 
                 if let onCall {
                     Button(action: {
@@ -1482,7 +1482,7 @@ private struct UpcomingVisitHero: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Call handyman")
+                    .accessibilityLabel("Call contractor")
                 }
             }
         }
@@ -1647,7 +1647,7 @@ private struct VisitStructuredChildRow: View {
                             Text("·")
                                 .font(.system(size: 11.5))
                                 .foregroundStyle(HavenColors.textTertiary)
-                            Text("Awaiting handyman confirmation")
+                            Text("Awaiting contractor confirmation")
                                 .font(.system(size: 11.5, weight: .medium))
                                 .foregroundStyle(HavenColors.action)
                         }
@@ -1826,9 +1826,15 @@ final class HandymanRequestCoordinator: ObservableObject {
                     propertyId: nil,
                     limit: 25
                 )
+                // Wave Y2: Drop the terminal-state filter so completed /
+                // cancelled / declined threads still surface here. The
+                // homeowner needs to see the audit trail when the
+                // contractor marks a visit complete from the Operations
+                // Desk — Apple Mail / Linear / GitHub all keep
+                // terminal-state threads visible. The status badge in
+                // the chat sheet header reflects the lifecycle state.
                 let match = candidates
                     .filter { $0.contractorId == vendor.id }
-                    .filter { !["completed", "cancelled", "declined"].contains($0.status) }
                     .sorted { $0.updatedAt > $1.updatedAt }
                     .first
                 if let match {

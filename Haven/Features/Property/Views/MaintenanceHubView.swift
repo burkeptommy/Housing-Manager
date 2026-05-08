@@ -104,7 +104,7 @@ struct SeasonalServiceSummary: Identifiable {
         case .needsRouting:
             return "You need to choose a vendor before Chez can schedule this."
         case .handymanRecommended:
-            return "Chez can likely bundle this into one handyman visit."
+            return "Chez can likely bundle this into one contractor visit."
         case .vendorAssigned(let vendorName):
             let name = vendorName.isEmpty ? "Your vendor" : vendorName
             return "\(name) is handling this."
@@ -2820,7 +2820,7 @@ final class MaintenanceHubViewModel: ObservableObject {
             name: .openAlfredWithContext,
             object: nil,
             userInfo: [
-                "message": "I need a handyman for routine home maintenance. Can you help me find a vetted local pro?"
+                "message": "I need a contractor for routine home maintenance. Can you help me find a vetted local pro?"
             ]
         )
     }
@@ -2939,16 +2939,16 @@ struct HandymanQueueView: View {
                     && visibleSuggestedTasks.isEmpty
                     && seasonalVisitPlans.isEmpty {
                     ContentUnavailableView {
-                        Label("Nothing in the handyman bundle", systemImage: "hammer.fill")
+                        Label("Nothing in the contractor bundle", systemImage: "hammer.fill")
                     } description: {
-                        Text("Chez will keep your spring and fall handyman walkthroughs here, along with any odd jobs that are worth batching into those visits.")
+                        Text("Chez will keep your spring and fall contractor walkthroughs here, along with any odd jobs that are worth batching into those visits.")
                     }
                 }
             }
             .padding(HavenTheme.spacing20)
         }
         .background(HavenColors.background)
-        .navigationTitle("Handyman Bundle")
+        .navigationTitle("Contractor Bundle")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -2965,7 +2965,7 @@ struct HandymanQueueView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if activePreferredHandyman == nil && !seasonalVisitPlans.isEmpty {
-                footerButton(title: "Choose handyman", action: { showProviderPicker = true })
+                footerButton(title: "Choose contractor", action: { showProviderPicker = true })
             } else if !seasonalVisitPlans.isEmpty || !queuedTasks.isEmpty {
                 footerButton(title: nextVisit == nil ? "Schedule next visit" : "Visit scheduled", action: {
                     guard nextVisit == nil else { return }
@@ -2998,7 +2998,7 @@ struct HandymanQueueView: View {
                         selectedRequestKind = .standardVisit
                         showProviderPicker = false
                         showRequestComposer = true
-                        showToast("Handyman connected to this home")
+                        showToast("Contractor connected to this home")
                         Task { await loadProgramContext() }
                         onChanged()
                     }
@@ -3107,7 +3107,7 @@ struct HandymanQueueView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(activePreferredHandyman?.companyName.isEmpty == false ? activePreferredHandyman?.companyName ?? "Handyman bundle" : "Handyman bundle")
+                        Text(activePreferredHandyman?.companyName.isEmpty == false ? activePreferredHandyman?.companyName ?? "Contractor bundle" : "Contractor bundle")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
                         Text(headerSubtitle)
@@ -3144,7 +3144,7 @@ struct HandymanQueueView: View {
                         .font(HavenTypography.uiLabelSmall.weight(.semibold))
                         .foregroundStyle(HavenColors.navy700)
                     } else if activePreferredHandyman == nil {
-                        Button("Choose handyman") {
+                        Button("Choose contractor") {
                             showProviderPicker = true
                         }
                         .font(HavenTypography.uiLabelSmall.weight(.semibold))
@@ -3159,9 +3159,9 @@ struct HandymanQueueView: View {
         let count = queuedTasks.count + punchItems.count
         if !seasonalVisitPlans.isEmpty {
             if count > 0 {
-                return "Chez assumes a spring and fall handyman walkthrough. These are the extra jobs you've already batched onto that maintenance rhythm."
+                return "Chez assumes a spring and fall contractor walkthrough. These are the extra jobs you've already batched onto that maintenance rhythm."
             }
-            return "Chez assumes a spring and fall handyman walkthrough. Review the default checklist below, then add odd jobs and touch-ups anytime."
+            return "Chez assumes a spring and fall contractor walkthrough. Review the default checklist below, then add odd jobs and touch-ups anytime."
         }
         if count > 0 {
             return "\(count) small job\(count == 1 ? "" : "s") are batched here instead of showing up as individual chore-like tasks."
@@ -3171,9 +3171,9 @@ struct HandymanQueueView: View {
 
     private var programActionsSection: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-            sectionTitle("How should your handyman help?")
+            sectionTitle("How should your contractor help?")
 
-            Text("Choose the kind of work you want this provider to handle. Quotes, installs, repairs, and first-visit setup all route through the same Chez handyman program.")
+            Text("Choose the kind of work you want this provider to handle. Quotes, installs, repairs, and first-visit setup all route through the same Chez Contractor program.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 
@@ -3234,7 +3234,7 @@ struct HandymanQueueView: View {
                         Text("First visit should improve the data too")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("When this house still has setup gaps, the handyman should leave it easier to service next time by capturing systems, labels, manuals, and practical service details.")
+                        Text("When this house still has setup gaps, the contractor should leave it easier to service next time by capturing systems, labels, manuals, and practical service details.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -3252,12 +3252,12 @@ struct HandymanQueueView: View {
                     Text("Generate the visit microsite")
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.textPrimary)
-                    Text("The handyman gets a clean, offline-capable page with the checklist, quick upsells, and first-visit setup prompts for the house.")
+                    Text("The contractor gets a clean, offline-capable page with the checklist, quick upsells, and first-visit setup prompts for the house.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
 
                     if activePreferredHandyman == nil {
-                        Text("Pick a preferred handyman first so Chez knows who this should be routed to.")
+                        Text("Pick a preferred contractor first so Chez knows who this should be routed to.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     } else if primaryVisitTask == nil {
@@ -3327,7 +3327,7 @@ struct HandymanQueueView: View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             sectionTitle("Spring & fall walkthroughs")
 
-            Text("These are the default maintenance checks Chez expects your handyman to review each visit. Add any odd jobs on top, and let them flag bigger issues that need a specialist.")
+            Text("These are the default maintenance checks Chez expects your contractor to review each visit. Add any odd jobs on top, and let them flag bigger issues that need a specialist.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 
@@ -3567,7 +3567,7 @@ struct HandymanQueueView: View {
     private func addToQueue(_ task: MaintenanceTaskDBRow) async {
         try? await UnifiedRoutingActions.routeToHandyman(task: task, category: nil)
         hiddenSuggestedTaskIds.insert(task.id)
-        showToast("Added to handyman bundle")
+        showToast("Added to contractor bundle")
         onChanged()
     }
 
@@ -3599,7 +3599,7 @@ struct HandymanQueueView: View {
 
     private func scheduleVisit(on date: Date, contractor: ContractorRow?) async {
         guard let propertyId else {
-            showToast("Pick a property before scheduling a handyman visit.")
+            showToast("Pick a property before scheduling a contractor visit.")
             return
         }
 
@@ -3612,7 +3612,7 @@ struct HandymanQueueView: View {
             )
         }
         guard var activeRoutine else {
-            showToast("Couldn't create a handyman routine.")
+            showToast("Couldn't create a contractor routine.")
             return
         }
 
@@ -3636,7 +3636,7 @@ struct HandymanQueueView: View {
             scheduledDate: dateString,
             visitState: .scheduled
         )
-        showToast("Handyman visit scheduled for \(MaintenanceDateFormatting.shortDate(dateString))")
+        showToast("Contractor visit scheduled for \(MaintenanceDateFormatting.shortDate(dateString))")
         onChanged()
     }
 
@@ -3742,10 +3742,10 @@ private struct HandymanProviderPickerSheet: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
                 HavenCard {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                        Text("Choose a Chez Field handyman")
+                        Text("Choose a Chez Field contractor")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Search the Chez Field directory, connect a handyman to this home, and start scheduling visits right away.")
+                        Text("Search the Chez Field directory, connect a contractor to this home, and start scheduling visits right away.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
 
@@ -3771,12 +3771,12 @@ private struct HandymanProviderPickerSheet: View {
                 }
 
                 if isLoading && providers.isEmpty {
-                    ProgressView("Loading handymen…")
+                    ProgressView("Loading contractors…")
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, HavenTheme.spacing24)
                 } else if providers.isEmpty {
                     ContentUnavailableView(
-                        "No handymen found",
+                        "No contractors found",
                         systemImage: "wrench.adjustable.fill",
                         description: Text("Try another search, or use Alfred to look outside the Chez Field directory.")
                     )
@@ -3832,7 +3832,7 @@ private struct HandymanProviderPickerSheet: View {
                                                         .progressViewStyle(.circular)
                                                         .tint(HavenColors.textOnAction)
                                                 }
-                                                Text(provider.isLinked ? "Use this handyman" : "Connect & use")
+                                                Text(provider.isLinked ? "Use this contractor" : "Connect & use")
                                                     .font(HavenTypography.uiButton)
                                             }
                                             .frame(maxWidth: .infinity)
@@ -3871,7 +3871,7 @@ private struct HandymanProviderPickerSheet: View {
             .padding(HavenTheme.spacing20)
         }
         .background(HavenColors.background)
-        .navigationTitle("Choose Handyman")
+        .navigationTitle("Choose Contractor")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -3964,7 +3964,7 @@ private struct QuickAddHandymanItemSheet: View {
 
     var body: some View {
         Form {
-            Section("What should the handyman handle?") {
+            Section("What should the contractor handle?") {
                 TextField("Title", text: $title)
             }
 
@@ -3973,7 +3973,7 @@ private struct QuickAddHandymanItemSheet: View {
                     .lineLimit(2...5)
             }
         }
-        .navigationTitle("Add Handyman Item")
+        .navigationTitle("Add Contractor Item")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {

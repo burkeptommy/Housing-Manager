@@ -86,7 +86,7 @@ struct BookHandymanWindowSheet: View {
             Text("When works for you?")
                 .font(HavenTypography.title)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Your free Chez handyman visit takes about 90 minutes. Tell us when you're around. We'll match you with someone in the window you pick.")
+            Text("Your free Chez Contractor visit takes about 90 minutes. Tell us when you're around. We'll match you with someone in the window you pick.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
         }

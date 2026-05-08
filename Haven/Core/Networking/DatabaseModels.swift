@@ -1435,25 +1435,29 @@ enum HandymanRequestStatus: String, Codable, CaseIterable {
     }
 
     var homeownerSummary: String {
+        // Wave U follow-up: replaced "the handyman" with "your contractor"
+        // per the brand-voice rebrand (CLAUDE.md hard rule — no
+        // "handyman" in user-facing copy). The displayLabel "Sent to
+        // handyman" is internal status text and stays as-is.
         switch self {
         case .draft:
             return "This visit is still a draft."
         case .submitted:
             return "Chez saved the request and is getting it ready to send."
         case .scheduled:
-            return "The visit has a date, but the handyman still needs the full Chez confirmation flow."
+            return "The visit has a date, but your contractor still needs the full Chez confirmation flow."
         case .sentToHandyman:
-            return "The handyman has the visit link and still needs to confirm or suggest another date."
+            return "Your contractor has the visit link and still needs to confirm or suggest another date."
         case .alternateDatesProposed:
-            return "The handyman asked for different timing."
+            return "Your contractor asked for different timing."
         case .awaitingHomeowner:
-            return "The handyman sent a question or note that needs a homeowner reply."
+            return "Your contractor sent a question or note that needs a homeowner reply."
         case .confirmed:
             return "Both sides are aligned and the visit is confirmed."
         case .onMyWay:
-            return "The handyman is on the way."
+            return "Your contractor is on the way."
         case .checkedIn:
-            return "The handyman has checked in and started the visit."
+            return "Your contractor has checked in and started the visit."
         case .quoted:
             return "A quote is ready for review."
         case .inProgress:
@@ -1461,11 +1465,11 @@ enum HandymanRequestStatus: String, Codable, CaseIterable {
         case .completed:
             return "The visit is complete."
         case .followUpRecommended:
-            return "The handyman finished and recommended follow-up work."
+            return "Your contractor finished and recommended follow-up work."
         case .cancelled:
             return "This request was cancelled."
         case .declined:
-            return "The handyman declined this visit."
+            return "Your contractor declined this visit."
         }
     }
 
@@ -1565,6 +1569,29 @@ enum HandymanMessageKind: String, Codable {
     /// the dollar total and a "Review quote" CTA that opens the
     /// HandymanQuoteReviewSheet.
     case quoteSent = "quote_sent"
+    /// Wave Y2: a vendor-side or homeowner-side action transitioned
+    /// the request status (Mark complete / Decline / Reopen / etc.).
+    /// Renders as a small centered system-event pill in the chat
+    /// thread instead of as a sender-aligned bubble.
+    case statusChange = "status_change"
+    /// Wave Y2: provider sent an invoice. Mirror message in the
+    /// thread so the homeowner can see the invoice was issued and
+    /// deep-link to the invoice detail / web view.
+    case invoiceSent = "invoice_sent"
+    /// Wave V: provider sent a good/better/best quote bundle.
+    /// Renders as a rich card listing the three tiers.
+    case quoteBundleSent = "quote_bundle_sent"
+    /// Wave V: homeowner picked a tier from a bundle. Audit trail.
+    case quoteBundleDecided = "quote_bundle_decided"
+
+    /// Resilient decode — unknown raw values fall back to `.text` so
+    /// new event types added on the server don't break older clients
+    /// or freeze the thread render.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        self = HandymanMessageKind(rawValue: raw) ?? .text
+    }
 }
 
 extension HandymanRequestMessageRow {

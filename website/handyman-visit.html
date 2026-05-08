@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Chez Contractor Visit</title>
-  <meta name="description" content="Offline-ready field microsite for Chez contractor visits.">
+  <meta name="description" content="Offline-ready field microsite for Chez Contractor visits.">
+
   <meta name="theme-color" content="#ED6955">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="handyman-visit.webmanifest">
-  <link rel="stylesheet" href="handyman-visit.css?v=30260427-chat1">
+  <link rel="stylesheet" href="handyman-visit.css?v=30260508-rebrand2">
   <link rel="icon" type="image/x-icon" href="/chez-handyman-favicon.ico?v=4">
   <link rel="icon" type="image/svg+xml" href="/chez-handyman-favicon.svg?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/chez-handyman-192.png?v=4">
@@ -37,7 +38,7 @@
       font-weight: 500;
       font-size: 18px;
       letter-spacing: -0.012em;
-      color: #2A2252;
+      color: #FAF7FF;
     }
   </style>
 </head>
@@ -63,9 +64,9 @@
             <span id="property-address">Waiting for visit details</span>
           </div>
           <div class="meta-card">
-            <span class="meta-label">Handyman</span>
+            <span class="meta-label">Contractor</span>
             <strong id="contractor-name">Unassigned</strong>
-            <span id="contractor-contact">Add a preferred handyman in Chez</span>
+            <span id="contractor-contact">Add a preferred contractor in Chez</span>
           </div>
         </div>
       </div>
@@ -87,7 +88,7 @@
         </div>
       </div>
       <p class="hero-copy compact-copy">
-        You're walking through the homeowner's systems, vendors, recurring services, and documents to populate their app. The full guided wizard lives in the Chez Field iOS app — strongly recommended for this visit type.
+        You're walking through the homeowner's systems, vendors, recurring services, and documents to populate their app. The full guided wizard lives in the Chez Field iOS app, strongly recommended for this visit type.
       </p>
       <div class="button-row">
         <a class="primary-button small-button" href="https://apps.apple.com/app/chez-field" target="_blank" rel="noopener">Open Chez Field app</a>
@@ -95,7 +96,7 @@
       </div>
 
       <div id="assessment-fallback-form" style="display: none; margin-top: 16px;">
-        <p class="task-subtitle compact-eyebrow">Fallback capture — autosaves to the assessment as you add items.</p>
+        <p class="task-subtitle compact-eyebrow">Fallback capture, autosaves to the assessment as you add items.</p>
 
         <details open style="margin-top: 12px;">
           <summary style="cursor: pointer; font-weight: 600;">Add a system</summary>
@@ -170,7 +171,7 @@
             <input
               id="chat-input"
               type="text"
-              placeholder="Message the homeowner — “The basement door is locked, can you let me in?”"
+              placeholder="Message the homeowner. Example: The basement door is locked, can you let me in?"
               maxlength="600"
               aria-label="Quick message to homeowner"
             />
@@ -447,7 +448,7 @@
     </div>
   </template>
 
-  <script src="handyman-visit.js?v=30260427-chat1" defer></script>
+  <script src="handyman-visit.js?v=30260508-rebrand2" defer></script>
   <!-- Phase 84.5 — assessment-mode shared helpers + offline persistence.
        Loaded unconditionally; handyman-visit.js will only invoke them when
        the loaded visit's visit_type ∈ ('home_assessment', 'home_assessment_continuation').

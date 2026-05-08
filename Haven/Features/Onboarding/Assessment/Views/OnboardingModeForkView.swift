@@ -84,9 +84,9 @@ struct OnboardingModeForkView: View {
         Button(action: onSelectHandyman) {
             modeCard(
                 icon: "✨",
-                title: "Send a Chez handyman to set up",
+                title: "Send a Chez Contractor to set up",
                 timeEstimate: "Free 90-min visit · we handle everything",
-                description: "A Chez handyman comes to your home. They'll walk every system, photograph equipment, flag what needs work, and capture your existing vendors. Then Chez can start handling the recommended work.",
+                description: "A Chez Contractor comes to your home. They'll walk every system, photograph equipment, flag what needs work, and capture your existing vendors. Then Chez can start handling the recommended work.",
                 cta: "Schedule a free visit",
                 ctaIsPrimary: true
             )
@@ -112,7 +112,7 @@ struct OnboardingModeForkView: View {
                     Text("📋")
                         .font(.system(size: 32))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Chez handyman isn't in your area yet")
+                        Text("Chez Contractor isn't in your area yet")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
                         Text("Join the waitlist. We'll notify you when we expand.")

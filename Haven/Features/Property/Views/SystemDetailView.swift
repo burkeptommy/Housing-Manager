@@ -1507,7 +1507,7 @@ struct SystemDetailRowView: View {
                         Haptics.light()
                         Task { await addTaskToHandymanPunchList(task) }
                     } label: {
-                        Text("Try handyman")
+                        Text("Try contractor")
                             .font(HavenTypography.uiLabelSmall)
                             .foregroundStyle(HavenColors.navy700)
                             .padding(.horizontal, 10)
@@ -1532,7 +1532,7 @@ struct SystemDetailRowView: View {
                             } else {
                                 Image(systemName: "hammer.fill")
                             }
-                            Text("Add to handyman")
+                            Text("Add to contractor")
                         }
                         .font(HavenTypography.uiLabelSmall)
                         .foregroundStyle(HavenColors.navy700)

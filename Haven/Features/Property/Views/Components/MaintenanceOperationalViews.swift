@@ -926,7 +926,7 @@ struct MaintenanceYearPlanView: View {
                 Button {
                     onOpenHandymanQueue()
                 } label: {
-                    Text("Review handyman bundle")
+                    Text("Review contractor bundle")
                         .font(HavenTypography.uiLabelSmall.weight(.semibold))
                         .foregroundStyle(HavenColors.navy700)
                         .padding(.horizontal, 12)

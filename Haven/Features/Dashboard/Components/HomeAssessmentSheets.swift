@@ -88,7 +88,7 @@ struct AssessmentPrepNotesSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Anything we should know?")
                     .font(HavenTypography.title2)
-                Text("Notes for the handyman. Examples: \"Boiler is in the basement closet,\" \"Side gate code is 1234,\" \"Dog is friendly.\"")
+                Text("Notes for your contractor. Examples: \"Boiler is in the basement closet,\" \"Side gate code is 1234,\" \"Dog is friendly.\"")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
 
@@ -127,7 +127,7 @@ struct AssessmentPrepNotesSheet: View {
                 Spacer()
             }
             .padding(20)
-            .navigationTitle("Notes for handyman")
+            .navigationTitle("Notes for contractor")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -155,7 +155,7 @@ struct AssessmentPrepPhotosSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Photos for your handyman")
+                Text("Photos for your contractor")
                     .font(HavenTypography.title2)
                 Text("Snap photos of any rooms or systems you want them to focus on. Optional. They'll capture everything during the visit.")
                     .font(HavenTypography.bodySmall)
@@ -261,7 +261,7 @@ struct AssessmentPrepQuizSheet: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("A quick 5-question prep")
                         .font(HavenTypography.title2)
-                    Text("Helps your handyman move fast. All optional.")
+                    Text("Helps your contractor move fast. All optional.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
 

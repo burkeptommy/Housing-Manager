@@ -286,7 +286,7 @@ function syncExperienceMode() {
     : `${state.dashboard.workspace.companyName} operations desk`;
   dom.experienceLede.textContent = permissions.isFieldTechnician
     ? "See assigned work, homeowner context, home systems, and visit details in one place."
-    : "Route visits, manage the crew, plan the calendar, and build quotes from one Chez Handyman workspace.";
+    : "Route visits, manage the crew, plan the calendar, and build quotes from one Chez Contractor workspace.";
 }
 
 function workspaceSeed() {
@@ -375,7 +375,7 @@ async function loadInvitePreview() {
       dom.inviteTitle.textContent = `Join ${payload.teamInvite.workspace.companyName}`;
       dom.inviteStatus.textContent = payload.teamInvite.member.roleLabel;
       dom.inviteSummary.textContent =
-        "Create your secure login to see your assigned visits, route, homes, messages, and field workspaces from Chez Handyman.";
+        "Create your secure login to see your assigned visits, route, homes, messages, and field workspaces from Chez Contractor.";
       dom.inviteLabelA.textContent = "Company";
       dom.inviteLabelB.textContent = "Role";
       dom.inviteLabelC.textContent = "Invitee";
@@ -385,7 +385,7 @@ async function loadInvitePreview() {
       dom.inviteCompany.textContent = payload.teamInvite.member.fullName;
       dom.inviteFieldLink.href = payload.teamInvite.inviteUrl || "#";
       dom.inviteFieldLink.textContent = "Open secure team invite";
-      dom.authHelperCopy.textContent = "This invite attaches you to an existing Chez Handyman company account. Once you log in, the workspace will open with the visits, homes, messages, and tools that match your role.";
+      dom.authHelperCopy.textContent = "This invite attaches you to an existing Chez Contractor company account. Once you log in, the workspace will open with the visits, homes, messages, and tools that match your role.";
       dom.companyField.classList.add("hidden");
       dom.signUpCompany.value = payload.teamInvite.workspace.companyName || "";
       dom.signUpName.value = payload.teamInvite.member.fullName || "";
@@ -402,7 +402,7 @@ async function loadInvitePreview() {
     dom.inviteTitle.textContent = payload.invite.title || "Claim this Chez visit";
     dom.inviteStatus.textContent = payload.invite.requestStatusLabel || "Secure link";
     dom.inviteSummary.textContent =
-      "Create your Chez Handyman account to confirm this visit, route future work, and keep every home's systems record sharper after each stop.";
+      "Create your Chez Contractor account to confirm this visit, route future work, and keep every home's systems record sharper after each stop.";
     dom.inviteLabelA.textContent = "Home";
     dom.inviteLabelB.textContent = "Requested date";
     dom.inviteLabelC.textContent = "Company";
@@ -488,7 +488,7 @@ async function refreshWorkspace() {
           action: "bootstrap_workspace",
           ...seed,
         });
-        setFeedback(dom.authFeedback, "Workspace ready. Loading your Chez Handyman desk.");
+        setFeedback(dom.authFeedback, "Workspace ready. Loading your Chez Contractor desk.");
       } catch (error) {
         console.error("[handyman] bootstrap_workspace failed", error);
         setFeedback(dom.authFeedback, error instanceof Error ? error.message : "Couldn't create workspace.", true);
@@ -617,7 +617,7 @@ function renderWorkspaceHeader() {
   } else {
     dom.controlBar.querySelector(".section-eyebrow").textContent = "Operations";
     dom.controlBar.querySelector("h3").textContent = "Own the queue, route the field team, and keep every home moving forward.";
-    dom.controlBar.querySelector(".card-copy").textContent = "Plan the week, route jobs, manage the crew, and build quotes from one Chez Handyman workspace.";
+    dom.controlBar.querySelector(".card-copy").textContent = "Plan the week, route jobs, manage the crew, and build quotes from one Chez Contractor workspace.";
     dom.quickOpenMyDay.textContent = "Open my day";
     dom.quickNewQuote.textContent = "New quote";
   }
@@ -2570,7 +2570,7 @@ async function signUp(event) {
     action: "bootstrap_workspace",
     ...payload,
   });
-  setFeedback(dom.authFeedback, "Account created. Loading your Chez Handyman workspace.");
+  setFeedback(dom.authFeedback, "Account created. Loading your Chez Contractor workspace.");
   await refreshWorkspace();
 }
 

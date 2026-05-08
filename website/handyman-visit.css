@@ -195,6 +195,7 @@ dd {
   cursor: pointer;
   font-weight: 700;
   padding: 12px 18px;
+  min-height: 44px;
   transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease;
 }
 

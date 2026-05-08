@@ -212,7 +212,7 @@ function requestStatusLabel(status: string) {
     case "scheduled":
       return "Scheduled";
     case "sent_to_handyman":
-      return "Sent to handyman";
+      return "Sent to contractor";
     case "alternate_dates_proposed":
       return "Dates proposed";
     case "awaiting_homeowner":
@@ -534,7 +534,28 @@ async function getWorkspaceMembership(
   service: ServiceClient,
   userId: string,
   authEmail?: string,
+  preferredWorkspaceId?: string,
 ) {
+  // Wave S: when the caller passes a preferredWorkspaceId (the SPA sends
+  // this from localStorage so the user's last-selected workspace sticks),
+  // try to load the membership for THAT workspace first. Fall through to
+  // the default first-active selection only if the preferred workspace
+  // isn't a valid membership for this user. We never trust the preference
+  // blindly — RLS-equivalent check via `.eq("user_id", userId)` and
+  // `.eq("status", "active")` ensures the caller actually belongs there.
+  if (preferredWorkspaceId) {
+    const preferred = await service
+      .from("provider_workspace_members")
+      .select(MEMBER_SELECT)
+      .eq("user_id", userId)
+      .eq("workspace_id", preferredWorkspaceId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (preferred.error) throw preferred.error;
+    if (preferred.data) return preferred.data as Record<string, unknown>;
+  }
+
   // Primary: active row already pinned to this auth.users.id.
   const direct = await service
     .from("provider_workspace_members")
@@ -1324,7 +1345,7 @@ async function sendRequestMessageEmail(
       bodyHtml,
       ctaLabel: params.quoteUrl ? "Review latest quote" : undefined,
       ctaUrl: params.quoteUrl || undefined,
-      footer: "Open Chez to reply or coordinate next steps with your handyman.",
+      footer: "Open Chez to reply or coordinate next steps with your contractor.",
     }),
     text,
     replyToEmail: workspace.primaryEmail || null,
@@ -1719,7 +1740,7 @@ async function fetchInvitePreview(service: ServiceClient, token: string) {
     token,
     providerUrl: providerInviteUrl(token),
     fieldUrl: fieldVisitUrl(token, visitTaskId || null),
-    title: compactString(request?.title) || compactString(session.title) || "Chez Handyman Visit",
+    title: compactString(request?.title) || compactString(session.title) || "Chez Contractor Visit",
     preferredTiming: compactString(request?.preferred_timing) || compactString((session.seed_payload as Record<string, unknown> | undefined)?.scheduledDate),
     requestStatus: compactString(request?.status) || null,
     requestStatusLabel: request ? requestStatusLabel(compactString(request.status)) : null,
@@ -1780,10 +1801,19 @@ async function claimInviteForWorkspace(
   return preview;
 }
 
-async function loadDashboard(service: ServiceClient, user: Record<string, unknown>) {
+async function loadDashboard(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  preferredWorkspaceId?: string,
+) {
   const userId = compactString(user.id);
   const userEmail = normalizedEmail(user.email);
-  const membership = await getWorkspaceMembership(service, userId, userEmail);
+  const membership = await getWorkspaceMembership(
+    service,
+    userId,
+    userEmail,
+    preferredWorkspaceId,
+  );
   if (!membership) {
     console.log("[handyman-provider] needsWorkspace=true", {
       userId,
@@ -1829,6 +1859,11 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     sessionsResult,
     quotesResult,
     savedItemsResult,
+    invoicesResult,
+    // Wave S — list every workspace this user is an active member of so
+    // the SPA can render a switcher dropdown. Single round-trip alongside
+    // the existing parallel batch so adding the switcher costs ~0ms.
+    availableWorkspacesResult,
   ] = await Promise.all([
     service
       .from("provider_workspace_members")
@@ -1870,6 +1905,21 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       .eq("workspace_id", workspaceId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false }),
+    // Wave Q (Section 8) — provider invoices.
+    service
+      .from("provider_invoices")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("updated_at", { ascending: false })
+      .limit(120),
+    // Wave S — fetch every workspace this user can switch into. Filtered
+    // to active memberships only so revoked/invited rows never leak. The
+    // joined `provider_workspaces` row gives us company_name + primary_email.
+    service
+      .from("provider_workspace_members")
+      .select("workspace_id, role, status, provider_workspaces(id, company_name, primary_email)")
+      .eq("user_id", userId)
+      .eq("status", "active"),
   ]);
 
   if (teamMembersResult.error) throw teamMembersResult.error;
@@ -1878,6 +1928,30 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   if (sessionsResult.error) throw sessionsResult.error;
   if (quotesResult.error) throw quotesResult.error;
   if (savedItemsResult.error) throw savedItemsResult.error;
+  if (invoicesResult.error) throw invoicesResult.error;
+  if (availableWorkspacesResult.error) throw availableWorkspacesResult.error;
+
+  // Wave S — distill the membership rows into a clean { id, companyName,
+  // primaryEmail, role, isCurrent } array. Multiple rows for the same
+  // workspace_id (rare — would mean stale dup data) collapse to the
+  // first hit. Sorted alphabetically by company name to match common
+  // workspace-switcher UX (Slack, Linear, Notion).
+  const availableWorkspaceMap = new Map<string, Record<string, unknown>>();
+  for (const row of (availableWorkspacesResult.data ?? []) as Record<string, unknown>[]) {
+    const ws = (row.provider_workspaces as Record<string, unknown> | undefined) ?? {};
+    const id = compactString(ws.id) || compactString(row.workspace_id);
+    if (!id || availableWorkspaceMap.has(id)) continue;
+    availableWorkspaceMap.set(id, {
+      id,
+      companyName: compactString(ws.company_name) || "Workspace",
+      primaryEmail: compactString(ws.primary_email),
+      role: compactString(row.role),
+      isCurrent: id === workspaceId,
+    });
+  }
+  const availableWorkspaces = Array.from(availableWorkspaceMap.values()).sort((a, b) =>
+    String(a.companyName).localeCompare(String(b.companyName)),
+  );
 
   let teamMembers = (teamMembersResult.data ?? []) as Record<string, unknown>[];
   let assignments = (assignmentsResult.data ?? []) as Record<string, unknown>[];
@@ -1885,6 +1959,7 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   let sessions = (sessionsResult.data ?? []) as Record<string, unknown>[];
   let quotes = (quotesResult.data ?? []) as Record<string, unknown>[];
   const savedItems = (savedItemsResult.data ?? []) as Record<string, unknown>[];
+  let invoices = (invoicesResult.data ?? []) as Record<string, unknown>[];
   const myMemberId = compactString(membership.id);
 
   let visibleRequests = requests;
@@ -1905,6 +1980,10 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       const requestId = compactString(row.request_id);
       return requestId ? allowedRequestIds.has(requestId) : compactString(row.created_by_user_id) === userId;
     });
+    invoices = invoices.filter((row) => {
+      const requestId = compactString(row.request_id);
+      return requestId ? allowedRequestIds.has(requestId) : compactString(row.created_by_user_id) === userId;
+    });
     teamMembers = teamMembers.filter((row) => compactString(row.id) === myMemberId);
   }
 
@@ -1917,10 +1996,36 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   ];
   const propertyIds = [
     ...new Set(
-      [...visibleRequests.map((row) => compactString(row.property_id)), ...sessions.map((row) => compactString(row.property_id)), ...quotes.map((row) => compactString(row.property_id))]
+      [
+        ...visibleRequests.map((row) => compactString(row.property_id)),
+        ...sessions.map((row) => compactString(row.property_id)),
+        ...quotes.map((row) => compactString(row.property_id)),
+        ...invoices.map((row) => compactString(row.property_id)),
+      ].filter(Boolean),
+    ),
+  ];
+
+  // Section 19d: pull chez_profile for every household in scope so the
+  // contractor sees standing instructions (esp. spending tiers — the
+  // contractor needs to know whether to ping Chez before a $500+
+  // proposal). Phase 80.1 added the JSONB column; this SPA was the
+  // last consumer to wire it in.
+  const householdIds = [
+    ...new Set(
+      [...visibleRequests.map((row) => compactString(row.household_id)), ...quotes.map((row) => compactString(row.household_id))]
         .filter(Boolean),
     ),
   ];
+  const { data: householdsForProfile } = householdIds.length
+    ? await service
+        .from("households")
+        .select("id, chez_profile")
+        .in("id", householdIds)
+    : { data: [] as Record<string, unknown>[] };
+  const chezProfileByHouseholdId = new Map<string, Record<string, unknown> | null>();
+  for (const row of householdsForProfile ?? []) {
+    chezProfileByHouseholdId.set(compactString(row.id), (row.chez_profile as Record<string, unknown>) ?? null);
+  }
 
   const quoteIds = quotes.map((row) => compactString(row.id)).filter(Boolean);
 
@@ -2152,6 +2257,11 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       status: compactString(request.status),
       statusLabel: requestStatusLabel(compactString(request.status)),
       preferredTiming: compactString(request.preferred_timing),
+      // Section 19a — surface origin + urgency so the desktop can render
+      // a "Routed by Chez" pill on requests created by the Chez admin
+      // (source='haven') and an Emergency pill on urgency='urgent' rows.
+      source: compactString(request.source) || null,
+      urgency: compactString(request.urgency) || null,
       proposedVisitAt: request.proposed_visit_at ?? null,
       proposedByRole: compactString(request.proposed_by_role) || null,
       proposedAt: request.proposed_at ?? null,
@@ -2259,15 +2369,29 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       .slice(0, 8);
     const homeFiles = (filesByPropertyId.get(propertyId) ?? []).slice(0, 16);
 
+    const homeHouseholdId = compactString(homeVisits[0]?.householdId);
+    const chezProfile = homeHouseholdId ? chezProfileByHouseholdId.get(homeHouseholdId) ?? null : null;
     return {
       propertyId,
-      householdId: compactString(homeVisits[0]?.householdId),
+      householdId: homeHouseholdId,
       name: compactString(property?.name) || "Home",
       address: [property?.street, property?.city, property?.state, property?.zip_code].filter(Boolean).join(", "),
       systemCount: homeSystems.length,
       openRequests: homeVisits.filter((row) => !["completed", "cancelled", "declined"].includes(row.status)).length,
       lastCompletedVisit: completed[0]?.fieldWorkspace?.completedAt ?? null,
       assignedMembers: [...new Set(homeVisits.map((row) => row.assignment?.memberName).filter(Boolean))],
+      // Section 19d: pass-through subset of households.chez_profile so
+      // the contractor SPA can render standing-instructions banners
+      // (spending tier, vendor preferences, logistics). Send only the
+      // contractor-relevant subset — full profile incl. communication
+      // prefs is intentionally not surfaced to the contractor (privacy).
+      chezProfile: chezProfile
+        ? {
+            spendingTiers: (chezProfile as Record<string, unknown>)?.spending_tiers ?? null,
+            vendorPreferences: (chezProfile as Record<string, unknown>)?.vendor_preferences ?? null,
+            logistics: (chezProfile as Record<string, unknown>)?.logistics ?? null,
+          }
+        : null,
       // Sign photos in parallel — bucket is private so the React side
       // needs short-lived signed URLs to display thumbnails.
       systems: await Promise.all(homeSystems.map(async (system) => ({
@@ -2447,6 +2571,21 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       activeMemberCount: activeMembers.length,
       invitedMemberCount: teamMemberRows.filter((row) => row.status === "invited").length,
       providerUrl: PROVIDER_SITE_URL,
+      // Wave P: branding + directory fields the Settings screen reads/writes.
+      // Always serialize (empty string / [] when null) so the SPA never has
+      // to special-case undefined.
+      licenseNumber: compactString(workspace.license_number),
+      serviceState: compactString(workspace.service_state),
+      serviceCity: compactString(workspace.service_city),
+      serviceZipCodes: Array.isArray(workspace.service_zip_codes)
+        ? (workspace.service_zip_codes as unknown[]).map((z) => compactString(z)).filter(Boolean)
+        : [],
+      categories: Array.isArray(workspace.categories)
+        ? (workspace.categories as unknown[]).map((c) => compactString(c)).filter(Boolean)
+        : [],
+      displayBlurb: compactString(workspace.display_blurb),
+      headshotUrl: compactString(workspace.headshot_url),
+      isListedInDirectory: Boolean(workspace.is_listed_in_directory),
     },
     linkedContractors: (contractorLinks ?? []).map((row: Record<string, unknown>) => {
       const contractor = (row.contractors as Record<string, unknown> | undefined) ?? {};
@@ -2510,6 +2649,11 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
         viewedAt: quote.viewed_at,
         approvedAt: quote.approved_at,
         declinedAt: quote.declined_at,
+        // Wave Z.3 — surface negotiation metadata so the desktop can
+        // render the version timeline. Phase 73b added these columns.
+        signedAt: quote.signed_at ?? null,
+        signedName: compactString(quote.signed_name) || null,
+        homeownerRevisedAt: quote.homeowner_revised_at ?? null,
         requestId: compactString(quote.request_id),
         publicShareUrl: publicQuoteUrl(compactString(quote.public_share_token)),
         lineItems,
@@ -2524,6 +2668,26 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
             }
           : null,
         recentMessages: recentQuoteMessages,
+        // Wave V.1 — quote bundles. parent_quote_id is the FK chain
+        // shared with Phase 73b counter-offers, but the bundle case is
+        // distinguished by the BUNDLE_MARKER sentinel in scope_notes.
+        // bundleTierLabel is the per-child label parsed off the title
+        // suffix; bundleMeta on the parent carries the tier list +
+        // chosen-child breadcrumb if a tier has been picked.
+        parentQuoteId: compactString(quote.parent_quote_id) || null,
+        bundleMeta: (() => {
+          const { meta } = parseBundleScopeNotes(compactString(quote.scope_notes));
+          return meta;
+        })(),
+        bundleTierLabel: (() => {
+          if (!quote.parent_quote_id) return null;
+          const childTitle = compactString(quote.title);
+          // Tier lives as title suffix " · {label}". Parent title may
+          // not be in scope here (it's a different row), so fall back
+          // to splitting on the last " · " separator.
+          const idx = childTitle.lastIndexOf(" · ");
+          return idx >= 0 ? childTitle.slice(idx + 3) : null;
+        })(),
       };
     }),
     savedQuoteItems: savedItems.map((item) => ({
@@ -2535,7 +2699,64 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       defaultUnitPrice: numberValue(item.default_unit_price || 0),
       sortOrder: numberValue(item.sort_order),
     })),
+    // Wave Q (Section 8) — provider invoices.
+    invoices: invoices.map((row) => {
+      const property = propertyById.get(compactString(row.property_id));
+      const lineItems = (Array.isArray(row.line_items) ? row.line_items : []).map(mapLineItemForClient);
+      const status = compactString(row.status) || "draft";
+      return {
+        id: compactString(row.id),
+        workspaceId: compactString(row.workspace_id),
+        contractorId: compactString(row.contractor_id) || null,
+        householdId: compactString(row.household_id) || null,
+        propertyId: compactString(row.property_id) || null,
+        requestId: compactString(row.request_id) || null,
+        sourceQuoteId: compactString(row.source_quote_id) || null,
+        invoiceNumber: compactString(row.invoice_number),
+        title: compactString(row.title) || "",
+        status,
+        statusLabel: invoiceStatusLabel(status),
+        currency: compactString(row.currency) || "USD",
+        lineItems,
+        scopeNotes: compactString(row.scope_notes) || null,
+        homeownerMessage: compactString(row.homeowner_message) || null,
+        subtotal: numberValue(row.subtotal),
+        taxTotal: numberValue(row.tax_total),
+        total: numberValue(row.total),
+        amountPaid: numberValue(row.amount_paid),
+        propertyName: compactString(property?.name) || "",
+        dueDate: compactString(row.due_date) || null,
+        sentAt: row.sent_at ?? null,
+        paidAt: row.paid_at ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }),
+    // Wave S — every workspace this user can switch into. Single-workspace
+    // users get a length=1 array; the SPA hides the dropdown affordance.
+    availableWorkspaces,
   };
+}
+
+function invoiceStatusLabel(status: string): string {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "sent":
+      return "Sent";
+    case "viewed":
+      return "Viewed";
+    case "paid":
+      return "Paid";
+    case "partial":
+      return "Partially paid";
+    case "overdue":
+      return "Overdue";
+    case "void":
+      return "Void";
+    default:
+      return status || "Draft";
+  }
 }
 
 /**
@@ -2932,22 +3153,24 @@ async function splitVisitPunchList(
   // the existing "vendor" sender_role so RLS + display layer treat
   // it like a normal vendor message.
   const movedSummary = `${moved.length} item${moved.length === 1 ? "" : "s"} moved to a follow-up visit${followUpDate ? ` on ${followUpDate}` : ""}.`;
+  // handyman_request_messages does NOT have a sender_user_id column
+  // (PGRST204 confirmed). Stash the actor in metadata.actor_user_id so
+  // the audit trail still has provenance without breaking the insert.
+  // Wave Z subagent flagged this as a latent bug; this is the fix.
   await service.from("handyman_request_messages").insert([
     {
       request_id: requestId,
       household_id: householdId,
       sender_role: "vendor",
-      sender_user_id: userId,
       body: `Split this visit: ${movedSummary} The follow-up is now its own thread.`,
-      metadata: { kind: "text", split_to_request_id: newRequest.id },
+      metadata: { kind: "text", split_to_request_id: newRequest.id, actor_user_id: userId },
     },
     {
       request_id: newRequest.id,
       household_id: householdId,
       sender_role: "vendor",
-      sender_user_id: userId,
       body: `Created from a previous visit. ${moved.length} item${moved.length === 1 ? "" : "s"} ready to schedule${followUpDate ? ` for ${followUpDate}` : ""}.`,
-      metadata: { kind: "text", split_from_request_id: requestId },
+      metadata: { kind: "text", split_from_request_id: requestId, actor_user_id: userId },
     },
   ]);
 
@@ -3069,7 +3292,7 @@ async function addClientForProvider(
       created_by_user_id: userId,
       request_type: "standard_visit",
       source: "vendor",
-      title: `Initial setup — ${clientName}`,
+      title: `Initial setup: ${clientName}`,
       details: noteParts.join("\n"),
       preferred_timing: null,
       urgency: "routine",
@@ -3124,6 +3347,28 @@ async function deleteQuoteForProvider(
   if (!quote) throw new Error("Quote not found");
   if (compactString(quote.status) !== "draft") {
     throw new Error("Only draft quotes can be deleted. Withdraw or supersede sent quotes instead.");
+  }
+
+  // Wave V.1 — when the deleted quote is a BUNDLE PARENT, walk its
+  // children too. Children carry their own provider_quote_messages
+  // (the bundle-sent event lives on the parent only, but counter-offer
+  // chains can attach messages to children) so clean those first.
+  const { data: childIdsRaw } = await service
+    .from("provider_quotes")
+    .select("id, status")
+    .eq("parent_quote_id", quoteId);
+  const children = (childIdsRaw ?? []) as Array<{ id: string; status: string }>;
+  // Refuse to delete a bundle parent if any child has been sent — the
+  // homeowner has already seen the offer. Force the contractor to
+  // withdraw individual children first instead. For pure-draft bundles
+  // (no child sent), cascade clean.
+  if (children.some((c) => compactString(c.status) !== "draft")) {
+    throw new Error("This bundle has tiers that have already been sent. Withdraw them individually instead.");
+  }
+  if (children.length > 0) {
+    const childIds = children.map((c) => compactString(c.id));
+    await service.from("provider_quote_messages").delete().in("quote_id", childIds);
+    await service.from("provider_quotes").delete().in("id", childIds);
   }
 
   // Cascade: provider_quote_messages have ON DELETE CASCADE on most
@@ -3186,6 +3431,51 @@ async function updateRequestStatusForProvider(
     .select()
     .single();
   if (updateError) throw updateError;
+
+  // Cross-app parity: append an audit-trail message to the homeowner's
+  // conversation thread so they see WHEN the contractor flipped the
+  // status and to WHAT. Without this, the homeowner has zero record of
+  // visit completion / cancellation events. The sender_role CHECK
+  // constraint is ('homeowner', 'haven', 'vendor'); we use 'vendor' so
+  // the message renders inline as a contractor-side update with the
+  // existing iOS message-thread layout. The body is a short, neutral
+  // status flip — the homeowner's iOS app already formats sender_role
+  // 'vendor' as the contractor's voice. Failures here do NOT roll back
+  // the status update; the audit message is best-effort.
+  try {
+    const householdId = compactString(updated.household_id);
+    const statusLabel = (() => {
+      switch (status) {
+        case "completed": return "Visit marked complete.";
+        case "in_progress": return "Visit started.";
+        case "on_my_way": return "Tech on the way.";
+        case "checked_in": return "Tech checked in.";
+        case "cancelled": return "Visit cancelled.";
+        case "follow_up_recommended": return "Follow-up recommended after this visit.";
+        case "scheduled": return "Visit scheduled.";
+        case "confirmed": return "Visit confirmed.";
+        case "awaiting_homeowner": return "Awaiting your response.";
+        case "alternate_dates_proposed": return "New time options proposed.";
+        case "submitted": return "Request received.";
+        case "sent_to_handyman": return "Request sent to the contractor.";
+        case "quoted": return "Quote ready for review.";
+        case "declined": return "Request declined.";
+        default: return `Status changed to ${status}.`;
+      }
+    })();
+    if (householdId) {
+      await service.from("handyman_request_messages").insert({
+        request_id: requestId,
+        household_id: householdId,
+        sender_role: "vendor",
+        body: statusLabel,
+        metadata: { kind: "status_change", status },
+      });
+    }
+  } catch (auditErr) {
+    console.error("[handyman-provider] audit-trail message insert failed", auditErr);
+  }
+
   return { request: updated };
 }
 
@@ -3358,6 +3648,33 @@ async function updateWorkspaceDirectory(
     updated_at: isoNow(),
   };
 
+  // Wave P: identity fields (company name, primary contact, website,
+  // license). Live alongside the directory fields below — the Settings
+  // screen treats them as one logical save. Each typeof-guarded so a
+  // partial update only writes the fields the caller passed.
+  if (typeof body.companyName !== "undefined") {
+    const name = compactString(body.companyName);
+    if (!name) throw new Error("Company name cannot be blank");
+    updates.company_name = name.slice(0, 200);
+  }
+  if (typeof body.primaryEmail !== "undefined") {
+    const raw = compactString(body.primaryEmail);
+    if (raw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+      throw new Error("Primary email is not a valid email address");
+    }
+    updates.primary_email = raw ? raw.toLowerCase() : null;
+  }
+  if (typeof body.primaryPhone !== "undefined") {
+    updates.primary_phone = compactString(body.primaryPhone) || null;
+  }
+  if (typeof body.website !== "undefined") {
+    updates.website = compactString(body.website) || null;
+  }
+  if (typeof body.licenseNumber !== "undefined") {
+    const raw = compactString(body.licenseNumber);
+    updates.license_number = raw ? raw.slice(0, 80) : null;
+  }
+
   if (typeof body.isListedInDirectory !== "undefined") {
     updates.is_listed_in_directory = Boolean(body.isListedInDirectory);
   }
@@ -3412,7 +3729,7 @@ async function updateWorkspaceDirectory(
     .update(updates)
     .eq("id", workspaceId)
     .select(
-      "id, company_name, is_listed_in_directory, service_state, service_city, service_zip_codes, categories, display_blurb, headshot_url, aggregate_rating, review_count",
+      "id, company_name, primary_email, primary_phone, website, license_number, is_listed_in_directory, service_state, service_city, service_zip_codes, categories, display_blurb, headshot_url, aggregate_rating, review_count",
     )
     .single();
 
@@ -3526,6 +3843,385 @@ async function assignVisit(
   }
 
   return data;
+}
+
+/**
+ * Wave Z.1 — Drag-to-reschedule on the calendar. Moves a visit's
+ * route_date to a new day. Lighter-touch than propose_visit_time:
+ * - Doesn't go through the homeowner accept/decline cycle
+ * - Doesn't shift confirmed_visit_at hours (calendar drag is day-grain)
+ * - Keeps the same assigned tech, window times, stop_order
+ *
+ * Use cases:
+ * 1. Unconfirmed/draft visits — contractor moves the proposed day
+ * 2. Already-confirmed visits — contractor needs to shift; an audit
+ *    message lands in the thread so the homeowner sees what happened.
+ *    For confirmed visits the SPA also shows a confirm dialog before
+ *    calling here.
+ *
+ * Writes a `visit_rescheduled` audit message into handyman_request_messages
+ * so the homeowner-side thread mirrors the change (cross-app parity per
+ * Section 22 mandate).
+ */
+async function rescheduleVisit(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canAssignWork");
+
+  const requestId = compactString(body.requestId);
+  const newRouteDate = compactString(body.newRouteDate);
+  if (!requestId) throw new Error("Missing request");
+  if (!newRouteDate || !/^\d{4}-\d{2}-\d{2}$/.test(newRouteDate)) {
+    throw new Error("Invalid newRouteDate (expected yyyy-MM-dd)");
+  }
+
+  // Lookup the visit assignment row + parent request for context.
+  const { data: assignment } = await service
+    .from("provider_visit_assignments")
+    .select("id, route_date")
+    .eq("workspace_id", workspaceId)
+    .eq("request_id", requestId)
+    .limit(1)
+    .maybeSingle();
+  if (!assignment) throw new Error("Visit assignment not found");
+
+  const { data: request } = await service
+    .from("handyman_requests")
+    .select("id, household_id, status, confirmed_visit_at, title")
+    .eq("id", requestId)
+    .limit(1)
+    .maybeSingle();
+  if (!request) throw new Error("Request not found");
+
+  const oldRouteDate = compactString(assignment.route_date);
+  const householdId = compactString(request.household_id);
+  const wasConfirmed = Boolean(compactString(request.confirmed_visit_at));
+
+  // Update the assignment row. Confirmed visits also need confirmed_visit_at
+  // shifted to keep the calendar truth in sync — preserve the original
+  // hour/minute when shifting.
+  await service
+    .from("provider_visit_assignments")
+    .update({
+      route_date: newRouteDate,
+      updated_at: isoNow(),
+    })
+    .eq("id", compactString(assignment.id));
+
+  if (wasConfirmed) {
+    const oldConfirmed = new Date(compactString(request.confirmed_visit_at));
+    if (!Number.isNaN(oldConfirmed.getTime())) {
+      const [yyyy, mm, dd] = newRouteDate.split("-").map((s) => Number(s));
+      const newConfirmed = new Date(oldConfirmed);
+      newConfirmed.setUTCFullYear(yyyy, mm - 1, dd);
+      await service
+        .from("handyman_requests")
+        .update({
+          confirmed_visit_at: newConfirmed.toISOString(),
+          updated_at: isoNow(),
+        })
+        .eq("id", requestId);
+    }
+  }
+
+  // Audit message — keeps the homeowner thread in sync. Same pattern
+  // Wave Y2 used for cross-app parity.
+  if (householdId) {
+    const dateLabel = (iso: string) => {
+      try {
+        const d = new Date(`${iso}T12:00:00Z`);
+        return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      } catch (_) {
+        return iso;
+      }
+    };
+    const oldLabel = oldRouteDate ? dateLabel(oldRouteDate) : "an earlier date";
+    const newLabel = dateLabel(newRouteDate);
+    const visitTitle = compactString(request.title) || "Visit";
+
+    // Note: handyman_request_messages doesn't have a sender_user_id
+    // column (only sender_role + body + metadata). Pre-existing
+    // inserts elsewhere in this file include sender_user_id silently;
+    // PostgREST rejects the insert outright (PGRST204), so we omit it
+    // here and stash the actor's user id in metadata instead so it
+    // remains queryable for audit.
+    await service.from("handyman_request_messages").insert({
+      request_id: requestId,
+      household_id: householdId,
+      sender_role: "vendor",
+      body: `${visitTitle} moved from ${oldLabel} to ${newLabel}.`,
+      metadata: {
+        kind: "visit_rescheduled",
+        actor_user_id: userId,
+        old_route_date: oldRouteDate || null,
+        new_route_date: newRouteDate,
+        was_confirmed: wasConfirmed,
+      },
+    });
+
+    if (wasConfirmed) {
+      // Push the homeowner only when the visit was already confirmed —
+      // otherwise the desktop drag is just calendar planning the
+      // homeowner doesn't need a notification for yet.
+      await notifyHomeownersForRequest(service, householdId, {
+        title: "Visit moved",
+        body: `${visitTitle} is now ${newLabel}.`,
+        requestId,
+        eventType: "handyman_visit_rescheduled",
+        extra: { old_route_date: oldRouteDate || null, new_route_date: newRouteDate },
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    requestId,
+    oldRouteDate: oldRouteDate || null,
+    newRouteDate,
+    wasConfirmed,
+  };
+}
+
+/**
+ * Wave Z.2 — Aggregate task list for the cross-customer Tasks screen.
+ *
+ * Returns every open punch item across the workspace's customers + every
+ * non-archived maintenance_task linked to a workspace-assigned visit.
+ * One trip on demand (not part of loadDashboard) so the regular page
+ * loads stay lean.
+ *
+ * Source-of-truth boundaries (how we decide what's "this workspace's"):
+ * 1. handyman_punch_items: items whose assigned_visit_task_id appears
+ *    on a visit currently assigned to this workspace via
+ *    provider_visit_assignments.
+ * 2. maintenance_tasks: tasks where task.id is referenced by a
+ *    workspace assignment as visit_task_id (i.e., the contractor is
+ *    going to work on it).
+ *
+ * Customer name resolution: punch_items already carry household_id,
+ * maintenance_tasks have property_id. We fold both into a
+ * household-name lookup pulled from properties + households.
+ */
+async function fetchAggregateTasks(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  // Find every visit_task_id this workspace is assigned to.
+  const { data: assignments, error: aErr } = await service
+    .from("provider_visit_assignments")
+    .select("request_id, visit_task_id, assigned_member_id, route_date")
+    .eq("workspace_id", workspaceId);
+  if (aErr) throw aErr;
+
+  const visitTaskIds = [
+    ...new Set(
+      (assignments ?? [])
+        .map((row: Record<string, unknown>) => compactString(row.visit_task_id))
+        .filter(Boolean),
+    ),
+  ];
+  const requestIds = [
+    ...new Set(
+      (assignments ?? [])
+        .map((row: Record<string, unknown>) => compactString(row.request_id))
+        .filter(Boolean),
+    ),
+  ];
+
+  // Member→tech-name index for the "By tech" filter.
+  const { data: members } = await service
+    .from("provider_workspace_members")
+    .select("id, full_name, email")
+    .eq("workspace_id", workspaceId);
+  const memberIndex = new Map<string, string>();
+  for (const row of (members ?? []) as Record<string, unknown>[]) {
+    const name = compactString(row.full_name) || compactString(row.email) || "Tech";
+    memberIndex.set(compactString(row.id), name);
+  }
+  const visitTechByVisitTaskId = new Map<string, string>();
+  for (const row of (assignments ?? []) as Record<string, unknown>[]) {
+    const vt = compactString(row.visit_task_id);
+    const am = compactString(row.assigned_member_id);
+    if (vt && am) {
+      visitTechByVisitTaskId.set(vt, memberIndex.get(am) || "Tech");
+    }
+  }
+
+  // Fetch maintenance tasks + punch items in parallel.
+  const [tasksResult, punchResult] = await Promise.all([
+    visitTaskIds.length
+      ? service
+          .from("maintenance_tasks")
+          .select(
+            "id, title, priority, scheduled_date, next_due_date, property_id, household_id, assignment_type, is_archived, last_completed_date, parent_routine_id, notes",
+          )
+          .in("id", visitTaskIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+    visitTaskIds.length
+      ? service
+          .from("handyman_punch_items")
+          .select(
+            "id, household_id, property_id, assigned_visit_task_id, title, description, source, status, priority, estimated_minutes, estimated_cost_range, completed_at, archived_at, created_at, updated_at",
+          )
+          .in("assigned_visit_task_id", visitTaskIds)
+          .is("archived_at", null)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+  ]);
+  if (tasksResult.error) throw tasksResult.error;
+  if (punchResult.error) throw punchResult.error;
+
+  const tasks = (tasksResult.data ?? []) as Record<string, unknown>[];
+  const punchItems = (punchResult.data ?? []) as Record<string, unknown>[];
+
+  // Resolve customer names. We need property_id → property.name and
+  // household_id → primary contact name (fall back to property name).
+  const propertyIds = [
+    ...new Set(
+      [
+        ...tasks.map((row) => compactString(row.property_id)),
+        ...punchItems.map((row) => compactString(row.property_id)),
+      ].filter(Boolean),
+    ),
+  ];
+  const householdIds = [
+    ...new Set(
+      [
+        ...tasks.map((row) => compactString(row.household_id)),
+        ...punchItems.map((row) => compactString(row.household_id)),
+      ].filter(Boolean),
+    ),
+  ];
+
+  const [propertiesResult, requestsResult] = await Promise.all([
+    propertyIds.length
+      ? service
+          .from("properties")
+          .select("id, name, household_id, street, city, state")
+          .in("id", propertyIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+    requestIds.length
+      ? service
+          .from("handyman_requests")
+          .select("id, household_id, property_id, title, visit_task_id")
+          .in("id", requestIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+  ]);
+
+  const propertyById = new Map<string, Record<string, unknown>>();
+  for (const row of (propertiesResult.data ?? []) as Record<string, unknown>[]) {
+    propertyById.set(compactString(row.id), row);
+  }
+
+  // Customer label resolution: prefer property.name (e.g. "Burke Residence"),
+  // fall back to street, then "Customer" placeholder.
+  function customerLabel(propertyId: string, householdId: string): string {
+    const p = propertyById.get(propertyId);
+    if (p) {
+      const name = compactString(p.name);
+      if (name) return name;
+      const street = compactString(p.street);
+      if (street) return street;
+    }
+    if (householdId) return "Customer";
+    return "Customer";
+  }
+
+  // Source label friendly for UI.
+  function sourceKindLabel(source: string): string {
+    switch (source) {
+      case "manual": return "Manual punch item";
+      case "promoted_from_task": return "Promoted from task";
+      case "migrated_from_task": return "Migrated from task";
+      case "auto_seed_handyman_tier": return "Routed to contractor";
+      case "recommended": return "Recommended service";
+      case "template": return "Template-seeded";
+      default: return source.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+  }
+
+  // Map punch items.
+  const aggregatePunch = punchItems.map((row) => {
+    const propertyId = compactString(row.property_id);
+    const householdId = compactString(row.household_id);
+    const visitTaskId = compactString(row.assigned_visit_task_id);
+    const status = compactString(row.status) || "pending";
+    return {
+      id: `pi:${compactString(row.id)}`,
+      source: "punch_item" as const,
+      title: compactString(row.title) || "Untitled item",
+      customerName: customerLabel(propertyId, householdId),
+      customerPropertyId: propertyId,
+      estimatedMinutes: numberValue(row.estimated_minutes) || null,
+      dueDate: null as string | null,
+      status: ["pending", "in_progress", "done", "cancelled"].includes(status) ? status : "pending",
+      visitTaskId: visitTaskId || null,
+      sourceKindLabel: sourceKindLabel(compactString(row.source)),
+      assignedTechName: visitTaskId ? visitTechByVisitTaskId.get(visitTaskId) || null : null,
+      rawId: compactString(row.id),
+    };
+  });
+
+  // Map maintenance tasks. Only show tasks whose status is meaningful
+  // and not archived. Treat is_archived === true as filtered out.
+  const aggregateTasks = tasks
+    .filter((row) => row.is_archived !== true)
+    .map((row) => {
+      const propertyId = compactString(row.property_id);
+      const householdId = compactString(row.household_id);
+      const taskId = compactString(row.id);
+      const due = compactString(row.scheduled_date) || compactString(row.next_due_date) || null;
+      const completed = Boolean(compactString(row.last_completed_date));
+      // Project the row to a UI status. maintenance_tasks doesn't carry
+      // pending/in_progress like punch items — derive from completion.
+      const uiStatus = completed ? "done" : "pending";
+      return {
+        id: `mt:${taskId}`,
+        source: "maintenance_task" as const,
+        title: compactString(row.title) || "Untitled task",
+        customerName: customerLabel(propertyId, householdId),
+        customerPropertyId: propertyId,
+        estimatedMinutes: null as number | null,
+        dueDate: due,
+        status: uiStatus,
+        visitTaskId: taskId,
+        sourceKindLabel: "Visit task",
+        assignedTechName: visitTechByVisitTaskId.get(taskId) || null,
+        rawId: taskId,
+      };
+    });
+
+  // Sort: open first (by dueDate asc, nulls last), then completed.
+  function statusOrder(s: string): number {
+    if (s === "done" || s === "cancelled") return 1;
+    return 0;
+  }
+  const all = [...aggregatePunch, ...aggregateTasks];
+  all.sort((a, b) => {
+    const so = statusOrder(a.status) - statusOrder(b.status);
+    if (so !== 0) return so;
+    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return a.title.localeCompare(b.title);
+  });
+
+  // Note: requestsResult is fetched in the parallel Promise.all above
+  // because future iterations may need request titles for grouping.
+  // Not used in v1 output — referenced here so unused-var lint doesn't
+  // fire and to make the intent visible at the boundary.
+  void requestsResult;
+
+  return { tasks: all };
 }
 
 function buildFieldSystemSeed(system: Record<string, unknown>) {
@@ -3853,7 +4549,7 @@ function serializePairingRequest(row: Record<string, unknown>, companyName: stri
     homeName,
     homeownerName,
     address: addressLine([row.address_line, row.city, row.state, row.postal_code]),
-    shareText: `Download Chez and use pairing code ${accessCode} to connect ${homeName} with ${companyName}. If you already have Chez, ask support to add this handyman using the code ${accessCode}.`,
+    shareText: `Download Chez and use pairing code ${accessCode} to connect ${homeName} with ${companyName}. If you already have Chez, ask support to add this contractor using the code ${accessCode}.`,
   };
 }
 
@@ -3982,7 +4678,7 @@ async function saveQuote(
   }
 
   const recipientKind = quoteRecipientKind(householdId);
-  title = title || (recipientKind === "prospect" && prospectName ? `Quote for ${prospectName}` : "Handyman quote");
+  title = title || (recipientKind === "prospect" && prospectName ? `Quote for ${prospectName}` : "Untitled quote");
 
   if (!workspaceId || lineItems.length === 0) {
     throw new Error("Workspace and at least one line item are required");
@@ -4143,11 +4839,45 @@ async function saveQuote(
     if (householdId) {
       await notifyHomeownersForRequest(service, householdId, {
         title: `${propertyName ? "Quote ready for " + propertyName : "Quote ready"}`,
-        body: `${moneyLabel(totals.total)} from your handyman. Tap to review.`,
+        body: `${moneyLabel(totals.total)} from your contractor. Tap to review.`,
         requestId: requestId || compactString(quote.id),
         eventType: "handyman_quote_sent",
         extra: { quote_id: compactString(quote.id) },
       });
+    }
+
+    // Cross-app parity: when a quote is sent WITHOUT a linked request
+    // (ad-hoc quote to a Chez homeowner, e.g. from the Quotes screen
+    // not tied to an existing visit), the mirrorQuoteMessageToRequestThread
+    // call above no-ops (it requires both requestId and householdId).
+    // Without an inbox row the homeowner has no in-app surface for the
+    // quote — only a push notification, which iOS-less homeowners and
+    // anyone who's missed the push will never see. Drop a best-effort
+    // inbox_items row so the quote appears in their universal inbox.
+    if (householdId && !requestId) {
+      try {
+        const summary = title
+          ? `Quote: ${title} · ${moneyLabel(totals.total)}`
+          : `New quote: ${moneyLabel(totals.total)}`;
+        // Wave Y2 — stamp metadata so iOS can deep-link from the
+        // homeowner's inbox row to the underlying provider_quotes row.
+        await service.from("inbox_items").insert({
+          household_id: householdId,
+          type: "handyman_quote_received",
+          title: propertyName ? `Quote ready for ${propertyName}` : "Quote ready",
+          summary,
+          from_email: compactString(user.email),
+          seen: false,
+          metadata: {
+            quote_id: compactString(quote.id),
+            property_id: compactString(propertyId),
+            total: totals.total,
+            quote_kind: compactString(quote.kind),
+          },
+        });
+      } catch (inboxErr) {
+        console.error("[handyman-provider] inbox_items insert failed for ad-hoc quote", inboxErr);
+      }
     }
 
     // Email is additive — try it but never let a failure roll back
@@ -4179,6 +4909,625 @@ async function saveQuote(
   }
 
   return { quote, delivery };
+}
+
+// ─── Wave V.1 — quote bundles (good/better/best) ─────────────────
+//
+// A "bundle" is a parent quote with N child quotes. The parent's row
+// is a wrapper: it holds the shared title, scope, homeowner_message,
+// recipient context, and a sentinel string in scope_notes
+// (BUNDLE_MARKER followed by JSON metadata) so the SPA can identify
+// it. Each child has parent_quote_id pointing at the parent and
+// carries the actual line items + per-tier total. Tier label rides
+// in the child title as " · Good" / " · Better" / " · Best" suffix.
+//
+// On the homeowner side, the iOS app sees ONE message in the chat
+// thread (the parent's "quote_bundle_sent" event) with a list of
+// children attached so it can render a 3-card picker. When the
+// homeowner picks a tier, decide_quote_bundle flips the chosen
+// child to 'approved', the others to 'superseded', and stamps the
+// parent with chosen-tier breadcrumb in scope_notes.
+//
+// This implementation deliberately reuses the existing schema
+// (parent_quote_id from Phase 73b) without a migration. Encoding the
+// bundle metadata in scope_notes keeps the row layout backward-
+// compatible with every existing single-tier read path.
+
+const BUNDLE_MARKER = "[CHEZ_QUOTE_BUNDLE]";
+
+interface BundleTier {
+  label: string;
+  lineItems: Array<Record<string, unknown>>;
+  scopeNotes?: string;
+}
+
+interface BundleMeta {
+  bundle: true;
+  tiers: string[];
+  chosenChildId?: string | null;
+  chosenTierLabel?: string | null;
+}
+
+function buildBundleScopeNotes(meta: BundleMeta, baseScope: string | null): string {
+  // Marker on the FIRST line so the SPA can detect it even if the
+  // contractor types into the scope-notes field. The marker carries
+  // its own JSON payload after a colon. The contractor-authored scope
+  // (if any) trails on its own line below.
+  const json = JSON.stringify(meta);
+  const marker = `${BUNDLE_MARKER}:${json}`;
+  return baseScope ? `${marker}\n${baseScope}` : marker;
+}
+
+function parseBundleScopeNotes(scopeNotes: string | null | undefined): {
+  meta: BundleMeta | null;
+  authorScope: string;
+} {
+  const text = compactString(scopeNotes);
+  if (!text.startsWith(BUNDLE_MARKER + ":")) return { meta: null, authorScope: text };
+  const newlineIdx = text.indexOf("\n");
+  const markerLine = newlineIdx >= 0 ? text.slice(0, newlineIdx) : text;
+  const trailing = newlineIdx >= 0 ? text.slice(newlineIdx + 1) : "";
+  const jsonStr = markerLine.slice(BUNDLE_MARKER.length + 1);
+  try {
+    const meta = JSON.parse(jsonStr) as BundleMeta;
+    if (meta && meta.bundle === true && Array.isArray(meta.tiers)) {
+      return { meta, authorScope: trailing };
+    }
+  } catch {
+    // fall through
+  }
+  return { meta: null, authorScope: text };
+}
+
+async function saveQuoteBundle(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+  sendNow: boolean,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  // Wave V.1 — re-send path for an existing draft bundle. The contractor
+  // saved the bundle as draft earlier, then clicked Send on the detail
+  // panel. Skip the insert flow entirely and just walk parent +
+  // children, flip status to sent, and fire the chat / push.
+  const bundleId = compactString(body.bundleId);
+  if (bundleId) {
+    return await sendExistingBundle(service, user, membership, bundleId);
+  }
+
+  const tiersRaw = Array.isArray(body.tiers) ? (body.tiers as Array<Record<string, unknown>>) : [];
+  const tiers: BundleTier[] = tiersRaw
+    .map((t) => ({
+      label: compactString(t.label) || "Option",
+      lineItems: Array.isArray(t.lineItems)
+        ? (t.lineItems as Array<Record<string, unknown>>).map((item) => ({
+            id: compactString(item.id) || crypto.randomUUID(),
+            name: compactString(item.name),
+            description: compactString(item.description),
+            unit: compactString(item.unit) || "ea",
+            quantity: numberValue(item.quantity || 1),
+            unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+          })).filter((item) => item.name)
+        : [],
+      scopeNotes: compactString(t.scopeNotes) || undefined,
+    }))
+    .filter((t) => t.lineItems.length > 0);
+
+  if (tiers.length < 2) {
+    throw new Error("A quote bundle needs at least two tiers. Use save_quote for a single-tier quote.");
+  }
+  if (tiers.length > 4) {
+    throw new Error("A quote bundle is capped at four tiers (Good / Better / Best is plenty).");
+  }
+
+  // Pre-compute totals per tier for response shaping.
+  const tierTotals = tiers.map((t) => quoteSummary(t.lineItems));
+
+  const requestId = compactString(body.requestId) || null;
+  const propertyId = compactString(body.propertyId) || null;
+  let householdId = compactString(body.householdId) || null;
+  let contractorId = compactString(body.contractorId) || null;
+  let visitTaskId = compactString(body.visitTaskId) || null;
+  let parentTitle = compactString(body.title);
+  const parentHomeownerMessage = compactString(body.homeownerMessage);
+  const parentScopeNotes = compactString(body.scopeNotes);
+  const prospectName = compactString(body.prospectName);
+  const prospectEmail = normalizedEmail(body.prospectEmail);
+  const prospectPhone = compactString(body.prospectPhone);
+  const prospectAddress = compactString(body.prospectAddress);
+
+  if (requestId) {
+    const { data: request } = await service
+      .from("handyman_requests")
+      .select("id, household_id, property_id, contractor_id, visit_task_id, title")
+      .eq("id", requestId)
+      .limit(1)
+      .maybeSingle();
+    if (request) {
+      householdId = compactString(request.household_id) || householdId;
+      contractorId = compactString(request.contractor_id) || contractorId;
+      visitTaskId = compactString(request.visit_task_id) || visitTaskId;
+      parentTitle = parentTitle || `Quote for ${compactString(request.title)}`;
+    }
+  }
+
+  const recipientKind = quoteRecipientKind(householdId);
+  parentTitle =
+    parentTitle ||
+    (recipientKind === "prospect" && prospectName ? `Quote for ${prospectName}` : "Untitled quote");
+
+  if (recipientKind === "linked_home" && !householdId) {
+    throw new Error("Choose a Chez client request before sending this quote to a home");
+  }
+  if (sendNow && recipientKind === "prospect" && !prospectEmail) {
+    throw new Error("A prospect email is required to send a standalone quote");
+  }
+
+  const now = isoNow();
+
+  // Bundle parent: holds the wrapper. line_items stays empty, total is
+  // 0 (UI reads tier totals off the children). scope_notes carries
+  // the BUNDLE_MARKER + tier list so the SPA can identify it.
+  const parentBundleMeta: BundleMeta = {
+    bundle: true,
+    tiers: tiers.map((t) => t.label),
+  };
+  const parentScopeWithMarker = buildBundleScopeNotes(parentBundleMeta, parentScopeNotes || null);
+
+  const parentPayload = {
+    workspace_id: workspaceId,
+    contractor_id: contractorId,
+    household_id: householdId || null,
+    property_id: propertyId,
+    request_id: requestId,
+    visit_task_id: visitTaskId,
+    title: parentTitle,
+    recipient_kind: recipientKind,
+    prospect_name: recipientKind === "prospect" ? prospectName || null : null,
+    prospect_email: recipientKind === "prospect" ? prospectEmail || null : null,
+    prospect_phone: recipientKind === "prospect" ? prospectPhone || null : null,
+    prospect_address: recipientKind === "prospect" ? prospectAddress || null : null,
+    status: "draft",
+    currency: "USD",
+    line_items: [],
+    scope_notes: parentScopeWithMarker,
+    homeowner_message: parentHomeownerMessage || null,
+    subtotal: 0,
+    tax_total: 0,
+    total: 0,
+    created_by_user_id: userId,
+    updated_by_user_id: userId,
+    updated_at: now,
+    public_share_token: crypto.randomUUID(),
+  };
+
+  const { data: parentRow, error: parentErr } = await service
+    .from("provider_quotes")
+    .insert(parentPayload)
+    .select()
+    .single();
+  if (parentErr || !parentRow) throw parentErr ?? new Error("Failed to insert bundle parent");
+
+  // Insert each child with parent_quote_id pointing at the parent.
+  // Tier label rides in the title suffix.
+  const childRows: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < tiers.length; i++) {
+    const tier = tiers[i];
+    const totals = tierTotals[i];
+    const childPayload = {
+      workspace_id: workspaceId,
+      contractor_id: contractorId,
+      household_id: householdId || null,
+      property_id: propertyId,
+      request_id: requestId,
+      visit_task_id: visitTaskId,
+      title: `${parentTitle} · ${tier.label}`,
+      recipient_kind: recipientKind,
+      prospect_name: recipientKind === "prospect" ? prospectName || null : null,
+      prospect_email: recipientKind === "prospect" ? prospectEmail || null : null,
+      prospect_phone: recipientKind === "prospect" ? prospectPhone || null : null,
+      prospect_address: recipientKind === "prospect" ? prospectAddress || null : null,
+      status: "draft",
+      currency: "USD",
+      line_items: tier.lineItems,
+      scope_notes: tier.scopeNotes || null,
+      homeowner_message: parentHomeownerMessage || null,
+      subtotal: totals.subtotal,
+      tax_total: totals.taxTotal,
+      total: totals.total,
+      parent_quote_id: parentRow.id,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      updated_at: now,
+      public_share_token: crypto.randomUUID(),
+    };
+    const { data: childRow, error: childErr } = await service
+      .from("provider_quotes")
+      .insert(childPayload)
+      .select()
+      .single();
+    if (childErr || !childRow) {
+      // Clean up parent + any prior children if a child insert fails so
+      // we don't leave an orphan bundle in a half-built state.
+      await service.from("provider_quotes").delete().eq("id", parentRow.id);
+      for (const prior of childRows) {
+        await service.from("provider_quotes").delete().eq("id", compactString(prior.id));
+      }
+      throw childErr ?? new Error("Failed to insert bundle child");
+    }
+    childRows.push(childRow as Record<string, unknown>);
+  }
+
+  let parent = parentRow as Record<string, unknown>;
+  let delivery: Record<string, unknown> | null = null;
+
+  if (sendNow) {
+    // Flip parent + every child from draft to sent.
+    const sendIds = [parent.id, ...childRows.map((c) => c.id)] as string[];
+    const { error: sendErr } = await service
+      .from("provider_quotes")
+      .update({
+        status: "sent",
+        sent_at: now,
+        last_sent_at: now,
+        sent_via: ["in_app"],
+        viewed_at: null,
+        approved_at: null,
+        declined_at: null,
+        updated_by_user_id: userId,
+        updated_at: now,
+      })
+      .in("id", sendIds);
+    if (sendErr) throw sendErr;
+
+    // Re-read the parent with status flipped.
+    const { data: refetched } = await service
+      .from("provider_quotes")
+      .select("*")
+      .eq("id", parent.id)
+      .limit(1)
+      .maybeSingle();
+    if (refetched) parent = refetched as Record<string, unknown>;
+
+    // One in-app message per bundle (not per tier) on the request
+    // thread. The metadata.kind discriminator is `quote_bundle_sent`
+    // so iOS can render a 3-tier card. The body summarizes the tier
+    // range so even a list-only client renders something useful.
+    const tierSummary = childRows
+      .map((c, i) => `${tiers[i].label}: ${moneyLabel(numberValue(c.total))}`)
+      .join(" · ");
+    const bodyText = `${parentTitle} is ready with ${tiers.length} options. ${tierSummary}.`;
+
+    await addQuoteMessage(service, {
+      workspaceId,
+      quoteId: compactString(parent.id),
+      requestId,
+      householdId: householdId || null,
+      senderRole: "provider",
+      senderName: compactString(membership.full_name) || compactString(user.email),
+      senderEmail: compactString(user.email),
+      deliveryChannel: "in_app",
+      body: bodyText,
+      metadata: {
+        event: "quote_bundle_sent",
+        kind: "quote_bundle_sent",
+        bundle_parent_id: compactString(parent.id),
+        tiers: childRows.map((c, i) => ({
+          quote_id: compactString(c.id),
+          label: tiers[i].label,
+          total: numberValue(c.total),
+          line_item_count: tiers[i].lineItems.length,
+          public_share_url: publicQuoteUrl(compactString(c.public_share_token)),
+        })),
+      },
+    });
+
+    if (requestId) {
+      await service
+        .from("handyman_requests")
+        .update({ status: "quoted", updated_at: now })
+        .eq("id", requestId);
+
+      await mirrorQuoteMessageToRequestThread(service, {
+        requestId,
+        householdId: householdId || null,
+        senderRole: "vendor",
+        body: bodyText,
+        metadata: {
+          kind: "quote_bundle_sent",
+          event: "quote_bundle_sent",
+          bundle_parent_id: compactString(parent.id),
+          tiers: childRows.map((c, i) => ({
+            quote_id: compactString(c.id),
+            label: tiers[i].label,
+            total: numberValue(c.total),
+            line_item_count: tiers[i].lineItems.length,
+          })),
+        },
+      });
+    }
+
+    if (householdId) {
+      await notifyHomeownersForRequest(service, householdId, {
+        title: "Quote ready · pick a tier",
+        body: `${tiers.length} options from your contractor. Tap to compare.`,
+        requestId: requestId || compactString(parent.id),
+        eventType: "handyman_quote_bundle_sent",
+        extra: { bundle_parent_id: compactString(parent.id) },
+      });
+    }
+
+    delivery = { sent: true, channel: "in_app", recipientCount: 1 };
+  }
+
+  return { parent, children: childRows, delivery };
+}
+
+async function sendExistingBundle(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  membership: Record<string, unknown>,
+  bundleId: string,
+) {
+  // Walk parent + every child. Validate parent has a BUNDLE_MARKER so
+  // we don't accidentally send a single-tier quote through this path.
+  const { data: parent } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("id", bundleId)
+    .limit(1)
+    .maybeSingle();
+  if (!parent) throw new Error("Bundle parent not found");
+
+  const { meta } = parseBundleScopeNotes(compactString(parent.scope_notes));
+  if (!meta || !meta.bundle) throw new Error("This quote isn't a bundle.");
+
+  const { data: childrenRaw } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("parent_quote_id", bundleId);
+  const children = ((childrenRaw ?? []) as Array<Record<string, unknown>>).slice();
+  if (children.length === 0) throw new Error("Bundle has no tiers — nothing to send.");
+
+  // Sort children by the tier order recorded on the parent.
+  const order = meta.tiers ?? [];
+  children.sort((a, b) => {
+    const at = compactString(a.title);
+    const bt = compactString(b.title);
+    const ai = order.findIndex((t) => at.endsWith(" · " + t));
+    const bi = order.findIndex((t) => bt.endsWith(" · " + t));
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  const now = isoNow();
+  const userId = compactString(user.id);
+  const sendIds = [bundleId, ...children.map((c) => compactString(c.id))];
+  const { error: sendErr } = await service
+    .from("provider_quotes")
+    .update({
+      status: "sent",
+      sent_at: now,
+      last_sent_at: now,
+      sent_via: ["in_app"],
+      viewed_at: null,
+      approved_at: null,
+      declined_at: null,
+      updated_by_user_id: userId,
+      updated_at: now,
+    })
+    .in("id", sendIds);
+  if (sendErr) throw sendErr;
+
+  const refreshed = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("id", bundleId)
+    .limit(1)
+    .maybeSingle();
+  const updatedParent = (refreshed.data ?? parent) as Record<string, unknown>;
+
+  const tierLabels: string[] = order.length > 0 ? order : children.map((c) => {
+    const t = compactString(c.title);
+    const p = compactString(parent.title);
+    return t.startsWith(p + " · ") ? t.slice(p.length + 3) : t;
+  });
+  const tierSummary = children
+    .map((c, i) => `${tierLabels[i] ?? "Option"}: ${moneyLabel(numberValue(c.total))}`)
+    .join(" · ");
+  const bodyText = `${compactString(parent.title)} is ready with ${children.length} options. ${tierSummary}.`;
+
+  const requestId = compactString(parent.request_id) || null;
+  const householdId = compactString(parent.household_id) || null;
+
+  await addQuoteMessage(service, {
+    workspaceId: compactString(parent.workspace_id),
+    quoteId: bundleId,
+    requestId,
+    householdId,
+    senderRole: "provider",
+    senderName: compactString(membership.full_name) || compactString(user.email),
+    senderEmail: compactString(user.email),
+    deliveryChannel: "in_app",
+    body: bodyText,
+    metadata: {
+      event: "quote_bundle_sent",
+      kind: "quote_bundle_sent",
+      bundle_parent_id: bundleId,
+      tiers: children.map((c, i) => ({
+        quote_id: compactString(c.id),
+        label: tierLabels[i] ?? "Option",
+        total: numberValue(c.total),
+        line_item_count: Array.isArray(c.line_items) ? c.line_items.length : 0,
+        public_share_url: publicQuoteUrl(compactString(c.public_share_token)),
+      })),
+    },
+  });
+
+  if (requestId) {
+    await service
+      .from("handyman_requests")
+      .update({ status: "quoted", updated_at: now })
+      .eq("id", requestId);
+
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body: bodyText,
+      metadata: {
+        kind: "quote_bundle_sent",
+        event: "quote_bundle_sent",
+        bundle_parent_id: bundleId,
+        tiers: children.map((c, i) => ({
+          quote_id: compactString(c.id),
+          label: tierLabels[i] ?? "Option",
+          total: numberValue(c.total),
+          line_item_count: Array.isArray(c.line_items) ? c.line_items.length : 0,
+        })),
+      },
+    });
+  }
+
+  if (householdId) {
+    await notifyHomeownersForRequest(service, householdId, {
+      title: "Quote ready · pick a tier",
+      body: `${children.length} options from your contractor. Tap to compare.`,
+      requestId: requestId || bundleId,
+      eventType: "handyman_quote_bundle_sent",
+      extra: { bundle_parent_id: bundleId },
+    });
+  }
+
+  return { parent: updatedParent, children, delivery: { sent: true, channel: "in_app", recipientCount: 1 } };
+}
+
+async function decideQuoteBundle(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  // Provider-side acceptance of a bundle on behalf of the homeowner.
+  // Useful in the demo when the contractor is walking the homeowner
+  // through tiers in person and just wants to confirm the pick.
+  // Phase 80+ chez-concierge will route the homeowner-side decision
+  // through its own action; this is the contractor-portal lever.
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const parentId = compactString(body.parentId);
+  const chosenChildId = compactString(body.chosenChildId);
+  if (!parentId || !chosenChildId) {
+    throw new Error("parentId and chosenChildId are required");
+  }
+
+  // Load parent + every child for consistency check.
+  const { data: parent } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("id", parentId)
+    .eq("workspace_id", workspaceId)
+    .limit(1)
+    .maybeSingle();
+  if (!parent) throw new Error("Bundle parent not found");
+
+  const { data: childrenRaw } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("parent_quote_id", parentId);
+  const children = (childrenRaw ?? []) as Array<Record<string, unknown>>;
+  const chosenChild = children.find((c) => compactString(c.id) === chosenChildId);
+  if (!chosenChild) throw new Error("Chosen tier is not a child of this bundle");
+
+  const now = isoNow();
+
+  // Flip chosen child to approved, others to superseded.
+  const otherIds = children
+    .filter((c) => compactString(c.id) !== chosenChildId)
+    .map((c) => compactString(c.id));
+
+  await service
+    .from("provider_quotes")
+    .update({
+      status: "approved",
+      approved_at: now,
+      updated_by_user_id: userId,
+      updated_at: now,
+    })
+    .eq("id", chosenChildId);
+
+  if (otherIds.length > 0) {
+    await service
+      .from("provider_quotes")
+      .update({
+        status: "superseded",
+        updated_by_user_id: userId,
+        updated_at: now,
+      })
+      .in("id", otherIds);
+  }
+
+  // Update parent: flip status to approved + record chosen-tier
+  // breadcrumb in scope_notes so the SPA + homeowner thread can
+  // render "Homeowner picked the {tier} tier".
+  const { meta, authorScope } = parseBundleScopeNotes(compactString(parent.scope_notes));
+  const tierLabel = (() => {
+    const childTitle = compactString(chosenChild.title);
+    const parentTitle = compactString(parent.title);
+    if (childTitle.startsWith(parentTitle + " · ")) {
+      return childTitle.slice(parentTitle.length + 3);
+    }
+    return childTitle;
+  })();
+  const updatedMeta: BundleMeta = {
+    bundle: true,
+    tiers: meta?.tiers ?? children.map((c) => {
+      const t = compactString(c.title);
+      const p = compactString(parent.title);
+      return t.startsWith(p + " · ") ? t.slice(p.length + 3) : t;
+    }),
+    chosenChildId,
+    chosenTierLabel: tierLabel,
+  };
+  const updatedScope = buildBundleScopeNotes(updatedMeta, authorScope || null);
+
+  await service
+    .from("provider_quotes")
+    .update({
+      status: "approved",
+      approved_at: now,
+      scope_notes: updatedScope,
+      updated_by_user_id: userId,
+      updated_at: now,
+    })
+    .eq("id", parentId);
+
+  // Audit message on the parent's quote thread.
+  await addQuoteMessage(service, {
+    workspaceId,
+    quoteId: parentId,
+    requestId: compactString(parent.request_id) || null,
+    householdId: compactString(parent.household_id) || null,
+    senderRole: "provider",
+    senderName: compactString(membership.full_name) || compactString(user.email),
+    senderEmail: compactString(user.email),
+    deliveryChannel: "system",
+    body: `Homeowner picked the ${tierLabel} tier (${moneyLabel(numberValue(chosenChild.total))}).`,
+    metadata: {
+      event: "quote_bundle_decided",
+      kind: "quote_bundle_decided",
+      bundle_parent_id: parentId,
+      chosen_child_id: chosenChildId,
+      chosen_tier_label: tierLabel,
+    },
+  });
+
+  return { parentId, chosenChildId, chosenTierLabel: tierLabel };
 }
 
 async function saveQuoteItem(
@@ -4223,6 +5572,429 @@ async function saveQuoteItem(
   const { data, error } = await mutation;
   if (error || !data) throw error ?? new Error("Failed to save quote item");
   return data;
+}
+
+// ─── Wave Q (Section 8) — Provider invoices ───
+//
+// `saveInvoice` upserts a draft invoice. When `body.send === true`,
+// flips status to "sent" and mirrors the invoice into the homeowner's
+// inbox + (optionally) the request thread, mirroring the quote-send
+// pattern.
+
+function generateInvoiceNumber(): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  // 6-char base36 suffix from a random uint32 — collision risk on a
+  // single workspace is negligible at the volumes we're targeting and
+  // the unique index protects us.
+  const rand = Math.floor(Math.random() * 0xffffff)
+    .toString(36)
+    .toUpperCase()
+    .padStart(6, "0");
+  return `INV-${year}${month}-${rand}`;
+}
+
+function invoiceSummary(lineItems: Array<Record<string, unknown>>) {
+  const subtotal = roundMoney(
+    lineItems.reduce((sum, item) => {
+      const quantity = numberValue(item.quantity || 1);
+      const unitPrice = numberValue(item.unit_price || item.unitPrice || 0);
+      return sum + quantity * unitPrice;
+    }, 0),
+  );
+  return {
+    subtotal,
+    taxTotal: 0,
+    total: subtotal,
+  };
+}
+
+function providerInvoiceMessageBody(
+  title: string,
+  total: number,
+  lineItemCount: number,
+  note?: string,
+) {
+  const summary = `${title} for ${moneyLabel(total)} across ${lineItemCount} line item${lineItemCount === 1 ? "" : "s"}.`;
+  const cleanNote = compactString(note);
+  return cleanNote ? `${summary} ${cleanNote}` : summary;
+}
+
+async function saveInvoice(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  // Reuse the canBuildQuotes permission for invoice authoring; same role
+  // gate (owner / admin) applies and we don't want to mint a new perm
+  // flag for v1.
+  assertPermission(membership, "canBuildQuotes");
+
+  const invoiceId = compactString(body.invoiceId);
+  const existing = invoiceId
+    ? await service
+        .from("provider_invoices")
+        .select("*")
+        .eq("id", invoiceId)
+        .eq("workspace_id", workspaceId)
+        .limit(1)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (existing.error) throw existing.error;
+
+  // Optional: prefill from a source quote when caller passes
+  // sourceQuoteId. We snapshot line items + scope notes + total so
+  // future quote edits don't retroactively mutate the invoice.
+  const sourceQuoteId = compactString(body.sourceQuoteId);
+  let sourceQuote: Record<string, unknown> | null = null;
+  if (sourceQuoteId && !existing.data) {
+    const { data: quoteRow, error: quoteError } = await service
+      .from("provider_quotes")
+      .select("*")
+      .eq("id", sourceQuoteId)
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .maybeSingle();
+    if (quoteError) throw quoteError;
+    sourceQuote = quoteRow as Record<string, unknown> | null;
+  }
+
+  const incomingLineItems = Array.isArray(body.lineItems)
+    ? (body.lineItems as Array<Record<string, unknown>>)
+    : null;
+  const fallbackLineItems = Array.isArray(existing.data?.line_items)
+    ? (existing.data!.line_items as Array<Record<string, unknown>>)
+    : Array.isArray(sourceQuote?.line_items)
+    ? (sourceQuote!.line_items as Array<Record<string, unknown>>)
+    : [];
+  const sourceLineItems = incomingLineItems ?? fallbackLineItems;
+  const lineItems = sourceLineItems
+    .map((item) => ({
+      id: compactString(item.id) || crypto.randomUUID(),
+      name: compactString(item.name),
+      description: compactString(item.description),
+      unit: compactString(item.unit) || "ea",
+      quantity: numberValue(item.quantity || 1),
+      unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+    }))
+    .filter((item) => item.name);
+
+  if (!workspaceId || lineItems.length === 0) {
+    throw new Error("Workspace and at least one line item are required");
+  }
+
+  const totals = invoiceSummary(lineItems);
+  const now = isoNow();
+  const sendNow = Boolean(body.send);
+
+  const householdId =
+    compactString(body.householdId) ||
+    compactString(existing.data?.household_id) ||
+    compactString(sourceQuote?.household_id) ||
+    null;
+  const propertyId =
+    compactString(body.propertyId) ||
+    compactString(existing.data?.property_id) ||
+    compactString(sourceQuote?.property_id) ||
+    null;
+  const requestId =
+    compactString(body.requestId) ||
+    compactString(existing.data?.request_id) ||
+    compactString(sourceQuote?.request_id) ||
+    null;
+  const visitTaskId =
+    compactString(body.visitTaskId) ||
+    compactString(existing.data?.visit_task_id) ||
+    compactString(sourceQuote?.visit_task_id) ||
+    null;
+  const contractorId =
+    compactString(body.contractorId) ||
+    compactString(existing.data?.contractor_id) ||
+    compactString(sourceQuote?.contractor_id) ||
+    null;
+  const title =
+    compactString(body.title) ||
+    compactString(existing.data?.title) ||
+    (sourceQuote ? `Invoice for ${compactString(sourceQuote.title)}` : "Invoice");
+  const scopeNotes =
+    compactString(body.scopeNotes) || compactString(existing.data?.scope_notes) || null;
+  const homeownerMessage =
+    compactString(body.homeownerMessage) ||
+    compactString(existing.data?.homeowner_message) ||
+    null;
+  const dueDate = compactString(body.dueDate) || compactString(existing.data?.due_date) || null;
+
+  const invoiceNumber = compactString(existing.data?.invoice_number) || generateInvoiceNumber();
+
+  const payload = {
+    workspace_id: workspaceId,
+    contractor_id: contractorId,
+    household_id: householdId,
+    property_id: propertyId,
+    request_id: requestId,
+    visit_task_id: visitTaskId,
+    source_quote_id:
+      sourceQuoteId || compactString(existing.data?.source_quote_id) || null,
+    invoice_number: invoiceNumber,
+    title,
+    status: existing.data?.status || "draft",
+    currency: "USD",
+    line_items: lineItems,
+    scope_notes: scopeNotes,
+    homeowner_message: homeownerMessage,
+    subtotal: totals.subtotal,
+    tax_total: totals.taxTotal,
+    total: totals.total,
+    amount_paid: numberValue(existing.data?.amount_paid || 0),
+    due_date: dueDate,
+    updated_at: now,
+  };
+
+  const mutation = existing.data
+    ? service
+        .from("provider_invoices")
+        .update(payload)
+        .eq("id", invoiceId)
+        .select()
+        .single()
+    : service
+        .from("provider_invoices")
+        .insert({
+          ...payload,
+          created_by_user_id: userId,
+        })
+        .select()
+        .single();
+
+  const { data: invoiceRow, error } = await mutation;
+  if (error || !invoiceRow) throw error ?? new Error("Failed to save invoice");
+
+  let invoice = invoiceRow as Record<string, unknown>;
+
+  if (sendNow) {
+    invoice = await deliverInvoice(service, {
+      invoice,
+      lineItems,
+      total: totals.total,
+      title,
+      homeownerMessage: homeownerMessage ?? "",
+      requestId,
+      householdId,
+      userId,
+      providerName:
+        compactString(membership.full_name) || compactString(user.email) || "Your contractor",
+      propertyId,
+    });
+  }
+
+  return { invoice };
+}
+
+async function deliverInvoice(
+  service: ServiceClient,
+  args: {
+    invoice: Record<string, unknown>;
+    lineItems: Array<Record<string, unknown>>;
+    total: number;
+    title: string;
+    homeownerMessage: string;
+    requestId: string | null;
+    householdId: string | null;
+    userId: string;
+    providerName: string;
+    propertyId: string | null;
+  },
+) {
+  const now = isoNow();
+  const invoiceId = compactString(args.invoice.id);
+
+  const { data: sentRow, error } = await service
+    .from("provider_invoices")
+    .update({
+      status: "sent",
+      sent_at: now,
+      updated_at: now,
+    })
+    .eq("id", invoiceId)
+    .select()
+    .single();
+  if (error || !sentRow) throw error ?? new Error("Failed to mark invoice sent");
+
+  const bodyText = providerInvoiceMessageBody(
+    args.title,
+    args.total,
+    args.lineItems.length,
+    args.homeownerMessage,
+  );
+
+  // Mirror the send into the request chat thread so the homeowner's
+  // iOS app surfaces an "Invoice received" entry on the request. Same
+  // pattern as quote-send.
+  if (args.requestId && args.householdId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId: args.requestId,
+      householdId: args.householdId,
+      senderRole: "vendor",
+      body: bodyText,
+      metadata: {
+        kind: "invoice_sent",
+        event: "invoice_sent",
+        invoice_id: invoiceId,
+        invoice_number: compactString(sentRow.invoice_number),
+        total: args.total,
+        line_item_count: args.lineItems.length,
+      },
+    });
+  }
+
+  // Universal inbox row so the invoice always lands in the homeowner's
+  // Needs-Action list, even on ad-hoc invoices not tied to a request.
+  if (args.householdId) {
+    let propertyName = "";
+    if (args.propertyId) {
+      const { data: property } = await service
+        .from("properties")
+        .select("name")
+        .eq("id", args.propertyId)
+        .limit(1)
+        .maybeSingle();
+      propertyName = compactString(property?.name);
+    }
+    try {
+      const summary = `${args.title} · ${moneyLabel(args.total)}`;
+      // Wave Y2 — stamp metadata so iOS can deep-link from the
+      // homeowner's inbox row to the underlying invoice.
+      await service.from("inbox_items").insert({
+        household_id: args.householdId,
+        type: "invoice_received",
+        title: propertyName ? `Invoice for ${propertyName}` : "Invoice received",
+        summary,
+        from_email: args.providerName,
+        seen: false,
+        metadata: {
+          invoice_id: invoiceId,
+          property_id: compactString(args.propertyId),
+          request_id: compactString(args.requestId),
+          total: args.total,
+        },
+      });
+    } catch (inboxErr) {
+      console.error("[handyman-provider] inbox_items insert failed for invoice", inboxErr);
+    }
+
+    // Push notification — same pattern as quote send.
+    await notifyHomeownersForRequest(service, args.householdId, {
+      title: "Invoice received",
+      body: `${moneyLabel(args.total)} from your contractor. Tap to review.`,
+      requestId: args.requestId || invoiceId,
+      eventType: "handyman_invoice_sent",
+      extra: { invoice_id: invoiceId },
+    });
+  }
+
+  return sentRow as Record<string, unknown>;
+}
+
+async function voidInvoice(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const invoiceId = compactString(body.invoiceId);
+  if (!workspaceId || !invoiceId) throw new Error("workspaceId and invoiceId are required");
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const now = isoNow();
+  const { data, error } = await service
+    .from("provider_invoices")
+    .update({
+      status: "void",
+      voided_at: now,
+      updated_at: now,
+    })
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId)
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to void invoice");
+
+  const requestId = compactString(data.request_id);
+  const householdId = compactString(data.household_id);
+  if (requestId && householdId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body: `Invoice ${compactString(data.invoice_number)} was voided.`,
+      metadata: {
+        kind: "invoice_voided",
+        event: "invoice_voided",
+        invoice_id: invoiceId,
+      },
+    });
+  }
+  return { invoice: data as Record<string, unknown> };
+}
+
+async function markInvoicePaid(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const invoiceId = compactString(body.invoiceId);
+  if (!workspaceId || !invoiceId) throw new Error("workspaceId and invoiceId are required");
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const now = isoNow();
+  const { data: existing } = await service
+    .from("provider_invoices")
+    .select("total")
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId)
+    .limit(1)
+    .maybeSingle();
+  const totalAmount = numberValue(existing?.total || 0);
+
+  const { data, error } = await service
+    .from("provider_invoices")
+    .update({
+      status: "paid",
+      paid_at: now,
+      amount_paid: totalAmount,
+      updated_at: now,
+    })
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId)
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to mark invoice paid");
+
+  const requestId = compactString(data.request_id);
+  const householdId = compactString(data.household_id);
+  if (requestId && householdId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body: `Invoice ${compactString(data.invoice_number)} marked paid.`,
+      metadata: {
+        kind: "invoice_paid",
+        event: "invoice_paid",
+        invoice_id: invoiceId,
+      },
+    });
+  }
+  return { invoice: data as Record<string, unknown> };
 }
 
 async function sendMessage(
@@ -4341,12 +6113,23 @@ async function sendMessage(
 
   if (!request || !requestId) throw new Error("Request not found");
 
+  // Wave T: caller may pass `metadata` to ride a structured payload on
+  // the message (attachments array, kind: "visit_proposed" slot card,
+  // etc.). We always stamp event=provider_message so the existing
+  // notification path keeps working; caller-supplied keys override
+  // only when they don't collide with reserved event identity.
+  const incomingMetadata =
+    typeof body.metadata === "object" && body.metadata !== null
+      ? (body.metadata as Record<string, unknown>)
+      : {};
+
   const payload: Record<string, unknown> = {
     request_id: requestId,
     household_id: request.household_id,
     sender_role: "vendor",
     body: messageBody,
     metadata: {
+      ...incomingMetadata,
       event: "provider_message",
     },
   };
@@ -4750,6 +6533,236 @@ async function proposeVisitTimeForProvider(
   });
 
   return { request: updated };
+}
+
+/// Wave T: contractor proposes 2-3 candidate slots for the homeowner
+/// to pick from. Inserts a single message into the thread with
+/// `metadata.kind = "visit_proposed"` and a `slots` array; the
+/// homeowner-side iOS reads this metadata to render a slot card with
+/// tap-to-accept buttons. We do NOT call propose_visit_time per slot
+/// because that would create N proposed_visit_at writes on the request
+/// row; the slot card is just chat content. When the homeowner accepts
+/// one, the existing accept_visit_time path takes over.
+async function proposeVisitSlotsForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const rawSlots = Array.isArray(body.slots) ? body.slots : [];
+  const slots = (rawSlots as unknown[])
+    .map((slot) => {
+      if (!slot || typeof slot !== "object") return null;
+      const start = compactString((slot as Record<string, unknown>).start);
+      const end = compactString((slot as Record<string, unknown>).end);
+      const note = compactString((slot as Record<string, unknown>).note);
+      if (!start) return null;
+      return { start, end: end || null, note: note || null };
+    })
+    .filter((slot): slot is { start: string; end: string | null; note: string | null } => slot !== null);
+
+  if (slots.length === 0) {
+    throw new Error("At least one slot is required");
+  }
+  if (slots.length > 5) {
+    throw new Error("Send no more than five candidate slots at a time");
+  }
+
+  // Confirm workspace ownership of this request before writing.
+  const { data: request, error: requestError } = await service
+    .from("handyman_requests")
+    .select("id, contractor_id, household_id, title, status")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    throw requestError ?? new Error("Request not found");
+  }
+
+  const contractorId = compactString(request.contractor_id);
+  if (!contractorId) {
+    throw new Error("Request has no linked contractor");
+  }
+
+  const { data: links, error: linksError } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+
+  if (linksError) throw linksError;
+  const linkedContractorIds = new Set(
+    ((links ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.contractor_id))
+      .filter(Boolean),
+  );
+
+  if (!linkedContractorIds.has(contractorId)) {
+    throw new Error("This workspace is not linked to this homeowner's contractor");
+  }
+
+  const messageBody = compactString(body.body) ||
+    `Pick a time that works. We have ${slots.length} option${slots.length === 1 ? "" : "s"}:\n` +
+      slots
+        .map((slot, idx) => {
+          const t = formatScheduleForPush(slot.start) || slot.start;
+          return `${idx + 1}. ${t}`;
+        })
+        .join("\n");
+
+  const { data: message, error: messageError } = await service
+    .from("handyman_request_messages")
+    .insert({
+      request_id: requestId,
+      household_id: request.household_id,
+      sender_role: "vendor",
+      body: messageBody,
+      metadata: {
+        event: "provider_message",
+        kind: "visit_proposed",
+        slots,
+      },
+    })
+    .select()
+    .single();
+
+  if (messageError || !message) {
+    throw messageError ?? new Error("Failed to insert visit proposal message");
+  }
+
+  // Bump request updated_at so the inbox reorders.
+  await service
+    .from("handyman_requests")
+    .update({ updated_at: isoNow() })
+    .eq("id", requestId);
+
+  return { message, requestId, slots };
+}
+
+/// Wave T: upload one photo attachment for a request thread. Caller
+/// posts base64 data plus a content_type and filename. We upload to
+/// the message-attachments bucket and return a signed URL the caller
+/// can immediately render in the thread bubble. The actual message
+/// row gets created by a follow-up `send_message` call where the
+/// caller passes `metadata.attachments` with the path/URL we returned.
+async function uploadMessageAttachment(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const dataBase64 = compactString(body.dataBase64);
+  if (!dataBase64) throw new Error("dataBase64 is required");
+
+  const contentType = compactString(body.contentType) || "image/jpeg";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("Only image content types are supported");
+  }
+
+  // Confirm workspace ownership of this request before writing.
+  const { data: request, error: requestError } = await service
+    .from("handyman_requests")
+    .select("id, contractor_id, household_id")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    throw requestError ?? new Error("Request not found");
+  }
+
+  const contractorId = compactString(request.contractor_id);
+  if (!contractorId) {
+    throw new Error("Request has no linked contractor");
+  }
+
+  const { data: links, error: linksError } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+
+  if (linksError) throw linksError;
+  const linkedContractorIds = new Set(
+    ((links ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.contractor_id))
+      .filter(Boolean),
+  );
+
+  if (!linkedContractorIds.has(contractorId)) {
+    throw new Error("This workspace is not linked to this homeowner's contractor");
+  }
+
+  // Decode base64. Reject anything bigger than 8 MB (after decode) to
+  // keep storage bills sane; the SPA already resizes to ~1600px JPEG
+  // at 80% quality before sending so this is a hard ceiling.
+  const cleanBase64 = dataBase64.replace(/^data:[^,]+,/, "");
+  const bytes = base64ToUint8Array(cleanBase64);
+  if (bytes.byteLength > 8 * 1024 * 1024) {
+    throw new Error("Image too large. Keep attachments under 8MB.");
+  }
+
+  // Pick an extension based on content type so the URL is friendly.
+  const extension = contentType === "image/png"
+    ? "png"
+    : contentType === "image/webp"
+      ? "webp"
+      : contentType === "image/gif"
+        ? "gif"
+        : "jpg";
+
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const householdId = compactString(request.household_id);
+  const path = `${householdId}/${requestId}/${random}.${extension}`;
+
+  const { error: uploadError } = await service.storage
+    .from("message-attachments")
+    .upload(path, bytes, {
+      contentType,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Upload failed: ${uploadError.message}`);
+  }
+
+  // Mint a signed URL valid 7 days. The reader path will re-mint each
+  // time the thread is fetched (same pattern as document-viewer).
+  const { data: signed, error: signedError } = await service.storage
+    .from("message-attachments")
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+
+  if (signedError || !signed) {
+    throw signedError ?? new Error("Failed to mint signed URL");
+  }
+
+  return {
+    path,
+    contentType,
+    signedUrl: signed.signedUrl,
+    bytes: bytes.byteLength,
+  };
+}
+
+// Decode base64 to a Uint8Array. Deno doesn't ship Buffer; the standard
+// approach is atob + Uint8Array.from. We strip data URL prefixes upstream.
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /// Phase 73 sub-phase A: provider-side wrapper around `accept_visit_time`.
@@ -6389,9 +8402,16 @@ serve(async (req) => {
 
       const user = await getAuthenticatedUser(service, req);
       if (!user) return json({ error: "Unauthorized" }, 401);
+      // Wave S — accept `?workspace=<uuid>` so the SPA can request a
+      // specific workspace from a multi-workspace user. The membership
+      // helper validates the user actually belongs there before honoring
+      // it; an unrecognized id falls through to the default first-active
+      // pick rather than returning an error.
+      const requestedWorkspaceId = compactString(url.searchParams.get("workspace"));
       const dashboard = await loadDashboard(
         service,
         user as unknown as Record<string, unknown>,
+        requestedWorkspaceId,
       );
       return json(dashboard);
     }
@@ -6458,6 +8478,16 @@ serve(async (req) => {
         return json({ assignment });
       }
 
+      if (action === "reschedule_visit") {
+        const result = await rescheduleVisit(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+
+      if (action === "fetch_aggregate_tasks") {
+        const result = await fetchAggregateTasks(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+
       if (action === "create_ad_hoc_visit") {
         const result = await createAdHocVisit(service, user as unknown as Record<string, unknown>, body);
         return json(result);
@@ -6515,6 +8545,60 @@ serve(async (req) => {
         return json(result);
       }
 
+      // Wave V.1 — quote bundles (good/better/best)
+      if (action === "save_quote_bundle") {
+        const result = await saveQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+          false,
+        );
+        return json(result);
+      }
+      if (action === "send_quote_bundle") {
+        const result = await saveQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+          true,
+        );
+        return json(result);
+      }
+      if (action === "decide_quote_bundle") {
+        const result = await decideQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave Q (Section 8) — provider invoices.
+      if (action === "save_invoice") {
+        const result = await saveInvoice(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+      if (action === "send_invoice") {
+        const result = await saveInvoice(
+          service,
+          user as unknown as Record<string, unknown>,
+          { ...body, send: true },
+        );
+        return json(result);
+      }
+      if (action === "void_invoice") {
+        const result = await voidInvoice(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+      if (action === "mark_invoice_paid") {
+        const result = await markInvoicePaid(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
       if (action === "send_message") {
         const result = await sendMessage(service, user as unknown as Record<string, unknown>, body);
         return json(result);
@@ -6531,6 +8615,35 @@ serve(async (req) => {
 
       if (action === "propose_visit_time") {
         const result = await proposeVisitTimeForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave T: contractor proposes 2-3 candidate slots in one shot.
+      // Drops a single message into the thread with metadata.kind =
+      // "visit_proposed" + slots array; the homeowner picks one and
+      // a downstream action accepts it. Chat-card UX, not a calendar
+      // round-trip per slot.
+      if (action === "propose_visit_slots") {
+        const result = await proposeVisitSlotsForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave T: photo upload helper. Caller posts base64 image; we
+      // upload to the message-attachments bucket under a
+      // household/request scoped path, mint a signed URL, and return
+      // it. Caller then sends a regular message with metadata.attachments
+      // referencing the same path + URL. We don't create the message
+      // here so the caller can compose body + attachments together.
+      if (action === "upload_message_attachment") {
+        const result = await uploadMessageAttachment(
           service,
           user as unknown as Record<string, unknown>,
           body,
@@ -7385,6 +9498,143 @@ serve(async (req) => {
         const { error: updErr } = await service
           .from("handyman_punch_items")
           .update(updatePayload)
+          .eq("id", itemId);
+        if (updErr) throw updErr;
+
+        return json({ ok: true });
+      }
+
+      // Wave O: Either party. Edits an existing punch item's title,
+      // description, estimated minutes, priority, or material flag.
+      // Status / completion / archival flow through dedicated actions.
+      // Used by the contractor SPA inline editor and the iOS app row sheet.
+      if (action === "update_punch_item") {
+        const callerUserId = compactString(user.id);
+        const itemId = compactString(body.itemId);
+        if (!itemId) return json({ error: "itemId is required" }, 400);
+
+        const { data: item } = await service
+          .from("handyman_punch_items")
+          .select("id, household_id, assigned_visit_task_id")
+          .eq("id", itemId)
+          .maybeSingle();
+        if (!item) return json({ error: "Punch item not found" }, 404);
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const isHomeowner = compactString(callerRow?.household_id) === compactString(item.household_id);
+
+        let isHandyman = false;
+        if (!isHomeowner && item.assigned_visit_task_id) {
+          const { data: linkedReq } = await service
+            .from("handyman_requests")
+            .select("contractor_id")
+            .eq("visit_task_id", compactString(item.assigned_visit_task_id))
+            .limit(1)
+            .maybeSingle();
+          if (linkedReq?.contractor_id) {
+            const { data: workspaceLink } = await service
+              .from("provider_contractor_links")
+              .select("workspace_id")
+              .eq("contractor_id", compactString(linkedReq.contractor_id))
+              .limit(1)
+              .maybeSingle();
+            if (workspaceLink?.workspace_id) {
+              try {
+                await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+                isHandyman = true;
+              } catch (_) { /* not a member */ }
+            }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (typeof body.title === "string") {
+          const t = compactString(body.title);
+          if (!t) return json({ error: "title cannot be empty" }, 400);
+          updatePayload.title = t;
+        }
+        if (typeof body.description === "string" || body.description === null) {
+          updatePayload.description = compactString(body.description) || null;
+        }
+        if (body.estimatedMinutes != null) {
+          const n = numberValue(body.estimatedMinutes);
+          if (!Number.isFinite(n) || n < 0) return json({ error: "estimatedMinutes must be >= 0" }, 400);
+          updatePayload.estimated_minutes = n;
+        } else if (body.estimatedMinutes === null) {
+          updatePayload.estimated_minutes = null;
+        }
+        if (typeof body.priority === "string") {
+          const p = compactString(body.priority);
+          if (!["low", "medium", "high", "urgent"].includes(p)) {
+            return json({ error: "Invalid priority" }, 400);
+          }
+          updatePayload.priority = p;
+        }
+        if (body.materialRequired != null) {
+          updatePayload.material_required = Boolean(body.materialRequired);
+        }
+
+        const { error: updErr } = await service
+          .from("handyman_punch_items")
+          .update(updatePayload)
+          .eq("id", itemId);
+        if (updErr) throw updErr;
+
+        return json({ ok: true });
+      }
+
+      // Wave O: Either party. Soft-deletes a punch item by stamping
+      // archived_at. The dashboard query already filters on
+      // archived_at IS NULL so the row drops out of every UI surface
+      // immediately. Recovery is a manual DB operation by design —
+      // homeowners and contractors get a confirm dialog before this fires.
+      if (action === "archive_punch_item") {
+        const callerUserId = compactString(user.id);
+        const itemId = compactString(body.itemId);
+        if (!itemId) return json({ error: "itemId is required" }, 400);
+
+        const { data: item } = await service
+          .from("handyman_punch_items")
+          .select("id, household_id, assigned_visit_task_id")
+          .eq("id", itemId)
+          .maybeSingle();
+        if (!item) return json({ error: "Punch item not found" }, 404);
+
+        const { data: callerRow } = await service
+          .from("users").select("household_id").eq("id", callerUserId).maybeSingle();
+        const isHomeowner = compactString(callerRow?.household_id) === compactString(item.household_id);
+
+        let isHandyman = false;
+        if (!isHomeowner && item.assigned_visit_task_id) {
+          const { data: linkedReq } = await service
+            .from("handyman_requests")
+            .select("contractor_id")
+            .eq("visit_task_id", compactString(item.assigned_visit_task_id))
+            .limit(1)
+            .maybeSingle();
+          if (linkedReq?.contractor_id) {
+            const { data: workspaceLink } = await service
+              .from("provider_contractor_links")
+              .select("workspace_id")
+              .eq("contractor_id", compactString(linkedReq.contractor_id))
+              .limit(1)
+              .maybeSingle();
+            if (workspaceLink?.workspace_id) {
+              try {
+                await assertWorkspaceAccess(service, callerUserId, compactString(workspaceLink.workspace_id));
+                isHandyman = true;
+              } catch (_) { /* not a member */ }
+            }
+          }
+        }
+        if (!isHomeowner && !isHandyman) return json({ error: "Not authorized" }, 403);
+
+        const now = new Date().toISOString();
+        const { error: updErr } = await service
+          .from("handyman_punch_items")
+          .update({ archived_at: now, updated_at: now })
           .eq("id", itemId);
         if (updErr) throw updErr;
 

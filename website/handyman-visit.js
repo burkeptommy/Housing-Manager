@@ -77,11 +77,11 @@ const draftKey = `chez-handyman-portal:${token || "demo"}`;
 
 const demoSession = {
   id: "demo-session",
-  title: "Spring Handyman Visit",
+  title: "Spring Service Visit",
   portal_token: "demo",
   seed_payload: {
     visitId: null,
-    visitTitle: "Spring Handyman Visit",
+    visitTitle: "Spring Service Visit",
     scheduledDate: null,
     dueDate: "2026-05-14",
     firstVisit: true,
@@ -110,7 +110,7 @@ const demoSession = {
         },
       ],
     },
-    contractorName: "Preferred Handyman",
+    contractorName: "Preferred Contractor",
     contractorPhone: "(203) 555-0123",
     contractorEmail: "crew@example.com",
     homeownerNotes: "Please check the side gate latch and note any attic issues before summer.",
@@ -155,9 +155,9 @@ const demoSession = {
     ],
     coordination: {
       status: "sent_to_handyman",
-      status_label: "Sent to handyman",
+      status_label: "Sent to contractor",
       intro: "Confirm the requested date or suggest another option before starting the visit.",
-      last_message: "Chez prepared the visit link for the handyman.",
+      last_message: "Chez prepared the visit link for the contractor.",
       scheduled_date: "2026-05-14",
       needs_homeowner_reply: false,
     },

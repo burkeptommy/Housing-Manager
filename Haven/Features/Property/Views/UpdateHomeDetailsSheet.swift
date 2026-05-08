@@ -151,7 +151,7 @@ struct UpdateHomeDetailsSheet: View {
                         .foregroundStyle(HavenColors.textSecondary)
 
                     toggleRow(title: "Radon mitigation fan",
-                              subtitle: "Adds a fall verification check during your handyman visit.",
+                              subtitle: "Adds a fall verification check during your contractor visit.",
                               isOn: $hasRadonMitigation)
                     Divider()
                     toggleRow(title: "Whole-home humidifier on HVAC",
@@ -172,11 +172,11 @@ struct UpdateHomeDetailsSheet: View {
                               isOn: $hasEVCharger)
                     Divider()
                     toggleRow(title: "Smart water leak detector",
-                              subtitle: "Moen Flo, Phyn, or similar. Tested during your spring handyman visit.",
+                              subtitle: "Moen Flo, Phyn, or similar. Tested during your spring contractor visit.",
                               isOn: $hasLeakDetector)
                     Divider()
                     toggleRow(title: "Central vacuum system",
-                              subtitle: "Serviced during your fall handyman visit.",
+                              subtitle: "Serviced during your fall contractor visit.",
                               isOn: $hasCentralVacuum)
                     Divider()
                     toggleRow(title: "Built-in outdoor grill",
@@ -188,7 +188,7 @@ struct UpdateHomeDetailsSheet: View {
                               isOn: $hasOutdoorLighting)
                     Divider()
                     toggleRow(title: "Whole-house water filter",
-                              subtitle: "Filter swap folded into your handyman visits.",
+                              subtitle: "Filter swap folded into your contractor visits.",
                               isOn: $hasWholeHouseFilter)
                     Divider()
                     toggleRow(title: "Pool safety fence",
@@ -516,11 +516,11 @@ struct SubtypeReviewDiffSheet: View {
     private static let previewByKey: [String: String] = [
         "has_humidifier": "Adds the annual humidifier service task.",
         "has_ev_charger": "Adds the annual EV charger inspection task.",
-        "has_leak_detector": "Adds the leak-detector test to your spring handyman visit.",
-        "has_central_vacuum": "Adds the central vacuum service to your fall handyman visit.",
+        "has_leak_detector": "Adds the leak-detector test to your spring contractor visit.",
+        "has_central_vacuum": "Adds the central vacuum service to your fall contractor visit.",
         "has_built_in_grill": "Adds the annual grill service task.",
         "has_outdoor_lighting": "Adds the annual outdoor lighting service task.",
-        "has_whole_house_filter": "Adds the filter swap to your handyman visits.",
+        "has_whole_house_filter": "Adds the filter swap to your contractor visits.",
         "has_radon_mitigation": "Adds the fall fan verification + annual radon test.",
         "has_pool_safety_fence": "Adds the annual safety fence inspection.",
         "has_scheduled_valuables": "Surfaces the appraisal recommendation in the Life tab.",

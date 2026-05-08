@@ -1,5 +1,5 @@
 /* ============================================================
- * Chez Handyman Operations Desk — app-specific styles.
+ * Chez Contractor Operations Desk — app-specific styles.
  * Sits on top of the canonical chez.css token system.
  * ============================================================ */
 
@@ -127,6 +127,90 @@ button { font-family: inherit; }
   color: rgba(255,255,255,0.55);
 }
 
+/* Wave S — workspace switcher dropdown.
+   Anchored to the workspace pill, opens downward. Pearl background to
+   read against the dark indigo sidebar shell, narrow shadow to feel
+   anchored. Only renders when availableWorkspaces.length > 1. */
+.ops-sidebar__workspace-wrap {
+  position: relative;
+}
+.ops-sidebar__workspace-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #FFFFFF;
+  border: 1px solid rgba(42,34,82,0.10);
+  border-radius: 12px;
+  padding: 6px;
+  z-index: 50;
+  box-shadow: 0 12px 32px rgba(42,34,82,0.18), 0 4px 8px rgba(42,34,82,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: opsWorkspacePopoverIn 160ms cubic-bezier(0.32,0.72,0.16,1);
+}
+@keyframes opsWorkspacePopoverIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ops-sidebar__workspace-popover__header {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6F6A88;
+  padding: 8px 10px 4px;
+}
+.ops-sidebar__workspace-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+  color: #2A2252;
+  transition: background 120ms cubic-bezier(0.32,0.72,0.16,1);
+}
+.ops-sidebar__workspace-option:hover {
+  background: #F2EFF8;
+}
+.ops-sidebar__workspace-option.is-current {
+  background: #FFF5F2;
+}
+.ops-sidebar__workspace-option-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.ops-sidebar__workspace-option-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2A2252;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-sidebar__workspace-option-role {
+  font-size: 11px;
+  color: #6F6A88;
+  text-transform: capitalize;
+}
+.ops-sidebar__workspace-option-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ED6955;
+}
+
 .ops-sidebar__nav {
   display: flex;
   flex-direction: column;
@@ -201,9 +285,10 @@ button { font-family: inherit; }
   border: 1px solid rgba(255,255,255,0.14);
   color: rgba(255,255,255,0.7);
   border-radius: 9px;
-  padding: 6px 8px;
+  padding: 8px 12px;
   cursor: pointer;
   font-size: 11px;
+  min-height: 32px;
 }
 .ops-sidebar__footer-button:hover {
   background: rgba(255,255,255,0.08);
@@ -243,6 +328,7 @@ button { font-family: inherit; }
   color: var(--text);
   letter-spacing: -0.018em;
   line-height: 1.1;
+  margin: 0;
 }
 .ops-topbar__breadcrumb {
   font-size: 12px;
@@ -706,4 +792,64 @@ button { font-family: inherit; }
   .ops-hero {
     grid-template-columns: 1fr;
   }
+}
+
+/* H4 — Honor user preference for reduced motion: disable transitions
+   and animations across the Operations Desk for users who request it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Wave V.2 — invoice print/PDF view ────────────────────────────
+ *
+ * The /invoices/:id/print route uses these rules to strip the SPA
+ * chrome (sidebar, topbar, content padding) when printing AND when
+ * just viewing the printable page. The browser's print dialog
+ * automatically saves a clean PDF when the user picks "Save as PDF".
+ */
+.invoice-print-shell {
+  background: var(--pearl);
+  min-height: 100vh;
+}
+.invoice-print-page {
+  /* On screen: card with shadow. When printing: takes the page. */
+}
+@media print {
+  /* Hide every non-essential SPA element so only the printable page
+   * lands on the PDF. The print route still renders inside Shell on
+   * screen (so the sidebar / back nav / topbar work normally), but
+   * we strip them out at print time. */
+  .invoice-print-toolbar,
+  .ops-sidebar,
+  .ops-topbar {
+    display: none !important;
+  }
+  .ops-shell {
+    grid-template-columns: 1fr !important;
+  }
+  .ops-content {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .invoice-print-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    max-width: 100% !important;
+  }
+  body, .invoice-print-shell {
+    background: #fff !important;
+  }
+  /* Make link text print as plain (no underline distraction). */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+  /* Ensure tabular numbers print sharp. */
+  table { page-break-inside: avoid; }
 }

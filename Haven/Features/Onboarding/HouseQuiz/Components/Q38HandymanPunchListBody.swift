@@ -53,7 +53,7 @@ struct Q38HandymanPunchListBody: View {
 
             sectionHeader(
                 title: "ADD YOUR OWN",
-                subtitle: "Anything specific your handyman should knock out next visit."
+                subtitle: "Anything specific your contractor should knock out next visit."
             )
             // Phase 67 hydration: previously saved customs appear above the
             // input as fixed "Saved" rows so the user doesn't re-add them

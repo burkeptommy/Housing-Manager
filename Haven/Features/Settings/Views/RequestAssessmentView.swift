@@ -21,7 +21,7 @@ struct RequestAssessmentView: View {
     var body: some View {
         Form {
             Section {
-                Text("A Chez handyman comes to your home for free, walks every system, captures vendors and routines, and flags any work needed. We'll merge what they find with what you already have. Nothing existing is removed.")
+                Text("A Chez Contractor comes to your home for free, walks every system, captures vendors and routines, and flags any work needed. We'll merge what they find with what you already have. Nothing existing is removed.")
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textSecondary)
             }

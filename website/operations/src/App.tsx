@@ -8,24 +8,35 @@ import VisitsScreen from "./screens/Visits";
 import VisitDetailScreen from "./screens/VisitDetail";
 import CalendarScreen from "./screens/Calendar";
 import RoutesScreen from "./screens/Routes";
+import TasksScreen from "./screens/Tasks";
 import CrewScreen from "./screens/Crew";
 import HomesScreen from "./screens/Homes";
 import HomeDetailScreen from "./screens/HomeDetail";
 import QuotesScreen from "./screens/Quotes";
+import InvoicesScreen from "./screens/Invoices";
+import InvoiceDetailScreen from "./screens/InvoiceDetail";
+import InvoicePrintScreen from "./screens/InvoicePrint";
 import MessagesScreen from "./screens/Messages";
+import SettingsScreen from "./screens/Settings";
 import { CommandPalette } from "./components/CommandPalette";
 import { NewQuoteModal, NewQuoteProvider, useNewQuoteModal } from "./components/NewQuoteModal";
+import { NewInvoiceModal, NewInvoiceProvider } from "./components/NewInvoiceModal";
 import { AddClientModal } from "./components/AddClientModal";
+import { InviteTeammateSheet } from "./components/InviteTeammateSheet";
 
 export default function App() {
   return (
     <WorkspaceProvider>
       <NewQuoteProvider>
-        <MobileInterstitial />
-        <Shell />
-        <NewQuoteModal />
-        <AddClientModal />
-        <CommandPalette />
+        <NewInvoiceProvider>
+          <MobileInterstitial />
+          <Shell />
+          <NewQuoteModal />
+          <NewInvoiceModal />
+          <AddClientModal />
+          <InviteTeammateSheet />
+          <CommandPalette />
+        </NewInvoiceProvider>
       </NewQuoteProvider>
     </WorkspaceProvider>
   );
@@ -38,9 +49,13 @@ function Shell() {
   // Auth gate. If we're not loading and there's no session, kick the user
   // to the marketing/auth page. Preserve the deep link in `?next=` so a
   // post-login redirect can land them where they wanted to go.
+  // The router base is `/operations`, so `location.pathname` here is the
+  // path *inside* the SPA (e.g. `/homes/{id}`). handyman.js validates that
+  // `next` starts with `/operations`, so we must prepend that prefix.
   useEffect(() => {
     if (!isLoading && !session) {
-      const next = encodeURIComponent(location.pathname + location.search);
+      const fullPath = `/operations${location.pathname}${location.search}`;
+      const next = encodeURIComponent(fullPath);
       window.location.assign(`/handyman.html?next=${next}`);
     }
   }, [isLoading, session, location]);
@@ -67,11 +82,16 @@ function Shell() {
             <Route path="/dispatch" element={<Navigate to="/visits" replace />} />
             <Route path="/calendar" element={<CalendarScreen />} />
             <Route path="/routes" element={<RoutesScreen />} />
+            <Route path="/tasks" element={<TasksScreen />} />
             <Route path="/crew" element={<CrewScreen />} />
             <Route path="/homes" element={<HomesScreen />} />
             <Route path="/homes/:propertyId" element={<HomeDetailScreen />} />
             <Route path="/quotes" element={<QuotesScreen />} />
+            <Route path="/invoices" element={<InvoicesScreen />} />
+            <Route path="/invoices/:invoiceId" element={<InvoiceDetailScreen />} />
+            <Route path="/invoices/:invoiceId/print" element={<InvoicePrintScreen />} />
             <Route path="/messages" element={<MessagesScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

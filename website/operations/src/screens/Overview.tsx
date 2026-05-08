@@ -21,13 +21,21 @@ export default function OverviewScreen() {
   }, [dashboard]);
 
   // The decision queue: requests that need attention from the workspace
-  // owner — needs assignment, awaiting response, urgent, or quoted but
-  // not approved.
+  // owner. Order: emergency first (urgency='urgent'), then Chez-routed
+  // requests (need an explicit ack), then routine. Limit 4 to keep the
+  // panel scannable. Section 19a fix.
   const decisions = useMemo(() => {
     if (!dashboard) return [];
-    return dashboard.visits.filter((v) =>
-      ["submitted", "sent_to_handyman", "alternate_dates_proposed", "awaiting_homeowner", "quoted"].includes(v.status)
-    ).slice(0, 4);
+    return dashboard.visits
+      .filter((v) =>
+        ["submitted", "sent_to_handyman", "alternate_dates_proposed", "awaiting_homeowner", "quoted"].includes(v.status)
+      )
+      .sort((a, b) => {
+        const aPriority = a.urgency === "urgent" ? 0 : a.source === "haven" ? 1 : 2;
+        const bPriority = b.urgency === "urgent" ? 0 : b.source === "haven" ? 1 : 2;
+        return aPriority - bPriority;
+      })
+      .slice(0, 4);
   }, [dashboard]);
 
   if (isLoading) return <LoadingShell />;
@@ -37,8 +45,12 @@ export default function OverviewScreen() {
   const personHero = mode === "sole";
   const todayDoneCount = dashboard.visits.filter((v) => isToday(v.routeDate) && v.status === "completed").length;
   const todayInProgress = dashboard.visits.filter((v) => isToday(v.routeDate) && ["on_my_way", "in_progress", "checked_in"].includes(v.status)).length;
-  const todayCount = todaysVisits.length;
-  const todayRemaining = Math.max(todayCount - todayDoneCount - todayInProgress, 0);
+  // todaysVisits already filters out completed/cancelled/declined and so
+  // includes both in-progress and to-go visits. The hero count is the
+  // total (all today's visits including done), and remaining = the slice
+  // not yet started.
+  const todayCount = todaysVisits.length + todayDoneCount;
+  const todayRemaining = Math.max(todaysVisits.length - todayInProgress, 0);
 
   return (
     <>
@@ -46,7 +58,7 @@ export default function OverviewScreen() {
         eyebrow={`OPERATIONS · ${formattedDate()}`}
         personHero={personHero}
         firstName={greetName}
-        todayCount={todayCount + todayDoneCount + todayInProgress}
+        todayCount={todayCount}
         todayDone={todayDoneCount}
         todayInProgress={todayInProgress}
         todayRemaining={todayRemaining}
@@ -225,9 +237,9 @@ function Hero(props: {
     <div className="ops-hero">
       <div>
         <div className="ops-hero__eyebrow">{props.eyebrow}</div>
-        <h1 className="ops-hero__headline">
+        <h2 className="ops-hero__headline">
           {headline.lead}<em>{headline.emphasis}</em>
-        </h1>
+        </h2>
         <div className="ops-hero__cta-row">
           <button className="ops-button ops-button--salmon">Open my day →</button>
           <button className="ops-button ops-button--ghost">New quote</button>
@@ -305,7 +317,7 @@ function FieldBoardRow({ visit }: { visit: VisitRow }) {
           <Pill tone={requestStatusTone(visit.status)}>{visit.statusLabel}</Pill>
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-          {visit.property?.name || visit.property?.address || "—"}
+          {visit.property?.name || visit.property?.address || "No address on file"}
         </div>
       </div>
       {visit.assignment && (
@@ -325,13 +337,27 @@ function FieldBoardRow({ visit }: { visit: VisitRow }) {
 
 function DecisionRow({ visit }: { visit: VisitRow }) {
   const sub = visit.preferredTiming || visit.property?.address || formatRelativeTime(visit.updatedAt);
+  // Section 19a — Chez-routed (source='haven') and emergency-urgency
+  // requests get a small marker so the dispatcher knows the reply path
+  // and how fast to act before they click in.
+  const routedByChez = visit.source === "haven";
+  const isEmergency = visit.urgency === "urgent";
+  // Salmon discipline: only emergency or Chez-routed rows get the salmon tile.
+  // Default rows use neutral indigo so the salmon signal stays meaningful.
+  const useSalmonTile = isEmergency || routedByChez;
+  const tileBg = useSalmonTile ? "var(--salmon-pale)" : "var(--neutral-200)";
+  const tileFg = useSalmonTile ? "var(--salmon-dark)" : "var(--text-soft)";
   return (
     <Link to={`/visits/${visit.requestId}`} className="ops-row" style={{ borderBottom: "1px solid var(--neutral-200)", padding: "12px 0", textDecoration: "none", color: "inherit" }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: tileBg, color: tileFg, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
         <Icon name={iconForRequest(visit.requestType)} size={18} stroke={1.9} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>{visit.title}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 600 }}>{visit.title}</div>
+          {isEmergency && <Pill tone="critical">Emergency</Pill>}
+          {routedByChez && <Pill tone="indigo">Routed by Chez</Pill>}
+        </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
           {visit.property?.name ? `${visit.property.name} · ` : ""}{sub}
         </div>
@@ -410,12 +436,19 @@ function pipelineTotal(quotes: { status: string; total: number }[]): number {
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      // Truly counter-offered: needs your response to unblock.
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      // Routine inbound. Indigo says "in flight, no action yet."
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      // Gentle attention: ball is in their court.
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";

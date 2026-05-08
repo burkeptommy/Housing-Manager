@@ -72,7 +72,7 @@ struct AssessmentReviewView: View {
             Text("Your home is set up")
                 .font(HavenTypography.title)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Here's what your Chez handyman captured during the visit. Take a quick look. Anything wrong, just flag it and we'll come back.")
+            Text("Here's what your Chez Contractor captured during the visit. Take a quick look. Anything wrong, just flag it and we'll come back.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -266,7 +266,7 @@ struct AssessmentCorrectionsSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("What needs fixing?")
                     .font(HavenTypography.title2)
-                Text("Tell us what your handyman missed or got wrong. We'll come back to fix it.")
+                Text("Tell us what your contractor missed or got wrong. We'll come back to fix it.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
 

@@ -37,7 +37,7 @@ struct UnifiedRoutingMenu: View {
                     routingButton(
                         icon: "wrench.adjustable.fill",
                         title: handymanLabel,
-                        subtitle: "Adds to next handyman visit",
+                        subtitle: "Adds to next contractor visit",
                         action: {
                             trackChoice("handyman")
                             onRouteToHandyman()

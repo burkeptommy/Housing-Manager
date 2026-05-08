@@ -53,7 +53,12 @@ export default function CrewScreen() {
               {isSole ? "Just you for now" : `${members.length} teammate${members.length === 1 ? "" : "s"} · ${dashboard.workspace.invitedMemberCount} pending`}
             </div>
           </div>
-          <button className="ops-button ops-button--salmon">+ Invite teammate</button>
+          <button
+            className="ops-button ops-button--salmon"
+            onClick={() => window.dispatchEvent(new CustomEvent("ops:open-invite-teammate"))}
+          >
+            + Invite teammate
+          </button>
         </div>
 
         {isSole && members.length === 1 ? (
@@ -75,7 +80,7 @@ export default function CrewScreen() {
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
                 Bring on a teammate?
               </div>
-              When you add a second person, the workspace flips into crew mode — Dispatch lanes split by tech, the Calendar gets per-tech filters, and Routes shows side-by-side boards.
+              When you add a second person, the workspace flips into crew mode. Dispatch lanes split by tech, the Calendar gets per-tech filters, and Routes shows side-by-side boards.
             </div>
           </>
         ) : (
@@ -127,10 +132,10 @@ export default function CrewScreen() {
                 </Pill>
               </div>
               <div style={{ padding: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Detail icon="mail"      label="Email"  value={selected.email || "—"} />
-                <Detail icon="phone"     label="Phone"  value={selected.phone || "—"} />
+                <Detail icon="mail"      label="Email"  value={selected.email || "Not set"} />
+                <Detail icon="phone"     label="Phone"  value={selected.phone || "Not set"} />
                 <Detail icon="briefcase" label="Role"   value={selected.role} />
-                <Detail icon="shield"    label="Last seen" value={selected.lastSeenAt ? formatRelativeTime(selected.lastSeenAt) : "—"} />
+                <Detail icon="shield"    label="Last seen" value={selected.lastSeenAt ? formatRelativeTime(selected.lastSeenAt) : "Never"} />
               </div>
             </Card>
 

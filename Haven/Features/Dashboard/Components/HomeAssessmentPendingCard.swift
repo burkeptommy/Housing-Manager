@@ -89,7 +89,7 @@ struct HomeAssessmentPendingCard: View {
             HStack(spacing: 10) {
                 handymanAvatar
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Your handyman")
+                    Text("Your contractor")
                         .font(HavenTypography.uiLabelSmall)
                         .foregroundStyle(HavenColors.textTertiary)
                     Text(firstName)

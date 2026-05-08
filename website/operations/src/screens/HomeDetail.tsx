@@ -82,6 +82,14 @@ export default function HomeDetailScreen() {
         <Link to="/homes" style={{ color: "var(--text-soft)", textDecoration: "none" }}>← Homes</Link>
       </div>
 
+      {/* Section 19d.21: Chez profile spending-tier banner.
+          Renders only when the homeowner has set up standing
+          instructions. The contractor needs this BEFORE they quote
+          so they know whether to ping Chez first. */}
+      {home.chezProfile?.spendingTiers && (
+        <ChezSpendingTierBanner tiers={home.chezProfile.spendingTiers} />
+      )}
+
       {/* Header */}
       <Card padding="default" style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
@@ -90,7 +98,7 @@ export default function HomeDetailScreen() {
             <div style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.018em" }}>
               {home.name}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{home.address || "—"}</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{home.address || "No address on file"}</div>
           </div>
           <button className="ops-button ops-button--salmon" onClick={() => setShowSuggest(true)}>
             <Icon name="sparkles" size={14} stroke={1.9} />
@@ -104,7 +112,7 @@ export default function HomeDetailScreen() {
           <Stat label="Systems" value={String(home.systemCount)} />
           <Stat label="Open requests" value={String(home.openRequests)} accent={home.openRequests > 0} />
           <Stat label="Lifetime" value={formatCurrency(lifetime)} />
-          <Stat label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "—"} />
+          <Stat label="Last visit" value={home.lastCompletedVisit ? formatRelativeTime(home.lastCompletedVisit) : "Never"} />
         </div>
       </Card>
 
@@ -118,7 +126,7 @@ export default function HomeDetailScreen() {
             </div>
             {!home.systems || home.systems.length === 0 ? (
               <div style={{ padding: 16, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                No systems registered yet for this home. On your first visit, build the home profile in Chez Field — manufacturer + model + serial syncs back to the homeowner's app automatically.
+                No systems registered yet for this home. On your first visit, build the home profile in Chez Field. Manufacturer, model, and serial sync back to the homeowner's app automatically.
               </div>
             ) : (
               <CategorizedSystems systems={home.systems} onEditSystem={setEditingSystem} />
@@ -158,7 +166,7 @@ export default function HomeDetailScreen() {
                     setShowSuggest(true);
                   }}
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--salmon-pale)", color: "var(--salmon-dark)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--neutral-200)", color: "var(--text-soft)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                     <Icon name={s.icon} size={16} stroke={1.9} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -702,7 +710,7 @@ function generateAISuggestions(home: { name: string; systems?: HomeSystem[] } | 
   if (monthsSinceLast === null || monthsSinceLast > 12) {
     out.push({
       title: "Annual home walk-through",
-      reason: lastVisitDate ? `Last visit was ${monthsSinceLast} months ago.` : "No completed visits on file yet — a walk-through builds the profile and finds easy wins.",
+      reason: lastVisitDate ? `Last visit was ${monthsSinceLast} months ago.` : "No completed visits on file yet. A walk-through builds the profile and finds easy wins.",
       icon: "home",
       priority: "Soon",
       requestType: "standard_visit",
@@ -721,12 +729,16 @@ function generateAISuggestions(home: { name: string; systems?: HomeSystem[] } | 
 }
 
 function requestStatusTone(status: RequestStatus): PillTone {
+  // Salmon discipline (CLAUDE.md): salmon is reserved for SLA-critical /
+  // counter-offered states only — never for routine status decoration.
   switch (status) {
+    case "alternate_dates_proposed":
+      return "salmon";
     case "submitted":
     case "sent_to_handyman":
-    case "alternate_dates_proposed":
+      return "indigo";
     case "awaiting_homeowner":
-      return "salmon";
+      return "warning";
     case "scheduled":
     case "confirmed":
       return "indigo";
@@ -918,7 +930,7 @@ function SystemEditSheet({
           </Field>
           <Field label="Notes">
             <textarea
-              placeholder="Anything you noticed — corrosion, last service date, recommended replacements…"
+              placeholder="Anything you noticed: corrosion, last service date, recommended replacements…"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               style={{ ...inputStyle2, minHeight: 100, resize: "vertical" }}
@@ -1084,3 +1096,75 @@ const inputStyle2: React.CSSProperties = {
   fontFamily: "var(--sans)",
   color: "var(--text)",
 };
+
+// ─────────────────────────────────────────────────────────────────
+// Section 19d.21 — Chez profile spending tier banner.
+//
+// Surfaces the homeowner's standing-instructions thresholds so the
+// contractor knows BEFORE they quote whether they need to ping Chez
+// first. Three tiers per households.chez_profile (Phase 80.1):
+//   auto_approve_under  — quote totals up to this amount go through
+//   ping_under          — quote totals up to this need a quick Chez ping
+//   explicit_above      — quote totals above this need explicit approval
+//
+// Renders inline above the home detail header. Salmon is intentional
+// here — it IS the kind of "this changes how you act on this home"
+// affordance salmon is reserved for. Per CLAUDE.md the SLA-critical-pill
+// equivalent.
+// ─────────────────────────────────────────────────────────────────
+
+interface ChezSpendingTierBannerProps {
+  tiers: { auto_approve_under?: number | null; ping_under?: number | null; explicit_above?: number | null } | null | undefined;
+}
+
+function ChezSpendingTierBanner({ tiers }: ChezSpendingTierBannerProps) {
+  if (!tiers) return null;
+  const autoApprove = numberOrNull(tiers.auto_approve_under);
+  const ping = numberOrNull(tiers.ping_under);
+  const explicit = numberOrNull(tiers.explicit_above);
+  if (autoApprove == null && ping == null && explicit == null) return null;
+
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg, rgba(237,105,85,0.08), rgba(237,105,85,0.04))",
+        border: "1px solid rgba(237,105,85,0.30)",
+        borderRadius: 14,
+        padding: "14px 18px",
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--salmon)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+        $
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--salmon-dark)", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>
+          Chez standing instructions
+        </div>
+        <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.45 }}>
+          {autoApprove != null && (
+            <span><strong>Auto-approve under ${autoApprove.toLocaleString()}.</strong> </span>
+          )}
+          {ping != null && (
+            <span>Ping Chez before proposing under ${ping.toLocaleString()}. </span>
+          )}
+          {explicit != null && (
+            <span>Anything over ${explicit.toLocaleString()} needs explicit homeowner approval.</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}

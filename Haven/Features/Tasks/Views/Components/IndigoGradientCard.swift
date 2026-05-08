@@ -172,7 +172,7 @@ struct VisitHeroContent: View {
     }
 
     private var subline: String {
-        let vendor = vendorName ?? "No handyman yet"
+        let vendor = vendorName ?? "No contractor yet"
         if let estimate = estimateLabel, !estimate.isEmpty {
             return "\(vendor) · \(estimate) estimated"
         } else {

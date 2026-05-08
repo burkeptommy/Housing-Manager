@@ -39,19 +39,10 @@ export default function RoutesScreen() {
   return (
     <>
       <div className="ops-page-toolbar">
-        <button className="ops-button ops-button--ghost" style={{ height: 32 }}>
-          <Icon name="chevron" size={14} stroke={2} style={{ transform: "rotate(180deg)" }} />
-        </button>
         <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600 }}>Today · {today}</div>
-        <button className="ops-button ops-button--ghost" style={{ height: 32 }}>
-          <Icon name="chevron" size={14} stroke={2} />
-        </button>
-        {routes.length > 1 && (
-          <div style={{ marginLeft: "auto" }}>
-            <button className="ops-button ops-button--indigo">
-              <Icon name="sparkles" size={14} stroke={1.9} />
-              Optimize all routes
-            </button>
+        {routes.length > 0 && (
+          <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-soft)" }}>
+            {routes.length} {routes.length === 1 ? "tech" : "techs"} routed · {routes.reduce((sum, r) => sum + r.visits.length, 0)} stops
           </div>
         )}
       </div>
@@ -132,7 +123,7 @@ export default function RoutesScreen() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{stop.title}</div>
                         <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 4 }}>
-                          {stop.property?.name || "—"}{stop.property?.address ? ` · ${stop.property.address.split(",")[1]?.trim() ?? ""}` : ""}
+                          {stop.property?.name || stop.property?.address || "No address on file"}{stop.property?.name && stop.property?.address ? ` · ${stop.property.address.split(",")[1]?.trim() ?? ""}` : ""}
                         </div>
                         <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-soft)" }}>
                           {stop.assignment?.windowStartTime && (

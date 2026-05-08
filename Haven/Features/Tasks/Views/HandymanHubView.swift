@@ -155,7 +155,7 @@ struct HandymanHubView: View {
             .padding(.bottom, HavenTheme.spacing48)
         }
         .background(HavenColors.background)
-        .navigationTitle("Handyman")
+        .navigationTitle("Contractor")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if let hid = householdId {
@@ -301,7 +301,7 @@ struct HandymanHubView: View {
                     VendorLogoView(contractor: handyman, size: 48)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Your handyman")
+                        Text("Your contractor")
                             .font(HavenTypography.uiSectionHeader)
                             .foregroundStyle(HavenColors.textSoft)
                         Text(handyman.companyName)
@@ -344,7 +344,7 @@ struct HandymanHubView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("No handyman yet")
+                        Text("No contractor yet")
                             .font(HavenTypography.title3)
                         Text("Find a vetted local pro you trust.")
                             .font(HavenTypography.bodySmall)
@@ -354,7 +354,7 @@ struct HandymanHubView: View {
                 }
 
                 HavenButton(
-                    title: "Find a handyman",
+                    title: "Find a contractor",
                     action: {
                         Haptics.medium()
                         showFindHandyman = true
@@ -697,7 +697,7 @@ struct HandymanHubView: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                 Text("Anything been bugging you?")
                     .font(HavenTypography.headline)
-                Text("Add small repairs, dryer-vent cleaning, a squeaky door. We'll hand the whole list to your handyman on the next visit.")
+                Text("Add small repairs, dryer-vent cleaning, a squeaky door. We'll hand the whole list to your contractor on the next visit.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                 HavenButton(
@@ -1046,7 +1046,7 @@ struct HandymanHubView: View {
                         Spacer()
                         HavenPill(label: "Companion app", tone: .salmon, showsDot: false)
                     }
-                    Text("Your handyman can use the Chez Field app to see your punch list, system details, and visit notes before they arrive.")
+                    Text("Your contractor can use the Chez Field app to see your punch list, system details, and visit notes before they arrive.")
                         .font(HavenTypography.bodySmall)
                         .opacity(0.85)
                 }
@@ -1066,7 +1066,7 @@ struct HandymanHubView: View {
                 HavenCard {
                     Text(linkedHandyman == nil
                          ? "Visit history will appear here after your first scheduled visit is completed."
-                         : "No completed visits yet. Once your handyman finishes a visit it shows up here.")
+                         : "No completed visits yet. Once your contractor finishes a visit it shows up here.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }

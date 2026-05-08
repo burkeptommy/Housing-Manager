@@ -80,7 +80,7 @@ struct HandymanChatSheet: View {
                 composer
             }
             .background(HavenColors.background)
-            .navigationTitle(vendor?.companyName ?? "Handyman")
+            .navigationTitle(vendor?.companyName ?? "Contractor")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -118,7 +118,7 @@ struct HandymanChatSheet: View {
                     Text("When works for you?")
                         .font(HavenTypography.fraunces(size: 22, weight: 600))
                         .foregroundStyle(HavenColors.navy900)
-                    Text("\(vendor?.companyName ?? "Your handyman") will see this in their app right away.")
+                    Text("\(vendor?.companyName ?? "Your contractor") will see this in their app right away.")
                         .font(.system(size: 13))
                         .foregroundStyle(HavenColors.textSecondary)
                         .lineSpacing(2)
@@ -186,7 +186,7 @@ struct HandymanChatSheet: View {
             Text("Start a conversation")
                 .font(HavenTypography.fraunces(size: 19, weight: 600))
                 .foregroundStyle(HavenColors.navy900)
-            Text("Ask a question, request a change, or share a photo. Your handyman gets it in their app right away.")
+            Text("Ask a question, request a change, or share a photo. Your contractor gets it in their app right away.")
                 .font(.system(size: 13))
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -202,7 +202,7 @@ struct HandymanChatSheet: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 10) {
-                TextField("Message your handyman…", text: $draft, axis: .vertical)
+                TextField("Message your contractor…", text: $draft, axis: .vertical)
                     .lineLimit(1...4)
                     .font(.system(size: 14))
                     .padding(.horizontal, 14)
@@ -326,9 +326,14 @@ private struct MessageBubble: View {
         switch message.typedKind {
         case .proposeTime:
             proposalCard
-        case .quoteSent:
+        case .quoteSent, .quoteBundleSent:
             quoteCard
-        case .acceptTime, .declineTime:
+        case .acceptTime, .declineTime, .statusChange, .invoiceSent, .quoteBundleDecided:
+            // Wave Y2: status changes (Mark complete / Decline / Reopen),
+            // invoice mirrors, and quote bundle decisions all render as
+            // small centered system-event pills, not as sender-aligned
+            // bubbles. Visually subtle audit trail per Apple Messages /
+            // Linear / GitHub patterns.
             systemEventRow
         case .text:
             if isFromHomeowner {
@@ -372,7 +377,7 @@ private struct MessageBubble: View {
                     .font(HavenTypography.fraunces(size: 28, weight: 600))
                     .foregroundStyle(HavenColors.navy900)
                 if count > 0 {
-                    Text("\(count) line item\(count == 1 ? "" : "s") from \(vendorName ?? "your handyman")")
+                    Text("\(count) line item\(count == 1 ? "" : "s") from \(vendorName ?? "your contractor")")
                         .font(.system(size: 13))
                         .foregroundStyle(HavenColors.textSecondary)
                 } else if let vendor = vendorName {
@@ -440,7 +445,7 @@ private struct MessageBubble: View {
 
     private var proposalCard: some View {
         let proposed = message.proposedTime
-        let proposedBy: String = isFromHomeowner ? "You" : (vendorName ?? "Your handyman")
+        let proposedBy: String = isFromHomeowner ? "You" : (vendorName ?? "Your contractor")
         let isLiveVendorProposal = isLive && !isFromHomeowner
 
         return VStack(alignment: .leading, spacing: 14) {
@@ -570,18 +575,24 @@ private struct MessageBubble: View {
     private var systemEventRow: some View {
         HStack {
             Spacer()
-            HStack(spacing: 6) {
-                Image(systemName: iconForEvent)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(message.body.isEmpty ? defaultEventLabel : message.body)
-                    .font(.system(size: 11.5, weight: .semibold))
+            VStack(spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: iconForEvent)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(message.body.isEmpty ? defaultEventLabel : message.body)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundStyle(eventForeground)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().fill(eventBackground)
+                )
+                Text(message.createdAt, format: .relative(presentation: .named))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(HavenColors.textTertiary)
             }
-            .foregroundStyle(HavenColors.success)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Capsule().fill(HavenColors.success.opacity(0.12))
-            )
             Spacer()
         }
     }
@@ -591,6 +602,9 @@ private struct MessageBubble: View {
         case .proposeTime: return "calendar.badge.plus"
         case .acceptTime: return "checkmark.seal.fill"
         case .declineTime: return "xmark.circle"
+        case .statusChange: return "arrow.triangle.2.circlepath"
+        case .invoiceSent: return "doc.plaintext"
+        case .quoteBundleDecided: return "checkmark.circle"
         default: return "info.circle"
         }
     }
@@ -600,7 +614,31 @@ private struct MessageBubble: View {
         case .proposeTime: return "Time proposed"
         case .acceptTime: return "Time confirmed"
         case .declineTime: return "Time declined"
+        case .statusChange: return "Status updated"
+        case .invoiceSent: return "Invoice sent"
+        case .quoteBundleDecided: return "Quote tier selected"
         default: return ""
+        }
+    }
+
+    /// Neutral grey for status changes / invoice mirrors / decisions
+    /// (audit-trail tone). Success green stays for the accept/decline
+    /// scheduling events that pre-date Wave Y2.
+    private var eventForeground: Color {
+        switch message.typedKind {
+        case .acceptTime, .declineTime, .proposeTime:
+            return HavenColors.success
+        default:
+            return HavenColors.textSecondary
+        }
+    }
+
+    private var eventBackground: Color {
+        switch message.typedKind {
+        case .acceptTime, .declineTime, .proposeTime:
+            return HavenColors.success.opacity(0.12)
+        default:
+            return HavenColors.beige200.opacity(0.7)
         }
     }
 

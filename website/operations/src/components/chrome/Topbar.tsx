@@ -5,7 +5,7 @@ interface RouteMeta {
   title: string;
   eyebrow?: string;
   breadcrumb?: string;
-  primaryCta?: { label: string; action: "new-quote" | "add-client" | "navigate"; to?: string };
+  primaryCta?: { label: string; action: "new-quote" | "add-client" | "navigate" | "new-invoice"; to?: string };
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
@@ -27,6 +27,10 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "Routes",
     breadcrumb: "Per-tech daily routing",
   },
+  "/tasks": {
+    title: "Tasks",
+    breadcrumb: "Every open task across your customers",
+  },
   "/crew": {
     title: "Crew",
     breadcrumb: "Roster, profiles, and access",
@@ -41,9 +45,18 @@ const ROUTE_META: Record<string, RouteMeta> = {
     breadcrumb: "Pipeline and quote builder",
     primaryCta: { label: "+ New quote", action: "new-quote" },
   },
+  "/invoices": {
+    title: "Invoices",
+    breadcrumb: "Billing pipeline and customer invoice history",
+    primaryCta: { label: "+ New invoice", action: "new-invoice" },
+  },
   "/messages": {
     title: "Messages",
     breadcrumb: "Homeowner conversations",
+  },
+  "/settings": {
+    title: "Settings",
+    breadcrumb: "Workspace branding and service area",
   },
 };
 
@@ -55,6 +68,7 @@ export function Topbar() {
     if (ROUTE_META[location.pathname]) return ROUTE_META[location.pathname];
     if (location.pathname.startsWith("/visits/")) return ROUTE_META["/visits"];
     if (location.pathname.startsWith("/homes/")) return ROUTE_META["/homes"];
+    if (location.pathname.startsWith("/invoices/")) return { title: "Invoice", breadcrumb: "Invoice detail" };
     return { title: "Operations" };
   })();
 
@@ -66,6 +80,8 @@ export function Topbar() {
     if (!meta.primaryCta) return;
     if (meta.primaryCta.action === "new-quote") {
       window.dispatchEvent(new CustomEvent("ops:open-new-quote"));
+    } else if (meta.primaryCta.action === "new-invoice") {
+      window.dispatchEvent(new CustomEvent("ops:open-new-invoice"));
     } else if (meta.primaryCta.action === "add-client") {
       window.dispatchEvent(new CustomEvent("ops:open-add-client"));
     } else if (meta.primaryCta.action === "navigate" && meta.primaryCta.to) {
@@ -77,7 +93,7 @@ export function Topbar() {
     <header className="ops-topbar">
       <div className="ops-topbar__title-block">
         {meta.eyebrow && <div className="ops-topbar__eyebrow">{meta.eyebrow}</div>}
-        <div className="ops-topbar__title">{meta.title}</div>
+        <h1 className="ops-topbar__title">{meta.title}</h1>
         {meta.breadcrumb && <div className="ops-topbar__breadcrumb">{meta.breadcrumb}</div>}
       </div>
 
