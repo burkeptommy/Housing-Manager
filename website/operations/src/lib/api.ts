@@ -128,6 +128,72 @@ export function isToday(iso: string | null | undefined): boolean {
   return day === todayStr;
 }
 
+// ─── Photo attachment upload ──────────────────────────────────
+
+/**
+ * Wave T: client-side image resize before upload. Loads the file into
+ * a hidden canvas, scales the long edge to `maxEdge` (default 1600),
+ * encodes JPEG at the given quality (default 0.8), and returns a
+ * base64 data string (no data: prefix).
+ *
+ * Why client-side resize? Tom's audience uploads phone photos that
+ * routinely run 4-12 MB; resizing to 1600px @ 80% JPEG gets us to
+ * ~250-400 KB which keeps Storage bills sane and the chat thread
+ * snappy. The edge function rejects > 8 MB as a hard ceiling.
+ */
+export async function resizeImageForMessageUpload(
+  file: File,
+  maxEdge = 1600,
+  quality = 0.8,
+): Promise<{ dataBase64: string; contentType: "image/jpeg" }> {
+  const dataUrl = await readFileAsDataURL(file);
+  const img = await loadImage(dataUrl);
+  const ratio = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  ctx.drawImage(img, 0, 0, w, h);
+  const blob: Blob | null = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", quality),
+  );
+  if (!blob) throw new Error("Failed to encode image");
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  // Convert Uint8Array to base64 in chunks to avoid the call-stack
+  // overflow that hits if you spread a multi-MB array into String.fromCharCode.
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return {
+    dataBase64: btoa(binary),
+    contentType: "image/jpeg" as const,
+  };
+}
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = src;
+  });
+}
+
 // ─── Visit punch list parser ───────────────────────────────────
 
 /**

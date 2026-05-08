@@ -48,6 +48,12 @@ const PATHS: Record<string, string> = {
   gear: "M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM19.4 13.6a7.6 7.6 0 0 0 0-3.2l2-1.5-2-3.4-2.3.9a7.6 7.6 0 0 0-2.8-1.6l-.4-2.4h-3.8l-.4 2.4a7.6 7.6 0 0 0-2.8 1.6l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3.2l-2 1.5 2 3.4 2.3-.9a7.6 7.6 0 0 0 2.8 1.6l.4 2.4h3.8l.4-2.4a7.6 7.6 0 0 0 2.8-1.6l2.3.9 2-3.4z",
   // Wave Q: Invoices nav entry. Receipt with line items.
   receipt: "M5 3v18l3-2 3 2 3-2 3 2 3-2V3zM8 8h8M8 12h8M8 16h5",
+  // Wave T: paperclip for the Messages composer photo upload affordance.
+  paperclip: "M21 11.5l-9.2 9.2a5 5 0 0 1-7-7l9.2-9.2a3.5 3.5 0 0 1 5 5l-8.7 8.7a2 2 0 0 1-2.8-2.8l8-8",
+  // Wave T: image-in-frame glyph for inline thumbnail rendering.
+  image: "M4 4h16v16H4zM4 16l4-4 4 4 6-6 2 2",
+  // Wave T: dollar sign for the +Quote composer affordance.
+  dollar: "M12 3v18M16 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H8",
 };
 
 interface IconProps {

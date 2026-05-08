@@ -5050,12 +5050,23 @@ async function sendMessage(
 
   if (!request || !requestId) throw new Error("Request not found");
 
+  // Wave T: caller may pass `metadata` to ride a structured payload on
+  // the message (attachments array, kind: "visit_proposed" slot card,
+  // etc.). We always stamp event=provider_message so the existing
+  // notification path keeps working; caller-supplied keys override
+  // only when they don't collide with reserved event identity.
+  const incomingMetadata =
+    typeof body.metadata === "object" && body.metadata !== null
+      ? (body.metadata as Record<string, unknown>)
+      : {};
+
   const payload: Record<string, unknown> = {
     request_id: requestId,
     household_id: request.household_id,
     sender_role: "vendor",
     body: messageBody,
     metadata: {
+      ...incomingMetadata,
       event: "provider_message",
     },
   };
@@ -5459,6 +5470,236 @@ async function proposeVisitTimeForProvider(
   });
 
   return { request: updated };
+}
+
+/// Wave T: contractor proposes 2-3 candidate slots for the homeowner
+/// to pick from. Inserts a single message into the thread with
+/// `metadata.kind = "visit_proposed"` and a `slots` array; the
+/// homeowner-side iOS reads this metadata to render a slot card with
+/// tap-to-accept buttons. We do NOT call propose_visit_time per slot
+/// because that would create N proposed_visit_at writes on the request
+/// row; the slot card is just chat content. When the homeowner accepts
+/// one, the existing accept_visit_time path takes over.
+async function proposeVisitSlotsForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const rawSlots = Array.isArray(body.slots) ? body.slots : [];
+  const slots = (rawSlots as unknown[])
+    .map((slot) => {
+      if (!slot || typeof slot !== "object") return null;
+      const start = compactString((slot as Record<string, unknown>).start);
+      const end = compactString((slot as Record<string, unknown>).end);
+      const note = compactString((slot as Record<string, unknown>).note);
+      if (!start) return null;
+      return { start, end: end || null, note: note || null };
+    })
+    .filter((slot): slot is { start: string; end: string | null; note: string | null } => slot !== null);
+
+  if (slots.length === 0) {
+    throw new Error("At least one slot is required");
+  }
+  if (slots.length > 5) {
+    throw new Error("Send no more than five candidate slots at a time");
+  }
+
+  // Confirm workspace ownership of this request before writing.
+  const { data: request, error: requestError } = await service
+    .from("handyman_requests")
+    .select("id, contractor_id, household_id, title, status")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    throw requestError ?? new Error("Request not found");
+  }
+
+  const contractorId = compactString(request.contractor_id);
+  if (!contractorId) {
+    throw new Error("Request has no linked contractor");
+  }
+
+  const { data: links, error: linksError } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+
+  if (linksError) throw linksError;
+  const linkedContractorIds = new Set(
+    ((links ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.contractor_id))
+      .filter(Boolean),
+  );
+
+  if (!linkedContractorIds.has(contractorId)) {
+    throw new Error("This workspace is not linked to this homeowner's contractor");
+  }
+
+  const messageBody = compactString(body.body) ||
+    `Pick a time that works. We have ${slots.length} option${slots.length === 1 ? "" : "s"}:\n` +
+      slots
+        .map((slot, idx) => {
+          const t = formatScheduleForPush(slot.start) || slot.start;
+          return `${idx + 1}. ${t}`;
+        })
+        .join("\n");
+
+  const { data: message, error: messageError } = await service
+    .from("handyman_request_messages")
+    .insert({
+      request_id: requestId,
+      household_id: request.household_id,
+      sender_role: "vendor",
+      body: messageBody,
+      metadata: {
+        event: "provider_message",
+        kind: "visit_proposed",
+        slots,
+      },
+    })
+    .select()
+    .single();
+
+  if (messageError || !message) {
+    throw messageError ?? new Error("Failed to insert visit proposal message");
+  }
+
+  // Bump request updated_at so the inbox reorders.
+  await service
+    .from("handyman_requests")
+    .update({ updated_at: isoNow() })
+    .eq("id", requestId);
+
+  return { message, requestId, slots };
+}
+
+/// Wave T: upload one photo attachment for a request thread. Caller
+/// posts base64 data plus a content_type and filename. We upload to
+/// the message-attachments bucket and return a signed URL the caller
+/// can immediately render in the thread bubble. The actual message
+/// row gets created by a follow-up `send_message` call where the
+/// caller passes `metadata.attachments` with the path/URL we returned.
+async function uploadMessageAttachment(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const dataBase64 = compactString(body.dataBase64);
+  if (!dataBase64) throw new Error("dataBase64 is required");
+
+  const contentType = compactString(body.contentType) || "image/jpeg";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("Only image content types are supported");
+  }
+
+  // Confirm workspace ownership of this request before writing.
+  const { data: request, error: requestError } = await service
+    .from("handyman_requests")
+    .select("id, contractor_id, household_id")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    throw requestError ?? new Error("Request not found");
+  }
+
+  const contractorId = compactString(request.contractor_id);
+  if (!contractorId) {
+    throw new Error("Request has no linked contractor");
+  }
+
+  const { data: links, error: linksError } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+
+  if (linksError) throw linksError;
+  const linkedContractorIds = new Set(
+    ((links ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.contractor_id))
+      .filter(Boolean),
+  );
+
+  if (!linkedContractorIds.has(contractorId)) {
+    throw new Error("This workspace is not linked to this homeowner's contractor");
+  }
+
+  // Decode base64. Reject anything bigger than 8 MB (after decode) to
+  // keep storage bills sane; the SPA already resizes to ~1600px JPEG
+  // at 80% quality before sending so this is a hard ceiling.
+  const cleanBase64 = dataBase64.replace(/^data:[^,]+,/, "");
+  const bytes = base64ToUint8Array(cleanBase64);
+  if (bytes.byteLength > 8 * 1024 * 1024) {
+    throw new Error("Image too large. Keep attachments under 8MB.");
+  }
+
+  // Pick an extension based on content type so the URL is friendly.
+  const extension = contentType === "image/png"
+    ? "png"
+    : contentType === "image/webp"
+      ? "webp"
+      : contentType === "image/gif"
+        ? "gif"
+        : "jpg";
+
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const householdId = compactString(request.household_id);
+  const path = `${householdId}/${requestId}/${random}.${extension}`;
+
+  const { error: uploadError } = await service.storage
+    .from("message-attachments")
+    .upload(path, bytes, {
+      contentType,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Upload failed: ${uploadError.message}`);
+  }
+
+  // Mint a signed URL valid 7 days. The reader path will re-mint each
+  // time the thread is fetched (same pattern as document-viewer).
+  const { data: signed, error: signedError } = await service.storage
+    .from("message-attachments")
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+
+  if (signedError || !signed) {
+    throw signedError ?? new Error("Failed to mint signed URL");
+  }
+
+  return {
+    path,
+    contentType,
+    signedUrl: signed.signedUrl,
+    bytes: bytes.byteLength,
+  };
+}
+
+// Decode base64 to a Uint8Array. Deno doesn't ship Buffer; the standard
+// approach is atob + Uint8Array.from. We strip data URL prefixes upstream.
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /// Phase 73 sub-phase A: provider-side wrapper around `accept_visit_time`.
@@ -7273,6 +7514,35 @@ serve(async (req) => {
 
       if (action === "propose_visit_time") {
         const result = await proposeVisitTimeForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave T: contractor proposes 2-3 candidate slots in one shot.
+      // Drops a single message into the thread with metadata.kind =
+      // "visit_proposed" + slots array; the homeowner picks one and
+      // a downstream action accepts it. Chat-card UX, not a calendar
+      // round-trip per slot.
+      if (action === "propose_visit_slots") {
+        const result = await proposeVisitSlotsForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave T: photo upload helper. Caller posts base64 image; we
+      // upload to the message-attachments bucket under a
+      // household/request scoped path, mint a signed URL, and return
+      // it. Caller then sends a regular message with metadata.attachments
+      // referencing the same path + URL. We don't create the message
+      // here so the caller can compose body + attachments together.
+      if (action === "upload_message_attachment") {
+        const result = await uploadMessageAttachment(
           service,
           user as unknown as Record<string, unknown>,
           body,
