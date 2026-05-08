@@ -66,6 +66,7 @@ gaps** section.
 - **Brand voice — quote fallback title "Handyman quote"** — `handyman-provider/index.ts` line 4030 fallback was rendered prominently in the user-facing detail header. Changed to "Untitled quote".
 - **Brand voice — multiple "handyman" user-facing strings** in edge function: line 215 status label "Sent to handyman", line 1327 push footer "your handyman", line 1722 visit title "Chez Handyman Visit", line 3901 share text "this handyman", line 4191 push body "from your handyman". All rebranded to "contractor". Server redeploy required.
 - **Em-dash seed pollution** — `Tests/e2e/run-contractor.mjs` line 463 was seeding 12 quote titles like "Roof repair — Customer 7", and line 468 had a homeowner_message with " — ". Fixed; future fixture runs will be em-dash-clean.
+- **Wave W — em-dash residue scrub** — Wave W demo dry-run found pre-existing fixture data still on the DB carrying em dashes (the run-contractor.mjs source had been fixed pre-Wave-D but the seeded rows from earlier runs persisted). Scrubbed via PATCH against PostgREST: 20 `provider_quotes.title` rows, 1 `provider_invoices.title` row, 5 `handyman_request_messages.body` rows, 7 `handyman_requests.title` rows. Replaced ` — ` with `. ` (period + space) to match the run-contractor.mjs current convention. All four screens verified em-dash-free post-scrub. Idempotent — re-running the same scrub is a no-op.
 
 ### Major — gaps not yet implemented
 - **7.27 Quote-with-options (good/better/best)** — no UI; line items are flat. Real selling tool for HNW Westchester scope tradeoffs.
