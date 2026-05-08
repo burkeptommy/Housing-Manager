@@ -285,6 +285,15 @@
       .ops-main { padding: 16px 14px !important; }
       .ops-topbar-title { font-size: 18px !important; }
       .ops-kpi-value { font-size: 18px !important; }
+      /* Override inline repeat(4, 1fr) on the pricing pillars + team roles grids */
+      .grid-2x2[style*="repeat(4"] { grid-template-columns: 1fr !important; }
+    }
+    @media (min-width: 769px) and (max-width: 1023px) {
+      .grid-2x2[style*="repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    }
+    /* Belt-and-suspenders: prevent grid items from blowing past their column on tight viewports */
+    @media (max-width: 1023px) {
+      .grid-2x2[style*="repeat(4"] > * { min-width: 0; }
     }
   </style>
   <script defer src="chez.js"></script>
