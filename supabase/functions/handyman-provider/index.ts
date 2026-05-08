@@ -3153,22 +3153,24 @@ async function splitVisitPunchList(
   // the existing "vendor" sender_role so RLS + display layer treat
   // it like a normal vendor message.
   const movedSummary = `${moved.length} item${moved.length === 1 ? "" : "s"} moved to a follow-up visit${followUpDate ? ` on ${followUpDate}` : ""}.`;
+  // handyman_request_messages does NOT have a sender_user_id column
+  // (PGRST204 confirmed). Stash the actor in metadata.actor_user_id so
+  // the audit trail still has provenance without breaking the insert.
+  // Wave Z subagent flagged this as a latent bug; this is the fix.
   await service.from("handyman_request_messages").insert([
     {
       request_id: requestId,
       household_id: householdId,
       sender_role: "vendor",
-      sender_user_id: userId,
       body: `Split this visit: ${movedSummary} The follow-up is now its own thread.`,
-      metadata: { kind: "text", split_to_request_id: newRequest.id },
+      metadata: { kind: "text", split_to_request_id: newRequest.id, actor_user_id: userId },
     },
     {
       request_id: newRequest.id,
       household_id: householdId,
       sender_role: "vendor",
-      sender_user_id: userId,
       body: `Created from a previous visit. ${moved.length} item${moved.length === 1 ? "" : "s"} ready to schedule${followUpDate ? ` for ${followUpDate}` : ""}.`,
-      metadata: { kind: "text", split_from_request_id: requestId },
+      metadata: { kind: "text", split_from_request_id: requestId, actor_user_id: userId },
     },
   ]);
 
