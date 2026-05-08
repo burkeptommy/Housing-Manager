@@ -810,6 +810,11 @@ struct InboxItemCard: View {
         case "document_stored": return HavenColors.navy
         case "vendor_added": return HavenColors.success
         case "contractor_quote": return HavenColors.warning
+        // Wave Y2: contractor-side mirrors. Quote = warning amber so it
+        // visually nudges the homeowner to review. Invoice = success
+        // green because it's a positive completion signal.
+        case "handyman_quote_received": return HavenColors.warning
+        case "invoice_received": return HavenColors.success
         default: return HavenColors.textTertiary
         }
     }

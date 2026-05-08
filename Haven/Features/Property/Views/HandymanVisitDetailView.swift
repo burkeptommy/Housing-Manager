@@ -1788,12 +1788,39 @@ struct HandymanVisitDetailView: View {
                 tint: HavenColors.critical,
                 headline: "Declined the proposed time"
             )
-        case .quoteSent:
+        case .quoteSent, .quoteBundleSent:
             scheduleSystemEventRow(
                 message: message,
                 icon: "doc.text.fill",
                 tint: HavenColors.action,
                 headline: "Sent a quote. Open the chat to review"
+            )
+        case .invoiceSent:
+            // Wave Y2: contractor sent an invoice from the Operations
+            // Desk. Renders as a subtle system row in the visit detail
+            // coordination feed.
+            scheduleSystemEventRow(
+                message: message,
+                icon: "doc.plaintext",
+                tint: HavenColors.success,
+                headline: "Sent an invoice. Open the chat to review"
+            )
+        case .statusChange:
+            // Wave Y2: contractor / homeowner side flipped the request
+            // status (Mark complete / Decline / Reopen). Subtle audit
+            // row so the visit detail timeline reflects every move.
+            scheduleSystemEventRow(
+                message: message,
+                icon: "arrow.triangle.2.circlepath",
+                tint: HavenColors.textSecondary,
+                headline: message.body.isEmpty ? "Status updated" : message.body
+            )
+        case .quoteBundleDecided:
+            scheduleSystemEventRow(
+                message: message,
+                icon: "checkmark.circle",
+                tint: HavenColors.success,
+                headline: message.body.isEmpty ? "Quote tier selected" : message.body
             )
         case .text:
             coordinationTextMessageRow(message)

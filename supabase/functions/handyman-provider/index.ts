@@ -4473,6 +4473,8 @@ async function saveQuote(
         const summary = title
           ? `Quote: ${title} · ${moneyLabel(totals.total)}`
           : `New quote: ${moneyLabel(totals.total)}`;
+        // Wave Y2 — stamp metadata so iOS can deep-link from the
+        // homeowner's inbox row to the underlying provider_quotes row.
         await service.from("inbox_items").insert({
           household_id: householdId,
           type: "handyman_quote_received",
@@ -4480,6 +4482,12 @@ async function saveQuote(
           summary,
           from_email: compactString(user.email),
           seen: false,
+          metadata: {
+            quote_id: compactString(quote.id),
+            property_id: compactString(propertyId),
+            total: totals.total,
+            quote_kind: compactString(quote.kind),
+          },
         });
       } catch (inboxErr) {
         console.error("[handyman-provider] inbox_items insert failed for ad-hoc quote", inboxErr);
@@ -5472,6 +5480,8 @@ async function deliverInvoice(
     }
     try {
       const summary = `${args.title} · ${moneyLabel(args.total)}`;
+      // Wave Y2 — stamp metadata so iOS can deep-link from the
+      // homeowner's inbox row to the underlying invoice.
       await service.from("inbox_items").insert({
         household_id: args.householdId,
         type: "invoice_received",
@@ -5479,6 +5489,12 @@ async function deliverInvoice(
         summary,
         from_email: args.providerName,
         seen: false,
+        metadata: {
+          invoice_id: invoiceId,
+          property_id: compactString(args.propertyId),
+          request_id: compactString(args.requestId),
+          total: args.total,
+        },
       });
     } catch (inboxErr) {
       console.error("[handyman-provider] inbox_items insert failed for invoice", inboxErr);

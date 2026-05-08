@@ -1826,9 +1826,15 @@ final class HandymanRequestCoordinator: ObservableObject {
                     propertyId: nil,
                     limit: 25
                 )
+                // Wave Y2: Drop the terminal-state filter so completed /
+                // cancelled / declined threads still surface here. The
+                // homeowner needs to see the audit trail when the
+                // contractor marks a visit complete from the Operations
+                // Desk — Apple Mail / Linear / GitHub all keep
+                // terminal-state threads visible. The status badge in
+                // the chat sheet header reflects the lifecycle state.
                 let match = candidates
                     .filter { $0.contractorId == vendor.id }
-                    .filter { !["completed", "cancelled", "declined"].contains($0.status) }
                     .sorted { $0.updatedAt > $1.updatedAt }
                     .first
                 if let match {

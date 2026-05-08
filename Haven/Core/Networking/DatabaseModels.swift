@@ -1569,6 +1569,29 @@ enum HandymanMessageKind: String, Codable {
     /// the dollar total and a "Review quote" CTA that opens the
     /// HandymanQuoteReviewSheet.
     case quoteSent = "quote_sent"
+    /// Wave Y2: a vendor-side or homeowner-side action transitioned
+    /// the request status (Mark complete / Decline / Reopen / etc.).
+    /// Renders as a small centered system-event pill in the chat
+    /// thread instead of as a sender-aligned bubble.
+    case statusChange = "status_change"
+    /// Wave Y2: provider sent an invoice. Mirror message in the
+    /// thread so the homeowner can see the invoice was issued and
+    /// deep-link to the invoice detail / web view.
+    case invoiceSent = "invoice_sent"
+    /// Wave V: provider sent a good/better/best quote bundle.
+    /// Renders as a rich card listing the three tiers.
+    case quoteBundleSent = "quote_bundle_sent"
+    /// Wave V: homeowner picked a tier from a bundle. Audit trail.
+    case quoteBundleDecided = "quote_bundle_decided"
+
+    /// Resilient decode — unknown raw values fall back to `.text` so
+    /// new event types added on the server don't break older clients
+    /// or freeze the thread render.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        self = HandymanMessageKind(rawValue: raw) ?? .text
+    }
 }
 
 extension HandymanRequestMessageRow {

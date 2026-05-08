@@ -3615,6 +3615,10 @@ final class DatabaseService {
             case "contractor_quote": return "doc.text.magnifyingglass"
             case "insurance_claim": return "shield.fill"
             case "family": return "person.2.fill"
+            // Wave Y2: contractor-side actions that mirror into the
+            // homeowner's inbox so cross-app activity is visible.
+            case "handyman_quote_received": return "doc.text.magnifyingglass"
+            case "invoice_received": return "doc.plaintext"
             case "chez_reply_action_needed",
                  "chez_reply_informational",
                  "chez_status_change":
@@ -3706,6 +3710,13 @@ final class DatabaseService {
         /// stamps both, but if a row predates the column add we still
         /// fall back to the metadata blob.
         let chezRequestIdString: String?
+        /// Wave Y2 — provider quote / invoice deep-link IDs. Stamped by
+        /// the `handyman-provider` Edge Function when it ad-hoc inserts
+        /// a `handyman_quote_received` / `invoice_received` mirror row
+        /// for the homeowner's inbox.
+        let quoteIdString: String?
+        let invoiceIdString: String?
+        let providerRequestIdString: String?
 
         enum CodingKeys: String, CodingKey {
             case subject, classification
@@ -3722,10 +3733,28 @@ final class DatabaseService {
             case analysisSkipped = "analysis_skipped"
             case analysisSkipReason = "analysis_skip_reason"
             case chezRequestIdString = "chez_request_id"
+            case quoteIdString = "quote_id"
+            case invoiceIdString = "invoice_id"
+            case providerRequestIdString = "request_id"
         }
 
         var chezRequestIdAsUUID: UUID? {
             guard let raw = chezRequestIdString else { return nil }
+            return UUID(uuidString: raw)
+        }
+
+        var quoteIdAsUUID: UUID? {
+            guard let raw = quoteIdString else { return nil }
+            return UUID(uuidString: raw)
+        }
+
+        var invoiceIdAsUUID: UUID? {
+            guard let raw = invoiceIdString else { return nil }
+            return UUID(uuidString: raw)
+        }
+
+        var providerRequestIdAsUUID: UUID? {
+            guard let raw = providerRequestIdString else { return nil }
             return UUID(uuidString: raw)
         }
 
@@ -3750,6 +3779,9 @@ final class DatabaseService {
             analysisSkipped = try? c.decodeIfPresent(Bool.self, forKey: .analysisSkipped)
             analysisSkipReason = try? c.decodeIfPresent(String.self, forKey: .analysisSkipReason)
             chezRequestIdString = try? c.decodeIfPresent(String.self, forKey: .chezRequestIdString)
+            quoteIdString = try? c.decodeIfPresent(String.self, forKey: .quoteIdString)
+            invoiceIdString = try? c.decodeIfPresent(String.self, forKey: .invoiceIdString)
+            providerRequestIdString = try? c.decodeIfPresent(String.self, forKey: .providerRequestIdString)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
                 vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)
