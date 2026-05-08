@@ -519,7 +519,7 @@ struct HouseQuizView: View {
                             // and dismisses to dashboard. The handyman picks
                             // up where the homeowner left off when the
                             // submitted assessment ingestion runs server-side.
-                            Button("Send a Chez handyman instead") {
+                            Button("Send a Chez Contractor instead") {
                                 Task {
                                     await viewModel.switchToHandymanMode()
                                     if viewModel.savedAndReady {
@@ -531,7 +531,7 @@ struct HouseQuizView: View {
                             }
                             Button("Cancel", role: .cancel) {}
                         } message: {
-                            Text("We'll save your place. You can pick up where you left off anytime, or hand the rest off to a Chez handyman.")
+                            Text("We'll save your place. You can pick up where you left off anytime, or hand the rest off to a Chez Contractor.")
                         }
                     }
                 }

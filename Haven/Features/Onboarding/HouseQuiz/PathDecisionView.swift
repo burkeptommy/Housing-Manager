@@ -77,7 +77,7 @@ struct PathDecisionView: View {
                 .font(HavenTypography.title)
                 .foregroundColor(HavenColors.textPrimary)
                 .lineLimit(3)
-            Text("You've given us everything we need to know what's at your home. The next step is capturing the details. Model numbers, photos, condition. You can do that yourself, or have a Chez handyman do it for you.")
+            Text("You've given us everything we need to know what's at your home. The next step is capturing the details. Model numbers, photos, condition. You can do that yourself, or have a Chez Contractor do it for you.")
                 .font(HavenTypography.body)
                 .foregroundColor(HavenColors.textSecondary)
                 .padding(.top, 4)
@@ -116,7 +116,7 @@ struct PathDecisionView: View {
                 iconBackground: HavenColors.action.opacity(0.14),
                 iconForeground: HavenColors.action,
                 title: "Have Chez handle it",
-                subtitle: "Free home assessment. We send a Chez handyman to your house. They walk through each system, capture everything, and you review when done.",
+                subtitle: "Free home assessment. We send a Chez Contractor to your house. They walk through each system, capture everything, and you review when done.",
                 accentColor: HavenColors.action
             )
         }
@@ -178,7 +178,7 @@ struct PathDecisionView: View {
             Text("You can change your mind later")
                 .font(HavenTypography.uiLabel)
                 .foregroundColor(HavenColors.textSecondary)
-            Text("If you book a handyman visit and decide to do it yourself before they arrive, you can cancel anytime from your dashboard.")
+            Text("If you book a contractor visit and decide to do it yourself before they arrive, you can cancel anytime from your dashboard.")
                 .font(HavenTypography.caption)
                 .foregroundColor(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

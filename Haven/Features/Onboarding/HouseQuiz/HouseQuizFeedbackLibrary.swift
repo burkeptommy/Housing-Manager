@@ -314,7 +314,7 @@ enum HouseQuizFeedbackLibrary {
         "q15b_household_contractors": [
             "handyman": AnswerFeedback(
                 badge: "Good call",
-                title: "A good handyman is the glue of a well-kept home.",
+                title: "A reliable contractor is the glue of a well-kept home.",
                 subhead: "We'll bundle small tasks into their spring and fall visits so nothing leaks through.",
                 citationName: nil
             ),
