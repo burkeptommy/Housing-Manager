@@ -444,6 +444,21 @@ export interface Invoice {
   updatedAt: string;
 }
 
+/**
+ * Wave S — workspace summary surfaced in the sidebar switcher dropdown.
+ * One row per active membership the signed-in user holds. Keep this
+ * narrow (id + display fields + role) so the dashboard payload stays
+ * lean — the full Workspace shape is only loaded when that workspace
+ * becomes current.
+ */
+export interface AvailableWorkspace {
+  id: string;
+  companyName: string;
+  primaryEmail: string;
+  role: ProviderRole | string;
+  isCurrent: boolean;
+}
+
 export interface Dashboard {
   needsWorkspace: boolean;
   currentUser: CurrentUser;
@@ -459,4 +474,11 @@ export interface Dashboard {
   quotes: Quote[];
   savedQuoteItems: SavedQuoteItem[];
   invoices: Invoice[];
+  /**
+   * Wave S — every workspace this user can switch into. Length=1 means
+   * single-workspace user (hide the dropdown affordance). Always present
+   * post-Wave-S, but typed optional so older edge function deploys don't
+   * break the SPA decode.
+   */
+  availableWorkspaces?: AvailableWorkspace[];
 }

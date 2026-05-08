@@ -534,7 +534,28 @@ async function getWorkspaceMembership(
   service: ServiceClient,
   userId: string,
   authEmail?: string,
+  preferredWorkspaceId?: string,
 ) {
+  // Wave S: when the caller passes a preferredWorkspaceId (the SPA sends
+  // this from localStorage so the user's last-selected workspace sticks),
+  // try to load the membership for THAT workspace first. Fall through to
+  // the default first-active selection only if the preferred workspace
+  // isn't a valid membership for this user. We never trust the preference
+  // blindly — RLS-equivalent check via `.eq("user_id", userId)` and
+  // `.eq("status", "active")` ensures the caller actually belongs there.
+  if (preferredWorkspaceId) {
+    const preferred = await service
+      .from("provider_workspace_members")
+      .select(MEMBER_SELECT)
+      .eq("user_id", userId)
+      .eq("workspace_id", preferredWorkspaceId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (preferred.error) throw preferred.error;
+    if (preferred.data) return preferred.data as Record<string, unknown>;
+  }
+
   // Primary: active row already pinned to this auth.users.id.
   const direct = await service
     .from("provider_workspace_members")
@@ -1780,10 +1801,19 @@ async function claimInviteForWorkspace(
   return preview;
 }
 
-async function loadDashboard(service: ServiceClient, user: Record<string, unknown>) {
+async function loadDashboard(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  preferredWorkspaceId?: string,
+) {
   const userId = compactString(user.id);
   const userEmail = normalizedEmail(user.email);
-  const membership = await getWorkspaceMembership(service, userId, userEmail);
+  const membership = await getWorkspaceMembership(
+    service,
+    userId,
+    userEmail,
+    preferredWorkspaceId,
+  );
   if (!membership) {
     console.log("[handyman-provider] needsWorkspace=true", {
       userId,
@@ -1830,6 +1860,10 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
     quotesResult,
     savedItemsResult,
     invoicesResult,
+    // Wave S — list every workspace this user is an active member of so
+    // the SPA can render a switcher dropdown. Single round-trip alongside
+    // the existing parallel batch so adding the switcher costs ~0ms.
+    availableWorkspacesResult,
   ] = await Promise.all([
     service
       .from("provider_workspace_members")
@@ -1878,6 +1912,14 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
       .eq("workspace_id", workspaceId)
       .order("updated_at", { ascending: false })
       .limit(120),
+    // Wave S — fetch every workspace this user can switch into. Filtered
+    // to active memberships only so revoked/invited rows never leak. The
+    // joined `provider_workspaces` row gives us company_name + primary_email.
+    service
+      .from("provider_workspace_members")
+      .select("workspace_id, role, status, provider_workspaces(id, company_name, primary_email)")
+      .eq("user_id", userId)
+      .eq("status", "active"),
   ]);
 
   if (teamMembersResult.error) throw teamMembersResult.error;
@@ -1887,6 +1929,29 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
   if (quotesResult.error) throw quotesResult.error;
   if (savedItemsResult.error) throw savedItemsResult.error;
   if (invoicesResult.error) throw invoicesResult.error;
+  if (availableWorkspacesResult.error) throw availableWorkspacesResult.error;
+
+  // Wave S — distill the membership rows into a clean { id, companyName,
+  // primaryEmail, role, isCurrent } array. Multiple rows for the same
+  // workspace_id (rare — would mean stale dup data) collapse to the
+  // first hit. Sorted alphabetically by company name to match common
+  // workspace-switcher UX (Slack, Linear, Notion).
+  const availableWorkspaceMap = new Map<string, Record<string, unknown>>();
+  for (const row of (availableWorkspacesResult.data ?? []) as Record<string, unknown>[]) {
+    const ws = (row.provider_workspaces as Record<string, unknown> | undefined) ?? {};
+    const id = compactString(ws.id) || compactString(row.workspace_id);
+    if (!id || availableWorkspaceMap.has(id)) continue;
+    availableWorkspaceMap.set(id, {
+      id,
+      companyName: compactString(ws.company_name) || "Workspace",
+      primaryEmail: compactString(ws.primary_email),
+      role: compactString(row.role),
+      isCurrent: id === workspaceId,
+    });
+  }
+  const availableWorkspaces = Array.from(availableWorkspaceMap.values()).sort((a, b) =>
+    String(a.companyName).localeCompare(String(b.companyName)),
+  );
 
   let teamMembers = (teamMembersResult.data ?? []) as Record<string, unknown>[];
   let assignments = (assignmentsResult.data ?? []) as Record<string, unknown>[];
@@ -2642,6 +2707,9 @@ async function loadDashboard(service: ServiceClient, user: Record<string, unknow
         updatedAt: row.updated_at,
       };
     }),
+    // Wave S — every workspace this user can switch into. Single-workspace
+    // users get a length=1 array; the SPA hides the dropdown affordance.
+    availableWorkspaces,
   };
 }
 
@@ -7030,9 +7098,16 @@ serve(async (req) => {
 
       const user = await getAuthenticatedUser(service, req);
       if (!user) return json({ error: "Unauthorized" }, 401);
+      // Wave S — accept `?workspace=<uuid>` so the SPA can request a
+      // specific workspace from a multi-workspace user. The membership
+      // helper validates the user actually belongs there before honoring
+      // it; an unrecognized id falls through to the default first-active
+      // pick rather than returning an error.
+      const requestedWorkspaceId = compactString(url.searchParams.get("workspace"));
       const dashboard = await loadDashboard(
         service,
         user as unknown as Record<string, unknown>,
+        requestedWorkspaceId,
       );
       return json(dashboard);
     }

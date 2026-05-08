@@ -10,12 +10,20 @@ import type { Dashboard } from "./types";
  * One round-trip per page load. Each screen reads from `useWorkspace()`
  * which caches the result in React state.
  */
-export async function fetchDashboard(): Promise<Dashboard> {
+export async function fetchDashboard(workspaceId?: string): Promise<Dashboard> {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData.session;
   if (!session) throw new Error("Not signed in");
 
-  const res = await fetch(PROVIDER_API_URL, {
+  // Wave S — when the caller has a stashed preferred workspace id (from
+  // localStorage in WorkspaceProvider), pass it as ?workspace=<id> so the
+  // edge function loads that workspace if the user is a member. Empty/
+  // missing id falls through to the default first-active pick.
+  const url = workspaceId
+    ? `${PROVIDER_API_URL}?workspace=${encodeURIComponent(workspaceId)}`
+    : PROVIDER_API_URL;
+
+  const res = await fetch(url, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${session.access_token}`,

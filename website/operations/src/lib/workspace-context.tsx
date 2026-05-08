@@ -22,6 +22,42 @@ interface WorkspaceContextValue {
   error: string | null;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  /**
+   * Wave S — set the user's preferred workspace and reload the dashboard.
+   * Persists to localStorage so the choice survives reloads. The full
+   * page reloads after the dashboard refresh resolves, which clears any
+   * route-level state stale to the previous workspace (selected quote,
+   * open visit, draft text, etc.). No-op if the requested id is already
+   * the current one or doesn't exist in availableWorkspaces.
+   */
+  switchWorkspace: (workspaceId: string) => Promise<void>;
+}
+
+/**
+ * Wave S — localStorage key for the sticky workspace selection. Lives
+ * outside React state so a full reload after switchWorkspace() picks up
+ * the new value before the WorkspaceProvider mounts.
+ */
+const WORKSPACE_STORAGE_KEY = "ops:current_workspace_id";
+
+function readStoredWorkspaceId(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    return window.localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredWorkspaceId(id: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (id) window.localStorage.setItem(WORKSPACE_STORAGE_KEY, id);
+    else window.localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+  } catch {
+    // Storage may be disabled (private mode, quota); silently fall back
+    // to single-workspace behavior. The dashboard load still works.
+  }
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -60,7 +96,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (isInitial) setIsLoading(true);
       else setIsRefreshing(true);
       try {
-        const data = await fetchDashboard();
+        // Wave S — pull the sticky workspace preference and pass it to
+        // the edge function. Edge function validates membership and falls
+        // back to the default first-active pick if the id is stale.
+        const storedWorkspaceId = readStoredWorkspaceId();
+        const data = await fetchDashboard(storedWorkspaceId);
+        // If the loaded workspace ended up being a different one than
+        // requested (stale localStorage entry pointing at a workspace
+        // the user no longer belongs to), rewrite the cache so we don't
+        // keep retrying that id on every refresh.
+        if (storedWorkspaceId && data.workspace?.id && storedWorkspaceId !== data.workspace.id) {
+          writeStoredWorkspaceId(data.workspace.id);
+        }
         if (data.needsWorkspace) {
           // Session exists but no provider workspace yet — the bootstrap
           // flow lives on handyman.html. Redirect there with a hint.
@@ -166,9 +213,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [session, scheduleRefresh]);
 
   const signOut = useCallback(async () => {
+    // Wave S — clear the sticky workspace preference on sign-out so the
+    // next user landing on this browser doesn't inherit the previous
+    // operator's last-selected workspace. Storage failure is non-fatal.
+    writeStoredWorkspaceId(null);
     await supabase.auth.signOut();
     window.location.assign("/handyman.html");
   }, []);
+
+  const switchWorkspace = useCallback(
+    async (workspaceId: string) => {
+      // Defensive guards: skip no-op switches and unknown ids.
+      const id = workspaceId.trim();
+      if (!id) return;
+      const current = dashboard?.workspace?.id;
+      if (current && current === id) return;
+      const known = (dashboard?.availableWorkspaces ?? []).some((w) => w.id === id);
+      if (!known) return;
+
+      // Persist the choice BEFORE reloading so the next mount picks it up.
+      writeStoredWorkspaceId(id);
+      // Hard reload — switching workspaces invalidates every cached row
+      // (assignments, quotes, visits, drafts in feature views). A reload
+      // is simpler and more robust than threading invalidation through
+      // every screen. Trade-off: ~700ms versus ~150ms incremental refresh,
+      // but we get correctness for free.
+      window.location.reload();
+    },
+    [dashboard?.availableWorkspaces, dashboard?.workspace?.id],
+  );
 
   const value: WorkspaceContextValue = {
     session,
@@ -179,6 +252,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     error,
     signOut,
     refresh,
+    switchWorkspace,
   };
 
   return (
