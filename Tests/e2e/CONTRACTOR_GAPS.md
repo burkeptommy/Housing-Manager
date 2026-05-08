@@ -5,6 +5,30 @@ Findings from the overnight E2E run that the matrix flagged as
 then matrix section. Each row is meant to feed into product input —
 the main thread is NOT auto-fixing these.
 
+## Wave FINAL (2026-05-08) — pre-demo dry-run
+
+Walked every demo surface end-to-end (Operations Desk, Field PWA, iOS
+Haven). Demo-readiness: GREEN across all three surfaces. One inline fix:
+
+- **Em-dash in fixture comment** (FIXED in DB, not in code).
+  `provider_quote_comments` row id `1efcfaed-c804-43b7-acd3-f2c13f50dec9`
+  contained an em-dash inside the homeowner question text rendered on
+  Customer 5's countered Water-heater quote ("...seems high — can you
+  walk me through..."). Replaced with a period. The seed is not in
+  `Tests/e2e/run-contractor.mjs`; if a future fixture refresh re-seeds
+  this comment, watch for the em-dash to come back.
+
+All other surfaces are demoable as-is. Wave Z.3 negotiation timeline
+required a real counter-chain — created a v2 child quote
+(`36ebfbe1-4bc1-4c5c-a0f8-5da1e09b0b3e`) under
+`67cefaf3-cc84-4c04-ac55-36a7accc6c80` so the timeline now renders 2
+versions. Wave Y2 cross-app parity verified end-to-end: triggering
+`update_request_status` on `ad20bb2a` produced a status-change
+audit-trail message in `handyman_request_messages` that the iOS
+HandymanMessageKind enum decodes correctly.
+
+
+
 Schema additions / behavioral gaps that surfaced during fixture
 seeding go in the **Schema gaps** section. Web UI gaps go in the
 **Web UI gaps** section. Cross-app desync goes in the **Cross-app
