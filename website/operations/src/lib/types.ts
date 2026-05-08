@@ -135,6 +135,15 @@ export interface VisitAssignment {
   windowEndTime: string;
   stopOrder: number;
   routeNotes: string;
+  /// Wave M1 — visit lifecycle. ISO timestamps for clock-in/clock-out,
+  /// pause accumulation in seconds, and GPS coords stamped at clock-in.
+  /// Defaults to nulls for legacy rows that pre-date the lifecycle phase.
+  clockInAt?: string | null;
+  clockOutAt?: string | null;
+  pausedSeconds?: number;
+  clockInLat?: number | null;
+  clockInLng?: number | null;
+  clockInAccuracyM?: number | null;
 }
 
 export interface VisitMessagePreview {

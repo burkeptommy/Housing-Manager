@@ -366,6 +366,17 @@ export default function VisitDetailScreen() {
               so the dispatcher sees the reply path and pace at a glance. */}
           {visit.urgency === "urgent" && <Pill tone="critical">Emergency</Pill>}
           {visit.source === "haven" && <Pill tone="indigo">Routed by Chez</Pill>}
+          {/* Wave M1 — verified arrival pill renders when the field tech
+              clocked in with GPS coords. Tooltip carries the lat/lng so a
+              dispatcher can spot a wildly-wrong arrival. */}
+          {visit.assignment?.clockInLat != null && visit.assignment?.clockInLng != null && (
+            <span
+              title={`Arrived at ${visit.assignment.clockInLat.toFixed(4)}, ${visit.assignment.clockInLng.toFixed(4)}`}
+              style={{ display: "inline-flex" }}
+            >
+              <Pill tone="success">Verified arrival</Pill>
+            </span>
+          )}
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-soft)" }}>
             Updated {formatRelativeTime(visit.updatedAt)}
           </span>
@@ -884,6 +895,21 @@ export default function VisitDetailScreen() {
             <SidebarRow label="Window" value={visit.assignment?.windowStartTime ? `${formatTime12h(visit.assignment.windowStartTime)} to ${formatTime12h(visit.assignment.windowEndTime)}` : "Not scheduled"} />
             <SidebarRow label="Tech" value={visit.assignment?.memberName || "Unassigned"} />
             <SidebarRow label="Stop #" value={visit.assignment?.stopOrder ? String(visit.assignment.stopOrder) : "Not assigned"} />
+            {/* Wave M1 — visit lifecycle. Time on-site renders the live or
+                final elapsed clock once the tech has started the visit.
+                Net of any pause windows. */}
+            {visit.assignment?.clockInAt && (
+              <SidebarRow
+                label="Time on-site"
+                value={formatTimeOnSite(visit.assignment)}
+              />
+            )}
+            {visit.assignment?.clockInLat != null && visit.assignment?.clockInLng != null && (
+              <SidebarRow
+                label="Arrival GPS"
+                value={`${visit.assignment.clockInLat.toFixed(4)}, ${visit.assignment.clockInLng.toFixed(4)}`}
+              />
+            )}
           </Card>
 
           {visit.quote ? (
@@ -955,6 +981,32 @@ function SidebarRow({ label, value }: { label: string; value: string }) {
       <span style={{ fontSize: 13, color: "var(--text)" }}>{value}</span>
     </div>
   );
+}
+
+// Wave M1 — render an "Hh Mm" time-on-site label.
+//
+// While the visit is in flight (clock_in set, clock_out not yet), we show
+// the live-elapsed total computed against `Date.now()` minus
+// pausedSeconds. After clock_out fires, we lock to the final delta. We
+// don't auto-tick here — the dispatcher reading this view doesn't need
+// second-level accuracy. The PWA shows a live H:MM:SS counter for the
+// tech who actually needs it.
+function formatTimeOnSite(a: {
+  clockInAt?: string | null;
+  clockOutAt?: string | null;
+  pausedSeconds?: number;
+}): string {
+  if (!a.clockInAt) return "Not started";
+  const startMs = new Date(a.clockInAt).getTime();
+  const endMs = a.clockOutAt ? new Date(a.clockOutAt).getTime() : Date.now();
+  const pausedSec = a.pausedSeconds || 0;
+  const elapsedSec = Math.max(0, Math.round((endMs - startMs) / 1000) - pausedSec);
+  const h = Math.floor(elapsedSec / 3600);
+  const m = Math.floor((elapsedSec % 3600) / 60);
+  const live = !a.clockOutAt;
+  if (h === 0 && m === 0) return live ? "Just started" : "0m";
+  if (h === 0) return `${m}m${live ? " (live)" : ""}`;
+  return `${h}h ${m}m${live ? " (live)" : ""}`;
 }
 
 function Estimate({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {

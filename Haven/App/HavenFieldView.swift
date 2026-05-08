@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreLocation
 import Supabase
 
 // MARK: - Native Haven Field
@@ -459,6 +460,91 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
     let windowEndTime: String?
     let stopOrder: Int?
     let routeNotes: String?
+    /// Wave M1 — visit lifecycle. Optional ISO timestamps + GPS coords +
+    /// banked pause seconds. Defaults to nulls / 0 for legacy rows that
+    /// pre-date the lifecycle phase. Resilient decoder so a future field
+    /// drift on the server doesn't take down the entire assignment.
+    let clockInAt: String?
+    let clockOutAt: String?
+    let pausedSeconds: Int
+    let clockInLat: Double?
+    let clockInLng: Double?
+    let clockInAccuracyM: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case memberId
+        case memberName
+        case memberRole
+        case memberRoleLabel
+        case routeDate
+        case windowStartTime
+        case windowEndTime
+        case stopOrder
+        case routeNotes
+        case clockInAt
+        case clockOutAt
+        case pausedSeconds
+        case clockInLat
+        case clockInLng
+        case clockInAccuracyM
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? nil
+        memberId = (try? c.decodeIfPresent(String.self, forKey: .memberId)) ?? nil
+        memberName = (try? c.decodeIfPresent(String.self, forKey: .memberName)) ?? nil
+        memberRole = (try? c.decodeIfPresent(String.self, forKey: .memberRole)) ?? nil
+        memberRoleLabel = (try? c.decodeIfPresent(String.self, forKey: .memberRoleLabel)) ?? nil
+        routeDate = (try? c.decodeIfPresent(String.self, forKey: .routeDate)) ?? nil
+        windowStartTime = (try? c.decodeIfPresent(String.self, forKey: .windowStartTime)) ?? nil
+        windowEndTime = (try? c.decodeIfPresent(String.self, forKey: .windowEndTime)) ?? nil
+        stopOrder = (try? c.decodeIfPresent(Int.self, forKey: .stopOrder)) ?? nil
+        routeNotes = (try? c.decodeIfPresent(String.self, forKey: .routeNotes)) ?? nil
+        clockInAt = (try? c.decodeIfPresent(String.self, forKey: .clockInAt)) ?? nil
+        clockOutAt = (try? c.decodeIfPresent(String.self, forKey: .clockOutAt)) ?? nil
+        pausedSeconds = (try? c.decodeIfPresent(Int.self, forKey: .pausedSeconds)) ?? 0
+        clockInLat = (try? c.decodeIfPresent(Double.self, forKey: .clockInLat)) ?? nil
+        clockInLng = (try? c.decodeIfPresent(Double.self, forKey: .clockInLng)) ?? nil
+        clockInAccuracyM = (try? c.decodeIfPresent(Int.self, forKey: .clockInAccuracyM)) ?? nil
+    }
+
+    init(
+        id: String? = nil,
+        memberId: String? = nil,
+        memberName: String? = nil,
+        memberRole: String? = nil,
+        memberRoleLabel: String? = nil,
+        routeDate: String? = nil,
+        windowStartTime: String? = nil,
+        windowEndTime: String? = nil,
+        stopOrder: Int? = nil,
+        routeNotes: String? = nil,
+        clockInAt: String? = nil,
+        clockOutAt: String? = nil,
+        pausedSeconds: Int = 0,
+        clockInLat: Double? = nil,
+        clockInLng: Double? = nil,
+        clockInAccuracyM: Int? = nil
+    ) {
+        self.id = id
+        self.memberId = memberId
+        self.memberName = memberName
+        self.memberRole = memberRole
+        self.memberRoleLabel = memberRoleLabel
+        self.routeDate = routeDate
+        self.windowStartTime = windowStartTime
+        self.windowEndTime = windowEndTime
+        self.stopOrder = stopOrder
+        self.routeNotes = routeNotes
+        self.clockInAt = clockInAt
+        self.clockOutAt = clockOutAt
+        self.pausedSeconds = pausedSeconds
+        self.clockInLat = clockInLat
+        self.clockInLng = clockInLng
+        self.clockInAccuracyM = clockInAccuracyM
+    }
 }
 
 struct HavenFieldLatestMessage: Codable, Hashable {
@@ -1306,6 +1392,132 @@ actor HavenFieldService {
             reason: reason?.trimmedOrNil
         ))
         try await perform(function: "handyman-provider", method: "POST", body: data)
+    }
+
+    // MARK: - Wave M1 visit lifecycle
+
+    /// Wave M1 — clock in to a visit. Optional GPS coords + accuracy
+    /// stamp `provider_visit_assignments.clock_in_at` + lat/lng. Server
+    /// also flips `handyman_requests.status` to `in_progress` and writes
+    /// an audit-trail message into the homeowner's thread. The
+    /// CLLocationManager prompt and grant flow lives in the calling view
+    /// — this method just forwards what we got.
+    func startVisit(
+        workspaceId: String,
+        requestId: String,
+        latitude: Double?,
+        longitude: Double?,
+        accuracy: Double?
+    ) async throws -> HavenFieldVisitAssignment {
+        struct Request: Encodable {
+            let action = "start_visit"
+            let workspaceId: String
+            let requestId: String
+            let latitude: Double?
+            let longitude: Double?
+            let accuracy: Double?
+        }
+        struct Response: Decodable {
+            let assignment: HavenFieldVisitAssignment
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            latitude: latitude,
+            longitude: longitude,
+            accuracy: accuracy
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return response.assignment
+    }
+
+    /// Wave M1 — open a pause window with a reason. NO status flip; the
+    /// visit stays in_progress. Server inserts a provider_visit_pauses
+    /// row that resume_visit later closes by stamping resumed_at.
+    /// Idempotent: if a pause is already open, the server returns it.
+    func pauseVisit(workspaceId: String, requestId: String, reason: String) async throws {
+        struct Request: Encodable {
+            let action = "pause_visit"
+            let workspaceId: String
+            let requestId: String
+            let reason: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            reason: reason
+        ))
+        try await perform(function: "handyman-provider", method: "POST", body: data)
+    }
+
+    /// Wave M1 — close the open pause and bank the elapsed seconds into
+    /// `assignments.paused_seconds`. The running clock subtracts this
+    /// total from elapsed for the live counter on the iOS UI.
+    func resumeVisit(workspaceId: String, requestId: String) async throws -> HavenFieldVisitAssignment {
+        struct Request: Encodable {
+            let action = "resume_visit"
+            let workspaceId: String
+            let requestId: String
+        }
+        struct Response: Decodable {
+            let assignment: HavenFieldVisitAssignment
+            let addedSeconds: Int?
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, requestId: requestId))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return response.assignment
+    }
+
+    /// Wave M1 — clock out + flip request to completed. If a pause is
+    /// open at the moment of completion, the server closes it before
+    /// computing the total so a "forgot to resume" doesn't mis-credit
+    /// minutes. Returns the final total seconds the iOS app shows.
+    func completeVisit(workspaceId: String, requestId: String) async throws -> (assignment: HavenFieldVisitAssignment, totalSeconds: Int) {
+        struct Request: Encodable {
+            let action = "complete_visit"
+            let workspaceId: String
+            let requestId: String
+        }
+        struct Response: Decodable {
+            let assignment: HavenFieldVisitAssignment
+            let totalSeconds: Int?
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, requestId: requestId))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return (response.assignment, response.totalSeconds ?? 0)
+    }
+
+    /// Wave M1 — read the open pause window for this assignment, if any.
+    /// Used by HavenFieldVisitWorkspaceView's onAppear hydration so a
+    /// background → foreground cycle resumes into the right state. Hits
+    /// the PostgREST endpoint directly (RLS scoped via session JWT).
+    func fetchOpenPause(assignmentId: String) async throws -> [HavenFieldOpenPause] {
+        var components = URLComponents(string: "\(AppConfig.Supabase.url)/rest/v1/provider_visit_pauses")
+        components?.queryItems = [
+            URLQueryItem(name: "assignment_id", value: "eq.\(assignmentId)"),
+            URLQueryItem(name: "resumed_at", value: "is.null"),
+            URLQueryItem(name: "select", value: "id,paused_at,resumed_at,reason"),
+            URLQueryItem(name: "order", value: "paused_at.desc"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+        if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try decoder.decode([HavenFieldOpenPause].self, from: data)
     }
 
     // MARK: - Phase 78 punch list / proposals
@@ -3035,6 +3247,176 @@ private struct HavenFieldMessagesTab: View {
     }
 }
 
+// MARK: - Wave M1 visit lifecycle
+
+/// Wave M1 — single-shot location capture for clock-in. Asks for
+/// when-in-use authorization, takes one location reading, hands it back
+/// via the completion. The whole class lives for the duration of one
+/// capture: instantiate, call `capture(...)`, the callback fires once
+/// with either coords or nil-on-denied/timeout. The `CLLocationManager`
+/// instance is held by the wrapper so the delegate stays alive for the
+/// async hop into iOS' location service.
+@MainActor
+final class FieldLocationCapture: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    private var completion: ((CLLocation?) -> Void)?
+    /// 4-second timeout — long enough for a typical residential GPS
+    /// fix on iOS but short enough that the iOS UI's loading state
+    /// doesn't trap the user staring at a spinner.
+    private let timeout: TimeInterval = 4.0
+
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+    }
+
+    func capture(completion: @escaping (CLLocation?) -> Void) {
+        self.completion = completion
+        let status = manager.authorizationStatus
+        switch status {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+            // Fall through — the delegate will fire when the user
+            // grants/denies, and that handler kicks off the request.
+        case .authorizedWhenInUse, .authorizedAlways:
+            requestSingleLocation()
+        case .denied, .restricted:
+            finish(with: nil)
+        @unknown default:
+            finish(with: nil)
+        }
+    }
+
+    private func requestSingleLocation() {
+        manager.requestLocation()
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(self!.timeout * 1_000_000_000))
+            await MainActor.run { [weak self] in
+                self?.finish(with: nil)
+            }
+        }
+    }
+
+    private func finish(with location: CLLocation?) {
+        guard let cb = completion else { return }
+        completion = nil
+        cb(location)
+    }
+
+    // MARK: CLLocationManagerDelegate
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didChangeAuthorization status: CLAuthorizationStatus
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                self.requestSingleLocation()
+            case .denied, .restricted:
+                self.finish(with: nil)
+            default:
+                break
+            }
+        }
+    }
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didUpdateLocations locations: [CLLocation]
+    ) {
+        Task { @MainActor [weak self] in
+            self?.finish(with: locations.last)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor [weak self] in
+            self?.finish(with: nil)
+        }
+    }
+}
+
+/// Wave M1 — visit lifecycle state derived from the assignment row.
+/// Names the four user-visible states so the rendering logic stays a
+/// simple switch instead of nested `if let`s.
+enum FieldVisitLifecycleState {
+    case notStarted
+    case running(clockInAt: Date, pausedSeconds: Int)
+    case paused(clockInAt: Date, pausedSeconds: Int, pausedAt: Date)
+    case completed(elapsed: Int)
+
+    /// Read the lifecycle state out of an assignment, given the optional
+    /// open pause's `paused_at`. iOS pulls the open pause's timestamp
+    /// from the running clock view's local state — there's no single
+    /// edge-fn-served boolean for "is currently paused" because the
+    /// pause row is its own lifecycle.
+    static func resolve(
+        assignment: HavenFieldVisitAssignment?,
+        currentlyPausedAt: Date?
+    ) -> FieldVisitLifecycleState {
+        guard let assignment else { return .notStarted }
+        guard let clockInAtString = assignment.clockInAt,
+              let clockInAt = parseISO(clockInAtString) else {
+            return .notStarted
+        }
+        if let clockOutAtString = assignment.clockOutAt,
+           let clockOutAt = parseISO(clockOutAtString) {
+            // Final number — server already deducted paused_seconds.
+            let totalSec = Int(clockOutAt.timeIntervalSince(clockInAt)) - assignment.pausedSeconds
+            return .completed(elapsed: max(0, totalSec))
+        }
+        if let pausedAt = currentlyPausedAt {
+            return .paused(clockInAt: clockInAt, pausedSeconds: assignment.pausedSeconds, pausedAt: pausedAt)
+        }
+        return .running(clockInAt: clockInAt, pausedSeconds: assignment.pausedSeconds)
+    }
+
+    private static func parseISO(_ string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = formatter.date(from: string) { return parsed }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
+}
+
+/// Wave M1 — pause reason picker options, surfaced in the Pause modal.
+enum FieldPauseReason: String, CaseIterable, Identifiable {
+    case lunch = "Lunch"
+    case wrongScope = "Customer answered for different reason"
+    case issue = "Issue"
+    case other = "Other"
+
+    var id: String { rawValue }
+}
+
+/// Wave M1 — open pause window decoded from PostgREST. Resilient
+/// decoder so a future column drift doesn't take down the whole array.
+struct HavenFieldOpenPause: Codable, Identifiable, Hashable {
+    let id: String
+    let pausedAt: String?
+    let resumedAt: String?
+    let reason: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case pausedAt = "paused_at"
+        case resumedAt = "resumed_at"
+        case reason
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        pausedAt = (try? c.decodeIfPresent(String.self, forKey: .pausedAt)) ?? nil
+        resumedAt = (try? c.decodeIfPresent(String.self, forKey: .resumedAt)) ?? nil
+        reason = (try? c.decodeIfPresent(String.self, forKey: .reason)) ?? nil
+    }
+}
+
 private struct HavenFieldVisitWorkspaceView: View {
     @ObservedObject var viewModel: HavenFieldVisitWorkspaceModel
     @State private var showCoordinationComposer = false
@@ -3058,6 +3440,46 @@ private struct HavenFieldVisitWorkspaceView: View {
     /// Local override map so a successful toggle reads as 'done' until
     /// the parent dashboard refresh comes back with the new server state.
     @State private var locallyDoneItemIds: Set<String> = []
+
+    // MARK: Wave M1 lifecycle state
+
+    /// The most recent assignment row from a successful start/pause/resume/
+    /// complete network call. Falls back to `viewModel.visit.assignment`
+    /// when the local override is nil so the UI reads from canonical
+    /// dashboard state on first render.
+    @State private var lifecycleAssignment: HavenFieldVisitAssignment?
+    /// When the local pause was opened (server hasn't told us about
+    /// existing open pauses, so we track the local opening here). Synced
+    /// from the lifecycleAssignment if the server reports we're already
+    /// paused on first load.
+    @State private var currentlyPausedAt: Date?
+    /// True while a lifecycle network request is in flight. Drives the
+    /// loading skeleton on the lifecycle section without blocking other
+    /// taps elsewhere on the view.
+    @State private var lifecycleSyncing = false
+    /// Localized error from the most recent lifecycle action — surfaces
+    /// inline as a Retry banner on the lifecycle section.
+    @State private var lifecycleError: String?
+    /// Keeps the FieldLocationCapture instance alive for the duration of
+    /// one start_visit hit. iOS' delegate-based auth grant flow needs a
+    /// live anchor.
+    @State private var locationCapture: FieldLocationCapture?
+    /// True when location auth was denied or unavailable on the most
+    /// recent capture attempt. Surfaces a small caption beneath Start.
+    @State private var locationDenied = false
+    /// Pause modal state.
+    @State private var showPauseSheet = false
+    @State private var pauseReason: FieldPauseReason = .lunch
+    @State private var pauseOtherText = ""
+    @State private var pauseSubmitting = false
+    @State private var pauseValidationError: String?
+    /// Live timer that ticks once a second while the workspace is on
+    /// screen. The clock face reads from `Date.now` minus `clockInAt`,
+    /// minus banked + currently-running pause seconds. Computed on each
+    /// tick so background → foreground "just works" — `Date.now` jumps
+    /// forward and the next tick paints the new total.
+    @State private var nowTick: Date = Date()
+    private let lifecycleTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     /// Phase 78: toggles a punch item between pending and done. Hits the
     /// `update_punch_item_status` edge action; on success, posts
@@ -3148,6 +3570,8 @@ private struct HavenFieldVisitWorkspaceView: View {
             VStack(alignment: .leading, spacing: 18) {
                 headerCard
 
+                lifecycleSection
+
                 if let errorMessage = viewModel.errorMessage {
                     FieldErrorBanner(message: errorMessage)
                 }
@@ -3169,6 +3593,19 @@ private struct HavenFieldVisitWorkspaceView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load()
+            // Hydrate lifecycle state from the dashboard payload on
+            // first appear. If the user backgrounded mid-paused, we'd
+            // need to learn about it from the server — best-effort:
+            // reload the open pause from PostgREST so the right state
+            // resumes when the app re-foregrounds.
+            await hydrateLifecycleStateFromServer()
+        }
+        .onReceive(lifecycleTimer) { tick in
+            nowTick = tick
+        }
+        .sheet(isPresented: $showPauseSheet) {
+            pauseSheet
+                .presentationDetents([.medium])
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -3279,6 +3716,482 @@ private struct HavenFieldVisitWorkspaceView: View {
 
                 actionRow
             }
+        }
+    }
+
+    // MARK: Wave M1 lifecycle section
+
+    /// Source-of-truth assignment for the lifecycle UI. Local override
+    /// (set by start/pause/resume/complete responses) wins; otherwise
+    /// fall through to the dashboard payload. Every render reads via
+    /// this so the live timer reflects the most recent snapshot.
+    private var resolvedAssignment: HavenFieldVisitAssignment? {
+        lifecycleAssignment ?? viewModel.visit.assignment
+    }
+
+    private var lifecycleState: FieldVisitLifecycleState {
+        FieldVisitLifecycleState.resolve(
+            assignment: resolvedAssignment,
+            currentlyPausedAt: currentlyPausedAt
+        )
+    }
+
+    @ViewBuilder
+    private var lifecycleSection: some View {
+        FieldSectionCard(kicker: "Visit lifecycle", title: lifecycleHeadline) {
+            VStack(alignment: .leading, spacing: 14) {
+                // Live elapsed clock — only shown for in-flight states.
+                switch lifecycleState {
+                case .notStarted:
+                    Text("Tap Start to clock in. We'll record the time and stamp your arrival GPS so the homeowner knows you're on-site.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                case .running, .paused:
+                    elapsedClockView
+                case .completed(let elapsed):
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(HavenColors.success)
+                            .font(.system(size: 22))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(formatElapsed(elapsed))
+                                .font(HavenTypography.largeTitle)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Total time on-site")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                }
+
+                // Error banner specific to the lifecycle action — does
+                // not collide with viewModel.errorMessage.
+                if let lifecycleError {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(HavenColors.action)
+                        Text(lifecycleError)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Button("Retry") {
+                            self.lifecycleError = nil
+                        }
+                        .buttonStyle(FieldSecondaryButtonStyle(compact: true))
+                    }
+                    .padding(12)
+                    .background(HavenColors.action.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                lifecycleButtonRow
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var elapsedClockView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(formatElapsed(elapsedSeconds))
+                    .font(.system(size: 36, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(HavenColors.textPrimary)
+                if case .paused = lifecycleState {
+                    Text("PAUSED")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.action)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(HavenColors.action.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+                Spacer()
+            }
+            Text(elapsedSubtitle)
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var lifecycleButtonRow: some View {
+        switch lifecycleState {
+        case .notStarted:
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    Task { await startLifecycle() }
+                } label: {
+                    if lifecycleSyncing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(HavenColors.textOnAction)
+                            Text("Starting...")
+                        }
+                    } else {
+                        Text("Start visit")
+                    }
+                }
+                .buttonStyle(FieldPrimaryButtonStyle())
+                .disabled(lifecycleSyncing || resolvedAssignment == nil)
+
+                if locationDenied {
+                    Text("GPS unavailable. Visit start time will be recorded without location.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+        case .running:
+            HStack(spacing: 10) {
+                Button("Pause") {
+                    pauseReason = .lunch
+                    pauseOtherText = ""
+                    pauseValidationError = nil
+                    showPauseSheet = true
+                }
+                .buttonStyle(FieldSecondaryButtonStyle())
+                .disabled(lifecycleSyncing)
+
+                Button {
+                    Task { await completeLifecycle() }
+                } label: {
+                    if lifecycleSyncing {
+                        ProgressView().tint(HavenColors.textOnAction)
+                    } else {
+                        Text("Complete")
+                    }
+                }
+                .buttonStyle(FieldPrimaryButtonStyle())
+                .disabled(lifecycleSyncing)
+            }
+        case .paused:
+            HStack(spacing: 10) {
+                Button {
+                    Task { await resumeLifecycle() }
+                } label: {
+                    if lifecycleSyncing {
+                        ProgressView().tint(HavenColors.textOnAction)
+                    } else {
+                        Text("Resume")
+                    }
+                }
+                .buttonStyle(FieldPrimaryButtonStyle())
+                .disabled(lifecycleSyncing)
+
+                Button {
+                    Task { await completeLifecycle() }
+                } label: {
+                    Text("Complete")
+                }
+                .buttonStyle(FieldSecondaryButtonStyle())
+                .disabled(lifecycleSyncing)
+            }
+        case .completed:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var pauseSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("Why are you pausing?")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+
+                    Picker("Reason", selection: $pauseReason) {
+                        ForEach(FieldPauseReason.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: pauseReason) { _, _ in
+                        pauseValidationError = nil
+                    }
+
+                    if pauseReason == .other {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Tell the homeowner why")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            TextField("e.g. waiting on parts", text: $pauseOtherText)
+                                .textInputAutocapitalization(.sentences)
+                                .padding(12)
+                                .background(HavenColors.surface)
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+
+                    if let pauseValidationError {
+                        Text(pauseValidationError)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+
+                    Button {
+                        Task { await submitPause() }
+                    } label: {
+                        if pauseSubmitting {
+                            HStack(spacing: 8) {
+                                ProgressView().tint(HavenColors.textOnAction)
+                                Text("Pausing...")
+                            }
+                        } else {
+                            Text("Pause visit")
+                        }
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                    .disabled(pauseSubmitting)
+                }
+                .padding(20)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Pause")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") {
+                        showPauseSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    /// Lifecycle headline — describes what state the visit is in.
+    private var lifecycleHeadline: String {
+        switch lifecycleState {
+        case .notStarted:
+            return "Ready when you are"
+        case .running:
+            return "Visit in progress"
+        case .paused:
+            return "Visit paused"
+        case .completed:
+            return "Visit complete"
+        }
+    }
+
+    private var elapsedSubtitle: String {
+        switch lifecycleState {
+        case .running(let clockInAt, _):
+            return "Started \(timeOfDayString(clockInAt))"
+        case .paused(_, _, let pausedAt):
+            return "Paused \(timeOfDayString(pausedAt))"
+        default:
+            return ""
+        }
+    }
+
+    /// Live elapsed counter in seconds. Reads from `nowTick` so the
+    /// view re-renders every second while the workspace is foregrounded.
+    /// Background → foreground is naturally handled: when the timer fires
+    /// after re-appearing, `Date.now` jumps to the current wall-clock
+    /// and the next tick paints the right value.
+    private var elapsedSeconds: Int {
+        guard let assignment = resolvedAssignment,
+              let clockInAtString = assignment.clockInAt,
+              let clockInAt = parseISODate(clockInAtString) else {
+            return 0
+        }
+
+        // Use `nowTick` so SwiftUI re-renders on every timer tick.
+        let referenceNow = nowTick
+        var elapsed = Int(referenceNow.timeIntervalSince(clockInAt)) - assignment.pausedSeconds
+        // While locally paused, the live counter freezes at the moment
+        // we entered pause — subtract the unbanked pause window too.
+        if let pausedAt = currentlyPausedAt {
+            elapsed -= Int(referenceNow.timeIntervalSince(pausedAt))
+        }
+        return max(0, elapsed)
+    }
+
+    private func formatElapsed(_ seconds: Int) -> String {
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        let s = seconds % 60
+        if h > 0 {
+            return String(format: "%d:%02d:%02d", h, m, s)
+        }
+        return String(format: "%d:%02d", m, s)
+    }
+
+    private func timeOfDayString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    private func parseISODate(_ string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = formatter.date(from: string) { return parsed }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
+
+    /// On view appear, ask the server whether there's an open pause
+    /// window for this assignment. Sets `currentlyPausedAt` if so —
+    /// otherwise leaves the running clock. Fault tolerant: a network
+    /// failure here just keeps whatever state was last known.
+    private func hydrateLifecycleStateFromServer() async {
+        guard let assignmentId = (resolvedAssignment?.id),
+              !assignmentId.isEmpty else { return }
+        do {
+            let pauses = try await HavenFieldService.shared.fetchOpenPause(assignmentId: assignmentId)
+            if let openPause = pauses.first,
+               let pausedAtString = openPause.pausedAt,
+               let pausedAt = parseISODate(pausedAtString) {
+                currentlyPausedAt = pausedAt
+            } else {
+                currentlyPausedAt = nil
+            }
+        } catch {
+            // Best-effort. Don't bug the user about it.
+            print("[HavenFieldVisitWorkspaceView] hydrate pause state failed: \(error)")
+        }
+    }
+
+    private func startLifecycle() async {
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            lifecycleError = "Workspace not loaded yet. Try again in a moment."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            lifecycleError = "Visit identifier missing."
+            return
+        }
+
+        lifecycleError = nil
+        lifecycleSyncing = true
+        defer { lifecycleSyncing = false }
+
+        // Capture GPS — graceful failure on denied / timeout.
+        let capture = FieldLocationCapture()
+        locationCapture = capture
+        let location: CLLocation? = await withCheckedContinuation { continuation in
+            capture.capture { loc in
+                continuation.resume(returning: loc)
+            }
+        }
+        locationCapture = nil
+        locationDenied = (location == nil)
+
+        do {
+            let assignment = try await HavenFieldService.shared.startVisit(
+                workspaceId: workspaceId,
+                requestId: requestId,
+                latitude: location?.coordinate.latitude,
+                longitude: location?.coordinate.longitude,
+                accuracy: location?.horizontalAccuracy
+            )
+            lifecycleAssignment = assignment
+            currentlyPausedAt = nil
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+        } catch {
+            lifecycleError = friendlyServerError(from: error, fallback: "Couldn't start the visit. Tap Retry to dismiss this message and try again.")
+        }
+    }
+
+    private func submitPause() async {
+        if pauseReason == .other {
+            let trimmed = pauseOtherText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                pauseValidationError = "Tell the homeowner why."
+                return
+            }
+        }
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            pauseValidationError = "Workspace not loaded yet."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            pauseValidationError = "Visit identifier missing."
+            return
+        }
+
+        let reasonText: String = (pauseReason == .other)
+            ? pauseOtherText.trimmingCharacters(in: .whitespacesAndNewlines)
+            : pauseReason.rawValue
+
+        pauseValidationError = nil
+        pauseSubmitting = true
+        defer { pauseSubmitting = false }
+
+        do {
+            try await HavenFieldService.shared.pauseVisit(
+                workspaceId: workspaceId,
+                requestId: requestId,
+                reason: reasonText
+            )
+            currentlyPausedAt = Date()
+            showPauseSheet = false
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+        } catch {
+            pauseValidationError = friendlyServerError(from: error, fallback: "Couldn't pause the visit. Try again.")
+        }
+    }
+
+    private func resumeLifecycle() async {
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            lifecycleError = "Workspace not loaded yet."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            lifecycleError = "Visit identifier missing."
+            return
+        }
+
+        lifecycleError = nil
+        lifecycleSyncing = true
+        defer { lifecycleSyncing = false }
+
+        do {
+            let assignment = try await HavenFieldService.shared.resumeVisit(
+                workspaceId: workspaceId,
+                requestId: requestId
+            )
+            lifecycleAssignment = assignment
+            currentlyPausedAt = nil
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+        } catch {
+            lifecycleError = friendlyServerError(from: error, fallback: "Couldn't resume the visit. Tap Retry and try again.")
+        }
+    }
+
+    private func completeLifecycle() async {
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            lifecycleError = "Workspace not loaded yet."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            lifecycleError = "Visit identifier missing."
+            return
+        }
+
+        lifecycleError = nil
+        lifecycleSyncing = true
+        defer { lifecycleSyncing = false }
+
+        do {
+            let result = try await HavenFieldService.shared.completeVisit(
+                workspaceId: workspaceId,
+                requestId: requestId
+            )
+            lifecycleAssignment = result.assignment
+            currentlyPausedAt = nil
+            await viewModel.onCoordinated?()
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+        } catch {
+            lifecycleError = friendlyServerError(from: error, fallback: "Couldn't complete the visit. Tap Retry and try again.")
         }
     }
 
@@ -5383,6 +6296,14 @@ private struct FieldScheduledVisitRow: View {
                         Text(home?.address ?? visit.property?.address ?? home?.name ?? visit.property?.name ?? "Connected home")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
+                        // Wave M1 — time-on-site caption shows once the
+                        // tech has clocked in. Cross-app parity with
+                        // Operations Desk's TIME ON-SITE label.
+                        if let timeOnSite = timeOnSiteLabel {
+                            Text(timeOnSite)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
                     }
                     Spacer(minLength: 8)
                     if highlightNext {
@@ -5406,6 +6327,46 @@ private struct FieldScheduledVisitRow: View {
         .background(HavenColors.surface)
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    /// Wave M1 — small caption that surfaces "TIME ON-SITE" when the
+    /// tech has clocked in. Computed against the assignment's clock_in
+    /// timestamps; static (non-live) on the row to keep the today list
+    /// simple — the live H:MM:SS belongs to the workspace view.
+    private var timeOnSiteLabel: String? {
+        guard let assignment = visit.assignment,
+              let clockInAtString = assignment.clockInAt,
+              let clockInAt = parseISODate(clockInAtString) else {
+            return nil
+        }
+        let endDate: Date
+        if let clockOutString = assignment.clockOutAt,
+           let clockOut = parseISODate(clockOutString) {
+            endDate = clockOut
+        } else {
+            endDate = Date()
+        }
+        let elapsedSec = max(0, Int(endDate.timeIntervalSince(clockInAt)) - assignment.pausedSeconds)
+        let h = elapsedSec / 3600
+        let m = (elapsedSec % 3600) / 60
+        let live = (assignment.clockOutAt == nil)
+        let value: String
+        if h > 0 {
+            value = "\(h)h \(m)m"
+        } else if m > 0 {
+            value = "\(m)m"
+        } else {
+            value = live ? "Just started" : "0m"
+        }
+        return live ? "TIME ON-SITE: \(value) (live)" : "TIME ON-SITE: \(value)"
+    }
+
+    private func parseISODate(_ string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = formatter.date(from: string) { return parsed }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
     }
 
     private var timeLabel: String {

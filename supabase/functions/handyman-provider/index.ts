@@ -3504,6 +3504,334 @@ async function updateRequestStatusForProvider(
   return { request: updated };
 }
 
+// Wave M1 — visit lifecycle handlers.
+//
+// Four actions cover the on-site beat for a field tech:
+//   start_visit   — clock in (records GPS + flips request to in_progress)
+//   pause_visit   — open a pause window with a reason (no status flip)
+//   resume_visit  — close the open pause and bank the elapsed seconds
+//   complete_visit — clock out + flip to completed (audit message + total)
+//
+// Auth: every action goes through assertWorkspaceAccess() so a tech in
+// workspace A cannot stamp clock_in on a visit in workspace B. The visit
+// row is loaded by request_id + workspace_id, so a missing/foreign row
+// fails the membership check before any write happens.
+//
+// Pause math: provider_visit_pauses rows store the open pause window;
+// resume_visit folds the elapsed seconds into the assignment's
+// paused_seconds counter and stamps resumed_at on the pause row. We
+// keep the pause table around as the audit trail (one row per pause
+// window with reason + actor) and `paused_seconds` as the running
+// total the iOS clock subtracts from elapsed for the live counter.
+
+async function loadAssignmentForLifecycle(
+  service: ServiceClient,
+  workspaceId: string,
+  requestId: string,
+) {
+  const { data: assignment, error } = await service
+    .from("provider_visit_assignments")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("request_id", requestId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!assignment) {
+    throw new Error("No assignment found for this visit. Confirm scheduling first.");
+  }
+  return assignment;
+}
+
+// Wave M1 — convert a raw provider_visit_assignments row (snake_case) to
+// the camelCase shape iOS' HavenFieldVisitAssignment expects. Mirrors the
+// keys baked into loadDashboard so start/pause/resume/complete responses
+// round-trip cleanly through the resilient decoder.
+function serializeAssignment(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: compactString(row.id),
+    memberId: compactString(row.assigned_member_id),
+    routeDate: compactString(row.route_date),
+    windowStartTime: compactString(row.window_start_time),
+    windowEndTime: compactString(row.window_end_time),
+    stopOrder: numberValue(row.stop_order || 0),
+    routeNotes: compactString(row.route_notes),
+    clockInAt: row.clock_in_at ?? null,
+    clockOutAt: row.clock_out_at ?? null,
+    pausedSeconds: numberValue(row.paused_seconds || 0),
+    clockInLat: row.clock_in_lat !== null && row.clock_in_lat !== undefined
+      ? Number(row.clock_in_lat)
+      : null,
+    clockInLng: row.clock_in_lng !== null && row.clock_in_lng !== undefined
+      ? Number(row.clock_in_lng)
+      : null,
+    clockInAccuracyM: row.clock_in_accuracy_m !== null && row.clock_in_accuracy_m !== undefined
+      ? Number(row.clock_in_accuracy_m)
+      : null,
+  };
+}
+
+async function startVisitForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+
+  // Idempotent: if clock_in_at already set, return the existing row
+  // instead of double-stamping. Tech may have tapped twice on a slow
+  // network. Surfacing the already-recorded value lets the iOS app
+  // resume into the running-clock state without confusion.
+  if (assignment.clock_in_at) {
+    return { assignment: serializeAssignment(assignment) };
+  }
+
+  const lat = body.latitude !== null && body.latitude !== undefined && body.latitude !== ""
+    ? Number(body.latitude)
+    : null;
+  const lng = body.longitude !== null && body.longitude !== undefined && body.longitude !== ""
+    ? Number(body.longitude)
+    : null;
+  const accuracyRaw = body.accuracy !== null && body.accuracy !== undefined && body.accuracy !== ""
+    ? Number(body.accuracy)
+    : null;
+  const accuracy = accuracyRaw !== null && Number.isFinite(accuracyRaw)
+    ? Math.round(accuracyRaw)
+    : null;
+
+  const now = isoNow();
+  const updates: Record<string, unknown> = {
+    clock_in_at: now,
+    updated_at: now,
+  };
+  if (lat !== null && Number.isFinite(lat)) updates.clock_in_lat = lat;
+  if (lng !== null && Number.isFinite(lng)) updates.clock_in_lng = lng;
+  if (accuracy !== null) updates.clock_in_accuracy_m = accuracy;
+
+  const { data: updated, error: updateError } = await service
+    .from("provider_visit_assignments")
+    .update(updates)
+    .eq("id", assignment.id)
+    .select()
+    .single();
+  if (updateError || !updated) throw updateError ?? new Error("Failed to start visit");
+
+  // Flip the request to in_progress when starting fresh — only when the
+  // status is in a pre-start phase. Don't downgrade a more advanced
+  // status (e.g. quoted, follow_up_recommended).
+  try {
+    const { data: request } = await service
+      .from("handyman_requests")
+      .select("id, status, household_id")
+      .eq("id", requestId)
+      .maybeSingle();
+    if (request) {
+      const currentStatus = compactString(request.status);
+      const startableStatuses = [
+        "submitted", "scheduled", "sent_to_handyman", "alternate_dates_proposed",
+        "awaiting_homeowner", "confirmed", "on_my_way", "checked_in",
+      ];
+      if (startableStatuses.includes(currentStatus)) {
+        await service
+          .from("handyman_requests")
+          .update({ status: "in_progress", updated_at: now })
+          .eq("id", requestId);
+        const householdId = compactString(request.household_id);
+        if (householdId) {
+          await service.from("handyman_request_messages").insert({
+            request_id: requestId,
+            household_id: householdId,
+            sender_role: "vendor",
+            body: "Visit started.",
+            metadata: { kind: "status_change", status: "in_progress" },
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[handyman-provider] start_visit status flip failed", err);
+  }
+
+  return { assignment: serializeAssignment(updated) };
+}
+
+async function pauseVisitForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+  const reason = compactString(body.reason);
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+  if (!assignment.clock_in_at) {
+    throw new Error("Start the visit before pausing.");
+  }
+
+  // If a pause is already open, return it instead of opening a second
+  // one. Prevents the "user double-tapped Pause" race producing two
+  // overlapping pause windows.
+  const { data: existingOpen } = await service
+    .from("provider_visit_pauses")
+    .select("*")
+    .eq("assignment_id", assignment.id)
+    .is("resumed_at", null)
+    .maybeSingle();
+  if (existingOpen) {
+    return { pause: existingOpen };
+  }
+
+  const { data: pause, error } = await service
+    .from("provider_visit_pauses")
+    .insert({
+      workspace_id: workspaceId,
+      assignment_id: assignment.id,
+      reason: reason || null,
+      created_by_user_id: userId || null,
+    })
+    .select()
+    .single();
+  if (error || !pause) throw error ?? new Error("Failed to pause visit");
+
+  return { pause };
+}
+
+async function resumeVisitForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+
+  // Find the open pause. If there isn't one, return the assignment
+  // as-is — caller likely raced a tap.
+  const { data: openPause } = await service
+    .from("provider_visit_pauses")
+    .select("*")
+    .eq("assignment_id", assignment.id)
+    .is("resumed_at", null)
+    .order("paused_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!openPause) {
+    return { assignment: serializeAssignment(assignment) };
+  }
+
+  const now = isoNow();
+  const pausedAtMs = new Date(compactString(openPause.paused_at) || now).getTime();
+  const resumedAtMs = new Date(now).getTime();
+  const elapsedSec = Math.max(0, Math.round((resumedAtMs - pausedAtMs) / 1000));
+
+  const { error: pauseUpdateError } = await service
+    .from("provider_visit_pauses")
+    .update({ resumed_at: now })
+    .eq("id", openPause.id);
+  if (pauseUpdateError) throw pauseUpdateError;
+
+  const newPausedSeconds = numberValue(assignment.paused_seconds || 0) + elapsedSec;
+  const { data: updated, error: assignmentUpdateError } = await service
+    .from("provider_visit_assignments")
+    .update({
+      paused_seconds: newPausedSeconds,
+      updated_at: now,
+    })
+    .eq("id", assignment.id)
+    .select()
+    .single();
+  if (assignmentUpdateError || !updated) {
+    throw assignmentUpdateError ?? new Error("Failed to resume visit");
+  }
+
+  return { assignment: serializeAssignment(updated), addedSeconds: elapsedSec };
+}
+
+async function completeVisitForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+
+  const now = isoNow();
+  const updates: Record<string, unknown> = {
+    updated_at: now,
+  };
+  // Only stamp clock_out_at if not already set. Idempotent on retry.
+  if (!assignment.clock_out_at) {
+    updates.clock_out_at = now;
+  }
+  // If a pause is still open, close it before computing total. Counts
+  // the trailing pause window so an "I forgot to resume before tapping
+  // Complete" doesn't mis-credit minutes.
+  const { data: openPause } = await service
+    .from("provider_visit_pauses")
+    .select("*")
+    .eq("assignment_id", assignment.id)
+    .is("resumed_at", null)
+    .maybeSingle();
+  if (openPause) {
+    const pausedAtMs = new Date(compactString(openPause.paused_at) || now).getTime();
+    const resumedAtMs = new Date(now).getTime();
+    const elapsedSec = Math.max(0, Math.round((resumedAtMs - pausedAtMs) / 1000));
+    await service
+      .from("provider_visit_pauses")
+      .update({ resumed_at: now })
+      .eq("id", openPause.id);
+    updates.paused_seconds = numberValue(assignment.paused_seconds || 0) + elapsedSec;
+  }
+
+  const { data: updated, error: updateError } = await service
+    .from("provider_visit_assignments")
+    .update(updates)
+    .eq("id", assignment.id)
+    .select()
+    .single();
+  if (updateError || !updated) throw updateError ?? new Error("Failed to complete visit");
+
+  // Flip the request to completed via the existing handler so the
+  // status-change audit message + cross-app parity ride along
+  // automatically.
+  await updateRequestStatusForProvider(
+    service,
+    user,
+    { workspaceId, requestId, status: "completed" },
+  );
+
+  // Compute total time on-site so the iOS app can show the final stat.
+  const startMs = updated.clock_in_at ? new Date(compactString(updated.clock_in_at)).getTime() : null;
+  const endMs = updated.clock_out_at ? new Date(compactString(updated.clock_out_at)).getTime() : null;
+  const totalSeconds = startMs && endMs
+    ? Math.max(0, Math.round((endMs - startMs) / 1000) - numberValue(updated.paused_seconds || 0))
+    : 0;
+
+  return { assignment: serializeAssignment(updated), totalSeconds };
+}
+
 async function assertWorkspaceAccess(service: ServiceClient, userId: string, workspaceId: string) {
   const membership = await getWorkspaceMembership(service, userId);
   if (!membership) throw new Error("No provider workspace found");
@@ -8737,6 +9065,45 @@ serve(async (req) => {
 
       if (action === "update_request_status") {
         const result = await updateRequestStatusForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M1 — visit lifecycle actions. start / pause / resume / complete
+      // each operate on the assignment row for (workspace, request) and
+      // bank elapsed time across pause windows.
+      if (action === "start_visit") {
+        const result = await startVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "pause_visit") {
+        const result = await pauseVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "resume_visit") {
+        const result = await resumeVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "complete_visit") {
+        const result = await completeVisitForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
