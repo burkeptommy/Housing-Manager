@@ -1435,25 +1435,29 @@ enum HandymanRequestStatus: String, Codable, CaseIterable {
     }
 
     var homeownerSummary: String {
+        // Wave U follow-up: replaced "the handyman" with "your contractor"
+        // per the brand-voice rebrand (CLAUDE.md hard rule — no
+        // "handyman" in user-facing copy). The displayLabel "Sent to
+        // handyman" is internal status text and stays as-is.
         switch self {
         case .draft:
             return "This visit is still a draft."
         case .submitted:
             return "Chez saved the request and is getting it ready to send."
         case .scheduled:
-            return "The visit has a date, but the handyman still needs the full Chez confirmation flow."
+            return "The visit has a date, but your contractor still needs the full Chez confirmation flow."
         case .sentToHandyman:
-            return "The handyman has the visit link and still needs to confirm or suggest another date."
+            return "Your contractor has the visit link and still needs to confirm or suggest another date."
         case .alternateDatesProposed:
-            return "The handyman asked for different timing."
+            return "Your contractor asked for different timing."
         case .awaitingHomeowner:
-            return "The handyman sent a question or note that needs a homeowner reply."
+            return "Your contractor sent a question or note that needs a homeowner reply."
         case .confirmed:
             return "Both sides are aligned and the visit is confirmed."
         case .onMyWay:
-            return "The handyman is on the way."
+            return "Your contractor is on the way."
         case .checkedIn:
-            return "The handyman has checked in and started the visit."
+            return "Your contractor has checked in and started the visit."
         case .quoted:
             return "A quote is ready for review."
         case .inProgress:
@@ -1461,11 +1465,11 @@ enum HandymanRequestStatus: String, Codable, CaseIterable {
         case .completed:
             return "The visit is complete."
         case .followUpRecommended:
-            return "The handyman finished and recommended follow-up work."
+            return "Your contractor finished and recommended follow-up work."
         case .cancelled:
             return "This request was cancelled."
         case .declined:
-            return "The handyman declined this visit."
+            return "Your contractor declined this visit."
         }
     }
 
