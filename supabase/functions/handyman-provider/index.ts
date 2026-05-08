@@ -2649,6 +2649,11 @@ async function loadDashboard(
         viewedAt: quote.viewed_at,
         approvedAt: quote.approved_at,
         declinedAt: quote.declined_at,
+        // Wave Z.3 — surface negotiation metadata so the desktop can
+        // render the version timeline. Phase 73b added these columns.
+        signedAt: quote.signed_at ?? null,
+        signedName: compactString(quote.signed_name) || null,
+        homeownerRevisedAt: quote.homeowner_revised_at ?? null,
         requestId: compactString(quote.request_id),
         publicShareUrl: publicQuoteUrl(compactString(quote.public_share_token)),
         lineItems,
@@ -3836,6 +3841,385 @@ async function assignVisit(
   }
 
   return data;
+}
+
+/**
+ * Wave Z.1 — Drag-to-reschedule on the calendar. Moves a visit's
+ * route_date to a new day. Lighter-touch than propose_visit_time:
+ * - Doesn't go through the homeowner accept/decline cycle
+ * - Doesn't shift confirmed_visit_at hours (calendar drag is day-grain)
+ * - Keeps the same assigned tech, window times, stop_order
+ *
+ * Use cases:
+ * 1. Unconfirmed/draft visits — contractor moves the proposed day
+ * 2. Already-confirmed visits — contractor needs to shift; an audit
+ *    message lands in the thread so the homeowner sees what happened.
+ *    For confirmed visits the SPA also shows a confirm dialog before
+ *    calling here.
+ *
+ * Writes a `visit_rescheduled` audit message into handyman_request_messages
+ * so the homeowner-side thread mirrors the change (cross-app parity per
+ * Section 22 mandate).
+ */
+async function rescheduleVisit(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canAssignWork");
+
+  const requestId = compactString(body.requestId);
+  const newRouteDate = compactString(body.newRouteDate);
+  if (!requestId) throw new Error("Missing request");
+  if (!newRouteDate || !/^\d{4}-\d{2}-\d{2}$/.test(newRouteDate)) {
+    throw new Error("Invalid newRouteDate (expected yyyy-MM-dd)");
+  }
+
+  // Lookup the visit assignment row + parent request for context.
+  const { data: assignment } = await service
+    .from("provider_visit_assignments")
+    .select("id, route_date")
+    .eq("workspace_id", workspaceId)
+    .eq("request_id", requestId)
+    .limit(1)
+    .maybeSingle();
+  if (!assignment) throw new Error("Visit assignment not found");
+
+  const { data: request } = await service
+    .from("handyman_requests")
+    .select("id, household_id, status, confirmed_visit_at, title")
+    .eq("id", requestId)
+    .limit(1)
+    .maybeSingle();
+  if (!request) throw new Error("Request not found");
+
+  const oldRouteDate = compactString(assignment.route_date);
+  const householdId = compactString(request.household_id);
+  const wasConfirmed = Boolean(compactString(request.confirmed_visit_at));
+
+  // Update the assignment row. Confirmed visits also need confirmed_visit_at
+  // shifted to keep the calendar truth in sync — preserve the original
+  // hour/minute when shifting.
+  await service
+    .from("provider_visit_assignments")
+    .update({
+      route_date: newRouteDate,
+      updated_at: isoNow(),
+    })
+    .eq("id", compactString(assignment.id));
+
+  if (wasConfirmed) {
+    const oldConfirmed = new Date(compactString(request.confirmed_visit_at));
+    if (!Number.isNaN(oldConfirmed.getTime())) {
+      const [yyyy, mm, dd] = newRouteDate.split("-").map((s) => Number(s));
+      const newConfirmed = new Date(oldConfirmed);
+      newConfirmed.setUTCFullYear(yyyy, mm - 1, dd);
+      await service
+        .from("handyman_requests")
+        .update({
+          confirmed_visit_at: newConfirmed.toISOString(),
+          updated_at: isoNow(),
+        })
+        .eq("id", requestId);
+    }
+  }
+
+  // Audit message — keeps the homeowner thread in sync. Same pattern
+  // Wave Y2 used for cross-app parity.
+  if (householdId) {
+    const dateLabel = (iso: string) => {
+      try {
+        const d = new Date(`${iso}T12:00:00Z`);
+        return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      } catch (_) {
+        return iso;
+      }
+    };
+    const oldLabel = oldRouteDate ? dateLabel(oldRouteDate) : "an earlier date";
+    const newLabel = dateLabel(newRouteDate);
+    const visitTitle = compactString(request.title) || "Visit";
+
+    // Note: handyman_request_messages doesn't have a sender_user_id
+    // column (only sender_role + body + metadata). Pre-existing
+    // inserts elsewhere in this file include sender_user_id silently;
+    // PostgREST rejects the insert outright (PGRST204), so we omit it
+    // here and stash the actor's user id in metadata instead so it
+    // remains queryable for audit.
+    await service.from("handyman_request_messages").insert({
+      request_id: requestId,
+      household_id: householdId,
+      sender_role: "vendor",
+      body: `${visitTitle} moved from ${oldLabel} to ${newLabel}.`,
+      metadata: {
+        kind: "visit_rescheduled",
+        actor_user_id: userId,
+        old_route_date: oldRouteDate || null,
+        new_route_date: newRouteDate,
+        was_confirmed: wasConfirmed,
+      },
+    });
+
+    if (wasConfirmed) {
+      // Push the homeowner only when the visit was already confirmed —
+      // otherwise the desktop drag is just calendar planning the
+      // homeowner doesn't need a notification for yet.
+      await notifyHomeownersForRequest(service, householdId, {
+        title: "Visit moved",
+        body: `${visitTitle} is now ${newLabel}.`,
+        requestId,
+        eventType: "handyman_visit_rescheduled",
+        extra: { old_route_date: oldRouteDate || null, new_route_date: newRouteDate },
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    requestId,
+    oldRouteDate: oldRouteDate || null,
+    newRouteDate,
+    wasConfirmed,
+  };
+}
+
+/**
+ * Wave Z.2 — Aggregate task list for the cross-customer Tasks screen.
+ *
+ * Returns every open punch item across the workspace's customers + every
+ * non-archived maintenance_task linked to a workspace-assigned visit.
+ * One trip on demand (not part of loadDashboard) so the regular page
+ * loads stay lean.
+ *
+ * Source-of-truth boundaries (how we decide what's "this workspace's"):
+ * 1. handyman_punch_items: items whose assigned_visit_task_id appears
+ *    on a visit currently assigned to this workspace via
+ *    provider_visit_assignments.
+ * 2. maintenance_tasks: tasks where task.id is referenced by a
+ *    workspace assignment as visit_task_id (i.e., the contractor is
+ *    going to work on it).
+ *
+ * Customer name resolution: punch_items already carry household_id,
+ * maintenance_tasks have property_id. We fold both into a
+ * household-name lookup pulled from properties + households.
+ */
+async function fetchAggregateTasks(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  // Find every visit_task_id this workspace is assigned to.
+  const { data: assignments, error: aErr } = await service
+    .from("provider_visit_assignments")
+    .select("request_id, visit_task_id, assigned_member_id, route_date")
+    .eq("workspace_id", workspaceId);
+  if (aErr) throw aErr;
+
+  const visitTaskIds = [
+    ...new Set(
+      (assignments ?? [])
+        .map((row: Record<string, unknown>) => compactString(row.visit_task_id))
+        .filter(Boolean),
+    ),
+  ];
+  const requestIds = [
+    ...new Set(
+      (assignments ?? [])
+        .map((row: Record<string, unknown>) => compactString(row.request_id))
+        .filter(Boolean),
+    ),
+  ];
+
+  // Member→tech-name index for the "By tech" filter.
+  const { data: members } = await service
+    .from("provider_workspace_members")
+    .select("id, full_name, email")
+    .eq("workspace_id", workspaceId);
+  const memberIndex = new Map<string, string>();
+  for (const row of (members ?? []) as Record<string, unknown>[]) {
+    const name = compactString(row.full_name) || compactString(row.email) || "Tech";
+    memberIndex.set(compactString(row.id), name);
+  }
+  const visitTechByVisitTaskId = new Map<string, string>();
+  for (const row of (assignments ?? []) as Record<string, unknown>[]) {
+    const vt = compactString(row.visit_task_id);
+    const am = compactString(row.assigned_member_id);
+    if (vt && am) {
+      visitTechByVisitTaskId.set(vt, memberIndex.get(am) || "Tech");
+    }
+  }
+
+  // Fetch maintenance tasks + punch items in parallel.
+  const [tasksResult, punchResult] = await Promise.all([
+    visitTaskIds.length
+      ? service
+          .from("maintenance_tasks")
+          .select(
+            "id, title, priority, scheduled_date, next_due_date, property_id, household_id, assignment_type, is_archived, last_completed_date, parent_routine_id, notes",
+          )
+          .in("id", visitTaskIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+    visitTaskIds.length
+      ? service
+          .from("handyman_punch_items")
+          .select(
+            "id, household_id, property_id, assigned_visit_task_id, title, description, source, status, priority, estimated_minutes, estimated_cost_range, completed_at, archived_at, created_at, updated_at",
+          )
+          .in("assigned_visit_task_id", visitTaskIds)
+          .is("archived_at", null)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+  ]);
+  if (tasksResult.error) throw tasksResult.error;
+  if (punchResult.error) throw punchResult.error;
+
+  const tasks = (tasksResult.data ?? []) as Record<string, unknown>[];
+  const punchItems = (punchResult.data ?? []) as Record<string, unknown>[];
+
+  // Resolve customer names. We need property_id → property.name and
+  // household_id → primary contact name (fall back to property name).
+  const propertyIds = [
+    ...new Set(
+      [
+        ...tasks.map((row) => compactString(row.property_id)),
+        ...punchItems.map((row) => compactString(row.property_id)),
+      ].filter(Boolean),
+    ),
+  ];
+  const householdIds = [
+    ...new Set(
+      [
+        ...tasks.map((row) => compactString(row.household_id)),
+        ...punchItems.map((row) => compactString(row.household_id)),
+      ].filter(Boolean),
+    ),
+  ];
+
+  const [propertiesResult, requestsResult] = await Promise.all([
+    propertyIds.length
+      ? service
+          .from("properties")
+          .select("id, name, household_id, street, city, state")
+          .in("id", propertyIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+    requestIds.length
+      ? service
+          .from("handyman_requests")
+          .select("id, household_id, property_id, title, visit_task_id")
+          .in("id", requestIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+  ]);
+
+  const propertyById = new Map<string, Record<string, unknown>>();
+  for (const row of (propertiesResult.data ?? []) as Record<string, unknown>[]) {
+    propertyById.set(compactString(row.id), row);
+  }
+
+  // Customer label resolution: prefer property.name (e.g. "Burke Residence"),
+  // fall back to street, then "Customer" placeholder.
+  function customerLabel(propertyId: string, householdId: string): string {
+    const p = propertyById.get(propertyId);
+    if (p) {
+      const name = compactString(p.name);
+      if (name) return name;
+      const street = compactString(p.street);
+      if (street) return street;
+    }
+    if (householdId) return "Customer";
+    return "Customer";
+  }
+
+  // Source label friendly for UI.
+  function sourceKindLabel(source: string): string {
+    switch (source) {
+      case "manual": return "Manual punch item";
+      case "promoted_from_task": return "Promoted from task";
+      case "migrated_from_task": return "Migrated from task";
+      case "auto_seed_handyman_tier": return "Routed to contractor";
+      case "recommended": return "Recommended service";
+      case "template": return "Template-seeded";
+      default: return source.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+  }
+
+  // Map punch items.
+  const aggregatePunch = punchItems.map((row) => {
+    const propertyId = compactString(row.property_id);
+    const householdId = compactString(row.household_id);
+    const visitTaskId = compactString(row.assigned_visit_task_id);
+    const status = compactString(row.status) || "pending";
+    return {
+      id: `pi:${compactString(row.id)}`,
+      source: "punch_item" as const,
+      title: compactString(row.title) || "Untitled item",
+      customerName: customerLabel(propertyId, householdId),
+      customerPropertyId: propertyId,
+      estimatedMinutes: numberValue(row.estimated_minutes) || null,
+      dueDate: null as string | null,
+      status: ["pending", "in_progress", "done", "cancelled"].includes(status) ? status : "pending",
+      visitTaskId: visitTaskId || null,
+      sourceKindLabel: sourceKindLabel(compactString(row.source)),
+      assignedTechName: visitTaskId ? visitTechByVisitTaskId.get(visitTaskId) || null : null,
+      rawId: compactString(row.id),
+    };
+  });
+
+  // Map maintenance tasks. Only show tasks whose status is meaningful
+  // and not archived. Treat is_archived === true as filtered out.
+  const aggregateTasks = tasks
+    .filter((row) => row.is_archived !== true)
+    .map((row) => {
+      const propertyId = compactString(row.property_id);
+      const householdId = compactString(row.household_id);
+      const taskId = compactString(row.id);
+      const due = compactString(row.scheduled_date) || compactString(row.next_due_date) || null;
+      const completed = Boolean(compactString(row.last_completed_date));
+      // Project the row to a UI status. maintenance_tasks doesn't carry
+      // pending/in_progress like punch items — derive from completion.
+      const uiStatus = completed ? "done" : "pending";
+      return {
+        id: `mt:${taskId}`,
+        source: "maintenance_task" as const,
+        title: compactString(row.title) || "Untitled task",
+        customerName: customerLabel(propertyId, householdId),
+        customerPropertyId: propertyId,
+        estimatedMinutes: null as number | null,
+        dueDate: due,
+        status: uiStatus,
+        visitTaskId: taskId,
+        sourceKindLabel: "Visit task",
+        assignedTechName: visitTechByVisitTaskId.get(taskId) || null,
+        rawId: taskId,
+      };
+    });
+
+  // Sort: open first (by dueDate asc, nulls last), then completed.
+  function statusOrder(s: string): number {
+    if (s === "done" || s === "cancelled") return 1;
+    return 0;
+  }
+  const all = [...aggregatePunch, ...aggregateTasks];
+  all.sort((a, b) => {
+    const so = statusOrder(a.status) - statusOrder(b.status);
+    if (so !== 0) return so;
+    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return a.title.localeCompare(b.title);
+  });
+
+  // Note: requestsResult is fetched in the parallel Promise.all above
+  // because future iterations may need request titles for grouping.
+  // Not used in v1 output — referenced here so unused-var lint doesn't
+  // fire and to make the intent visible at the boundary.
+  void requestsResult;
+
+  return { tasks: all };
 }
 
 function buildFieldSystemSeed(system: Record<string, unknown>) {
@@ -8090,6 +8474,16 @@ serve(async (req) => {
       if (action === "assign_visit") {
         const assignment = await assignVisit(service, user as unknown as Record<string, unknown>, body);
         return json({ assignment });
+      }
+
+      if (action === "reschedule_visit") {
+        const result = await rescheduleVisit(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+
+      if (action === "fetch_aggregate_tasks") {
+        const result = await fetchAggregateTasks(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
       }
 
       if (action === "create_ad_hoc_visit") {

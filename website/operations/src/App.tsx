@@ -8,6 +8,7 @@ import VisitsScreen from "./screens/Visits";
 import VisitDetailScreen from "./screens/VisitDetail";
 import CalendarScreen from "./screens/Calendar";
 import RoutesScreen from "./screens/Routes";
+import TasksScreen from "./screens/Tasks";
 import CrewScreen from "./screens/Crew";
 import HomesScreen from "./screens/Homes";
 import HomeDetailScreen from "./screens/HomeDetail";
@@ -81,6 +82,7 @@ function Shell() {
             <Route path="/dispatch" element={<Navigate to="/visits" replace />} />
             <Route path="/calendar" element={<CalendarScreen />} />
             <Route path="/routes" element={<RoutesScreen />} />
+            <Route path="/tasks" element={<TasksScreen />} />
             <Route path="/crew" element={<CrewScreen />} />
             <Route path="/homes" element={<HomesScreen />} />
             <Route path="/homes/:propertyId" element={<HomeDetailScreen />} />

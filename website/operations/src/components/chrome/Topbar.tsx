@@ -27,6 +27,10 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "Routes",
     breadcrumb: "Per-tech daily routing",
   },
+  "/tasks": {
+    title: "Tasks",
+    breadcrumb: "Every open task across your customers",
+  },
   "/crew": {
     title: "Crew",
     breadcrumb: "Roster, profiles, and access",

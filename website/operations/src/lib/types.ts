@@ -418,6 +418,14 @@ export interface Quote {
     chosenTierLabel?: string | null;
   } | null;
   bundleTierLabel: string | null;
+  /**
+   * Wave Z.3 — Phase 73b negotiation metadata. signedAt / signedName
+   * stamped on homeowner approval; homeownerRevisedAt stamped when the
+   * homeowner counters with edited line items.
+   */
+  signedAt: string | null;
+  signedName: string | null;
+  homeownerRevisedAt: string | null;
 }
 
 export interface SavedQuoteItem {
@@ -481,6 +489,34 @@ export interface AvailableWorkspace {
   primaryEmail: string;
   role: ProviderRole | string;
   isCurrent: boolean;
+}
+
+/**
+ * Wave Z.2 — Cross-customer aggregate task row. Returned by the
+ * `fetch_aggregate_tasks` action. Combines two underlying tables:
+ *
+ *  - `handyman_punch_items` (source: "punch_item") — work picked up
+ *    inline at visits, on the workspace's customers' homes.
+ *  - `maintenance_tasks` (source: "maintenance_task") — assigned visit
+ *    tasks the contractor is going to do.
+ *
+ * id is prefixed `pi:` / `mt:` so React keys stay unique across the
+ * two source tables; rawId is the underlying row id used for status
+ * mutations.
+ */
+export interface AggregateTask {
+  id: string;
+  source: "punch_item" | "maintenance_task";
+  title: string;
+  customerName: string;
+  customerPropertyId: string;
+  estimatedMinutes: number | null;
+  dueDate: string | null;
+  status: "pending" | "in_progress" | "done" | "cancelled";
+  visitTaskId: string | null;
+  sourceKindLabel: string;
+  assignedTechName: string | null;
+  rawId: string;
 }
 
 export interface Dashboard {

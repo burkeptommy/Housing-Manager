@@ -5,7 +5,7 @@ import { Icon } from "../components/chrome/Icon";
 import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
 import { fetchQuoteComments, formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
-import type { QuoteComment } from "../lib/types";
+import type { Quote, QuoteComment } from "../lib/types";
 import { useNewQuoteModal } from "../components/NewQuoteModal";
 import { useNewInvoiceModal } from "../components/NewInvoiceModal";
 
@@ -472,6 +472,18 @@ export default function QuotesScreen() {
                 </div>
               </div>
             )}
+
+            {/* Wave Z.3 — Negotiation history. Walks the parent_quote_id
+                chain UP to the root and DOWN through children so the
+                whole back-and-forth shows on one timeline. Renders only
+                when the chain has 2+ rows (i.e., this quote was either
+                derived from another or has been replaced). */}
+            {!isSelectedBundle && (
+              <NegotiationTimeline
+                selectedQuote={selected}
+                allQuotes={allQuotes}
+              />
+            )}
           </>
         ) : (
           <EmptyState
@@ -857,6 +869,265 @@ function BundleTierCards({ parent, children, workspaceId, onPicked }: BundleTier
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Wave Z.3 — Negotiation history timeline ─────────────────────
+//
+// Walks the parent_quote_id chain in both directions (up to root,
+// down through children) so the operator sees the whole back-and-
+// forth. Phase 73b's data model: each counter / re-quote creates a
+// new row pointing at its parent; bundle parents and children share
+// the same FK column but are excluded from this surface (children
+// of a bundle are NOT a counter chain — they're alternate tiers).
+//
+// Display: vertical timeline with one card per version. The current
+// version gets a "Current" salmon pill; superseded versions render
+// muted. Status flips show the actor (homeowner / provider / Chez)
+// and the dollar shift if the total changed.
+
+interface NegotiationTimelineProps {
+  selectedQuote: Quote;
+  allQuotes: readonly Quote[];
+}
+
+interface ChainNode {
+  quote: Quote;
+  isRoot: boolean;
+  isCurrent: boolean;
+}
+
+function buildVersionChain(selectedQuote: Quote, allQuotes: readonly Quote[]): ChainNode[] {
+  // Index by id for O(1) lookups. Skip bundle children — they share
+  // the same parent_quote_id column but are alternate tiers, not
+  // versions. The bundle parent has bundleMeta != null; children
+  // have parentQuoteId set to the bundle parent which has bundleMeta.
+  const byId = new Map<string, Quote>();
+  for (const q of allQuotes) byId.set(q.id, q);
+
+  // Walk UP: collect ancestors (including self).
+  const lineage: Quote[] = [];
+  let cursor: Quote | undefined = selectedQuote;
+  const seen = new Set<string>();
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
+    lineage.unshift(cursor); // ancestors come first
+    if (!cursor.parentQuoteId) break;
+    const parent = byId.get(cursor.parentQuoteId);
+    if (!parent) break;
+    // If the parent has bundleMeta, this is a bundle child. Stop walking
+    // up; bundle parents are not part of the negotiation chain.
+    if (parent.bundleMeta) break;
+    cursor = parent;
+  }
+
+  // Walk DOWN from each lineage member's children. Children of a
+  // counter chain are themselves counter rows; bundle parents stop
+  // the walk above so we do not accidentally descend into tier rows.
+  const root = lineage[0];
+  if (!root) return [];
+
+  const result: Quote[] = [];
+  const visited = new Set<string>();
+  function walk(node: Quote) {
+    if (visited.has(node.id)) return;
+    visited.add(node.id);
+    result.push(node);
+    const kids = allQuotes.filter((q) => q.parentQuoteId === node.id);
+    for (const k of kids) walk(k);
+  }
+  walk(root);
+
+  // Sort by updatedAt ascending so older versions appear at the top.
+  result.sort((a, b) => {
+    const av = new Date(a.updatedAt).getTime();
+    const bv = new Date(b.updatedAt).getTime();
+    return av - bv;
+  });
+
+  return result.map((q) => ({
+    quote: q,
+    isRoot: q.id === root.id,
+    isCurrent: q.id === selectedQuote.id,
+  }));
+}
+
+function NegotiationTimeline({ selectedQuote, allQuotes }: NegotiationTimelineProps) {
+  const chain = useMemo(
+    () => buildVersionChain(selectedQuote, allQuotes),
+    [selectedQuote, allQuotes],
+  );
+
+  // Single-version chain isn't a "negotiation". Hide.
+  if (chain.length < 2) return null;
+
+  return (
+    <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--neutral-200)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <Icon name="history" size={14} stroke={1.9} color="var(--text-muted)" />
+        <div className="ops-section-label" style={{ marginBottom: 0 }}>
+          Negotiation history
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-soft)", marginLeft: 4 }}>
+          {chain.length} version{chain.length === 1 ? "" : "s"}
+        </div>
+      </div>
+
+      <div style={{ position: "relative", paddingLeft: 24 }}>
+        {/* Vertical connector line */}
+        <div style={{
+          position: "absolute",
+          left: 7,
+          top: 8,
+          bottom: 8,
+          width: 1.5,
+          background: "var(--neutral-200)",
+        }} />
+
+        {chain.map((node, i) => {
+          const prev = i > 0 ? chain[i - 1] : null;
+          return (
+            <TimelineRow
+              key={node.quote.id}
+              node={node}
+              previousTotal={prev ? prev.quote.total : null}
+              isLast={i === chain.length - 1}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TimelineRow({
+  node,
+  previousTotal,
+  isLast,
+}: {
+  node: ChainNode;
+  previousTotal: number | null;
+  isLast: boolean;
+}) {
+  const { quote, isRoot, isCurrent } = node;
+  const status = quote.status;
+  const tone: PillTone = STATUS_TONE[status] ?? "neutral";
+
+  // Actor + label inferred from status. The schema doesn't carry an
+  // explicit "who acted last" field, so this is a best-effort read.
+  let actor = "Provider";
+  let actionLabel = "Drafted";
+  if (status === "countered_by_homeowner" || quote.homeownerRevisedAt) {
+    actor = "Homeowner";
+    actionLabel = "Countered";
+  } else if (status === "approved" && quote.signedAt) {
+    actor = "Homeowner";
+    actionLabel = `Approved${quote.signedName ? ` (${quote.signedName})` : ""}`;
+  } else if (status === "declined") {
+    actionLabel = "Declined";
+  } else if (status === "sent") {
+    actionLabel = isRoot ? "Sent" : "Re-quoted";
+  } else if (status === "viewed") {
+    actionLabel = "Sent (viewed)";
+  } else if (status === "superseded") {
+    actionLabel = "Replaced by next version";
+  } else if (status === "draft") {
+    actionLabel = isRoot ? "Drafted" : "Re-quoted draft";
+  } else if (status === "withdrawn") {
+    actionLabel = "Withdrawn";
+  }
+
+  // Dollar shift relative to the previous version.
+  let shiftLabel: string | null = null;
+  let shiftTone: "down" | "up" | "flat" | null = null;
+  if (previousTotal != null && quote.total != null && previousTotal !== quote.total) {
+    const delta = quote.total - previousTotal;
+    const absStr = formatCurrency(Math.abs(delta));
+    if (delta < 0) {
+      shiftLabel = `↓ ${absStr}`;
+      shiftTone = "down";
+    } else {
+      shiftLabel = `↑ ${absStr}`;
+      shiftTone = "up";
+    }
+  } else if (previousTotal === quote.total) {
+    shiftTone = "flat";
+  }
+
+  // Date stamp.
+  const dateStr = (() => {
+    try {
+      const d = new Date(quote.updatedAt);
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch (_) {
+      return "";
+    }
+  })();
+
+  return (
+    <div style={{
+      position: "relative",
+      paddingBottom: isLast ? 0 : 18,
+      opacity: status === "superseded" ? 0.65 : 1,
+    }}>
+      {/* Dot marker */}
+      <div style={{
+        position: "absolute",
+        left: -23,
+        top: 4,
+        width: 16,
+        height: 16,
+        borderRadius: 999,
+        background: isCurrent ? "var(--salmon)" : "#fff",
+        border: isCurrent ? "none" : "2px solid var(--neutral-300, #D8DADF)",
+        boxShadow: isCurrent ? "0 0 0 3px rgba(237, 105, 85, 0.18)" : "none",
+      }} />
+
+      <div style={{
+        background: isCurrent ? "var(--salmon-50, #FFF5F2)" : "#fff",
+        border: `1px solid ${isCurrent ? "rgba(237, 105, 85, 0.35)" : "var(--neutral-200)"}`,
+        borderRadius: 10,
+        padding: "10px 14px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text)" }}>
+            {actor}
+          </span>
+          <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+            {actionLabel}
+          </span>
+          {isCurrent && <Pill tone="salmon">Current</Pill>}
+          {!isCurrent && status === "superseded" && <Pill tone="neutral">Superseded</Pill>}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 2, flexWrap: "wrap" }}>
+          <Pill tone={tone}>{quote.statusLabel}</Pill>
+          <span style={{
+            fontFamily: "var(--serif)",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--text)",
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {formatCurrency(quote.total)}
+          </span>
+          {shiftLabel && (
+            <span style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: shiftTone === "down" ? "#4A7C59" : "#C25A5E",
+              fontVariantNumeric: "tabular-nums",
+            }}>
+              {shiftLabel}
+            </span>
+          )}
+        </div>
+
+        <div style={{ fontSize: 11, color: "var(--text-soft)" }}>
+          {dateStr} · {formatRelativeTime(quote.updatedAt)}
+        </div>
       </div>
     </div>
   );
