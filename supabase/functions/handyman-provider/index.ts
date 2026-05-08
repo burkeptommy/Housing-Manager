@@ -17,7 +17,12 @@ const corsHeaders = {
 };
 
 const PROVIDER_SITE_URL = "https://www.getchez.com/handyman.html";
-const FIELD_SITE_URL = "https://www.getchez.com/handyman-visit.html";
+// Field tech surface is now the native Chez Field iOS app (TestFlight).
+// The legacy PWA at /handyman-visit.html was retired 2026-05-08; every
+// outbound link that used to point at it now routes the contractor to
+// install the iOS app, which authenticates them as a workspace member
+// and opens the visit on the Today tab.
+const FIELD_SITE_URL = "https://testflight.apple.com/join/sw4xWsTA";
 const QUOTE_SITE_URL = "https://www.getchez.com/handyman-quote.html";
 const FROM_EMAIL = "hello@getchez.com";
 const FROM_NAME = "Chez Field";
@@ -326,10 +331,15 @@ function teamInviteUrl(token: string) {
   return `${PROVIDER_SITE_URL}?teamInvite=${encodeURIComponent(token)}`;
 }
 
-function fieldVisitUrl(token: string, visitId?: string | null) {
-  const params = new URLSearchParams({ token });
-  if (visitId) params.set("visit", visitId);
-  return `${FIELD_SITE_URL}?${params.toString()}`;
+function fieldVisitUrl(_token: string, _visitId?: string | null) {
+  // 2026-05-08: the PWA at /handyman-visit.html is retired. The token /
+  // visit-id parameters are no longer in use because the native Chez Field
+  // iOS app authenticates workspace members via Supabase session, not a
+  // portal_token, and resolves the visit by request id from the Today tab.
+  // We return the bare TestFlight URL so any outbound email / SMS still
+  // gives the contractor a working install link. Parameters are intentionally
+  // discarded but kept on the signature so the call sites compile unchanged.
+  return FIELD_SITE_URL;
 }
 
 function publicQuoteUrl(token: string) {
@@ -2311,6 +2321,21 @@ async function loadDashboard(
             windowEndTime: compactString(assignment.window_end_time),
             stopOrder: numberValue(assignment.stop_order || 0),
             routeNotes: compactString(assignment.route_notes),
+            // Wave M1 — visit lifecycle. Surface clock_in/clock_out + GPS +
+            // pause accumulation so the Operations Desk can render the
+            // "TIME ON-SITE" stat + verified-arrival pill on VisitDetail.
+            clockInAt: assignment.clock_in_at ?? null,
+            clockOutAt: assignment.clock_out_at ?? null,
+            pausedSeconds: numberValue(assignment.paused_seconds || 0),
+            clockInLat: assignment.clock_in_lat !== null && assignment.clock_in_lat !== undefined
+              ? Number(assignment.clock_in_lat)
+              : null,
+            clockInLng: assignment.clock_in_lng !== null && assignment.clock_in_lng !== undefined
+              ? Number(assignment.clock_in_lng)
+              : null,
+            clockInAccuracyM: assignment.clock_in_accuracy_m !== null && assignment.clock_in_accuracy_m !== undefined
+              ? Number(assignment.clock_in_accuracy_m)
+              : null,
           }
         : null,
       latestMessage: message

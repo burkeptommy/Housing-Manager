@@ -108,10 +108,13 @@ function MobileInterstitial() {
       </div>
       <p className="ops-mobile-interstitial__body">
         Open this page on a desktop or tablet to dispatch the field team. For
-        in-truck use, the Chez Field PWA is the right tool.
+        in-truck use, install Chez Field on your iPhone.
       </p>
-      <a className="ops-mobile-interstitial__cta" href="/handyman-visit.html">
-        Open Chez Field
+      <a
+        className="ops-mobile-interstitial__cta"
+        href="https://testflight.apple.com/join/sw4xWsTA"
+      >
+        Get Chez Field on iOS
       </a>
     </div>
   );

@@ -394,13 +394,15 @@ enum HandymanVisitService {
     // MARK: - Premier portal
 
     static func portalURL(for token: String, visitId: UUID? = nil) -> URL? {
-        var components = URLComponents(string: "https://getchez.com/handyman-visit")
-        var queryItems = [URLQueryItem(name: "token", value: token)]
-        if let visitId {
-            queryItems.append(URLQueryItem(name: "visit", value: visitId.uuidString))
-        }
-        components?.queryItems = queryItems
-        return components?.url
+        // 2026-05-08: the PWA at /handyman-visit.html was retired. Every
+        // outbound contractor invitation now points at the native Chez Field
+        // iOS TestFlight build. The token / visitId arguments are kept so
+        // every call site compiles unchanged, but they are intentionally
+        // unused while we redesign the share-with-contractor flow as a
+        // proper deep link path. See CONTRACTOR_GAPS.md.
+        _ = token
+        _ = visitId
+        return URL(string: "https://testflight.apple.com/join/sw4xWsTA")
     }
 
     static func providerWorkspaceURL(for token: String) -> URL? {
@@ -761,10 +763,10 @@ enum HandymanVisitService {
         Home: \(propertyName)
         Requested date: \(preferredTiming)
 
-        Open Chez Handyman to confirm the date, suggest alternatives, ask a question, or begin the visit once it's confirmed:
+        Install Chez Field on your iPhone to confirm the date, propose alternatives, ask a question, and begin the visit once it's confirmed:
         \(portalURL.absoluteString)
 
-        If you create your free provider account, you'll also see every Chez home that wants to work with you, your recent work, upcoming visits, and your quote desk in one place.
+        Once you sign in, you'll also see every Chez home that wants to work with you, your recent work, upcoming visits, and your quote desk in one place.
         """
     }
 
@@ -775,7 +777,7 @@ enum HandymanVisitService {
         portalURL: URL
     ) -> String {
         let propertyName = property?.street ?? property?.name ?? "the home"
-        return "Chez visit request for \(propertyName): \(parentTask.title) on \(preferredTiming). Confirm the date, suggest another option, or create your free Chez Handyman account here: \(portalURL.absoluteString)"
+        return "Chez visit request for \(propertyName): \(parentTask.title) on \(preferredTiming). Install Chez Field on your iPhone to confirm or propose a new date: \(portalURL.absoluteString)"
     }
 
     private static func ensureVisitRequest(

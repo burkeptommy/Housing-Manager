@@ -1,8 +1,28 @@
-# Chez Field PWA (mobile contractor) — full buildout plan
+# Chez Field (mobile contractor) — full buildout plan
+
+> **2026-05-08 surface correction (Wave M0):** This plan was originally written against the deprecated PWA at `website/handyman-visit.html`. The PWA has been retired. **The canonical Chez Field surface is now the native iOS app — `HavenField` target in the Haven Xcode project, scheme "Chez Field", bundle `com.havenhome.field`, product `ChezField.app`.** Every wave's "SPA UI" / "PWA" / `handyman-visit.html` / `localStorage` / `MediaRecorder` / `navigator.geolocation` / service-worker reference is now native SwiftUI inside `Haven/App/HavenFieldView.swift` (the entire field app — 6,618 lines — lives in this one file). Schema migrations + edge function actions are unchanged but should be deployed against `handyman-provider` (workspace-member auth via Supabase session) rather than `handyman-portal` (the legacy portal-token PWA boundary). Surface map for the native field app:
+>
+> | Concept | Type or view | Line in `Haven/App/HavenFieldView.swift` | Wave that extends it |
+> |---|---|---|---|
+> | `HavenFieldVisit` model | `struct` | 203 | M1 (clock-in fields), M2 (punch list shape), M6 (tech notes) |
+> | `HavenFieldVisitAssignment` model | `struct` | 451 | M1 (clock-in/out + GPS columns) |
+> | `HavenFieldPunchItem` model | `struct` | 320 | M2 (attachments + materials + time + voice) |
+> | `HavenFieldHomeSystem` model | `struct` | 530 | M3 (decommissioned + followup + voice) |
+> | `HavenFieldService` actor | networking | 1118 | every wave (new methods on the actor) |
+> | `HavenFieldRootView` | `View` | 1988 | tab shell |
+> | `HavenFieldVisitsTab` | `View` | 2352 | M1+M6 (today list, route summary, tap-to-call/navigate) |
+> | **`HavenFieldVisitWorkspaceView`** | **`View`** | **3038-3779** | **M1 (clock-in/out + pause/resume + complete) + M2 (per-item action bar) + M6 (tech notes)** |
+> | `HavenFieldHomeProfileView` | `View` | 3780-3930 | M3 (system sweep + decommission + gap-fill) |
+> | `FieldPunchItemRow` | `View` | 2729 | M2 (attachments + materials + time chips) |
+> | `FieldScheduledVisitRow` | `View` | 5353 | M1+M6 (time-on-site stat, tap-to-call/navigate) |
+>
+> Cross-app parity unchanged — schema additions land in Operations Desk via `website/operations/src/lib/types.ts` + `website/operations/src/screens/VisitDetail.tsx` (pre-existing entry points).
+>
+> **iOS verification harness:** orchestrator boots an iPhone simulator (id `F9946648-90C6-42B0-AFCB-92E3807F36C8`, iOS 26.x) before dispatch. Every subagent uses `xcrun simctl install` + `xcrun simctl launch com.havenhome.field` to ship its build to the running sim, then drives via `mcp__computer-use__*` (request_access for `Simulator`) for screenshots. Build command: `xcodebuild -project Haven.xcodeproj -scheme "Chez Field" -sdk iphonesimulator -destination 'platform=iOS Simulator,id=F9946648-90C6-42B0-AFCB-92E3807F36C8' -configuration Debug build CODE_SIGNING_ALLOWED=NO`. Built bundle path: `~/Library/Developer/Xcode/DerivedData/Haven-*/Build/Products/Debug-iphonesimulator/ChezField.app`.
 
 Comprehensive plan covering EVERY mobile-side gap identified during the overnight E2E pass. 13 waves of work organized so a future chat session can drop in and execute one wave at a time via subagent dispatch.
 
-The PWA lives at `website/handyman-visit.html` (vanilla HTML/CSS/JS + service worker; ~2,760 lines total). It loads via `?token=<portal_token>` per visit, talks to the `handyman-portal` Edge Function, persists drafts to `localStorage`, and registers a service worker for offline.
+The native HavenField iOS app authenticates workspace members via Supabase session (no portal-token), stores drafts in SwiftData / `@AppStorage` rather than `localStorage`, and uses native iOS APIs (`CLLocationManager` instead of `navigator.geolocation`, `AVAudioRecorder` instead of `MediaRecorder`, native camera instead of `<input type="file">`). Translate every "PWA web tech" reference in the wave specs to its iOS equivalent.
 
 This is a **complete spec** — no "skip this" gates. Each wave is dispatched independently. The final state ships every Section 22 mobile concern + the full Section 5/6/7/9/10 mobile parity story.
 
