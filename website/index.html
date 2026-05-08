@@ -33,7 +33,7 @@
     </a>
     <div class="nav-links">
       <a href="/" class="nav-link is-active nav-link-text-hide">Homeowners</a>
-      <a href="handymen.html" class="nav-link nav-link-text-hide">Handymen</a>
+      <a href="contractors.html" class="nav-link nav-link-text-hide">Contractors</a>
       <a href="vendor-apply.html" class="nav-link nav-link-text-hide">List your business</a>
       <a href="security.html" class="nav-link nav-link-text-hide">Security</a>
       <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-sm">Get the app</a>
@@ -49,9 +49,9 @@
         <span class="hero-badge-dot"></span>
         Now in beta on iPhone
       </a>
-      <h1>Your home, organized.</h1>
+      <h1>Your home, organized. Or handled for you.</h1>
       <p class="lead">
-        The iOS app for high-net-worth homeowners. Snap a photo to identify any appliance. Forward an invoice and the right tasks land on your schedule. Coordinate every vendor. Manage every home and vehicle. All on one iPhone.
+        The iOS app for high-net-worth homeowners. Run your home yourself with a quiet, intelligent layer that knows every system, vendor, and document. Or pass any task, routine, vendor relationship, or coordination job to Chez — your built-in concierge — with a single tap.
       </p>
       <div class="hero-rich-cta">
         <a href="https://testflight.apple.com/join/sw4xWsTA" class="btn btn-salmon btn-lg">Get the iPhone app</a>
@@ -364,6 +364,161 @@
   </div>
 </section>
 
+<!-- DUAL MODE PITCH — "Run it yourself or hand it to Chez" -->
+<style>
+  /* Chez delegation composition — full-width side-by-side that stacks on tablet */
+  @media (max-width: 960px) {
+    .chez-composition { grid-template-columns: 1fr !important; gap: 28px !important; }
+    .chez-pillars { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  @media (max-width: 540px) {
+    .chez-pillars { grid-template-columns: 1fr !important; }
+  }
+</style>
+<section class="section bg-white" id="chez">
+  <div class="container">
+    <div class="section-header-v2 reveal">
+      <span class="eyebrow">The Chez difference</span>
+      <h2>Run your home yourself. Or hand any of it to Chez.</h2>
+      <p>Every task, routine, vendor relationship, and coordination job has a one-tap "Have Chez handle this." Chez is a real concierge service built into the app — they source vendors, negotiate, schedule, and keep visits on the calendar. You see structured proposals you Approve, Counter, or Decline, never an email chain.</p>
+    </div>
+
+    <!-- Full-width composition: homeowner side ↔ delegation thread -->
+    <div class="chez-composition reveal" style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: stretch; margin-top: 56px;">
+
+      <!-- LEFT: task card with delegation button -->
+      <div style="background: var(--pearl); border-radius: 24px; padding: 36px 32px; box-shadow: var(--shadow); border: 1px solid var(--neutral-200); position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 24px; right: 24px; padding: 4px 10px; background: var(--white); border-radius: 999px; font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase;">In your app</div>
+        <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-soft); text-transform: uppercase; margin-bottom: 12px;">NEEDS A VENDOR</div>
+        <div style="display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px;">
+          <div style="width: 44px; height: 44px; border-radius: 10px; background: var(--salmon-50); color: var(--salmon-dark); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">🌳</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-family: var(--serif); font-weight: 500; font-size: 22px; letter-spacing: -0.012em; color: var(--text); line-height: 1.2;">Annual tree pruning &amp; canopy work</div>
+            <div style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); margin-top: 4px;">Landscaping · Best done before May 15</div>
+          </div>
+        </div>
+
+        <div style="background: var(--white); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; border: 1px solid var(--neutral-200);">
+          <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--text-soft); text-transform: uppercase; margin-bottom: 6px;">What this involves</div>
+          <div style="font-family: var(--sans); font-size: 13px; color: var(--text); line-height: 1.5;">Walk the property. Identify storm-damaged limbs, raise canopies, prune fruit trees, mulch the bases. Typical $1,800–$2,800 in your area.</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 12px; padding: 14px; font-family: var(--sans); font-size: 14px; font-weight: 600; box-shadow: 0 6px 18px rgba(237, 105, 85, 0.28); display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-3.8a9 9 0 113.4 3.4L3 21z"/></svg>
+            Have Chez handle this
+          </button>
+          <button style="background: transparent; color: var(--text); border: 1px solid var(--neutral-300); border-radius: 12px; padding: 14px; font-family: var(--sans); font-size: 14px; font-weight: 600;">Find a pro myself</button>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--neutral-200); font-family: var(--sans); font-size: 12px; color: var(--text-muted); line-height: 1.55;">
+          <strong style="color: var(--text);">Standing instructions on file:</strong> Prefer local family-owned. Auto-approve under $500. Ping for $500–$2K. Always ask above.
+        </div>
+      </div>
+
+      <!-- RIGHT: Chez request thread with structured proposal -->
+      <div style="background: var(--indigo); border-radius: 24px; padding: 0; color: var(--white); position: relative; overflow: hidden; box-shadow: var(--shadow-xl);">
+        <!-- Header -->
+        <div style="background: rgba(0,0,0,0.18); padding: 22px 28px; display: flex; align-items: center; gap: 14px;">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--salmon); color: var(--white); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 20px;">C</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-family: var(--serif); font-weight: 600; font-size: 16px; color: var(--white);">Chez · Tree pruning</div>
+            <div style="font-family: var(--sans); font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 1px;">Open · SLA replied within 1 business day</div>
+          </div>
+          <span style="padding: 4px 10px; background: rgba(93, 202, 165, 0.2); border-radius: 999px; font-family: var(--sans); font-size: 10px; font-weight: 600; color: #5DCAA5; text-transform: uppercase; letter-spacing: 0.06em;">Awaiting you</span>
+        </div>
+
+        <!-- Thread body -->
+        <div style="padding: 24px 28px;">
+
+          <!-- Customer message bubble -->
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+            <div style="max-width: 80%; background: var(--salmon); color: var(--white); padding: 12px 16px; border-radius: 16px 16px 4px 16px; font-family: var(--sans); font-size: 13px; line-height: 1.5;">
+              Need annual tree work done before May 15. Standard scope.
+              <div style="font-size: 10px; opacity: 0.75; margin-top: 4px; text-align: right;">9:24 AM</div>
+            </div>
+          </div>
+
+          <!-- Chez reply bubble -->
+          <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--salmon); color: var(--white); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 13px; flex-shrink: 0;">C</div>
+            <div style="max-width: 82%; background: rgba(255,255,255,0.1); color: var(--white); padding: 12px 16px; border-radius: 16px 16px 16px 4px; font-family: var(--sans); font-size: 13px; line-height: 1.5;">
+              Got it. Reached out to three local arborists. Boughton &amp; Sons came back fastest with the best fit for your scope. Proposal below.
+              <div style="font-size: 10px; opacity: 0.65; margin-top: 4px;">11:42 AM</div>
+            </div>
+          </div>
+
+          <!-- STRUCTURED PROPOSAL CARD -->
+          <div style="background: var(--white); color: var(--text); border-radius: 16px; padding: 18px 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
+              <div>
+                <div style="font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--salmon); text-transform: uppercase;">Vendor proposal</div>
+                <div style="font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; margin-top: 2px;">Boughton &amp; Sons Tree Care</div>
+                <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin-top: 2px;">Mount Kisco, NY · 4.9★ (128 reviews) · Family-owned 1986</div>
+              </div>
+              <div style="background: var(--indigo); color: var(--white); border-radius: 8px; padding: 6px 10px; font-family: var(--sans); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0;">Chez<br>Certified</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--neutral-200); border-bottom: 1px solid var(--neutral-200); margin-bottom: 14px;">
+              <div>
+                <div style="font-family: var(--sans); font-size: 10px; color: var(--text-soft); letter-spacing: 0.04em; text-transform: uppercase;">Quote</div>
+                <div style="font-family: var(--serif); font-size: 24px; font-weight: 600; color: var(--text); letter-spacing: -0.018em; line-height: 1.05;">$2,150</div>
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--success); font-weight: 600;">Within fair-market band</div>
+              </div>
+              <div>
+                <div style="font-family: var(--sans); font-size: 10px; color: var(--text-soft); letter-spacing: 0.04em; text-transform: uppercase;">Earliest visit</div>
+                <div style="font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: -0.012em; line-height: 1.2; margin-top: 2px;">Tue, May 6 · 8 AM</div>
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">Or Wed May 7, Fri May 9</div>
+              </div>
+            </div>
+
+            <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--text-soft); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px;">Scope confirmed</div>
+            <div style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">7 mature oaks &amp; maples · canopy raise · deadwood removal · 2 fruit trees pruned · all debris hauled.</div>
+
+            <div style="display: flex; gap: 8px;">
+              <button style="flex: 1; background: var(--success); color: var(--white); border: none; border-radius: 10px; padding: 11px; font-family: var(--sans); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Approve
+              </button>
+              <button style="background: var(--neutral-200); color: var(--text); border: none; border-radius: 10px; padding: 11px 14px; font-family: var(--sans); font-size: 13px; font-weight: 600;">Counter</button>
+              <button style="background: transparent; color: var(--text-muted); border: 1px solid var(--neutral-300); border-radius: 10px; padding: 11px 14px; font-family: var(--sans); font-size: 13px; font-weight: 600;">Decline</button>
+            </div>
+          </div>
+
+          <!-- System message -->
+          <div style="text-align: center; padding: 6px 0; font-family: var(--sans); font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em; text-transform: uppercase;">
+            ⏵ Approve once, Chez handles confirmation, calendar, and follow-up
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- "What you can hand off" pillars -->
+    <div style="margin-top: 64px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;" class="chez-pillars reveal-stagger">
+      <div style="text-align: center; padding: 20px 8px;">
+        <div style="font-family: var(--serif); font-weight: 600; font-size: 32px; color: var(--salmon); letter-spacing: -0.02em; margin-bottom: 6px;">Tasks</div>
+        <p style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Any one-off task. With or without a vendor on file. Chez sources, schedules, and confirms.</p>
+      </div>
+      <div style="text-align: center; padding: 20px 8px;">
+        <div style="font-family: var(--serif); font-weight: 600; font-size: 32px; color: var(--salmon); letter-spacing: -0.02em; margin-bottom: 6px;">Routines</div>
+        <p style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Weekly cleaning. Lawn care. Snow plow contracts. Chez owns the schedule, you keep the vendor.</p>
+      </div>
+      <div style="text-align: center; padding: 20px 8px;">
+        <div style="font-family: var(--serif); font-weight: 600; font-size: 32px; color: var(--salmon); letter-spacing: -0.02em; margin-bottom: 6px;">Vendors</div>
+        <p style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Make Chez the point of contact for any contractor. They handle the back-and-forth. You see what's confirmed.</p>
+      </div>
+      <div style="text-align: center; padding: 20px 8px;">
+        <div style="font-family: var(--serif); font-weight: 600; font-size: 32px; color: var(--salmon); letter-spacing: -0.02em; margin-bottom: 6px;">Vehicles</div>
+        <p style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Inspections, oil changes, recall recovery, dealership coordination. Drop off where Chez tells you.</p>
+      </div>
+    </div>
+
+    <p style="text-align: center; font-family: var(--sans); font-size: 13px; color: var(--text-soft); margin-top: 40px; max-width: 720px; margin-left: auto; margin-right: auto;">Chez is a real concierge service. Standing instructions you set once — preferred budget, preferred vendors, communication preferences — apply across every request. The price is built into your Chez subscription. <em>Available to homeowners on the iPhone beta.</em></p>
+  </div>
+</section>
+
 <!-- FEATURE ROWS V2 — six themed -->
 <section class="section bg-pearl" id="features">
   <div class="container">
@@ -442,13 +597,13 @@
         <span class="feature-row-v2-eyebrow">Plan &amp; schedule</span>
         <h2 class="feature-row-v2-title">Maintenance, organized by what's on schedule and what needs a decision.</h2>
         <p class="feature-row-v2-desc">
-          The Maintenance Hub separates what's already happening (your services, your handyman, your vehicles) from what needs your attention (this season, upcoming visits). Two yearly handyman visits keep your home's value high — automatically bundled from your accumulated punch list.
+          The Maintenance Hub separates what's already happening (your services, your contractor, your vehicles) from what needs your attention (this season, upcoming visits). Two seasonal contractor visits — spring and fall — keep your home's value high, automatically bundled from your accumulated punch list.
         </p>
         <ul class="feature-row-v2-bullets">
-          <li><div><strong>House Quiz.</strong> 37 questions across 6 sections. Save and resume. Ends with a cinematic reveal of the dollar value your maintenance plan protects over 10 years.</div></li>
-          <li><div><strong>Maintenance Hub.</strong> Five sections: Your Services, Next Handyman Visit, Vehicles, This Season, Upcoming Scheduled.</div></li>
-          <li><div><strong>Routine management.</strong> Recurring services (cleaning, lawn, snow, pool) as first-class objects. Active months. Pause windows. One vendor per routine.</div></li>
-          <li><div><strong>Two yearly handyman visits.</strong> Spring and fall punch-list bundles auto-built from small DIY items you've accumulated all year.</div></li>
+          <li><div><strong>House Quiz.</strong> A cinematic onboarding that pulls your home's history from public records, detects your systems, and ends with the dollar value your maintenance plan protects over 10 years.</div></li>
+          <li><div><strong>Maintenance Hub.</strong> Five sections: Your Services, Next Contractor Visit, Vehicles, This Season, Upcoming Scheduled.</div></li>
+          <li><div><strong>Routine management.</strong> Recurring services (cleaning, lawn, snow, pool, pest, contractor) as first-class objects. Active months. Pause windows. One vendor per routine.</div></li>
+          <li><div><strong>Two seasonal contractor bundles.</strong> Spring and fall punch-list visits auto-built from the small jobs you've accumulated all year. Tap once to schedule.</div></li>
           <li><div><strong>Important events.</strong> Family calendar, school days, birthdays, recurring deliveries, trash days — with morning-of and evening-before reminders.</div></li>
         </ul>
       </div>
@@ -463,23 +618,27 @@
               </div>
             </div>
             <div class="phone-content">
-              <div class="ui-section-label" style="display: flex; justify-content: space-between; align-items: baseline;"><span>Handyman program</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">4 tasks</span></div>
+              <div class="ui-section-label" style="display: flex; justify-content: space-between; align-items: baseline;"><span>Spring contractor visit</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">7 items</span></div>
 
               <div style="background: var(--indigo); border-radius: 12px; padding: 12px; color: var(--white);">
                 <div style="display: flex; gap: 9px; align-items: flex-start; margin-bottom: 10px;">
                   <div style="width: 26px; height: 26px; border-radius: 6px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px;">🔧</div>
                   <div style="flex: 1; min-width: 0;">
-                    <div style="font-family: var(--serif); font-weight: 500; font-size: 12px; color: var(--white); line-height: 1.2; letter-spacing: -0.01em;">4 small jobs are ready to bundle</div>
-                    <div style="font-family: var(--sans); font-size: 8px; color: rgba(255,255,255,0.6); margin-top: 2px;">Pick a handyman, Chez combines the rest.</div>
+                    <div style="font-family: var(--serif); font-weight: 500; font-size: 12px; color: var(--white); line-height: 1.2; letter-spacing: -0.01em;">7 small jobs ready to bundle</div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: rgba(255,255,255,0.6); margin-top: 2px;">Pick a contractor, Chez combines the rest.</div>
                   </div>
                 </div>
                 <div style="background: rgba(255,255,255,0.06); border-radius: 7px; padding: 8px 9px; margin-bottom: 9px; font-family: var(--sans); font-size: 9px; color: rgba(255,255,255,0.85); line-height: 1.6;">
                   · Clean dryer vent duct<br>
-                  · Fire extinguisher annual check<br>
-                  · Treat weeds between pavers<br>
-                  <span style="color: rgba(255,255,255,0.55);">+1 more in this bundle</span>
+                  · Replace fire extinguisher<br>
+                  · Re-caulk powder room<br>
+                  · Hang gallery wall<br>
+                  <span style="color: rgba(255,255,255,0.55);">+3 more in this bundle</span>
                 </div>
-                <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 7px; padding: 7px; font-family: var(--sans); font-size: 9px; font-weight: 600; width: 100%;">Open program →</button>
+                <div style="display: flex; gap: 5px;">
+                  <button style="flex: 1; background: var(--salmon); color: var(--white); border: none; border-radius: 7px; padding: 7px; font-family: var(--sans); font-size: 9px; font-weight: 600;">Open visit →</button>
+                  <button style="flex: 1; background: rgba(255,255,255,0.12); color: var(--white); border: 1px solid rgba(255,255,255,0.25); border-radius: 7px; padding: 7px; font-family: var(--sans); font-size: 9px; font-weight: 600;">Hand to Chez</button>
+                </div>
               </div>
 
               <div>
@@ -511,13 +670,13 @@
         <span class="feature-row-v2-eyebrow">Coordinate</span>
         <h2 class="feature-row-v2-title">Every vendor, every family member, every helper — one directory, role-aware access.</h2>
         <p class="feature-row-v2-desc">
-          The first thing Chez does after the quiz: tell you which of your home systems still don't have a pro on file. Then helps you close the gaps. The Home Manager role is first-class — your property staff can run the home in Chez without ever seeing your will.
+          The first thing Chez does after the quiz: tell you which of your home systems still don't have a pro on file. Then helps you close the gaps — find a vetted local pro, add one you already use, or hand the search to Chez. Your property staff get their own first-class role with permissions scoped to home operations.
         </p>
         <ul class="feature-row-v2-bullets">
-          <li><div><strong>Vendor management.</strong> Full directory with specialty canonicalization, brand logos, and per-contractor service history.</div></li>
-          <li><div><strong>Vendor coverage gap analysis.</strong> "10 of 19 systems are covered." One-tap "Find a pro" or "I have one."</div></li>
-          <li><div><strong>Find local pros.</strong> Google Places, region-aware ranking, Chez Certified badge for top-rated non-chain vendors.</div></li>
-          <li><div><strong>Home Manager role.</strong> Give your property manager their own login. They manage tasks, systems, and vendors — they never see your will, financials, or medical documents.</div></li>
+          <li><div><strong>Vendor management.</strong> Full directory with specialty canonicalization, brand logos, and per-contractor service history. Add vendors by website, business card scan, or email forward.</div></li>
+          <li><div><strong>Vendor coverage gap analysis.</strong> "10 of 19 systems are covered." One-tap "Find a pro," "I have one," or "Have Chez source one."</div></li>
+          <li><div><strong>Find local pros.</strong> Google Places search with region-aware ranking and a Chez Certified badge for top-rated non-chain vendors in your area.</div></li>
+          <li><div><strong>Home Manager role.</strong> Give your property manager or executive assistant their own login. They manage tasks, systems, and vendors — but only see documents you've explicitly shared with them. Enforced server-side.</div></li>
           <li><div><strong>Family members.</strong> Spouses, kids, expecting members, paid staff — separate first-class entries with avatars, ages, and document linkage.</div></li>
         </ul>
       </div>
@@ -761,14 +920,14 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </div>
         <h4>Designed for delegation</h4>
-        <p>The Home Manager role lets your property manager work in Chez without ever seeing your financials or medical documents. Permissions enforced server-side. Trust by design.</p>
+        <p>Permissions are enforced at the database layer. Your property manager sees only what you share. Sensitive document categories stay locked to you and the family members you've invited. Trust by design.</p>
       </div>
       <div class="pillar-card">
         <div class="pillar-card-icon salmon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
         <h4>One platform, both sides</h4>
-        <p>Your handyman runs their business in Chez too. When they finish a visit at your home, the work, the photos, and the new system details flow back to your app — automatically.</p>
+        <p>Your contractor runs their business in Chez too. When they finish a visit at your home, the work, the photos, and the new system details flow back to your app — automatically.</p>
       </div>
     </div>
   </div>
@@ -795,7 +954,7 @@
         </div>
         <div class="security-band-item">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 6V4a4 4 0 018 0v2"/></svg>
-          <div>Role-based access<span class="security-band-item-sub">Staff never see your will</span></div>
+          <div>Role-based access<span class="security-band-item-sub">Staff see only what you share</span></div>
         </div>
         <div class="security-band-item">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg>
@@ -866,16 +1025,16 @@
   </div>
 </section>
 
-<!-- FOR HANDYMEN CALLOUT -->
+<!-- FOR CONTRACTORS CALLOUT -->
 <section class="section bg-pearl">
   <div class="container">
     <div class="cross-audience-callout reveal">
       <div>
-        <span class="eyebrow eyebrow-on-indigo">For Handyman Businesses</span>
-        <h2>Your handyman runs Chez too.</h2>
-        <p>The same platform powers a handyman business operating system: dispatch, quotes, scheduling, offline-capable field execution, CRM. When a Chez handyman finishes a visit at your home, the work, photos, and new system details flow right back into your app.</p>
+        <span class="eyebrow eyebrow-on-indigo">For Contractor Businesses</span>
+        <h2>Your contractor runs Chez too.</h2>
+        <p>The same platform powers a complete operating system for contractor businesses: dispatch, calendar, routes, crew, customer database, quote builder with reusable line items, two-way messaging, and an offline-capable field PWA with auto-equipment identification. When a Chez contractor finishes a visit at your home, the work, photos, and new system details flow right back into your app. Free to use, no per-tech fees, no contracts.</p>
       </div>
-      <a href="handymen.html" class="btn btn-salmon btn-lg">For handymen →</a>
+      <a href="contractors.html" class="btn btn-salmon btn-lg">For contractors →</a>
     </div>
   </div>
 </section>
@@ -918,13 +1077,13 @@
           <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
           <span>chez</span>
         </a>
-        <p>Your home, organized. The iOS app for high-net-worth homeowners and the platform for the handymen who serve them.</p>
+        <p>Your home, organized. Or handled for you. The iOS app for high-net-worth homeowners and the platform for the contractors who serve them.</p>
       </div>
       <div class="footer-col">
         <h5>Product</h5>
         <ul>
           <li><a href="/">For Homeowners</a></li>
-          <li><a href="handymen.html">For Handymen</a></li>
+          <li><a href="contractors.html">For Contractors</a></li>
           <li><a href="vendor-apply.html">List your business</a></li>
           <li><a href="https://testflight.apple.com/join/sw4xWsTA">Join Beta</a></li>
         </ul>
