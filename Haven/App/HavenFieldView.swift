@@ -1968,12 +1968,13 @@ actor HavenFieldService {
         )
     }
 
-    /// Wave M3 — convenience wrapper to insert a freshly-extracted
-    /// system into home_systems via PostgREST. RLS scoped via the
-    /// caller's session JWT; the workspace policy added in
-    /// 20261303_home_system_decommission already permits provider
-    /// workspace members to write systems for households they serve.
+    /// Wave M3 — insert a freshly-extracted system into home_systems via
+    /// the workspace-authed `create_home_system` action. RLS on
+    /// home_systems blocks INSERTs from workspace-member sessions; the
+    /// edge function bypasses RLS via the service-role key after
+    /// validating the workspace serves this property.
     func createHomeSystem(
+        workspaceId: String,
         propertyId: String,
         householdId: String,
         name: String,
@@ -1983,47 +1984,36 @@ actor HavenFieldService {
         serialNumber: String?,
         notes: String?
     ) async throws -> HavenFieldHomeSystem? {
-        struct Insert: Encodable {
-            let property_id: String
-            let household_id: String
+        struct Request: Encodable {
+            let action = "create_home_system"
+            let workspaceId: String
+            let propertyId: String
+            let householdId: String
             let name: String
             let category: String?
             let manufacturer: String?
-            let model_number: String?
-            let serial_number: String?
+            let modelNumber: String?
+            let serialNumber: String?
             let notes: String?
-            let onboarded_via: String? = "field_visit"
         }
-        let payload = Insert(
-            property_id: propertyId,
-            household_id: householdId,
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            propertyId: propertyId,
+            householdId: householdId,
             name: name,
             category: category,
             manufacturer: manufacturer,
-            model_number: modelNumber,
-            serial_number: serialNumber,
+            modelNumber: modelNumber,
+            serialNumber: serialNumber,
             notes: notes
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldSystemUpdateResponse.self
         )
-        var request = URLRequest(url: URL(string: "\(AppConfig.Supabase.url)/rest/v1/home_systems")!)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 12
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
-        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
-        if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        } else {
-            request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "Authorization")
-        }
-        request.httpBody = try JSONEncoder().encode([payload])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let preview = String(data: data, encoding: .utf8) ?? ""
-            throw NSError(domain: "ChezField.createHomeSystem", code: (response as? HTTPURLResponse)?.statusCode ?? -1, userInfo: [NSLocalizedDescriptionKey: preview])
-        }
-        let rows = (try? decoder.decode([HavenFieldHomeSystem].self, from: data)) ?? []
-        return rows.first
+        return response.system
     }
 
     // MARK: - Wave M2 punch capture depth
@@ -3798,63 +3788,66 @@ private struct FieldPunchItemRow: View {
 
     @ViewBuilder
     private var actionChipBar: some View {
-        HStack(spacing: 10) {
-            PhotosPicker(
-                selection: $photoPickerItem,
-                matching: .images,
-                preferredItemEncoding: .compatible
-            ) {
-                actionChip(
-                    icon: "camera.fill",
-                    label: attachments.isEmpty ? "Add photo" : "\(attachments.count)",
-                    inFlight: actionInFlight == .photo,
-                    accent: false
-                )
-            }
-            .disabled(actionInFlight != .none)
+        // Horizontal scroll keeps the four chips on one line at any iPhone
+        // width. Compact icon-first design so a screen with an HVAC visit
+        // showing 8 punch items doesn't blow up the row height.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                PhotosPicker(
+                    selection: $photoPickerItem,
+                    matching: .images,
+                    preferredItemEncoding: .compatible
+                ) {
+                    actionChip(
+                        icon: "camera.fill",
+                        label: attachments.isEmpty ? "Photo" : "\(attachments.count)",
+                        inFlight: actionInFlight == .photo,
+                        accent: false
+                    )
+                }
+                .disabled(actionInFlight != .none)
 
-            Button {
-                Task { await toggleVoiceRecording() }
-            } label: {
-                actionChip(
-                    icon: voiceRecorder.isRecording ? "stop.circle.fill" : "mic.fill",
-                    label: voiceRecorder.isRecording
-                        ? formatPunchTimeMMSS(voiceRecorder.elapsedSeconds)
-                        : (voicePresent ? "Voice" : "Record"),
-                    inFlight: actionInFlight == .voice,
-                    accent: voiceRecorder.isRecording
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(actionInFlight != .none && actionInFlight != .voice)
+                Button {
+                    Task { await toggleVoiceRecording() }
+                } label: {
+                    actionChip(
+                        icon: voiceRecorder.isRecording ? "stop.circle.fill" : "mic.fill",
+                        label: voiceRecorder.isRecording
+                            ? formatPunchTimeMMSS(voiceRecorder.elapsedSeconds)
+                            : "Voice",
+                        inFlight: actionInFlight == .voice,
+                        accent: voiceRecorder.isRecording
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(actionInFlight != .none && actionInFlight != .voice)
 
-            Button {
-                showMaterialsSheet = true
-            } label: {
-                actionChip(
-                    icon: "shippingbox.fill",
-                    label: materials.isEmpty ? "Materials" : "\(materials.count)",
-                    inFlight: actionInFlight == .materials,
-                    accent: false
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(actionInFlight != .none)
+                Button {
+                    showMaterialsSheet = true
+                } label: {
+                    actionChip(
+                        icon: "shippingbox.fill",
+                        label: materials.isEmpty ? "Parts" : "\(materials.count)",
+                        inFlight: actionInFlight == .materials,
+                        accent: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(actionInFlight != .none)
 
-            Button {
-                Task { await toggleTimer() }
-            } label: {
-                actionChip(
-                    icon: "timer",
-                    label: timerStart != nil ? "Stop" : (totalSeconds > 0 ? formatPunchTimeMMSS(totalSeconds) : "Start"),
-                    inFlight: actionInFlight == .time,
-                    accent: timerStart != nil
-                )
+                Button {
+                    Task { await toggleTimer() }
+                } label: {
+                    actionChip(
+                        icon: "timer",
+                        label: timerStart != nil ? "Stop" : (totalSeconds > 0 ? formatPunchTimeMMSS(totalSeconds) : "Time"),
+                        inFlight: actionInFlight == .time,
+                        accent: timerStart != nil
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(actionInFlight != .none && actionInFlight != .time)
             }
-            .buttonStyle(.plain)
-            .disabled(actionInFlight != .none && actionInFlight != .time)
-
-            Spacer(minLength: 0)
         }
     }
 
@@ -3873,9 +3866,11 @@ private struct FieldPunchItemRow: View {
             Text(label)
                 .font(HavenTypography.uiLabelSmall.monospacedDigit())
                 .foregroundStyle(accent ? .white : HavenColors.navy700)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(minHeight: 44)
         .background(accent ? HavenColors.action : HavenColors.indigo50)
         .clipShape(Capsule())
@@ -9814,10 +9809,12 @@ private struct HavenFieldSystemSweepSheet: View {
             errorMessage = "Sign in to your workspace to use sweep mode."
             return
         }
-        // 1x1 PNG (white pixel) — minimal valid PNG bytes the AI will
-        // gracefully say "not identifiable" against. Lets us exercise
-        // the iOS code path on the simulator without a real camera.
-        let onePixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEklEQVR4nGP8//8/AwAAAACFAAFv6w0YAAAAAElFTkSuQmCC"
+        // Minimal valid JPEG bytes (1x1 white pixel) — identify-equipment
+        // forwards to Claude Vision with media_type=image/jpeg, so we
+        // need real JPEG bytes to exercise the AI path. The AI will
+        // gracefully say "not identifiable" against a blank tile, which
+        // is the path we want to verify on the simulator.
+        let onePixel = "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APvSiiiv/9k="
         // Pre-fill the draft so the simulator-side reviewer has something
         // to confirm. Mirrors a high-confidence extraction.
         await MainActor.run {
@@ -9881,6 +9878,7 @@ private struct HavenFieldSystemSweepSheet: View {
         }
         do {
             let created = try await HavenFieldService.shared.createHomeSystem(
+                workspaceId: workspaceId,
                 propertyId: home.propertyId,
                 householdId: householdId,
                 name: draftName.trimmingCharacters(in: .whitespacesAndNewlines),

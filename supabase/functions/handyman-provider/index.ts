@@ -9296,6 +9296,75 @@ async function deleteSystemVoiceForProvider(
 }
 
 /**
+ * Wave M3 — create a new home_systems row for a property the workspace
+ * serves. Mirrors the workspace-auth pattern of updateHomeSystemForProvider
+ * (load-system / contractor-link / linked-request gate) but for INSERT
+ * instead of UPDATE. Bypasses the homeowner-only RLS policy on
+ * home_systems INSERT by writing through the service role.
+ */
+async function createHomeSystemForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const propertyId = compactString(body.propertyId);
+  const householdId = compactString(body.householdId);
+  if (!propertyId) throw new Error("propertyId is required");
+  if (!householdId) throw new Error("householdId is required");
+  const name = compactString(body.name);
+  if (!name) throw new Error("name is required");
+
+  // Verify the workspace serves this property via at least one
+  // handyman_request through one of its linked contractors. Mirrors
+  // loadSystemForProviderWrite() but for create-time when no system_id
+  // exists yet.
+  const { data: links } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id")
+    .eq("workspace_id", workspaceId);
+  const contractorIds = (links ?? [])
+    .map((row: Record<string, unknown>) => compactString(row.contractor_id))
+    .filter(Boolean);
+  if (contractorIds.length === 0) throw new Error("Workspace has no linked contractors");
+
+  const { data: linkedRequest } = await service
+    .from("handyman_requests")
+    .select("id")
+    .eq("property_id", propertyId)
+    .in("contractor_id", contractorIds)
+    .limit(1)
+    .maybeSingle();
+  if (!linkedRequest) throw new Error("This home isn't on your books");
+
+  const insert: Record<string, unknown> = {
+    property_id: propertyId,
+    household_id: householdId,
+    name,
+    onboarded_via: compactString(body.onboardedVia) || "field_visit",
+  };
+  if (typeof body.category === "string") insert.category = compactString(body.category);
+  if (typeof body.manufacturer === "string") insert.manufacturer = compactString(body.manufacturer);
+  if (typeof body.modelNumber === "string") insert.model_number = compactString(body.modelNumber);
+  if (typeof body.serialNumber === "string") insert.serial_number = compactString(body.serialNumber);
+  if (typeof body.installDate === "string") insert.install_date = compactString(body.installDate);
+  if (typeof body.notes === "string") insert.notes = compactString(body.notes);
+  if (typeof body.subtype === "string") insert.subtype = compactString(body.subtype);
+
+  const { data: created, error: createError } = await service
+    .from("home_systems")
+    .insert(insert)
+    .select()
+    .single();
+  if (createError) throw createError;
+
+  return { ok: true, system: created };
+}
+
+/**
  * Wave M3 — wrapper around the existing identify-equipment edge
  * function. The field iOS app posts a base64 JPEG of a model plate +
  * optional category; we forward it server-side so the workspace-auth
@@ -11125,6 +11194,15 @@ serve(async (req) => {
 
       if (action === "extract_system_from_photo") {
         const result = await extractSystemFromPhotoForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "create_home_system") {
+        const result = await createHomeSystemForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
