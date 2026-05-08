@@ -415,7 +415,7 @@ final class RoutineSeeder {
             let shouldCreate: Bool
         }
         let rules: [Rule] = [
-            Rule(category: "handyman", label: "handyman visits", shouldCreate: true),
+            Rule(category: "handyman", label: "contractor visits", shouldCreate: true),
             Rule(category: "trash", label: "trash and recycling", shouldCreate: true),
             Rule(category: "mosquito", label: "mosquito & tick spraying", shouldCreate: true),
             Rule(category: "pet waste", label: "pet waste pickup", shouldCreate: hasPets),

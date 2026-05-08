@@ -36,7 +36,7 @@ struct HomeAssessmentPrepCard: View {
 
             VStack(spacing: 8) {
                 prepRow(icon: "pencil",
-                        title: "Add notes for your handyman",
+                        title: "Add notes for your contractor",
                         subtitle: notesSubtitle,
                         complete: !(assessment.preVisitNotes ?? "").isEmpty,
                         action: onOpenNotes)

@@ -73,7 +73,7 @@ struct HomeAssessmentRequestSheet: View {
                 Text("Here's what happens next")
                     .font(HavenTypography.title3)
                     .foregroundColor(HavenColors.textPrimary)
-                Text("Within 1-2 business days a Chez handyman will reach out to schedule your free home assessment. They'll walk through every system, capture model numbers and condition, and flag anything that needs attention. You review everything before any of it goes live in your home record.")
+                Text("Within 1-2 business days a Chez Contractor will reach out to schedule your free home assessment. They'll walk through every system, capture model numbers and condition, and flag anything that needs attention. You review everything before any of it goes live in your home record.")
                     .font(HavenTypography.body)
                     .foregroundColor(HavenColors.textSecondary)
             }
@@ -119,7 +119,7 @@ struct HomeAssessmentRequestSheet: View {
             Text("Access notes (optional)")
                 .font(HavenTypography.uiLabel)
         } footer: {
-            Text("Only the assigned handyman and Chez admin will see these notes.")
+            Text("Only the assigned contractor and Chez admin will see these notes.")
                 .font(HavenTypography.caption)
                 .foregroundColor(HavenColors.textSecondary)
         }
@@ -148,7 +148,7 @@ struct HomeAssessmentRequestSheet: View {
             .disabled(isSubmitting || householdId == nil)
             .listRowBackground(HavenColors.action)
         } footer: {
-            Text("Free, no commitment. You can cancel anytime before the handyman arrives.")
+            Text("Free, no commitment. You can cancel anytime before the contractor arrives.")
                 .font(HavenTypography.caption)
                 .foregroundColor(HavenColors.textSecondary)
         }

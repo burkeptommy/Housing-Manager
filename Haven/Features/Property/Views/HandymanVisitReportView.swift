@@ -68,7 +68,7 @@ struct HandymanVisitReportView: View {
                 Text("No after-visit report yet")
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Once your handyman finalizes the field report, what they did, what they noticed, and any follow-ups will land here.")
+                Text("Once your contractor finalizes the field report, what they did, what they noticed, and any follow-ups will land here.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

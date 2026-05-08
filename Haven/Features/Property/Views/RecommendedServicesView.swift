@@ -114,7 +114,7 @@ struct RecommendedServicesView: View {
     private var mainList: some View {
         List {
             Section {
-                Text("Browse services Chez thinks your home could benefit from. Schedule any that fit, or drop them on your handyman's punch list.")
+                Text("Browse services Chez thinks your home could benefit from. Schedule any that fit, or drop them on your contractor's punch list.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .listRowSeparator(.hidden)
@@ -269,7 +269,7 @@ struct RecommendedServicesView: View {
                             Haptics.light()
                             Task { await addToHandyman(item) }
                         } label: {
-                            Text("Add to handyman")
+                            Text("Add to contractor")
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)
                                 .padding(.horizontal, 12)

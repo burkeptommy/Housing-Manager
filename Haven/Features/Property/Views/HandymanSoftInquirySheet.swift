@@ -35,7 +35,7 @@ struct HandymanSoftInquirySheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Send a quick question to \(contractor.companyName). They'll see it in their handyman queue and can reply before any visit is scheduled.")
+                    Text("Send a quick question to \(contractor.companyName). They'll see it in their contractor queue and can reply before any visit is scheduled.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }

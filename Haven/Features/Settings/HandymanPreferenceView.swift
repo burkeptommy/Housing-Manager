@@ -56,7 +56,7 @@ struct HandymanPreferenceView: View {
                     .foregroundStyle(HavenColors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("This helps Chez decide whether to route routine small-fix tasks to your handyman, keep them on your personal list, or offer to help you find someone.")
+                Text("This helps Chez decide whether to route routine small-fix tasks to your contractor, keep them on your personal list, or offer to help you find someone.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -85,7 +85,7 @@ struct HandymanPreferenceView: View {
             .padding(HavenTheme.spacing20)
         }
         .background(HavenColors.cream)
-        .navigationTitle("Handyman Preference")
+        .navigationTitle("Contractor Preference")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadInitialState() }
         .overlay(alignment: .bottom) {

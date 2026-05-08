@@ -152,7 +152,7 @@ struct HandymanPunchListView: View {
                 editingItem = nil
             }
         } message: {
-            Text("What needs fixing? Keep it short. The handyman reads this on the day of the visit.")
+            Text("What needs fixing? Keep it short. The contractor reads this on the day of the visit.")
         }
         .overlay(alignment: .top) {
             if let toast = viewModel.toast {
@@ -181,7 +181,7 @@ struct HandymanPunchListView: View {
         ContentUnavailableView {
             Label("Your punch list is empty", systemImage: "hammer.fill")
         } description: {
-            Text("Add anything you've been meaning to ask your handyman about. Small repairs, dryer vent cleaning, sump pump testing, a squeaky door. We'll hand the whole list to them on the next visit.")
+            Text("Add anything you've been meaning to ask your contractor about. Small repairs, dryer vent cleaning, sump pump testing, a squeaky door. We'll hand the whole list to them on the next visit.")
         } actions: {
             HavenButton(
                 title: "Add your first item",
@@ -314,7 +314,7 @@ struct HandymanPunchListView: View {
     private var bottomActionBar: some View {
         VStack(spacing: HavenTheme.spacing8) {
             HavenButton(
-                title: "Schedule next handyman visit",
+                title: "Schedule next contractor visit",
                 action: {
                     showScheduleSheet = true
                 },
@@ -338,7 +338,7 @@ struct HandymanPunchListView: View {
             // and book the visit.
             ChezEntryButton(
                 category: .findHandyman,
-                label: "Have Chez find me a handyman",
+                label: "Have Chez find me a contractor",
                 caption: "Chez finds a vetted local pro and books the visit.",
                 context: chezPunchContext
             )
@@ -493,7 +493,7 @@ struct AddHandymanPunchItemSheet: View {
             } header: {
                 Text("Rough effort (optional)")
             } footer: {
-                Text("Helps your handyman quote the visit.")
+                Text("Helps your contractor quote the visit.")
                     .font(HavenTypography.caption)
             }
 
@@ -1108,13 +1108,13 @@ final class HandymanPunchListViewModel: ObservableObject {
 
         var insert = MaintenanceTaskInsert(
             householdId: householdId,
-            title: "Handyman visit",
+            title: "Contractor visit",
             frequency: "Once",
             nextDueDate: dateStr
         )
         insert.propertyId = propertyId
         insert.scheduledDate = dateStr
-        insert.description = "The handyman will work through this visit's punch list."
+        insert.description = "The contractor will work through this visit's punch list."
         insert.priority = "medium"
         insert.isTemplateBased = false
         insert.seasonalTiming = nil
@@ -1391,7 +1391,7 @@ final class HandymanPunchListViewModel: ObservableObject {
         var insert = HandymanRequestInsert(
             householdId: householdId,
             requestType: "standard_visit",
-            title: "Handyman visit"
+            title: "Contractor visit"
         )
         insert.propertyId = propertyId
         insert.contractorId = contractor?.id

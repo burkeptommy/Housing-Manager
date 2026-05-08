@@ -368,7 +368,7 @@ struct MaintenanceTaskDetailSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "hammer.fill")
                         .foregroundStyle(HavenColors.navy700)
-                    Text("Added to your handyman punch list")
+                    Text("Added to your contractor punch list")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textPrimary)
                     Spacer()
@@ -1893,7 +1893,7 @@ struct MaintenanceTaskDetailSheet: View {
                         HStack(spacing: 8) {
                             Image(systemName: "hammer.fill")
                                 .foregroundStyle(HavenColors.navy600)
-                            Text("On the handyman list")
+                            Text("On the contractor list")
                                 .font(HavenTypography.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundStyle(HavenColors.textPrimary)
@@ -1911,8 +1911,8 @@ struct MaintenanceTaskDetailSheet: View {
 
                         Text(
                             prefersVendorCoverage
-                            ? "Your handyman can review this first. Add service coverage if you want Chez to schedule it automatically in the future."
-                            : "We’ll keep this with your handyman bundle so it still gets serviced without getting lost inside the system record."
+                            ? "Your contractor can review this first. Add service coverage if you want Chez to schedule it automatically in the future."
+                            : "We’ll keep this with your contractor bundle so it still gets serviced without getting lost inside the system record."
                         )
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textSecondary)
@@ -1924,7 +1924,7 @@ struct MaintenanceTaskDetailSheet: View {
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "hammer.fill")
-                                    Text("View handyman list")
+                                    Text("View contractor list")
                                 }
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)
@@ -2064,7 +2064,7 @@ struct MaintenanceTaskDetailSheet: View {
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "hammer.fill")
-                                    Text("Or batch this with your handyman")
+                                    Text("Or batch this with your contractor")
                                 }
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.navy700)
@@ -2667,7 +2667,7 @@ struct MaintenanceTaskDetailSheet: View {
                 } label: {
                     HStack {
                         Image(systemName: "hammer.fill")
-                        Text("Open handyman list")
+                        Text("Open contractor list")
                     }
                     .font(HavenTypography.uiButton)
                     .foregroundStyle(HavenColors.textPrimary)
@@ -2743,7 +2743,7 @@ struct MaintenanceTaskDetailSheet: View {
                         } else {
                             Image(systemName: "hammer.fill")
                         }
-                        Text("Add to handyman list")
+                        Text("Add to contractor list")
                     }
                     .font(HavenTypography.uiButton)
                     .foregroundStyle(HavenColors.textPrimary)
@@ -2778,7 +2778,7 @@ struct MaintenanceTaskDetailSheet: View {
                         } else {
                             Image(systemName: "arrow.right.circle.fill")
                         }
-                        Text("Have my handyman do this")
+                        Text("Have my contractor do this")
                     }
                     .font(HavenTypography.uiButton)
                     .foregroundStyle(HavenColors.textOnAction)

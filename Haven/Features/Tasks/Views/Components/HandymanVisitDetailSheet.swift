@@ -151,7 +151,7 @@ struct HandymanVisitDetailSheet: View {
                 HStack(spacing: 6) {
                     Image(systemName: "wrench.and.screwdriver.fill")
                         .font(.system(size: 11, weight: .semibold))
-                    Text(vendor?.companyName ?? "Your handyman")
+                    Text(vendor?.companyName ?? "Your contractor")
                         .font(.system(size: 12, weight: .medium))
                     if let total = totalEstimateLabel {
                         Text("·")
@@ -198,7 +198,7 @@ struct HandymanVisitDetailSheet: View {
             }
             Button("Keep it", role: .cancel) {}
         } message: {
-            Text("Your handyman will be notified.")
+            Text("Your contractor will be notified.")
         }
         .sheet(isPresented: $showRescheduleSheet) {
             ReschedulePlaceholderSheet(visit: visit, vendor: vendor)
@@ -251,7 +251,7 @@ struct HandymanVisitDetailSheet: View {
             VStack(spacing: 0) {
                 statusRow(icon: "clock.fill", title: "Scheduled", body: "We'll remind you the day before.", isActive: true)
                 Divider().padding(.leading, 44)
-                statusRow(icon: "location.fill", title: "On the way", body: "You'll get a heads-up when your handyman is en route.", isActive: false)
+                statusRow(icon: "location.fill", title: "On the way", body: "You'll get a heads-up when your contractor is en route.", isActive: false)
                 Divider().padding(.leading, 44)
                 statusRow(icon: "checkmark.seal.fill", title: "Wrapped up", body: "Real-time updates as items get checked off, plus before/after photos.", isActive: false)
             }
@@ -339,7 +339,7 @@ struct HandymanVisitDetailSheet: View {
     }
 
     private var emptyPunchListPlaceholder: some View {
-        Text("Nothing on the punch list yet. Add items so your handyman knows what's on the docket.")
+        Text("Nothing on the punch list yet. Add items so your contractor knows what's on the docket.")
             .font(.system(size: 13))
             .foregroundStyle(HavenColors.textSecondary)
             .padding(14)
@@ -509,7 +509,7 @@ private struct ReschedulePlaceholderSheet: View {
                     .font(HavenTypography.fraunces(size: 22, weight: 600))
                     .foregroundStyle(HavenColors.navy900)
 
-                Text("Suggest a new date for your visit with \(vendor?.companyName ?? "your handyman"). They'll get a notification and can accept or counter.")
+                Text("Suggest a new date for your visit with \(vendor?.companyName ?? "your contractor"). They'll get a notification and can accept or counter.")
                     .font(.system(size: 13))
                     .foregroundStyle(HavenColors.textSecondary)
                     .lineSpacing(2)

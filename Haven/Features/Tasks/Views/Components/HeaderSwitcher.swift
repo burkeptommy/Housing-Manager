@@ -73,7 +73,7 @@ struct HeaderSwitcher: View {
 #Preview {
     VStack(spacing: 0) {
         HeaderSwitcher(title: "Maintenance")
-        HeaderSwitcher(title: "Handyman")
+        HeaderSwitcher(title: "Contractor")
     }
     .background(HavenColors.background)
 }

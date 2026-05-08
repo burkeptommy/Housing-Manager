@@ -683,7 +683,7 @@ struct NextHandymanVisitSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
             sectionHeader(
-                title: "Handyman program",
+                title: "Contractor program",
                 meta: latestRequest?.typedStatus.displayLabel ?? (queueCount > 0 ? "\(queueCount) task\(queueCount == 1 ? "" : "s")" : nil)
             )
 

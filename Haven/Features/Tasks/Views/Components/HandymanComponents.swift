@@ -117,7 +117,7 @@ struct VendorCard: View {
                     )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Call handyman")
+            .accessibilityLabel("Call contractor")
         case .empty:
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))
@@ -338,7 +338,7 @@ struct VisitHistoryEmptyCard: View {
             Text("No completed visits yet.")
                 .font(.system(size: 13))
                 .foregroundStyle(HavenColors.textSecondary)
-            Text("Once your handyman finishes a visit it shows up here.")
+            Text("Once your contractor finishes a visit it shows up here.")
                 .font(.system(size: 13))
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -579,7 +579,7 @@ struct HandymanVisitCard: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Message handyman")
+                .accessibilityLabel("Message contractor")
             }
         }
         .padding(.horizontal, 14)
@@ -607,7 +607,7 @@ struct HandymanVisitPunchItem: Identifiable, Equatable {
     /// One-line meta badge under the title — minutes, system link, or
     /// "Added after Burke confirmed". First non-nil wins.
     var metaBadge: String? {
-        if addedAfterLock { return "Added after handyman confirmed" }
+        if addedAfterLock { return "Added after contractor confirmed" }
         if let systemLabel { return "Linked: \(systemLabel)" }
         if let m = estimatedMinutes { return "~\(m) min" }
         return nil
@@ -627,7 +627,7 @@ struct HandymanVisitPunchItem: Identifiable, Equatable {
             VendorCard(state: .linked(name: "Burke Handymen LLC", phoneURL: nil))
             VendorCard(state: .empty)
             HandymanVisitCard(
-                title: "Spring Handyman Visit",
+                title: "Spring Service Visit",
                 vendorName: "Burke Handymen LLC",
                 scheduledDate: Date(),
                 statusLabel: "Confirmed",

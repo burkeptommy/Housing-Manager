@@ -80,7 +80,7 @@ struct HandymanChatSheet: View {
                 composer
             }
             .background(HavenColors.background)
-            .navigationTitle(vendor?.companyName ?? "Handyman")
+            .navigationTitle(vendor?.companyName ?? "Contractor")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -118,7 +118,7 @@ struct HandymanChatSheet: View {
                     Text("When works for you?")
                         .font(HavenTypography.fraunces(size: 22, weight: 600))
                         .foregroundStyle(HavenColors.navy900)
-                    Text("\(vendor?.companyName ?? "Your handyman") will see this in their app right away.")
+                    Text("\(vendor?.companyName ?? "Your contractor") will see this in their app right away.")
                         .font(.system(size: 13))
                         .foregroundStyle(HavenColors.textSecondary)
                         .lineSpacing(2)
@@ -186,7 +186,7 @@ struct HandymanChatSheet: View {
             Text("Start a conversation")
                 .font(HavenTypography.fraunces(size: 19, weight: 600))
                 .foregroundStyle(HavenColors.navy900)
-            Text("Ask a question, request a change, or share a photo. Your handyman gets it in their app right away.")
+            Text("Ask a question, request a change, or share a photo. Your contractor gets it in their app right away.")
                 .font(.system(size: 13))
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -202,7 +202,7 @@ struct HandymanChatSheet: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 10) {
-                TextField("Message your handyman…", text: $draft, axis: .vertical)
+                TextField("Message your contractor…", text: $draft, axis: .vertical)
                     .lineLimit(1...4)
                     .font(.system(size: 14))
                     .padding(.horizontal, 14)
@@ -377,7 +377,7 @@ private struct MessageBubble: View {
                     .font(HavenTypography.fraunces(size: 28, weight: 600))
                     .foregroundStyle(HavenColors.navy900)
                 if count > 0 {
-                    Text("\(count) line item\(count == 1 ? "" : "s") from \(vendorName ?? "your handyman")")
+                    Text("\(count) line item\(count == 1 ? "" : "s") from \(vendorName ?? "your contractor")")
                         .font(.system(size: 13))
                         .foregroundStyle(HavenColors.textSecondary)
                 } else if let vendor = vendorName {
@@ -445,7 +445,7 @@ private struct MessageBubble: View {
 
     private var proposalCard: some View {
         let proposed = message.proposedTime
-        let proposedBy: String = isFromHomeowner ? "You" : (vendorName ?? "Your handyman")
+        let proposedBy: String = isFromHomeowner ? "You" : (vendorName ?? "Your contractor")
         let isLiveVendorProposal = isLive && !isFromHomeowner
 
         return VStack(alignment: .leading, spacing: 14) {

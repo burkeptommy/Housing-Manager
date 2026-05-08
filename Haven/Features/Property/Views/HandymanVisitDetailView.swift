@@ -17,9 +17,9 @@ struct HandymanVisitDetailView: View {
     var onDismiss: (() -> Void)? = nil
 
     private struct RequestMessageComposerConfiguration {
-        var title: String = "Reply to handyman"
+        var title: String = "Reply to contractor"
         var introText: String? = nil
-        var placeholder: String = "What do you want the handyman to know?"
+        var placeholder: String = "What do you want the contractor to know?"
         var defaultStatusOnReply: HandymanRequestStatus? = nil
         var metadataEvent: String = "homeowner_reply"
     }
@@ -330,7 +330,7 @@ struct HandymanVisitDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This completes every handyman-routed item on the list. DIY-claimed items stay on your personal list.")
+            Text("This completes every contractor-routed item on the list. DIY-claimed items stay on your personal list.")
         }
         .confirmationDialog(
             "Skip this visit?",
@@ -380,7 +380,7 @@ struct HandymanVisitDetailView: View {
                         .foregroundStyle(HavenColors.navy700)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(bundleKey.hasSuffix(":spring") ? "Spring Handyman Visit" : "Fall Handyman Visit")
+                        Text(bundleKey.hasSuffix(":spring") ? "Spring Service Visit" : "Fall Service Visit")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
                         if let scheduled = scheduledLabel, !scheduled.isEmpty {
@@ -414,7 +414,7 @@ struct HandymanVisitDetailView: View {
                     HStack(spacing: HavenTheme.spacing8) {
                         Image(systemName: "person.badge.plus")
                             .foregroundStyle(HavenColors.warning)
-                        Text("Add a handyman to schedule this visit")
+                        Text("Add a contractor to schedule this visit")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                         Spacer()
@@ -512,11 +512,11 @@ struct HandymanVisitDetailView: View {
                                 .foregroundStyle(HavenColors.textSecondary)
                         }
                     } else if preferredHandyman == nil {
-                        Text("Choose a preferred handyman first. Once a date is set, Chez will prepare the secure provider link so they can confirm the visit, ask questions, or start the job.")
+                        Text("Choose a preferred contractor first. Once a date is set, Chez will prepare the secure provider link so they can confirm the visit, ask questions, or start the job.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                     } else {
-                        Text("Pick the visit date and Chez will prepare the secure provider link so the handyman can confirm or propose another date before the visit begins.")
+                        Text("Pick the visit date and Chez will prepare the secure provider link so the contractor can confirm or propose another date before the visit begins.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -656,7 +656,7 @@ struct HandymanVisitDetailView: View {
             Text("Suggest a visit date")
                 .font(HavenTypography.headline)
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Pick a window that works for you. Your handyman will accept it or counter with another time.")
+            Text("Pick a window that works for you. Your contractor will accept it or counter with another time.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -832,7 +832,7 @@ struct HandymanVisitDetailView: View {
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.textPrimary)
                 }
-                Text("Send your handyman a follow-up note. Mention what changed since the visit, photos help. Chez gets a copy and can step in if it doesn't get resolved.")
+                Text("Send your contractor a follow-up note. Mention what changed since the visit, photos help. Chez gets a copy and can step in if it doesn't get resolved.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -872,7 +872,7 @@ struct HandymanVisitDetailView: View {
                             .font(HavenTypography.fraunces(size: 28, weight: 600))
                             .foregroundStyle(HavenColors.textPrimary)
                     }
-                    Text("Type your full name to sign and approve. Your handyman will see this as your authorization to start work on the agreed scope.")
+                    Text("Type your full name to sign and approve. Your contractor will see this as your authorization to start work on the agreed scope.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
@@ -918,7 +918,7 @@ struct HandymanVisitDetailView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Adjust quantities or remove items, then send your counter back. Your handyman will either accept it or come back with a revised quote.")
+                    Text("Adjust quantities or remove items, then send your counter back. Your contractor will either accept it or come back with a revised quote.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
@@ -978,7 +978,7 @@ struct HandymanVisitDetailView: View {
                     }
                 }
 
-                Section("Note to your handyman (optional)") {
+                Section("Note to your contractor (optional)") {
                     TextField("Why these changes?", text: $counterNoteInput, axis: .vertical)
                         .lineLimit(2...4)
                 }
@@ -1073,10 +1073,10 @@ struct HandymanVisitDetailView: View {
                         .font(.title3)
                         .foregroundStyle(HavenColors.warning)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Premier handyman program")
+                        Text("Premier contractor program")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("This is the house operator lane: standard visits, direct requests, and cleaner future service because Chez and your handyman keep the home record sharper together.")
+                        Text("This is the house operator lane: standard visits, direct requests, and cleaner future service because Chez and your contractor keep the home record sharper together.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1103,7 +1103,7 @@ struct HandymanVisitDetailView: View {
                         Text("Use this first visit to set the house up")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Chez already has strong system records. The missing piece is prompting the handyman to capture the context that makes future service smoother.")
+                        Text("Chez already has strong system records. The missing piece is prompting the contractor to capture the context that makes future service smoother.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1240,7 +1240,7 @@ struct HandymanVisitDetailView: View {
                                 }
                             }
 
-                            Text("Sign to lock in this scope, propose changes line-by-line, or ask a question. Your handyman sees the response in Chez right away.")
+                            Text("Sign to lock in this scope, propose changes line-by-line, or ask a question. Your contractor sees the response in Chez right away.")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -1299,7 +1299,7 @@ struct HandymanVisitDetailView: View {
 
                     if let homeownerMessage = quote.homeownerMessage, !homeownerMessage.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Note from your handyman")
+                            Text("Note from your contractor")
                                 .font(HavenTypography.uiLabelSmall.weight(.semibold))
                                 .foregroundStyle(HavenColors.textPrimary)
                             Text(homeownerMessage)
@@ -1379,11 +1379,11 @@ struct HandymanVisitDetailView: View {
     private func quoteStatusSummary(_ quote: ProviderQuoteRow) -> String {
         switch quote.typedStatus {
         case .sent:
-            return "Your handyman priced this scope and is waiting for your response so they can plan the next step."
+            return "Your contractor priced this scope and is waiting for your response so they can plan the next step."
         case .viewed:
             return "You've opened the quote. Approve it, ask a question, or decline it without leaving Chez."
         case .approved:
-            return "You've approved this scope. Your handyman now sees that response inside Chez and can move the work forward."
+            return "You've approved this scope. Your contractor now sees that response inside Chez and can move the work forward."
         case .declined:
             return "You've declined this quote. The thread stays open if you want to send more context or ask for a revised scope."
         case .withdrawn:
@@ -1391,7 +1391,7 @@ struct HandymanVisitDetailView: View {
         case .draft:
             return "This quote is still being prepared."
         case .counteredByHomeowner:
-            return "Your counter has been sent. Your handyman will accept it as-is or come back with a revised quote."
+            return "Your counter has been sent. Your contractor will accept it as-is or come back with a revised quote."
         case .superseded:
             return "An updated version of this quote took its place. Open the latest version to respond."
         }
@@ -1528,7 +1528,7 @@ struct HandymanVisitDetailView: View {
     private var emptyIncludedCard: some View {
         HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                Text("Nothing for the handyman this visit")
+                Text("Nothing for the contractor this visit")
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textPrimary)
                 Text("You've claimed everything on your own list. You can still add custom items or skip this visit entirely.")
@@ -2056,9 +2056,9 @@ struct HandymanVisitDetailView: View {
     @MainActor
     private func configureStandardMessageComposer(for request: HandymanRequestRow) {
         requestMessageComposerConfiguration = RequestMessageComposerConfiguration(
-            title: "Reply to handyman",
+            title: "Reply to contractor",
             introText: request.typedStatus.homeownerSummary,
-            placeholder: "What do you want the handyman to know?",
+            placeholder: "What do you want the contractor to know?",
             defaultStatusOnReply: request.typedStatus.actionRequiredByHomeowner ? .sentToHandyman : nil,
             metadataEvent: "homeowner_reply"
         )
@@ -2069,7 +2069,7 @@ struct HandymanVisitDetailView: View {
         guard coordinationRequest != nil else { return }
         requestMessageComposerConfiguration = RequestMessageComposerConfiguration(
             title: "Ask about this quote",
-            introText: "Send a quick question back to the handyman about this scope, timing, or pricing.",
+            introText: "Send a quick question back to the contractor about this scope, timing, or pricing.",
             placeholder: "Ask about a line item, timing, or any detail you want clarified.",
             defaultStatusOnReply: .sentToHandyman,
             metadataEvent: "quote_question"
@@ -2087,7 +2087,7 @@ struct HandymanVisitDetailView: View {
         guard coordinationRequest != nil else { return }
         requestMessageComposerConfiguration = RequestMessageComposerConfiguration(
             title: "Report an issue",
-            introText: "Tell your handyman what's not right. A photo helps. They'll get notified and Chez can step in if needed.",
+            introText: "Tell your contractor what's not right. A photo helps. They'll get notified and Chez can step in if needed.",
             placeholder: "What's not right with the visit? Be as specific as you can.",
             defaultStatusOnReply: .sentToHandyman,
             metadataEvent: "homeowner_visit_issue"
@@ -2383,7 +2383,7 @@ struct HandymanRequestComposerSheet: View {
 
             Section("Request") {
                 TextField("Title", text: $title)
-                TextField("What should the handyman know?", text: $details, axis: .vertical)
+                TextField("What should the contractor know?", text: $details, axis: .vertical)
                     .lineLimit(3...8)
                 TextField("Preferred timing (optional)", text: $preferredTiming)
             }
@@ -2398,14 +2398,14 @@ struct HandymanRequestComposerSheet: View {
             }
 
             Section {
-                Toggle("Ask the handyman to help finish house setup on this visit", isOn: $firstVisitSetupRequested)
+                Toggle("Ask the contractor to help finish house setup on this visit", isOn: $firstVisitSetupRequested)
                     .tint(HavenColors.action)
                 if let contractor {
                     Text("This request will be linked to \(contractor.companyName).")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textSecondary)
                 } else {
-                    Text("No preferred handyman yet. Chez can still save the request so it’s ready when you pick one.")
+                    Text("No preferred contractor yet. Chez can still save the request so it’s ready when you pick one.")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textSecondary)
                 }
@@ -2438,7 +2438,7 @@ struct HandymanRequestComposerSheet: View {
                 }
             }
         }
-        .navigationTitle("New handyman request")
+        .navigationTitle("New contractor request")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {

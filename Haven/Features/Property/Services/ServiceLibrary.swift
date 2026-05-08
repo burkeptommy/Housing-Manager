@@ -806,7 +806,7 @@ enum ServiceLibrary {
         ),
         handyman(
             key: "handyman_program",
-            title: "Handyman Program",
+            title: "Contractor Program",
             legacy: [
                 "Fire extinguisher annual check",
                 "Foundation walkaround: cracks and grading",

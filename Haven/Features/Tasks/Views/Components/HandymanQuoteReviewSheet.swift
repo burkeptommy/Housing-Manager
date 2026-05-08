@@ -470,7 +470,7 @@ struct HandymanQuoteReviewSheet: View {
                 .foregroundStyle(HavenColors.textTertiary)
             Text("No quote attached yet")
                 .font(HavenTypography.fraunces(size: 18, weight: 600))
-            Text("When your handyman sends a quote it will appear here for review.")
+            Text("When your contractor sends a quote it will appear here for review.")
                 .font(.system(size: 13))
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -579,7 +579,7 @@ struct HandymanQuoteReviewSheet: View {
                     Text("\(pendingQuestions.count) question\(pendingQuestions.count == 1 ? "" : "s") ready to send")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(HavenColors.navy900)
-                    Text("Your handyman gets a push and can reply on each item.")
+                    Text("Your contractor gets a push and can reply on each item.")
                         .font(.system(size: 11.5))
                         .foregroundStyle(HavenColors.textSecondary)
                 }
@@ -594,7 +594,7 @@ struct HandymanQuoteReviewSheet: View {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 12, weight: .bold))
                         }
-                        Text(sendingQuestions ? "Sending…" : "Send to handyman")
+                        Text(sendingQuestions ? "Sending…" : "Send to contractor")
                             .font(.system(size: 14, weight: .semibold))
                     }
                     .padding(.horizontal, 16)
@@ -1066,7 +1066,7 @@ struct LineItemCommentSheet: View {
             .buttonStyle(.plain)
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-            Text("Add as many as you want. They all send together when you tap “Send to handyman.”")
+            Text("Add as many as you want. They all send together when you tap “Send to contractor.”")
                 .font(.system(size: 11.5))
                 .foregroundStyle(HavenColors.textSecondary)
                 .padding(.top, 2)

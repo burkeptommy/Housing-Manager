@@ -93,9 +93,9 @@ struct TaskRoutingPicker: View {
 
     private func handymanButton(isPrimary: Bool) -> some View {
         let subtitle = preferredHandymanName.map { "Add to \($0)'s next visit" }
-            ?? "Add to your handyman list"
+            ?? "Add to your contractor list"
         return routeButton(
-            label: "Add to handyman visit",
+            label: "Add to contractor visit",
             icon: "wrench.adjustable.fill",
             subtitle: subtitle,
             isPrimary: isPrimary,
