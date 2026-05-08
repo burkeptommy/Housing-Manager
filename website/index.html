@@ -186,20 +186,32 @@
   </div>
 </section>
 
-<!-- MULTI-PHONE GALLERY — "Inside the app" -->
+<!-- INSIDE THE APP — 3 full-width showcase tiles -->
 <section class="section bg-pearl" id="gallery">
   <div class="container">
     <div class="section-header-v2 reveal">
       <span class="eyebrow">Inside the app</span>
       <h2>An entire household, in your pocket.</h2>
-      <p>From appliance identification to vendor coordination — every screen designed for the way an HNW household actually runs.</p>
+      <p>Three of the screens every Chez homeowner opens daily. Every system, vendor, recall, dollar amount, and date you see is real data the app pulls from your home — not stock copy.</p>
     </div>
 
-    <div class="phone-gallery reveal-stagger">
-
-      <!-- Gallery phone 1: Spring Readiness Dashboard -->
-      <div class="phone-gallery-item">
-        <div class="phone phone-xs" aria-hidden="true">
+    <!-- TILE 1: Dashboard — full Spring Readiness with routines + Up Next + recent activity -->
+    <div class="feature-row-v2 reveal" style="margin-top: 80px;">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Dashboard</span>
+        <h2 class="feature-row-v2-title">Your whole home, every morning.</h2>
+        <p class="feature-row-v2-desc">
+          Open the app and the first screen knows everything about your home today. What's overdue and the consequences if you wait. The next vendor visit Chez has confirmed and whether the price is fair. The recurring routines that don't need your attention, and the items that do. The dollar value your maintenance plan protects this year.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Spring/Fall readiness ring.</strong> Live system coverage as soon as you finish the House Quiz. 13 of 19 covered means 6 actual gaps you can act on today.</div></li>
+          <li><div><strong>OVERDUE alerts with consequences.</strong> Not just "maintenance due" — "Generac generator service overdue 14 months · would fail in next outage."</div></li>
+          <li><div><strong>Next scheduled, fair-market verified.</strong> Boughton &amp; Sons · May 6 · $2,150 within fair-market band ✓ — Chez priced it for you before it landed on your calendar.</div></li>
+          <li><div><strong>Up Next, Active routines, Recent activity.</strong> The next 5 actions, the always-running services, the last 5 things that landed in your inbox.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
           <div class="phone-screen">
             <div class="phone-notch"></div>
             <div class="phone-statusbar">
@@ -209,13 +221,18 @@
               </div>
             </div>
             <div class="phone-content">
-              <div class="ui-greeting">Good afternoon</div>
-              <div style="background: var(--indigo); border-radius: 11px; padding: 12px; color: var(--white);">
-                <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+              <div>
+                <div class="ui-greeting">Good afternoon, Tom</div>
+                <div class="ui-greeting-sub">Saturday, April 25</div>
+              </div>
+
+              <!-- Spring Readiness hero -->
+              <div style="background: var(--indigo); border-radius: 12px; padding: 12px; color: var(--white);">
+                <div style="display: flex; gap: 4px; margin-bottom: 7px; flex-wrap: wrap;">
                   <div style="display: inline-block; padding: 2px 7px; background: rgba(255,255,255,0.1); border-radius: 999px; font-family: var(--sans); font-size: 8px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.85);">SPRING READINESS</div>
-                  <div style="display: inline-block; padding: 2px 6px; background: rgba(237, 105, 85, 0.22); border-radius: 999px; font-family: var(--sans); font-size: 7px; font-weight: 700; letter-spacing: 0.06em; color: #FFB5A6;">1 OVERDUE</div>
+                  <div style="display: inline-block; padding: 2px 6px; background: rgba(237, 105, 85, 0.22); border-radius: 999px; font-family: var(--sans); font-size: 7px; font-weight: 700; color: #FFB5A6;">1 OVERDUE</div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 9px;">
                   <div style="position: relative; width: 44px; height: 44px; flex-shrink: 0;">
                     <svg viewBox="0 0 64 64" style="transform: rotate(-90deg); width: 100%; height: 100%;">
                       <circle cx="32" cy="32" r="26" stroke="rgba(255,255,255,0.18)" stroke-width="7" fill="none"/>
@@ -224,137 +241,348 @@
                     <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 500; font-size: 14px; color: var(--white);">13</div>
                   </div>
                   <div style="flex: 1; min-width: 0;">
-                    <div style="font-family: var(--serif); font-weight: 500; font-size: 12px; color: var(--white); line-height: 1.15;">13 of 19<br>covered</div>
-                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.6); margin-top: 2px;">6 need a pro · May 15</div>
+                    <div style="font-family: var(--serif); font-weight: 500; font-size: 12px; color: var(--white); line-height: 1.15;">13 of 19 covered</div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: rgba(255,255,255,0.6); margin-top: 2px;">6 need a pro · before May 15</div>
                   </div>
                 </div>
                 <div style="background: rgba(237, 105, 85, 0.16); border-left: 2px solid var(--salmon); border-radius: 5px; padding: 5px 7px; margin-bottom: 7px;">
-                  <div style="font-family: var(--sans); font-size: 7px; font-weight: 700; color: #FFB5A6; letter-spacing: 0.04em;">⚠︎ GENERAC · 14 MO OVERDUE</div>
+                  <div style="font-family: var(--sans); font-size: 7px; font-weight: 700; color: #FFB5A6; letter-spacing: 0.04em;">⚠︎ GENERAC 22KW · 14 MO OVERDUE</div>
+                  <div style="font-family: var(--sans); font-size: 8px; color: var(--white); margin-top: 1px;">Annual service · would fail in next outage</div>
                 </div>
-                <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 7px; padding: 7px; font-family: var(--sans); font-size: 9px; font-weight: 600; width: 100%;">Have Chez handle →</button>
+                <div style="background: rgba(255,255,255,0.07); border-radius: 5px; padding: 5px 7px; margin-bottom: 8px;">
+                  <div style="font-family: var(--sans); font-size: 7px; font-weight: 600; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">📅 NEXT · TUE MAY 6</div>
+                  <div style="font-family: var(--sans); font-size: 8px; color: var(--white); margin-top: 1px;">Boughton &amp; Sons · Tree care · $2,150 ✓</div>
+                </div>
+                <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 7px; padding: 7px; font-family: var(--sans); font-size: 9px; font-weight: 600; width: 100%;">Have Chez handle the 6 gaps →</button>
+                <div style="display: inline-block; margin-top: 6px; padding: 2px 7px; background: rgba(93, 202, 165, 0.18); border-radius: 999px; font-family: var(--sans); font-size: 7px; color: #5DCAA5; font-weight: 600;">$87K maintenance value protected</div>
               </div>
-            </div>
-            <div class="phone-tabbar">
-              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg></div>
-            </div>
-          </div>
-        </div>
-        <div class="phone-gallery-caption">
-          <div class="phone-gallery-caption-title">Dashboard</div>
-          <div class="phone-gallery-caption-sub">See your home's coverage, your next visit, and what needs your attention at a glance.</div>
-        </div>
-      </div>
 
-      <!-- Gallery phone 2: A.O. Smith System Detail -->
-      <div class="phone-gallery-item">
-        <div class="phone phone-xs" aria-hidden="true">
-          <div class="phone-screen">
-            <div class="phone-notch"></div>
-            <div class="phone-statusbar">
-              <span>9:41</span>
-              <div class="phone-statusbar-icons">
-                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
-              </div>
-            </div>
-            <div class="phone-content">
-              <div style="font-family: var(--serif); font-weight: 500; font-size: 14px; color: var(--text); line-height: 1.15;">80 Gal Signature 100</div>
-              <div class="ui-card-elevated">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                  <div style="width: 26px; height: 26px; border-radius: 5px; background: var(--indigo-50); color: var(--indigo); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; font-size: 10px;">AO</div>
-                  <div style="flex: 1;">
-                    <div style="font-family: var(--serif); font-weight: 500; font-size: 12px; color: var(--text);">A.O. Smith</div>
-                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Tank · Electric</div>
-                  </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 7px; border-top: 1px solid var(--neutral-200);">
-                  <div>
-                    <div style="font-family: var(--sans); font-size: 7px; color: var(--text-soft);">MODEL</div>
-                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">E6-80H45DV</div>
-                  </div>
-                  <div>
-                    <div style="font-family: var(--sans); font-size: 7px; color: var(--text-soft);">LIFESPAN</div>
-                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">12 yrs</div>
-                  </div>
+              <!-- ONGOING ROUTINES horizontal pills -->
+              <div>
+                <div class="ui-section-label">Ongoing routines</div>
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                  <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 999px; padding: 4px 9px; display: flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 9px; color: var(--text);"><span>🗑</span>Trash · Mon</div>
+                  <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 999px; padding: 4px 9px; display: flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 9px; color: var(--text);"><span style="color: #C77E2E;">▪</span>Cleaning · Wed</div>
+                  <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 999px; padding: 4px 9px; display: flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 9px; color: var(--text);"><span style="color: #4A7C59;">▪</span>Lawn · Thu</div>
+                  <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 999px; padding: 4px 9px; display: flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 9px; color: var(--text);"><span style="color: #5A8DB5;">▪</span>Pool · Fri</div>
                 </div>
               </div>
-              <div class="ui-card">
-                <div class="ui-section-label" style="margin-bottom: 4px;">📖 Manuals</div>
-                <div style="font-family: var(--sans); font-size: 9px; color: var(--indigo); line-height: 1.6;">🔗 Installation Guide<br>🔗 Owner's Manual<br>🔗 Spec Sheet</div>
-              </div>
-            </div>
-            <div class="phone-tabbar">
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></div>
-              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg></div>
-            </div>
-          </div>
-        </div>
-        <div class="phone-gallery-caption">
-          <div class="phone-gallery-caption-title">System detail</div>
-          <div class="phone-gallery-caption-sub">Snap any appliance label. Real make, model, manuals, and replacement parts in seconds.</div>
-        </div>
-      </div>
 
-      <!-- Gallery phone 3: Vehicle attention -->
-      <div class="phone-gallery-item">
-        <div class="phone phone-xs" aria-hidden="true">
-          <div class="phone-screen">
-            <div class="phone-notch"></div>
-            <div class="phone-statusbar">
-              <span>9:41</span>
-              <div class="phone-statusbar-icons">
-                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
-              </div>
-            </div>
-            <div class="phone-content">
-              <div class="ui-card-elevated">
-                <div style="text-align: center; padding: 4px 0;">
-                  <div style="font-size: 18px; margin-bottom: 4px;">🚙</div>
-                  <div style="font-family: var(--serif); font-weight: 500; font-size: 12px; color: var(--text); line-height: 1.15;">2024 Range Rover<br>Sport Autobiography</div>
-                  <div style="display: flex; gap: 3px; justify-content: center; margin-top: 5px;">
-                    <span class="ui-pill ui-pill-indigo" style="font-size: 7px;">NY-HRT24</span>
-                    <span class="ui-pill ui-pill-indigo" style="font-size: 7px;">12,400 mi</span>
+              <!-- UP NEXT -->
+              <div>
+                <div class="ui-section-label" style="display: flex; justify-content: space-between;"><span>Up next</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">5 in 60 days</span></div>
+                <div class="ui-vendor-row" style="margin-bottom: 4px;">
+                  <div class="ui-vendor-logo" style="background: linear-gradient(135deg, #2A4D38, #4A7C59); color: white;">B</div>
+                  <div class="ui-vendor-meta">
+                    <div class="ui-vendor-name" style="font-size: 10px;">Boughton &amp; Sons · May 6</div>
+                    <div class="ui-vendor-detail" style="font-size: 8px;">Annual tree care · $2,150</div>
+                  </div>
+                </div>
+                <div class="ui-vendor-row" style="margin-bottom: 4px;">
+                  <div class="ui-vendor-logo" style="background: linear-gradient(135deg, #B23A20, #ED6955); color: white;">T</div>
+                  <div class="ui-vendor-meta">
+                    <div class="ui-vendor-name" style="font-size: 10px;">Tyler Heating · May 10</div>
+                    <div class="ui-vendor-detail" style="font-size: 8px;">Annual boiler service · $440</div>
+                  </div>
+                </div>
+                <div class="ui-vendor-row">
+                  <div class="ui-vendor-logo" style="background: var(--indigo-50); color: var(--indigo);">📋</div>
+                  <div class="ui-vendor-meta">
+                    <div class="ui-vendor-name" style="font-size: 10px;">DIY · Replace HVAC filter · May 12</div>
+                    <div class="ui-vendor-detail" style="font-size: 8px;">5 min · last done Feb 12</div>
                   </div>
                 </div>
               </div>
-              <!-- ACTIVE NHTSA RECALL banner -->
-              <div style="background: var(--salmon-50); border: 1px solid var(--salmon); border-radius: 8px; padding: 7px 9px;">
-                <div style="font-family: var(--sans); font-size: 7px; font-weight: 700; color: var(--salmon-dark); letter-spacing: 0.06em; text-transform: uppercase;">⚠︎ NHTSA Recall · 25V-187</div>
-                <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text); line-height: 1.2; margin-top: 2px;">Brake fluid level sensor</div>
-                <div style="font-family: var(--sans); font-size: 7px; color: var(--text-muted); margin-top: 1px;">Free repair · Land Rover White Plains</div>
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                <div style="background: var(--salmon); border-radius: 9px; padding: 8px; color: var(--white);">
-                  <div style="font-family: var(--sans); font-size: 7px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.85);">REGISTRATION</div>
-                  <div style="font-family: var(--serif); font-weight: 500; font-size: 11px; line-height: 1.1; margin-top: 2px;">May 19</div>
-                  <div style="font-family: var(--sans); font-size: 8px; color: rgba(255,255,255,0.85);">11 days</div>
-                </div>
-                <div style="background: var(--indigo); border-radius: 9px; padding: 8px; color: var(--white);">
-                  <div style="font-family: var(--sans); font-size: 7px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.85);">INSURANCE</div>
-                  <div style="font-family: var(--serif); font-weight: 500; font-size: 11px; line-height: 1.1; margin-top: 2px;">Jun 30</div>
-                  <div style="font-family: var(--sans); font-size: 8px; color: rgba(255,255,255,0.85);">53 days</div>
+
+              <!-- RECENT ACTIVITY -->
+              <div>
+                <div class="ui-section-label">Recent activity</div>
+                <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted); line-height: 1.6;">
+                  <div style="padding: 3px 0; border-bottom: 1px dashed var(--neutral-200);">✓ Invoice processed · Tyler Heating · $440 · 2h ago</div>
+                  <div style="padding: 3px 0; border-bottom: 1px dashed var(--neutral-200);">✓ Document analyzed · USAA insurance renewal · yesterday</div>
+                  <div style="padding: 3px 0;">✓ Vendor linked · Boughton &amp; Sons · 2 days ago</div>
                 </div>
               </div>
             </div>
             <div class="phone-tabbar">
-              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span>Dashboard</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>Property</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span>Tasks</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg><span>Alfred</span></div>
             </div>
           </div>
         </div>
-        <div class="phone-gallery-caption">
-          <div class="phone-gallery-caption-title">Vehicles</div>
-          <div class="phone-gallery-caption-sub">Snap a VIN. NHTSA recall scans, inspection reminders, full service history.</div>
-        </div>
       </div>
-
     </div>
+
+    <!-- TILE 2: System detail — Bryant Evolution VC Plus 80 with full history, manuals, warranty, contractor -->
+    <div class="feature-row-v2 reverse reveal" style="margin-top: 80px;">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">System detail</span>
+        <h2 class="feature-row-v2-title">Every system in your home. Knowable in one screen.</h2>
+        <p class="feature-row-v2-desc">
+          Snap a label. Chez Vision matches it against a 219-brand, 2,818-model catalog and auto-attaches manuals, replacement parts, service intervals, and warranty status. Every invoice you forward updates the system's service history. The contractor who serviced it gets linked. The next service is on your calendar before you ask.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Auto-extracted brand &amp; model.</strong> Bryant Evolution VC Plus 80 · 5-ton variable-speed heat pump · installed Aug 2019. From a label photo.</div></li>
+          <li><div><strong>Service history with cost.</strong> Every visit logged: date, vendor, scope, dollar amount. Forwarded invoices auto-attach.</div></li>
+          <li><div><strong>Manuals + warranty + service interval.</strong> Installation guide, owner's manual, spec sheet, warranty PDF. Filter every 3 mo. Annual tune-up gated to October.</div></li>
+          <li><div><strong>Linked contractor.</strong> Tyler Heating ⭐ · 4.7★ · 8 visits · $3,840 lifetime spent. One tap to call, schedule, or hand to Chez.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <div class="phone-statusbar-icons">
+                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+              </div>
+            </div>
+            <div class="phone-content">
+              <div>
+                <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text-soft); letter-spacing: 0.08em; text-transform: uppercase;">HVAC · primary</div>
+                <div style="font-family: var(--serif); font-weight: 500; font-size: 16px; color: var(--text); letter-spacing: -0.012em; line-height: 1.15; margin-top: 2px;">Bryant Evolution VC Plus 80</div>
+              </div>
+
+              <!-- Brand hero card -->
+              <div class="ui-card-elevated" style="background: linear-gradient(135deg, #002A5C 0%, #003E84 100%); color: white;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 36px; height: 36px; border-radius: 7px; background: rgba(255,255,255,0.95); color: #002A5C; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 14px; flex-shrink: 0;">B</div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-family: var(--serif); font-weight: 500; font-size: 13px; color: white; letter-spacing: -0.012em;">Bryant Heating &amp; Cooling</div>
+                    <div style="font-family: var(--sans); font-size: 9px; color: rgba(255,255,255,0.7);">5-ton heat pump · variable speed</div>
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding-top: 9px; margin-top: 9px; border-top: 1px solid rgba(255,255,255,0.18);">
+                  <div>
+                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">MODEL</div>
+                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: white;">189BNV048</div>
+                  </div>
+                  <div>
+                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">INSTALLED</div>
+                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: white;">Aug 2019</div>
+                  </div>
+                  <div>
+                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">YRS LEFT</div>
+                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: white;">~8</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Filter alert -->
+              <div style="background: var(--salmon-50); border: 1px solid rgba(237, 105, 85, 0.25); border-radius: 8px; padding: 8px 10px;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <span style="font-size: 12px;">🔧</span>
+                  <div style="flex: 1;">
+                    <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Replace filter · 12 days overdue</div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Last replaced Jan 2 · MERV 13 · $42</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Service history -->
+              <div>
+                <div class="ui-section-label" style="display: flex; justify-content: space-between;"><span>Service history</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">7 visits · $3,840</span></div>
+                <div class="ui-card" style="padding: 8px 10px;">
+                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--neutral-200);">
+                    <div>
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Annual tune-up</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Tyler Heating · Mar 14, 2026</div>
+                    </div>
+                    <div style="font-family: var(--sans); font-size: 10px; font-weight: 700; color: var(--text);">$440</div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--neutral-200);">
+                    <div>
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Filter swap (DIY)</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Jan 2, 2026</div>
+                    </div>
+                    <div style="font-family: var(--sans); font-size: 10px; color: var(--text-muted);">$42</div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                    <div>
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Annual tune-up</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Tyler Heating · Mar 8, 2025</div>
+                    </div>
+                    <div style="font-family: var(--sans); font-size: 10px; font-weight: 700; color: var(--text);">$420</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Linked contractor -->
+              <div>
+                <div class="ui-section-label">Linked contractor</div>
+                <div class="ui-card" style="padding: 8px 10px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="ui-vendor-logo" style="width: 30px; height: 30px; background: linear-gradient(135deg, #B23A20, #ED6955); color: white;">T</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-family: var(--serif); font-weight: 500; font-size: 11px; color: var(--text); letter-spacing: -0.01em;">Tyler Heating ⭐</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">4.7★ · 8 visits · $3,840 lifetime</div>
+                    </div>
+                    <div style="display: flex; gap: 4px;">
+                      <button style="background: var(--indigo); color: white; border: none; border-radius: 5px; padding: 4px 7px; font-family: var(--sans); font-size: 8px; font-weight: 600;">Call</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manuals + warranty -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <div class="ui-card" style="padding: 7px 9px;">
+                  <div class="ui-section-label" style="margin-bottom: 3px;">📖 Manuals · 4</div>
+                  <div style="font-family: var(--sans); font-size: 8px; color: var(--indigo); line-height: 1.5;">Installation<br>Owner's manual<br>Spec sheet</div>
+                </div>
+                <div class="ui-card" style="padding: 7px 9px;">
+                  <div class="ui-section-label" style="margin-bottom: 3px; color: var(--success);">✓ Warranty</div>
+                  <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">Active</div>
+                  <div style="font-family: var(--sans); font-size: 7px; color: var(--text-muted);">Until Aug 2029</div>
+                </div>
+              </div>
+            </div>
+            <div class="phone-tabbar">
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span>Dashboard</span></div>
+              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>Property</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span>Tasks</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg><span>Alfred</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TILE 3: Vehicle — full Range Rover with NHTSA recall, maintenance grid, service history, mechanic -->
+    <div class="feature-row-v2 reveal" style="margin-top: 80px;">
+      <div class="feature-row-v2-text">
+        <span class="feature-row-v2-eyebrow">Vehicles</span>
+        <h2 class="feature-row-v2-title">Every car in your driveway, every alert, every service.</h2>
+        <p class="feature-row-v2-desc">
+          Snap a VIN. Chez decodes the make, model, trim, and engine via NHTSA. Pulls active recalls daily. Builds an AI maintenance schedule for your specific vehicle. Auto-links every service invoice and registration document you forward. Tracks the mechanic on file, the covered drivers, the inspection windows.
+        </p>
+        <ul class="feature-row-v2-bullets">
+          <li><div><strong>Active NHTSA recall scanning.</strong> 25V-187 · brake fluid level sensor · free repair at Land Rover White Plains · 0.4 hr. Surfaced the day NHTSA announced it.</div></li>
+          <li><div><strong>AI-generated maintenance schedule.</strong> Built for the exact year/make/model. Oil change due in 2,400 mi. Tire rotation due in 600 mi. NY inspection in 11 days.</div></li>
+          <li><div><strong>Service history + mechanic on file.</strong> Every invoice you forward auto-links. Land Rover White Plains · 1 hr response · 4-yr partner.</div></li>
+          <li><div><strong>Covered drivers.</strong> Tom, Sarah, Connor (16+). One tap to call your dealer, ask Alfred, or hand the recall recovery to Chez.</div></li>
+        </ul>
+      </div>
+      <div class="feature-row-v2-visual">
+        <div class="phone phone-sm" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-notch"></div>
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <div class="phone-statusbar-icons">
+                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+              </div>
+            </div>
+            <div class="phone-content">
+              <!-- Brand hero -->
+              <div class="ui-card-elevated" style="background: linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%); color: white; padding: 12px 14px;">
+                <div style="text-align: center; padding: 4px 0;">
+                  <div style="font-family: var(--sans); font-size: 7px; font-weight: 700; letter-spacing: 0.16em; color: rgba(255,255,255,0.55); margin-bottom: 4px;">LAND ROVER</div>
+                  <div style="font-family: var(--serif); font-weight: 500; font-size: 14px; color: white; line-height: 1.1; letter-spacing: -0.012em;">2024 Range Rover<br>Sport Autobiography</div>
+                  <div style="display: flex; gap: 4px; justify-content: center; margin-top: 6px; flex-wrap: wrap;">
+                    <span style="background: rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 7px; font-family: var(--sans); font-size: 7px; color: white;">NY-HRT24</span>
+                    <span style="background: rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 7px; font-family: var(--sans); font-size: 7px; color: white;">12,400 mi</span>
+                    <span style="background: rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 7px; font-family: var(--sans); font-size: 7px; color: white;">Carpathian Grey</span>
+                    <span style="background: rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 7px; font-family: var(--sans); font-size: 7px; color: white;">Owned</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Covered drivers -->
+              <div>
+                <div class="ui-section-label" style="display: flex; justify-content: space-between;"><span>Covered drivers</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">3 of 3</span></div>
+                <div style="display: flex; gap: -4px; align-items: center;">
+                  <div style="width: 26px; height: 26px; border-radius: 50%; background: var(--indigo); color: white; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; font-size: 10px; border: 2px solid white;">T</div>
+                  <div style="width: 26px; height: 26px; border-radius: 50%; background: #C77E2E; color: white; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; font-size: 10px; border: 2px solid white; margin-left: -6px;">S</div>
+                  <div style="width: 26px; height: 26px; border-radius: 50%; background: #4A7C59; color: white; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; font-size: 10px; border: 2px solid white; margin-left: -6px;">C</div>
+                  <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted); margin-left: 8px;">Tom · Sarah · Connor (16)</div>
+                </div>
+              </div>
+
+              <!-- ACTIVE RECALL -->
+              <div style="background: var(--salmon-50); border: 1px solid var(--salmon); border-radius: 8px; padding: 9px 11px;">
+                <div style="display: flex; align-items: flex-start; gap: 9px;">
+                  <span style="font-size: 14px;">⚠︎</span>
+                  <div style="flex: 1;">
+                    <div style="font-family: var(--sans); font-size: 8px; font-weight: 700; color: var(--salmon-dark); letter-spacing: 0.06em; text-transform: uppercase;">Active NHTSA Recall · 25V-187</div>
+                    <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--text); margin-top: 2px;">Brake fluid level sensor</div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted); margin-top: 1px;">Free repair · Land Rover White Plains · 0.4 hr</div>
+                    <div style="display: flex; gap: 4px; margin-top: 6px;">
+                      <button style="background: var(--salmon); color: white; border: none; border-radius: 5px; padding: 3px 7px; font-family: var(--sans); font-size: 8px; font-weight: 600;">Schedule recall</button>
+                      <button style="background: white; color: var(--text); border: 1px solid var(--neutral-300); border-radius: 5px; padding: 3px 7px; font-family: var(--sans); font-size: 8px; font-weight: 600;">Hand to Chez</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Stats row -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
+                <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 7px; padding: 6px 7px;">
+                  <div style="font-family: var(--sans); font-size: 7px; color: var(--text-soft); letter-spacing: 0.04em;">SPENT</div>
+                  <div style="font-family: var(--serif); font-weight: 600; font-size: 12px; color: var(--text);">$4,200</div>
+                </div>
+                <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 7px; padding: 6px 7px;">
+                  <div style="font-family: var(--sans); font-size: 7px; color: var(--text-soft); letter-spacing: 0.04em;">SERVICES</div>
+                  <div style="font-family: var(--serif); font-weight: 600; font-size: 12px; color: var(--text);">6</div>
+                </div>
+                <div style="background: var(--white); border: 1px solid var(--neutral-200); border-radius: 7px; padding: 6px 7px;">
+                  <div style="font-family: var(--sans); font-size: 7px; color: var(--text-soft); letter-spacing: 0.04em;">LAST</div>
+                  <div style="font-family: var(--serif); font-weight: 600; font-size: 12px; color: var(--text);">Mar 14</div>
+                </div>
+              </div>
+
+              <!-- Maintenance grid -->
+              <div>
+                <div class="ui-section-label">Upcoming maintenance</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                  <div class="ui-card" style="padding: 6px 8px;">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 2px;"><span style="font-size: 11px;">💧</span><span style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">Oil change</span></div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">In 2,400 mi · ~$145</div>
+                  </div>
+                  <div class="ui-card" style="padding: 6px 8px;">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 2px;"><span style="font-size: 11px;">🔘</span><span style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">Tire rotation</span></div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">In 600 mi · ~$95</div>
+                  </div>
+                  <div class="ui-card" style="padding: 6px 8px; background: var(--salmon-50); border-color: rgba(237, 105, 85, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 2px;"><span style="font-size: 11px;">📋</span><span style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--salmon-dark);">NY inspection</span></div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text);">May 18 · 11 days · $37</div>
+                  </div>
+                  <div class="ui-card" style="padding: 6px 8px;">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 2px;"><span style="font-size: 11px;">🛡</span><span style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">Brake fluid</span></div>
+                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Recall · free</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mechanic on file -->
+              <div>
+                <div class="ui-section-label">Mechanic on file</div>
+                <div class="ui-card" style="padding: 8px 10px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="ui-vendor-logo" style="width: 28px; height: 28px; background: linear-gradient(135deg, #1A1A1A, #2D2D2D); color: white; font-size: 11px;">L</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-family: var(--serif); font-weight: 500; font-size: 11px; color: var(--text);">Land Rover White Plains</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">4-yr partner · 1 hr response · 6 services</div>
+                    </div>
+                    <button style="background: var(--indigo); color: white; border: none; border-radius: 5px; padding: 4px 8px; font-family: var(--sans); font-size: 8px; font-weight: 600;">Call</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="phone-tabbar">
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span>Dashboard</span></div>
+              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>Property</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span>Tasks</span></div>
+              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg><span>Alfred</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -580,41 +808,121 @@
               </div>
             </div>
             <div class="phone-content">
-              <div class="ui-section-label">Identified</div>
-              <div class="ui-card-elevated">
+              <!-- ✓ Identified header -->
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <div style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: rgba(74, 124, 89, 0.14); border-radius: 999px; font-family: var(--sans); font-size: 9px; font-weight: 700; color: var(--success); letter-spacing: 0.04em;">
+                  <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--success); color: white; font-size: 7px; text-align: center; line-height: 10px;">✓</span>
+                  IDENTIFIED · 2.4s
+                </div>
+                <span style="font-family: var(--sans); font-size: 9px; color: var(--text-soft);">Edit</span>
+              </div>
+
+              <!-- Fake captured label photo (industrial nameplate) -->
+              <div style="background: linear-gradient(135deg, #2A2D33 0%, #3D414A 50%, #2A2D33 100%); border-radius: 10px; padding: 11px 14px; color: #DCDFE5; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px rgba(0,0,0,0.18); border: 1px solid #1A1C20; position: relative;">
+                <!-- silver corners -->
+                <div style="position: absolute; top: 4px; left: 4px; width: 6px; height: 6px; border-radius: 50%; background: rgba(220,223,229,0.18);"></div>
+                <div style="position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: rgba(220,223,229,0.18);"></div>
+                <div style="position: absolute; bottom: 4px; left: 4px; width: 6px; height: 6px; border-radius: 50%; background: rgba(220,223,229,0.18);"></div>
+                <div style="position: absolute; bottom: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: rgba(220,223,229,0.18);"></div>
+
+                <div style="text-align: center; padding: 2px 0;">
+                  <div style="font-family: var(--sans); font-weight: 800; font-size: 14px; letter-spacing: 0.18em; color: #F2F4F7; padding-bottom: 4px; border-bottom: 1px solid rgba(220,223,229,0.18);">RINNAI</div>
+                </div>
+                <div style="display: grid; grid-template-columns: 60px 1fr; gap: 4px 8px; padding-top: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 8.5px; line-height: 1.5;">
+                  <div style="color: rgba(220,223,229,0.55); letter-spacing: 0.06em;">MODEL</div><div style="color: #F2F4F7; font-weight: 600;">RUR199iN</div>
+                  <div style="color: rgba(220,223,229,0.55); letter-spacing: 0.06em;">SERIAL</div><div style="color: #F2F4F7; font-weight: 600;">F23-110-2847</div>
+                  <div style="color: rgba(220,223,229,0.55); letter-spacing: 0.06em;">INPUT</div><div style="color: #F2F4F7;">199,000 BTU/HR</div>
+                  <div style="color: rgba(220,223,229,0.55); letter-spacing: 0.06em;">FUEL</div><div style="color: #F2F4F7;">NAT GAS · 7–14" WC</div>
+                  <div style="color: rgba(220,223,229,0.55); letter-spacing: 0.06em;">ELEC</div><div style="color: #F2F4F7;">120V · 60Hz · 1.7A</div>
+                </div>
+                <div style="font-family: ui-monospace, Menlo, monospace; font-size: 7.5px; color: rgba(220,223,229,0.45); margin-top: 6px; padding-top: 5px; border-top: 1px dashed rgba(220,223,229,0.14); text-align: center; letter-spacing: 0.08em;">CSA US · ANSI Z21.10.3 · MFG JAPAN</div>
+
+                <!-- Camera/photo overlay corner -->
+                <div style="position: absolute; top: 8px; right: 26px; padding: 2px 6px; background: rgba(237, 105, 85, 0.85); border-radius: 999px; font-family: var(--sans); font-size: 7px; font-weight: 700; color: white; letter-spacing: 0.06em;">📷 CAPTURED</div>
+              </div>
+
+              <!-- Down arrow / extraction indicator -->
+              <div style="display: flex; align-items: center; justify-content: center; gap: 5px; padding: 1px 0;">
+                <span style="font-family: var(--sans); font-size: 9px; color: var(--text-muted); font-style: italic;">Matched in 219-brand catalog</span>
+                <span style="color: var(--salmon); font-size: 11px;">↓</span>
+              </div>
+
+              <!-- Brand hero card -->
+              <div class="ui-card-elevated" style="background: linear-gradient(135deg, #BB1F2E 0%, #8E1825 100%); color: white; padding: 11px 13px;">
                 <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 8px;">
-                  <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--indigo-50); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; color: var(--indigo); font-size: 11px; flex-shrink: 0;">AO</div>
+                  <div style="width: 32px; height: 32px; border-radius: 7px; background: rgba(255,255,255,0.95); color: #BB1F2E; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 13px; flex-shrink: 0;">R</div>
                   <div style="flex: 1; min-width: 0;">
-                    <div style="font-family: var(--serif); font-weight: 500; font-size: 14px; color: var(--text); letter-spacing: -0.01em; line-height: 1.2;">A.O. Smith</div>
-                    <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted);">Tank · Signature 100 · Electric</div>
+                    <div style="font-family: var(--sans); font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: rgba(255,255,255,0.7);">RINNAI</div>
+                    <div style="font-family: var(--serif); font-weight: 500; font-size: 14px; color: white; letter-spacing: -0.012em; line-height: 1.15;">RUR199iN Sensei</div>
+                    <div style="font-family: var(--sans); font-size: 9px; color: rgba(255,255,255,0.7);">Tankless · natural gas · condensing</div>
                   </div>
                 </div>
-                <div style="font-family: var(--serif); font-weight: 500; font-size: 13px; letter-spacing: -0.012em; color: var(--text); line-height: 1.2; margin-bottom: 8px;">80 Gal Signature 100 Electric</div>
-                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px;">
-                  <span class="ui-pill ui-pill-indigo" style="font-size: 8px;">4,500W elements</span>
-                  <span class="ui-pill ui-pill-indigo" style="font-size: 8px;">6-year warranty</span>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 9px;">
+                  <span style="background: rgba(255,255,255,0.14); border-radius: 4px; padding: 2px 6px; font-family: var(--sans); font-size: 7px; color: white; font-weight: 600;">11 GPM at 35°F rise</span>
+                  <span style="background: rgba(255,255,255,0.14); border-radius: 4px; padding: 2px 6px; font-family: var(--sans); font-size: 7px; color: white; font-weight: 600;">96% UEF</span>
+                  <span style="background: rgba(255,255,255,0.14); border-radius: 4px; padding: 2px 6px; font-family: var(--sans); font-size: 7px; color: white; font-weight: 600;">12-yr warranty</span>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding-top: 8px; border-top: 1px solid var(--neutral-200);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.18);">
                   <div>
-                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-soft);">Model</div>
-                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">E6-80H45DV</div>
+                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">INSTALLED</div>
+                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: white;">Sep 2021</div>
                   </div>
                   <div>
-                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-soft);">Fuel</div>
-                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">Electric</div>
+                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">LIFESPAN</div>
+                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: white;">~16 yrs</div>
                   </div>
                   <div>
-                    <div style="font-family: var(--sans); font-size: 8px; color: var(--text-soft);">Lifespan</div>
-                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: var(--text);">12 yrs</div>
+                    <div style="font-family: var(--sans); font-size: 7px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;">REPLACE</div>
+                    <div style="font-family: var(--sans); font-size: 9px; font-weight: 600; color: white;">~$3.4K</div>
                   </div>
                 </div>
               </div>
-              <div class="ui-card">
-                <div class="ui-section-label" style="margin-bottom: 5px;">📖 Manuals &amp; Guides</div>
-                <div style="font-family: var(--sans); font-size: 10px; color: var(--indigo); line-height: 1.7;">
-                  🔗 Installation Guide<br>
-                  🔗 Owner's Manual<br>
-                  🔗 Spec Sheet
+
+              <!-- Manuals row -->
+              <div>
+                <div class="ui-section-label" style="display: flex; justify-content: space-between;"><span>Manuals · auto-fetched</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">4</span></div>
+                <div class="ui-card" style="padding: 7px 10px;">
+                  <div style="display: flex; flex-direction: column; gap: 3px; font-family: var(--sans); font-size: 9.5px; color: var(--indigo); line-height: 1.5;">
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="color: var(--text-muted);">📄</span>Installation manual · 64p</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="color: var(--text-muted);">📄</span>Owner's guide · 28p</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="color: var(--text-muted);">📄</span>Spec sheet</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="color: var(--text-muted);">📄</span>Service &amp; troubleshooting</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Maintenance plan tied to this exact model -->
+              <div>
+                <div class="ui-section-label" style="display: flex; justify-content: space-between;"><span>Maintenance plan</span><span style="color: var(--text-soft); text-transform: none; letter-spacing: 0; font-weight: 400;">4 tasks</span></div>
+                <div class="ui-card" style="padding: 8px 10px;">
+                  <div style="display: flex; align-items: flex-start; gap: 7px; padding: 4px 0; border-bottom: 1px dashed var(--neutral-200);">
+                    <div style="width: 22px; height: 22px; border-radius: 5px; background: var(--salmon-50); color: var(--salmon-dark); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">⏰</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Annual flush + descale</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Tyler Heating · scheduled Oct 14 · ~$340</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: flex-start; gap: 7px; padding: 4px 0; border-bottom: 1px dashed var(--neutral-200);">
+                    <div style="width: 22px; height: 22px; border-radius: 5px; background: var(--indigo-50); color: var(--indigo); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">🔧</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Replace inlet filter</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">DIY · every 6 mo · part 232-1410 · $24</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: flex-start; gap: 7px; padding: 4px 0; border-bottom: 1px dashed var(--neutral-200);">
+                    <div style="width: 22px; height: 22px; border-radius: 5px; background: var(--salmon-50); color: var(--salmon-dark); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">🔥</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Combustion analyzer check</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Tyler Heating · annual · part of flush visit</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: flex-start; gap: 7px; padding: 4px 0;">
+                    <div style="width: 22px; height: 22px; border-radius: 5px; background: var(--indigo-50); color: var(--indigo); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">🛠</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-family: var(--sans); font-size: 10px; font-weight: 600; color: var(--text);">Anode rod replacement</div>
+                      <div style="font-family: var(--sans); font-size: 8px; color: var(--text-muted);">Tyler Heating · due Sep 2029 · ~$180</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
