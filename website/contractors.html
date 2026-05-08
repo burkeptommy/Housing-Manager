@@ -275,6 +275,17 @@
       .quote-line-row { grid-template-columns: 1fr 50px 70px; }
       .quote-line-row .qty { display: none; }
     }
+    /* Mobile: stack the inline 3-column routes grid + 2/3-column micro-grids */
+    @media (max-width: 768px) {
+      .feature-row-v2-visual > div[style*="grid-template-columns: repeat(3"],
+      .feature-row-v2-visual div[style*="grid-template-columns: repeat(3"] {
+        grid-template-columns: 1fr !important;
+      }
+      .ops-frame { border-radius: 12px; }
+      .ops-main { padding: 16px 14px !important; }
+      .ops-topbar-title { font-size: 18px !important; }
+      .ops-kpi-value { font-size: 18px !important; }
+    }
   </style>
   <script defer src="chez.js"></script>
 </head>
@@ -287,6 +298,9 @@
       <span class="nav-brand-mark"><img src="chez-logo.png" alt=""></span>
       <span>chez</span>
     </a>
+    <button class="nav-hamburger" aria-label="Toggle navigation" onclick="document.body.classList.toggle('nav-menu-open')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
     <div class="nav-links">
       <a href="/" class="nav-link nav-link-text-hide">Homeowners</a>
       <a href="contractors.html" class="nav-link is-active nav-link-text-hide">Contractors</a>
@@ -337,15 +351,7 @@
     <!-- Operations Desk hero mockup -->
     <div class="hero-rich-visual reveal" style="max-width: none;">
       <div class="ops-frame">
-        <div class="ops-frame-bar">
-          <div class="ops-frame-dots">
-            <div class="ops-frame-dot" style="background: #FF5F57;"></div>
-            <div class="ops-frame-dot" style="background: #FFBD2E;"></div>
-            <div class="ops-frame-dot" style="background: #28C840;"></div>
-          </div>
-          <div class="ops-frame-url">getchez.com/operations</div>
-        </div>
-        <div class="ops-shell">
+          <div class="ops-shell">
           <aside class="ops-sidebar">
             <div class="ops-sidebar-brand">
               <div class="ops-sidebar-brand-mark">R</div>
@@ -541,14 +547,6 @@
       <div class="feature-row-v2-visual">
         <!-- Routes screen mock -->
         <div class="ops-frame">
-          <div class="ops-frame-bar">
-            <div class="ops-frame-dots">
-              <div class="ops-frame-dot" style="background: #FF5F57;"></div>
-              <div class="ops-frame-dot" style="background: #FFBD2E;"></div>
-              <div class="ops-frame-dot" style="background: #28C840;"></div>
-            </div>
-            <div class="ops-frame-url">getchez.com/operations/routes</div>
-          </div>
           <div style="background: var(--pearl); padding: 22px 24px;">
             <div class="ops-topbar-eyebrow" style="margin-bottom: 4px;">Routes · Tuesday April 28</div>
             <div class="ops-topbar-title" style="margin-bottom: 14px;">3 techs · 11 stops · 47 mi total</div>
@@ -650,76 +648,56 @@
         </ul>
       </div>
       <div class="feature-row-v2-visual">
-        <div class="phone phone-sm field-phone" aria-hidden="true">
-          <div class="phone-screen">
-            <div class="phone-notch"></div>
-            <div class="phone-statusbar">
-              <span>9:41</span>
-              <div class="phone-statusbar-icons">
-                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9px; color: var(--success); font-weight: 600;">
-                  <span style="width: 6px; height: 6px; background: var(--success); border-radius: 50%;"></span>
-                  Synced
-                </span>
-                <svg viewBox="0 0 24 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="21.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/></svg>
+        <div class="ui-screenshot-card">
+          <div class="ui-section-label" style="display: flex; justify-content: space-between;">
+            <span>Visit · 14 Beacon Hill</span>
+            <span style="text-transform: none; letter-spacing: 0; color: var(--success); font-weight: 600;">● Checked in</span>
+          </div>
+          <div class="ui-card-elevated" style="padding: 12px 14px;">
+            <div style="font-family: var(--serif); font-weight: 600; font-size: 14px; color: var(--text); letter-spacing: -0.012em; margin-bottom: 4px;">Spring punch-list bundle</div>
+            <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">Whitfield · 7 items · $1,840 · ~4 hr</div>
+          </div>
+          <div class="ui-section-label">Checklist · 5 of 7 done</div>
+          <div class="ui-card" style="padding: 11px 14px;">
+            <div style="display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px solid var(--neutral-200);">
+              <div style="width: 16px; height: 16px; border-radius: 4px; background: var(--success); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--text); text-decoration: line-through; opacity: 0.6;">Replace dryer vent duct (rigid)</div>
               </div>
             </div>
-            <div class="phone-content">
-              <div class="ui-section-label" style="display: flex; justify-content: space-between;">
-                <span>Visit · 14 Beacon Hill</span>
-                <span style="text-transform: none; letter-spacing: 0; color: var(--success); font-weight: 600;">● Checked in</span>
+            <div style="display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px solid var(--neutral-200);">
+              <div style="width: 16px; height: 16px; border-radius: 4px; background: var(--success); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
-              <div class="ui-card-elevated" style="padding: 12px 14px;">
-                <div style="font-family: var(--serif); font-weight: 600; font-size: 14px; color: var(--text); letter-spacing: -0.012em; margin-bottom: 4px;">Spring punch-list bundle</div>
-                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">Whitfield · 7 items · $1,840 · ~4 hr</div>
-              </div>
-              <div class="ui-section-label">Checklist · 5 of 7 done</div>
-              <div class="ui-card" style="padding: 11px 14px;">
-                <div style="display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px solid var(--neutral-200);">
-                  <div style="width: 16px; height: 16px; border-radius: 4px; background: var(--success); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  </div>
-                  <div style="flex: 1; min-width: 0;">
-                    <div style="font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--text); text-decoration: line-through; opacity: 0.6;">Replace dryer vent duct (rigid)</div>
-                  </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px solid var(--neutral-200);">
-                  <div style="width: 16px; height: 16px; border-radius: 4px; background: var(--success); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  </div>
-                  <div style="flex: 1; min-width: 0;">
-                    <div style="font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--text); text-decoration: line-through; opacity: 0.6;">Re-caulk master bath shower (18 lf)</div>
-                  </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 9px; padding: 6px 0;">
-                  <div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--neutral-300); flex-shrink: 0;"></div>
-                  <div style="flex: 1; min-width: 0;">
-                    <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--text);">Identify HVAC + log to home profile</div>
-                    <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted);">Snap nameplate · auto-extract make/model</div>
-                  </div>
-                  <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 7px; padding: 5px 9px; font-family: var(--sans); font-size: 10px; font-weight: 600; flex-shrink: 0;">📷 Capture</button>
-                </div>
-              </div>
-              <!-- Last identified system result — premium HNW system -->
-              <div class="ui-card-elevated" style="padding: 11px 14px; background: linear-gradient(180deg, #F1F8F3, #E5F0E9); border: 1px solid rgba(74, 124, 89, 0.3);">
-                <div style="font-family: var(--sans); font-size: 9px; font-weight: 700; color: var(--success); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3px;">✓ Identified · added to home profile</div>
-                <div style="font-family: var(--serif); font-weight: 600; font-size: 13px; color: var(--text); letter-spacing: -0.012em; line-height: 1.2;">Bryant Evolution VC Plus 80</div>
-                <div style="font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 1px;">5-ton heat pump · Installed 2019 · 8 yrs life · $11.4K replacement</div>
-                <div style="display: flex; gap: 4px; margin-top: 6px;">
-                  <span class="ui-pill ui-pill-indigo" style="font-size: 8px;">Manuals fetched</span>
-                  <span class="ui-pill ui-pill-success" style="font-size: 8px;">Warranty active</span>
-                </div>
-              </div>
-              <div style="display: flex; gap: 6px; padding: 10px 0 6px;">
-                <button style="flex: 1; background: var(--salmon); color: var(--white); border: none; border-radius: 9px; padding: 10px; font-family: var(--sans); font-size: 11px; font-weight: 600;">Mark visit complete</button>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--text); text-decoration: line-through; opacity: 0.6;">Re-caulk master bath shower (18 lf)</div>
               </div>
             </div>
-            <div class="phone-tabbar">
-              <div class="phone-tab is-active"><svg viewBox="0 0 24 24" fill="currentColor"><polyline points="9 11 12 14 22 4 12 22 2 12"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M22 12c0-5.5-4.5-10-10-10S2 6.5 2 12s4.5 10 10 10"/></svg></div>
-              <div class="phone-tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/></svg></div>
+            <div style="display: flex; align-items: center; gap: 9px; padding: 6px 0;">
+              <div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--neutral-300); flex-shrink: 0;"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--text);">Identify HVAC + log to home profile</div>
+                <div style="font-family: var(--sans); font-size: 9px; color: var(--text-muted);">Snap nameplate · auto-extract make/model</div>
+              </div>
+              <button style="background: var(--salmon); color: var(--white); border: none; border-radius: 7px; padding: 5px 9px; font-family: var(--sans); font-size: 10px; font-weight: 600; flex-shrink: 0;">📷 Capture</button>
             </div>
           </div>
+          <!-- Last identified system result — premium HNW system -->
+          <div class="ui-card-elevated" style="padding: 11px 14px; background: linear-gradient(180deg, #F1F8F3, #E5F0E9); border: 1px solid rgba(74, 124, 89, 0.3);">
+            <div style="font-family: var(--sans); font-size: 9px; font-weight: 700; color: var(--success); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3px;">✓ Identified · added to home profile</div>
+            <div style="font-family: var(--serif); font-weight: 600; font-size: 13px; color: var(--text); letter-spacing: -0.012em; line-height: 1.2;">Bryant Evolution VC Plus 80</div>
+            <div style="font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 1px;">5-ton heat pump · Installed 2019 · 8 yrs life · $11.4K replacement</div>
+            <div style="display: flex; gap: 4px; margin-top: 6px;">
+              <span class="ui-pill ui-pill-indigo" style="font-size: 8px;">Manuals fetched</span>
+              <span class="ui-pill ui-pill-success" style="font-size: 8px;">Warranty active</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; padding: 10px 0 6px;">
+            <button style="flex: 1; background: var(--salmon); color: var(--white); border: none; border-radius: 9px; padding: 10px; font-family: var(--sans); font-size: 11px; font-weight: 600;">Mark visit complete</button>
+          </div>
+            
         </div>
       </div>
     </div>
@@ -743,14 +721,6 @@
       <div class="feature-row-v2-visual">
         <!-- Quote builder browser frame -->
         <div class="ops-frame quote-browser">
-          <div class="ops-frame-bar">
-            <div class="ops-frame-dots">
-              <div class="ops-frame-dot" style="background: #FF5F57;"></div>
-              <div class="ops-frame-dot" style="background: #FFBD2E;"></div>
-              <div class="ops-frame-dot" style="background: #28C840;"></div>
-            </div>
-            <div class="ops-frame-url">getchez.com/operations/quotes/Q-2026-031</div>
-          </div>
           <div style="background: var(--white); padding: 22px 26px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px;">
               <div>
@@ -869,14 +839,6 @@
       </div>
       <div class="feature-row-v2-visual">
         <div class="ops-frame">
-          <div class="ops-frame-bar">
-            <div class="ops-frame-dots">
-              <div class="ops-frame-dot" style="background: #FF5F57;"></div>
-              <div class="ops-frame-dot" style="background: #FFBD2E;"></div>
-              <div class="ops-frame-dot" style="background: #28C840;"></div>
-            </div>
-            <div class="ops-frame-url">getchez.com/operations/homes/14-beacon-hill</div>
-          </div>
           <div style="background: var(--white); padding: 22px 26px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
               <div>
