@@ -310,7 +310,7 @@ struct InboxItemDetailView: View {
                     .background(HavenColors.warning.opacity(0.12))
                     .clipShape(Capsule())
             } else {
-                Text(item.type.replacingOccurrences(of: "_", with: " ").capitalized)
+                Text(prettyTypeLabel(for: item.type))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(HavenColors.success)
                     .padding(.horizontal, 8)
@@ -1326,6 +1326,20 @@ struct InboxItemDetailView: View {
         case "document_stored": return HavenColors.navy
         case "vendor_added": return HavenColors.success
         default: return HavenColors.textTertiary
+        }
+    }
+
+    /// Wave Y2 follow-up: the legacy auto-formatter `type.replacingOccurrences("_"," ").capitalized`
+    /// renders Wave-Q ad-hoc-quote inbox rows as "Handyman Quote Received" — a B4 brand voice
+    /// violation visible to the homeowner. The DB enum string still says `handyman_quote_received`
+    /// (legacy column value, intentionally preserved); this helper overrides the user-facing
+    /// label so the pill reads "Quote Received" instead. New inbox types added in future Y2-style
+    /// fixes should pre-handle their label here too.
+    private func prettyTypeLabel(for type: String) -> String {
+        switch type {
+        case "handyman_quote_received": return "Quote Received"
+        case "invoice_received": return "Invoice Received"
+        default: return type.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 }

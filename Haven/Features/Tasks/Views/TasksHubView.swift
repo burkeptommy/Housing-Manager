@@ -18,7 +18,7 @@ enum TasksHubSection: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .maintenance: return "Maintenance"
-        case .handyman: return "Handyman"
+        case .handyman: return "Contractor"
         }
     }
 }
@@ -53,7 +53,7 @@ struct TasksHubView: View {
             titleVisibility: .hidden
         ) {
             Button("Maintenance") { setMode(.maintenance) }
-            Button("Handyman")    { setMode(.handyman) }
+            Button("Contractor")  { setMode(.handyman) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose the surface you want.")

@@ -82,8 +82,8 @@ struct VendorCard: View {
 
     private var eyebrow: String {
         switch state {
-        case .linked: return "YOUR HANDYMAN"
-        case .empty:  return "FIND A HANDYMAN"
+        case .linked: return "YOUR CONTRACTOR"
+        case .empty:  return "FIND A CONTRACTOR"
         }
     }
 
