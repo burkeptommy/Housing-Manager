@@ -1,13 +1,65 @@
 import Foundation
 import Supabase
+import Auth
+
+#if targetEnvironment(simulator)
+/// Simulator-only auth storage that uses `UserDefaults` instead of the iOS
+/// Keychain. The Supabase Swift SDK's default `KeychainLocalStorage` cannot
+/// persist auth sessions on iOS Simulator builds because the Security
+/// framework returns `errSecMissingEntitlement` (-34018) — Apple's
+/// per-target keychain access groups are only injected on signed device
+/// builds with valid provisioning, and adding explicit
+/// `keychain-access-groups` to the entitlements file causes
+/// FBSOpenApplicationServiceErrorDomain launch failures on the simulator
+/// because iOS validates the prefix matches the team identifier (which
+/// doesn't exist for simulator destinations).
+///
+/// Swapping to `UserDefaults` is gated on `targetEnvironment(simulator)`
+/// so device + TestFlight + App Store builds continue to use the secure
+/// Keychain path unchanged. Diagnosed 2026-05-08 from the simulator log:
+///   ChezField (Security) errSecMissingEntitlement -34018:
+///   "Client has neither application-identifier nor
+///    keychain-access-groups entitlements"
+private final class HavenSimulatorAuthStorage: AuthLocalStorage, @unchecked Sendable {
+    private let defaults = UserDefaults.standard
+    private let prefix = "supabase.auth."
+
+    func store(key: String, value: Data) throws {
+        defaults.set(value, forKey: prefix + key)
+    }
+
+    func retrieve(key: String) throws -> Data? {
+        defaults.data(forKey: prefix + key)
+    }
+
+    func remove(key: String) throws {
+        defaults.removeObject(forKey: prefix + key)
+    }
+}
+#endif
 
 /// Singleton Supabase client for Haven.
 /// Provides typed access to database, auth, storage, and Edge Functions.
 enum HavenSupabase {
-    static let client = SupabaseClient(
-        supabaseURL: URL(string: AppConfig.Supabase.url)!,
-        supabaseKey: AppConfig.Supabase.anonKey
-    )
+    static let client: SupabaseClient = {
+        #if targetEnvironment(simulator)
+        let options = SupabaseClientOptions(
+            auth: SupabaseClientOptions.AuthOptions(
+                storage: HavenSimulatorAuthStorage()
+            )
+        )
+        return SupabaseClient(
+            supabaseURL: URL(string: AppConfig.Supabase.url)!,
+            supabaseKey: AppConfig.Supabase.anonKey,
+            options: options
+        )
+        #else
+        return SupabaseClient(
+            supabaseURL: URL(string: AppConfig.Supabase.url)!,
+            supabaseKey: AppConfig.Supabase.anonKey
+        )
+        #endif
+    }()
 
     static func from(_ table: String) -> PostgrestQueryBuilder {
         client.from(table)

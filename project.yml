@@ -83,6 +83,17 @@ targets:
           - applinks:api.getchez.com
           - applinks:havenhome.dev
           - applinks:api.havenhome.dev
+        # iOS Simulator keychain note (2026-05-08): the Supabase Swift
+        # SDK's default KeychainLocalStorage cannot persist auth session
+        # tokens on iOS Simulator without proper provisioning — the
+        # Security framework returns errSecMissingEntitlement (-34018).
+        # Adding a literal keychain-access-groups here breaks simulator
+        # launch because iOS validates the team prefix (which is missing
+        # on unsigned simulator builds). The fix lives in code instead:
+        # HavenSimulatorAuthStorage in Haven/Core/Networking/SupabaseClient.swift
+        # swaps the SDK's storage backend to UserDefaults under
+        # #if targetEnvironment(simulator). Device + TestFlight + App Store
+        # builds keep using the secure Keychain path unchanged.
 
   HavenField:
     type: application
