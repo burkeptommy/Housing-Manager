@@ -77,11 +77,11 @@ const draftKey = `chez-handyman-portal:${token || "demo"}`;
 
 const demoSession = {
   id: "demo-session",
-  title: "Spring Handyman Visit",
+  title: "Spring Service Visit",
   portal_token: "demo",
   seed_payload: {
     visitId: null,
-    visitTitle: "Spring Handyman Visit",
+    visitTitle: "Spring Service Visit",
     scheduledDate: null,
     dueDate: "2026-05-14",
     firstVisit: true,
