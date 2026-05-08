@@ -514,3 +514,181 @@ Surfaces still gapped (next session):
 The Operations Desk SPA went from **invisible-sidebar / dead-CTAs / no-cross-app-parity** to **shippable preview with the four highest-priority architectural gaps closed**. Of the 16 critical/major bugs identified across the original 7 waves and the original gap log, 13 are now addressed inline in code. The remaining 3 (handyman_punch_items / quote send audit / Mark complete audit) all shipped as follow-up architectural fixes in Waves N + O.
 
 **Cross-app parity is now the strongest it's been across the project.** Every contractor-side action that touches a homeowner-visible state now leaves an audit trail (status changes, quote sends, invoice sends, punch list adds/completes). The two sides — homeowner iOS, contractor web — finally see the same data through the same DB rows.
+
+---
+
+# Demo-readiness addendum: Waves R–W
+
+After the 18-commit Phase 0–Q run, Tom asked to keep going through the night to make sure tomorrow's demo lands. 7 more commits shipped across 6 waves, closing every demo blocker I could identify. **Total: 25 commits.**
+
+## Wave R (commit `cdff07af`) — Calendar + Routes dead-button sweep
+
+The two screens that had **never** been tested in a dedicated wave were Calendar (Section 13) and Routes (Section 17). Wave R caught **5 dead interactive elements** that would have visibly failed if Tom touched them on stage:
+
+1. **Calendar Day/Week/Month toggle** — buttons updated state but only Month was implemented. Hid Day/Week until built.
+2. **Calendar tech filter chips** — 4 chips with `cursor:pointer` but ZERO onClick handlers. Wired with `Set<memberId>` state + aria-pressed + Clear filter affordance. Verified: 1-tech filter drops 11 visits to 6.
+3. **Routes date prev/next chevrons** — no state behind them. Removed.
+4. **Routes "Optimize all routes" CTA** — primary indigo button with no handler. Removed; replaced with a quiet "N techs routed · M stops" stat line.
+5. **Routes layout** — verified mini-map SVGs render with W2 fixture data; per-stop links work.
+
+Both screens now demo-ready GREEN. 0 em-dashes, 0 "handyman" leaks, 1 h1, salmon discipline holding.
+
+## Wave S (commit `46386479`) — Multi-workspace switcher
+
+The sidebar workspace pill had a `// TODO multi-workspace` comment. Click was a no-op. If Tom's account is multi-workspace (likely in production), the demo would visibly break.
+
+**Implementation:**
+- Edge function `loadDashboard` now accepts `?workspace=<uuid>` query param. Validates the user is an active member; falls back to first-active if stale. Returns `availableWorkspaces[]` on every payload.
+- SPA persists choice in `localStorage["ops:current_workspace_id"]` and includes it on every dashboard fetch.
+- Sidebar renders a popover dropdown (Slack/Linear/Notion-style) with workspace name + role label + salmon checkmark on current. Click outside or Escape closes.
+- Single-workspace users see no chevron and the button is disabled (no fake affordance).
+- Sign-out clears the stored id so the next operator on the same browser doesn't inherit a stale selection.
+
+**Smoke-tested:** added W1 owner as a member of W2, switched W1 → W2 → W1, verified data fully flipped each direction (5 vs 1 teammates, $1.1K vs $228 pipeline, Crew nav appearing/disappearing, hero copy changing). Hard-reload between switches confirmed persistence.
+
+## Wave T (commit `fa9ffb6e`) — Messages polish: 4 demo features
+
+The Messages screen had 7 of 15 features built. Wave T added 4 more demo-relevant ones:
+
+1. **10.5 Photo attachment** — paperclip → file input → 1600px JPEG resize on canvas → new `upload_message_attachment` Edge action → uploads to a new `message-attachments` Storage bucket → returns signed URL → next `send_message` call carries `metadata.attachments`. Bubbles render inline thumbnails (200px max, click-to-enlarge).
+2. **10.6 + Quote inline** — `+ Quote` button dispatches `ops:open-new-quote` event with thread context pre-filled. Modal handles save+send; existing `mirrorQuoteMessageToRequestThread` mirrors `quote_sent` metadata into the thread. New rich `quote_sent` bubble variant renders title + serif total + "View quote details" link.
+3. **10.7 + Visit inline** — `+ Visit` button opens `ProposeVisitSheet` modal. Submits via new `propose_visit_slots` Edge action which inserts ONE thread message with `metadata.kind=visit_proposed` + slots array. Slot card renders in the thread.
+4. **10.13 Suggestion chips** — 5 quick-reply chips above the composer ("On my way", "Running 15 min late", "Be there in 10", "Wrapping up", "All done. Thanks."). Click fills textarea (no auto-send — user reviews/edits first).
+
+All four verified end-to-end via Chrome MCP + DB cross-checks.
+
+## Wave U (commit `5b43a44d`) — Cross-app round-trip verification + iOS rebrand
+
+**Verification (no code change):** confirmed all 5 critical contractor → homeowner round-trips by calling the SPA's Edge Function actions as W2 owner JWT and cross-checking the homeowner-side rows via service-role JWT:
+
+1. **Mark visit complete** → `handyman_request_messages` audit row with `sender_role='vendor'`, `metadata.kind='status_change'`. ✓
+2. **Send quote** → `provider_quotes.status='sent'` + `inbox_items` row of type `handyman_quote_received` (ad-hoc path) OR `handyman_request_messages` mirror with `kind='quote_sent'` (request-linked path). ✓
+3. **Add punch item** → `handyman_punch_items` row with `proposed_by_role='handyman'`, `source='manual'`. Same row the homeowner iOS reads. ✓
+4. **Send invoice** → `provider_invoices.status='sent'` + `inbox_items` row of type `invoice_received` + `handyman_request_messages` mirror with `kind='invoice_sent'` (when request-linked). ✓
+5. **Decline Chez-routed visit** → `handyman_requests.status='declined'` + audit-trail message. ✓
+
+All 5 PASS. Data shape, RLS scoping, and iOS reader compatibility confirmed.
+
+**One demo-relevant finding fixed inline:** iOS `HandymanRequestStatus.homeownerSummary` had 6 user-facing "the handyman" strings in `Haven/Core/Networking/DatabaseModels.swift`. If Tom shows the iOS app side-by-side during the demo, they'd violate the rebrand mandate. Replaced with "your contractor" across all 6 cases. The internal `displayLabel "Sent to handyman"` and the `case .sentToHandyman = "sent_to_handyman"` raw value stay (not user-shown copy / matches DB column).
+
+## Wave V (commit `03462749`) — Quote bundles + Invoice PDF
+
+Two flagship demo features.
+
+### V.1 — Quote-with-options (good/better/best)
+
+Tom called this out as a key differentiator from QuickBooks. Implementation reuses the existing `parent_quote_id` FK from Phase 73b — no new schema column.
+
+**Architecture:** A bundle is one parent quote (empty line items, total=0, `BUNDLE_MARKER` sentinel in `scope_notes`) plus 2-3 child quotes. Children link via `parent_quote_id`; each carries actual line items + a tier label encoded as a title suffix.
+
+**3 new Edge actions:**
+- `save_quote_bundle` — creates parent + children atomically.
+- `send_quote_bundle` — flips parent + children draft → sent in one round-trip; mirrors a single `quote_bundle_sent` thread message with the tiers array (so iOS reads ONE rich card, not 3).
+- `decide_quote_bundle` — homeowner picks a tier; chosen child → `approved`, others → `superseded`, parent → `approved` with `chosenChildId` stamped.
+
+**SPA:** NewQuoteModal got a "+ Offer good / better / best options" button that flips into multi-tier mode (auto-renames tier 0 to "Good"). Quotes screen renders bundle parents with a "BUNDLE" badge + price range; clicking shows three side-by-side tier cards. The chosen tier gets a salmon left-border + "Approved" pill; others fade with "Superseded".
+
+**Smoke-tested:** 3-tier bundle ($700 / $1,750 / $20,500) created, sent, and decided end-to-end with DB cross-checks.
+
+### V.2 — Invoice print/PDF route
+
+Took the print-friendly route (no Deno headless Chrome dependency, no 3rd-party API).
+
+**`/operations/invoices/:id/print`** — new SPA screen with workspace letterhead (company name, email, phone, website, license number), invoice number + issued/due dates, Bill To / For block, line items table, subtotal/tax/total, "Paid in full" pill when paid, thank-you footer. Auto-fires `window.print()` on mount; Cmd+P → "Save as PDF" gives a clean artifact in two clicks. `?autoprint=0` disables for review. `@media print` CSS hides the SPA chrome.
+
+**InvoiceDetail** got a "Download PDF / Print" button on every invoice's action sidebar that opens the print page in a new tab.
+
+**Smoke-tested:** opened with W2's seeded invoice, verified letterhead + line items + total render correctly, browser print dialog opens automatically.
+
+## Wave W (commit `e3a3cc46`) — Demo dry-run, all 11 flows GREEN
+
+Walked through every flow Tom is likely to demo as a real contractor would:
+
+| # | Screen | Status | Highlight |
+|---|---|---|---|
+| 1 | Sign in | ✅ GREEN | Auth pitch + sign-in succeeds, `?next=` preserves on sign-out + restores on sign-in |
+| 2 | Overview | ✅ GREEN | Hero + KPIs + Decision Queue with Routed-by-Chez/Emergency pills + Field Board |
+| 3 | Visits + visit detail | ✅ GREEN | Decline + Mark complete buttons, structured punch list, conversation thread |
+| 4 | Calendar | ✅ GREEN | Month grid + tech filter chips + today salmon pill (Wave R fixes hold) |
+| 5 | Routes | ✅ GREEN | 3 tech cards + mini-map SVGs + numbered stops (Wave R fixes hold) |
+| 6 | Homes / Customer 7 | ✅ GREEN | chez_profile spending tier banner ("Auto-approve under $250…") visible (Wave N) |
+| 7 | Quotes + new-quote | ✅ GREEN | Wave V bundle CTA visible; existing 3-tier bundle renders with salmon-bordered Approved tier |
+| 8 | Invoices + print/PDF | ✅ GREEN | List + detail + print page with full letterhead all working (Wave V) |
+| 9 | Messages + chip | ✅ GREEN | Wave T polish — paperclip + +Quote + +Visit + chips all wired |
+| 10 | Settings | ✅ GREEN | All 4 cards render, fields populated (Wave P) |
+| 11 | Sign out | ✅ GREEN | Lands on /handyman.html with Signed-out pill, next-link preserved |
+
+**The one finding** was 33 pre-existing fixture rows with em-dashes in user-visible fields (titles, message bodies, etc.). The seed source was fixed pre-Wave-D but earlier seeded rows lingered. Scrubbed via PostgREST PATCH on the service-role JWT — idempotent, no code changes needed.
+
+After scrub: 0 em-dashes in user-facing data across all four affected screens.
+
+## Final 25-commit list
+
+| # | Commit | Wave | Title |
+|---|---|---|---|
+| 1 | `eae7baf1` | 0 | Phase 0 infrastructure |
+| 2 | `85874c1e` | preflight | chez.css 404 + initial rebrand |
+| 3 | `32c134f8` | preflight | auth gate hung |
+| 4 | `e6631804` | A | salmon discipline + em dashes |
+| 5 | `8de354a5` | A | Vite proxy `?v=...` |
+| 6 | `db0c1406` | B | auth-gate next-link + handyman.html rebrand + AddClientModal |
+| 7 | `99e15f06` | C | VisitDetail rebrand + en-dash + cross-app gaps logged |
+| 8 | `38485ba8` | C | status changes append audit-trail message |
+| 9 | `9aa3a1ba` | D | empty-state CTA + saved-item add + 5 brand-voice + em-dash seed |
+| 10 | `63faa0bb` | E | chat order + Chez bubble + 8 brand-voice |
+| 11 | `75eea466` | I | Chez routing UX |
+| 12 | `3d931953` | I | Section 19 gap log |
+| 13 | `1e23c9d3` | M | salmon + h1 + touch + reduced-motion |
+| 14 | `8c04f6bd` | report | Initial overnight report |
+| 15 | `22602f60` | N | quote-send audit + Decline button + chez_profile banner |
+| 16 | `41d6d370` | O | handyman_punch_items end-to-end |
+| 17 | `091d81ae` | P | Crew Invite sheet + Workspace Settings |
+| 18 | `fec90fc0` | Q | Section 8 Invoices skeleton |
+| 19 | `9584eb41` | report | N–Q addendum |
+| 20 | `cdff07af` | **R** | Calendar + Routes 5 dead buttons |
+| 21 | `46386479` | **S** | Multi-workspace switcher |
+| 22 | `fa9ffb6e` | **T** | Messages photo + quote + visit + chips |
+| 23 | `5b43a44d` | **U** | iOS homeownerSummary rebrand |
+| 24 | `03462749` | **V** | Quote bundles + invoice print/PDF |
+| 25 | `e3a3cc46` | **W** | Em-dash data scrub + dry-run report |
+
+## What is the contractor desk demo-ready for?
+
+✅ **Every flow Tom is likely to walk through tomorrow** — sign-in, Today's Desk, Customers/Homes with chez_profile awareness, Visits with Chez routing differentiation + structured punch list authoring + Decline + Mark complete with audit trail, Calendar (Month view + tech filter), Routes (with mini-maps), Crew with Invite flow, Quotes with good/better/best bundles, Invoices with print/PDF, Messages with photo + inline quote/visit + chips, Settings with branding config, Multi-workspace switcher, Sign-out with deep-link preservation.
+
+✅ **Cross-app parity** — every contractor action that touches a homeowner-visible state leaves a corresponding row the homeowner iOS app can read: status changes (Wave C), quote sends (Wave Q), invoice sends (Wave Q), punch list changes (Wave O), bundle decisions (Wave V). DB shapes verified.
+
+✅ **Brand voice clean** — 0 user-facing "handyman" mentions across every audited page on the SPA AND the iOS-side homeowner summaries (Wave U). The internal `handyman_*` table names, `/handyman.html` URL path, asset paths, and code comments stay.
+
+✅ **Salmon discipline** — only primary CTAs, active rows, salmon-50 wash on selected, status change indicators (Approved/Emergency/Routed-by-Chez SLA pills) use salmon. Wave M caught 3 stragglers; Wave R caught more.
+
+✅ **Em-dash discipline** — 0 user-facing em-dashes in either app strings or fixture data (after Wave W scrub).
+
+## What's NOT demo-ready (skip these surfaces)
+
+- **Section 5 — Systems aggregate (cross-customer)**. Wholesale gap. Don't navigate to a "/systems" route.
+- **Section 9a Tasks aggregate** — wholesale gap. The Decision Queue serves Tom for decisions; aggregate task list isn't surfaced.
+- **Section 11 — Cases (multi-visit threads)** — wholesale gap.
+- **Section 12 — Email integration** — wholesale gap.
+- **Section 14 — Forecasting + reporting** — wholesale gap.
+- **Section 15 — Marketing + pipeline + inventory** — wholesale gap.
+- **Stripe payment integration on Invoices** (8.7-8.9) — print/PDF works; online payment not implemented.
+- **A/R aging report (8.11)** — gap.
+- **Quote templates / duplication** (7.29-7.30) — bundles work; templates don't.
+- **e-Signature on quotes** (7.32) — gap.
+- **Negotiation history timeline** (7.44) — schema there; no UI.
+- **Drag-to-reschedule on Calendar** (13.3) — visits are static cards; drag isn't wired.
+- **Drag-to-reorder Routes stops** (17.3) — gap.
+- **Photo upload AI extraction on systems** (3.40) — manual edits work; AI extraction not wired.
+- **Bulk CSV import customers** (3.12) — gap.
+- **Map view of customers** (3.15) — gap.
+
+If Tom's deck doesn't go near these, the demo is solid.
+
+## Closing — demo-day note
+
+The contractor Operations Desk went from **invisible-sidebar / dead-CTAs / zero-cross-app-parity** to **shippable preview with 6 wholesale architectural surfaces newly closed and 11/11 demo flows GREEN**. 25 commits, 4 redeploys of `handyman-provider`, 1 new migration (`provider_invoices`), 1 new Storage bucket (`message-attachments`), and 1 new Storage path (`message-attachments`) — all green-lit on TS compile + Vite build + service-role JWT cross-checks.
+
+Cross-app parity is the strongest it's been across the project. Every contractor action that should land on the homeowner side does, with a verifiable DB row trail.
+
+Good luck on the demo.
