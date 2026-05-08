@@ -8,21 +8,23 @@ import { useWorkspace } from "../lib/workspace-context";
 import { formatTime12h } from "../lib/api";
 import type { VisitRow } from "../lib/types";
 
-type View = "Day" | "Week" | "Month";
-
 export default function CalendarScreen() {
   const { dashboard } = useWorkspace();
-  const [view, setView] = useState<View>("Month");
   const [cursor, setCursor] = useState(() => new Date());
+  const [techFilter, setTechFilter] = useState<Set<string>>(new Set());
 
   const cells = useMemo(() => buildMonthGrid(cursor), [cursor]);
 
-  if (!dashboard) return null;
-
-  // Group visits by ISO date (yyyy-MM-dd) so the cell render is O(1)
+  // Group filtered visits by ISO date (yyyy-MM-dd) so the cell render is O(1)
   const visitsByDate = useMemo(() => {
     const map = new Map<string, VisitRow[]>();
+    if (!dashboard) return map;
+    const filterActive = techFilter.size > 0;
     dashboard.visits.forEach((v) => {
+      if (filterActive) {
+        const memberId = v.assignment?.memberId;
+        if (!memberId || !techFilter.has(memberId)) return;
+      }
       const day = (v.routeDate || v.visit?.scheduledDate || "").slice(0, 10);
       if (!day) return;
       const arr = map.get(day) ?? [];
@@ -30,30 +32,26 @@ export default function CalendarScreen() {
       map.set(day, arr);
     });
     return map;
-  }, [dashboard]);
+  }, [dashboard, techFilter]);
+
+  if (!dashboard) return null;
 
   const totalVisits = dashboard.visits.filter((v) =>
     !["cancelled", "declined"].includes(v.status)
   ).length;
 
+  const toggleTech = (memberId: string) => {
+    setTechFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(memberId)) next.delete(memberId);
+      else next.add(memberId);
+      return next;
+    });
+  };
+
   return (
     <Card padding="default">
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 4, background: "var(--neutral-200)", padding: 3, borderRadius: 9 }}>
-          {(["Day", "Week", "Month"] as const).map((v) => (
-            <button
-              key={v}
-              className="ops-page-toolbar__seg-button"
-              style={{
-                background: view === v ? "var(--indigo)" : "transparent",
-                color: view === v ? "#fff" : "var(--text-muted)",
-              }}
-              onClick={() => setView(v)}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <button className="ops-button ops-button--ghost" style={{ height: 32, padding: "4px 10px" }} aria-label="Previous"
           onClick={() => setCursor((d) => addMonths(d, -1))}>
           <Icon name="chevron" size={14} stroke={2} style={{ transform: "rotate(180deg)" }} />
@@ -68,17 +66,40 @@ export default function CalendarScreen() {
         <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--text)", marginLeft: 8 }}>
           {cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-          {dashboard.teamMembers.filter((m) => m.status === "active").map((tech) => (
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          {techFilter.size > 0 && (
             <button
-              key={tech.id}
               className="ops-button ops-button--ghost"
-              style={{ height: 28, padding: "2px 10px 2px 4px", fontSize: 11, gap: 4 }}
+              style={{ height: 28, padding: "2px 10px", fontSize: 11, color: "var(--text-soft)" }}
+              onClick={() => setTechFilter(new Set())}
             >
-              <Avatar initials={initialsFor(tech.fullName || tech.email)} size={22} fontSize={9} />
-              {(tech.fullName || tech.email).split(" ")[0]}
+              Clear filter
             </button>
-          ))}
+          )}
+          {dashboard.teamMembers.filter((m) => m.status === "active").map((tech) => {
+            const isActive = techFilter.has(tech.id);
+            const filterEmpty = techFilter.size === 0;
+            return (
+              <button
+                key={tech.id}
+                className="ops-button ops-button--ghost"
+                aria-pressed={isActive}
+                style={{
+                  height: 28,
+                  padding: "2px 10px 2px 4px",
+                  fontSize: 11,
+                  gap: 4,
+                  background: isActive ? "var(--indigo)" : "transparent",
+                  color: isActive ? "#fff" : "var(--text-muted)",
+                  opacity: filterEmpty || isActive ? 1 : 0.55,
+                }}
+                onClick={() => toggleTech(tech.id)}
+              >
+                <Avatar initials={initialsFor(tech.fullName || tech.email)} size={22} fontSize={9} />
+                {(tech.fullName || tech.email).split(" ")[0]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
