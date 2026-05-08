@@ -394,6 +394,30 @@ export interface Quote {
   scopeNotes: string;
   latestMessage: { senderRole: string; senderName: string; body: string; createdAt: string } | null;
   recentMessages: { id: string; senderRole: string; senderName: string; body: string; createdAt: string; deliveryChannel: string }[];
+  /**
+   * Wave V.1 — quote bundles (good/better/best).
+   *
+   * - parentQuoteId: when set, this quote is a CHILD of a bundle. The
+   *   parent's row is the wrapper.
+   * - bundleMeta: when present (only on the parent row), this is a
+   *   BUNDLE PARENT. Carries the tier list and the chosen-child
+   *   breadcrumb if a tier has been picked.
+   * - bundleTierLabel: the per-child label ("Good" / "Better" / "Best"
+   *   or whatever the contractor typed). Only set on children.
+   *
+   * Implementation note: the schema reuses parent_quote_id from Phase
+   * 73b without a new column. The BUNDLE_MARKER sentinel in
+   * scope_notes is what distinguishes a bundle parent from a
+   * counter-offer chain.
+   */
+  parentQuoteId: string | null;
+  bundleMeta: {
+    bundle: true;
+    tiers: string[];
+    chosenChildId?: string | null;
+    chosenTierLabel?: string | null;
+  } | null;
+  bundleTierLabel: string | null;
 }
 
 export interface SavedQuoteItem {

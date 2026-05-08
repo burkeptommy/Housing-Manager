@@ -34,14 +34,55 @@ export default function QuotesScreen() {
   const [savedFormUnit, setSavedFormUnit] = useState("ea");
   const [savedFormPrice, setSavedFormPrice] = useState(0);
 
-  const quotes = useMemo(() => dashboard?.quotes ?? [], [dashboard]);
+  const allQuotes = useMemo(() => dashboard?.quotes ?? [], [dashboard]);
   const savedItems = useMemo(() => dashboard?.savedQuoteItems ?? [], [dashboard]);
+
+  // Wave V.1 — quote bundles. The pipeline list shows ONE row per
+  // bundle (the parent); children render as tier cards in the detail
+  // panel. Counter-offer chains (Phase 73b) keep their per-version
+  // visibility because they're not bundle parents — `bundleMeta` is
+  // only set on bundle parents via the BUNDLE_MARKER sentinel.
+  const quotes = useMemo(
+    () => allQuotes.filter((q) => !q.parentQuoteId || q.bundleMeta !== null),
+    [allQuotes],
+  );
+
+  // The detail panel needs to walk the parent → children fan-out.
+  // Build an index keyed by parent id once per dashboard refresh.
+  const childrenByParentId = useMemo(() => {
+    const map = new Map<string, typeof allQuotes>();
+    for (const q of allQuotes) {
+      if (q.parentQuoteId) {
+        const arr = map.get(q.parentQuoteId) ?? [];
+        arr.push(q);
+        map.set(q.parentQuoteId, arr);
+      }
+    }
+    // Sort children by tier order from the parent's bundleMeta when
+    // available so the cards render in the contractor-authored order.
+    return map;
+  }, [allQuotes]);
 
   const selected = useMemo(() => {
     if (!quotes.length) return null;
     if (selectedQuoteId) return quotes.find((q) => q.id === selectedQuoteId) ?? quotes[0];
     return quotes[0];
   }, [selectedQuoteId, quotes]);
+
+  // For a bundle parent, the ordered children. Empty array for non-bundle quotes.
+  const selectedBundleChildren = useMemo(() => {
+    if (!selected || !selected.bundleMeta) return [] as typeof allQuotes;
+    const kids = (childrenByParentId.get(selected.id) ?? []).slice();
+    const order = selected.bundleMeta.tiers;
+    kids.sort((a, b) => {
+      const ai = order.indexOf(a.bundleTierLabel ?? "");
+      const bi = order.indexOf(b.bundleTierLabel ?? "");
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+    return kids;
+  }, [selected, childrenByParentId]);
+
+  const isSelectedBundle = Boolean(selected?.bundleMeta);
 
   // Fetch the comment thread for the selected quote so we can show
   // homeowner questions inline + reply per-line.
@@ -104,35 +145,60 @@ export default function QuotesScreen() {
             <div style={{ padding: 14, fontSize: 13, color: "var(--text-muted)" }}>No quotes yet.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column" }}>
-              {quotes.map((q) => (
-                <button
-                  key={q.id}
-                  onClick={() => setSelectedQuoteId(q.id)}
-                  className="ops-row"
-                  style={{
-                    background: selected?.id === q.id ? "var(--salmon-50)" : "none",
-                    border: "none",
-                    borderBottom: "1px solid var(--neutral-200)",
-                    padding: "10px 8px",
-                    width: "100%",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    borderLeft: selected?.id === q.id ? "3px solid var(--salmon)" : "3px solid transparent",
-                    borderRadius: 0,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{q.audienceLabel}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                      {q.title} · {q.itemCount} item{q.itemCount === 1 ? "" : "s"} · {formatRelativeTime(q.updatedAt)}
+              {quotes.map((q) => {
+                const kids = q.bundleMeta ? childrenByParentId.get(q.id) ?? [] : [];
+                const isBundle = q.bundleMeta !== null;
+                const tierTotals = isBundle ? kids.map((c) => c.total).filter((n) => n > 0) : [];
+                const minTotal = tierTotals.length ? Math.min(...tierTotals) : 0;
+                const maxTotal = tierTotals.length ? Math.max(...tierTotals) : 0;
+                const subtitleSuffix = isBundle
+                  ? `${kids.length} option${kids.length === 1 ? "" : "s"}`
+                  : `${q.itemCount} item${q.itemCount === 1 ? "" : "s"}`;
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => setSelectedQuoteId(q.id)}
+                    className="ops-row"
+                    style={{
+                      background: selected?.id === q.id ? "var(--salmon-50)" : "none",
+                      border: "none",
+                      borderBottom: "1px solid var(--neutral-200)",
+                      padding: "10px 8px",
+                      width: "100%",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      borderLeft: selected?.id === q.id ? "3px solid var(--salmon)" : "3px solid transparent",
+                      borderRadius: 0,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
+                        {q.audienceLabel}
+                        {isBundle && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                            color: "var(--indigo)",
+                            background: "var(--pearl)",
+                            padding: "2px 7px", borderRadius: 999,
+                            border: "1px solid var(--neutral-300)",
+                          }}>
+                            BUNDLE
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                        {q.title} · {subtitleSuffix} · {formatRelativeTime(q.updatedAt)}
+                      </div>
                     </div>
-                  </div>
-                  <Pill tone={STATUS_TONE[q.status] ?? "neutral"}>{q.statusLabel}</Pill>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, color: "var(--indigo)", width: 80, textAlign: "right" }}>
-                    {formatCurrency(q.total)}
-                  </div>
-                </button>
-              ))}
+                    <Pill tone={STATUS_TONE[q.status] ?? "neutral"}>{q.statusLabel}</Pill>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, color: "var(--indigo)", width: 100, textAlign: "right" }}>
+                      {isBundle && tierTotals.length > 1 && minTotal !== maxTotal
+                        ? `${formatCurrency(minTotal)}–${formatCurrency(maxTotal)}`
+                        : formatCurrency(isBundle && tierTotals.length ? maxTotal : q.total)}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -241,16 +307,26 @@ export default function QuotesScreen() {
                   View public link
                 </a>
               )}
-              <button
-                className="ops-button ops-button--ghost"
-                onClick={() => newQuote.open({ editQuoteId: selected.id })}
-              >
-                Edit quote
-              </button>
+              {!isSelectedBundle && (
+                <button
+                  className="ops-button ops-button--ghost"
+                  onClick={() => newQuote.open({ editQuoteId: selected.id })}
+                >
+                  Edit quote
+                </button>
+              )}
               {selected.status === "approved" && (
                 <button
                   className="ops-button ops-button--ghost"
-                  onClick={() => newInvoice.open({ sourceQuoteId: selected.id })}
+                  onClick={() => {
+                    // For bundles, the chosen child holds the actual
+                    // line items. Source the invoice off it instead of
+                    // the empty parent.
+                    const sourceId = isSelectedBundle && selected.bundleMeta?.chosenChildId
+                      ? selected.bundleMeta.chosenChildId
+                      : selected.id;
+                    newInvoice.open({ sourceQuoteId: sourceId });
+                  }}
                 >
                   Convert to invoice
                 </button>
@@ -287,21 +363,24 @@ export default function QuotesScreen() {
                   onClick={async () => {
                     setBusy("send");
                     try {
-                      const result = await postProviderAction<{
-                        quote: { id: string; status: string };
-                        delivery?: { sent: boolean; channel?: string; error?: string };
-                      }>("send_quote", {
-                        workspaceId: dashboard.workspace.id,
-                        quoteId: selected.id,
-                      });
-                      await refresh();
-                      // Email is best-effort now — the quote always
-                      // lands in the homeowner's iOS chat + on the
-                      // public link. Quietly note when email also
-                      // didn't go out so the user knows; no alarm.
-                      if (result.delivery && result.delivery.sent === false) {
-                        console.info("[send_quote] email channel failed:", result.delivery.error);
+                      if (isSelectedBundle) {
+                        await postProviderAction("send_quote_bundle", {
+                          workspaceId: dashboard.workspace.id,
+                          bundleId: selected.id,
+                        });
+                      } else {
+                        const result = await postProviderAction<{
+                          quote: { id: string; status: string };
+                          delivery?: { sent: boolean; channel?: string; error?: string };
+                        }>("send_quote", {
+                          workspaceId: dashboard.workspace.id,
+                          quoteId: selected.id,
+                        });
+                        if (result.delivery && result.delivery.sent === false) {
+                          console.info("[send_quote] email channel failed:", result.delivery.error);
+                        }
                       }
+                      await refresh();
                     } catch (e) {
                       alert(e instanceof Error ? e.message : "Couldn't send the quote.");
                     } finally {
@@ -309,14 +388,16 @@ export default function QuotesScreen() {
                     }
                   }}
                 >
-                  {busy === "send" ? "Sending…" : selected.status === "draft" ? "Send to homeowner" : "Resend"}
+                  {busy === "send" ? "Sending..." : selected.status === "draft" ? (isSelectedBundle ? "Send bundle to homeowner" : "Send to homeowner") : "Resend"}
                 </button>
               )}
             </div>
 
             {/* Homeowner questions — surfaces above the spreadsheet so
-                the provider sees them before they edit anything */}
-            {selected && (
+                the provider sees them before they edit anything.
+                Bundles don't carry per-line questions (homeowner picks
+                a tier first) so we hide the panel in bundle mode. */}
+            {selected && !isSelectedBundle && (
               <QuestionsPanel
                 quote={selected}
                 comments={comments}
@@ -326,59 +407,71 @@ export default function QuotesScreen() {
               />
             )}
 
-            {/* Spreadsheet */}
-            <div style={{ border: "1px solid var(--neutral-200)", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "10px 12px", borderBottom: "1px solid var(--neutral-200)", background: "var(--pearl)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-soft)" }}>
-                <span>Item</span>
-                <span>Unit</span>
-                <span>Qty</span>
-                <span style={{ textAlign: "right" }}>Unit price</span>
-                <span style={{ textAlign: "right" }}>Subtotal</span>
-              </div>
-              {selected.lineItems.length === 0 ? (
-                <div style={{ padding: 16, fontSize: 13, color: "var(--text-muted)" }}>
-                  No line items on this quote yet.
+            {/* Bundle tier cards — only when the selected quote is a bundle parent. */}
+            {isSelectedBundle ? (
+              <BundleTierCards
+                parent={selected}
+                children={selectedBundleChildren}
+                workspaceId={dashboard.workspace.id}
+                onPicked={async () => { await refresh(); }}
+              />
+            ) : (
+              /* Spreadsheet — single-tier path keeps its original layout. */
+              <div style={{ border: "1px solid var(--neutral-200)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "10px 12px", borderBottom: "1px solid var(--neutral-200)", background: "var(--pearl)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-soft)" }}>
+                  <span>Item</span>
+                  <span>Unit</span>
+                  <span>Qty</span>
+                  <span style={{ textAlign: "right" }}>Unit price</span>
+                  <span style={{ textAlign: "right" }}>Subtotal</span>
                 </div>
-              ) : (
-                selected.lineItems.map((line, i) => {
-                  const lineComments = line.id ? comments.filter((c) => c.lineItemId === line.id) : [];
-                  const openCount = lineComments.filter((c) => c.status === "open" && c.authorRole === "homeowner").length;
-                  return (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "12px", borderBottom: i < selected.lineItems.length - 1 ? "1px solid var(--neutral-200)" : "none", alignItems: "center" }}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{line.name}</span>
-                          {openCount > 0 && (
-                            <span style={{
-                              fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
-                              color: "var(--salmon-dark)",
-                              background: "var(--salmon-pale)",
-                              padding: "2px 6px", borderRadius: 999,
-                            }}>
-                              {openCount} question{openCount === 1 ? "" : "s"}
-                            </span>
-                          )}
+                {selected.lineItems.length === 0 ? (
+                  <div style={{ padding: 16, fontSize: 13, color: "var(--text-muted)" }}>
+                    No line items on this quote yet.
+                  </div>
+                ) : (
+                  selected.lineItems.map((line, i) => {
+                    const lineComments = line.id ? comments.filter((c) => c.lineItemId === line.id) : [];
+                    const openCount = lineComments.filter((c) => c.status === "open" && c.authorRole === "homeowner").length;
+                    return (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 100px 100px", padding: "12px", borderBottom: i < selected.lineItems.length - 1 ? "1px solid var(--neutral-200)" : "none", alignItems: "center" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{line.name}</span>
+                            {openCount > 0 && (
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+                                color: "var(--salmon-dark)",
+                                background: "var(--salmon-pale)",
+                                padding: "2px 6px", borderRadius: 999,
+                              }}>
+                                {openCount} question{openCount === 1 ? "" : "s"}
+                              </span>
+                            )}
+                          </div>
+                          {line.description && <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{line.description}</div>}
                         </div>
-                        {line.description && <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{line.description}</div>}
+                        <div style={{ fontSize: 12, color: "var(--text)" }}>{line.unit ?? "ea"}</div>
+                        <div style={{ fontSize: 12, color: "var(--text)" }}>{line.quantity ?? 1}</div>
+                        <div style={{ fontSize: 12, color: "var(--text)", textAlign: "right" }}>{formatCurrency(line.unitPrice ?? 0)}</div>
+                        <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600, color: "var(--text)", textAlign: "right" }}>
+                          {formatCurrency((line.quantity ?? 1) * (line.unitPrice ?? 0))}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: "var(--text)" }}>{line.unit ?? "ea"}</div>
-                      <div style={{ fontSize: 12, color: "var(--text)" }}>{line.quantity ?? 1}</div>
-                      <div style={{ fontSize: 12, color: "var(--text)", textAlign: "right" }}>{formatCurrency(line.unitPrice ?? 0)}</div>
-                      <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600, color: "var(--text)", textAlign: "right" }}>
-                        {formatCurrency((line.quantity ?? 1) * (line.unitPrice ?? 0))}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Totals */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-              <div style={{ width: 280, display: "flex", flexDirection: "column", gap: 6 }}>
-                <Row label="Total" value={formatCurrency(selected.total)} bold />
+                    );
+                  })
+                )}
               </div>
-            </div>
+            )}
+
+            {/* Totals — single-tier only. Bundles surface per-tier totals on the cards above. */}
+            {!isSelectedBundle && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                <div style={{ width: 280, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Row label="Total" value={formatCurrency(selected.total)} bold />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <EmptyState
@@ -575,6 +668,195 @@ function QuestionItem({
         >
           {sending ? "Sending…" : "Reply"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Wave V.1 — bundle tier cards (good/better/best) ──────────────
+//
+// Renders the 3 (or 2 / 4) tiers of a bundle parent side-by-side as
+// equal-height cards. Each card shows the tier label, total, line-
+// item count + a snippet, and (when in-progress) a "Mark this tier
+// approved" button that fires `decide_quote_bundle`. Once a tier has
+// been picked, the chosen card gets a salmon left-border + "Approved"
+// pill and the others fade with a "Superseded" pill.
+//
+// Layout discipline: salmon is reserved for the chosen tier's accent.
+// Other cards stay on the indigo-on-pearl palette to match the rest
+// of the cockpit.
+//
+// Note: the children prop is named `children` here only because it
+// reads naturally for "the children of a bundle parent". React's
+// reserved `children` prop is unused — we don't render JSX content
+// through this slot. The eslint disable below is intentional.
+
+interface BundleTierCardsProps {
+  parent: import("../lib/types").Quote;
+  // eslint-disable-next-line react/no-children-prop
+  children: import("../lib/types").Quote[];
+  workspaceId: string;
+  onPicked: () => Promise<void>;
+}
+
+function BundleTierCards({ parent, children, workspaceId, onPicked }: BundleTierCardsProps) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const meta = parent.bundleMeta;
+  const chosenChildId = meta?.chosenChildId ?? null;
+
+  if (children.length === 0) {
+    return (
+      <div style={{ padding: 24, fontSize: 13, color: "var(--text-muted)", textAlign: "center", border: "1px dashed var(--neutral-300)", borderRadius: 12 }}>
+        This bundle has no tiers. Try deleting and recreating the bundle.
+      </div>
+    );
+  }
+
+  const sentLabel = parent.status === "approved" ? "Approved" : parent.status === "sent" || parent.status === "viewed" ? "In review" : null;
+
+  return (
+    <div>
+      {/* Header strip */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+        <div>
+          <div className="ops-section-label">Bundle options</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+            {chosenChildId
+              ? `Homeowner picked the ${meta?.chosenTierLabel ?? "selected"} tier.`
+              : sentLabel === "In review"
+                ? `Sent to the homeowner. Waiting on a tier choice.`
+                : `Draft. Send the bundle when you're ready.`}
+          </div>
+        </div>
+        {sentLabel && <Pill tone={parent.status === "approved" ? "success" : "info"}>{sentLabel}</Pill>}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${children.length}, 1fr)`,
+          gap: 12,
+        }}
+      >
+        {children.map((child) => {
+          const isChosen = chosenChildId === child.id;
+          const isSuperseded = chosenChildId !== null && !isChosen;
+          const tierLabel = child.bundleTierLabel ?? "Option";
+          const lineCount = child.lineItems?.length ?? 0;
+          return (
+            <div
+              key={child.id}
+              style={{
+                background: isChosen ? "var(--salmon-50)" : "#fff",
+                border: `1px solid ${isChosen ? "var(--salmon)" : "var(--neutral-200)"}`,
+                borderLeft: isChosen ? "4px solid var(--salmon)" : `4px solid ${isSuperseded ? "var(--neutral-300)" : "var(--indigo)"}`,
+                borderRadius: 14,
+                padding: 16,
+                opacity: isSuperseded ? 0.55 : 1,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 800, letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: isChosen ? "var(--salmon-dark)" : "var(--indigo)",
+                }}>
+                  {tierLabel}
+                </div>
+                {isChosen && <Pill tone="success">Approved</Pill>}
+                {isSuperseded && <Pill tone="neutral">Superseded</Pill>}
+              </div>
+
+              <div style={{
+                fontFamily: "var(--serif)", fontSize: 28, fontWeight: 700,
+                color: isChosen ? "var(--salmon-dark)" : "var(--indigo)",
+                letterSpacing: "-0.018em", lineHeight: 1.1,
+              }}>
+                {formatCurrency(child.total)}
+              </div>
+
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                {lineCount} line item{lineCount === 1 ? "" : "s"}
+              </div>
+
+              {/* Inline line-item summary so the contractor can scan
+                  what's in each tier without drilling in. */}
+              <ul style={{
+                margin: 0, padding: 0, listStyle: "none",
+                display: "flex", flexDirection: "column", gap: 4,
+                borderTop: "1px solid var(--neutral-200)",
+                paddingTop: 10,
+              }}>
+                {child.lineItems.slice(0, 6).map((line, i) => (
+                  <li key={i} style={{
+                    display: "flex", alignItems: "baseline", justifyContent: "space-between",
+                    fontSize: 12, color: "var(--text)",
+                  }}>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {line.name}
+                    </span>
+                    <span style={{ fontFamily: "var(--serif)", fontWeight: 600, color: "var(--text-soft)", fontSize: 11.5 }}>
+                      {formatCurrency((line.quantity ?? 1) * (line.unitPrice ?? 0))}
+                    </span>
+                  </li>
+                ))}
+                {child.lineItems.length > 6 && (
+                  <li style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    + {child.lineItems.length - 6} more
+                  </li>
+                )}
+              </ul>
+
+              {/* Action — only when sent & undecided. Provider-side
+                  acceptance covers the in-person walkthrough demo. */}
+              {(parent.status === "sent" || parent.status === "viewed") && !isChosen && !isSuperseded && (
+                <button
+                  className="ops-button ops-button--ghost"
+                  style={{ marginTop: 4, fontSize: 12.5, width: "100%" }}
+                  disabled={busy !== null}
+                  onClick={async () => {
+                    if (!confirm(`Mark the "${tierLabel}" tier as the homeowner's pick?`)) return;
+                    setBusy(child.id);
+                    try {
+                      await postProviderAction("decide_quote_bundle", {
+                        workspaceId,
+                        parentId: parent.id,
+                        chosenChildId: child.id,
+                      });
+                      await onPicked();
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "Couldn't accept the tier.");
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {busy === child.id ? "Saving..." : "Mark this tier approved"}
+                </button>
+              )}
+
+              {child.publicShareUrl && (
+                <a
+                  href={child.publicShareUrl}
+                  target="_blank"
+                  rel="noopener"
+                  style={{
+                    fontSize: 11.5, fontWeight: 600,
+                    color: "var(--text-soft)",
+                    textDecoration: "none",
+                    marginTop: "auto",
+                    paddingTop: 6,
+                  }}
+                >
+                  Public link →
+                </a>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

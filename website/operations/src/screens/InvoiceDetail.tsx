@@ -310,6 +310,20 @@ export default function InvoiceDetailScreen() {
                 This invoice was voided.
               </div>
             )}
+
+            {/* Wave V.2 — printable / PDF view. Always available; opens
+                a print-friendly page in a new tab and auto-fires the
+                print dialog so Cmd+P → Save as PDF lands instantly.
+                A no-op when the invoice is voided is fine; the artifact
+                is still useful for record-keeping. */}
+            <button
+              className="ops-button ops-button--ghost"
+              onClick={() => window.open(`/operations/invoices/${invoice.id}/print`, "_blank", "noopener")}
+              disabled={busy !== null}
+              style={{ width: "100%", marginTop: isPaid || isVoid ? 8 : 0 }}
+            >
+              Download PDF / Print
+            </button>
           </div>
         </Card>
 

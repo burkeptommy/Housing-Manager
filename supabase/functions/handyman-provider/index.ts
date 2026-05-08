@@ -2663,6 +2663,26 @@ async function loadDashboard(
             }
           : null,
         recentMessages: recentQuoteMessages,
+        // Wave V.1 — quote bundles. parent_quote_id is the FK chain
+        // shared with Phase 73b counter-offers, but the bundle case is
+        // distinguished by the BUNDLE_MARKER sentinel in scope_notes.
+        // bundleTierLabel is the per-child label parsed off the title
+        // suffix; bundleMeta on the parent carries the tier list +
+        // chosen-child breadcrumb if a tier has been picked.
+        parentQuoteId: compactString(quote.parent_quote_id) || null,
+        bundleMeta: (() => {
+          const { meta } = parseBundleScopeNotes(compactString(quote.scope_notes));
+          return meta;
+        })(),
+        bundleTierLabel: (() => {
+          if (!quote.parent_quote_id) return null;
+          const childTitle = compactString(quote.title);
+          // Tier lives as title suffix " · {label}". Parent title may
+          // not be in scope here (it's a different row), so fall back
+          // to splitting on the last " · " separator.
+          const idx = childTitle.lastIndexOf(" · ");
+          return idx >= 0 ? childTitle.slice(idx + 3) : null;
+        })(),
       };
     }),
     savedQuoteItems: savedItems.map((item) => ({
@@ -3320,6 +3340,28 @@ async function deleteQuoteForProvider(
   if (!quote) throw new Error("Quote not found");
   if (compactString(quote.status) !== "draft") {
     throw new Error("Only draft quotes can be deleted. Withdraw or supersede sent quotes instead.");
+  }
+
+  // Wave V.1 — when the deleted quote is a BUNDLE PARENT, walk its
+  // children too. Children carry their own provider_quote_messages
+  // (the bundle-sent event lives on the parent only, but counter-offer
+  // chains can attach messages to children) so clean those first.
+  const { data: childIdsRaw } = await service
+    .from("provider_quotes")
+    .select("id, status")
+    .eq("parent_quote_id", quoteId);
+  const children = (childIdsRaw ?? []) as Array<{ id: string; status: string }>;
+  // Refuse to delete a bundle parent if any child has been sent — the
+  // homeowner has already seen the offer. Force the contractor to
+  // withdraw individual children first instead. For pure-draft bundles
+  // (no child sent), cascade clean.
+  if (children.some((c) => compactString(c.status) !== "draft")) {
+    throw new Error("This bundle has tiers that have already been sent. Withdraw them individually instead.");
+  }
+  if (children.length > 0) {
+    const childIds = children.map((c) => compactString(c.id));
+    await service.from("provider_quote_messages").delete().in("quote_id", childIds);
+    await service.from("provider_quotes").delete().in("id", childIds);
   }
 
   // Cascade: provider_quote_messages have ON DELETE CASCADE on most
@@ -4473,6 +4515,625 @@ async function saveQuote(
   }
 
   return { quote, delivery };
+}
+
+// ─── Wave V.1 — quote bundles (good/better/best) ─────────────────
+//
+// A "bundle" is a parent quote with N child quotes. The parent's row
+// is a wrapper: it holds the shared title, scope, homeowner_message,
+// recipient context, and a sentinel string in scope_notes
+// (BUNDLE_MARKER followed by JSON metadata) so the SPA can identify
+// it. Each child has parent_quote_id pointing at the parent and
+// carries the actual line items + per-tier total. Tier label rides
+// in the child title as " · Good" / " · Better" / " · Best" suffix.
+//
+// On the homeowner side, the iOS app sees ONE message in the chat
+// thread (the parent's "quote_bundle_sent" event) with a list of
+// children attached so it can render a 3-card picker. When the
+// homeowner picks a tier, decide_quote_bundle flips the chosen
+// child to 'approved', the others to 'superseded', and stamps the
+// parent with chosen-tier breadcrumb in scope_notes.
+//
+// This implementation deliberately reuses the existing schema
+// (parent_quote_id from Phase 73b) without a migration. Encoding the
+// bundle metadata in scope_notes keeps the row layout backward-
+// compatible with every existing single-tier read path.
+
+const BUNDLE_MARKER = "[CHEZ_QUOTE_BUNDLE]";
+
+interface BundleTier {
+  label: string;
+  lineItems: Array<Record<string, unknown>>;
+  scopeNotes?: string;
+}
+
+interface BundleMeta {
+  bundle: true;
+  tiers: string[];
+  chosenChildId?: string | null;
+  chosenTierLabel?: string | null;
+}
+
+function buildBundleScopeNotes(meta: BundleMeta, baseScope: string | null): string {
+  // Marker on the FIRST line so the SPA can detect it even if the
+  // contractor types into the scope-notes field. The marker carries
+  // its own JSON payload after a colon. The contractor-authored scope
+  // (if any) trails on its own line below.
+  const json = JSON.stringify(meta);
+  const marker = `${BUNDLE_MARKER}:${json}`;
+  return baseScope ? `${marker}\n${baseScope}` : marker;
+}
+
+function parseBundleScopeNotes(scopeNotes: string | null | undefined): {
+  meta: BundleMeta | null;
+  authorScope: string;
+} {
+  const text = compactString(scopeNotes);
+  if (!text.startsWith(BUNDLE_MARKER + ":")) return { meta: null, authorScope: text };
+  const newlineIdx = text.indexOf("\n");
+  const markerLine = newlineIdx >= 0 ? text.slice(0, newlineIdx) : text;
+  const trailing = newlineIdx >= 0 ? text.slice(newlineIdx + 1) : "";
+  const jsonStr = markerLine.slice(BUNDLE_MARKER.length + 1);
+  try {
+    const meta = JSON.parse(jsonStr) as BundleMeta;
+    if (meta && meta.bundle === true && Array.isArray(meta.tiers)) {
+      return { meta, authorScope: trailing };
+    }
+  } catch {
+    // fall through
+  }
+  return { meta: null, authorScope: text };
+}
+
+async function saveQuoteBundle(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+  sendNow: boolean,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  // Wave V.1 — re-send path for an existing draft bundle. The contractor
+  // saved the bundle as draft earlier, then clicked Send on the detail
+  // panel. Skip the insert flow entirely and just walk parent +
+  // children, flip status to sent, and fire the chat / push.
+  const bundleId = compactString(body.bundleId);
+  if (bundleId) {
+    return await sendExistingBundle(service, user, membership, bundleId);
+  }
+
+  const tiersRaw = Array.isArray(body.tiers) ? (body.tiers as Array<Record<string, unknown>>) : [];
+  const tiers: BundleTier[] = tiersRaw
+    .map((t) => ({
+      label: compactString(t.label) || "Option",
+      lineItems: Array.isArray(t.lineItems)
+        ? (t.lineItems as Array<Record<string, unknown>>).map((item) => ({
+            id: compactString(item.id) || crypto.randomUUID(),
+            name: compactString(item.name),
+            description: compactString(item.description),
+            unit: compactString(item.unit) || "ea",
+            quantity: numberValue(item.quantity || 1),
+            unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+          })).filter((item) => item.name)
+        : [],
+      scopeNotes: compactString(t.scopeNotes) || undefined,
+    }))
+    .filter((t) => t.lineItems.length > 0);
+
+  if (tiers.length < 2) {
+    throw new Error("A quote bundle needs at least two tiers. Use save_quote for a single-tier quote.");
+  }
+  if (tiers.length > 4) {
+    throw new Error("A quote bundle is capped at four tiers (Good / Better / Best is plenty).");
+  }
+
+  // Pre-compute totals per tier for response shaping.
+  const tierTotals = tiers.map((t) => quoteSummary(t.lineItems));
+
+  const requestId = compactString(body.requestId) || null;
+  const propertyId = compactString(body.propertyId) || null;
+  let householdId = compactString(body.householdId) || null;
+  let contractorId = compactString(body.contractorId) || null;
+  let visitTaskId = compactString(body.visitTaskId) || null;
+  let parentTitle = compactString(body.title);
+  const parentHomeownerMessage = compactString(body.homeownerMessage);
+  const parentScopeNotes = compactString(body.scopeNotes);
+  const prospectName = compactString(body.prospectName);
+  const prospectEmail = normalizedEmail(body.prospectEmail);
+  const prospectPhone = compactString(body.prospectPhone);
+  const prospectAddress = compactString(body.prospectAddress);
+
+  if (requestId) {
+    const { data: request } = await service
+      .from("handyman_requests")
+      .select("id, household_id, property_id, contractor_id, visit_task_id, title")
+      .eq("id", requestId)
+      .limit(1)
+      .maybeSingle();
+    if (request) {
+      householdId = compactString(request.household_id) || householdId;
+      contractorId = compactString(request.contractor_id) || contractorId;
+      visitTaskId = compactString(request.visit_task_id) || visitTaskId;
+      parentTitle = parentTitle || `Quote for ${compactString(request.title)}`;
+    }
+  }
+
+  const recipientKind = quoteRecipientKind(householdId);
+  parentTitle =
+    parentTitle ||
+    (recipientKind === "prospect" && prospectName ? `Quote for ${prospectName}` : "Untitled quote");
+
+  if (recipientKind === "linked_home" && !householdId) {
+    throw new Error("Choose a Chez client request before sending this quote to a home");
+  }
+  if (sendNow && recipientKind === "prospect" && !prospectEmail) {
+    throw new Error("A prospect email is required to send a standalone quote");
+  }
+
+  const now = isoNow();
+
+  // Bundle parent: holds the wrapper. line_items stays empty, total is
+  // 0 (UI reads tier totals off the children). scope_notes carries
+  // the BUNDLE_MARKER + tier list so the SPA can identify it.
+  const parentBundleMeta: BundleMeta = {
+    bundle: true,
+    tiers: tiers.map((t) => t.label),
+  };
+  const parentScopeWithMarker = buildBundleScopeNotes(parentBundleMeta, parentScopeNotes || null);
+
+  const parentPayload = {
+    workspace_id: workspaceId,
+    contractor_id: contractorId,
+    household_id: householdId || null,
+    property_id: propertyId,
+    request_id: requestId,
+    visit_task_id: visitTaskId,
+    title: parentTitle,
+    recipient_kind: recipientKind,
+    prospect_name: recipientKind === "prospect" ? prospectName || null : null,
+    prospect_email: recipientKind === "prospect" ? prospectEmail || null : null,
+    prospect_phone: recipientKind === "prospect" ? prospectPhone || null : null,
+    prospect_address: recipientKind === "prospect" ? prospectAddress || null : null,
+    status: "draft",
+    currency: "USD",
+    line_items: [],
+    scope_notes: parentScopeWithMarker,
+    homeowner_message: parentHomeownerMessage || null,
+    subtotal: 0,
+    tax_total: 0,
+    total: 0,
+    created_by_user_id: userId,
+    updated_by_user_id: userId,
+    updated_at: now,
+    public_share_token: crypto.randomUUID(),
+  };
+
+  const { data: parentRow, error: parentErr } = await service
+    .from("provider_quotes")
+    .insert(parentPayload)
+    .select()
+    .single();
+  if (parentErr || !parentRow) throw parentErr ?? new Error("Failed to insert bundle parent");
+
+  // Insert each child with parent_quote_id pointing at the parent.
+  // Tier label rides in the title suffix.
+  const childRows: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < tiers.length; i++) {
+    const tier = tiers[i];
+    const totals = tierTotals[i];
+    const childPayload = {
+      workspace_id: workspaceId,
+      contractor_id: contractorId,
+      household_id: householdId || null,
+      property_id: propertyId,
+      request_id: requestId,
+      visit_task_id: visitTaskId,
+      title: `${parentTitle} · ${tier.label}`,
+      recipient_kind: recipientKind,
+      prospect_name: recipientKind === "prospect" ? prospectName || null : null,
+      prospect_email: recipientKind === "prospect" ? prospectEmail || null : null,
+      prospect_phone: recipientKind === "prospect" ? prospectPhone || null : null,
+      prospect_address: recipientKind === "prospect" ? prospectAddress || null : null,
+      status: "draft",
+      currency: "USD",
+      line_items: tier.lineItems,
+      scope_notes: tier.scopeNotes || null,
+      homeowner_message: parentHomeownerMessage || null,
+      subtotal: totals.subtotal,
+      tax_total: totals.taxTotal,
+      total: totals.total,
+      parent_quote_id: parentRow.id,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      updated_at: now,
+      public_share_token: crypto.randomUUID(),
+    };
+    const { data: childRow, error: childErr } = await service
+      .from("provider_quotes")
+      .insert(childPayload)
+      .select()
+      .single();
+    if (childErr || !childRow) {
+      // Clean up parent + any prior children if a child insert fails so
+      // we don't leave an orphan bundle in a half-built state.
+      await service.from("provider_quotes").delete().eq("id", parentRow.id);
+      for (const prior of childRows) {
+        await service.from("provider_quotes").delete().eq("id", compactString(prior.id));
+      }
+      throw childErr ?? new Error("Failed to insert bundle child");
+    }
+    childRows.push(childRow as Record<string, unknown>);
+  }
+
+  let parent = parentRow as Record<string, unknown>;
+  let delivery: Record<string, unknown> | null = null;
+
+  if (sendNow) {
+    // Flip parent + every child from draft to sent.
+    const sendIds = [parent.id, ...childRows.map((c) => c.id)] as string[];
+    const { error: sendErr } = await service
+      .from("provider_quotes")
+      .update({
+        status: "sent",
+        sent_at: now,
+        last_sent_at: now,
+        sent_via: ["in_app"],
+        viewed_at: null,
+        approved_at: null,
+        declined_at: null,
+        updated_by_user_id: userId,
+        updated_at: now,
+      })
+      .in("id", sendIds);
+    if (sendErr) throw sendErr;
+
+    // Re-read the parent with status flipped.
+    const { data: refetched } = await service
+      .from("provider_quotes")
+      .select("*")
+      .eq("id", parent.id)
+      .limit(1)
+      .maybeSingle();
+    if (refetched) parent = refetched as Record<string, unknown>;
+
+    // One in-app message per bundle (not per tier) on the request
+    // thread. The metadata.kind discriminator is `quote_bundle_sent`
+    // so iOS can render a 3-tier card. The body summarizes the tier
+    // range so even a list-only client renders something useful.
+    const tierSummary = childRows
+      .map((c, i) => `${tiers[i].label}: ${moneyLabel(numberValue(c.total))}`)
+      .join(" · ");
+    const bodyText = `${parentTitle} is ready with ${tiers.length} options. ${tierSummary}.`;
+
+    await addQuoteMessage(service, {
+      workspaceId,
+      quoteId: compactString(parent.id),
+      requestId,
+      householdId: householdId || null,
+      senderRole: "provider",
+      senderName: compactString(membership.full_name) || compactString(user.email),
+      senderEmail: compactString(user.email),
+      deliveryChannel: "in_app",
+      body: bodyText,
+      metadata: {
+        event: "quote_bundle_sent",
+        kind: "quote_bundle_sent",
+        bundle_parent_id: compactString(parent.id),
+        tiers: childRows.map((c, i) => ({
+          quote_id: compactString(c.id),
+          label: tiers[i].label,
+          total: numberValue(c.total),
+          line_item_count: tiers[i].lineItems.length,
+          public_share_url: publicQuoteUrl(compactString(c.public_share_token)),
+        })),
+      },
+    });
+
+    if (requestId) {
+      await service
+        .from("handyman_requests")
+        .update({ status: "quoted", updated_at: now })
+        .eq("id", requestId);
+
+      await mirrorQuoteMessageToRequestThread(service, {
+        requestId,
+        householdId: householdId || null,
+        senderRole: "vendor",
+        body: bodyText,
+        metadata: {
+          kind: "quote_bundle_sent",
+          event: "quote_bundle_sent",
+          bundle_parent_id: compactString(parent.id),
+          tiers: childRows.map((c, i) => ({
+            quote_id: compactString(c.id),
+            label: tiers[i].label,
+            total: numberValue(c.total),
+            line_item_count: tiers[i].lineItems.length,
+          })),
+        },
+      });
+    }
+
+    if (householdId) {
+      await notifyHomeownersForRequest(service, householdId, {
+        title: "Quote ready · pick a tier",
+        body: `${tiers.length} options from your contractor. Tap to compare.`,
+        requestId: requestId || compactString(parent.id),
+        eventType: "handyman_quote_bundle_sent",
+        extra: { bundle_parent_id: compactString(parent.id) },
+      });
+    }
+
+    delivery = { sent: true, channel: "in_app", recipientCount: 1 };
+  }
+
+  return { parent, children: childRows, delivery };
+}
+
+async function sendExistingBundle(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  membership: Record<string, unknown>,
+  bundleId: string,
+) {
+  // Walk parent + every child. Validate parent has a BUNDLE_MARKER so
+  // we don't accidentally send a single-tier quote through this path.
+  const { data: parent } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("id", bundleId)
+    .limit(1)
+    .maybeSingle();
+  if (!parent) throw new Error("Bundle parent not found");
+
+  const { meta } = parseBundleScopeNotes(compactString(parent.scope_notes));
+  if (!meta || !meta.bundle) throw new Error("This quote isn't a bundle.");
+
+  const { data: childrenRaw } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("parent_quote_id", bundleId);
+  const children = ((childrenRaw ?? []) as Array<Record<string, unknown>>).slice();
+  if (children.length === 0) throw new Error("Bundle has no tiers — nothing to send.");
+
+  // Sort children by the tier order recorded on the parent.
+  const order = meta.tiers ?? [];
+  children.sort((a, b) => {
+    const at = compactString(a.title);
+    const bt = compactString(b.title);
+    const ai = order.findIndex((t) => at.endsWith(" · " + t));
+    const bi = order.findIndex((t) => bt.endsWith(" · " + t));
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  const now = isoNow();
+  const userId = compactString(user.id);
+  const sendIds = [bundleId, ...children.map((c) => compactString(c.id))];
+  const { error: sendErr } = await service
+    .from("provider_quotes")
+    .update({
+      status: "sent",
+      sent_at: now,
+      last_sent_at: now,
+      sent_via: ["in_app"],
+      viewed_at: null,
+      approved_at: null,
+      declined_at: null,
+      updated_by_user_id: userId,
+      updated_at: now,
+    })
+    .in("id", sendIds);
+  if (sendErr) throw sendErr;
+
+  const refreshed = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("id", bundleId)
+    .limit(1)
+    .maybeSingle();
+  const updatedParent = (refreshed.data ?? parent) as Record<string, unknown>;
+
+  const tierLabels: string[] = order.length > 0 ? order : children.map((c) => {
+    const t = compactString(c.title);
+    const p = compactString(parent.title);
+    return t.startsWith(p + " · ") ? t.slice(p.length + 3) : t;
+  });
+  const tierSummary = children
+    .map((c, i) => `${tierLabels[i] ?? "Option"}: ${moneyLabel(numberValue(c.total))}`)
+    .join(" · ");
+  const bodyText = `${compactString(parent.title)} is ready with ${children.length} options. ${tierSummary}.`;
+
+  const requestId = compactString(parent.request_id) || null;
+  const householdId = compactString(parent.household_id) || null;
+
+  await addQuoteMessage(service, {
+    workspaceId: compactString(parent.workspace_id),
+    quoteId: bundleId,
+    requestId,
+    householdId,
+    senderRole: "provider",
+    senderName: compactString(membership.full_name) || compactString(user.email),
+    senderEmail: compactString(user.email),
+    deliveryChannel: "in_app",
+    body: bodyText,
+    metadata: {
+      event: "quote_bundle_sent",
+      kind: "quote_bundle_sent",
+      bundle_parent_id: bundleId,
+      tiers: children.map((c, i) => ({
+        quote_id: compactString(c.id),
+        label: tierLabels[i] ?? "Option",
+        total: numberValue(c.total),
+        line_item_count: Array.isArray(c.line_items) ? c.line_items.length : 0,
+        public_share_url: publicQuoteUrl(compactString(c.public_share_token)),
+      })),
+    },
+  });
+
+  if (requestId) {
+    await service
+      .from("handyman_requests")
+      .update({ status: "quoted", updated_at: now })
+      .eq("id", requestId);
+
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body: bodyText,
+      metadata: {
+        kind: "quote_bundle_sent",
+        event: "quote_bundle_sent",
+        bundle_parent_id: bundleId,
+        tiers: children.map((c, i) => ({
+          quote_id: compactString(c.id),
+          label: tierLabels[i] ?? "Option",
+          total: numberValue(c.total),
+          line_item_count: Array.isArray(c.line_items) ? c.line_items.length : 0,
+        })),
+      },
+    });
+  }
+
+  if (householdId) {
+    await notifyHomeownersForRequest(service, householdId, {
+      title: "Quote ready · pick a tier",
+      body: `${children.length} options from your contractor. Tap to compare.`,
+      requestId: requestId || bundleId,
+      eventType: "handyman_quote_bundle_sent",
+      extra: { bundle_parent_id: bundleId },
+    });
+  }
+
+  return { parent: updatedParent, children, delivery: { sent: true, channel: "in_app", recipientCount: 1 } };
+}
+
+async function decideQuoteBundle(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  // Provider-side acceptance of a bundle on behalf of the homeowner.
+  // Useful in the demo when the contractor is walking the homeowner
+  // through tiers in person and just wants to confirm the pick.
+  // Phase 80+ chez-concierge will route the homeowner-side decision
+  // through its own action; this is the contractor-portal lever.
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const parentId = compactString(body.parentId);
+  const chosenChildId = compactString(body.chosenChildId);
+  if (!parentId || !chosenChildId) {
+    throw new Error("parentId and chosenChildId are required");
+  }
+
+  // Load parent + every child for consistency check.
+  const { data: parent } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("id", parentId)
+    .eq("workspace_id", workspaceId)
+    .limit(1)
+    .maybeSingle();
+  if (!parent) throw new Error("Bundle parent not found");
+
+  const { data: childrenRaw } = await service
+    .from("provider_quotes")
+    .select("*")
+    .eq("parent_quote_id", parentId);
+  const children = (childrenRaw ?? []) as Array<Record<string, unknown>>;
+  const chosenChild = children.find((c) => compactString(c.id) === chosenChildId);
+  if (!chosenChild) throw new Error("Chosen tier is not a child of this bundle");
+
+  const now = isoNow();
+
+  // Flip chosen child to approved, others to superseded.
+  const otherIds = children
+    .filter((c) => compactString(c.id) !== chosenChildId)
+    .map((c) => compactString(c.id));
+
+  await service
+    .from("provider_quotes")
+    .update({
+      status: "approved",
+      approved_at: now,
+      updated_by_user_id: userId,
+      updated_at: now,
+    })
+    .eq("id", chosenChildId);
+
+  if (otherIds.length > 0) {
+    await service
+      .from("provider_quotes")
+      .update({
+        status: "superseded",
+        updated_by_user_id: userId,
+        updated_at: now,
+      })
+      .in("id", otherIds);
+  }
+
+  // Update parent: flip status to approved + record chosen-tier
+  // breadcrumb in scope_notes so the SPA + homeowner thread can
+  // render "Homeowner picked the {tier} tier".
+  const { meta, authorScope } = parseBundleScopeNotes(compactString(parent.scope_notes));
+  const tierLabel = (() => {
+    const childTitle = compactString(chosenChild.title);
+    const parentTitle = compactString(parent.title);
+    if (childTitle.startsWith(parentTitle + " · ")) {
+      return childTitle.slice(parentTitle.length + 3);
+    }
+    return childTitle;
+  })();
+  const updatedMeta: BundleMeta = {
+    bundle: true,
+    tiers: meta?.tiers ?? children.map((c) => {
+      const t = compactString(c.title);
+      const p = compactString(parent.title);
+      return t.startsWith(p + " · ") ? t.slice(p.length + 3) : t;
+    }),
+    chosenChildId,
+    chosenTierLabel: tierLabel,
+  };
+  const updatedScope = buildBundleScopeNotes(updatedMeta, authorScope || null);
+
+  await service
+    .from("provider_quotes")
+    .update({
+      status: "approved",
+      approved_at: now,
+      scope_notes: updatedScope,
+      updated_by_user_id: userId,
+      updated_at: now,
+    })
+    .eq("id", parentId);
+
+  // Audit message on the parent's quote thread.
+  await addQuoteMessage(service, {
+    workspaceId,
+    quoteId: parentId,
+    requestId: compactString(parent.request_id) || null,
+    householdId: compactString(parent.household_id) || null,
+    senderRole: "provider",
+    senderName: compactString(membership.full_name) || compactString(user.email),
+    senderEmail: compactString(user.email),
+    deliveryChannel: "system",
+    body: `Homeowner picked the ${tierLabel} tier (${moneyLabel(numberValue(chosenChild.total))}).`,
+    metadata: {
+      event: "quote_bundle_decided",
+      kind: "quote_bundle_decided",
+      bundle_parent_id: parentId,
+      chosen_child_id: chosenChildId,
+      chosen_tier_label: tierLabel,
+    },
+  });
+
+  return { parentId, chosenChildId, chosenTierLabel: tierLabel };
 }
 
 async function saveQuoteItem(
@@ -7469,6 +8130,34 @@ serve(async (req) => {
 
       if (action === "send_quote") {
         const result = await saveQuote(service, user as unknown as Record<string, unknown>, body, true);
+        return json(result);
+      }
+
+      // Wave V.1 — quote bundles (good/better/best)
+      if (action === "save_quote_bundle") {
+        const result = await saveQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+          false,
+        );
+        return json(result);
+      }
+      if (action === "send_quote_bundle") {
+        const result = await saveQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+          true,
+        );
+        return json(result);
+      }
+      if (action === "decide_quote_bundle") {
+        const result = await decideQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
         return json(result);
       }
 

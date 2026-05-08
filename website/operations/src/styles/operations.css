@@ -804,3 +804,52 @@ button { font-family: inherit; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ─── Wave V.2 — invoice print/PDF view ────────────────────────────
+ *
+ * The /invoices/:id/print route uses these rules to strip the SPA
+ * chrome (sidebar, topbar, content padding) when printing AND when
+ * just viewing the printable page. The browser's print dialog
+ * automatically saves a clean PDF when the user picks "Save as PDF".
+ */
+.invoice-print-shell {
+  background: var(--pearl);
+  min-height: 100vh;
+}
+.invoice-print-page {
+  /* On screen: card with shadow. When printing: takes the page. */
+}
+@media print {
+  /* Hide every non-essential SPA element so only the printable page
+   * lands on the PDF. The print route still renders inside Shell on
+   * screen (so the sidebar / back nav / topbar work normally), but
+   * we strip them out at print time. */
+  .invoice-print-toolbar,
+  .ops-sidebar,
+  .ops-topbar {
+    display: none !important;
+  }
+  .ops-shell {
+    grid-template-columns: 1fr !important;
+  }
+  .ops-content {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .invoice-print-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    max-width: 100% !important;
+  }
+  body, .invoice-print-shell {
+    background: #fff !important;
+  }
+  /* Make link text print as plain (no underline distraction). */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+  /* Ensure tabular numbers print sharp. */
+  table { page-break-inside: avoid; }
+}

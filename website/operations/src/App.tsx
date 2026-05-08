@@ -14,6 +14,7 @@ import HomeDetailScreen from "./screens/HomeDetail";
 import QuotesScreen from "./screens/Quotes";
 import InvoicesScreen from "./screens/Invoices";
 import InvoiceDetailScreen from "./screens/InvoiceDetail";
+import InvoicePrintScreen from "./screens/InvoicePrint";
 import MessagesScreen from "./screens/Messages";
 import SettingsScreen from "./screens/Settings";
 import { CommandPalette } from "./components/CommandPalette";
@@ -86,6 +87,7 @@ function Shell() {
             <Route path="/quotes" element={<QuotesScreen />} />
             <Route path="/invoices" element={<InvoicesScreen />} />
             <Route path="/invoices/:invoiceId" element={<InvoiceDetailScreen />} />
+            <Route path="/invoices/:invoiceId/print" element={<InvoicePrintScreen />} />
             <Route path="/messages" element={<MessagesScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
