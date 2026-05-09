@@ -1167,6 +1167,98 @@ struct HavenFieldDaySummary: Codable, Hashable {
     }
 }
 
+// MARK: - Wave M5 invoice models
+
+/// Wave M5 — pre-fill payload returned by `convert_visit_to_invoice`.
+/// Mirrors `HavenFieldQuoteDraftPayload` shape so the editor sheet
+/// pattern can be cleanly forked from `FieldBuildQuoteSheet`. The
+/// field tech edits these in-memory in `FieldBuildInvoiceSheet`,
+/// then save / send round-trip through `save_invoice` /
+/// `send_invoice`.
+struct HavenFieldInvoiceDraftPayload: Codable, Hashable {
+    let requestId: String?
+    let householdId: String?
+    let propertyId: String?
+    let contractorId: String?
+    let visitTaskId: String?
+    let workspaceId: String?
+    let title: String
+    let lineItems: [HavenFieldQuoteDraftLine]
+    let subtotal: Double
+    let taxTotal: Double
+    let total: Double
+    let defaultHourlyRateCents: Int
+    let eligibleCount: Int
+    let visitedCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case requestId, householdId, propertyId, contractorId, visitTaskId, workspaceId
+        case title, lineItems, subtotal, taxTotal, total
+        case defaultHourlyRateCents, eligibleCount, visitedCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        requestId = (try? c.decodeIfPresent(String.self, forKey: .requestId)) ?? nil
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? nil
+        propertyId = (try? c.decodeIfPresent(String.self, forKey: .propertyId)) ?? nil
+        contractorId = (try? c.decodeIfPresent(String.self, forKey: .contractorId)) ?? nil
+        visitTaskId = (try? c.decodeIfPresent(String.self, forKey: .visitTaskId)) ?? nil
+        workspaceId = (try? c.decodeIfPresent(String.self, forKey: .workspaceId)) ?? nil
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+        lineItems = (try? c.decodeIfPresent([HavenFieldQuoteDraftLine].self, forKey: .lineItems)) ?? []
+        subtotal = (try? c.decodeIfPresent(Double.self, forKey: .subtotal)) ?? 0
+        taxTotal = (try? c.decodeIfPresent(Double.self, forKey: .taxTotal)) ?? 0
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? 0
+        defaultHourlyRateCents = (try? c.decodeIfPresent(Int.self, forKey: .defaultHourlyRateCents)) ?? 12500
+        eligibleCount = (try? c.decodeIfPresent(Int.self, forKey: .eligibleCount)) ?? 0
+        visitedCount = (try? c.decodeIfPresent(Int.self, forKey: .visitedCount)) ?? 0
+    }
+}
+
+/// Wave M5 — server row returned by save_invoice / send_invoice.
+/// Resilient decoder tolerates pre-Wave-M5 shapes that don't expose
+/// every column (e.g. legacy invoices without amount_paid / sent_at).
+struct HavenFieldInvoiceRow: Codable, Hashable {
+    let id: String
+    let invoiceNumber: String?
+    let title: String?
+    let status: String?
+    let subtotal: Double
+    let taxTotal: Double
+    let total: Double
+    let amountPaid: Double
+    let sentAt: String?
+    let paidAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case invoiceNumber = "invoice_number"
+        case title
+        case status
+        case subtotal
+        case taxTotal = "tax_total"
+        case total
+        case amountPaid = "amount_paid"
+        case sentAt = "sent_at"
+        case paidAt = "paid_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        invoiceNumber = (try? c.decodeIfPresent(String.self, forKey: .invoiceNumber)) ?? nil
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? nil
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "draft"
+        subtotal = (try? c.decodeIfPresent(Double.self, forKey: .subtotal)) ?? 0
+        taxTotal = (try? c.decodeIfPresent(Double.self, forKey: .taxTotal)) ?? 0
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? 0
+        amountPaid = (try? c.decodeIfPresent(Double.self, forKey: .amountPaid)) ?? 0
+        sentAt = (try? c.decodeIfPresent(String.self, forKey: .sentAt)) ?? nil
+        paidAt = (try? c.decodeIfPresent(String.self, forKey: .paidAt)) ?? nil
+    }
+}
+
 struct HavenFieldHome: Codable, Identifiable {
     let id: String
     let propertyId: String
@@ -2297,6 +2389,115 @@ actor HavenFieldService {
             throw URLError(.zeroByteResource)
         }
         return quote
+    }
+
+    /// Wave M5 — pre-fill an invoice draft from a completed visit.
+    /// Mirrors `buildQuoteFromVisit` but lands the lines on the
+    /// invoice path. The field tech edits these in-memory in
+    /// `FieldBuildInvoiceSheet`, then save / send round-trips
+    /// through `save_invoice` / `send_invoice`.
+    func convertVisitToInvoice(
+        workspaceId: String,
+        requestId: String
+    ) async throws -> HavenFieldInvoiceDraftPayload {
+        struct Request: Encodable {
+            let action = "convert_visit_to_invoice"
+            let workspaceId: String
+            let requestId: String
+        }
+        struct Response: Decodable {
+            let draft: HavenFieldInvoiceDraftPayload
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.draft
+    }
+
+    /// Wave M5 — save / send an invoice draft. Single round-trip via
+    /// `save_invoice` (status=draft) or `send_invoice` (status=sent
+    /// + mirrored to homeowner inbox + push). Reuses the editable
+    /// `HavenFieldQuoteDraftLine` shape for line items so the editor
+    /// surface can be cleanly forked from `FieldBuildQuoteSheet`.
+    func saveInvoice(
+        workspaceId: String,
+        invoiceId: String?,
+        requestId: String?,
+        householdId: String?,
+        propertyId: String?,
+        contractorId: String?,
+        title: String,
+        homeownerMessage: String?,
+        scopeNotes: String?,
+        lineItems: [HavenFieldQuoteDraftLine],
+        send: Bool
+    ) async throws -> HavenFieldInvoiceRow {
+        struct LineItemPayload: Encodable {
+            let id: String
+            let name: String
+            let description: String
+            let unit: String
+            let quantity: Double
+            let unit_price: Double
+            let punch_item_id: String?
+        }
+        struct Request: Encodable {
+            let action: String
+            let workspaceId: String
+            let invoiceId: String?
+            let requestId: String?
+            let householdId: String?
+            let propertyId: String?
+            let contractorId: String?
+            let title: String
+            let homeownerMessage: String?
+            let scopeNotes: String?
+            let lineItems: [LineItemPayload]
+        }
+        struct Response: Decodable {
+            let invoice: HavenFieldInvoiceRow?
+        }
+        let payload = Request(
+            action: send ? "send_invoice" : "save_invoice",
+            workspaceId: workspaceId,
+            invoiceId: invoiceId,
+            requestId: requestId,
+            householdId: householdId,
+            propertyId: propertyId,
+            contractorId: contractorId,
+            title: title,
+            homeownerMessage: homeownerMessage,
+            scopeNotes: scopeNotes,
+            lineItems: lineItems.map { line in
+                LineItemPayload(
+                    id: line.id,
+                    name: line.name,
+                    description: line.description,
+                    unit: line.unit,
+                    quantity: line.quantity,
+                    unit_price: line.unitPrice,
+                    punch_item_id: line.punchItemId
+                )
+            }
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        guard let invoice = response.invoice else {
+            throw URLError(.zeroByteResource)
+        }
+        return invoice
     }
 
     /// Wave M4 — capture a finger-drawn signature on the iPad. Server
@@ -5637,6 +5838,16 @@ private struct HavenFieldVisitWorkspaceView: View {
     /// second tap on Pre-fill doesn't re-fire the network call.
     @State private var quoteDraftPayload: HavenFieldQuoteDraftPayload?
 
+    // MARK: Wave M5 visit-to-invoice state
+
+    /// True while the BuildInvoiceSheet is presented over the visit
+    /// workspace. Driven by the "Build invoice" CTA on the visit-
+    /// complete lifecycle screen.
+    @State private var showBuildInvoiceSheet = false
+    /// Pre-fill payload returned by convert_visit_to_invoice. Cached
+    /// so a re-open doesn't re-fire the network call.
+    @State private var invoiceDraftPayload: HavenFieldInvoiceDraftPayload?
+
     /// Phase 78: toggles a punch item between pending and done. Hits the
     /// `update_punch_item_status` edge action; on success, posts
     /// `.havenFieldVisitChanged` so the dashboard refreshes and the
@@ -5838,6 +6049,23 @@ private struct HavenFieldVisitWorkspaceView: View {
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showBuildInvoiceSheet) {
+            // Wave M5 — visit-to-invoice. Pre-fill labor + materials
+            // line items from completed punch items, edit, save / send.
+            FieldBuildInvoiceSheet(
+                workspaceId: viewModel.workspaceId ?? "",
+                requestId: viewModel.visit.requestId,
+                visit: viewModel.visit,
+                cachedDraft: invoiceDraftPayload,
+                onDraftCached: { draft in
+                    invoiceDraftPayload = draft
+                },
+                onClose: {
+                    showBuildInvoiceSheet = false
+                    NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+                }
+            )
         }
         .sheet(isPresented: $showBuildQuoteSheet) {
             // Wave M4 — kitchen-table close. Pre-fill from completed
@@ -6074,7 +6302,12 @@ private struct HavenFieldVisitWorkspaceView: View {
             // primary post-visit action is to build a quote from the
             // punch list and (optionally) capture a customer signature
             // right there at the kitchen table.
-            VStack(alignment: .leading, spacing: 8) {
+            //
+            // Wave M5 — once the visit has wrapped, the field tech can
+            // also one-tap convert completed punch items into a draft
+            // invoice. Pairs with the quote button: quote = future
+            // work, invoice = work just finished.
+            VStack(alignment: .leading, spacing: 10) {
                 Button {
                     showBuildQuoteSheet = true
                 } label: {
@@ -6085,7 +6318,17 @@ private struct HavenFieldVisitWorkspaceView: View {
                 }
                 .buttonStyle(FieldPrimaryButtonStyle())
 
-                Text("Pre-fill from this visit's punch list, edit lines, and have the customer sign on the spot.")
+                Button {
+                    showBuildInvoiceSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "scroll.fill")
+                        Text("Build invoice")
+                    }
+                }
+                .buttonStyle(FieldSecondaryButtonStyle())
+
+                Text("Quote upcoming work or invoice the visit you just finished. Both pre-fill from the punch list.")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
             }
@@ -11101,6 +11344,658 @@ private struct FieldQuoteDraftBadge: View {
             tone = HavenColors.action
         } else {
             label = "Draft"
+            tone = HavenColors.textSecondary
+        }
+        return Text(label)
+            .font(HavenTypography.caption)
+            .foregroundStyle(tone)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tone.opacity(0.12))
+            .clipShape(Capsule())
+    }
+}
+
+// MARK: - Wave M5 BuildInvoiceSheet
+
+/// Wave M5 — visit-to-invoice sheet. Mirrors `FieldBuildQuoteSheet`
+/// but lands the editable lines on the invoice path. Pre-fills from
+/// `convert_visit_to_invoice` (one Labor + N Materials lines per
+/// completed punch item), lets the field tech edit / add / reorder
+/// lines, then save / send through `save_invoice` / `send_invoice`.
+///
+/// Discipline notes:
+/// - Title row reads "Invoice draft" — never just "Invoice".
+/// - Salmon stays on primary CTA + saved badge active tone only.
+///   No salmon on tile backgrounds, dividers, or row decoration
+///   (Section 22 B1).
+/// - All states wired: loading skeleton, empty (no eligible items),
+///   editor, error banner. Save / Send buttons disable on empty
+///   line items + empty title (Section 22 B9 + C1).
+private struct FieldBuildInvoiceSheet: View {
+    let workspaceId: String
+    let requestId: String
+    let visit: HavenFieldVisit
+    let cachedDraft: HavenFieldInvoiceDraftPayload?
+    let onDraftCached: (HavenFieldInvoiceDraftPayload) -> Void
+    let onClose: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    // MARK: - Loading + draft state
+
+    @State private var draftPayload: HavenFieldInvoiceDraftPayload?
+    @State private var isLoadingDraft = false
+    @State private var errorMessage: String?
+
+    // MARK: - Editor state
+
+    @State private var lineItems: [HavenFieldQuoteDraftLine] = []
+    @State private var title: String = ""
+    @State private var homeownerMessage: String = ""
+    @State private var scopeNotes: String = ""
+
+    // MARK: - Save / send result
+
+    @State private var savedInvoiceId: String?
+    @State private var savedInvoiceNumber: String?
+    @State private var invoiceStatus: String?
+    @State private var invoiceSentAt: Date?
+    @State private var isSaving = false
+    @State private var isSending = false
+
+    // MARK: - Computed
+
+    private var subtotal: Double {
+        lineItems.reduce(0) { $0 + $1.lineTotal }
+    }
+
+    /// Tax rate in percent. The schema doesn't carry a workspace tax
+    /// setting yet (deferred to a future wave per Section 8.5 spec);
+    /// default 0% but the field is editable so the tech can stamp a
+    /// local rate at the kitchen table.
+    @State private var taxRatePercent: Double = 0
+
+    private var taxAmount: Double {
+        ((subtotal * taxRatePercent) / 100.0 * 100).rounded() / 100.0
+    }
+
+    private var total: Double { subtotal + taxAmount }
+
+    private var canSave: Bool {
+        let cleaned = lineItems.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        return !cleaned.isEmpty &&
+            !title.trimmingCharacters(in: .whitespaces).isEmpty &&
+            !isSaving && !isSending
+    }
+
+    private var moneyFormatter: NumberFormatter {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = "USD"
+        f.maximumFractionDigits = 2
+        return f
+    }
+
+    private var customerName: String {
+        visit.property?.name ?? visit.title.fieldDisplayTitle
+    }
+
+    private var customerAddress: String {
+        visit.property?.address ?? "Address on file"
+    }
+
+    private var visitDateLabel: String {
+        // Mirror M4 N-9 fix: dates can be plain yyyy-MM-dd or full ISO.
+        guard let routeDate = visit.routeDate, !routeDate.isEmpty else { return "Today" }
+        let dateOnly = DateFormatter()
+        dateOnly.locale = Locale(identifier: "en_US_POSIX")
+        dateOnly.dateFormat = "yyyy-MM-dd"
+        if let parsed = dateOnly.date(from: routeDate) {
+            let display = DateFormatter()
+            display.dateFormat = "EEE MMM d"
+            return display.string(from: parsed)
+        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: routeDate) ?? {
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: routeDate)
+        }()
+        guard let date else { return routeDate }
+        let display = DateFormatter()
+        display.dateFormat = "EEE MMM d"
+        return display.string(from: date)
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerCard
+
+                    if isLoadingDraft && draftPayload == nil {
+                        loadingSkeleton
+                    } else {
+                        prefillCard
+                        editorBody
+                    }
+
+                    if let errorMessage {
+                        errorBanner(errorMessage)
+                    }
+                }
+                .padding(20)
+            }
+            .background(HavenColors.background.ignoresSafeArea())
+            .navigationTitle("Build invoice")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") {
+                        onClose()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+        }
+        .task {
+            if let cachedDraft {
+                hydrate(from: cachedDraft)
+            } else if draftPayload == nil {
+                await loadDraft()
+            }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("VISIT WRAP-UP")
+                .font(HavenTypography.uiSectionHeader)
+                .kerning(1.2)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text(customerName)
+                .font(HavenTypography.title2)
+                .foregroundStyle(HavenColors.textPrimary)
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text(visitDateLabel)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text("·")
+                    .foregroundStyle(HavenColors.textTertiary)
+                FieldInvoiceDraftBadge(
+                    invoiceNumber: savedInvoiceNumber,
+                    sentAt: invoiceSentAt,
+                    status: invoiceStatus
+                )
+            }
+        }
+    }
+
+    private var loadingSkeleton: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(0..<3, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(HavenColors.creamLight.opacity(0.6))
+                    .frame(height: 80)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var prefillCard: some View {
+        if let draft = draftPayload, draft.eligibleCount > 0 {
+            HStack(spacing: 12) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.success)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pre-filled from this visit")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("\(draft.eligibleCount) punch item\(draft.eligibleCount == 1 ? "" : "s") loaded as labor and materials lines.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Button {
+                    Task { await loadDraft() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .padding(14)
+            .background(HavenColors.success.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if draftPayload != nil {
+            HStack(spacing: 12) {
+                Image(systemName: "tray")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("No completed work to pre-fill")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Add line items below to invoice the visit from scratch.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Button {
+                    Task { await loadDraft() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .padding(14)
+            .background(HavenColors.creamLight.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var editorBody: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            // Title + customer block
+            FieldSectionCard(kicker: "Invoice", title: "Title and recipient") {
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("Invoice title", text: $title)
+                        .textFieldStyle(.roundedBorder)
+                        .font(HavenTypography.body)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sending to")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text(customerName)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(customerAddress)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(HavenColors.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+
+            // Line items list with reorder support
+            lineItemsSection
+
+            // Tax row + scope notes + homeowner message
+            taxAndNotesSection
+
+            // Totals + actions
+            totalsCard
+            actionRow
+        }
+    }
+
+    /// Wave M5 — line items list. Each line is a `FieldQuoteLineItemRow`
+    /// reused from M4 (same shape, same editor primitives). `onMove`
+    /// gives the tech drag-to-reorder so they can group materials with
+    /// labor at the kitchen table.
+    private var lineItemsSection: some View {
+        FieldSectionCard(kicker: "Line items", title: "What's on the invoice") {
+            VStack(alignment: .leading, spacing: 10) {
+                if lineItems.isEmpty {
+                    Text("No items yet. Tap + to add one.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                } else {
+                    ForEach($lineItems) { $line in
+                        FieldQuoteLineItemRow(
+                            line: $line,
+                            moneyFormatter: moneyFormatter,
+                            onDelete: {
+                                lineItems.removeAll { $0.id == line.id }
+                            }
+                        )
+                    }
+                    .onMove { indices, dest in
+                        lineItems.move(fromOffsets: indices, toOffset: dest)
+                    }
+                }
+                Button {
+                    lineItems.append(
+                        HavenFieldQuoteDraftLine(name: "", description: "", unit: "ea", quantity: 1, unitPrice: 0)
+                    )
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(HavenColors.action)
+                        Text("Add line")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+        }
+    }
+
+    private var taxAndNotesSection: some View {
+        FieldSectionCard(kicker: "Tax and notes", title: "Tax rate and homeowner message") {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Tax rate")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        TextField("0", value: $taxRatePercent, format: .number)
+                            .keyboardType(.decimalPad)
+                            .frame(width: 70)
+                            .multilineTextAlignment(.trailing)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .padding(8)
+                            .background(HavenColors.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Text("%")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Scope of work (optional)")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    TextField(
+                        "What was completed during the visit...",
+                        text: $scopeNotes,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+                    .font(HavenTypography.body)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Note to customer (optional)")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    TextField(
+                        "Thanks for letting us into your home today...",
+                        text: $homeownerMessage,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+                    .font(HavenTypography.body)
+                }
+            }
+        }
+    }
+
+    private var totalsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Subtotal")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Text(formatMoney(subtotal))
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .monospacedDigit()
+            }
+            HStack {
+                Text("Tax (\(formatPercent(taxRatePercent)))")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Text(formatMoney(taxAmount))
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .monospacedDigit()
+            }
+            Divider()
+            HStack {
+                Text("Total")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                Text(formatMoney(total))
+                    .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .monospacedDigit()
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Wave M5 — Save draft / Send to customer / Print here. The
+    /// "Print here" button opens the iOS share sheet with a plain-
+    /// text invoice transcript so the homeowner can AirDrop / Mail
+    /// / Print from the OS-native share menu. Full PDF rendering is
+    /// deferred to the Operations Desk's print route (already shipped).
+    private var actionRow: some View {
+        VStack(spacing: 10) {
+            Button {
+                Task { await save(send: false) }
+            } label: {
+                if isSaving && !isSending {
+                    ProgressView().tint(HavenColors.textOnAction)
+                } else {
+                    Text("Save as draft")
+                }
+            }
+            .buttonStyle(FieldSecondaryButtonStyle())
+            .disabled(!canSave)
+
+            Button {
+                Task { await save(send: true) }
+            } label: {
+                if isSending {
+                    ProgressView().tint(HavenColors.textOnAction)
+                } else {
+                    Text("Send to customer")
+                }
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+            .disabled(!canSave)
+
+            // "Print here" — share-sheet route. Only wires up once
+            // we have something to share (saved or pre-filled lines).
+            if let summary = printSummary {
+                ShareLink(item: summary, subject: Text(title.isEmpty ? "Invoice" : title)) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "printer")
+                        Text("Print or share")
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+                .accessibilityLabel("Print or share the invoice via the iOS share sheet")
+            }
+        }
+    }
+
+    private var printSummary: String? {
+        let cleaned = lineItems.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !cleaned.isEmpty else { return nil }
+        var lines: [String] = []
+        lines.append(title.isEmpty ? "Invoice" : title)
+        if let number = savedInvoiceNumber { lines.append("Invoice #\(number)") }
+        lines.append("")
+        lines.append("To: \(customerName)")
+        lines.append(customerAddress)
+        lines.append("")
+        lines.append("Visit: \(visitDateLabel)")
+        lines.append("")
+        lines.append("Line items:")
+        for line in cleaned {
+            let qty = formatQuantity(line.quantity)
+            let unit = line.unit.isEmpty ? "ea" : line.unit
+            let price = formatMoney(line.unitPrice)
+            let lineTotal = formatMoney(line.lineTotal)
+            var row = "  \(line.name): \(qty) \(unit) @ \(price) = \(lineTotal)"
+            if !line.description.isEmpty {
+                row += "\n    \(line.description)"
+            }
+            lines.append(row)
+        }
+        lines.append("")
+        lines.append("Subtotal: \(formatMoney(subtotal))")
+        if taxRatePercent > 0 {
+            lines.append("Tax (\(formatPercent(taxRatePercent))): \(formatMoney(taxAmount))")
+        }
+        lines.append("Total: \(formatMoney(total))")
+        if !scopeNotes.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines.append("")
+            lines.append("Scope of work:")
+            lines.append(scopeNotes)
+        }
+        if !homeownerMessage.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines.append("")
+            lines.append("Note: \(homeownerMessage)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(HavenColors.action)
+            Text(message)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
+            Spacer()
+            Button {
+                errorMessage = nil
+                Task { await loadDraft() }
+            } label: {
+                Text("Retry")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.action)
+            }
+            .frame(minWidth: 60, minHeight: 44)
+        }
+        .padding(12)
+        .background(HavenColors.action.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Helpers
+
+    private func formatMoney(_ value: Double) -> String {
+        moneyFormatter.string(from: NSNumber(value: value)) ?? "$\(value)"
+    }
+
+    private func formatPercent(_ value: Double) -> String {
+        if value == value.rounded() { return "\(Int(value))%" }
+        return String(format: "%.2f%%", value)
+    }
+
+    private func formatQuantity(_ q: Double) -> String {
+        if q == q.rounded() { return String(format: "%.0f", q) }
+        return String(format: "%.2f", q)
+    }
+
+    private func hydrate(from draft: HavenFieldInvoiceDraftPayload) {
+        draftPayload = draft
+        lineItems = draft.lineItems
+        title = draft.title
+    }
+
+    // MARK: - Network
+
+    private func loadDraft() async {
+        guard !workspaceId.isEmpty, !requestId.isEmpty else {
+            errorMessage = "Visit identifier missing."
+            return
+        }
+        errorMessage = nil
+        isLoadingDraft = true
+        defer { isLoadingDraft = false }
+        do {
+            let draft = try await HavenFieldService.shared.convertVisitToInvoice(
+                workspaceId: workspaceId,
+                requestId: requestId
+            )
+            hydrate(from: draft)
+            onDraftCached(draft)
+        } catch {
+            errorMessage = "Couldn't pre-fill the invoice: \(error.localizedDescription)"
+        }
+    }
+
+    private func save(send: Bool) async {
+        guard canSave else { return }
+        errorMessage = nil
+        if send { isSending = true } else { isSaving = true }
+        defer {
+            isSaving = false
+            isSending = false
+        }
+
+        do {
+            let cleaned = lineItems.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+            let saved = try await HavenFieldService.shared.saveInvoice(
+                workspaceId: workspaceId,
+                invoiceId: savedInvoiceId,
+                requestId: requestId,
+                householdId: draftPayload?.householdId,
+                propertyId: draftPayload?.propertyId,
+                contractorId: draftPayload?.contractorId,
+                title: title.trimmingCharacters(in: .whitespaces),
+                homeownerMessage: homeownerMessage.trimmingCharacters(in: .whitespaces).isEmpty ? nil : homeownerMessage,
+                scopeNotes: scopeNotes.trimmingCharacters(in: .whitespaces).isEmpty ? nil : scopeNotes,
+                lineItems: cleaned,
+                send: send
+            )
+            if !saved.id.isEmpty {
+                savedInvoiceId = saved.id
+                savedInvoiceNumber = saved.invoiceNumber
+                invoiceStatus = saved.status
+                if send {
+                    invoiceSentAt = Date()
+                }
+            }
+        } catch {
+            errorMessage = "Couldn't \(send ? "send" : "save") the invoice: \(error.localizedDescription)"
+        }
+    }
+}
+
+/// Wave M5 — small status pill on the BuildInvoiceSheet header.
+/// Shows "Invoice draft" until a save round-trip lands a number,
+/// then the invoice number, then "Sent" after send_invoice. Mirrors
+/// `FieldQuoteDraftBadge`.
+private struct FieldInvoiceDraftBadge: View {
+    let invoiceNumber: String?
+    let sentAt: Date?
+    let status: String?
+
+    var body: some View {
+        let label: String
+        let tone: Color
+        if sentAt != nil || status == "sent" {
+            label = "Sent"
+            tone = HavenColors.success
+        } else if let number = invoiceNumber {
+            label = number
+            tone = HavenColors.action
+        } else {
+            label = "Invoice draft"
             tone = HavenColors.textSecondary
         }
         return Text(label)

@@ -7326,6 +7326,188 @@ async function saveQuoteItem(
 // inbox + (optionally) the request thread, mirroring the quote-send
 // pattern.
 
+/// Wave M5 — convert a completed visit into a draft invoice.
+///
+/// Mirrors `buildQuoteFromVisit` (Wave M4) but lands the lines on
+/// the invoice path instead of the quote path. For each completed
+/// punch item we emit two kinds of line items:
+///   1) Labor line: name = "Labor: <punch title>", qty = hours
+///      (time_spent_seconds / 3600), unit_price =
+///      workspace.default_hourly_rate_cents / 100.
+///   2) One Material line per `materials_used` entry, with that
+///      material's qty + unit_cost.
+///
+/// Each line item carries `punch_item_id` for traceability so the
+/// Operations Desk + homeowner inbox can link back. Returns the same
+/// shape iOS pre-fills its FieldBuildInvoiceSheet form with — we do
+/// NOT insert a draft row here; the field tech edits in-memory and
+/// taps Save / Send to round-trip through `save_invoice` /
+/// `send_invoice`.
+async function convertVisitToInvoice(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  // Same role gate as save_invoice: owners + admins build invoices.
+  assertPermission(membership, "canBuildQuotes");
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const { data: request, error: requestErr } = await service
+    .from("handyman_requests")
+    .select(
+      "id, household_id, property_id, contractor_id, visit_task_id, title, status",
+    )
+    .eq("id", requestId)
+    .maybeSingle();
+  if (requestErr) throw requestErr;
+  if (!request) throw new Error("Visit / request not found");
+
+  const householdId = compactString(request.household_id);
+  const propertyId = compactString(request.property_id);
+  const contractorId = compactString(request.contractor_id);
+  const visitTaskId = compactString(request.visit_task_id);
+
+  // Verify the request belongs to this workspace via the contractor link.
+  if (contractorId) {
+    const { data: link } = await service
+      .from("provider_contractor_links")
+      .select("workspace_id")
+      .eq("contractor_id", contractorId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!link) throw new Error("Visit belongs to a different workspace");
+  }
+
+  // Default labor rate from the workspace settings (Wave M4 column,
+  // default 12500 cents = $125/hr). Same source as build_quote_from_visit.
+  const { data: workspace } = await service
+    .from("provider_workspaces")
+    .select("default_hourly_rate_cents")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  const hourlyRateCents = numberValue(workspace?.default_hourly_rate_cents ?? 12500);
+  const hourlyRate = hourlyRateCents / 100;
+
+  // Pull every non-archived punch item assigned to this visit.
+  let punchItems: Record<string, unknown>[] = [];
+  if (visitTaskId) {
+    const { data: items, error: itemsErr } = await service
+      .from("handyman_punch_items")
+      .select(
+        "id, title, description, status, materials_used, time_spent_seconds, completed_at, archived_at",
+      )
+      .eq("assigned_visit_task_id", visitTaskId)
+      .is("archived_at", null);
+    if (itemsErr) throw itemsErr;
+    punchItems = (items ?? []) as Record<string, unknown>[];
+  }
+
+  // Same eligibility rule as build_quote_from_visit: include rows that
+  // were marked done OR have time tracked OR have materials recorded.
+  const eligible = punchItems.filter((item) => {
+    const status = compactString(item.status);
+    const timeSec = numberValue(item.time_spent_seconds || 0);
+    const materials = Array.isArray(item.materials_used) ? item.materials_used : [];
+    return status === "completed" || timeSec > 0 || materials.length > 0;
+  });
+
+  // Build line items. One Labor line per punch item + one Material line
+  // per material entry. Materials get their own row so the homeowner
+  // sees the parts breakdown clearly on the invoice (vs the quote
+  // which bundles labor + materials into a single line).
+  const lineItems: Array<Record<string, unknown>> = [];
+  for (const item of eligible) {
+    const punchId = compactString(item.id);
+    const title = compactString(item.title) || "Visit work";
+    const timeSec = numberValue(item.time_spent_seconds || 0);
+    const hours = roundMoney(timeSec / 3600);
+    const materials = (Array.isArray(item.materials_used) ? item.materials_used : []) as Array<
+      Record<string, unknown>
+    >;
+
+    // Labor line: only emit if there's tracked time. A pure-materials
+    // punch item still gets material lines below.
+    if (hours > 0) {
+      const minutes = Math.round(timeSec / 60);
+      lineItems.push({
+        id: crypto.randomUUID(),
+        name: `Labor: ${title}`,
+        description: `${minutes} min @ ${moneyLabel(hourlyRate)}/hr`,
+        unit: "hr",
+        quantity: hours,
+        unit_price: hourlyRate,
+        punch_item_id: punchId,
+      });
+    } else if (materials.length === 0 && compactString(item.status) === "completed") {
+      // Completed punch with no time + no materials: still emit a
+      // 30-min minimum labor line so the technician's time doesn't
+      // ghost on the customer's bill.
+      lineItems.push({
+        id: crypto.randomUUID(),
+        name: `Labor: ${title}`,
+        description: "Visit task completed",
+        unit: "hr",
+        quantity: 0.5,
+        unit_price: hourlyRate,
+        punch_item_id: punchId,
+      });
+    }
+
+    for (const material of materials) {
+      const matName = compactString(material.name) || "Material";
+      const qty = numberValue(material.qty ?? 1);
+      const unit = compactString(material.unit) || "ea";
+      const unitCost = numberValue(material.unit_cost ?? material.unitCost ?? 0);
+      if (qty <= 0) continue;
+      lineItems.push({
+        id: crypto.randomUUID(),
+        name: matName,
+        description: `Used on ${title}`,
+        unit,
+        quantity: qty,
+        unit_price: unitCost,
+        punch_item_id: punchId,
+      });
+    }
+  }
+
+  const totals = invoiceSummary(lineItems);
+  const requestTitle = compactString(request.title) || "Visit";
+  const draftTitle = `Invoice for ${requestTitle}`;
+
+  return {
+    draft: {
+      requestId,
+      householdId,
+      propertyId,
+      contractorId,
+      visitTaskId,
+      workspaceId,
+      title: draftTitle,
+      lineItems: lineItems.map((line) => ({
+        id: compactString(line.id),
+        name: compactString(line.name),
+        description: compactString(line.description),
+        unit: compactString(line.unit) || "ea",
+        quantity: numberValue(line.quantity),
+        unitPrice: numberValue(line.unit_price),
+        punchItemId: compactString(line.punch_item_id) || null,
+      })),
+      subtotal: totals.subtotal,
+      taxTotal: totals.taxTotal,
+      total: totals.total,
+      defaultHourlyRateCents: hourlyRateCents,
+      eligibleCount: eligible.length,
+      visitedCount: punchItems.length,
+    },
+  };
+}
+
 function generateInvoiceNumber(): string {
   const now = new Date();
   const year = now.getUTCFullYear();
@@ -7418,14 +7600,24 @@ async function saveInvoice(
     : [];
   const sourceLineItems = incomingLineItems ?? fallbackLineItems;
   const lineItems = sourceLineItems
-    .map((item) => ({
-      id: compactString(item.id) || crypto.randomUUID(),
-      name: compactString(item.name),
-      description: compactString(item.description),
-      unit: compactString(item.unit) || "ea",
-      quantity: numberValue(item.quantity || 1),
-      unit_price: numberValue(item.unitPrice || item.unit_price || 0),
-    }))
+    .map((item) => {
+      // Wave M5 — preserve the cross-link to the source punch item so
+      // the Operations Desk can render the punch's photos / voice note
+      // on the invoice line. Mirror M4's save_quote treatment of the
+      // same field on quote lines.
+      const punchItemId =
+        compactString(item.punch_item_id) || compactString(item.punchItemId) || null;
+      const base: Record<string, unknown> = {
+        id: compactString(item.id) || crypto.randomUUID(),
+        name: compactString(item.name),
+        description: compactString(item.description),
+        unit: compactString(item.unit) || "ea",
+        quantity: numberValue(item.quantity || 1),
+        unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+      };
+      if (punchItemId) base.punch_item_id = punchItemId;
+      return base;
+    })
     .filter((item) => item.name);
 
   if (!workspaceId || lineItems.length === 0) {
@@ -10648,6 +10840,15 @@ serve(async (req) => {
       }
 
       // Wave Q (Section 8) — provider invoices.
+      // Wave M5 — convert visit → invoice draft (one-tap close-out).
+      if (action === "convert_visit_to_invoice") {
+        const result = await convertVisitToInvoice(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
       if (action === "save_invoice") {
         const result = await saveInvoice(service, user as unknown as Record<string, unknown>, body);
         return json(result);
