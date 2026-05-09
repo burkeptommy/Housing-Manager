@@ -481,6 +481,7 @@
 		84D034B797C487155A3F3C3E /* SystemGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C235D5924950601DBEC89D /* SystemGroup.swift */; };
 		84E263024BA7EB0EB1C27CC4 /* TrustedContactDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5964DD20089AE2FA96DD6B3F /* TrustedContactDetailView.swift */; };
 		84FD05A8CBA41E39DC4DEF8F /* GuidedAssessmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 800954EB4564B197E8AEE609 /* GuidedAssessmentView.swift */; };
+		85414C4D42B8169B70DF198E /* HavenFieldCrewChatTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F4C0E9441B3FE3C52CAE43 /* HavenFieldCrewChatTab.swift */; };
 		859215987971D6716E999BB9 /* RequestAssessmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E56265BF2A2E74DD788D6CDE /* RequestAssessmentView.swift */; };
 		85EDC669E036389F6A00F5B6 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F21E2347101F280AF6E2FC /* AppState.swift */; };
 		8642A4872399D9AB3358993C /* LinkDocumentToProjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1077727F8CD1C7CEC052D32 /* LinkDocumentToProjectSheet.swift */; };
@@ -519,6 +520,7 @@
 		91AE516BAE40BA3EED92B9B6 /* AddressCompletionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F676C1BCF5799F544342A088 /* AddressCompletionSheet.swift */; };
 		923E6C88A0FD716A8D2EE9AC /* UnifiedTaskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0AE7AB5E6C3F35C6429980C /* UnifiedTaskCard.swift */; };
 		926BD1CDA47AD0E3C0C64AD3 /* AfterActionReportCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA07A5036C7F8D62584F86AA /* AfterActionReportCard.swift */; };
+		9279D944AF88F3A74FB8690F /* HavenFieldCrewChatTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F4C0E9441B3FE3C52CAE43 /* HavenFieldCrewChatTab.swift */; };
 		927F2A9E44D826E4FD5F0631 /* OverdueTasksDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E53234F9D430302A1C9755 /* OverdueTasksDetailView.swift */; };
 		9290FD2D1C17DA4B93093ED6 /* HouseQuizAnswerMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8AE811AFA8FA636CE93EB2D /* HouseQuizAnswerMapper.swift */; };
 		92F2718BF8A80427D29361FB /* Color+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2218FB82A32E8E479EB1078E /* Color+Haven.swift */; };
@@ -1196,6 +1198,7 @@
 		90D7D8CB37718374CFD958AA /* QuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActions.swift; sourceTree = "<group>"; };
 		91EFE100675E01BCBB2021FF /* SpecialtySuggestionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecialtySuggestionCard.swift; sourceTree = "<group>"; };
 		91F21E2347101F280AF6E2FC /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		91F4C0E9441B3FE3C52CAE43 /* HavenFieldCrewChatTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenFieldCrewChatTab.swift; sourceTree = "<group>"; };
 		92FA1BB2ACAD067BEEE1857A /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 		9382135E9032A56C0BBB9959 /* ProjectsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsViewModel.swift; sourceTree = "<group>"; };
 		93A775F9C2277D1A212DB94D /* UnifiedRoutingMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedRoutingMenu.swift; sourceTree = "<group>"; };
@@ -1494,13 +1497,6 @@
 			path = Walkthrough;
 			sourceTree = "<group>";
 		};
-		1F3D5CB59EF18672D8DD0BE6 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
 		230F0FE9429642FCD2F949E2 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -1553,7 +1549,6 @@
 			children = (
 				ADB91A7ED8E275B9D543F76C /* Models */,
 				5205F9275D8C401D26DBB69E /* Services */,
-				1F3D5CB59EF18672D8DD0BE6 /* ViewModels */,
 				619173566B8EA01F69B4A4F7 /* Views */,
 			);
 			path = Assessment;
@@ -1563,6 +1558,7 @@
 			isa = PBXGroup;
 			children = (
 				A5FF84789EB236108BF1F8C5 /* Assessment */,
+				F8E28B8AAA07D023211F85A7 /* CrewChat */,
 			);
 			path = HavenField;
 			sourceTree = "<group>";
@@ -2410,6 +2406,14 @@
 			path = Notifications;
 			sourceTree = "<group>";
 		};
+		F8E28B8AAA07D023211F85A7 /* CrewChat */ = {
+			isa = PBXGroup;
+			children = (
+				91F4C0E9441B3FE3C52CAE43 /* HavenFieldCrewChatTab.swift */,
+			);
+			path = CrewChat;
+			sourceTree = "<group>";
+		};
 		FA36D8D6CB59830094A69E80 /* Components */ = {
 			isa = PBXGroup;
 			children = (
@@ -2803,6 +2807,7 @@
 				F52507EB3AA830122241C680 /* HavenButton.swift in Sources */,
 				444A7ADC42BE3E2D7F3A4005 /* HavenCard.swift in Sources */,
 				EC92CC3B89ED33CA01D5F3DD /* HavenColors.swift in Sources */,
+				9279D944AF88F3A74FB8690F /* HavenFieldCrewChatTab.swift in Sources */,
 				57F7223B2CC0D05A108B80C9 /* HavenFieldView.swift in Sources */,
 				CFA016496AE42337FF9C2AED /* HavenPill.swift in Sources */,
 				BD84E08D39EE8F4E79EE6ACD /* HavenTextField.swift in Sources */,
@@ -3267,6 +3272,7 @@
 				F34E28DD2B012319BC1BEA30 /* HavenCard.swift in Sources */,
 				4A67D195FB30C8FC75BCD0AF /* HavenColors.swift in Sources */,
 				651BB5718EB1414F9D989240 /* HavenFieldApp.swift in Sources */,
+				85414C4D42B8169B70DF198E /* HavenFieldCrewChatTab.swift in Sources */,
 				2756D44332E73867AAEF0560 /* HavenFieldView.swift in Sources */,
 				CE9EC6715E28C456DB14EBD0 /* HavenPill.swift in Sources */,
 				38CA138431C897283BFC259A /* HavenTextField.swift in Sources */,

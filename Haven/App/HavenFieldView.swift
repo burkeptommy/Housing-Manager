@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreLocation
+import MapKit
 import PhotosUI
 import AVFoundation
 import PencilKit
@@ -236,6 +237,13 @@ struct HavenFieldVisit: Codable, Identifiable, Hashable {
     /// Phase 78: structured punch list rows for this visit, served by the
     /// handyman-provider edge function. Replaces VisitNotesParser regex.
     let punchItems: [HavenFieldPunchItem]
+    /// Wave M9 — mid-stream cancellation context. Distinct from the
+    /// existing M5 `cancelled_by_user_id` / `cancelled_by_role` fields:
+    /// these only populate when the field tech ended a visit early via
+    /// `cancel_visit_mid_stream`, not when the homeowner cancelled
+    /// pre-visit. Renders the "Cancelled mid-visit at HH:MM" annotation.
+    let cancellationReason: String?
+    let cancelledAt: String?
 
     private enum CodingKeys: String, CodingKey {
         case requestId
@@ -256,6 +264,8 @@ struct HavenFieldVisit: Codable, Identifiable, Hashable {
         case latestMessage
         case quote
         case punchItems
+        case cancellationReason
+        case cancelledAt
     }
 
     init(from decoder: Decoder) throws {
@@ -283,6 +293,8 @@ struct HavenFieldVisit: Codable, Identifiable, Hashable {
         latestMessage = (try? container.decodeIfPresent(HavenFieldLatestMessage.self, forKey: .latestMessage)) ?? nil
         quote = (try? container.decodeIfPresent(HavenFieldQuoteSummary.self, forKey: .quote)) ?? nil
         punchItems = (try? container.decodeIfPresent([HavenFieldPunchItem].self, forKey: .punchItems)) ?? []
+        cancellationReason = (try? container.decodeIfPresent(String.self, forKey: .cancellationReason)) ?? nil
+        cancelledAt = (try? container.decodeIfPresent(String.self, forKey: .cancelledAt)) ?? nil
     }
 
     init(
@@ -303,7 +315,9 @@ struct HavenFieldVisit: Codable, Identifiable, Hashable {
         assignment: HavenFieldVisitAssignment?,
         latestMessage: HavenFieldLatestMessage?,
         quote: HavenFieldQuoteSummary?,
-        punchItems: [HavenFieldPunchItem] = []
+        punchItems: [HavenFieldPunchItem] = [],
+        cancellationReason: String? = nil,
+        cancelledAt: String? = nil
     ) {
         self.requestId = requestId
         self.id = requestId
@@ -324,6 +338,8 @@ struct HavenFieldVisit: Codable, Identifiable, Hashable {
         self.latestMessage = latestMessage
         self.quote = quote
         self.punchItems = punchItems
+        self.cancellationReason = cancellationReason
+        self.cancelledAt = cancelledAt
     }
 }
 
@@ -585,6 +601,17 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
     /// the small "N notes" badge on the visit row + workspace header so
     /// a tech walking up to a job knows there's prior context to read.
     let techNotesCount: Int
+    /// Wave M9 — additional workspace members assigned alongside the
+    /// primary tech (see `memberId`). Both can check off punch items.
+    /// Defaults to empty for legacy / pre-M9 rows.
+    let coTechMemberIds: [String]
+    /// Wave M9 — entry method captured before the visit. One of:
+    /// `customer_present`, `lockbox`, `key_under_mat`, `door_code`. Drives
+    /// the lockbox badge in the visit-detail header.
+    let accessMethod: String?
+    /// Wave M9 — free-form notes for the access method (lockbox code,
+    /// key location, etc.).
+    let accessNotes: String?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -604,6 +631,9 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         case clockInLng
         case clockInAccuracyM
         case techNotesCount
+        case coTechMemberIds
+        case accessMethod
+        case accessNotes
     }
 
     init(from decoder: Decoder) throws {
@@ -625,6 +655,9 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         clockInLng = (try? c.decodeIfPresent(Double.self, forKey: .clockInLng)) ?? nil
         clockInAccuracyM = (try? c.decodeIfPresent(Int.self, forKey: .clockInAccuracyM)) ?? nil
         techNotesCount = (try? c.decodeIfPresent(Int.self, forKey: .techNotesCount)) ?? 0
+        coTechMemberIds = (try? c.decodeIfPresent([String].self, forKey: .coTechMemberIds)) ?? []
+        accessMethod = (try? c.decodeIfPresent(String.self, forKey: .accessMethod)) ?? nil
+        accessNotes = (try? c.decodeIfPresent(String.self, forKey: .accessNotes)) ?? nil
     }
 
     init(
@@ -644,7 +677,10 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         clockInLat: Double? = nil,
         clockInLng: Double? = nil,
         clockInAccuracyM: Int? = nil,
-        techNotesCount: Int = 0
+        techNotesCount: Int = 0,
+        coTechMemberIds: [String] = [],
+        accessMethod: String? = nil,
+        accessNotes: String? = nil
     ) {
         self.id = id
         self.memberId = memberId
@@ -663,6 +699,9 @@ struct HavenFieldVisitAssignment: Codable, Hashable {
         self.clockInLng = clockInLng
         self.clockInAccuracyM = clockInAccuracyM
         self.techNotesCount = techNotesCount
+        self.coTechMemberIds = coTechMemberIds
+        self.accessMethod = accessMethod
+        self.accessNotes = accessNotes
     }
 }
 
@@ -1256,6 +1295,190 @@ struct HavenFieldInvoiceRow: Codable, Hashable {
         amountPaid = (try? c.decodeIfPresent(Double.self, forKey: .amountPaid)) ?? 0
         sentAt = (try? c.decodeIfPresent(String.self, forKey: .sentAt)) ?? nil
         paidAt = (try? c.decodeIfPresent(String.self, forKey: .paidAt)) ?? nil
+    }
+}
+
+// MARK: - Wave M7 crew chat models
+
+/// Wave M7 — single message inside a `crew_chat_threads` row. Author
+/// name joins from `provider_workspace_members.full_name`. Resilient
+/// decoder so a malformed row doesn't take down the whole conversation.
+struct HavenFieldCrewChatMessage: Codable, Identifiable, Hashable {
+    let id: String
+    let threadId: String
+    let workspaceId: String?
+    let senderMemberId: String
+    let senderName: String
+    let body: String
+    let attachments: [String]
+    let readBy: [String]
+    let createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case threadId
+        case workspaceId
+        case senderMemberId
+        case senderName
+        case body
+        case attachments
+        case readBy
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        threadId = (try? c.decodeIfPresent(String.self, forKey: .threadId)) ?? ""
+        workspaceId = (try? c.decodeIfPresent(String.self, forKey: .workspaceId)) ?? nil
+        senderMemberId = (try? c.decodeIfPresent(String.self, forKey: .senderMemberId)) ?? ""
+        senderName = (try? c.decodeIfPresent(String.self, forKey: .senderName)) ?? "Workspace member"
+        body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? ""
+        // Attachments today are an opaque array of identifiers; future
+        // versions may carry richer shapes (signed URLs, mime types).
+        // Decode as `[String]` and fall back to empty array.
+        attachments = (try? c.decodeIfPresent([String].self, forKey: .attachments)) ?? []
+        readBy = (try? c.decodeIfPresent([String].self, forKey: .readBy)) ?? []
+        createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
+    }
+
+    init(
+        id: String,
+        threadId: String,
+        workspaceId: String? = nil,
+        senderMemberId: String,
+        senderName: String,
+        body: String,
+        attachments: [String] = [],
+        readBy: [String] = [],
+        createdAt: String? = nil
+    ) {
+        self.id = id
+        self.threadId = threadId
+        self.workspaceId = workspaceId
+        self.senderMemberId = senderMemberId
+        self.senderName = senderName
+        self.body = body
+        self.attachments = attachments
+        self.readBy = readBy
+        self.createdAt = createdAt
+    }
+}
+
+/// Wave M7 — last-message preview embedded in the thread list payload.
+/// Shape mirrors `HavenFieldCrewChatMessage` but stripped down to the
+/// fields the row card needs.
+struct HavenFieldCrewChatLastMessage: Codable, Hashable {
+    let id: String?
+    let body: String
+    let senderMemberId: String?
+    let senderName: String
+    let createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, body, senderMemberId, senderName, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? nil
+        body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? ""
+        senderMemberId = (try? c.decodeIfPresent(String.self, forKey: .senderMemberId)) ?? nil
+        senderName = (try? c.decodeIfPresent(String.self, forKey: .senderName)) ?? "Workspace member"
+        createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
+    }
+}
+
+/// Wave M7 — one row in the Crew tab's thread list. Carries enough
+/// state to render the row WITHOUT drilling into the thread itself.
+/// `unreadCount` is computed server-side per the calling member.
+struct HavenFieldCrewChatThread: Codable, Identifiable, Hashable {
+    let id: String
+    let workspaceId: String
+    let name: String?
+    /// One of `general` / `route_day` / `tech_pair`. The native UI uses
+    /// it for the row icon — generals get the bubble icon, route_day
+    /// gets the calendar icon, tech_pair gets the two-people icon.
+    let kind: String
+    let createdAt: String?
+    let lastMessage: HavenFieldCrewChatLastMessage?
+    let unreadCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case id, workspaceId, name, kind, createdAt, lastMessage, unreadCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        workspaceId = (try? c.decodeIfPresent(String.self, forKey: .workspaceId)) ?? ""
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil
+        kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? "general"
+        createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
+        lastMessage = (try? c.decodeIfPresent(HavenFieldCrewChatLastMessage.self, forKey: .lastMessage)) ?? nil
+        unreadCount = (try? c.decodeIfPresent(Int.self, forKey: .unreadCount)) ?? 0
+    }
+
+    /// Display label fall-back chain: explicit name → "Tuesday route"-
+    /// style stub for `route_day` rows lacking a name → "Direct chat"
+    /// for `tech_pair` → "Crew chat" otherwise.
+    var displayName: String {
+        if let trimmed = name?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
+            return trimmed
+        }
+        switch kind {
+        case "route_day": return "Route day"
+        case "tech_pair": return "Direct chat"
+        default: return "Crew chat"
+        }
+    }
+
+    /// SF Symbol the thread row + thread header use to identify the
+    /// thread kind at a glance.
+    var iconName: String {
+        switch kind {
+        case "route_day": return "calendar.badge.clock"
+        case "tech_pair": return "person.2.fill"
+        default: return "bubble.left.and.bubble.right.fill"
+        }
+    }
+}
+
+/// Wave M7 — workspace member roster row consumed by the new-thread
+/// sheet's member picker and the in-thread sender name lookup. Pulled
+/// from PostgREST direct against `provider_workspace_members`.
+struct HavenFieldCrewChatMember: Identifiable, Hashable {
+    let id: String
+    let role: String
+    let fullName: String?
+    let email: String?
+    let status: String
+
+    /// Display name fall-back chain: full name → local part of the
+    /// email → "Workspace member". Used in chip pickers, message
+    /// bubbles, and the read-receipt list.
+    var displayName: String {
+        if let trimmed = fullName?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+            return trimmed
+        }
+        if let email, !email.isEmpty {
+            return email.split(separator: "@").first.map(String.init) ?? email
+        }
+        return "Workspace member"
+    }
+
+    /// Two-letter initials for the avatar bubble. Falls back to "?"
+    /// for completely unknown rows so we never render an empty disc.
+    var initials: String {
+        let source = displayName
+        let parts = source.split(separator: " ").compactMap { $0.first }
+        if parts.count >= 2 {
+            return String([parts.first!, parts.last!]).uppercased()
+        }
+        if let first = parts.first {
+            return String(first).uppercased()
+        }
+        return "?"
     }
 }
 
@@ -1940,6 +2163,146 @@ enum HavenFieldCache {
     }
 }
 
+/// Wave M10 — one customer pin returned by `nearest_customers`. Distance
+/// is in meters from the tech's current location. `address` is the
+/// canonical "street, city, state, zip" join the server geocoded;
+/// `latitude` / `longitude` are the resolved coords. The map renders one
+/// `Marker` per row, the list renders one `NavigationLink` per row that
+/// pushes `HavenFieldHomeProfileView` for the matching home.
+struct HavenFieldNearbyCustomer: Codable, Identifiable, Hashable {
+    var id: String { propertyId }
+    let householdId: String
+    let propertyId: String
+    let customerName: String
+    let address: String
+    let latitude: Double
+    let longitude: Double
+    let distanceMeters: Int
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? ""
+        propertyId = (try? c.decodeIfPresent(String.self, forKey: .propertyId)) ?? ""
+        customerName = (try? c.decodeIfPresent(String.self, forKey: .customerName)) ?? "Customer"
+        address = (try? c.decodeIfPresent(String.self, forKey: .address)) ?? ""
+        latitude = (try? c.decodeIfPresent(Double.self, forKey: .latitude)) ?? 0
+        longitude = (try? c.decodeIfPresent(Double.self, forKey: .longitude)) ?? 0
+        distanceMeters = (try? c.decodeIfPresent(Int.self, forKey: .distanceMeters)) ?? 0
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case householdId, propertyId, customerName, address, latitude, longitude, distanceMeters
+    }
+}
+
+/// Wave M10 — full payload returned by `nearest_customers`. `note` is
+/// populated when the workspace has zero linked customers OR zero
+/// customers with addresses on file (separate empty states).
+struct HavenFieldNearbyCustomersPayload: Decodable {
+    let ok: Bool
+    let customers: [HavenFieldNearbyCustomer]
+    let note: String?
+    let geocodedCount: Int?
+    let candidateCount: Int?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = (try? c.decodeIfPresent(Bool.self, forKey: .ok)) ?? false
+        customers = (try? c.decodeIfPresent([HavenFieldNearbyCustomer].self, forKey: .customers)) ?? []
+        note = try? c.decodeIfPresent(String.self, forKey: .note)
+        geocodedCount = try? c.decodeIfPresent(Int.self, forKey: .geocodedCount)
+        candidateCount = try? c.decodeIfPresent(Int.self, forKey: .candidateCount)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case ok, customers, note, geocodedCount, candidateCount
+    }
+}
+
+/// Wave M10 — structured business-card extraction returned by
+/// `extract_business_card`. All fields nullable because cards vary
+/// wildly in completeness; the iOS confirmation card lets the tech
+/// fill in anything Claude couldn't read.
+struct HavenFieldBusinessCardExtraction: Codable {
+    let ok: Bool
+    let companyName: String?
+    let contactName: String?
+    let phone: String?
+    let email: String?
+    let website: String?
+    let tradeCategory: String?
+    let confidence: String?
+    let rawText: String?
+    let parseError: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = (try? c.decodeIfPresent(Bool.self, forKey: .ok)) ?? false
+        companyName = try? c.decodeIfPresent(String.self, forKey: .companyName)
+        contactName = try? c.decodeIfPresent(String.self, forKey: .contactName)
+        phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+        email = try? c.decodeIfPresent(String.self, forKey: .email)
+        website = try? c.decodeIfPresent(String.self, forKey: .website)
+        tradeCategory = try? c.decodeIfPresent(String.self, forKey: .tradeCategory)
+        confidence = try? c.decodeIfPresent(String.self, forKey: .confidence)
+        rawText = try? c.decodeIfPresent(String.self, forKey: .rawText)
+        parseError = try? c.decodeIfPresent(String.self, forKey: .parseError)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case ok, companyName, contactName, phone, email, website
+        case tradeCategory, confidence, rawText, parseError
+    }
+}
+
+/// Wave M10 — response from `create_contractor_from_card`. Mirrors the
+/// homeowner-side `contractors` row shape so the iOS UI can show "Saved
+/// Acme Plumbing to Customer 4" with the right brand fields.
+struct HavenFieldCreatedContractorPayload: Decodable {
+    let ok: Bool
+    let contractor: HavenFieldCreatedContractor?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = (try? c.decodeIfPresent(Bool.self, forKey: .ok)) ?? false
+        contractor = try? c.decodeIfPresent(HavenFieldCreatedContractor.self, forKey: .contractor)
+    }
+
+    private enum CodingKeys: String, CodingKey { case ok, contractor }
+}
+
+struct HavenFieldCreatedContractor: Decodable, Identifiable {
+    let id: String
+    let householdId: String
+    let companyName: String
+    let contactName: String?
+    let phone: String?
+    let email: String?
+    let website: String?
+    let specialties: [String]?
+    let source: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? ""
+        companyName = (try? c.decodeIfPresent(String.self, forKey: .companyName)) ?? ""
+        contactName = try? c.decodeIfPresent(String.self, forKey: .contactName)
+        phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+        email = try? c.decodeIfPresent(String.self, forKey: .email)
+        website = try? c.decodeIfPresent(String.self, forKey: .website)
+        specialties = try? c.decodeIfPresent([String].self, forKey: .specialties)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, phone, email, website, specialties, source
+        case householdId = "household_id"
+        case companyName = "company_name"
+        case contactName = "contact_name"
+    }
+}
+
 actor HavenFieldService {
     static let shared = HavenFieldService()
 
@@ -2224,6 +2587,118 @@ actor HavenFieldService {
         let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, requestId: requestId))
         let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
         return (response.assignment, response.totalSeconds ?? 0)
+    }
+
+    // MARK: - Wave M9 visit edge cases
+
+    /// Wave M9 — append a workspace member to the visit's co-tech
+    /// roster. Server validates membership in the same workspace + non-
+    /// duplication. Returns the updated assignment so the local view
+    /// state can pick up the new id without a full dashboard reload.
+    func addCoTech(
+        workspaceId: String,
+        requestId: String,
+        memberId: String
+    ) async throws -> HavenFieldVisitAssignment {
+        struct Request: Encodable {
+            let action = "add_co_tech"
+            let workspaceId: String
+            let requestId: String
+            let memberId: String
+        }
+        struct Response: Decodable {
+            let assignment: HavenFieldVisitAssignment
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            memberId: memberId
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return response.assignment
+    }
+
+    /// Wave M9 — capture entry method + free-form notes (lockbox code,
+    /// key location, door code, etc.). Saved on the assignment row so
+    /// dispatch + the operator can both read it.
+    func setAccessMethod(
+        workspaceId: String,
+        requestId: String,
+        method: String,
+        notes: String?
+    ) async throws -> HavenFieldVisitAssignment {
+        struct Request: Encodable {
+            let action = "set_access_method"
+            let workspaceId: String
+            let requestId: String
+            let method: String
+            let notes: String?
+        }
+        struct Response: Decodable {
+            let assignment: HavenFieldVisitAssignment
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            method: method,
+            notes: notes
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return response.assignment
+    }
+
+    /// Wave M9 — end the running visit early. Closes any open pause
+    /// window so paused_seconds banks correctly, stamps the cancellation
+    /// reason, and (when partialState.scheduleFollowup is true) creates
+    /// a placeholder follow-up request linked to this one.
+    func cancelVisitMidStream(
+        workspaceId: String,
+        requestId: String,
+        reason: String,
+        scheduleFollowup: Bool,
+        proposedDate: Date?,
+        durationMinutes: Int
+    ) async throws -> (status: String, followupRequestId: String?) {
+        struct Partial: Encodable {
+            let scheduleFollowup: Bool
+            let proposedDate: String?
+            let durationMinutes: Int
+        }
+        struct Request: Encodable {
+            let action = "cancel_visit_mid_stream"
+            let workspaceId: String
+            let requestId: String
+            let reason: String
+            let partialState: Partial
+        }
+        struct ResponseRequest: Decodable {
+            let id: String?
+            let status: String?
+            let cancellationReason: String?
+            let cancelledAt: String?
+            let cancelledByMemberId: String?
+        }
+        struct Response: Decodable {
+            let request: ResponseRequest?
+            let followupRequestId: String?
+        }
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+
+        let partial = Partial(
+            scheduleFollowup: scheduleFollowup,
+            proposedDate: proposedDate.map(isoFormatter.string(from:)),
+            durationMinutes: durationMinutes
+        )
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            reason: reason,
+            partialState: partial
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
+        return (response.request?.status ?? "cancelled", response.followupRequestId)
     }
 
     // MARK: - Wave M4 kitchen-table close
@@ -2735,6 +3210,260 @@ actor HavenFieldService {
         let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, requestId: requestId))
         let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
         return response.notes
+    }
+
+    // MARK: - Wave M7 crew chat
+
+    /// Wave M7 — list every thread visible to the caller in the workspace,
+    /// each with the most recent message preview + unread count. Threads
+    /// are returned newest-created first; the iOS view re-sorts by last
+    /// message activity so the most recently active thread floats up.
+    func listCrewChatThreads(workspaceId: String) async throws -> [HavenFieldCrewChatThread] {
+        struct Request: Encodable {
+            let action = "list_threads"
+            let workspaceId: String
+        }
+        struct Response: Decodable {
+            let threads: [HavenFieldCrewChatThread]
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId))
+        let response = try await perform(
+            function: "crew-chat",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.threads
+    }
+
+    /// Wave M7 — send a single crew chat message. Sender member id is
+    /// stamped server-side from the auth JWT; we never trust the client
+    /// to claim a different sender.
+    func sendCrewChatMessage(
+        workspaceId: String,
+        threadId: String,
+        body: String,
+        attachments: [String] = []
+    ) async throws -> HavenFieldCrewChatMessage {
+        struct Request: Encodable {
+            let action = "send"
+            let workspaceId: String
+            let threadId: String
+            let body: String
+            let attachments: [String]
+        }
+        struct Response: Decodable {
+            let message: HavenFieldCrewChatMessage
+        }
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw URLError(.badURL) }
+        let data = try JSONEncoder().encode(
+            Request(
+                workspaceId: workspaceId,
+                threadId: threadId,
+                body: trimmed,
+                attachments: attachments
+            )
+        )
+        let response = try await perform(
+            function: "crew-chat",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.message
+    }
+
+    /// Wave M7 — append the caller's `member_id` to `read_by` on every
+    /// message in the thread. Idempotent — calling twice is a no-op.
+    func markCrewChatThreadRead(workspaceId: String, threadId: String) async throws {
+        struct Request: Encodable {
+            let action = "mark_read"
+            let workspaceId: String
+            let threadId: String
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, threadId: threadId))
+        try await perform(function: "crew-chat", method: "POST", body: data)
+    }
+
+    /// Wave M7 — create a new crew chat thread. `kind` is one of
+    /// `general` / `route_day` / `tech_pair`. memberIds is accepted by
+    /// the edge function but not yet persisted to a participants table —
+    /// every active workspace member sees every thread by RLS policy.
+    func createCrewChatThread(
+        workspaceId: String,
+        name: String?,
+        kind: String,
+        memberIds: [String]
+    ) async throws -> HavenFieldCrewChatThread {
+        struct Request: Encodable {
+            let action = "create_thread"
+            let workspaceId: String
+            let name: String?
+            let kind: String
+            let memberIds: [String]
+        }
+        struct Response: Decodable {
+            let thread: HavenFieldCrewChatThread
+        }
+        let normalizedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = try JSONEncoder().encode(
+            Request(
+                workspaceId: workspaceId,
+                name: (normalizedName?.isEmpty ?? true) ? nil : normalizedName,
+                kind: kind,
+                memberIds: memberIds
+            )
+        )
+        let response = try await perform(
+            function: "crew-chat",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.thread
+    }
+
+    /// Wave M7 — fetch raw `crew_chat_messages` rows for a thread via
+    /// PostgREST. The list_threads action returns only the last preview
+    /// per thread; the Crew tab thread view renders the full history.
+    /// RLS on `crew_chat_messages` gates by workspace via
+    /// `get_my_provider_workspace_ids()`, so the caller's session JWT is
+    /// the only auth boundary needed here.
+    func fetchCrewChatMessages(
+        workspaceId: String,
+        threadId: String
+    ) async throws -> [HavenFieldCrewChatMessage] {
+        // We can't compute author names from a single PostgREST query
+        // without `select=...,sender:provider_workspace_members(*)` and
+        // even then names get nested deep. Instead, fetch the message
+        // rows + the workspace's members in two parallel calls and join
+        // in memory. The roster is small (≤ 25 members per workspace
+        // per the largest fixture), so this is cheap.
+        async let messagesTask = fetchCrewChatMessageRows(threadId: threadId, workspaceId: workspaceId)
+        async let rosterTask = fetchWorkspaceMemberDirectory(workspaceId: workspaceId)
+        let messages = try await messagesTask
+        let roster = try await rosterTask
+
+        let nameById = Dictionary(uniqueKeysWithValues: roster.map { ($0.id, $0.displayName) })
+        return messages.map { row in
+            let displayName = nameById[row.senderMemberId] ?? row.senderName
+            return HavenFieldCrewChatMessage(
+                id: row.id,
+                threadId: row.threadId,
+                workspaceId: row.workspaceId ?? workspaceId,
+                senderMemberId: row.senderMemberId,
+                senderName: displayName,
+                body: row.body,
+                attachments: row.attachments,
+                readBy: row.readBy,
+                createdAt: row.createdAt
+            )
+        }
+    }
+
+    /// Internal helper for `fetchCrewChatMessages`. PostgREST GET
+    /// against the `crew_chat_messages` table directly; member-name
+    /// join is done after the fact in `fetchCrewChatMessages`.
+    private func fetchCrewChatMessageRows(
+        threadId: String,
+        workspaceId: String
+    ) async throws -> [HavenFieldCrewChatMessage] {
+        struct Row: Decodable {
+            let id: String
+            let thread_id: String
+            let workspace_id: String?
+            let sender_member_id: String
+            let body: String
+            let attachments: [String]?
+            let read_by: [String]?
+            let created_at: String?
+        }
+        var components = URLComponents(string: "\(AppConfig.Supabase.url)/rest/v1/crew_chat_messages")
+        components?.queryItems = [
+            URLQueryItem(name: "thread_id", value: "eq.\(threadId)"),
+            URLQueryItem(name: "workspace_id", value: "eq.\(workspaceId)"),
+            URLQueryItem(name: "select", value: "id,thread_id,workspace_id,sender_member_id,body,attachments,read_by,created_at"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+        if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        return rows.map { row in
+            HavenFieldCrewChatMessage(
+                id: row.id,
+                threadId: row.thread_id,
+                workspaceId: row.workspace_id,
+                senderMemberId: row.sender_member_id,
+                senderName: "Workspace member",
+                body: row.body,
+                attachments: row.attachments ?? [],
+                readBy: row.read_by ?? [],
+                createdAt: row.created_at
+            )
+        }
+    }
+
+    /// Wave M7 helper — pull every active workspace member for the new
+    /// thread sheet (member chip picker) and the message-render name
+    /// join. Defensive shape (no member shows up as empty string) so a
+    /// row that's missing full_name + email still renders something.
+    func fetchWorkspaceMemberDirectory(
+        workspaceId: String
+    ) async throws -> [HavenFieldCrewChatMember] {
+        struct Row: Decodable {
+            let id: String
+            let workspace_id: String?
+            let role: String?
+            let full_name: String?
+            let email: String?
+            let status: String?
+        }
+        var components = URLComponents(string: "\(AppConfig.Supabase.url)/rest/v1/provider_workspace_members")
+        components?.queryItems = [
+            URLQueryItem(name: "workspace_id", value: "eq.\(workspaceId)"),
+            URLQueryItem(name: "select", value: "id,workspace_id,role,full_name,email,status"),
+            URLQueryItem(name: "order", value: "full_name.asc"),
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+        if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        return rows.map { row in
+            HavenFieldCrewChatMember(
+                id: row.id,
+                role: row.role ?? "technician",
+                fullName: row.full_name?.trimmingCharacters(in: .whitespacesAndNewlines),
+                email: row.email,
+                status: row.status ?? "active"
+            )
+        }
     }
 
     /// Wave M1 — read the open pause window for this assignment, if any.
@@ -3447,6 +4176,114 @@ actor HavenFieldService {
         let data = try JSONEncoder().encode(Request(token: token, report: draft, coordinationAction: coordinationAction))
         return try await perform(function: "handyman-portal", method: "POST", body: data, expecting: HavenFieldPortalPayload.self)
     }
+
+    // MARK: - Wave M10 — Closest customer to me + business card AI
+
+    /// Wave M10 — fetch the workspace's customers sorted by distance
+    /// from the tech's current location. The server geocodes property
+    /// addresses via Nominatim (1/sec rate limit), so this call can
+    /// take up to ~12 seconds for a workspace with 10 customers — show
+    /// a skeleton while it's in flight.
+    func nearestCustomers(
+        workspaceId: String,
+        latitude: Double,
+        longitude: Double,
+        limit: Int
+    ) async throws -> HavenFieldNearbyCustomersPayload {
+        struct Request: Encodable {
+            let action = "nearest_customers"
+            let workspaceId: String
+            let latitude: Double
+            let longitude: Double
+            let limit: Int
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            latitude: latitude,
+            longitude: longitude,
+            limit: limit
+        ))
+        return try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldNearbyCustomersPayload.self
+        )
+    }
+
+    /// Wave M10 — extract structured business-card data via Claude
+    /// Vision. Returns nullable fields the iOS confirmation card can
+    /// edit before saving. Bytes arrive as base64 (UIImage → JPEG →
+    /// base64); the iOS caller is responsible for downsizing to a
+    /// sane width before sending.
+    func extractBusinessCard(
+        workspaceId: String,
+        imageBase64: String
+    ) async throws -> HavenFieldBusinessCardExtraction {
+        struct Request: Encodable {
+            let action = "extract_business_card"
+            let workspaceId: String
+            let imageBase64: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            imageBase64: imageBase64
+        ))
+        return try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldBusinessCardExtraction.self
+        )
+    }
+
+    /// Wave M10 — insert a `contractors` row from a business-card
+    /// capture. Workspace members can't INSERT directly into
+    /// `contractors` (RLS gate); the edge function bypasses RLS via
+    /// service-role after validating the workspace serves the target
+    /// household.
+    func createContractorFromCard(
+        workspaceId: String,
+        householdId: String,
+        companyName: String,
+        contactName: String?,
+        phone: String,
+        email: String?,
+        website: String?,
+        tradeCategory: String?,
+        notes: String?
+    ) async throws -> HavenFieldCreatedContractor? {
+        struct Request: Encodable {
+            let action = "create_contractor_from_card"
+            let workspaceId: String
+            let householdId: String
+            let companyName: String
+            let contactName: String?
+            let phone: String
+            let email: String?
+            let website: String?
+            let tradeCategory: String?
+            let notes: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            householdId: householdId,
+            companyName: companyName,
+            contactName: contactName,
+            phone: phone,
+            email: email,
+            website: website,
+            tradeCategory: tradeCategory,
+            notes: notes
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldCreatedContractorPayload.self
+        )
+        return response.contractor
+    }
 }
 
 @MainActor
@@ -3454,6 +4291,7 @@ final class HavenFieldViewModel: ObservableObject {
     enum RootTab: Hashable {
         case home
         case visits
+        case crew
         case clients
         case messages
     }
@@ -3865,6 +4703,19 @@ struct HavenFieldRootView: View {
                 Label("Visits", systemImage: "calendar")
             }
             .tag(HavenFieldViewModel.RootTab.visits)
+
+            NavigationStack {
+                // Wave M7 — intra-workspace messaging surface. Distinct
+                // from the Messages tab below (which is the
+                // customer-facing thread). Lives between Visits and
+                // Homes so route-day coordination chats sit next to
+                // the dispatch surface.
+                HavenFieldCrewTab(viewModel: viewModel)
+            }
+            .tabItem {
+                Label("Crew", systemImage: "person.2.wave.2.fill")
+            }
+            .tag(HavenFieldViewModel.RootTab.crew)
 
             NavigationStack {
                 HavenFieldClientsTab(viewModel: viewModel)
@@ -4558,6 +5409,10 @@ private struct FieldVisitDateGroup: Equatable {
 private struct HavenFieldClientsTab: View {
     @ObservedObject var viewModel: HavenFieldViewModel
     @State private var searchText: String = ""
+    /// Wave M10 — destination for the "Closest customer to me" map view.
+    @State private var showNearbyCustomers: Bool = false
+    /// Wave M10 — destination for the business-card capture flow.
+    @State private var showBusinessCardCapture: Bool = false
 
     private var sortedHomes: [HavenFieldHome] {
         (viewModel.dashboard?.homes ?? []).sorted {
@@ -4595,6 +5450,33 @@ private struct HavenFieldClientsTab: View {
                         .background(HavenColors.surface)
                         .overlay(Capsule().stroke(HavenColors.border, lineWidth: 1))
                         .clipShape(Capsule())
+                }
+
+                // Wave M10 — two side-by-side CTAs above the home list.
+                // "Closest customer" routes to the map view; "Add
+                // existing vendor" opens the business-card capture flow.
+                HStack(spacing: 10) {
+                    Button {
+                        showNearbyCustomers = true
+                    } label: {
+                        FieldClientsToolbarPill(
+                            icon: "location.fill",
+                            label: "Closest customer"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show closest customer to me")
+
+                    Button {
+                        showBusinessCardCapture = true
+                    } label: {
+                        FieldClientsToolbarPill(
+                            icon: "rectangle.stack.badge.plus",
+                            label: "Add existing vendor"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add existing vendor by business card")
                 }
 
                 if !sortedHomes.isEmpty {
@@ -4659,6 +5541,18 @@ private struct HavenFieldClientsTab: View {
         }
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showNearbyCustomers) {
+            FieldNearbyCustomersView(
+                workspaceId: viewModel.dashboard?.workspace?.id,
+                homes: sortedHomes
+            )
+        }
+        .sheet(isPresented: $showBusinessCardCapture) {
+            FieldBusinessCardCaptureView(
+                workspaceId: viewModel.dashboard?.workspace?.id,
+                homes: sortedHomes
+            )
+        }
     }
 
     private var homeCountLabel: String {
@@ -5852,6 +6746,80 @@ enum FieldPauseReason: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Wave M9 — entry method picker options. The wire-format value is the
+/// snake_case `code` (matches the server's `access_method` column +
+/// `M9_ACCESS_METHODS` allowlist on the edge function).
+enum FieldAccessMethod: String, CaseIterable, Identifiable {
+    case customerPresent = "customer_present"
+    case lockbox = "lockbox"
+    case keyUnderMat = "key_under_mat"
+    case doorCode = "door_code"
+
+    var id: String { rawValue }
+
+    var displayLabel: String {
+        switch self {
+        case .customerPresent: return "Customer present"
+        case .lockbox: return "Lockbox"
+        case .keyUnderMat: return "Key under mat"
+        case .doorCode: return "Door code"
+        }
+    }
+
+    /// Inline notes prompt — guides the tech on what to capture so the
+    /// next-day reader has actionable detail.
+    var notesPrompt: String {
+        switch self {
+        case .customerPresent: return "Optional. e.g. \"Side door, ring twice\""
+        case .lockbox: return "Lockbox code + location, e.g. \"Code 1234, side gate\""
+        case .keyUnderMat: return "Key location, e.g. \"Under flowerpot on porch\""
+        case .doorCode: return "Door code + which door, e.g. \"Garage door 5678\""
+        }
+    }
+
+    /// SF Symbol for the row icon + header chip.
+    var icon: String {
+        switch self {
+        case .customerPresent: return "person.fill"
+        case .lockbox: return "lock.fill"
+        case .keyUnderMat: return "key.fill"
+        case .doorCode: return "number.square.fill"
+        }
+    }
+
+    /// True when this method needs notes to be useful at all (lockbox
+    /// code, key location, door code). `customer_present` is the only
+    /// method where empty notes is a sensible default.
+    var requiresNotes: Bool {
+        switch self {
+        case .customerPresent: return false
+        case .lockbox, .keyUnderMat, .doorCode: return true
+        }
+    }
+}
+
+/// Wave M9 — mid-stream cancellation reason picker options. Wire format
+/// matches the server's `M9_CANCEL_REASONS` allowlist; "Other" sends
+/// the free-form text the tech typed in `body.reason` so the audit
+/// message reads naturally.
+enum FieldCancelReason: String, CaseIterable, Identifiable {
+    case weather = "weather"
+    case customerCancelled = "customer_cancelled"
+    case techEmergency = "tech_emergency"
+    case other = "other"
+
+    var id: String { rawValue }
+
+    var displayLabel: String {
+        switch self {
+        case .weather: return "Weather"
+        case .customerCancelled: return "Customer cancelled"
+        case .techEmergency: return "Tech emergency"
+        case .other: return "Other"
+        }
+    }
+}
+
 /// Wave M1 — open pause window decoded from PostgREST. Resilient
 /// decoder so a future column drift doesn't take down the whole array.
 struct HavenFieldOpenPause: Codable, Identifiable, Hashable {
@@ -5976,6 +6944,38 @@ private struct HavenFieldVisitWorkspaceView: View {
     /// Pre-fill payload returned by convert_visit_to_invoice. Cached
     /// so a re-open doesn't re-fire the network call.
     @State private var invoiceDraftPayload: HavenFieldInvoiceDraftPayload?
+
+    // MARK: Wave M9 visit edge cases state
+
+    /// Workspace member roster used by the co-tech picker. Loaded once
+    /// per workspace via `fetchWorkspaceMemberDirectory` (the same
+    /// helper M7's chat thread sheet uses, kept in one place to avoid
+    /// double-fetching).
+    @State private var workspaceMemberRoster: [HavenFieldCrewChatMember] = []
+    /// True while the co-tech picker sheet is presented.
+    @State private var showCoTechPicker = false
+    /// True while the access-method sheet is presented.
+    @State private var showAccessMethodSheet = false
+    /// In-progress access-method draft (one of customer_present, lockbox,
+    /// key_under_mat, door_code) + free-form notes for the lockbox
+    /// code, key location, etc.
+    @State private var accessMethodDraft: String = "customer_present"
+    @State private var accessNotesDraft: String = ""
+    @State private var accessMethodSubmitting: Bool = false
+    @State private var accessMethodError: String?
+    /// True while the mid-stream cancel sheet is presented. Shown only
+    /// while the visit is in the `.running` lifecycle state.
+    @State private var showCancelMidStreamSheet = false
+    @State private var cancelReason: FieldCancelReason = .weather
+    @State private var cancelOtherText: String = ""
+    @State private var cancelScheduleFollowup: Bool = true
+    @State private var cancelSubmitting: Bool = false
+    @State private var cancelValidationError: String?
+    @State private var cancelGenericError: String?
+    /// In flight while a co-tech add is round-tripping. Drives row
+    /// dimming on the picker sheet without locking out the lifecycle bar.
+    @State private var coTechSyncing: Bool = false
+    @State private var coTechError: String?
 
     // MARK: Wave M8 end-of-visit suggestion authoring state
 
@@ -6334,6 +7334,64 @@ private struct HavenFieldVisitWorkspaceView: View {
             )
             .interactiveDismissDisabled(false)
         }
+        // Wave M9 — co-tech picker. Workspace-member roster loaded
+        // lazily from the existing M7 fetch helper.
+        .sheet(isPresented: $showCoTechPicker) {
+            FieldCoTechPickerSheet(
+                primaryMemberId: resolvedAssignment?.memberId,
+                alreadyCoTechIds: resolvedAssignment?.coTechMemberIds ?? [],
+                roster: workspaceMemberRoster,
+                isLoadingRoster: workspaceMemberRoster.isEmpty && coTechSyncing,
+                isSubmitting: coTechSyncing,
+                errorMessage: coTechError,
+                onSelect: { member in
+                    Task { await addCoTech(memberId: member.id) }
+                },
+                onClose: {
+                    showCoTechPicker = false
+                    coTechError = nil
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        // Wave M9 — access method sheet (lockbox / key location /
+        // door code).
+        .sheet(isPresented: $showAccessMethodSheet) {
+            FieldAccessMethodSheet(
+                method: $accessMethodDraft,
+                notes: $accessNotesDraft,
+                isSubmitting: accessMethodSubmitting,
+                errorMessage: accessMethodError,
+                onSave: {
+                    Task { await saveAccessMethod() }
+                },
+                onClose: {
+                    showAccessMethodSheet = false
+                    accessMethodError = nil
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        // Wave M9 — mid-stream cancellation.
+        .sheet(isPresented: $showCancelMidStreamSheet) {
+            FieldCancelMidStreamSheet(
+                reason: $cancelReason,
+                otherText: $cancelOtherText,
+                scheduleFollowup: $cancelScheduleFollowup,
+                isSubmitting: cancelSubmitting,
+                validationError: cancelValidationError,
+                genericError: cancelGenericError,
+                onSubmit: {
+                    Task { await cancelVisitMidStream() }
+                },
+                onClose: {
+                    showCancelMidStreamSheet = false
+                    cancelValidationError = nil
+                    cancelGenericError = nil
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
         .confirmationDialog(
             "Decline this visit?",
             isPresented: $showDeclineConfirmation,
@@ -6347,6 +7405,157 @@ private struct HavenFieldVisitWorkspaceView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The homeowner will be notified that you can't take this visit. You can leave them a note from Messages first if you want to explain.")
+        }
+    }
+
+    // MARK: - Wave M9 action handlers
+
+    /// Lazy fetch the workspace member roster on first access (when the
+    /// co-tech picker opens). Cached for the lifetime of this view.
+    private func loadWorkspaceMembersIfNeeded() async {
+        guard workspaceMemberRoster.isEmpty,
+              let workspaceId = viewModel.workspaceId,
+              !workspaceId.isEmpty else { return }
+        coTechSyncing = true
+        defer { coTechSyncing = false }
+        do {
+            let members = try await HavenFieldService.shared.fetchWorkspaceMemberDirectory(workspaceId: workspaceId)
+            workspaceMemberRoster = members
+        } catch {
+            coTechError = "Couldn't load workspace members."
+            print("[HavenFieldVisitWorkspaceView] loadWorkspaceMembersIfNeeded failed: \(error)")
+        }
+    }
+
+    private func addCoTech(memberId: String) async {
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            coTechError = "Workspace not loaded yet."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            coTechError = "Visit identifier missing."
+            return
+        }
+
+        coTechError = nil
+        coTechSyncing = true
+        defer { coTechSyncing = false }
+
+        do {
+            let assignment = try await HavenFieldService.shared.addCoTech(
+                workspaceId: workspaceId,
+                requestId: requestId,
+                memberId: memberId
+            )
+            lifecycleAssignment = assignment
+            // Refresh the parent dashboard so other surfaces (Today
+            // tile, Operations Desk via cross-app sync) pick up the
+            // change.
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+            // Close the picker on success — leaves the user in the
+            // visit detail with the new chip rendered.
+            showCoTechPicker = false
+        } catch {
+            coTechError = friendlyServerError(from: error, fallback: "Couldn't add co-tech.")
+        }
+    }
+
+    private func saveAccessMethod() async {
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            accessMethodError = "Workspace not loaded yet."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            accessMethodError = "Visit identifier missing."
+            return
+        }
+
+        let method = FieldAccessMethod(rawValue: accessMethodDraft) ?? .customerPresent
+        let trimmedNotes = accessNotesDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // C1 — every access method that needs notes (lockbox, key,
+        // door code) fires a visible validation when notes are empty.
+        if method.requiresNotes && trimmedNotes.isEmpty {
+            accessMethodError = "Add the \(method.displayLabel.lowercased()) details so the next tech knows."
+            return
+        }
+
+        accessMethodError = nil
+        accessMethodSubmitting = true
+        defer { accessMethodSubmitting = false }
+
+        do {
+            let assignment = try await HavenFieldService.shared.setAccessMethod(
+                workspaceId: workspaceId,
+                requestId: requestId,
+                method: method.rawValue,
+                notes: trimmedNotes.isEmpty ? nil : trimmedNotes
+            )
+            lifecycleAssignment = assignment
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+            showAccessMethodSheet = false
+        } catch {
+            accessMethodError = friendlyServerError(from: error, fallback: "Couldn't save access method.")
+        }
+    }
+
+    private func cancelVisitMidStream() async {
+        guard let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty else {
+            cancelGenericError = "Workspace not loaded yet."
+            return
+        }
+        let requestId = viewModel.visit.requestId
+        guard !requestId.isEmpty else {
+            cancelGenericError = "Visit identifier missing."
+            return
+        }
+
+        // C1 — empty "Other" text fires inline validation. Other reasons
+        // submit verbatim.
+        let reasonForRecord: String
+        if cancelReason == .other {
+            let trimmed = cancelOtherText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                cancelValidationError = "Tell the homeowner what happened."
+                return
+            }
+            reasonForRecord = trimmed
+        } else {
+            reasonForRecord = cancelReason.displayLabel
+        }
+
+        cancelValidationError = nil
+        cancelGenericError = nil
+        cancelSubmitting = true
+        defer { cancelSubmitting = false }
+
+        // Default proposed date for the follow-up: tomorrow 9 AM.
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        let proposedDate = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow)
+
+        do {
+            let result = try await HavenFieldService.shared.cancelVisitMidStream(
+                workspaceId: workspaceId,
+                requestId: requestId,
+                reason: reasonForRecord,
+                scheduleFollowup: cancelScheduleFollowup,
+                proposedDate: cancelScheduleFollowup ? proposedDate : nil,
+                durationMinutes: 60
+            )
+            // Local lifecycle override — close the running clock state
+            // so the UI flips to the cancelled annotation immediately
+            // without waiting for the dashboard refresh.
+            currentlyPausedAt = nil
+            // Refresh the parent dashboard so the cancellation +
+            // follow-up land on the Today list.
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+            showCancelMidStreamSheet = false
+            print("[HavenFieldVisitWorkspaceView] cancel_visit_mid_stream OK status=\(result.status) followup=\(result.followupRequestId ?? "none")")
+        } catch {
+            cancelGenericError = friendlyServerError(from: error, fallback: "Couldn't cancel the visit.")
         }
     }
 
@@ -6369,12 +7578,189 @@ private struct HavenFieldVisitWorkspaceView: View {
                 if let notes = viewModel.visit.assignment?.routeNotes, !notes.isEmpty {
                     FieldKeyValueRow(label: "Route notes", value: notes, inverse: true)
                 }
+
+                // Wave M9 — surface lockbox / non-customer-present access
+                // method as a salmon-tinted badge in the header (one of
+                // the load-bearing salmon usages allowed by Section 22
+                // B1 — the tech needs this context BEFORE walking up).
+                accessMethodHeaderBadge
+
+                // Wave M9 — mid-stream cancellation annotation. Renders
+                // only when the visit was cancelled mid-flight (M9-tagged
+                // columns populated, distinct from M5 pre-visit cancel).
+                cancelledStateHeaderAnnotation
+
                 Text(viewModel.syncMessage)
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textOnNavy.opacity(0.8))
 
                 actionRow
             }
+        }
+    }
+
+    /// Wave M9 — co-tech roster row + Add CTA. Renders inline in the
+    /// lifecycle section card. Empty state explains the value to
+    /// invite-curious techs without auto-presenting any UI.
+    @ViewBuilder
+    private var coTechSection: some View {
+        let coTechIds = (resolvedAssignment?.coTechMemberIds ?? [])
+        let coTechs: [HavenFieldCrewChatMember] = coTechIds.compactMap { id in
+            workspaceMemberRoster.first(where: { $0.id == id })
+        }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text("CO-TECH")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Button {
+                    Task { await loadWorkspaceMembersIfNeeded() }
+                    showCoTechPicker = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text(coTechs.isEmpty ? "Add co-tech" : "Add another")
+                            .font(HavenTypography.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityLabel("Add a co-tech to this visit")
+            }
+
+            if coTechs.isEmpty {
+                Text("Pair up with another tech to share punch-list check-off.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(coTechs) { member in
+                        HStack(spacing: 10) {
+                            FieldCoTechAvatar(initials: member.initials)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(member.displayName)
+                                    .font(HavenTypography.bodySmall.weight(.semibold))
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text(member.role.localizedCapitalized)
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            if let coTechError {
+                Text(coTechError)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.critical)
+            }
+        }
+        .padding(12)
+        .background(HavenColors.cream.opacity(0.4))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Wave M9 — lockbox / access method badge in the dark visit
+    /// header. Renders only when a non-default access method was set;
+    /// salmon-tinted to stand out against the indigo backdrop.
+    @ViewBuilder
+    private var accessMethodHeaderBadge: some View {
+        let methodRaw = resolvedAssignment?.accessMethod
+        let notes = resolvedAssignment?.accessNotes
+        if let methodRaw,
+           let method = FieldAccessMethod(rawValue: methodRaw),
+           method != .customerPresent {
+            Button {
+                accessMethodDraft = methodRaw
+                accessNotesDraft = notes ?? ""
+                accessMethodError = nil
+                showAccessMethodSheet = true
+            } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: method.icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                        .frame(width: 26, height: 26)
+                        .background(HavenColors.action.opacity(0.18))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Access: \(method.displayLabel)")
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                            .foregroundStyle(HavenColors.textOnNavy)
+                        if let notes, !notes.isEmpty {
+                            Text(notes)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textOnNavy.opacity(0.85))
+                                .multilineTextAlignment(.leading)
+                        } else {
+                            Text("Tap to add lockbox or key details")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
+                }
+                .padding(12)
+                .background(HavenColors.action.opacity(0.16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(HavenColors.action.opacity(0.5), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .frame(minHeight: 44)
+            .accessibilityLabel("Access method: \(method.displayLabel). Tap to edit.")
+        }
+    }
+
+    /// Wave M9 — cancelled-state header annotation. Renders only when
+    /// the visit was cancelled mid-flight (M9-tagged cancellation_reason
+    /// + cancelled_at columns populated). Distinct from the M5 pre-visit
+    /// homeowner cancel path.
+    @ViewBuilder
+    private var cancelledStateHeaderAnnotation: some View {
+        if viewModel.visit.status == "cancelled",
+           let cancelledAtIso = viewModel.visit.cancelledAt,
+           let cancelledAt = parseISODate(cancelledAtIso) {
+            let reason = viewModel.visit.cancellationReason ?? ""
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "xmark.octagon.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(HavenColors.critical)
+                    .frame(width: 26, height: 26)
+                    .background(HavenColors.critical.opacity(0.18))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Cancelled mid-visit at \(timeOfDayString(cancelledAt))")
+                        .font(HavenTypography.uiLabel.weight(.semibold))
+                        .foregroundStyle(HavenColors.textOnNavy)
+                    if !reason.isEmpty {
+                        Text("Reason: \(reason)")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textOnNavy.opacity(0.85))
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .background(HavenColors.critical.opacity(0.18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(HavenColors.critical.opacity(0.45), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -6444,8 +7830,60 @@ private struct HavenFieldVisitWorkspaceView: View {
                 }
 
                 lifecycleButtonRow
+
+                // Wave M9 — co-tech section + access tile. Both render
+                // for every lifecycle state (techs may want to set
+                // access pre-arrival or pair up before clock-in too).
+                Divider()
+                    .background(HavenColors.border)
+                coTechSection
+                accessMethodTile
             }
         }
+    }
+
+    /// Wave M9 — access method tile inside the lifecycle section. Tap
+    /// opens the same sheet the header badge opens. Renders ALWAYS so
+    /// the tech can set access pre-visit (door code captured before
+    /// arrival) or edit it post-arrival.
+    @ViewBuilder
+    private var accessMethodTile: some View {
+        let methodRaw = resolvedAssignment?.accessMethod ?? "customer_present"
+        let method = FieldAccessMethod(rawValue: methodRaw) ?? .customerPresent
+        let notes = resolvedAssignment?.accessNotes
+        Button {
+            accessMethodDraft = methodRaw
+            accessNotesDraft = notes ?? ""
+            accessMethodError = nil
+            showAccessMethodSheet = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: method.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ACCESS METHOD")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Text(method == .customerPresent && (notes?.isEmpty ?? true)
+                         ? "Customer present (default). Tap to edit."
+                         : (method.displayLabel + ((notes?.isEmpty ?? true) ? "" : " • \(notes ?? "")")))
+                        .font(HavenTypography.bodySmall.weight(.semibold))
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            .padding(12)
+            .background(HavenColors.cream.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityLabel("Access method: \(method.displayLabel). Tap to change.")
     }
 
     @ViewBuilder
@@ -6502,27 +7940,56 @@ private struct HavenFieldVisitWorkspaceView: View {
                 }
             }
         case .running:
-            HStack(spacing: 10) {
-                Button("Pause") {
-                    pauseReason = .lunch
-                    pauseOtherText = ""
-                    pauseValidationError = nil
-                    showPauseSheet = true
-                }
-                .buttonStyle(FieldSecondaryButtonStyle())
-                .disabled(lifecycleSyncing)
-
-                Button {
-                    Task { await completeLifecycle() }
-                } label: {
-                    if lifecycleSyncing {
-                        ProgressView().tint(HavenColors.textOnAction)
-                    } else {
-                        Text("Complete")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Button("Pause") {
+                        pauseReason = .lunch
+                        pauseOtherText = ""
+                        pauseValidationError = nil
+                        showPauseSheet = true
                     }
+                    .buttonStyle(FieldSecondaryButtonStyle())
+                    .disabled(lifecycleSyncing)
+
+                    Button {
+                        Task { await completeLifecycle() }
+                    } label: {
+                        if lifecycleSyncing {
+                            ProgressView().tint(HavenColors.textOnAction)
+                        } else {
+                            Text("Complete")
+                        }
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                    .disabled(lifecycleSyncing)
                 }
-                .buttonStyle(FieldPrimaryButtonStyle())
+
+                // Wave M9 — "End visit early" link. Salmon-tinted text
+                // (one of the load-bearing salmon usages allowed by
+                // Section 22 B1 — clearly destructive action that needs
+                // attention) but rendered as a flat text button so it
+                // doesn't compete with the primary Complete CTA above.
+                Button {
+                    cancelReason = .weather
+                    cancelOtherText = ""
+                    cancelScheduleFollowup = true
+                    cancelValidationError = nil
+                    cancelGenericError = nil
+                    showCancelMidStreamSheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark.octagon")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("End visit early")
+                            .font(HavenTypography.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(HavenColors.action)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
                 .disabled(lifecycleSyncing)
+                .accessibilityLabel("End visit early. Opens cancellation reason picker.")
             }
         case .paused:
             HStack(spacing: 10) {
@@ -9026,9 +10493,15 @@ private struct HavenFieldTabBar: View {
     @Binding var selectedTab: HavenFieldViewModel.RootTab
 
     var body: some View {
-        HStack(spacing: 10) {
+        // Wave M7 — five-tab bar (was four pre-M7). The new "Crew"
+        // affordance sits between Visits and Homes so route-day
+        // coordination chats live next to the dispatch surface.
+        // Spacing tightened from 10pt to 6pt to keep all five
+        // pills inside the capsule on iPhone SE viewports.
+        HStack(spacing: 6) {
             tabButton(tab: .home, icon: "square.grid.2x2.fill", label: "Overview")
             tabButton(tab: .visits, icon: "calendar.badge.clock", label: "Visits")
+            tabButton(tab: .crew, icon: "person.2.wave.2.fill", label: "Crew")
             tabButton(tab: .clients, icon: "house.fill", label: "Homes")
             tabButton(tab: .messages, icon: "bubble.left.and.bubble.right.fill", label: "Messages")
         }
@@ -10788,6 +12261,435 @@ private struct HavenFieldRescheduleSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Wave M9 visit edge cases (co-tech + access method + cancel)
+
+/// Wave M9 — small avatar bubble used in the co-tech roster row + the
+/// add-co-tech picker. Displays initials over a navy disc.
+private struct FieldCoTechAvatar: View {
+    let initials: String
+    var body: some View {
+        Text(initials)
+            .font(HavenTypography.caption.weight(.semibold))
+            .foregroundStyle(HavenColors.textOnNavy)
+            .frame(width: 32, height: 32)
+            .background(HavenColors.navy700)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+}
+
+/// Wave M9 — "Add co-tech" picker. Lists every active workspace
+/// member except the primary tech and any already-added co-techs.
+/// Tap a row → calls `add_co_tech` action. Sheet closes on success.
+private struct FieldCoTechPickerSheet: View {
+    let primaryMemberId: String?
+    let alreadyCoTechIds: [String]
+    let roster: [HavenFieldCrewChatMember]
+    let isLoadingRoster: Bool
+    let isSubmitting: Bool
+    let errorMessage: String?
+    let onSelect: (HavenFieldCrewChatMember) -> Void
+    let onClose: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var eligible: [HavenFieldCrewChatMember] {
+        roster.filter { member in
+            member.id != primaryMemberId &&
+            !alreadyCoTechIds.contains(member.id) &&
+            member.status == "active"
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("Pair up with another tech to share punch-list check-off on this visit. Both techs can mark items done.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    if let errorMessage {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(HavenColors.action)
+                            Text(errorMessage)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(HavenColors.action.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    if isLoadingRoster {
+                        VStack(spacing: 10) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .fill(HavenColors.cream)
+                                        .frame(width: 32, height: 32)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Rectangle()
+                                            .fill(HavenColors.cream)
+                                            .frame(width: 140, height: 12)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        Rectangle()
+                                            .fill(HavenColors.cream)
+                                            .frame(width: 80, height: 10)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    }
+                                    Spacer()
+                                }
+                                .padding(12)
+                                .background(HavenColors.cream.opacity(0.4))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
+                    } else if eligible.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("No teammates to add")
+                                .font(HavenTypography.bodySmall.weight(.semibold))
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text(roster.isEmpty
+                                 ? "Couldn't load workspace members. Check your connection."
+                                 : "Every active workspace member is already on this visit, or no one else is active.")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(HavenColors.cream.opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(eligible) { member in
+                                Button {
+                                    onSelect(member)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        FieldCoTechAvatar(initials: member.initials)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(member.displayName)
+                                                .font(HavenTypography.body.weight(.semibold))
+                                                .foregroundStyle(HavenColors.textPrimary)
+                                            Text(member.role.localizedCapitalized)
+                                                .font(HavenTypography.caption)
+                                                .foregroundStyle(HavenColors.textSecondary)
+                                        }
+                                        Spacer()
+                                        if isSubmitting {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        } else {
+                                            Image(systemName: "plus.circle.fill")
+                                                .font(.system(size: 18, weight: .semibold))
+                                                .foregroundStyle(HavenColors.navy700)
+                                        }
+                                    }
+                                    .padding(12)
+                                    .background(HavenColors.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(HavenColors.border, lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isSubmitting)
+                                .frame(minHeight: 44)
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Add co-tech")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        onClose()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+        }
+    }
+}
+
+/// Wave M9 — access method picker. Choose entry method + free-form
+/// notes; Save round-trips through `set_access_method`.
+private struct FieldAccessMethodSheet: View {
+    @Binding var method: String
+    @Binding var notes: String
+    let isSubmitting: Bool
+    let errorMessage: String?
+    let onSave: () -> Void
+    let onClose: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var resolvedMethod: FieldAccessMethod {
+        FieldAccessMethod(rawValue: method) ?? .customerPresent
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("How will you get into the home?")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(FieldAccessMethod.allCases) { option in
+                            Button {
+                                method = option.rawValue
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: option == resolvedMethod ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(option == resolvedMethod ? HavenColors.action : HavenColors.textSecondary)
+                                    Image(systemName: option.icon)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Text(option.displayLabel)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .background(option == resolvedMethod ? HavenColors.action.opacity(0.08) : HavenColors.surface)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(option == resolvedMethod ? HavenColors.action : HavenColors.border, lineWidth: 1)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .frame(minHeight: 44)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(resolvedMethod.requiresNotes ? "Notes (required)" : "Notes (optional)")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        TextField(resolvedMethod.notesPrompt, text: $notes, axis: .vertical)
+                            .lineLimit(2...4)
+                            .textInputAutocapitalization(.sentences)
+                            .padding(12)
+                            .background(HavenColors.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+
+                    Button {
+                        onSave()
+                    } label: {
+                        if isSubmitting {
+                            HStack(spacing: 8) {
+                                ProgressView().tint(HavenColors.textOnAction)
+                                Text("Saving...")
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            Text("Save access method")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                    .disabled(isSubmitting)
+                }
+                .padding(20)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Access method")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") {
+                        onClose()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+        }
+    }
+}
+
+/// Wave M9 — mid-stream cancel sheet. Reason picker + optional
+/// "Other" free-form text + schedule-follow-up toggle. Submit calls
+/// `cancel_visit_mid_stream` and the parent dismisses on success.
+private struct FieldCancelMidStreamSheet: View {
+    @Binding var reason: FieldCancelReason
+    @Binding var otherText: String
+    @Binding var scheduleFollowup: Bool
+    let isSubmitting: Bool
+    let validationError: String?
+    let genericError: String?
+    let onSubmit: () -> Void
+    let onClose: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("Why are you ending the visit?")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+
+                    Text("We'll close the running clock, save what you've already captured, and let the homeowner know in their thread.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(FieldCancelReason.allCases) { option in
+                            Button {
+                                reason = option
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: option == reason ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(option == reason ? HavenColors.action : HavenColors.textSecondary)
+                                    Text(option.displayLabel)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .background(option == reason ? HavenColors.action.opacity(0.08) : HavenColors.surface)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(option == reason ? HavenColors.action : HavenColors.border, lineWidth: 1)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .frame(minHeight: 44)
+                        }
+                    }
+
+                    if reason == .other {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Tell the homeowner what happened")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            TextField("e.g. car trouble, returning tomorrow", text: $otherText, axis: .vertical)
+                                .lineLimit(2...4)
+                                .textInputAutocapitalization(.sentences)
+                                .padding(12)
+                                .background(HavenColors.surface)
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+
+                    Toggle(isOn: $scheduleFollowup) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Schedule a follow-up visit")
+                                .font(HavenTypography.body.weight(.semibold))
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Creates a placeholder request the homeowner can confirm.")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: HavenColors.action))
+                    .padding(12)
+                    .background(HavenColors.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    if let validationError {
+                        Text(validationError)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    if let genericError {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(HavenColors.action)
+                            Text(genericError)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(HavenColors.action.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    // Critical-tinted Cancel CTA — visit cancellation
+                    // is destructive, so the primary action uses the
+                    // critical color (per Section 22 B1: action salmon
+                    // is for primary CTAs and load-bearing alerts; the
+                    // cancel button itself is critical = red).
+                    Button {
+                        onSubmit()
+                    } label: {
+                        if isSubmitting {
+                            HStack(spacing: 8) {
+                                ProgressView().tint(HavenColors.textOnAction)
+                                Text("Cancelling...")
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            Text("Cancel this visit")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(FieldCriticalButtonStyle())
+                    .disabled(isSubmitting)
+                }
+                .padding(20)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("End visit early")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Keep going") {
+                        onClose()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+        }
+    }
+}
+
+/// Wave M9 — critical-tinted button style for destructive actions.
+/// Mirrors `FieldPrimaryButtonStyle` but with `HavenColors.critical`
+/// as the fill so cancellation reads as destructive at first glance.
+private struct FieldCriticalButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(HavenTypography.body.weight(.semibold))
+            .foregroundStyle(HavenColors.textOnAction)
+            .frame(minHeight: 50)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 18)
+            .background(HavenColors.critical)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
     }
 }
 
@@ -14274,6 +16176,832 @@ private struct HavenFieldCameraPicker: UIViewControllerRepresentable {
             dismiss()
         }
     }
+}
+
+// MARK: - Wave M10 — Closest customer + business card capture
+
+/// Wave M10 — pill button used in the Homes tab toolbar row to surface
+/// the two new flows. Matches the muted-chip aesthetic of FieldPunch's
+/// chip bar so the row doesn't compete with the salmon CTAs elsewhere.
+private struct FieldClientsToolbarPill: View {
+    let icon: String
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HavenColors.textPrimary)
+            Text(label)
+                .font(HavenTypography.uiButton)
+                .foregroundStyle(HavenColors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .padding(.horizontal, 12)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+/// Wave M10 — "Closest customer to me." Geolocates the tech, calls
+/// nearest_customers, renders a top-half map + bottom-half sortable
+/// list. Tap a row to recenter the map on that customer's pin.
+struct FieldNearbyCustomersView: View {
+    let workspaceId: String?
+    let homes: [HavenFieldHome]
+
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var model = FieldNearbyCustomersModel()
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if let error = model.errorMessage {
+                    Text(error)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(HavenColors.critical.opacity(0.08))
+                }
+
+                mapPane
+                    .frame(maxWidth: .infinity)
+                    .frame(height: UIScreen.main.bounds.height * 0.42)
+
+                Divider()
+                listPane
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Closest customer")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .task {
+                guard let workspaceId else { return }
+                await model.loadIfNeeded(workspaceId: workspaceId)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mapPane: some View {
+        switch model.stage {
+        case .idle, .askingPermission, .locating, .loading:
+            mapPlaceholder(message: model.stageMessage)
+        case .denied:
+            mapPlaceholder(message: "Allow location access to find customers near you.")
+        case .empty:
+            mapPlaceholder(message: model.note ?? "No customers with mappable addresses yet.")
+        case .ready:
+            customerMap
+        case .error:
+            mapPlaceholder(message: model.errorMessage ?? "Something went wrong.")
+        }
+    }
+
+    private var customerMap: some View {
+        Map(position: $model.cameraPosition) {
+            UserAnnotation()
+            ForEach(model.customers) { customer in
+                Marker(
+                    customer.customerName.isEmpty ? "Customer" : customer.customerName,
+                    systemImage: "house.fill",
+                    coordinate: CLLocationCoordinate2D(
+                        latitude: customer.latitude,
+                        longitude: customer.longitude
+                    )
+                )
+                .tint(HavenColors.action)
+            }
+        }
+        .mapStyle(.standard(elevation: .flat))
+        .mapControls {
+            MapUserLocationButton()
+            MapCompass()
+        }
+    }
+
+    private func mapPlaceholder(message: String) -> some View {
+        ZStack {
+            HavenColors.surface
+            VStack(spacing: 14) {
+                if model.stage == .askingPermission || model.stage == .locating || model.stage == .loading {
+                    ProgressView()
+                        .controlSize(.large)
+                }
+                Image(systemName: model.stage == .denied ? "location.slash.fill" : "map")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text(message)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                if model.stage == .denied {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("Open Settings")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(HavenColors.action)
+                } else if model.stage == .error {
+                    Button {
+                        Task { await model.retry(workspaceId: workspaceId) }
+                    } label: {
+                        Text("Retry")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(HavenColors.action)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var listPane: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if !model.customers.isEmpty {
+                    HStack {
+                        Text("\(model.customers.count) nearby")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .textCase(.uppercase)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                    ForEach(model.customers) { customer in
+                        Button {
+                            model.recenter(on: customer)
+                        } label: {
+                            FieldNearbyCustomerRow(customer: customer)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else if model.stage == .ready || model.stage == .empty {
+                    FieldEmptyState(
+                        title: "No customers found nearby",
+                        subtitle: model.note ?? "Customers with addresses on file will appear here."
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                }
+            }
+            .padding(.bottom, 24)
+        }
+    }
+}
+
+/// Wave M10 — list row for one nearby customer. Distance pill is on
+/// the right; tapping recenters the map. Future iteration could push
+/// to the home profile when the home is in the dashboard's home list.
+private struct FieldNearbyCustomerRow: View {
+    let customer: HavenFieldNearbyCustomer
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(HavenColors.action.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "house.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(customer.customerName.isEmpty ? "Customer" : customer.customerName)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(1)
+                Text(customer.address)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Text(distanceLabel)
+                .font(HavenTypography.uiLabelSmall)
+                .foregroundStyle(HavenColors.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(HavenColors.surface)
+                .overlay(Capsule().stroke(HavenColors.border, lineWidth: 1))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 16)
+    }
+
+    private var distanceLabel: String {
+        let miles = Double(customer.distanceMeters) * 0.0006213712
+        if miles < 0.1 { return "<0.1 mi" }
+        if miles < 10 { return String(format: "%.1f mi", miles) }
+        return "\(Int(miles.rounded())) mi"
+    }
+}
+
+/// Wave M10 — view-model for the closest-customer flow. Owns the
+/// CLLocation capture, the edge-fn call, and the map camera position
+/// so the View can stay declarative.
+@MainActor
+final class FieldNearbyCustomersModel: ObservableObject {
+    enum Stage: Equatable { case idle, askingPermission, locating, loading, denied, ready, empty, error }
+
+    @Published var stage: Stage = .idle
+    @Published var customers: [HavenFieldNearbyCustomer] = []
+    @Published var note: String?
+    @Published var errorMessage: String?
+    @Published var cameraPosition: MapCameraPosition = .automatic
+    private var lastWorkspaceId: String?
+    private let locationCapture = FieldLocationCapture()
+
+    var stageMessage: String {
+        switch stage {
+        case .idle: return "Tap to start finding customers near you."
+        case .askingPermission: return "Allow location access to continue."
+        case .locating: return "Finding your location..."
+        case .loading: return "Looking up customer addresses..."
+        case .denied: return "Location access denied."
+        case .empty: return note ?? "No customers nearby yet."
+        case .ready: return ""
+        case .error: return errorMessage ?? "Something went wrong."
+        }
+    }
+
+    func loadIfNeeded(workspaceId: String) async {
+        if lastWorkspaceId == workspaceId && (stage == .ready || stage == .loading || stage == .locating) { return }
+        lastWorkspaceId = workspaceId
+        await runFlow(workspaceId: workspaceId)
+    }
+
+    func retry(workspaceId: String?) async {
+        guard let workspaceId else { return }
+        await runFlow(workspaceId: workspaceId)
+    }
+
+    func recenter(on customer: HavenFieldNearbyCustomer) {
+        let center = CLLocationCoordinate2D(latitude: customer.latitude, longitude: customer.longitude)
+        cameraPosition = .region(MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+        ))
+    }
+
+    private func runFlow(workspaceId: String) async {
+        errorMessage = nil
+        stage = .askingPermission
+
+        let location: CLLocation? = await withCheckedContinuation { continuation in
+            stage = .locating
+            locationCapture.capture { location in
+                continuation.resume(returning: location)
+            }
+        }
+
+        guard let location else {
+            stage = .denied
+            return
+        }
+
+        stage = .loading
+        do {
+            let payload = try await HavenFieldService.shared.nearestCustomers(
+                workspaceId: workspaceId,
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                limit: 10
+            )
+            customers = payload.customers
+            note = payload.note
+            if customers.isEmpty {
+                stage = .empty
+            } else {
+                stage = .ready
+                fitMapToCustomers(myLocation: location)
+            }
+        } catch {
+            stage = .error
+            errorMessage = "Couldn't load nearby customers. Try again in a moment."
+        }
+    }
+
+    private func fitMapToCustomers(myLocation: CLLocation) {
+        var lats: [Double] = [myLocation.coordinate.latitude]
+        var lngs: [Double] = [myLocation.coordinate.longitude]
+        for customer in customers {
+            lats.append(customer.latitude)
+            lngs.append(customer.longitude)
+        }
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return }
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2
+        )
+        // Pad span by 30% so pins aren't right at the edge of the map.
+        let latDelta = max(0.02, (maxLat - minLat) * 1.3)
+        let lngDelta = max(0.02, (maxLng - minLng) * 1.3)
+        cameraPosition = .region(MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lngDelta)
+        ))
+    }
+}
+
+/// Wave M10 — business-card capture flow. Camera-first, AI-extracted
+/// fields surface as an editable confirmation card; save inserts a
+/// new contractors row via the workspace-authed wrapper. Mirrors the
+/// M3 system-sweep aesthetic so the operator's mental model is "snap
+/// → confirm → save."
+struct FieldBusinessCardCaptureView: View {
+    let workspaceId: String?
+    let homes: [HavenFieldHome]
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var stage: Stage = .pickHome
+    @State private var selectedHomeId: String?
+    @State private var capturedImage: UIImage?
+    @State private var extraction: HavenFieldBusinessCardExtraction?
+    @State private var draftCompany: String = ""
+    @State private var draftContact: String = ""
+    @State private var draftPhone: String = ""
+    @State private var draftEmail: String = ""
+    @State private var draftWebsite: String = ""
+    @State private var draftCategory: String = ""
+    @State private var draftNotes: String = ""
+    @State private var savedContractor: HavenFieldCreatedContractor?
+    @State private var errorMessage: String?
+    @State private var isExtracting: Bool = false
+    @State private var isSaving: Bool = false
+    @State private var showCamera: Bool = false
+
+    enum Stage { case pickHome, ready, extracting, confirming, saving, saved }
+
+    private var selectedHome: HavenFieldHome? {
+        homes.first(where: { $0.id == selectedHomeId })
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(HavenColors.critical.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    switch stage {
+                    case .pickHome: pickHomeCard
+                    case .ready: readyCard
+                    case .extracting: extractingCard
+                    case .confirming: confirmingCard
+                    case .saving: savingCard
+                    case .saved: savedCard
+                    }
+                }
+                .padding(16)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Add existing vendor")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showCamera) {
+                HavenFieldCameraPicker { image in
+                    capturedImage = image
+                    Task { await runExtraction(image: image) }
+                }
+            }
+        }
+    }
+
+    private var pickHomeCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Which home is this vendor for?")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("The captured contact will be added to that homeowner's vendor directory.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            if homes.isEmpty {
+                FieldEmptyState(
+                    title: "No homes yet",
+                    subtitle: "Once you have at least one customer, you can capture their existing vendors here."
+                )
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(homes) { home in
+                        Button {
+                            selectedHomeId = home.id
+                            stage = .ready
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(home.name)
+                                        .font(HavenTypography.uiButton)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Text(home.address)
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 14)
+                            .background(HavenColors.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(HavenColors.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var readyCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Snap the business card")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+            if let home = selectedHome {
+                Text("For \(home.name)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            Text("Get the card flat in frame. We'll read the company, contact, phone, email, and trade automatically.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            Button {
+                resetDraft()
+                showCamera = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "camera.fill")
+                    Text("Open camera")
+                }
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+
+            #if DEBUG
+            Button {
+                resetDraft()
+                Task { await runExtractionWithSeed() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "wand.and.stars")
+                    Text("Use test image (debug)")
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(HavenColors.action)
+            #endif
+
+            Button("Choose a different home") {
+                stage = .pickHome
+            }
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.action)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var extractingCard: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Reading the card...")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var confirmingCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Confirm the contact")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+
+            if let confidence = extraction?.confidence {
+                Text("Confidence: \(confidence.capitalized)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                fieldRow(label: "Company", text: $draftCompany, required: true)
+                fieldRow(label: "Contact name", text: $draftContact)
+                fieldRow(label: "Phone", text: $draftPhone, required: true, keyboard: .phonePad)
+                fieldRow(label: "Email", text: $draftEmail, keyboard: .emailAddress)
+                fieldRow(label: "Website", text: $draftWebsite, keyboard: .URL)
+                fieldRow(label: "Trade", text: $draftCategory)
+                fieldRow(label: "Notes", text: $draftNotes)
+            }
+
+            HStack {
+                Button {
+                    showCamera = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Re-shoot")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .tint(HavenColors.action)
+
+                Spacer()
+
+                Button {
+                    Task { await saveContractor() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark")
+                        Text("Save vendor")
+                    }
+                }
+                .buttonStyle(FieldPrimaryButtonStyle(compact: true))
+                .disabled(!canSave)
+            }
+        }
+        .padding(16)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var savingCard: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Saving \(draftCompany.isEmpty ? "vendor" : draftCompany)...")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var savedCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.action.opacity(0.16))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(HavenColors.action)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Vendor saved")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if let saved = savedContractor {
+                        Text(saved.companyName)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+            }
+            if let home = selectedHome {
+                Text("Added to \(home.name)'s vendor directory.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            Button {
+                resetDraft()
+                stage = .ready
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Add another vendor")
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(HavenColors.action)
+        }
+        .padding(16)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func fieldRow(
+        label: String,
+        text: Binding<String>,
+        required: Bool = false,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Text(label.uppercased())
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                if required {
+                    Text("*")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.action)
+                }
+            }
+            TextField("", text: text, prompt: Text(label).foregroundStyle(HavenColors.textTertiary))
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+                .keyboardType(keyboard)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(label == "Company" || label == "Contact name" ? .words : .never)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(HavenColors.border, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private var canSave: Bool {
+        !draftCompany.trimmingCharacters(in: .whitespaces).isEmpty
+            && !draftPhone.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func resetDraft() {
+        capturedImage = nil
+        extraction = nil
+        draftCompany = ""
+        draftContact = ""
+        draftPhone = ""
+        draftEmail = ""
+        draftWebsite = ""
+        draftCategory = ""
+        draftNotes = ""
+        savedContractor = nil
+        errorMessage = nil
+    }
+
+    private func runExtraction(image: UIImage) async {
+        let downsized = downsizedJpegBase64(from: image)
+        await postExtraction(base64: downsized)
+    }
+
+    #if DEBUG
+    private func runExtractionWithSeed() async {
+        // Tiny valid JPEG. Same one Wave M3 uses for the simulator
+        // debug path — Claude returns a graceful "no card visible"
+        // which exercises the extract-then-fall-through path.
+        let onePixel = "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APvSiiiv/9k="
+        // Pre-fill so the simulator-side reviewer has fields to confirm.
+        await MainActor.run {
+            draftCompany = "Acme Plumbing & Heating"
+            draftContact = "John Smith"
+            draftPhone = "(203) 555-0142"
+            draftEmail = "john@acmeplumbingct.com"
+            draftWebsite = "acmeplumbingct.com"
+            draftCategory = "Plumbing"
+            draftNotes = "Captured via debug seed (simulator)"
+        }
+        await postExtraction(base64: onePixel)
+    }
+    #endif
+
+    private func downsizedJpegBase64(from image: UIImage) -> String {
+        let maxEdge: CGFloat = 1600
+        let size = image.size
+        let scale = min(1, maxEdge / max(size.width, size.height))
+        let target = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: target)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: target))
+        }
+        let data = resized.jpegData(compressionQuality: 0.82) ?? Data()
+        return data.base64EncodedString()
+    }
+
+    private func postExtraction(base64: String) async {
+        guard let workspaceId, !workspaceId.isEmpty else {
+            errorMessage = "Sign in to your workspace to capture vendors."
+            return
+        }
+        await MainActor.run {
+            stage = .extracting
+            isExtracting = true
+            errorMessage = nil
+        }
+        do {
+            let result = try await HavenFieldService.shared.extractBusinessCard(
+                workspaceId: workspaceId,
+                imageBase64: base64
+            )
+            await MainActor.run {
+                extraction = result
+                if draftCompany.isEmpty, let v = result.companyName { draftCompany = v }
+                if draftContact.isEmpty, let v = result.contactName { draftContact = v }
+                if draftPhone.isEmpty, let v = result.phone { draftPhone = v }
+                if draftEmail.isEmpty, let v = result.email { draftEmail = v }
+                if draftWebsite.isEmpty, let v = result.website { draftWebsite = v }
+                if draftCategory.isEmpty, let v = result.tradeCategory { draftCategory = v }
+                stage = .confirming
+                isExtracting = false
+                if let parseError = result.parseError {
+                    errorMessage = parseError
+                }
+            }
+        } catch {
+            await MainActor.run {
+                stage = .ready
+                isExtracting = false
+                errorMessage = "Couldn't read the card. Re-shoot or fill it in by hand."
+            }
+        }
+    }
+
+    private func saveContractor() async {
+        guard let workspaceId else { return }
+        guard let householdId = selectedHome?.householdId, !householdId.isEmpty else {
+            errorMessage = "This home doesn't have a household on file. Open the home profile first."
+            return
+        }
+        await MainActor.run {
+            stage = .saving
+            isSaving = true
+            errorMessage = nil
+        }
+        do {
+            let saved = try await HavenFieldService.shared.createContractorFromCard(
+                workspaceId: workspaceId,
+                householdId: householdId,
+                companyName: draftCompany.trimmingCharacters(in: .whitespaces),
+                contactName: draftContact.trimmingCharacters(in: .whitespaces).fieldNilIfEmpty,
+                phone: draftPhone.trimmingCharacters(in: .whitespaces),
+                email: draftEmail.trimmingCharacters(in: .whitespaces).fieldNilIfEmpty,
+                website: draftWebsite.trimmingCharacters(in: .whitespaces).fieldNilIfEmpty,
+                tradeCategory: draftCategory.trimmingCharacters(in: .whitespaces).fieldNilIfEmpty,
+                notes: draftNotes.trimmingCharacters(in: .whitespaces).fieldNilIfEmpty
+            )
+            await MainActor.run {
+                savedContractor = saved
+                isSaving = false
+                stage = .saved
+            }
+        } catch {
+            await MainActor.run {
+                isSaving = false
+                stage = .confirming
+                errorMessage = "Save failed. Try again or check your connection."
+            }
+        }
+    }
+}
+
+private extension String {
+    var fieldNilIfEmpty: String? { self.isEmpty ? nil : self }
 }
 
 private struct FieldPrimaryButtonStyle: ButtonStyle {

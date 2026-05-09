@@ -2362,6 +2362,12 @@ async function loadDashboard(
       // end-of-visit wizard. Operations Desk renders a "Suggested by
       // visit" pill so the operator knows the row was tech-driven.
       suggestedByRequestId: compactString(request.suggested_by_request_id) || null,
+      // Wave M9 — mid-stream cancellation context. Operations Desk's
+      // VisitDetail renders "Cancelled mid-visit at HH:MM, reason: ..."
+      // when status='cancelled' and these fields are populated.
+      cancellationReason: compactString(request.cancellation_reason) || null,
+      cancelledAt: request.cancelled_at ?? null,
+      cancelledByMemberId: compactString(request.cancelled_by_member_id) || null,
       proposedVisitAt: request.proposed_visit_at ?? null,
       proposedByRole: compactString(request.proposed_by_role) || null,
       proposedAt: request.proposed_at ?? null,
@@ -2430,6 +2436,14 @@ async function loadDashboard(
             // Surfaces a "N notes" badge on visit list rows so a tech
             // walking up to a job knows there's prior context to read.
             techNotesCount: techNotesCountByRequestId.get(requestId) ?? 0,
+            // Wave M9 — co-tech roster + access method/notes. iOS Field
+            // and Operations Desk both read these to render co-tech
+            // avatars + lockbox badges on the visit detail header.
+            coTechMemberIds: Array.isArray(assignment.co_tech_member_ids)
+              ? (assignment.co_tech_member_ids as unknown[]).map((v) => compactString(v)).filter(Boolean)
+              : [],
+            accessMethod: compactString(assignment.access_method) || null,
+            accessNotes: compactString(assignment.access_notes) || null,
           }
         : null,
       latestMessage: message
@@ -3705,6 +3719,15 @@ function serializeAssignment(row: Record<string, unknown>): Record<string, unkno
     clockInAccuracyM: row.clock_in_accuracy_m !== null && row.clock_in_accuracy_m !== undefined
       ? Number(row.clock_in_accuracy_m)
       : null,
+    // Wave M9 — visit edge cases. Co-tech roster + access method/notes
+    // round-trip on every assignment-shaped response so the iOS visit
+    // detail can render the co-tech avatars + lockbox badge without a
+    // separate fetch. Operations Desk reads the same fields.
+    coTechMemberIds: Array.isArray(row.co_tech_member_ids)
+      ? (row.co_tech_member_ids as unknown[]).map((v) => compactString(v)).filter(Boolean)
+      : [],
+    accessMethod: compactString(row.access_method) || null,
+    accessNotes: compactString(row.access_notes) || null,
   };
 }
 
@@ -4036,6 +4059,404 @@ async function completeVisitForProvider(
     : 0;
 
   return { assignment: serializeAssignment(updated), totalSeconds };
+}
+
+// MARK: - Wave M9 — visit edge cases (co-tech + access method + mid-stream cancel)
+//
+// Three small actions on top of M1's lifecycle. Each gates on
+// assertWorkspaceAccess + verifies the assignment for (workspace, request)
+// before mutating. Inserts a structured audit row on
+// handyman_request_messages so the operations desk + homeowner thread can
+// render the change inline.
+//
+// add_co_tech              — appends a member id to co_tech_member_ids.
+//                            Both members can check off punch items and
+//                            their identity is captured per check-off via
+//                            the existing punch-item update flow.
+// set_access_method        — captures customer_present | lockbox |
+//                            key_under_mat | door_code + free-form notes.
+// cancel_visit_mid_stream  — closes any open pause window, stamps
+//                            handyman_requests.status='cancelled' +
+//                            cancellation_reason + cancelled_at +
+//                            cancelled_by_member_id, and optionally
+//                            scheduled a placeholder follow-up visit.
+
+const M9_ACCESS_METHODS = new Set([
+  "customer_present",
+  "lockbox",
+  "key_under_mat",
+  "door_code",
+]);
+
+const M9_CANCEL_REASONS = new Set([
+  "weather",
+  "customer_cancelled",
+  "tech_emergency",
+  "other",
+]);
+
+async function addCoTechForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  const memberId = compactString(body.memberId);
+  if (!requestId) throw new Error("requestId is required");
+  if (!memberId) throw new Error("memberId is required");
+
+  // The candidate member must also belong to the same workspace. Stops a
+  // tech from accidentally adding a member from a different workspace
+  // (the autocomplete on the iOS side already filters, this is the
+  // server-side belt-and-suspenders).
+  const { data: memberRow, error: memberLookupErr } = await service
+    .from("provider_workspace_members")
+    .select("id, workspace_id, status, full_name, email")
+    .eq("id", memberId)
+    .maybeSingle();
+  if (memberLookupErr) throw memberLookupErr;
+  if (!memberRow) throw new Error("Co-tech member not found");
+  if (compactString(memberRow.workspace_id) !== workspaceId) {
+    throw new Error("Co-tech member is not in this workspace");
+  }
+  if (compactString(memberRow.status) !== "active") {
+    throw new Error("Co-tech member is not active");
+  }
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+
+  // Don't add the primary tech as a co-tech of themselves.
+  if (compactString(assignment.assigned_member_id) === memberId) {
+    throw new Error("This member is already the primary tech on the visit.");
+  }
+
+  const existing = Array.isArray(assignment.co_tech_member_ids)
+    ? (assignment.co_tech_member_ids as unknown[]).map((v) => compactString(v)).filter(Boolean)
+    : [];
+  // Idempotent — if the member is already a co-tech, return the row as-is.
+  if (existing.includes(memberId)) {
+    return { assignment: serializeAssignment(assignment) };
+  }
+
+  const updatedList = [...existing, memberId];
+  const now = isoNow();
+
+  const { data: updated, error: updateError } = await service
+    .from("provider_visit_assignments")
+    .update({
+      co_tech_member_ids: updatedList,
+      updated_at: now,
+    })
+    .eq("id", assignment.id)
+    .select()
+    .single();
+  if (updateError || !updated) throw updateError ?? new Error("Failed to add co-tech");
+
+  // Audit-trail message. Workspace-internal context only (sender_role
+  // 'vendor' so the homeowner sees a benign "We added another tech"
+  // line in their thread; metadata.kind='co_tech_added' lets the
+  // Operations Desk render a structured chip if it wants).
+  const householdId = compactString((assignment as Record<string, unknown>).household_id) ||
+    await loadHouseholdIdForRequest(service, requestId);
+  if (householdId) {
+    const memberLabel = compactString(memberRow.full_name) ||
+      compactString(memberRow.email) ||
+      "another tech";
+    try {
+      await service.from("handyman_request_messages").insert({
+        request_id: requestId,
+        household_id: householdId,
+        sender_role: "vendor",
+        body: `We added ${memberLabel} as a co-tech on this visit.`,
+        metadata: { kind: "co_tech_added", member_id: memberId },
+      });
+    } catch (err) {
+      console.error("[handyman-provider] add_co_tech audit-message failed", err);
+    }
+  }
+
+  return { assignment: serializeAssignment(updated) };
+}
+
+async function setAccessMethodForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const method = compactString(body.method);
+  if (!method) throw new Error("method is required");
+  if (!M9_ACCESS_METHODS.has(method)) {
+    throw new Error(`Unsupported access method: ${method}`);
+  }
+
+  const notes = compactString(body.notes) || null;
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+  const now = isoNow();
+
+  const { data: updated, error: updateError } = await service
+    .from("provider_visit_assignments")
+    .update({
+      access_method: method,
+      access_notes: notes,
+      updated_at: now,
+    })
+    .eq("id", assignment.id)
+    .select()
+    .single();
+  if (updateError || !updated) throw updateError ?? new Error("Failed to save access method");
+
+  return { assignment: serializeAssignment(updated) };
+}
+
+async function cancelVisitMidStreamForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const reasonRaw = compactString(body.reason);
+  if (!reasonRaw) throw new Error("reason is required");
+  // Allow free-form 'other' text by accepting any reason that starts
+  // with one of the canonical keywords, plus accept any reason if it
+  // matches the canonical set. This is intentionally permissive so a
+  // human-typed reason ("Customer not home, neighbor said they left")
+  // round-trips even though it's not on the canonical list.
+  const canonicalReason = M9_CANCEL_REASONS.has(reasonRaw) ? reasonRaw : "other";
+  const reasonForRecord = reasonRaw;
+
+  const partialState = (body.partialState ?? null) as Record<string, unknown> | null;
+  const scheduleFollowup = partialState && partialState.scheduleFollowup === true;
+
+  const memberId = compactString(membership.id) || null;
+
+  const { data: requestRow, error: requestErr } = await service
+    .from("handyman_requests")
+    .select("id, household_id, status, contractor_id, property_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (requestErr) throw requestErr;
+  if (!requestRow) throw new Error("Request not found");
+  const householdId = compactString(requestRow.household_id);
+
+  // Idempotent — if already cancelled, just return the existing state.
+  if (compactString(requestRow.status) === "cancelled") {
+    return {
+      request: {
+        id: compactString(requestRow.id),
+        status: "cancelled",
+        cancellationReason: null,
+        cancelledAt: null,
+        cancelledByMemberId: null,
+      },
+      followupRequestId: null,
+    };
+  }
+
+  const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+  const now = isoNow();
+
+  // 1. Close any open pause so paused_seconds banks correctly. Don't
+  //    auto-clock-out — cancellation is distinct from completion and we
+  //    want to leave clock_out_at null so the homeowner thread reads
+  //    "cancelled at 10:42" rather than "completed at 10:42".
+  if (assignment.clock_in_at) {
+    const { data: openPause } = await service
+      .from("provider_visit_pauses")
+      .select("*")
+      .eq("assignment_id", assignment.id)
+      .is("resumed_at", null)
+      .maybeSingle();
+    if (openPause) {
+      const pausedAtMs = new Date(compactString(openPause.paused_at) || now).getTime();
+      const resumedAtMs = new Date(now).getTime();
+      const elapsedSec = Math.max(0, Math.round((resumedAtMs - pausedAtMs) / 1000));
+      await service
+        .from("provider_visit_pauses")
+        .update({ resumed_at: now })
+        .eq("id", openPause.id);
+      const newPausedSeconds = numberValue(assignment.paused_seconds || 0) + elapsedSec;
+      await service
+        .from("provider_visit_assignments")
+        .update({ paused_seconds: newPausedSeconds, updated_at: now })
+        .eq("id", assignment.id);
+    }
+  }
+
+  // 2. Stamp the request: status=cancelled + M9 cancellation columns +
+  //    M5's existing cancelled_by_user_id / cancelled_by_role columns
+  //    so the read paths that already render those don't see null.
+  const { error: cancelErr } = await service
+    .from("handyman_requests")
+    .update({
+      status: "cancelled",
+      cancellation_reason: reasonForRecord,
+      cancelled_at: now,
+      cancelled_by_member_id: memberId,
+      cancelled_by_user_id: userId || null,
+      cancelled_by_role: "handyman",
+      proposal_status: "cancelled",
+      updated_at: now,
+    })
+    .eq("id", requestId);
+  if (cancelErr) throw cancelErr;
+
+  // 3. Audit-trail message on the homeowner thread. 'haven' role so the
+  //    thread renderer treats it as informational, not "the contractor
+  //    typed this".
+  if (householdId) {
+    try {
+      await service.from("handyman_request_messages").insert({
+        request_id: requestId,
+        household_id: householdId,
+        sender_role: "haven",
+        body: `Visit cancelled mid-stream. Reason: ${reasonForRecord}.`,
+        metadata: {
+          kind: "visit_cancelled",
+          reason: canonicalReason,
+          reason_text: reasonForRecord,
+          schedule_followup: scheduleFollowup,
+        },
+      });
+    } catch (err) {
+      console.error("[handyman-provider] cancel_visit_mid_stream audit-message failed", err);
+    }
+  }
+
+  // 4. Optionally create a placeholder follow-up request stamped against
+  //    the same household + property + contractor. Pre-stamps an
+  //    assignment for the same tech so dispatch can confirm the slot.
+  let followupRequestId: string | null = null;
+  if (scheduleFollowup && householdId) {
+    const followupTitle = compactString(partialState?.followupTitle) || "Follow-up visit (rescheduled after mid-stream cancel)";
+    const proposedDate = compactString(partialState?.proposedDate) || null;
+    const durationMinutes = Math.max(15, numberValue(partialState?.durationMinutes ?? 60));
+    const contractorId = compactString(requestRow.contractor_id) || null;
+    const propertyId = compactString(requestRow.property_id) || null;
+
+    try {
+      const { data: newRequest, error: insertErr } = await service
+        .from("handyman_requests")
+        .insert({
+          household_id: householdId,
+          property_id: propertyId,
+          contractor_id: contractorId,
+          request_type: "standard_visit",
+          source: "vendor",
+          title: followupTitle,
+          status: proposedDate ? "scheduled" : "submitted",
+          preferred_timing: proposedDate,
+          proposed_visit_at: proposedDate,
+          proposed_by_role: "handyman",
+          proposed_at: proposedDate ? now : null,
+          proposal_status: proposedDate ? "none" : "pending",
+          parent_request_id: requestId,
+          suggested_by_request_id: requestId,
+          suggested_at: now,
+        })
+        .select("id, title")
+        .single();
+      if (insertErr || !newRequest) throw insertErr ?? new Error("Failed to create follow-up");
+
+      followupRequestId = compactString(newRequest.id);
+
+      // Pre-stamp an assignment for the same tech (matches M8's pattern).
+      if (memberId && proposedDate) {
+        const routeDate = proposedDate.length >= 10 ? proposedDate.slice(0, 10) : null;
+        let nextStopOrder = 1;
+        if (routeDate) {
+          const { data: existingStops } = await service
+            .from("provider_visit_assignments")
+            .select("stop_order")
+            .eq("workspace_id", workspaceId)
+            .eq("assigned_member_id", memberId)
+            .eq("route_date", routeDate)
+            .order("stop_order", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const maxOrder = numberValue(existingStops?.stop_order || 0);
+          if (maxOrder >= 1) nextStopOrder = maxOrder + 1;
+        }
+        await service
+          .from("provider_visit_assignments")
+          .insert({
+            workspace_id: workspaceId,
+            request_id: followupRequestId,
+            assigned_member_id: memberId,
+            assigned_by_user_id: userId,
+            route_date: routeDate,
+            stop_order: nextStopOrder,
+          });
+      }
+
+      // Audit-trail message on the original thread linking to the new
+      // request so the homeowner sees the pivot.
+      try {
+        await service.from("handyman_request_messages").insert({
+          request_id: requestId,
+          household_id: householdId,
+          sender_role: "haven",
+          body: proposedDate
+            ? `We've scheduled a follow-up visit on ${formatHumanDateForSuggestion(proposedDate)}.`
+            : `We've created a placeholder follow-up so we can pick this up again.`,
+          metadata: {
+            kind: "followup_visit_after_cancel",
+            request_id: followupRequestId,
+            proposed_date: proposedDate,
+            duration_minutes: durationMinutes,
+          },
+        });
+      } catch (err) {
+        console.error("[handyman-provider] cancel followup audit-message failed", err);
+      }
+    } catch (err) {
+      console.error("[handyman-provider] cancel_visit_mid_stream followup insert failed", err);
+      // Don't fail the whole call — the cancel itself landed.
+    }
+  }
+
+  return {
+    request: {
+      id: requestId,
+      status: "cancelled",
+      cancellationReason: reasonForRecord,
+      cancelledAt: now,
+      cancelledByMemberId: memberId,
+    },
+    followupRequestId,
+  };
+}
+
+// Small helper — load the household_id for a request so audit-trail
+// inserts can land. Avoids a redundant select when callers already have
+// the request row in hand.
+async function loadHouseholdIdForRequest(
+  service: ServiceClient,
+  requestId: string,
+): Promise<string | null> {
+  const { data: row } = await service
+    .from("handyman_requests")
+    .select("household_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  return compactString(row?.household_id) || null;
 }
 
 // MARK: - Wave M8 — end-of-visit suggestion authoring
@@ -10807,6 +11228,446 @@ async function extractSystemFromPhotoForProvider(
   };
 }
 
+/**
+ * Wave M10 — Haversine distance between two lat/lng points in meters.
+ * Pure function so we can sort the customer list deterministically.
+ */
+function haversineMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371000; // Earth radius in meters
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Wave M10 — geocode a free-form address string via Nominatim
+ * (OpenStreetMap). 1-second-per-request rate limit per their TOS, so
+ * the caller MUST throttle when looping. 2-second timeout per call.
+ * Returns null on any failure (rate-limit, no match, timeout) so the
+ * caller can degrade gracefully rather than fail the whole request.
+ *
+ * Per Nominatim TOS we MUST set a unique User-Agent. We use the Chez
+ * Field iOS app identifier so abuse complaints route to a real address.
+ */
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  const trimmed = address.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("q", trimmed);
+    url.searchParams.set("format", "json");
+    url.searchParams.set("limit", "1");
+    url.searchParams.set("addressdetails", "0");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": "ChezField/1.0 (https://getchez.com; tom@getchez.com)",
+        "Accept": "application/json",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return null;
+    const results = await response.json() as Array<{ lat?: string; lon?: string }>;
+    if (!Array.isArray(results) || results.length === 0) return null;
+    const first = results[0];
+    const lat = parseFloat(first.lat ?? "");
+    const lng = parseFloat(first.lon ?? "");
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+    return { lat, lng };
+  } catch (err) {
+    console.warn("[handyman-provider] geocode failed for", trimmed.slice(0, 60), err);
+    return null;
+  }
+}
+
+/**
+ * Wave M10 — "Closest customer to me." Returns the workspace's
+ * customers sorted by Haversine distance from the tech's current
+ * location. Properties don't carry lat/lng columns yet, so we
+ * geocode `street, city, state, zip` via Nominatim with one second
+ * between requests (their TOS) — capped at `limit + 5` candidates so
+ * we don't slam their service on big workspaces.
+ *
+ * Customers without a usable address (or that fail to geocode) are
+ * dropped from the result silently. The iOS UI surfaces "no
+ * customers with mappable addresses" via the empty state when the
+ * array is empty, distinct from the geolocation-denied empty state.
+ */
+async function nearestCustomersForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  let workspaceId = compactString(body.workspaceId);
+  if (!workspaceId) {
+    const m = await getWorkspaceMembership(service, userId);
+    if (!m) throw new Error("No provider workspace found");
+    const ws = (m as Record<string, unknown>).provider_workspaces as Record<string, unknown> | undefined;
+    workspaceId = compactString(ws?.id);
+    if (!workspaceId) throw new Error("Workspace id missing on membership row.");
+  } else {
+    await assertWorkspaceAccess(service, userId, workspaceId);
+  }
+
+  const lat = numberValue(body.latitude);
+  const lng = numberValue(body.longitude);
+  if (Number.isNaN(lat) || Number.isNaN(lng) || lat === 0 || lng === 0) {
+    throw new Error("latitude and longitude are required");
+  }
+
+  const limitRaw = numberValue(body.limit ?? 10);
+  const limit = Math.max(1, Math.min(20, Math.floor(limitRaw)));
+
+  // 1. Pull contractor links → contractors → households for this
+  //    workspace. Households can have multiple contractor rows
+  //    (legacy + chez_field-sourced) so we de-dup by household.
+  const { data: links, error: linksError } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id, contractors(id, household_id, company_name, contact_name)")
+    .eq("workspace_id", workspaceId);
+  if (linksError) throw linksError;
+
+  const householdIds = new Set<string>();
+  const householdMeta = new Map<string, { contactName: string; companyName: string }>();
+  for (const link of (links ?? []) as Array<Record<string, unknown>>) {
+    const c = link.contractors as Record<string, unknown> | null;
+    if (!c) continue;
+    const householdId = compactString(c.household_id);
+    if (!householdId || householdIds.has(householdId)) continue;
+    householdIds.add(householdId);
+    householdMeta.set(householdId, {
+      contactName: compactString(c.contact_name) || "",
+      companyName: compactString(c.company_name) || "",
+    });
+  }
+
+  if (householdIds.size === 0) {
+    return { ok: true, customers: [], note: "Workspace has no linked customers." };
+  }
+
+  // 2. Pull one property per household. Sort by created_at so the
+  //    "first property" is the canonical pin for that customer.
+  const { data: properties, error: propsError } = await service
+    .from("properties")
+    .select("id, household_id, name, street, city, state, zip_code, created_at")
+    .in("household_id", Array.from(householdIds))
+    .order("created_at", { ascending: true });
+  if (propsError) throw propsError;
+
+  const byHousehold = new Map<string, Record<string, unknown>>();
+  for (const p of (properties ?? []) as Array<Record<string, unknown>>) {
+    const hid = compactString(p.household_id);
+    if (!hid) continue;
+    if (!byHousehold.has(hid)) byHousehold.set(hid, p);
+  }
+
+  // 3. Build the candidate list. We cap to `limit + 5` candidates
+  //    we actually attempt to geocode — Nominatim's 1/sec rate limit
+  //    means a 100-customer workspace would take 100s otherwise. v1
+  //    accepts this ceiling; future work: persist lat/lng on
+  //    properties at create time so we skip the geocoding step.
+  const candidates: Array<{
+    householdId: string;
+    propertyId: string;
+    customerName: string;
+    address: string;
+    fallbackAddress: string;
+  }> = [];
+  for (const [hid, prop] of byHousehold) {
+    const street = compactString(prop.street);
+    const city = compactString(prop.city);
+    const stateCode = compactString(prop.state);
+    const zip = compactString(prop.zip_code);
+    const address = [street, city, stateCode, zip].filter(Boolean).join(", ");
+    // Fallback used when the full street address doesn't geocode
+    // (synthetic / misspelled / unrecognized streets). City + state
+    // gets us a town-center pin which is good enough to show "this
+    // customer is in Ridgefield, ~3 miles away."
+    const fallbackAddress = [city, stateCode].filter(Boolean).join(", ");
+    if (!address && !fallbackAddress) continue;
+    const meta = householdMeta.get(hid);
+    const customerName = meta?.contactName || compactString(prop.name) || meta?.companyName || "Customer";
+    candidates.push({
+      householdId: hid,
+      propertyId: compactString(prop.id),
+      customerName,
+      address: address || fallbackAddress,
+      fallbackAddress,
+    });
+  }
+
+  if (candidates.length === 0) {
+    return { ok: true, customers: [], note: "No customers have an address on file yet." };
+  }
+
+  const geocodeCap = Math.min(candidates.length, limit + 5);
+  type Resolved = {
+    householdId: string;
+    propertyId: string;
+    customerName: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    distanceMeters: number;
+  };
+  const resolved: Resolved[] = [];
+
+  for (let i = 0; i < geocodeCap; i++) {
+    const candidate = candidates[i];
+    let coords = await geocodeAddress(candidate.address);
+    // If the full street address didn't match, try city+state. We
+    // only do the fallback when the addresses differ so we don't
+    // double-spend the rate limit on rows where the full address
+    // already collapses to a town-center pin.
+    if (!coords && candidate.fallbackAddress && candidate.fallbackAddress !== candidate.address) {
+      await new Promise(resolve => setTimeout(resolve, 1100));
+      coords = await geocodeAddress(candidate.fallbackAddress);
+    }
+    if (coords) {
+      resolved.push({
+        householdId: candidate.householdId,
+        propertyId: candidate.propertyId,
+        customerName: candidate.customerName,
+        address: candidate.address,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        distanceMeters: Math.round(haversineMeters(lat, lng, coords.lat, coords.lng)),
+      });
+    }
+    // Nominatim TOS: max 1 request per second. Skip the wait on the
+    // last iteration so we don't pad the response.
+    if (i < geocodeCap - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1100));
+    }
+  }
+
+  resolved.sort((a, b) => a.distanceMeters - b.distanceMeters);
+  return {
+    ok: true,
+    customers: resolved.slice(0, limit),
+    geocodedCount: resolved.length,
+    candidateCount: candidates.length,
+  };
+}
+
+/**
+ * Wave M10 — extract structured business-card data via Claude Vision.
+ * Mirrors `extractSystemFromPhotoForProvider`'s shape but routes to
+ * Claude directly with a card-specific prompt rather than going
+ * through identify-equipment (which would try to match the result
+ * against the equipment catalog).
+ *
+ * The iOS UI presents the result as an editable confirmation card; we
+ * never auto-save. All fields are nullable because business cards
+ * vary wildly in completeness.
+ */
+async function extractBusinessCardForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  const workspaceId = compactString(body.workspaceId);
+  if (workspaceId) {
+    await assertWorkspaceAccess(service, userId, workspaceId);
+  } else {
+    const m = await getWorkspaceMembership(service, userId);
+    if (!m) throw new Error("No provider workspace found");
+  }
+
+  const fileBase64 = compactString(body.imageBase64) || compactString(body.base64);
+  if (!fileBase64) throw new Error("imageBase64 is required");
+
+  const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!anthropicApiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not configured");
+  }
+
+  const prompt = `You are reading a business card to capture a vendor's contact info.
+
+Extract these fields from the card image:
+- companyName: the business / brand name (e.g., "Smith Plumbing & Heating")
+- contactName: the person's name (e.g., "John Smith")
+- phone: primary phone number (any format)
+- email: email address
+- website: website URL or domain
+- tradeCategory: best-fit trade label from this list, or null if unclear:
+  Plumbing, HVAC, Electrical, Roofing, Landscaping, Pest Control,
+  Pool Service, Septic, Well, Chimney, Tree Service, Handyman,
+  Cleaning, Painting, Carpentry, General Contractor, Other
+
+If a field isn't on the card or you can't read it confidently, use null.
+
+Respond with ONLY valid JSON in this exact shape, no prose:
+{
+  "companyName": "..." or null,
+  "contactName": "..." or null,
+  "phone": "..." or null,
+  "email": "..." or null,
+  "website": "..." or null,
+  "tradeCategory": "..." or null,
+  "confidence": "high" or "medium" or "low",
+  "rawText": "all readable text from the card"
+}`;
+
+  const visionResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": anthropicApiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: "image/jpeg",
+                data: fileBase64,
+              },
+            },
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!visionResponse.ok) {
+    const errText = await visionResponse.text();
+    throw new Error(`Claude Vision failed: ${visionResponse.status} ${errText.slice(0, 300)}`);
+  }
+
+  const visionData = await visionResponse.json();
+  const visionText: string = visionData.content?.[0]?.text ?? "";
+
+  let extracted: Record<string, unknown>;
+  try {
+    const jsonMatch = visionText.match(/\{[\s\S]*\}/);
+    extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(visionText);
+  } catch {
+    return {
+      ok: true,
+      companyName: null,
+      contactName: null,
+      phone: null,
+      email: null,
+      website: null,
+      tradeCategory: null,
+      confidence: "low",
+      rawText: visionText.slice(0, 500),
+      parseError: "Could not parse the card. Re-shoot or fill it in by hand.",
+    };
+  }
+
+  return {
+    ok: true,
+    companyName: compactString(extracted.companyName) || null,
+    contactName: compactString(extracted.contactName) || null,
+    phone: compactString(extracted.phone) || null,
+    email: compactString(extracted.email) || null,
+    website: compactString(extracted.website) || null,
+    tradeCategory: compactString(extracted.tradeCategory) || null,
+    confidence: compactString(extracted.confidence) || "medium",
+    rawText: compactString(extracted.rawText) || null,
+  };
+}
+
+/**
+ * Wave M10 — insert a `contractors` row from a business-card capture.
+ * Mirrors the M3 `create_home_system` pattern: workspace members
+ * can't directly INSERT into `contractors` because the table is
+ * household-scoped via RLS. This wrapper validates the caller belongs
+ * to the workspace, validates the workspace serves the target
+ * household (via `provider_contractor_links`), then inserts via the
+ * service-role client.
+ *
+ * Source is stamped `chez_field` per the Phase 19k+ source
+ * discriminator. `specialties` is set to a single-element array
+ * containing the trade category so the homeowner-side coverage logic
+ * can match the new vendor against open systems.
+ */
+async function createContractorFromCardForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  const workspaceId = compactString(body.workspaceId);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const householdId = compactString(body.householdId);
+  const companyName = compactString(body.companyName);
+  const phone = compactString(body.phone);
+  if (!householdId) throw new Error("householdId is required");
+  if (!companyName) throw new Error("Company name is required");
+  if (!phone) throw new Error("Phone is required");
+
+  // Confirm the workspace actually serves this household via the
+  // contractor-links table (same access guard pattern as
+  // create_home_system).
+  const { data: linkRows } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id, contractors!inner(household_id)")
+    .eq("workspace_id", workspaceId);
+  const servesHousehold = (linkRows ?? []).some((row: Record<string, unknown>) => {
+    const c = row.contractors as Record<string, unknown> | null;
+    return compactString(c?.household_id) === householdId;
+  });
+  if (!servesHousehold) {
+    throw new Error("Workspace does not serve this household");
+  }
+
+  const contactName = compactString(body.contactName);
+  const email = normalizedEmail(body.email);
+  const website = compactString(body.website);
+  const tradeCategory = compactString(body.tradeCategory);
+  const notes = compactString(body.notes);
+  const specialties = tradeCategory ? [tradeCategory] : null;
+
+  const { data: created, error: insertError } = await service
+    .from("contractors")
+    .insert({
+      household_id: householdId,
+      company_name: companyName,
+      contact_name: contactName || null,
+      phone,
+      email: email || null,
+      website: website || null,
+      specialties,
+      notes: notes || null,
+      source: "chez_field",
+    })
+    .select("id, household_id, company_name, contact_name, phone, email, website, specialties, source")
+    .single();
+
+  if (insertError) throw insertError;
+  return { ok: true, contractor: created };
+}
+
 /** G47 — multi-handyman support: add a workspace member to an assessment. */
 async function addAssessmentMember(
   service: ServiceClient,
@@ -11410,6 +12271,34 @@ serve(async (req) => {
 
       if (action === "complete_visit") {
         const result = await completeVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M9 — visit edge cases (co-tech + access method + mid-stream cancel).
+      if (action === "add_co_tech") {
+        const result = await addCoTechForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "set_access_method") {
+        const result = await setAccessMethodForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "cancel_visit_mid_stream") {
+        const result = await cancelVisitMidStreamForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
@@ -12666,6 +13555,45 @@ serve(async (req) => {
 
       if (action === "create_home_system") {
         const result = await createHomeSystemForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M10 — "Closest customer to me." Returns the workspace's
+      // customers sorted by Haversine distance from the tech's
+      // current location. Geocodes addresses via Nominatim on the
+      // server side.
+      if (action === "nearest_customers") {
+        const result = await nearestCustomersForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M10 — extract structured data from a business card photo
+      // via Claude Vision. Returns editable fields the iOS UI
+      // confirms before saving as a `contractors` row.
+      if (action === "extract_business_card") {
+        const result = await extractBusinessCardForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M10 — insert a `contractors` row from a business-card
+      // capture. RLS on contractors blocks direct writes from
+      // workspace-member sessions; this wrapper validates the
+      // workspace serves the target household, then inserts via the
+      // service-role client with `source = 'chez_field'`.
+      if (action === "create_contractor_from_card") {
+        const result = await createContractorFromCardForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,

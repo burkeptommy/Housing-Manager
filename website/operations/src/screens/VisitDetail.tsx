@@ -444,10 +444,57 @@ export default function VisitDetailScreen() {
               <Pill tone="success">Verified arrival</Pill>
             </span>
           )}
+          {/* Wave M9 — co-tech roster pill. Surfaces "+ N co-tech" when
+              the field tech added at least one teammate. Operations uses
+              this to know who's on-site beyond the primary assignee. */}
+          {visit.assignment?.coTechMemberIds && visit.assignment.coTechMemberIds.length > 0 && (
+            <Pill tone="indigo">
+              + {visit.assignment.coTechMemberIds.length} co-tech{visit.assignment.coTechMemberIds.length === 1 ? "" : "s"}
+            </Pill>
+          )}
+          {/* Wave M9 — access method pill. Renders only for non-default
+              entry methods (lockbox / key_under_mat / door_code) so
+              dispatch sees the lockbox case without scrolling. */}
+          {visit.assignment?.accessMethod && visit.assignment.accessMethod !== "customer_present" && (
+            <span title={visit.assignment.accessNotes || ""} style={{ display: "inline-flex" }}>
+              <Pill tone="warning">
+                Access: {accessMethodLabel(visit.assignment.accessMethod)}
+              </Pill>
+            </span>
+          )}
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-soft)" }}>
             Updated {formatRelativeTime(visit.updatedAt)}
           </span>
         </div>
+        {/* Wave M9 — mid-stream cancellation annotation. Renders only when
+            the visit was cancelled mid-flight (M9-tagged columns
+            populated, distinct from M5 pre-visit cancel). */}
+        {visit.status === "cancelled" && visit.cancelledAt && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: "10px 12px",
+              marginBottom: 8,
+              backgroundColor: "color-mix(in srgb, var(--critical) 12%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--critical) 32%, transparent)",
+              borderRadius: 12,
+            }}
+          >
+            <Icon name="remove" size={16} stroke={2} color="var(--critical)" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>
+                Cancelled mid-visit at {new Date(visit.cancelledAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+              </div>
+              {visit.cancellationReason && (
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>
+                  Reason: {visit.cancellationReason}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <div style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.018em", marginBottom: 6 }}>
           {visit.title}
         </div>
@@ -992,6 +1039,24 @@ export default function VisitDetailScreen() {
                 value={`${visit.assignment.clockInLat.toFixed(4)}, ${visit.assignment.clockInLng.toFixed(4)}`}
               />
             )}
+            {/* Wave M9 — surface co-tech count + access method in the
+                Schedule rail so dispatch can read both at a glance. */}
+            {visit.assignment?.coTechMemberIds && visit.assignment.coTechMemberIds.length > 0 && (
+              <SidebarRow
+                label="Co-tech"
+                value={`${visit.assignment.coTechMemberIds.length} additional tech${visit.assignment.coTechMemberIds.length === 1 ? "" : "s"}`}
+              />
+            )}
+            {visit.assignment?.accessMethod && visit.assignment.accessMethod !== "customer_present" && (
+              <SidebarRow
+                label="Access"
+                value={
+                  visit.assignment.accessNotes
+                    ? `${accessMethodLabel(visit.assignment.accessMethod)} · ${visit.assignment.accessNotes}`
+                    : accessMethodLabel(visit.assignment.accessMethod)
+                }
+              />
+            )}
           </Card>
 
           {visit.quote ? (
@@ -1258,6 +1323,23 @@ function formatTimeOnSite(a: {
   if (h === 0 && m === 0) return live ? "Just started" : "0m";
   if (h === 0) return `${m}m${live ? " (live)" : ""}`;
   return `${h}h ${m}m${live ? " (live)" : ""}`;
+}
+
+// Wave M9 — convert the wire-format access_method (snake_case) to a
+// human label for the header pill + Schedule rail row.
+function accessMethodLabel(method: string): string {
+  switch (method) {
+    case "lockbox":
+      return "Lockbox";
+    case "key_under_mat":
+      return "Key under mat";
+    case "door_code":
+      return "Door code";
+    case "customer_present":
+      return "Customer present";
+    default:
+      return method;
+  }
 }
 
 function Estimate({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {

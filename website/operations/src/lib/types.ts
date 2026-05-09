@@ -144,6 +144,20 @@ export interface VisitAssignment {
   clockInLat?: number | null;
   clockInLng?: number | null;
   clockInAccuracyM?: number | null;
+  /// Wave M6 — count of internal tech notes on this request. Drives
+  /// the "N notes" badge in the right-rail visit detail.
+  techNotesCount?: number;
+  /// Wave M9 — additional workspace member IDs assigned alongside the
+  /// primary tech (memberId). Both can check off punch items. Defaults
+  /// to empty for legacy / pre-M9 rows.
+  coTechMemberIds?: string[];
+  /// Wave M9 — entry method captured before the visit. One of:
+  /// `customer_present`, `lockbox`, `key_under_mat`, `door_code`. Drives
+  /// the lockbox badge in the visit-detail header.
+  accessMethod?: string | null;
+  /// Wave M9 — free-form notes for the access method (lockbox code,
+  /// key location, etc.).
+  accessNotes?: string | null;
 }
 
 export interface VisitMessagePreview {
@@ -298,6 +312,15 @@ export interface VisitRow {
   /// operator knows the row was tech-driven (not a homeowner submission
   /// or admin route).
   suggestedByRequestId?: string | null;
+  /// Wave M9 — mid-stream cancellation context. Distinct from the
+  /// existing M5 `cancelled_by_user_id` / `cancelled_by_role` fields:
+  /// these only populate when the field tech ended a visit early via
+  /// `cancel_visit_mid_stream`, not when the homeowner cancelled
+  /// pre-visit. Drives the "Cancelled mid-visit at HH:MM, follow-up
+  /// scheduled May 14" annotation on VisitDetail.
+  cancellationReason?: string | null;
+  cancelledAt?: string | null;
+  cancelledByMemberId?: string | null;
 }
 
 export interface HomeSystemPhoto {
@@ -668,4 +691,43 @@ export interface TodaySummaryTomorrow {
 export interface TodaySummary {
   today: TodaySummaryToday;
   tomorrow: TodaySummaryTomorrow;
+}
+
+// ─── Wave M7 — Crew chat ──────────────────────────────────────────
+//
+// Mirrors the iOS `HavenFieldCrewChatThread` / `HavenFieldCrewChatMessage`
+// shape served by the `crew-chat` Edge Function. RLS gates per-workspace
+// via `provider_workspace_members.user_id = auth.uid()`.
+
+export type CrewChatThreadKind = "general" | "route_day" | "tech_pair";
+
+export interface CrewChatLastMessage {
+  id: string | null;
+  body: string;
+  senderMemberId: string | null;
+  senderName: string;
+  createdAt: string | null;
+}
+
+export interface CrewChatThread {
+  id: string;
+  workspaceId: string;
+  name: string | null;
+  kind: CrewChatThreadKind;
+  createdAt: string | null;
+  lastMessage: CrewChatLastMessage | null;
+  /** Computed server-side per the calling member's read_by membership. */
+  unreadCount: number;
+}
+
+export interface CrewChatMessage {
+  id: string;
+  threadId: string;
+  workspaceId?: string | null;
+  senderMemberId: string;
+  senderName: string;
+  body: string;
+  attachments: string[];
+  readBy: string[];
+  createdAt: string | null;
 }
