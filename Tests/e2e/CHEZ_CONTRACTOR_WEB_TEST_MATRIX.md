@@ -86,7 +86,7 @@ JWT. No UI required for setup.
 | 1.11 | Forgotten password reset (email flow) | Web | Standard supabase-auth path; verify the reset link routes back to `/handyman.html` and post-reset to `/operations/`. |
 | 1.12 | Sign out | Web | Confirm session cleared, redirected to auth page. |
 | 1.13 | Cookie/localStorage cleared between sessions | Web | Reload after sign-out → no session leak. |
-| 1.14 | Mobile viewport <768px → "Use the field app" interstitial | Web | Resize browser; verify the interstitial renders with a link to `/handyman-visit.html`. |
+| 1.14 | Mobile viewport <768px → "Use the field app" interstitial | Web | Resize browser; verify the interstitial renders with a TestFlight CTA pointing at the Chez Field iOS app (`https://testflight.apple.com/join/sw4xWsTA`). |
 
 ---
 

@@ -23,7 +23,7 @@ export default defineConfig({
       // the marketing pages cache-bust their CSS / JS via `?v=...`,
       // and Vite's regex matches the full request path including the
       // query, so the trailing `$` would 404 every cache-busted asset.
-      "^/(handyman|handymen|handyman-quote|handyman-visit|index|chez|styles|verify|terms|privacy|security)\\.(html|css|js)(\\?.*)?$": {
+      "^/(handyman|handymen|handyman-quote|index|chez|styles|verify|terms|privacy|security)\\.(html|css|js)(\\?.*)?$": {
         target: "http://localhost:8000",
         changeOrigin: true,
       },

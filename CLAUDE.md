@@ -812,7 +812,7 @@ Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces t
 
 **Deployment:** `website/Dockerfile` is now multi-stage — `node:20-alpine` builds the SPA → `nginx:alpine` serves both `handyman.html` (vanilla auth pitch) and `/operations/*` (React SPA). `nginx.conf` gained a `location /operations/` block with SPA-fallback rewrite (`try_files $uri $uri/ /operations/index.html`) so React Router owns every `/operations/*` route. `chez.css` + `favicon.svg` are now COPY'd into the image (previously missing — referenced by both vanilla pages and the Operations Desk's `<link rel="stylesheet" href="/chez.css">`).
 
-**Mobile:** `<768px` shows a "Use the field app on your phone" interstitial linking to `/handyman-visit.html`. Tablet 768–1279px collapses 3-col layouts (Dispatch, Messages) to single column.
+**Mobile:** `<768px` shows a "Use the field app on your phone" interstitial linking to the Chez Field iOS app (TestFlight: https://testflight.apple.com/join/sw4xWsTA). Tablet 768–1279px collapses 3-col layouts (Dispatch, Messages) to single column.
 
 **Local dev:** `cd website/operations && npm install && npm run dev` runs Vite at `localhost:5173/operations/`. Use `python3 -m http.server 8000` from `website/` in another terminal so Vite's proxy can forward `/handyman.html` for the auth flow. Production build: `npm run build` emits to `dist/` → Docker stage 1 picks it up.
 

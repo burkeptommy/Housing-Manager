@@ -8,7 +8,7 @@ This is the **single entry point** for executing the Chez Contractor buildout wo
 
 | Plan | Path | Waves | Surface |
 |---|---|---|---|
-| **Mobile** | `Tests/e2e/CONTRACTOR_MOBILE_BUILDOUT_PLAN.md` | M1–M13 (13 waves) | Chez Field PWA at `website/handyman-visit.html` |
+| **Mobile** | `Tests/e2e/CONTRACTOR_MOBILE_BUILDOUT_PLAN.md` | M1–M13 (13 waves) | Chez Field native iOS app — Haven Xcode project, target HavenField, scheme "Chez Field" |
 | **Web** | `Tests/e2e/CONTRACTOR_WEB_BUILDOUT_PLAN.md` | W1–W20 + B1–B7 (27 waves) | Operations Desk SPA at `website/operations/` + cross-app |
 | **Test** | `Tests/e2e/CONTRACTOR_BUILDOUT_TEST_PLAN.md` | T1–T11 (11 waves) | All three surfaces (web + mobile + iOS) |
 

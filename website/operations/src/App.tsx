@@ -107,11 +107,14 @@ function MobileInterstitial() {
         Operations Desk is desktop-only
       </div>
       <p className="ops-mobile-interstitial__body">
-        Open this page on a desktop or tablet to dispatch the field team. For
-        in-truck use, the Chez Field PWA is the right tool.
+        Open this page on a desktop or tablet to dispatch the field team.
+        Install Chez Field on your iPhone for in-truck field work.
       </p>
-      <a className="ops-mobile-interstitial__cta" href="/handyman-visit.html">
-        Open Chez Field
+      <a
+        className="ops-mobile-interstitial__cta"
+        href="https://testflight.apple.com/join/sw4xWsTA"
+      >
+        Get Chez Field on iOS
       </a>
     </div>
   );

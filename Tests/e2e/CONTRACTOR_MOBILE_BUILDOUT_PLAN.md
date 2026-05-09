@@ -1,5 +1,7 @@
 # Chez Field PWA (mobile contractor) — full buildout plan
 
+> **2026-05-08 surface correction:** This plan was originally written against the deprecated PWA at `website/handyman-visit.html`. The PWA has been removed (Wave M0). Every wave's "SPA UI" / "PWA" / `handyman-visit.html` reference now means the native HavenField iOS target (Haven Xcode project, scheme "Chez Field", `Haven/App/HavenFieldView.swift` is where the entire app lives). Schema migrations + edge function actions are unchanged. Tab structure: Home (L2046), Visits (L2352), Clients (L2591), Messages (L2893). Visit detail = `HavenFieldVisitWorkspaceView` (L3038-3779). Punch list row = `FieldPunchItemRow` (L2729). Models + service in same file: `HavenFieldVisit` (L203), `HavenFieldPunchItem` (L320), `HavenFieldHomeSystem` (L530), `HavenFieldService` actor (L1118).
+
 Comprehensive plan covering EVERY mobile-side gap identified during the overnight E2E pass. 13 waves of work organized so a future chat session can drop in and execute one wave at a time via subagent dispatch.
 
 The PWA lives at `website/handyman-visit.html` (vanilla HTML/CSS/JS + service worker; ~2,760 lines total). It loads via `?token=<portal_token>` per visit, talks to the `handyman-portal` Edge Function, persists drafts to `localStorage`, and registers a service worker for offline.

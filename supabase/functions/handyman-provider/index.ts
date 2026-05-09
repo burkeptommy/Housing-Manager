@@ -17,7 +17,12 @@ const corsHeaders = {
 };
 
 const PROVIDER_SITE_URL = "https://www.getchez.com/handyman.html";
-const FIELD_SITE_URL = "https://www.getchez.com/handyman-visit.html";
+// Chez Field is the native iOS app; field-side URLs point to TestFlight install.
+// The function signature for fieldVisitUrl preserves token + visitId so the API
+// response shape stays compatible with iOS HavenFieldService decoders, but the
+// URL itself is bare (TestFlight does not accept query params). Tokens flow
+// through the iOS app's separate portal session call (handyman-portal action).
+const FIELD_SITE_URL = "https://testflight.apple.com/join/sw4xWsTA";
 const QUOTE_SITE_URL = "https://www.getchez.com/handyman-quote.html";
 const FROM_EMAIL = "hello@getchez.com";
 const FROM_NAME = "Chez Field";
@@ -326,10 +331,11 @@ function teamInviteUrl(token: string) {
   return `${PROVIDER_SITE_URL}?teamInvite=${encodeURIComponent(token)}`;
 }
 
-function fieldVisitUrl(token: string, visitId?: string | null) {
-  const params = new URLSearchParams({ token });
-  if (visitId) params.set("visit", visitId);
-  return `${FIELD_SITE_URL}?${params.toString()}`;
+function fieldVisitUrl(_token: string, _visitId?: string | null) {
+  // Token + visitId flow through the iOS app via the handyman-portal session
+  // call after install. Returning the bare TestFlight URL keeps response
+  // decoding stable while routing the contractor to the right surface.
+  return FIELD_SITE_URL;
 }
 
 function publicQuoteUrl(token: string) {

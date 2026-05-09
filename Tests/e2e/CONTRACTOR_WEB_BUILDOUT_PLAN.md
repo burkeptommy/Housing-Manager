@@ -1016,7 +1016,7 @@ These are not strictly "web" or "mobile" — they ship features that require coo
 - `fetch_visit_prep` — accepts `{ workspaceId, visitAssignmentId }`. Returns: customer chez_profile (logistics, vendor preferences, communication, spending tiers), last visit's tech notes, open punch items count, last 3 messages, any case links, system-level safety flags (e.g. "respirator required for furnace room").
 
 **SPA UI:**
-- Mobile (`handyman-visit.html`): pre-visit prep card on Today screen for each upcoming stop. "Show prep" expand → renders structured info.
+- Mobile (Chez Field iOS app, `Haven/App/HavenFieldView.swift`): pre-visit prep card on Home screen for each upcoming stop. "Show prep" expand → renders structured info.
 - Web (`VisitDetail.tsx`): collapsible "Prep" section at the top of the visit detail.
 
 **Cross-app parity:** mobile + web read same data; mobile prioritizes brevity, web shows full structured.

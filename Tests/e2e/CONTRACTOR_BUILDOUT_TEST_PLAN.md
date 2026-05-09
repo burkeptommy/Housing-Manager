@@ -490,7 +490,7 @@ SELECT count(*) FROM handyman_punch_items WHERE source = 'chez_admin';
 
 12. **Inventory:** part SKU "PVC-1IN" → low stock alert → create PO → send.
 
-13. **Mobile (in browser at 390×844 OR iOS Safari):** open `/handyman-visit.html?demo=1` → assigned visits appear → start visit → punch list capture → in-person quote → on-site invoice.
+13. **Mobile (Chez Field iOS app):** open Chez Field on the iOS Simulator (`com.havenhome.field`, scheme "Chez Field") → assigned visits appear → start visit → punch list capture → in-person quote → on-site invoice.
 
 14. **iOS Haven app:** open as customer → verify all the above lands on Tasks tab → Contractor → thread.
 
