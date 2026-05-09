@@ -10,10 +10,44 @@
             "comment": "Haven household invite codes — opens InviteCodeEntrySheet pre-filled."
           }
         ]
+      },
+      {
+        "appIDs": ["RW9CWCAWGQ.com.havenhome.field"],
+        "components": [
+          {
+            "/": "/handyman/visits/*",
+            "comment": "Sprint #4 R4-E-1 fix: Chez Field deep link to a specific visit."
+          },
+          {
+            "/": "/handyman/requests/*",
+            "comment": "Chez Field deep link to a specific homeowner request thread."
+          },
+          {
+            "/": "/handyman/threads/*",
+            "comment": "Chez Field deep link to a specific message thread."
+          },
+          {
+            "/": "/handyman/quotes/*",
+            "comment": "Chez Field deep link to a specific quote."
+          },
+          {
+            "/": "/handyman/invoices/*",
+            "comment": "Chez Field deep link to a specific invoice."
+          },
+          {
+            "/": "/handyman/parts/*",
+            "comment": "Chez Field deep link to a specific part request."
+          },
+          {
+            "/": "/operations/*",
+            "?": { "field": "true" },
+            "comment": "Operations Desk URL with ?field=true → open in Chez Field app."
+          }
+        ]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["RW9CWCAWGQ.com.havenhome.app"]
+    "apps": ["RW9CWCAWGQ.com.havenhome.app", "RW9CWCAWGQ.com.havenhome.field"]
   }
 }

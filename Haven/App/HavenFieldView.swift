@@ -5182,6 +5182,11 @@ private func friendlyServerError(from error: Error, fallback: String = "Somethin
 struct HavenFieldRootView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel = HavenFieldViewModel()
+    // Sprint #4 R4-E-3 fix: refresh dashboard on background → active so
+    // the user doesn't have to cold-launch to see new visits, replies,
+    // task date changes, etc. The existing pull-to-refresh + .task on
+    // first appear handle the rest of the cases.
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // D7 fix: SwiftUI's `.toolbar(.hidden, for: .tabBar)` modifier
@@ -5289,6 +5294,16 @@ struct HavenFieldRootView: View {
         .onChange(of: viewModel.dashboard?.workspace?.activeMemberCount) { _, newValue in
             if (newValue ?? 1) <= 1 && viewModel.selectedTab == .crew {
                 viewModel.selectedTab = .home
+            }
+        }
+        // Sprint #4 R4-E-3 fix: refresh on background → active so
+        // dispatcher reassignments, homeowner replies, status flips
+        // from another tech, and concierge updates land without a
+        // cold-launch cycle. Mirrors the pattern Apple's Mail and
+        // Reminders apps use for foreground refresh.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await viewModel.refresh() }
             }
         }
     }
@@ -5608,6 +5623,14 @@ private struct HavenFieldHomeTab: View {
         }
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        // Sprint #4 R4-E-3 fix: explicit pull-to-refresh on the
+        // Overview ScrollView. The TabView root has the same modifier
+        // but mounting it here ensures the gesture lands on this
+        // particular ScrollView (SwiftUI's environmental refresh
+        // sometimes doesn't bubble through a NavigationStack child).
+        .refreshable {
+            await viewModel.refresh()
+        }
         .sheet(isPresented: $showSettings) {
             // Wave 5 finding: pre-fix this passed workspace.primaryEmail /
             // primaryPhone — meaning a crew tech opening Settings saw the
@@ -5936,6 +5959,12 @@ private struct HavenFieldVisitsTab: View {
             }
             .background(HavenColors.cream.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            // Sprint #4 R4-E-3 fix: explicit pull-to-refresh on the
+            // Visits ScrollView so reassignments + status changes
+            // surface without a cold-launch cycle.
+            .refreshable {
+                await viewModel.refresh()
+            }
 
             FieldFloatingActionButton(label: "New visit", systemImage: "plus") {
                 showVisitActions = true
@@ -6150,10 +6179,19 @@ private struct HavenFieldClientsTab: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 20)
-            .padding(.bottom, 40)
+            // Sprint #4 R4-E-5 fix: extra bottom padding so the last
+            // home row in a tall list doesn't sit underneath the
+            // floating tab bar pill (was 40, now matches Visits at 140).
+            .padding(.bottom, 140)
         }
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        // Sprint #4 R4-E-3 fix: explicit pull-to-refresh on the Homes
+        // ScrollView so newly-paired homes + invoiced totals refresh
+        // without a cold-launch cycle.
+        .refreshable {
+            await viewModel.refresh()
+        }
         .sheet(isPresented: $showNearbyCustomers) {
             FieldNearbyCustomersView(
                 workspaceId: viewModel.dashboard?.workspace?.id,
@@ -10929,6 +10967,13 @@ private struct HavenFieldHomeProfileView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 20)
+            // Sprint #4 R4-E-5 fix: bottom padding so the last task /
+            // system row isn't clipped by the floating tab bar pill
+            // when the section content overflows the visible viewport.
+            // Pre-fix users couldn't reach the 5th task row in the
+            // home detail "Tasks Chez sees" section because it sat
+            // beneath the bottom tab bar with no scroll affordance.
+            .padding(.bottom, 140)
         }
         .background(HavenColors.cream.ignoresSafeArea())
         .navigationTitle(home.name)
@@ -19571,15 +19616,25 @@ private extension DateFormatter {
 }
 
 private extension HavenFieldVisit {
+    // Sprint #4 R4-E-7 fix: align iOS queue classification with the
+    // server's stats categorization (handyman-provider/index.ts ~line 2788
+    // — server treats `scheduled` as upcoming, not request). Pre-fix,
+    // iOS treated `scheduled` as a request-queue state, so an assigned
+    // visit with status=scheduled never surfaced on the Today tab even
+    // though the workspace owner had already assigned the tech.
+    // Post-fix: assigned `scheduled` → upcoming queue (Today eligible);
+    // unassigned `scheduled` → request queue (still needs dispatch).
     var belongsInRequestQueue: Bool {
         switch status {
         case HandymanRequestStatus.submitted.rawValue,
-             HandymanRequestStatus.scheduled.rawValue,
              HandymanRequestStatus.sentToHandyman.rawValue,
              HandymanRequestStatus.alternateDatesProposed.rawValue,
              HandymanRequestStatus.awaitingHomeowner.rawValue,
              HandymanRequestStatus.quoted.rawValue:
             return true
+        case HandymanRequestStatus.scheduled.rawValue:
+            // Scheduled but not yet assigned → still needs dispatch attention.
+            return assignment?.memberId == nil
         default:
             return false
         }
@@ -19592,6 +19647,9 @@ private extension HavenFieldVisit {
              HandymanRequestStatus.checkedIn.rawValue,
              HandymanRequestStatus.inProgress.rawValue:
             return true
+        case HandymanRequestStatus.scheduled.rawValue:
+            // Scheduled AND assigned → on the assignee's Today/Visits tab.
+            return assignment?.memberId != nil
         default:
             return false
         }
@@ -19724,7 +19782,20 @@ private extension String {
 
     var fieldShortDate: String {
         if let date = DateFormatter.havenISODate.date(from: self) {
-            return date.formatted(.dateTime.month(.abbreviated).day())
+            // Sprint #4 R4-E-4 fix: pre-fix this stripped year
+            // unconditionally, so a task accidentally created with
+            // next_due_date = 1970-01-01 (epoch) rendered as "Jan 1"
+            // and read as Jan 1 of the current year. Apple's Mail
+            // pattern: omit year when same as current year, include
+            // it otherwise. Year-distance guard catches both ancient
+            // (1970-01-01) and far-future (2099-12-31) dates.
+            let cal = Calendar.current
+            let currentYear = cal.component(.year, from: Date())
+            let dateYear = cal.component(.year, from: date)
+            if dateYear == currentYear {
+                return date.formatted(.dateTime.month(.abbreviated).day())
+            }
+            return date.formatted(.dateTime.month(.abbreviated).day().year())
         }
         return self
     }

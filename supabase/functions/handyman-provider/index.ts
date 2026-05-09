@@ -1871,7 +1871,6 @@ async function loadDashboard(
   const workspaceId = compactString(workspace.id);
   const currentRole = compactString(membership.role);
   const permissions = rolePermissions(currentRole);
-  const today = localDateString();
 
   await service
     .from("provider_workspace_members")
@@ -1887,6 +1886,39 @@ async function loadDashboard(
   const contractorIds = (contractorLinks ?? [])
     .map((row: Record<string, unknown>) => compactString(row.contractor_id))
     .filter(Boolean);
+
+  // Sprint #4 R4-E-2 fix: localDateString() uses UTC, so "today" rolls
+  // over to tomorrow at 8 PM EDT (00:00 UTC). The workspace dashboard
+  // hero + the per-tech "stops today" pill both use this string to
+  // filter route_date == today. We mirror todaySummaryForProvider's tz
+  // resolution: prefer the workspace's first-linked household's
+  // primary property time_zone, fall back to America/New_York.
+  let dashboardTimeZone = FIELD_DEFAULT_TIMEZONE;
+  try {
+    const firstContractorId = contractorIds[0];
+    if (firstContractorId) {
+      const { data: contractor } = await service
+        .from("contractors")
+        .select("household_id")
+        .eq("id", firstContractorId)
+        .maybeSingle();
+      const householdId = compactString(contractor?.household_id);
+      if (householdId) {
+        const { data: prop } = await service
+          .from("properties")
+          .select("time_zone")
+          .eq("household_id", householdId)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        const propTz = compactString(prop?.time_zone);
+        if (propTz) dashboardTimeZone = propTz;
+      }
+    }
+  } catch (err) {
+    console.error("[handyman-provider] dashboard tz lookup failed", err);
+  }
+  const today = fieldFormatYmdInZone(new Date(), dashboardTimeZone);
 
   const [
     teamMembersResult,
@@ -3659,12 +3691,28 @@ async function updateRequestStatusForProvider(
 
   const { data: request } = await service
     .from("handyman_requests")
-    .select("id, contractor_id")
+    .select("id, contractor_id, status")
     .eq("id", requestId)
     .maybeSingle();
   if (!request) throw new Error("Request not found");
   if (!contractorIds.includes(compactString(request.contractor_id))) {
     throw new Error("Request not in this workspace");
+  }
+
+  // Sprint #4 R5-E-3: don't overwrite a terminal state (cancelled) with
+  // a different terminal state (completed). When an operator hits Complete
+  // after a concurrent Cancel landed, the cancel wins and we don't write
+  // a contradictory audit row.
+  const currentStatus = compactString(request.status);
+  if (currentStatus === "cancelled" && status === "completed") {
+    throw new Error("Visit was cancelled; cannot mark complete.");
+  }
+  if (currentStatus === "completed" && status === "cancelled") {
+    throw new Error("Visit was completed; cannot mark cancelled.");
+  }
+  // Idempotent: same-state writes are no-ops with no audit message.
+  if (currentStatus === status) {
+    return { request };
   }
 
   const { data: updated, error: updateError } = await service
@@ -3841,13 +3889,26 @@ async function startVisitForProvider(
   if (lng !== null && Number.isFinite(lng)) updates.clock_in_lng = lng;
   if (accuracy !== null) updates.clock_in_accuracy_m = accuracy;
 
+  // Sprint #4 R5-E-8 fix: atomic conditional UPDATE so a rapid
+  // double-tap doesn't overwrite clock_in_at twice. The pre-check at
+  // line ~3818 (`if (assignment.clock_in_at) return …`) is a stale
+  // read; two parallel calls both pass it and both write. With
+  // `.is("clock_in_at", null)`, only the first writer commits and the
+  // second writer sees zero rows affected — refetch and return the
+  // canonical row.
   const { data: updated, error: updateError } = await service
     .from("provider_visit_assignments")
     .update(updates)
     .eq("id", assignment.id)
+    .is("clock_in_at", null)
     .select()
-    .single();
-  if (updateError || !updated) throw updateError ?? new Error("Failed to start visit");
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (!updated) {
+    // Another writer beat us. Refetch the assignment and return it.
+    const refetched = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+    return { assignment: serializeAssignment(refetched) };
+  }
 
   // Flip the request to in_progress when starting fresh — only when the
   // status is in a pre-start phase. Don't downgrade a more advanced
@@ -4005,6 +4066,31 @@ async function completeVisitForProvider(
   const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
   const assignmentId = compactString(assignment.id);
   if (!assignmentId) throw new Error("Assignment id missing on lifecycle row.");
+
+  // Sprint #4 R5-E-3 fix (race vs cancel_visit_mid_stream): if the
+  // request is already in a terminal state (cancelled), don't try to
+  // flip it to completed. Returning the current assignment state is
+  // the right idempotent answer — if the user tapped Complete after
+  // a concurrent Cancel landed, the cancel won.
+  const { data: currentReq } = await service
+    .from("handyman_requests")
+    .select("status")
+    .eq("id", requestId)
+    .maybeSingle();
+  const currentStatus = compactString(currentReq?.status);
+  if (currentStatus === "cancelled") {
+    throw new Error("Visit was cancelled by another member; cannot mark complete.");
+  }
+  if (currentStatus === "completed" && assignment.clock_out_at) {
+    // Already completed by a prior tap; idempotent return so the iOS
+    // app sees the final state without re-stamping clock_out.
+    const startMs = assignment.clock_in_at ? new Date(compactString(assignment.clock_in_at)).getTime() : null;
+    const endMs = assignment.clock_out_at ? new Date(compactString(assignment.clock_out_at)).getTime() : null;
+    const totalSeconds = startMs && endMs
+      ? Math.max(0, Math.round((endMs - startMs) / 1000) - numberValue(assignment.paused_seconds || 0))
+      : 0;
+    return { assignment: serializeAssignment(assignment), totalSeconds };
+  }
 
   const now = isoNow();
 
@@ -4322,12 +4408,18 @@ async function cancelVisitMidStreamForProvider(
   if (!requestRow) throw new Error("Request not found");
   const householdId = compactString(requestRow.household_id);
 
-  // Idempotent — if already cancelled, just return the existing state.
-  if (compactString(requestRow.status) === "cancelled") {
+  // Sprint #4 R5-E-12B BLOCKER: cross-workspace guard.
+  await assertRequestInWorkspace(service, requestId, workspaceId);
+
+  // Idempotent — if already in a terminal state (cancelled OR completed),
+  // just return the existing state. This is a fast-path check; the
+  // atomic UPDATE+RETURNING below is the canonical race guard.
+  if (compactString(requestRow.status) === "cancelled" ||
+      compactString(requestRow.status) === "completed") {
     return {
       request: {
         id: compactString(requestRow.id),
-        status: "cancelled",
+        status: compactString(requestRow.status),
         cancellationReason: null,
         cancelledAt: null,
         cancelledByMemberId: null,
@@ -4366,10 +4458,17 @@ async function cancelVisitMidStreamForProvider(
     }
   }
 
-  // 2. Stamp the request: status=cancelled + M9 cancellation columns +
-  //    M5's existing cancelled_by_user_id / cancelled_by_role columns
-  //    so the read paths that already render those don't see null.
-  const { error: cancelErr } = await service
+  // 2. Sprint #4 R5-E-3 + R5-E-7 fix: atomic UPDATE with status guard.
+  //    The previous implementation read status, then if-not-cancelled
+  //    wrote — a stale-read race window where two concurrent cancels
+  //    (or a cancel+complete pair) both passed the read check and both
+  //    wrote, producing duplicate audit messages and mixed columns.
+  //    Now: filter the UPDATE on `status NOT IN ('cancelled', 'completed')`
+  //    + RETURNING. If 0 rows came back, another writer already won
+  //    the terminal-state race; return the current state and skip the
+  //    audit-message insert so the homeowner thread doesn't show two
+  //    contradictory explanations.
+  const { data: cancelUpdated, error: cancelErr } = await service
     .from("handyman_requests")
     .update({
       status: "cancelled",
@@ -4381,8 +4480,32 @@ async function cancelVisitMidStreamForProvider(
       proposal_status: "cancelled",
       updated_at: now,
     })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .not("status", "in", '("cancelled","completed")')
+    .select("id, status")
+    .maybeSingle();
   if (cancelErr) throw cancelErr;
+  if (!cancelUpdated) {
+    // Another concurrent caller already moved the visit to a terminal
+    // state. Re-read the canonical row and return it; do NOT insert
+    // duplicate audit messages or schedule a follow-up against a visit
+    // that's already closed.
+    const { data: finalRow } = await service
+      .from("handyman_requests")
+      .select("id, status, cancellation_reason, cancelled_at, cancelled_by_member_id")
+      .eq("id", requestId)
+      .maybeSingle();
+    return {
+      request: {
+        id: compactString(finalRow?.id) || requestId,
+        status: compactString(finalRow?.status) || "cancelled",
+        cancellationReason: compactString(finalRow?.cancellation_reason) || null,
+        cancelledAt: finalRow?.cancelled_at ?? null,
+        cancelledByMemberId: compactString(finalRow?.cancelled_by_member_id) || null,
+      },
+      followupRequestId: null,
+    };
+  }
 
   // 3. Audit-trail message on the homeowner thread. 'haven' role so the
   //    thread renderer treats it as informational, not "the contractor
@@ -4613,6 +4736,25 @@ async function suggestFollowupTask(
 
   const now = isoNow();
 
+  // Sprint #4 R5-E-10 fix: rapid double-tap dedup. iOS button debounce
+  // doesn't catch a 22ms repeat tap, and the homeowner sees two
+  // identical "We suggested a follow-up task" messages + two duplicate
+  // tasks. Look for a recent identical insert in the last 5 minutes
+  // before writing; if one exists, return its id idempotently.
+  const dedupWindowStartIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data: recentDup } = await service
+    .from("maintenance_tasks")
+    .select("id, title")
+    .eq("suggested_by_request_id", ctx.requestId)
+    .eq("title", title)
+    .gte("suggested_at", dedupWindowStartIso)
+    .order("suggested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recentDup) {
+    return { ok: true, taskId: compactString(recentDup.id), deduped: true };
+  }
+
   const { data: inserted, error: insertErr } = await service
     .from("maintenance_tasks")
     .insert({
@@ -4631,7 +4773,27 @@ async function suggestFollowupTask(
     })
     .select("id, title")
     .single();
-  if (insertErr) throw insertErr;
+  if (insertErr) {
+    // Sprint #4 R5-E-10: handle race-loser case from the unique partial
+    // index uq_maintenance_tasks_suggestion_dedup (Postgres error code
+    // 23505 = unique_violation). When a truly-concurrent caller's INSERT
+    // gets rejected by the DB, refetch the winning row and return its
+    // id idempotently rather than surfacing the constraint error.
+    if ((insertErr as { code?: string }).code === "23505") {
+      const { data: winner } = await service
+        .from("maintenance_tasks")
+        .select("id, title")
+        .eq("suggested_by_request_id", ctx.requestId)
+        .eq("title", title)
+        .order("suggested_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (winner) {
+        return { ok: true, taskId: compactString(winner.id), deduped: true };
+      }
+    }
+    throw insertErr;
+  }
 
   const taskId = compactString(inserted.id);
 
@@ -4695,6 +4857,27 @@ async function suggestFollowupQuote(
   const contractorId = compactString(parentReq?.contractor_id) || null;
 
   const now = isoNow();
+
+  // Sprint #4 R5-E-10 fix: rapid double-tap dedup for follow-up quote
+  // drafts. Same pattern as suggestFollowupTask — 5-minute window on
+  // (request_id, title) returns the existing draft id rather than
+  // inserting a second draft the user never asked for.
+  const dedupWindowStartIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data: recentDup } = await service
+    .from("provider_quotes")
+    .select("id, title")
+    .eq("workspace_id", workspaceId)
+    .eq("suggested_by_request_id", ctx.requestId)
+    .eq("title", title)
+    .eq("status", "draft")
+    .gte("suggested_at", dedupWindowStartIso)
+    .order("suggested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recentDup) {
+    return { ok: true, quoteId: compactString(recentDup.id), title: compactString(recentDup.title), deduped: true };
+  }
+
   // public_share_token is NOT NULL on provider_quotes (the prospect
   // share link is keyed off it). crypto.randomUUID() in Deno is the
   // standard token source — matches save_quote's behavior, which lets
@@ -4728,7 +4911,25 @@ async function suggestFollowupQuote(
     })
     .select("id, title")
     .single();
-  if (insertErr) throw insertErr;
+  if (insertErr) {
+    // Sprint #4 R5-E-10: race-loser case from uq_provider_quotes_suggestion_dedup.
+    if ((insertErr as { code?: string }).code === "23505") {
+      const { data: winner } = await service
+        .from("provider_quotes")
+        .select("id, title")
+        .eq("workspace_id", workspaceId)
+        .eq("suggested_by_request_id", ctx.requestId)
+        .eq("title", title)
+        .eq("status", "draft")
+        .order("suggested_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (winner) {
+        return { ok: true, quoteId: compactString(winner.id), title: compactString(winner.title), deduped: true };
+      }
+    }
+    throw insertErr;
+  }
 
   const quoteId = compactString(inserted.id);
 
@@ -4771,6 +4972,31 @@ async function scheduleFollowupVisit(
 
   const now = isoNow();
 
+  // Sprint #4 R5-E-10 fix: rapid double-tap dedup for follow-up visit
+  // requests. 5-minute window on (parent_request_id, title, proposed_date)
+  // returns the existing follow-up id idempotently rather than scheduling
+  // two visits the user never asked for.
+  const dedupWindowStartIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data: recentDup } = await service
+    .from("handyman_requests")
+    .select("id, title")
+    .eq("parent_request_id", ctx.requestId)
+    .eq("title", titleOverride)
+    .eq("proposed_visit_at", proposedDate)
+    .gte("suggested_at", dedupWindowStartIso)
+    .order("suggested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recentDup) {
+    return {
+      ok: true,
+      requestId: compactString(recentDup.id),
+      title: compactString(recentDup.title),
+      assignmentId: null,
+      deduped: true,
+    };
+  }
+
   const { data: newRequest, error: insertErr } = await service
     .from("handyman_requests")
     .insert({
@@ -4793,7 +5019,30 @@ async function scheduleFollowupVisit(
     })
     .select("id, title")
     .single();
-  if (insertErr) throw insertErr;
+  if (insertErr) {
+    // Sprint #4 R5-E-10: race-loser case from uq_handyman_requests_followup_dedup.
+    if ((insertErr as { code?: string }).code === "23505") {
+      const { data: winner } = await service
+        .from("handyman_requests")
+        .select("id, title")
+        .eq("parent_request_id", ctx.requestId)
+        .eq("title", titleOverride)
+        .eq("proposed_visit_at", proposedDate)
+        .order("suggested_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (winner) {
+        return {
+          ok: true,
+          requestId: compactString(winner.id),
+          title: compactString(winner.title),
+          assignmentId: null,
+          deduped: true,
+        };
+      }
+    }
+    throw insertErr;
+  }
 
   const newRequestId = compactString(newRequest.id);
 
@@ -5282,6 +5531,11 @@ async function addTechNoteForProvider(
 
   const requestId = compactString(body.requestId);
   if (!requestId) throw new Error("requestId is required");
+  // Sprint #4 R5-E-12B BLOCKER: tech notes are workspace-scoped, but
+  // the row is keyed by request_id. Without this guard a W1 caller
+  // could pass a W2 request_id and the row would land in W2's thread
+  // even though the workspace_id stamp is W1.
+  await assertRequestInWorkspace(service, requestId, workspaceId);
 
   const noteBody = compactString(body.body);
   if (!noteBody) throw new Error("body is required");
@@ -5332,6 +5586,12 @@ async function listTechNotesForProvider(
 
   const requestId = compactString(body.requestId);
   if (!requestId) throw new Error("requestId is required");
+  // Sprint #4 R5-E-12B: belt-and-braces — the SELECT below already
+  // double-filters on workspace_id, so a cross-workspace requestId
+  // returns an empty array, but we throw early so the caller gets a
+  // clear "Request not found" error instead of a misleading empty
+  // notes array.
+  await assertRequestInWorkspace(service, requestId, workspaceId);
 
   const { data: notes, error } = await service
     .from("provider_visit_tech_notes")
@@ -5859,6 +6119,14 @@ async function createPartRequestForProvider(
     throw new Error("Either requestId or punchItemId is required");
   }
 
+  // Sprint #4 R5-E-12B: cross-workspace guard on optional requestId.
+  // The punchItemId path has its own loadPunchItemForWorkspace check
+  // upstream when needed; this protects the direct-requestId path that
+  // skips punch item lookup.
+  if (requestId) {
+    await assertRequestInWorkspace(service, requestId, workspaceId);
+  }
+
   const description = compactString(body.description);
   if (!description) throw new Error("description is required");
 
@@ -6144,6 +6412,64 @@ async function assertWorkspaceAccess(service: ServiceClient, userId: string, wor
   const activeWorkspaceId = compactString((membership.provider_workspaces as Record<string, unknown> | undefined)?.id);
   if (activeWorkspaceId !== workspaceId) throw new Error("Workspace access denied");
   return membership;
+}
+
+// Sprint #4 R5-E-12B fix (BLOCKER cross-tenant isolation): every action
+// that takes a `requestId` must verify the request actually belongs to
+// the caller's workspace. Without this guard, a malicious or buggy
+// caller could pass a foreign workspaceId-validated `workspaceId` plus
+// a `requestId` belonging to another contractor's customer, and the
+// handler would happily write a message / tech note / status update
+// against the foreign request — emailing the foreign customer with
+// content they didn't ask for and polluting their thread.
+//
+// Most lifecycle handlers already enforce this implicitly by going
+// through `loadAssignmentForLifecycle(workspaceId, requestId)` (which
+// scopes the SELECT by both columns); the bugs are in handlers that
+// take requestId for non-assignment writes (sendMessage,
+// addTechNoteForProvider) or for actions that don't need an assignment
+// row to exist (e.g. message threads where no assignment was ever
+// created). The workspace ↔ request linkage is via the
+// `provider_contractor_links.contractor_id` <-> `handyman_requests.contractor_id`
+// edge — same shape that buildQuoteFromVisit / convertVisitToInvoice
+// already check inline.
+//
+// Throws on mismatch; returns void on pass. Callers should run this
+// AFTER assertWorkspaceAccess (which validates membership) and BEFORE
+// any DB writes that reference requestId.
+async function assertRequestInWorkspace(
+  service: ServiceClient,
+  requestId: string,
+  workspaceId: string,
+) {
+  if (!requestId) throw new Error("requestId is required");
+  if (!workspaceId) throw new Error("workspaceId is required");
+
+  const { data: requestRow, error: requestErr } = await service
+    .from("handyman_requests")
+    .select("id, contractor_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (requestErr) throw requestErr;
+  if (!requestRow) throw new Error("Request not found in this workspace");
+
+  const contractorId = compactString(requestRow.contractor_id);
+  if (!contractorId) {
+    // Request exists but has no contractor — can't possibly belong to
+    // this workspace. Treat as a not-found / cross-tenant violation.
+    throw new Error("Request not found in this workspace");
+  }
+
+  const { data: link, error: linkErr } = await service
+    .from("provider_contractor_links")
+    .select("workspace_id")
+    .eq("contractor_id", contractorId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (linkErr) throw linkErr;
+  if (!link) {
+    throw new Error("Request not found in this workspace");
+  }
 }
 
 function assertPermission(membership: Record<string, unknown>, permission: keyof ReturnType<typeof rolePermissions>) {
@@ -7039,7 +7365,6 @@ async function createAdHocVisit(
 
   const title = compactString(body.title) || "Ad hoc visit";
   const details = compactString(body.details || body.notes);
-  const scheduledDate = localDateString(compactString(body.scheduledDate) || undefined) || localDateString();
   const requestType = compactString(body.requestType) || "standard_visit";
   if (!["standard_visit", "quote", "repair", "install", "assembly", "question", "setup"].includes(requestType)) {
     throw new Error("Invalid visit type");
@@ -7047,13 +7372,24 @@ async function createAdHocVisit(
 
   const { data: property, error: propertyError } = await service
     .from("properties")
-    .select("id, household_id, name, street, city, state, zip_code, property_type, square_footage, year_built")
+    .select("id, household_id, name, street, city, state, zip_code, property_type, square_footage, year_built, time_zone")
     .eq("id", propertyId)
     .limit(1)
     .maybeSingle();
 
   if (propertyError) throw propertyError;
   if (!property) throw new Error("Home not found");
+
+  // Sprint #4 R4-E-2 fix: when scheduledDate is provided, normalize via
+  // localDateString (passes through YYYY-MM-DD strings unchanged); when
+  // omitted, default to "today" in the property's local time zone, not
+  // UTC, so a 9 PM EDT ad hoc add doesn't land on tomorrow's calendar.
+  const scheduledDate = (() => {
+    const explicit = compactString(body.scheduledDate);
+    if (explicit) return localDateString(explicit);
+    const tz = compactString(property.time_zone) || FIELD_DEFAULT_TIMEZONE;
+    return fieldFormatYmdInZone(new Date(), tz);
+  })();
 
   const householdId = compactString(property.household_id);
   if (!householdId) throw new Error("This home is missing a household record");
@@ -9704,6 +10040,16 @@ async function sendMessage(
 
   if (!requestId && !propertyId) {
     throw new Error("Choose a home or request before sending a message");
+  }
+
+  // Sprint #4 R5-E-12B BLOCKER: when caller supplies requestId, verify
+  // the request actually belongs to their workspace. Without this, a
+  // W1 caller could pass a W2 requestId and we'd happily insert a
+  // message into W2's thread + email W2's customer. The propertyId
+  // path below has its own contractor-link check (line ~9750) that
+  // rejects unlinked homes; this guards the requestId path identically.
+  if (requestId) {
+    await assertRequestInWorkspace(service, requestId, workspaceId);
   }
 
   let request:
