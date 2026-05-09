@@ -146,6 +146,13 @@ export default function DispatchScreen() {
                   </div>
                 )}
                 <Pill tone={requestStatusTone(v.status)}>{v.statusLabel}</Pill>
+                {v.suggestedByRequestId && (
+                  /* Wave M8 — visit was scheduled from a field tech's
+                     end-of-visit wizard. The pill tells the operator
+                     this row didn't come from the homeowner queue or
+                     from the admin route — it's a tech's recommendation. */
+                  <Pill tone="indigo">Suggested by visit</Pill>
+                )}
                 {v.quote && (
                   <Pill tone={v.quote.status === "approved" ? "success" : "indigo"}>
                     Quote · {v.quote.statusLabel}

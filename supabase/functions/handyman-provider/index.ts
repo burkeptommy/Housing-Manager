@@ -2358,6 +2358,10 @@ async function loadDashboard(
       // (source='haven') and an Emergency pill on urgency='urgent' rows.
       source: compactString(request.source) || null,
       urgency: compactString(request.urgency) || null,
+      // Wave M8 — set when the visit was scheduled from the field tech's
+      // end-of-visit wizard. Operations Desk renders a "Suggested by
+      // visit" pill so the operator knows the row was tech-driven.
+      suggestedByRequestId: compactString(request.suggested_by_request_id) || null,
       proposedVisitAt: request.proposed_visit_at ?? null,
       proposedByRole: compactString(request.proposed_by_role) || null,
       proposedAt: request.proposed_at ?? null,
@@ -2801,6 +2805,17 @@ async function loadDashboard(
         // render the version timeline. Phase 73b added these columns.
         signedAt: quote.signed_at ?? null,
         signedName: compactString(quote.signed_name) || null,
+        // Wave M4 — kitchen-table signature artifact. Operations Desk
+        // appends "· signed in person" / "· witnessed" suffixes off
+        // these two fields to make in-person signatures readable in
+        // the Quotes list.
+        signaturePath: compactString(quote.signature_path) || null,
+        signerRole: compactString(quote.signer_role) || null,
+        // Wave M8 — set when the quote was staged from the field tech's
+        // end-of-visit wizard. Drives the "Suggested by visit" badge
+        // on the Quotes list + selected card so the operator knows the
+        // row is a draft from the field needing line items + send.
+        suggestedByRequestId: compactString(quote.suggested_by_request_id) || null,
         homeownerRevisedAt: quote.homeowner_revised_at ?? null,
         requestId: compactString(quote.request_id),
         publicShareUrl: publicQuoteUrl(compactString(quote.public_share_token)),
@@ -4021,6 +4036,375 @@ async function completeVisitForProvider(
     : 0;
 
   return { assignment: serializeAssignment(updated), totalSeconds };
+}
+
+// MARK: - Wave M8 — end-of-visit suggestion authoring
+//
+// Three light-touch artifact creators. Each gates on
+// assertWorkspaceAccess + verifies the originating handyman_requests
+// row belongs to the caller's workspace, then creates a downstream row
+// (maintenance_tasks / provider_quotes / handyman_requests) tagged
+// with `suggested_by_request_id` so the homeowner-side surfaces (and
+// the Operations Desk Quotes / Dispatch screens) can render the
+// "Suggested by visit" badge.
+//
+// Distinct from `propose_homeowner_task` / `propose_followup_visit`
+// which carry the full proposal/expiration/approval ceremony — these
+// are tech-driven recommendations the homeowner reads, not pending
+// approvals that block the homeowner's queue.
+
+interface VisitContextForSuggestion {
+  requestId: string;
+  householdId: string;
+  propertyId: string | null;
+  workspaceId: string;
+}
+
+async function loadVisitContextForSuggestion(
+  service: ServiceClient,
+  workspaceId: string,
+  requestId: string,
+): Promise<VisitContextForSuggestion> {
+  if (!requestId) throw new Error("requestId is required");
+
+  // Make sure the assignment exists for this workspace + request — same
+  // gate the lifecycle helpers use, prevents a tech from another
+  // workspace seeding artifacts onto an unrelated request.
+  await loadAssignmentForLifecycle(service, workspaceId, requestId);
+
+  const { data: req, error } = await service
+    .from("handyman_requests")
+    .select("id, household_id, property_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!req) throw new Error("Originating request not found");
+
+  return {
+    requestId: compactString(req.id),
+    householdId: compactString(req.household_id),
+    propertyId: compactString(req.property_id) || null,
+    workspaceId,
+  };
+}
+
+async function suggestFollowupTask(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const ctx = await loadVisitContextForSuggestion(
+    service,
+    workspaceId,
+    compactString(body.requestId),
+  );
+
+  const title = compactString(body.title);
+  if (!title) throw new Error("title is required");
+  if (title.length > 200) throw new Error("title is too long (max 200 chars)");
+
+  const description = compactString(body.description) || null;
+  // dueDate is an optional ISO date string ("2026-08-15"). The
+  // maintenance_tasks.next_due_date column is NOT NULL, so when the
+  // tech doesn't pick a specific date we default to 30 days out — far
+  // enough to feel "soon" without forcing a deadline that misleads the
+  // homeowner into thinking the contractor scheduled it.
+  const explicitDueDate = compactString(body.dueDate);
+  const dueDate = explicitDueDate || (() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 30);
+    return d.toISOString().slice(0, 10);
+  })();
+  // Default the property scope to the visit's property so the row
+  // surfaces on the right home in the homeowner's task surfaces.
+  const propertyId = compactString(body.propertyId) || ctx.propertyId;
+  const householdId = compactString(body.householdId) || ctx.householdId;
+
+  const now = isoNow();
+
+  const { data: inserted, error: insertErr } = await service
+    .from("maintenance_tasks")
+    .insert({
+      household_id: householdId,
+      property_id: propertyId,
+      title,
+      description,
+      frequency: "Once",
+      next_due_date: dueDate,
+      priority: "medium",
+      assignment_type: "either",
+      source: "contractor_suggestion",
+      suggested_by_request_id: ctx.requestId,
+      suggested_by_workspace_id: workspaceId,
+      suggested_at: now,
+    })
+    .select("id, title")
+    .single();
+  if (insertErr) throw insertErr;
+
+  const taskId = compactString(inserted.id);
+
+  // Audit-trail message on the request thread so the homeowner sees the
+  // suggestion in context. metadata.kind = 'task_suggested' lets the
+  // thread renderer pick a distinct treatment.
+  await mirrorQuoteMessageToRequestThread(service, {
+    requestId: ctx.requestId,
+    householdId: ctx.householdId,
+    senderRole: "vendor",
+    body: `We suggested a follow-up task: ${title}`,
+    metadata: {
+      kind: "task_suggested",
+      task_id: taskId,
+      task_title: title,
+      due_date: explicitDueDate || null,
+    },
+  });
+
+  await notifyHomeownersForRequest(service, ctx.householdId, {
+    title: "New follow-up suggested",
+    body: title.length > 80 ? title.slice(0, 77) + "…" : title,
+    requestId: ctx.requestId,
+    eventType: "handyman_task_suggested",
+    extra: { task_id: taskId, suggestion_kind: "task" },
+  });
+
+  return { ok: true, taskId };
+}
+
+async function suggestFollowupQuote(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const ctx = await loadVisitContextForSuggestion(
+    service,
+    workspaceId,
+    compactString(body.requestId),
+  );
+
+  const title = compactString(body.title) || "Follow-up quote";
+  const scopeNotes = compactString(body.scopeNotes) || null;
+  const propertyId = compactString(body.propertyId) || ctx.propertyId;
+  const householdId = compactString(body.householdId) || ctx.householdId;
+
+  // Pull the contractor_id from the originating request — that's the
+  // canonical workspace ↔ household contractor relationship and matches
+  // what every other workspace-driven quote write uses (M4's
+  // build_quote_from_visit, save_quote, send_quote all walk this same
+  // edge from request → contractor).
+  const { data: parentReq } = await service
+    .from("handyman_requests")
+    .select("contractor_id")
+    .eq("id", ctx.requestId)
+    .maybeSingle();
+  const contractorId = compactString(parentReq?.contractor_id) || null;
+
+  const now = isoNow();
+  // public_share_token is NOT NULL on provider_quotes (the prospect
+  // share link is keyed off it). crypto.randomUUID() in Deno is the
+  // standard token source — matches save_quote's behavior, which lets
+  // Postgres' default fill it in for us. We assign explicitly because
+  // some Postgres environments don't provision a default for the column
+  // until the first save_quote write hydrates it.
+  const publicShareToken = crypto.randomUUID();
+
+  const { data: inserted, error: insertErr } = await service
+    .from("provider_quotes")
+    .insert({
+      workspace_id: workspaceId,
+      contractor_id: contractorId,
+      household_id: householdId,
+      property_id: propertyId,
+      request_id: ctx.requestId,
+      title,
+      status: "draft",
+      currency: "USD",
+      line_items: [],
+      scope_notes: scopeNotes,
+      subtotal: 0,
+      tax_total: 0,
+      total: 0,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      recipient_kind: "linked_home",
+      public_share_token: publicShareToken,
+      suggested_by_request_id: ctx.requestId,
+      suggested_at: now,
+    })
+    .select("id, title")
+    .single();
+  if (insertErr) throw insertErr;
+
+  const quoteId = compactString(inserted.id);
+
+  // Don't push the homeowner thread yet — the quote is still a draft.
+  // The tech finishes building it inside M4's quote builder and the
+  // existing send_quote flow handles the customer-visible message.
+
+  return { ok: true, quoteId, title };
+}
+
+async function scheduleFollowupVisit(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const ctx = await loadVisitContextForSuggestion(
+    service,
+    workspaceId,
+    compactString(body.requestId),
+  );
+
+  const proposedDate = compactString(body.proposedDate);
+  if (!proposedDate) throw new Error("proposedDate is required");
+  const durationMinutes = Math.max(15, numberValue(body.durationMinutes ?? 60));
+  const titleOverride = compactString(body.title) || "Follow-up visit";
+  const details = compactString(body.details) || null;
+
+  // Pull the parent request's contractor_id so the new row stays on
+  // the same vendor relationship.
+  const { data: parent } = await service
+    .from("handyman_requests")
+    .select("contractor_id")
+    .eq("id", ctx.requestId)
+    .maybeSingle();
+  const contractorId = compactString(parent?.contractor_id) || null;
+
+  const now = isoNow();
+
+  const { data: newRequest, error: insertErr } = await service
+    .from("handyman_requests")
+    .insert({
+      household_id: ctx.householdId,
+      property_id: ctx.propertyId,
+      contractor_id: contractorId,
+      request_type: "standard_visit",
+      source: "vendor",
+      title: titleOverride,
+      details,
+      status: "scheduled",
+      preferred_timing: proposedDate,
+      proposed_visit_at: proposedDate,
+      proposed_by_role: "handyman",
+      proposed_at: now,
+      proposal_status: "none",
+      parent_request_id: ctx.requestId,
+      suggested_by_request_id: ctx.requestId,
+      suggested_at: now,
+    })
+    .select("id, title")
+    .single();
+  if (insertErr) throw insertErr;
+
+  const newRequestId = compactString(newRequest.id);
+
+  // Pre-stamp a provider_visit_assignments row so the new request lands
+  // back on the same tech's calendar (the most natural assignee — the
+  // tech who suggested the follow-up usually wants to do the work).
+  const memberId = compactString(membership.id);
+  let assignmentId: string | null = null;
+  if (memberId) {
+    const routeDate = proposedDate.length >= 10 ? proposedDate.slice(0, 10) : null;
+    // stop_order has a > 0 CHECK constraint. Compute the next free slot
+    // for this tech on this date so the new visit lands at the end of
+    // their day. Falls back to 1 when there are no other stops yet.
+    let nextStopOrder = 1;
+    if (routeDate) {
+      const { data: existingStops } = await service
+        .from("provider_visit_assignments")
+        .select("stop_order")
+        .eq("workspace_id", workspaceId)
+        .eq("assigned_member_id", memberId)
+        .eq("route_date", routeDate)
+        .order("stop_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const maxOrder = numberValue(existingStops?.stop_order || 0);
+      if (maxOrder >= 1) nextStopOrder = maxOrder + 1;
+    }
+
+    const { data: assignmentRow, error: assignmentErr } = await service
+      .from("provider_visit_assignments")
+      .insert({
+        workspace_id: workspaceId,
+        request_id: newRequestId,
+        assigned_member_id: memberId,
+        assigned_by_user_id: userId,
+        route_date: routeDate,
+        stop_order: nextStopOrder,
+      })
+      .select("id")
+      .single();
+    if (assignmentErr) {
+      // Don't fail the whole call — the request landed, the homeowner
+      // sees it, and dispatch can manually assign later. But surface the
+      // failure so the operator can see why the calendar slot is empty.
+      console.error("[handyman-provider:schedule_followup_visit] assignment insert failed", assignmentErr);
+    } else {
+      assignmentId = compactString(assignmentRow?.id);
+    }
+  }
+
+  // Post a system audit message on the parent thread so the homeowner
+  // sees the visit suggestion in the same conversation. Use 'haven' role
+  // for the system bubble so the thread renderer treats it as
+  // informational, not "the contractor said this".
+  await mirrorQuoteMessageToRequestThread(service, {
+    requestId: ctx.requestId,
+    householdId: ctx.householdId,
+    senderRole: "haven",
+    body: `We scheduled a follow-up visit on ${formatHumanDateForSuggestion(proposedDate)}.`,
+    metadata: {
+      kind: "followup_visit_scheduled",
+      request_id: newRequestId,
+      proposed_date: proposedDate,
+      duration_minutes: durationMinutes,
+    },
+  });
+
+  await notifyHomeownersForRequest(service, ctx.householdId, {
+    title: "Follow-up visit scheduled",
+    body: `${titleOverride} on ${formatHumanDateForSuggestion(proposedDate)}.`,
+    requestId: newRequestId,
+    eventType: "handyman_visit_suggested",
+    extra: { followup_request_id: newRequestId, suggestion_kind: "visit" },
+  });
+
+  return { ok: true, requestId: newRequestId, title: titleOverride, assignmentId };
+}
+
+function formatHumanDateForSuggestion(iso: string): string {
+  // Render a server-side ISO timestamp as "Wed, Aug 15 at 9:00 AM" for
+  // the audit-trail message body. Falls back to the raw string on parse
+  // failure so we never null-insert into the message body.
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const dateFmt = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    const timeFmt = new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return `${dateFmt.format(d)} at ${timeFmt.format(d)}`;
+  } catch {
+    return iso;
+  }
 }
 
 // MARK: - Wave M11 — End-of-day summary + day completion
@@ -11026,6 +11410,36 @@ serve(async (req) => {
 
       if (action === "complete_visit") {
         const result = await completeVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M8 — end-of-visit suggestion authoring. The tech wraps a
+      // visit and proposes follow-up work that drives recurring revenue.
+      // Three light-touch artifact creators; no proposal/expiration
+      // ceremony (use propose_homeowner_task / propose_followup_visit
+      // for the heavier approval-bearing flows).
+      if (action === "suggest_followup_task") {
+        const result = await suggestFollowupTask(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+      if (action === "suggest_followup_quote") {
+        const result = await suggestFollowupQuote(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+      if (action === "schedule_followup_visit") {
+        const result = await scheduleFollowupVisit(
           service,
           user as unknown as Record<string, unknown>,
           body,

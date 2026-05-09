@@ -2563,6 +2563,135 @@ actor HavenFieldService {
         )
     }
 
+    // MARK: - Wave M8 end-of-visit suggestion authoring
+
+    /// Wave M8 — propose a follow-up task for the homeowner's task list.
+    /// Lands as a `maintenance_tasks` row with `source = 'contractor_suggestion'`
+    /// + a thread audit message tagged `metadata.kind = 'task_suggested'`.
+    /// Optional `dueDate` is a "yyyy-MM-dd" string (no enforced format on
+    /// the server beyond what `next_due_date` accepts).
+    func suggestFollowupTask(
+        workspaceId: String,
+        requestId: String,
+        title: String,
+        description: String?,
+        dueDate: String?
+    ) async throws -> String {
+        struct Request: Encodable {
+            let action = "suggest_followup_task"
+            let workspaceId: String
+            let requestId: String
+            let title: String
+            let description: String?
+            let dueDate: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+            let taskId: String?
+        }
+        let payload = Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            title: title,
+            description: description,
+            dueDate: dueDate
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.taskId ?? ""
+    }
+
+    /// Wave M8 — pre-create a draft `provider_quotes` row that the M4
+    /// quote builder picks up (we open `FieldBuildQuoteSheet` after the
+    /// draft lands so the tech can finish the line items + customer
+    /// signature). Returns the new quote id so the parent view can
+    /// route the M4 sheet at the right row.
+    func suggestFollowupQuote(
+        workspaceId: String,
+        requestId: String,
+        title: String,
+        scopeNotes: String?
+    ) async throws -> String {
+        struct Request: Encodable {
+            let action = "suggest_followup_quote"
+            let workspaceId: String
+            let requestId: String
+            let title: String
+            let scopeNotes: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+            let quoteId: String?
+            let title: String?
+        }
+        let payload = Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            title: title,
+            scopeNotes: scopeNotes
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.quoteId ?? ""
+    }
+
+    /// Wave M8 — schedule a brand-new follow-up visit on the same
+    /// vendor relationship. Server creates the `handyman_requests` row
+    /// + pre-stamps a `provider_visit_assignments` slot for the same
+    /// member who suggested the follow-up. `proposedDate` is the
+    /// requested arrival time as an ISO-8601 string.
+    func scheduleFollowupVisit(
+        workspaceId: String,
+        requestId: String,
+        proposedDate: Date,
+        durationMinutes: Int,
+        title: String?,
+        details: String?
+    ) async throws -> String {
+        struct Request: Encodable {
+            let action = "schedule_followup_visit"
+            let workspaceId: String
+            let requestId: String
+            let proposedDate: String
+            let durationMinutes: Int
+            let title: String?
+            let details: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+            let requestId: String?
+            let title: String?
+            let assignmentId: String?
+        }
+        let isoFormatter = ISO8601DateFormatter()
+        let payload = Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            proposedDate: isoFormatter.string(from: proposedDate),
+            durationMinutes: durationMinutes,
+            title: title,
+            details: details
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.requestId ?? ""
+    }
+
     // MARK: - Wave M6 internal tech notes
 
     /// Wave M6 — append an internal note to this visit. Tech notes are
@@ -5672,7 +5801,7 @@ final class FieldLocationCapture: NSObject, CLLocationManagerDelegate {
 /// Wave M1 — visit lifecycle state derived from the assignment row.
 /// Names the four user-visible states so the rendering logic stays a
 /// simple switch instead of nested `if let`s.
-enum FieldVisitLifecycleState {
+enum FieldVisitLifecycleState: Equatable {
     case notStarted
     case running(clockInAt: Date, pausedSeconds: Int)
     case paused(clockInAt: Date, pausedSeconds: Int, pausedAt: Date)
@@ -5848,6 +5977,61 @@ private struct HavenFieldVisitWorkspaceView: View {
     /// so a re-open doesn't re-fire the network call.
     @State private var invoiceDraftPayload: HavenFieldInvoiceDraftPayload?
 
+    // MARK: Wave M8 end-of-visit suggestion authoring state
+
+    /// True after the lifecycle flips into `.completed` for the first
+    /// time during this view's lifetime. Drives the "Anything to follow
+    /// up on?" wizard sheet so it appears once after Complete lands and
+    /// not again on every re-render. The wizard itself owns the dismiss
+    /// path; flipping this back to false on dismiss prevents accidental
+    /// re-presentation when the user comes back to the visit later.
+    @State private var showEndOfVisitWizard: Bool = false
+    /// True when the wizard has fired at least once during this view's
+    /// lifetime. Belt-and-suspenders so background → foreground (E1
+    /// preservation) doesn't pop the wizard a second time after the
+    /// user has already worked through it. Persisted per-visit via
+    /// AppStorage so a hard kill of the app doesn't re-fire either.
+    @State private var endOfVisitWizardShown: Bool = false
+    /// True after the wizard finishes saving its suggestions. Drives a
+    /// 2-second dashboard banner ("Suggestions sent") so the tech sees
+    /// confirmation even though the wizard auto-dismisses.
+    @State private var endOfVisitWizardDidComplete: Bool = false
+    /// Cached suggestions so background → foreground restores mid-wizard
+    /// state. Encoded into AppStorage as JSON; the wizard hydrates from
+    /// it on appear and writes through it on every queue mutation.
+    @State private var endOfVisitWizardDraftJson: String = ""
+
+    // MARK: - Wave M8 wizard presentation
+
+    /// Per-visit AppStorage key so the wizard fires once per Complete
+    /// even across launches. Hard kill mid-wizard? Wizard re-presents.
+    /// Hard kill AFTER wizard finished? Wizard does NOT re-present.
+    private var endOfVisitWizardShownKey: String {
+        "havenfield.m8.wizardShown.\(viewModel.visit.requestId)"
+    }
+
+    /// Per-visit AppStorage key for the in-progress wizard draft. Lets
+    /// background → foreground (E1) restore the queue, the observation
+    /// text, and the chip mode the tech was last in.
+    private var endOfVisitWizardDraftKey: String {
+        "havenfield.m8.wizardDraft.\(viewModel.visit.requestId)"
+    }
+
+    /// Decides whether to present the wizard. Gates on the persisted
+    /// "already shown for this visit" flag so re-entering a completed
+    /// visit doesn't re-fire it (the tech already sent suggestions, or
+    /// already opted out — either way we don't bug them again).
+    private func presentEndOfVisitWizardIfNeeded() {
+        if endOfVisitWizardShown { return }
+        let alreadyShown = UserDefaults.standard.bool(forKey: endOfVisitWizardShownKey)
+        if alreadyShown { return }
+        endOfVisitWizardShown = true
+        UserDefaults.standard.set(true, forKey: endOfVisitWizardShownKey)
+        // Hydrate any preserved draft (E1 background → foreground state).
+        endOfVisitWizardDraftJson = UserDefaults.standard.string(forKey: endOfVisitWizardDraftKey) ?? ""
+        showEndOfVisitWizard = true
+    }
+
     /// Phase 78: toggles a punch item between pending and done. Hits the
     /// `update_punch_item_status` edge action; on success, posts
     /// `.havenFieldVisitChanged` so the dashboard refreshes and the
@@ -5974,6 +6158,36 @@ private struct HavenFieldVisitWorkspaceView: View {
         .onReceive(lifecycleTimer) { tick in
             nowTick = tick
         }
+        // Wave M8 — present the end-of-visit wizard the FIRST time the
+        // lifecycle flips into `.completed` during this view's lifetime.
+        // Per-visit AppStorage gate (see endOfVisitWizardShownKey) prevents
+        // the wizard from re-firing on background → foreground or on a
+        // later return to the same visit.
+        .onChange(of: lifecycleState) { _, newValue in
+            if case .completed = newValue {
+                presentEndOfVisitWizardIfNeeded()
+            }
+        }
+        .onAppear {
+            // Belt-and-suspenders: if the view re-appears already in the
+            // completed state and the wizard hasn't been shown yet,
+            // present it. Covers the case where complete_visit landed
+            // before this view rendered (background → foreground re-entry
+            // after Complete tap).
+            if case .completed = lifecycleState {
+                presentEndOfVisitWizardIfNeeded()
+            }
+        }
+        // Wave M8 — write through the wizard's draft JSON to per-visit
+        // UserDefaults so background → foreground (E1) restores the
+        // queue + observation text exactly where the tech left them.
+        .onChange(of: endOfVisitWizardDraftJson) { _, newValue in
+            if newValue.isEmpty {
+                UserDefaults.standard.removeObject(forKey: endOfVisitWizardDraftKey)
+            } else {
+                UserDefaults.standard.set(newValue, forKey: endOfVisitWizardDraftKey)
+            }
+        }
         .sheet(isPresented: $showPauseSheet) {
             pauseSheet
                 .presentationDetents([.medium])
@@ -6084,6 +6298,41 @@ private struct HavenFieldVisitWorkspaceView: View {
                     NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
                 }
             )
+        }
+        .sheet(isPresented: $showEndOfVisitWizard) {
+            // Wave M8 — end-of-visit suggestion authoring. Drives recurring
+            // revenue: the tech proposes a follow-up task, a quote draft
+            // (chained into M4's BuildQuoteSheet), or a follow-up visit
+            // slot. Auto-presents on the FIRST `.completed` lifecycle
+            // transition during this view's lifetime; the wizard owns
+            // its own dismiss + persistence.
+            FieldEndOfVisitWizard(
+                workspaceId: viewModel.workspaceId ?? "",
+                requestId: viewModel.visit.requestId,
+                visit: viewModel.visit,
+                draftJsonBinding: $endOfVisitWizardDraftJson,
+                onOpenQuoteDraft: { _ in
+                    // Hand off to M4's existing BuildQuoteSheet — the draft
+                    // row is already created server-side, so M4 just
+                    // re-fetches and the tech edits in place.
+                    showEndOfVisitWizard = false
+                    showBuildQuoteSheet = true
+                },
+                onDismiss: { didSave in
+                    showEndOfVisitWizard = false
+                    if didSave {
+                        endOfVisitWizardDidComplete = true
+                        // Auto-fade the success banner after 3s.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            endOfVisitWizardDidComplete = false
+                        }
+                        // Refresh dashboard so the parent visit's queue
+                        // reflects the new artifacts.
+                        NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+                    }
+                }
+            )
+            .interactiveDismissDisabled(false)
         }
         .confirmationDialog(
             "Decline this visit?",
@@ -6307,7 +6556,29 @@ private struct HavenFieldVisitWorkspaceView: View {
             // also one-tap convert completed punch items into a draft
             // invoice. Pairs with the quote button: quote = future
             // work, invoice = work just finished.
+            //
+            // Wave M8 — and on top of both, an end-of-visit wizard fires
+            // automatically (and is reachable from a secondary CTA) for
+            // staging follow-up tasks / quote drafts / next-visit slots.
             VStack(alignment: .leading, spacing: 10) {
+                if endOfVisitWizardDidComplete {
+                    // Wave M8 — short-lived confirmation banner that
+                    // fades after 3s. Reads as "we got your suggestions"
+                    // without locking the tech into another modal.
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(HavenColors.success)
+                        Text("Suggestions sent to the homeowner.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.success.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity)
+                }
                 Button {
                     showBuildQuoteSheet = true
                 } label: {
@@ -6327,6 +6598,28 @@ private struct HavenFieldVisitWorkspaceView: View {
                     }
                 }
                 .buttonStyle(FieldSecondaryButtonStyle())
+
+                // Wave M8 — secondary entry point so the tech can
+                // re-open the wizard later (or for the first time, if
+                // they tapped Skip the first time it appeared). Hidden
+                // when the wizard is already on screen so we don't
+                // leave a dead button behind it.
+                if !showEndOfVisitWizard {
+                    Button {
+                        // Reset the per-visit gate so the wizard fires
+                        // even after a previous Skip/Done. The draft
+                        // JSON is also reloaded so the tech picks up
+                        // any in-flight suggestions they had open.
+                        endOfVisitWizardDraftJson = UserDefaults.standard.string(forKey: endOfVisitWizardDraftKey) ?? ""
+                        showEndOfVisitWizard = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "lightbulb")
+                            Text("Send follow-up suggestions")
+                        }
+                    }
+                    .buttonStyle(FieldSecondaryButtonStyle())
+                }
 
                 Text("Quote upcoming work or invoice the visit you just finished. Both pre-fill from the punch list.")
                     .font(HavenTypography.caption)
@@ -12239,6 +12532,884 @@ private struct FieldSignatureCanvas: UIViewRepresentable {
                 self.parent.hasStrokes = !canvasView.drawing.strokes.isEmpty
             }
         }
+    }
+}
+
+// MARK: - Wave M8 end-of-visit suggestion authoring
+
+/// Local model: one staged suggestion in the wizard's queue. We keep
+/// these client-side until the tech taps Done; then they get flushed
+/// to the server via the three M8 actions (suggest_followup_task /
+/// suggest_followup_quote / schedule_followup_visit). Identifiable so
+/// SwiftUI diffing keeps the queue rows stable as the tech edits.
+struct FieldEndOfVisitSuggestion: Identifiable, Codable, Equatable {
+    enum Kind: String, Codable {
+        case task
+        case quote
+        case visit
+    }
+    var id: UUID = UUID()
+    var kind: Kind
+    var title: String
+    var detail: String?
+    /// Task-only: ISO date string ("yyyy-MM-dd"), nil for "no specific date".
+    var dueDate: String?
+    /// Visit-only: proposed arrival as an ISO-8601 timestamp.
+    var proposedDate: Date?
+    /// Visit-only: visit duration estimate in minutes.
+    var durationMinutes: Int?
+
+    /// True after the suggestion has been flushed to the server. Lets
+    /// the queue render a check + grays out the Remove button.
+    var sent: Bool = false
+}
+
+/// Persisted draft shape for E1 background → foreground state preservation.
+private struct FieldEndOfVisitWizardDraft: Codable, Equatable {
+    var observation: String
+    var queue: [FieldEndOfVisitSuggestion]
+
+    static let empty = FieldEndOfVisitWizardDraft(observation: "", queue: [])
+}
+
+/// Wave M8 — the end-of-visit suggestion authoring wizard. Fires
+/// automatically the FIRST time the lifecycle flips into `.completed`
+/// (and from a secondary "Send follow-up suggestions" CTA below the
+/// completed-state Build quote button). Three artifact types:
+///   • Task — drives a `maintenance_tasks` row + thread audit message
+///   • Quote — opens M4's `FieldBuildQuoteSheet` over a pre-created
+///     draft `provider_quotes` row
+///   • Visit — drives a fresh `handyman_requests` row pre-stamped with
+///     a `provider_visit_assignments` slot for the suggesting tech
+///
+/// Discipline:
+///   • Done is the only salmon (primary CTA) on the screen
+///   • Skip is a clearly-secondary text button at the bottom
+///   • All state preserved through E1 background → foreground via
+///     AppStorage-backed JSON binding from the parent
+///   • Empty observation submits OK (suggestions are the value), but
+///     adding a task with empty title fires inline validation
+///   • Min ≥ 44pt tap targets on every chip + every queue row's
+///     Remove button (D7 / B6)
+private struct FieldEndOfVisitWizard: View {
+    let workspaceId: String
+    let requestId: String
+    let visit: HavenFieldVisit
+    /// Two-way binding to the parent's JSON-string AppStorage cache.
+    /// Wizard hydrates from this on appear and writes through on every
+    /// queue / observation change so background → foreground (E1)
+    /// preserves mid-wizard state.
+    @Binding var draftJsonBinding: String
+    /// Called when a suggested quote is finalized server-side. The
+    /// parent dismisses the wizard and pushes M4's BuildQuoteSheet over
+    /// the freshly-created draft so the tech can finish the line items
+    /// + signature inline.
+    let onOpenQuoteDraft: (String) -> Void
+    /// Called when the tech taps Done (didSave=true) or Skip (false).
+    let onDismiss: (Bool) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    // MARK: - Form state
+
+    @State private var observation: String = ""
+    @State private var queue: [FieldEndOfVisitSuggestion] = []
+
+    /// Which "Add" inline picker is open. Drives the conditional-render
+    /// of the form below the chip row.
+    private enum AddingMode: String { case none, task, quote, visit }
+    @State private var addingMode: AddingMode = .none
+
+    // MARK: - Add-task form state
+    @State private var newTaskTitle: String = ""
+    @State private var newTaskDetail: String = ""
+    @State private var newTaskDueDate: Date = Calendar.current.date(byAdding: .day, value: 90, to: Date()) ?? Date()
+    @State private var newTaskUseDueDate: Bool = false
+    @State private var newTaskValidationError: String? = nil
+
+    // MARK: - Add-quote form state
+    @State private var newQuoteTitle: String = ""
+    @State private var newQuoteScopeNotes: String = ""
+    @State private var newQuoteValidationError: String? = nil
+
+    // MARK: - Add-visit form state
+    @State private var newVisitTitle: String = ""
+    @State private var newVisitDetails: String = ""
+    @State private var newVisitDate: Date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+    @State private var newVisitDurationMinutes: Int = 60
+    @State private var newVisitValidationError: String? = nil
+
+    // MARK: - Submit state
+
+    @State private var isSubmitting: Bool = false
+    @State private var submitError: String? = nil
+
+    /// Templated task suggestions — quick-pick chips above the free-form
+    /// title field. Tapping one fills the title + leaves the detail
+    /// editable. Templates aren't substantive enough to warrant a
+    /// separate sheet flow; they're just keyboard-savings.
+    private static let taskTemplates: [String] = [
+        "Replace HVAC filter in 90 days",
+        "Reseal the valve before next service",
+        "Annual furnace tune-up",
+        "Inspect water heater anode rod",
+        "Replace smoke detector batteries",
+        "Service the well pressure tank"
+    ]
+
+    private var quickSlots: [Date] {
+        // Tomorrow 9am, day-after 1pm, three days out 9am — same heuristic
+        // as the M6 reschedule sheet so the tech reads a familiar pattern.
+        let cal = Calendar.current
+        let now = Date()
+        let candidates: [(Int, Int)] = [(1, 9), (2, 13), (4, 9)]
+        return candidates.compactMap { dayOffset, hour in
+            guard let day = cal.date(byAdding: .day, value: dayOffset, to: now) else { return nil }
+            return cal.date(bySettingHour: hour, minute: 0, second: 0, of: day)
+        }
+    }
+
+    private var slotFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d 'at' h:mm a"
+        return f
+    }
+
+    private var canSubmit: Bool {
+        !observation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !queue.isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    promptHeader
+                    observationField
+                    chipRow
+                    addingForm
+                    queueSection
+                    submitSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Wrap-up")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Skip") {
+                        // Don't fire the Done flush — Skip means the
+                        // tech wants to bail without sending anything.
+                        clearPersistedDraft()
+                        onDismiss(false)
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+            .task {
+                hydrateFromBinding()
+            }
+            .onChange(of: observation) { _, _ in
+                persistDraft()
+            }
+            .onChange(of: queue) { _, _ in
+                persistDraft()
+            }
+        }
+    }
+
+    // MARK: - Prompt header
+
+    private var promptHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ANYTHING TO FOLLOW UP ON?")
+                .font(HavenTypography.uiSectionHeader)
+                .kerning(1.2)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text("Wrap up your visit")
+                .font(HavenTypography.title2)
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("Add anything you noticed, or stage follow-up work for the homeowner. They'll see your suggestions in their app.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+    }
+
+    // MARK: - Observation field
+
+    private var observationField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Observation")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+            TextField(
+                "e.g. Boiler relief valve is starting to weep. Recommend replacement next service.",
+                text: $observation,
+                axis: .vertical
+            )
+            .lineLimit(3...8)
+            .font(HavenTypography.body)
+            .foregroundStyle(HavenColors.textPrimary)
+            .padding(12)
+            .background(HavenColors.surface)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(HavenColors.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            Text("Saved with the visit notes. The homeowner sees this in their thread.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+    }
+
+    // MARK: - Chip row
+
+    private var chipRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Stage follow-ups")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+            // 3 chips: tap to expand a small inline form below.
+            HStack(spacing: 8) {
+                addChip(label: "+ Task", systemImage: "checklist", mode: .task)
+                addChip(label: "+ Quote", systemImage: "doc.text", mode: .quote)
+                addChip(label: "+ Visit", systemImage: "calendar.badge.plus", mode: .visit)
+            }
+        }
+    }
+
+    private func addChip(label: String, systemImage: String, mode: AddingMode) -> some View {
+        Button {
+            // Toggle the form open / closed. Tapping the active chip
+            // closes the form (lets the tech back out without scrolling).
+            if addingMode == mode {
+                addingMode = .none
+            } else {
+                addingMode = mode
+                // Reset the new-row form state every open so previously-
+                // typed text doesn't carry over from a prior chip session.
+                resetNewRowState(for: mode)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(label)
+                    .font(HavenTypography.uiButton)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(addingMode == mode ? HavenColors.navy800.opacity(0.08) : HavenColors.surface)
+            .foregroundStyle(HavenColors.textPrimary)
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(addingMode == mode ? HavenColors.navy800 : HavenColors.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func resetNewRowState(for mode: AddingMode) {
+        switch mode {
+        case .task:
+            newTaskTitle = ""
+            newTaskDetail = ""
+            newTaskUseDueDate = false
+            newTaskDueDate = Calendar.current.date(byAdding: .day, value: 90, to: Date()) ?? Date()
+            newTaskValidationError = nil
+        case .quote:
+            newQuoteTitle = ""
+            newQuoteScopeNotes = observation
+            newQuoteValidationError = nil
+        case .visit:
+            newVisitTitle = ""
+            newVisitDetails = ""
+            newVisitDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+            newVisitDurationMinutes = 60
+            newVisitValidationError = nil
+        case .none:
+            break
+        }
+    }
+
+    // MARK: - Adding form
+
+    @ViewBuilder
+    private var addingForm: some View {
+        switch addingMode {
+        case .none:
+            EmptyView()
+        case .task:
+            addTaskForm
+        case .quote:
+            addQuoteForm
+        case .visit:
+            addVisitForm
+        }
+    }
+
+    private var addTaskForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("New follow-up task")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            // Quick-pick templates
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Self.taskTemplates, id: \.self) { template in
+                        Button {
+                            newTaskTitle = template
+                            newTaskValidationError = nil
+                        } label: {
+                            Text(template)
+                                .font(HavenTypography.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .frame(minHeight: 36)
+                                .background(HavenColors.surface)
+                                .foregroundStyle(HavenColors.textPrimary)
+                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            TextField("Task title (e.g. Replace boiler relief valve)", text: $newTaskTitle)
+                .font(HavenTypography.body)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(
+                    newTaskValidationError != nil ? HavenColors.action : HavenColors.border,
+                    lineWidth: 1
+                ))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            if let error = newTaskValidationError {
+                Text(error)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.action)
+            }
+
+            TextField("Detail (optional)", text: $newTaskDetail, axis: .vertical)
+                .lineLimit(2...4)
+                .font(HavenTypography.body)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            Toggle("Specific due date", isOn: $newTaskUseDueDate)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+                .tint(HavenColors.navy800)
+            if newTaskUseDueDate {
+                DatePicker("Due", selection: $newTaskDueDate, in: Date()..., displayedComponents: [.date])
+                    .datePickerStyle(.compact)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+
+            HStack(spacing: 10) {
+                Button("Add to list") {
+                    addTaskToQueue()
+                }
+                .buttonStyle(FieldSecondaryButtonStyle())
+                Button("Cancel") {
+                    addingMode = .none
+                }
+                .buttonStyle(FieldGhostButtonStyle())
+            }
+        }
+        .padding(14)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var addQuoteForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("New quote draft")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text("Stage a quote draft now and finish the line items in the quote builder. The customer doesn't see anything until you send.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            TextField("Quote title (e.g. Boiler relief valve replacement)", text: $newQuoteTitle)
+                .font(HavenTypography.body)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(
+                    newQuoteValidationError != nil ? HavenColors.action : HavenColors.border,
+                    lineWidth: 1
+                ))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            if let error = newQuoteValidationError {
+                Text(error)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.action)
+            }
+
+            TextField("Scope notes (optional)", text: $newQuoteScopeNotes, axis: .vertical)
+                .lineLimit(2...5)
+                .font(HavenTypography.body)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            HStack(spacing: 10) {
+                Button("Add to list") {
+                    addQuoteToQueue()
+                }
+                .buttonStyle(FieldSecondaryButtonStyle())
+                Button("Cancel") {
+                    addingMode = .none
+                }
+                .buttonStyle(FieldGhostButtonStyle())
+            }
+        }
+        .padding(14)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var addVisitForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Schedule a follow-up visit")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text("Pick a quick slot or set a custom time. Adds the visit to your route.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            TextField("Visit title (e.g. Boiler relief valve replacement)", text: $newVisitTitle)
+                .font(HavenTypography.body)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(
+                    newVisitValidationError != nil ? HavenColors.action : HavenColors.border,
+                    lineWidth: 1
+                ))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            if let error = newVisitValidationError {
+                Text(error)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.action)
+            }
+
+            // Quick-pick slots
+            VStack(spacing: 6) {
+                ForEach(quickSlots, id: \.self) { slot in
+                    Button {
+                        newVisitDate = slot
+                    } label: {
+                        HStack {
+                            Image(systemName: abs(slot.timeIntervalSince(newVisitDate)) < 60 ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(abs(slot.timeIntervalSince(newVisitDate)) < 60 ? HavenColors.navy800 : HavenColors.textSecondary)
+                            Text(slotFormatter.string(from: slot))
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
+                        .background(abs(slot.timeIntervalSince(newVisitDate)) < 60 ? HavenColors.navy800.opacity(0.06) : HavenColors.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(abs(slot.timeIntervalSince(newVisitDate)) < 60 ? HavenColors.navy800 : HavenColors.border, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            DatePicker("Or pick exact time", selection: $newVisitDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+
+            HStack(spacing: 12) {
+                Text("Duration")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Picker("Duration", selection: $newVisitDurationMinutes) {
+                    Text("30 min").tag(30)
+                    Text("45 min").tag(45)
+                    Text("1 hr").tag(60)
+                    Text("1.5 hr").tag(90)
+                    Text("2 hr").tag(120)
+                }
+                .pickerStyle(.segmented)
+            }
+
+            TextField("Details (optional)", text: $newVisitDetails, axis: .vertical)
+                .lineLimit(2...4)
+                .font(HavenTypography.body)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            HStack(spacing: 10) {
+                Button("Add to list") {
+                    addVisitToQueue()
+                }
+                .buttonStyle(FieldSecondaryButtonStyle())
+                Button("Cancel") {
+                    addingMode = .none
+                }
+                .buttonStyle(FieldGhostButtonStyle())
+            }
+        }
+        .padding(14)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    // MARK: - Queue section
+
+    private var queueSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Suggestions queue")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                if !queue.isEmpty {
+                    Text("\(queue.count) staged")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+
+            if queue.isEmpty {
+                Text("No follow-ups yet.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(queue) { item in
+                        queueRow(for: item)
+                    }
+                }
+            }
+        }
+    }
+
+    private func queueRow(for item: FieldEndOfVisitSuggestion) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: kindIcon(item.kind))
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(HavenColors.navy800)
+                .frame(width: 28, height: 28)
+                .background(HavenColors.navy800.opacity(0.08))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                HStack(spacing: 6) {
+                    Text(kindLabel(item.kind))
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.beige200)
+                        .clipShape(Capsule())
+                    if let due = item.dueDate {
+                        Text("Due \(due)")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    if let proposed = item.proposedDate {
+                        Text(slotFormatter.string(from: proposed))
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    if item.sent {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(HavenColors.success)
+                            .font(.system(size: 12))
+                    }
+                }
+            }
+            Spacer()
+            if !item.sent {
+                Button {
+                    queue.removeAll { $0.id == item.id }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove suggestion")
+            }
+        }
+        .padding(12)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func kindIcon(_ kind: FieldEndOfVisitSuggestion.Kind) -> String {
+        switch kind {
+        case .task: return "checklist"
+        case .quote: return "doc.text"
+        case .visit: return "calendar.badge.plus"
+        }
+    }
+
+    private func kindLabel(_ kind: FieldEndOfVisitSuggestion.Kind) -> String {
+        switch kind {
+        case .task: return "TASK"
+        case .quote: return "QUOTE"
+        case .visit: return "VISIT"
+        }
+    }
+
+    // MARK: - Submit section
+
+    private var submitSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let error = submitError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(HavenColors.action)
+                    Text(error)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    Button("Retry") {
+                        submitError = nil
+                        Task { await submitAll() }
+                    }
+                    .buttonStyle(FieldSecondaryButtonStyle(compact: true))
+                }
+                .padding(12)
+                .background(HavenColors.action.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            Button {
+                Task { await submitAll() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isSubmitting {
+                        ProgressView()
+                            .tint(HavenColors.textOnAction)
+                    } else {
+                        Image(systemName: "paperplane.fill")
+                    }
+                    Text(isSubmitting ? "Sending…" : "Done — send suggestions")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+            .disabled(isSubmitting || !canSubmit)
+
+            if !canSubmit {
+                Text("Add an observation or stage at least one follow-up to send.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+    }
+
+    // MARK: - Add → queue
+
+    private func addTaskToQueue() {
+        let trimmed = newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            // C1 — empty submit fires inline validation. Salmon border
+            // on the title field + a one-line message below it.
+            newTaskValidationError = "Add a task title before staging."
+            return
+        }
+        let dueIso: String?
+        if newTaskUseDueDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            dueIso = formatter.string(from: newTaskDueDate)
+        } else {
+            dueIso = nil
+        }
+        let item = FieldEndOfVisitSuggestion(
+            kind: .task,
+            title: trimmed,
+            detail: newTaskDetail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newTaskDetail,
+            dueDate: dueIso,
+            proposedDate: nil,
+            durationMinutes: nil
+        )
+        queue.append(item)
+        addingMode = .none
+    }
+
+    private func addQuoteToQueue() {
+        let trimmed = newQuoteTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            newQuoteValidationError = "Add a quote title before staging."
+            return
+        }
+        let item = FieldEndOfVisitSuggestion(
+            kind: .quote,
+            title: trimmed,
+            detail: newQuoteScopeNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newQuoteScopeNotes,
+            dueDate: nil,
+            proposedDate: nil,
+            durationMinutes: nil
+        )
+        queue.append(item)
+        addingMode = .none
+    }
+
+    private func addVisitToQueue() {
+        let trimmed = newVisitTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            newVisitValidationError = "Add a visit title before staging."
+            return
+        }
+        let item = FieldEndOfVisitSuggestion(
+            kind: .visit,
+            title: trimmed,
+            detail: newVisitDetails.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newVisitDetails,
+            dueDate: nil,
+            proposedDate: newVisitDate,
+            durationMinutes: newVisitDurationMinutes
+        )
+        queue.append(item)
+        addingMode = .none
+    }
+
+    // MARK: - Submit all
+
+    private func submitAll() async {
+        guard !isSubmitting else { return }
+        guard canSubmit else { return }
+        isSubmitting = true
+        submitError = nil
+        defer { isSubmitting = false }
+
+        // 1. The observation lands as an internal tech note (workspace
+        //    only) — same M6 surface, no new edge fn needed. Skip the
+        //    write if the field is empty.
+        let trimmedObservation = observation.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedObservation.isEmpty {
+            do {
+                _ = try await HavenFieldService.shared.addTechNote(
+                    workspaceId: workspaceId,
+                    requestId: requestId,
+                    body: "Observation: \(trimmedObservation)"
+                )
+            } catch {
+                submitError = friendlyServerError(from: error, fallback: "Couldn't save your observation. Tap Retry.")
+                return
+            }
+        }
+
+        // 2. Walk the queue. Order doesn't matter for correctness, but
+        //    we send tasks first (lightest), then quotes, then visits
+        //    (heaviest — touches the calendar). Sent items get marked
+        //    so the queue row renders a check + the Remove button
+        //    disappears. If a single item fails, we surface the error
+        //    + bail; the user can Retry to flush the rest.
+        var openedQuoteId: String? = nil
+        for index in queue.indices where !queue[index].sent {
+            let item = queue[index]
+            do {
+                switch item.kind {
+                case .task:
+                    _ = try await HavenFieldService.shared.suggestFollowupTask(
+                        workspaceId: workspaceId,
+                        requestId: requestId,
+                        title: item.title,
+                        description: item.detail,
+                        dueDate: item.dueDate
+                    )
+                case .quote:
+                    let quoteId = try await HavenFieldService.shared.suggestFollowupQuote(
+                        workspaceId: workspaceId,
+                        requestId: requestId,
+                        title: item.title,
+                        scopeNotes: item.detail
+                    )
+                    openedQuoteId = quoteId
+                case .visit:
+                    guard let proposed = item.proposedDate else {
+                        submitError = "One of the visits is missing a proposed time."
+                        return
+                    }
+                    _ = try await HavenFieldService.shared.scheduleFollowupVisit(
+                        workspaceId: workspaceId,
+                        requestId: requestId,
+                        proposedDate: proposed,
+                        durationMinutes: item.durationMinutes ?? 60,
+                        title: item.title,
+                        details: item.detail
+                    )
+                }
+                queue[index].sent = true
+            } catch {
+                submitError = friendlyServerError(from: error, fallback: "Couldn't send a suggestion. Tap Retry to send the rest.")
+                return
+            }
+        }
+
+        // 3. All sent. Clear persisted draft (E1 cache no longer
+        //    needed) and dismiss with `didSave=true` so the parent
+        //    fires the success banner.
+        clearPersistedDraft()
+
+        // If the tech staged at least one quote, hand off to M4's
+        // BuildQuoteSheet over the most recent draft so they can finish
+        // the line items + signature inline.
+        if let quoteId = openedQuoteId {
+            onOpenQuoteDraft(quoteId)
+        } else {
+            onDismiss(true)
+        }
+        dismiss()
+    }
+
+    // MARK: - Persistence
+
+    private func hydrateFromBinding() {
+        let raw = draftJsonBinding
+        guard !raw.isEmpty, let data = raw.data(using: .utf8) else { return }
+        do {
+            let draft = try JSONDecoder().decode(FieldEndOfVisitWizardDraft.self, from: data)
+            observation = draft.observation
+            queue = draft.queue
+        } catch {
+            // Corrupt cache — wipe it so the next persist starts clean.
+            draftJsonBinding = ""
+        }
+    }
+
+    private func persistDraft() {
+        let draft = FieldEndOfVisitWizardDraft(observation: observation, queue: queue)
+        guard let data = try? JSONEncoder().encode(draft),
+              let raw = String(data: data, encoding: .utf8) else { return }
+        draftJsonBinding = raw
+    }
+
+    private func clearPersistedDraft() {
+        draftJsonBinding = ""
     }
 }
 

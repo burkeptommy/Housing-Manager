@@ -292,6 +292,12 @@ export interface VisitRow {
   /// row so emergency-routing requests render with a critical pill instead
   /// of a routine indigo one.
   urgency?: string | null;
+  /// Wave M8 — set when the visit was scheduled from the field tech's
+  /// end-of-visit wizard via `schedule_followup_visit`. Drives the
+  /// "Suggested by visit" badge on Dispatch / Visits surfaces so the
+  /// operator knows the row was tech-driven (not a homeowner submission
+  /// or admin route).
+  suggestedByRequestId?: string | null;
 }
 
 export interface HomeSystemPhoto {
@@ -495,6 +501,16 @@ export interface Quote {
   signaturePath: string | null;
   signerRole: string | null;
   homeownerRevisedAt: string | null;
+  /**
+   * Wave M8 — set when the quote was staged from the field tech's
+   * end-of-visit wizard (the row was created by the
+   * `suggest_followup_quote` action with the originating
+   * handyman_request id stamped into `suggested_by_request_id`). Drives
+   * the "Suggested by visit" badge on the Quotes list + selected card,
+   * so the operator knows the row didn't go through the full quote
+   * builder yet — only the title + scope notes are populated.
+   */
+  suggestedByRequestId: string | null;
 }
 
 export interface SavedQuoteItem {

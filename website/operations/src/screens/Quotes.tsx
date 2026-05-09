@@ -185,6 +185,20 @@ export default function QuotesScreen() {
                             BUNDLE
                           </span>
                         )}
+                        {q.suggestedByRequestId && (
+                          /* Wave M8 — quote was staged from the field
+                             tech's end-of-visit wizard. Operator
+                             knows it needs line items + a send. */
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                            color: "var(--indigo)",
+                            background: "var(--pearl)",
+                            padding: "2px 7px", borderRadius: 999,
+                            border: "1px solid var(--neutral-300)",
+                          }}>
+                            SUGGESTED
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
                         {q.title} · {subtitleSuffix} · {formatRelativeTime(q.updatedAt)}
