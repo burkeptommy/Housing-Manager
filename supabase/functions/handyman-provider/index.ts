@@ -1945,13 +1945,20 @@ async function loadDashboard(
       .eq("workspace_id", workspaceId)
       .order("route_date", { ascending: true })
       .order("stop_order", { ascending: true }),
+    // Bugfix Sprint #5 R7-E-1 — bumped cap from 120 → 500. The
+    // previous 120 cap silently truncated active workspaces (a 5-tech
+    // crew running 5 visits/day hits 120 in <1 week of backlog). 500
+    // covers ~3 months of active-workspace volume; real pagination +
+    // total_count is deferred to a future wave. Tiebreak by id so
+    // updated_at ties don't drop rows non-deterministically.
     contractorIds.length
       ? service
           .from("handyman_requests")
           .select("*")
           .in("contractor_id", contractorIds)
           .order("updated_at", { ascending: false })
-          .limit(120)
+          .order("id", { ascending: true })
+          .limit(500)
       : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
     contractorIds.length
       ? service
@@ -1959,14 +1966,16 @@ async function loadDashboard(
           .select("*")
           .in("contractor_id", contractorIds)
           .order("updated_at", { ascending: false })
-          .limit(120)
+          .order("id", { ascending: true })
+          .limit(500)
       : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
     service
       .from("provider_quotes")
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("updated_at", { ascending: false })
-      .limit(120),
+      .order("id", { ascending: true })
+      .limit(500),
     service
       .from("provider_saved_quote_items")
       .select("*")
@@ -1979,7 +1988,8 @@ async function loadDashboard(
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("updated_at", { ascending: false })
-      .limit(120),
+      .order("id", { ascending: true })
+      .limit(500),
     // Wave S — fetch every workspace this user can switch into. Filtered
     // to active memberships only so revoked/invited rows never leak. The
     // joined `provider_workspaces` row gives us company_name + primary_email.

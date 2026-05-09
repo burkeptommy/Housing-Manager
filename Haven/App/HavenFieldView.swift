@@ -5398,11 +5398,28 @@ private struct HavenFieldHomeTab: View {
     private var todayRouteSummary: RouteSummary? {
         let stops = todayVisits.count
         guard stops > 0 else { return nil }
-        // Estimate: 15 min driving between consecutive stops, plus 10 min
-        // initial leg. NOT a real routing call — flagged in the JSON
-        // output as `route_summary_uses_stub_drive_time: true`.
-        let driveMinutes = max(0, (stops - 1) * 15) + 10
-        let estimatedMiles = stops * 6
+        // Bugfix Sprint #5 R7-E-3 — dedup by location before estimating
+        // drive time + miles. Two visits at the same propertyId (or two
+        // visits with no propertyId at all that share an address) are
+        // ONE physical stop on the route. The previous code treated
+        // every assignment as a separate leg, which produced "606 miles
+        // / 25h drive time" for 100 visits at the same address.
+        // Visits with no propertyId fall back to a synthesized key from
+        // the property summary's address line so the dedup still works
+        // for prospect / unhoused requests.
+        var locationKeys = Set<String>()
+        for visit in todayVisits {
+            let key = visit.propertyId
+                ?? visit.property?.address?.lowercased()
+                ?? "visit:\(visit.requestId)"
+            locationKeys.insert(key)
+        }
+        let uniqueLocations = max(1, locationKeys.count)
+        // Estimate: 15 min driving between consecutive UNIQUE stops, plus
+        // 10 min initial leg. NOT a real routing call — flagged in the
+        // JSON output as `route_summary_uses_stub_drive_time: true`.
+        let driveMinutes = max(0, (uniqueLocations - 1) * 15) + 10
+        let estimatedMiles = uniqueLocations * 6
         return RouteSummary(
             stops: stops,
             driveMinutes: driveMinutes,
@@ -12485,8 +12502,16 @@ private struct FieldWorkspaceHeader: View {
                     .frame(width: 36, height: 36)
                     .background(HavenColors.indigo50)
                     .clipShape(Circle())
+                    // Bugfix Sprint #5 R6 hit-target — visible chrome stays
+                    // 36×36 (intentional design density) but the tappable
+                    // hit target meets WCAG 2.5.5 / Apple HIG 44pt minimum.
+                    // .contentShape inside .frame keeps the visual tile
+                    // sized while expanding the actual touch area.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Settings")
         }
     }
 
@@ -19665,7 +19690,28 @@ private func fieldVisitSort(_ lhs: HavenFieldVisit, _ rhs: HavenFieldVisit) -> B
     let rightWindow = rhs.assignment?.windowStartTime?.trimmedOrNil ?? "99:99"
     if leftWindow != rightWindow { return leftWindow < rightWindow }
 
-    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    // Bugfix Sprint #5 R7-E-2 — assignment stop_order is the canonical
+    // route-position field when set; honor it before falling back to
+    // title. Two visits at the same route_date + window with different
+    // stop_orders should sort by stop_order (the dispatcher's planned
+    // sequence), not alphabetically by title.
+    let leftStop = lhs.assignment?.stopOrder ?? Int.max
+    let rightStop = rhs.assignment?.stopOrder ?? Int.max
+    if leftStop != rightStop { return leftStop < rightStop }
+
+    // Bugfix Sprint #5 R7-E-2 — use natural / numeric-aware comparison
+    // so "Visit #2" sorts before "Visit #10" instead of after it. The
+    // .numeric option treats embedded digit runs as numbers rather than
+    // characters — fixes the "Visit #1, #10, #100, #11" ordering bug.
+    let titleComparison = lhs.title.compare(
+        rhs.title,
+        options: [.caseInsensitive, .numeric]
+    )
+    if titleComparison != .orderedSame { return titleComparison == .orderedAscending }
+
+    // Final tiebreaker — request id, so the order is deterministic
+    // across renders even when title + window + stop are identical.
+    return lhs.requestId < rhs.requestId
 }
 
 private extension HavenFieldMessageThread {
