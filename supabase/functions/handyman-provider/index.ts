@@ -4023,6 +4023,375 @@ async function completeVisitForProvider(
   return { assignment: serializeAssignment(updated), totalSeconds };
 }
 
+// MARK: - Wave M11 — End-of-day summary + day completion
+//
+// Aggregates today's stops + clock totals + materials + invoiced revenue +
+// a tomorrow preview. Reads M1's clock_in_at / clock_out_at / paused_seconds
+// off provider_visit_assignments and falls back to 0 cleanly if any layer
+// (M5 invoices, attachments, materials) hasn't shipped yet. The iOS app
+// renders this as the "Day complete" hero on the Today tab once the last
+// stop's clock_out_at lands.
+
+const FIELD_DEFAULT_TIMEZONE = "America/New_York";
+
+function fieldFormatYmdInZone(date: Date, timeZone: string): string {
+  // Intl gives us locale-formatted parts in the workspace tz; we reassemble
+  // YYYY-MM-DD so the comparison against route_date (DATE column, no tz)
+  // matches calendar day in the operator's frame, not UTC.
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = fmt.formatToParts(date);
+    const y = parts.find((p) => p.type === "year")?.value ?? "1970";
+    const m = parts.find((p) => p.type === "month")?.value ?? "01";
+    const d = parts.find((p) => p.type === "day")?.value ?? "01";
+    return `${y}-${m}-${d}`;
+  } catch {
+    // Fallback to naive UTC if timezone string is invalid
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+function fieldAddDaysYmd(ymd: string, days: number): string {
+  // ymd is YYYY-MM-DD; treat as UTC for the +1d math then re-emit.
+  // Day arithmetic across DST is fine because we're only adding integer
+  // days and never asking for an hour-of-day.
+  const [y, m, d] = ymd.split("-").map((s) => Number(s));
+  if (!y || !m || !d) return ymd;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+async function todaySummaryForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  if (!userId) throw new Error("Unauthenticated");
+
+  // Resolve workspace: prefer the body's workspaceId (so multi-workspace
+  // users hit the one they're viewing), fall back to the caller's first
+  // active membership when omitted (sole-mode default).
+  let workspaceId = compactString(body.workspaceId);
+  if (workspaceId) {
+    await assertWorkspaceAccess(service, userId, workspaceId);
+  } else {
+    const m = await getWorkspaceMembership(service, userId);
+    if (!m) throw new Error("No provider workspace found");
+    const ws = (m as Record<string, unknown>).provider_workspaces as
+      | Record<string, unknown>
+      | undefined;
+    workspaceId = compactString(ws?.id);
+    if (!workspaceId) throw new Error("Workspace id missing on membership row.");
+  }
+
+  // Workspace timezone: provider_workspaces has no tz column today, so
+  // we default to America/New_York. If the workspace has at least one
+  // linked household with a primary property carrying time_zone, prefer
+  // that. Soft fallback — bad lookups never block the summary.
+  let timeZone = FIELD_DEFAULT_TIMEZONE;
+  try {
+    const { data: linkRow } = await service
+      .from("provider_contractor_links")
+      .select("contractor_id")
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .maybeSingle();
+    const contractorId = compactString(linkRow?.contractor_id);
+    if (contractorId) {
+      const { data: contractor } = await service
+        .from("contractors")
+        .select("household_id")
+        .eq("id", contractorId)
+        .maybeSingle();
+      const householdId = compactString(contractor?.household_id);
+      if (householdId) {
+        const { data: prop } = await service
+          .from("properties")
+          .select("time_zone")
+          .eq("household_id", householdId)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        const propTz = compactString(prop?.time_zone);
+        if (propTz) timeZone = propTz;
+      }
+    }
+  } catch (err) {
+    console.error("[handyman-provider] today_summary tz lookup failed", err);
+  }
+
+  const now = new Date();
+  const todayYmd = fieldFormatYmdInZone(now, timeZone);
+  const tomorrowYmd = fieldAddDaysYmd(todayYmd, 1);
+
+  // Pull all assignments scheduled for today. We filter completed vs
+  // remaining in JS off clock_out_at (M1's lifecycle column).
+  const { data: todayAssignmentsRaw, error: todayErr } = await service
+    .from("provider_visit_assignments")
+    .select(
+      "id, request_id, route_date, window_start_time, stop_order, clock_in_at, clock_out_at, paused_seconds",
+    )
+    .eq("workspace_id", workspaceId)
+    .eq("route_date", todayYmd)
+    .order("stop_order", { ascending: true });
+  if (todayErr) throw todayErr;
+  const todayAssignments = (todayAssignmentsRaw ?? []) as Array<Record<string, unknown>>;
+
+  // Stops completed today vs remaining
+  const completedAssignments = todayAssignments.filter(
+    (a) => !!compactString(a.clock_out_at),
+  );
+  const remainingAssignments = todayAssignments.filter(
+    (a) => !compactString(a.clock_out_at),
+  );
+
+  // Total clock minutes across today's completed assignments. For each
+  // assignment with both clock_in_at + clock_out_at, total = (out - in) -
+  // paused_seconds. Round to whole minutes; rounding errors of ±1 minute
+  // per stop are well within the precision the field tech actually cares
+  // about.
+  let totalClockSeconds = 0;
+  for (const a of completedAssignments) {
+    const inAt = compactString(a.clock_in_at);
+    const outAt = compactString(a.clock_out_at);
+    if (!inAt || !outAt) continue;
+    const inMs = new Date(inAt).getTime();
+    const outMs = new Date(outAt).getTime();
+    if (!Number.isFinite(inMs) || !Number.isFinite(outMs) || outMs <= inMs) continue;
+    const elapsed = Math.max(0, Math.round((outMs - inMs) / 1000) - numberValue(a.paused_seconds || 0));
+    totalClockSeconds += elapsed;
+  }
+  const totalClockMinutes = Math.round(totalClockSeconds / 60);
+
+  // Resolve today's request rows for customer + address. One round-trip
+  // for every today_request_id, then index for the per-stop loop.
+  const todayRequestIds = todayAssignments
+    .map((a) => compactString(a.request_id))
+    .filter((id) => !!id);
+  const requestById = new Map<string, Record<string, unknown>>();
+  if (todayRequestIds.length > 0) {
+    const { data: requestRows, error: requestErr } = await service
+      .from("handyman_requests")
+      .select("id, title, household_id, property_id, visit_task_id, contractor_id")
+      .in("id", todayRequestIds);
+    if (requestErr) throw requestErr;
+    for (const r of (requestRows ?? []) as Array<Record<string, unknown>>) {
+      const id = compactString(r.id);
+      if (id) requestById.set(id, r);
+    }
+  }
+
+  // Resolve property rows for address line on each stop
+  const todayPropertyIds = Array.from(requestById.values())
+    .map((r) => compactString(r.property_id))
+    .filter((id) => !!id);
+  const propertyById = new Map<string, Record<string, unknown>>();
+  if (todayPropertyIds.length > 0) {
+    const { data: propRows } = await service
+      .from("properties")
+      .select("id, address, household_id")
+      .in("id", todayPropertyIds);
+    for (const p of (propRows ?? []) as Array<Record<string, unknown>>) {
+      const id = compactString(p.id);
+      if (id) propertyById.set(id, p);
+    }
+  }
+
+  // Resolve household → primary user name for customer label. Lazy lookup
+  // per household so we don't blow N+1 queries when the same household has
+  // multiple stops on the same day.
+  const todayHouseholdIds = new Set<string>();
+  for (const r of requestById.values()) {
+    const hid = compactString(r.household_id);
+    if (hid) todayHouseholdIds.add(hid);
+  }
+  const customerByHousehold = new Map<string, string>();
+  if (todayHouseholdIds.size > 0) {
+    const { data: userRows } = await service
+      .from("users")
+      .select("household_id, first_name, last_name, email")
+      .in("household_id", Array.from(todayHouseholdIds))
+      .order("created_at", { ascending: true });
+    for (const u of (userRows ?? []) as Array<Record<string, unknown>>) {
+      const hid = compactString(u.household_id);
+      if (!hid || customerByHousehold.has(hid)) continue;
+      const first = compactString(u.first_name);
+      const last = compactString(u.last_name);
+      const full = [first, last].filter((s) => s.length > 0).join(" ");
+      customerByHousehold.set(hid, full || compactString(u.email) || "Customer");
+    }
+  }
+
+  // Materials cost across today's punch items. Sum across every punch item
+  // attached to today's visit_task_ids: qty * unit_cost. Round to whole
+  // cents at the end.
+  let materialsCostCents = 0;
+  const visitTaskIds = Array.from(requestById.values())
+    .map((r) => compactString(r.visit_task_id))
+    .filter((id) => !!id);
+  if (visitTaskIds.length > 0) {
+    const { data: punchRows } = await service
+      .from("handyman_punch_items")
+      .select("materials_used, assigned_visit_task_id")
+      .in("assigned_visit_task_id", visitTaskIds)
+      .is("archived_at", null);
+    for (const p of (punchRows ?? []) as Array<Record<string, unknown>>) {
+      const materials = Array.isArray(p.materials_used) ? p.materials_used : [];
+      for (const m of materials as Array<Record<string, unknown>>) {
+        const qty = Number(m.qty || 0);
+        const unitCost = Number(m.unit_cost || 0);
+        if (Number.isFinite(qty) && Number.isFinite(unitCost) && qty > 0 && unitCost > 0) {
+          materialsCostCents += Math.round(qty * unitCost * 100);
+        }
+      }
+    }
+  }
+
+  // Revenue invoiced today. Sum provider_invoices.total where workspace_id
+  // matches AND DATE(sent_at) in workspace tz = today. Best-effort — if
+  // the table doesn't exist (M5 hasn't shipped yet on this branch), or the
+  // query errors, gracefully return 0.
+  let revenueInvoicedCents = 0;
+  const invoiceByRequestId = new Map<string, string>();
+  try {
+    // Pull every invoice for this workspace that was sent in the last 48h
+    // (covers any tz drift) — filter to today in JS.
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const { data: invRows, error: invErr } = await service
+      .from("provider_invoices")
+      .select("id, request_id, total, sent_at, status")
+      .eq("workspace_id", workspaceId)
+      .gte("sent_at", cutoff)
+      .not("sent_at", "is", null);
+    if (invErr) {
+      console.error("[handyman-provider] today_summary invoices read failed", invErr);
+    } else {
+      for (const inv of (invRows ?? []) as Array<Record<string, unknown>>) {
+        const sentAt = compactString(inv.sent_at);
+        if (!sentAt) continue;
+        const sentYmd = fieldFormatYmdInZone(new Date(sentAt), timeZone);
+        if (sentYmd !== todayYmd) continue;
+        const totalDollars = Number(inv.total || 0);
+        if (Number.isFinite(totalDollars) && totalDollars > 0) {
+          revenueInvoicedCents += Math.round(totalDollars * 100);
+        }
+        const reqId = compactString(inv.request_id);
+        const invId = compactString(inv.id);
+        if (reqId && invId && !invoiceByRequestId.has(reqId)) {
+          invoiceByRequestId.set(reqId, invId);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[handyman-provider] today_summary invoices lookup failed", err);
+  }
+
+  // Build per-stop summary for the iOS list. Order matches stop_order
+  // ascending (already sorted off the SELECT).
+  const stops = todayAssignments.map((a) => {
+    const requestId = compactString(a.request_id);
+    const request = requestId ? requestById.get(requestId) : undefined;
+    const propertyId = compactString(request?.property_id);
+    const property = propertyId ? propertyById.get(propertyId) : undefined;
+    const householdId = compactString(request?.household_id);
+    const customerName = householdId
+      ? (customerByHousehold.get(householdId) || "Customer")
+      : "Customer";
+    const inAt = compactString(a.clock_in_at);
+    const outAt = compactString(a.clock_out_at);
+    let totalMinutes = 0;
+    if (inAt && outAt) {
+      const inMs = new Date(inAt).getTime();
+      const outMs = new Date(outAt).getTime();
+      if (Number.isFinite(inMs) && Number.isFinite(outMs) && outMs > inMs) {
+        totalMinutes = Math.round(
+          (Math.max(0, (outMs - inMs) / 1000) - numberValue(a.paused_seconds || 0)) / 60,
+        );
+      }
+    }
+    return {
+      requestId,
+      customerName,
+      address: compactString(property?.address) || "",
+      title: compactString(request?.title) || "Visit",
+      clockInAt: inAt || null,
+      clockOutAt: outAt || null,
+      totalMinutes,
+      invoiceId: requestId ? (invoiceByRequestId.get(requestId) || null) : null,
+    };
+  });
+
+  // Tomorrow preview — count + first stop. We pull the same shape as
+  // today, but only enough to surface the headline.
+  const { data: tomorrowAssignmentsRaw } = await service
+    .from("provider_visit_assignments")
+    .select("id, request_id, window_start_time, stop_order")
+    .eq("workspace_id", workspaceId)
+    .eq("route_date", tomorrowYmd)
+    .order("stop_order", { ascending: true });
+  const tomorrowAssignments = (tomorrowAssignmentsRaw ?? []) as Array<Record<string, unknown>>;
+
+  let firstAt: string | null = null;
+  let firstCustomer: string | null = null;
+  if (tomorrowAssignments.length > 0) {
+    const first = tomorrowAssignments[0];
+    firstAt = compactString(first.window_start_time) || null;
+    const firstRequestId = compactString(first.request_id);
+    if (firstRequestId) {
+      const { data: reqRow } = await service
+        .from("handyman_requests")
+        .select("household_id")
+        .eq("id", firstRequestId)
+        .maybeSingle();
+      const hid = compactString(reqRow?.household_id);
+      if (hid) {
+        const { data: userRow } = await service
+          .from("users")
+          .select("first_name, last_name, email")
+          .eq("household_id", hid)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (userRow) {
+          const f = compactString(userRow.first_name);
+          const l = compactString(userRow.last_name);
+          const full = [f, l].filter((s) => s.length > 0).join(" ");
+          firstCustomer = full || compactString(userRow.email) || null;
+        }
+      }
+    }
+  }
+
+  return {
+    today: {
+      date: todayYmd,
+      stopsCompleted: completedAssignments.length,
+      stopsRemaining: remainingAssignments.length,
+      totalClockMinutes,
+      materialsCostCents,
+      revenueInvoicedCents,
+      stops,
+    },
+    tomorrow: {
+      date: tomorrowYmd,
+      stopsCount: tomorrowAssignments.length,
+      firstAt,
+      firstCustomer,
+      weather: null,
+    },
+  };
+}
+
 // MARK: - Wave M6 — internal tech-to-tech notes
 //
 // Distinct from the customer-visible thread on `handyman_request_messages`.
@@ -10456,6 +10825,20 @@ serve(async (req) => {
 
       if (action === "complete_visit") {
         const result = await completeVisitForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M11 — End-of-day summary. Aggregates today's stops + clock
+      // totals + materials + invoiced revenue + tomorrow preview. Reads
+      // M1's clock_in_at / clock_out_at off provider_visit_assignments;
+      // gracefully returns 0 revenue when M5's provider_invoices isn't
+      // populated yet.
+      if (action === "today_summary") {
+        const result = await todaySummaryForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,

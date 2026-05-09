@@ -974,6 +974,199 @@ struct HavenFieldSignedQuote: Codable, Hashable {
     }
 }
 
+// MARK: - Wave M11 — End-of-day summary models
+//
+// Mirrors the response shape of the `today_summary` action on
+// handyman-provider. Three nested types: the parent envelope, the
+// today block (with stops + clock totals + materials + revenue), and
+// the tomorrow preview. Resilient decoders throughout so a single bad
+// stop or a missing tomorrow block degrades gracefully without taking
+// the whole sheet down.
+
+struct HavenFieldDayStop: Codable, Identifiable, Hashable {
+    let requestId: String
+    let customerName: String
+    let address: String
+    let title: String
+    let clockInAt: String?
+    let clockOutAt: String?
+    let totalMinutes: Int
+    let invoiceId: String?
+
+    var id: String { requestId }
+
+    private enum CodingKeys: String, CodingKey {
+        case requestId
+        case customerName
+        case address
+        case title
+        case clockInAt
+        case clockOutAt
+        case totalMinutes
+        case invoiceId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        requestId = (try? c.decodeIfPresent(String.self, forKey: .requestId)) ?? ""
+        customerName = (try? c.decodeIfPresent(String.self, forKey: .customerName)) ?? "Customer"
+        address = (try? c.decodeIfPresent(String.self, forKey: .address)) ?? ""
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? "Visit"
+        clockInAt = (try? c.decodeIfPresent(String.self, forKey: .clockInAt)) ?? nil
+        clockOutAt = (try? c.decodeIfPresent(String.self, forKey: .clockOutAt)) ?? nil
+        totalMinutes = (try? c.decodeIfPresent(Int.self, forKey: .totalMinutes)) ?? 0
+        invoiceId = (try? c.decodeIfPresent(String.self, forKey: .invoiceId)) ?? nil
+    }
+
+    init(
+        requestId: String,
+        customerName: String,
+        address: String,
+        title: String,
+        clockInAt: String?,
+        clockOutAt: String?,
+        totalMinutes: Int,
+        invoiceId: String?
+    ) {
+        self.requestId = requestId
+        self.customerName = customerName
+        self.address = address
+        self.title = title
+        self.clockInAt = clockInAt
+        self.clockOutAt = clockOutAt
+        self.totalMinutes = totalMinutes
+        self.invoiceId = invoiceId
+    }
+}
+
+struct HavenFieldDayToday: Codable, Hashable {
+    let date: String
+    let stopsCompleted: Int
+    let stopsRemaining: Int
+    let totalClockMinutes: Int
+    let materialsCostCents: Int
+    let revenueInvoicedCents: Int
+    let stops: [HavenFieldDayStop]
+
+    private enum CodingKeys: String, CodingKey {
+        case date
+        case stopsCompleted
+        case stopsRemaining
+        case totalClockMinutes
+        case materialsCostCents
+        case revenueInvoicedCents
+        case stops
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = (try? c.decodeIfPresent(String.self, forKey: .date)) ?? ""
+        stopsCompleted = (try? c.decodeIfPresent(Int.self, forKey: .stopsCompleted)) ?? 0
+        stopsRemaining = (try? c.decodeIfPresent(Int.self, forKey: .stopsRemaining)) ?? 0
+        totalClockMinutes = (try? c.decodeIfPresent(Int.self, forKey: .totalClockMinutes)) ?? 0
+        materialsCostCents = (try? c.decodeIfPresent(Int.self, forKey: .materialsCostCents)) ?? 0
+        revenueInvoicedCents = (try? c.decodeIfPresent(Int.self, forKey: .revenueInvoicedCents)) ?? 0
+        // One bad stop element shouldn't take the whole array down. The
+        // try? at the array level lets a future shape drift on a single
+        // row degrade the bad row to skipped without losing the rest.
+        stops = (try? c.decodeIfPresent([HavenFieldDayStop].self, forKey: .stops)) ?? []
+    }
+
+    init(
+        date: String,
+        stopsCompleted: Int,
+        stopsRemaining: Int,
+        totalClockMinutes: Int,
+        materialsCostCents: Int,
+        revenueInvoicedCents: Int,
+        stops: [HavenFieldDayStop]
+    ) {
+        self.date = date
+        self.stopsCompleted = stopsCompleted
+        self.stopsRemaining = stopsRemaining
+        self.totalClockMinutes = totalClockMinutes
+        self.materialsCostCents = materialsCostCents
+        self.revenueInvoicedCents = revenueInvoicedCents
+        self.stops = stops
+    }
+}
+
+struct HavenFieldDayTomorrow: Codable, Hashable {
+    let date: String
+    let stopsCount: Int
+    let firstAt: String?
+    let firstCustomer: String?
+    /// Phase-stub for a future weather API integration. Server returns
+    /// null today; we keep the field decoded so the UI can render it
+    /// once a back-end weather lookup ships without a model migration.
+    let weather: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case date
+        case stopsCount
+        case firstAt
+        case firstCustomer
+        case weather
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = (try? c.decodeIfPresent(String.self, forKey: .date)) ?? ""
+        stopsCount = (try? c.decodeIfPresent(Int.self, forKey: .stopsCount)) ?? 0
+        firstAt = (try? c.decodeIfPresent(String.self, forKey: .firstAt)) ?? nil
+        firstCustomer = (try? c.decodeIfPresent(String.self, forKey: .firstCustomer)) ?? nil
+        weather = (try? c.decodeIfPresent(String.self, forKey: .weather)) ?? nil
+    }
+
+    init(date: String, stopsCount: Int, firstAt: String?, firstCustomer: String?, weather: String?) {
+        self.date = date
+        self.stopsCount = stopsCount
+        self.firstAt = firstAt
+        self.firstCustomer = firstCustomer
+        self.weather = weather
+    }
+}
+
+struct HavenFieldDaySummary: Codable, Hashable {
+    let today: HavenFieldDayToday
+    let tomorrow: HavenFieldDayTomorrow
+
+    private enum CodingKeys: String, CodingKey {
+        case today
+        case tomorrow
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Defensive defaults — if the server ever drifts the shape,
+        // an empty Today / Tomorrow block renders the empty state
+        // rather than crashing the sheet.
+        today = (try? c.decodeIfPresent(HavenFieldDayToday.self, forKey: .today))
+            ?? HavenFieldDayToday(
+                date: "",
+                stopsCompleted: 0,
+                stopsRemaining: 0,
+                totalClockMinutes: 0,
+                materialsCostCents: 0,
+                revenueInvoicedCents: 0,
+                stops: []
+            )
+        tomorrow = (try? c.decodeIfPresent(HavenFieldDayTomorrow.self, forKey: .tomorrow))
+            ?? HavenFieldDayTomorrow(
+                date: "",
+                stopsCount: 0,
+                firstAt: nil,
+                firstCustomer: nil,
+                weather: nil
+            )
+    }
+
+    init(today: HavenFieldDayToday, tomorrow: HavenFieldDayTomorrow) {
+        self.today = today
+        self.tomorrow = tomorrow
+    }
+}
+
 struct HavenFieldHome: Codable, Identifiable {
     let id: String
     let propertyId: String
@@ -2145,6 +2338,28 @@ actor HavenFieldService {
             expecting: Response.self
         )
         return response.quote
+    }
+
+    // MARK: - Wave M11 end-of-day summary
+
+    /// Wave M11 — fetch today's stops + clock totals + materials + invoiced
+    /// revenue + tomorrow preview for the End of Day surface. workspaceId
+    /// is optional — when omitted, the server resolves the caller's first
+    /// active workspace (matches the iOS sole-mode default). Always returns
+    /// a HavenFieldDaySummary; resilient decoders mean a partial server
+    /// shape still hydrates the visible parts.
+    func todaySummary(workspaceId: String?) async throws -> HavenFieldDaySummary {
+        struct Request: Encodable {
+            let action = "today_summary"
+            let workspaceId: String?
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId))
+        return try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldDaySummary.self
+        )
     }
 
     // MARK: - Wave M6 internal tech notes
@@ -3361,11 +3576,38 @@ private struct HavenFieldHomeTab: View {
     @ObservedObject var viewModel: HavenFieldViewModel
     @EnvironmentObject private var appState: AppState
     @State private var showSettings = false
+    /// Wave M11 — End of Day sheet. Surfaced once the last today-stop's
+    /// status flips to `completed` (no more visits in the upcoming queue
+    /// and at least one with a completed-today status). Operator-controlled
+    /// — they tap the CTA when ready to sign off; we don't auto-present.
+    @State private var showEndOfDay = false
 
     private var requestedVisits: [HavenFieldVisit] {
         (viewModel.dashboard?.visits ?? [])
             .filter(\.belongsInRequestQueue)
             .sorted(by: fieldVisitSort)
+    }
+
+    /// Wave M11 — today's COMPLETED stops. We can't reuse `todayVisits`
+    /// because that's gated on `belongsInUpcomingQueue` (status NOT yet
+    /// completed). The End-of-day signal is "did the user finish at least
+    /// one stop today AND have nothing remaining". So we count completed
+    /// status rows whose route_date or scheduledDate is today, AND we know
+    /// there's nothing left in todayVisits (which excludes completed).
+    private var todayCompletedCount: Int {
+        guard let dashboard = viewModel.dashboard else { return 0 }
+        let today = DateFormatter.havenISODate.string(from: Date())
+        return dashboard.visits
+            .filter { ($0.routeDate ?? $0.visit?.scheduledDate ?? "") == today }
+            .filter { $0.status == HandymanRequestStatus.completed.rawValue }
+            .count
+    }
+
+    /// Wave M11 — show the End of Day CTA when remaining today-stops is 0
+    /// AND at least one stop was completed today. Field tech sees the
+    /// "Wrap up the day" salmon pill below the route summary.
+    private var canShowEndOfDayCTA: Bool {
+        todayVisits.isEmpty && todayCompletedCount > 0
     }
 
     private var todayVisits: [HavenFieldVisit] {
@@ -3518,6 +3760,28 @@ private struct HavenFieldHomeTab: View {
                     )
                 }
 
+                // Wave M11 — End of Day CTA. Visible when the field tech
+                // has finished every today-stop. Salmon pill so it reads
+                // as the natural next action; tap opens a focused sheet
+                // with the day's totals + tomorrow preview.
+                if canShowEndOfDayCTA {
+                    Button {
+                        showEndOfDay = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text("Wrap up the day")
+                                .font(HavenTypography.uiLabel)
+                            Spacer(minLength: 0)
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                }
+
                 if routePreviewVisits.isEmpty {
                     FieldForwardMomentumCard(
                         title: "No route is on deck yet",
@@ -3623,6 +3887,12 @@ private struct HavenFieldHomeTab: View {
             ) {
                 appState.authService.signOut()
             }
+        }
+        .sheet(isPresented: $showEndOfDay) {
+            // Wave M11 — end-of-day summary sheet. Loads its own state
+            // off `today_summary`. Presented as a focused sheet so the
+            // sign-off motion is intentional.
+            FieldEndOfDayView(workspaceId: viewModel.dashboard?.workspace?.id)
         }
     }
 
@@ -8403,6 +8673,333 @@ private struct FieldRouteSummaryCard: View {
     }
 }
 
+// MARK: - Wave M11 — End of Day view
+//
+// Operational closure for the field tech. Renders today's totals (stops,
+// hours, revenue, materials), the per-stop list (each tappable to the
+// invoice if there is one), a tomorrow preview, and a "Sign off" CTA
+// that just dismisses with a toast — no DB write yet (future timekeeping
+// hook).
+
+private struct FieldEndOfDayView: View {
+    let workspaceId: String?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var summary: HavenFieldDaySummary?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var signedOff = false
+
+    private var weekdayLabel: String {
+        guard let summary, !summary.today.date.isEmpty,
+              let date = DateFormatter.havenISODate.date(from: summary.today.date) else {
+            return Date.now.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+        }
+        return date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+    }
+
+    /// Pretty H:MM:SS from total minutes. 6h 12m for 372 min, 47m for
+    /// short days. Caps the "h" segment when zero.
+    private static func formatClockMinutes(_ minutes: Int) -> String {
+        let h = minutes / 60
+        let m = minutes % 60
+        if h > 0 && m > 0 { return "\(h)h \(m)m" }
+        if h > 0 { return "\(h)h" }
+        return "\(m)m"
+    }
+
+    /// Compact currency for the hero strip + per-stop badges. Uses the
+    /// device locale's currency code; integer cents in, $1,247 out.
+    private static func formatCents(_ cents: Int) -> String {
+        let dollars = Double(cents) / 100.0
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.maximumFractionDigits = 0
+        return f.string(from: NSNumber(value: dollars)) ?? "$\(Int(dollars))"
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if isLoading {
+                        ProgressView()
+                            .padding(.top, 80)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else if let summary {
+                        heroCard(summary: summary)
+                        stopsCard(summary: summary)
+                        if summary.today.materialsCostCents > 0 {
+                            materialsLine(summary: summary)
+                        }
+                        tomorrowCard(summary: summary)
+                        signOffCTA
+                    } else if let errorMessage {
+                        FieldErrorBanner(message: errorMessage)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+                .padding(.bottom, 60)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("End of day")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(HavenColors.action)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if signedOff {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("See you tomorrow")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(HavenColors.textOnNavy)
+                    .background(HavenColors.navy900)
+                    .clipShape(Capsule())
+                    .shadow(color: HavenColors.navy900.opacity(0.25), radius: 14, x: 0, y: 6)
+                    .padding(.bottom, 32)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .task {
+                await load()
+            }
+        }
+    }
+
+    // Indigo gradient hero — "Day complete · 4 stops · 6h 12m · $1,247
+    // invoiced". One serif headline + a body sub-line with the totals
+    // joined by middle dots. Mirrors the FieldBrandHeroCard chrome but
+    // is a closed (non-generic) variant so we can render the totals
+    // directly.
+    @ViewBuilder
+    private func heroCard(summary: HavenFieldDaySummary) -> some View {
+        let today = summary.today
+        let stops = today.stopsCompleted
+        let stopWord = stops == 1 ? "stop" : "stops"
+        var parts: [String] = ["\(stops) \(stopWord)"]
+        if today.totalClockMinutes > 0 {
+            parts.append("\(Self.formatClockMinutes(today.totalClockMinutes)) on the clock")
+        }
+        if today.revenueInvoicedCents > 0 {
+            parts.append("\(Self.formatCents(today.revenueInvoicedCents)) invoiced")
+        }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(weekdayLabel.uppercased())
+                .font(HavenTypography.uiSectionHeader)
+                .kerning(1.2)
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.74))
+            Text("Day complete")
+                .font(HavenTypography.largeTitle)
+                .foregroundStyle(HavenColors.textOnNavy)
+            Text(parts.joined(separator: " · "))
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.86))
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            ZStack {
+                LinearGradient(
+                    colors: [HavenColors.navy900, HavenColors.navy800],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                RadialGradient(
+                    colors: [HavenColors.action.opacity(0.24), Color.clear],
+                    center: .topTrailing,
+                    startRadius: 18,
+                    endRadius: 220
+                )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+        .shadow(color: HavenColors.navy900.opacity(0.18), radius: 18, x: 0, y: 10)
+    }
+
+    @ViewBuilder
+    private func stopsCard(summary: HavenFieldDaySummary) -> some View {
+        if summary.today.stops.isEmpty {
+            FieldEmptyState(
+                title: "No stops on the books today",
+                subtitle: "Once you wrap your first visit, the rundown lands here."
+            )
+        } else {
+            FieldSectionCard(kicker: "Today", title: "Per stop") {
+                VStack(spacing: 12) {
+                    ForEach(summary.today.stops) { stop in
+                        endOfDayStopRow(stop: stop)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func endOfDayStopRow(stop: HavenFieldDayStop) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Status pill: clock-out lands → green checkmark, in-progress →
+            // amber, untouched → grey. Lets the operator scan the day at a
+            // glance.
+            ZStack {
+                Circle()
+                    .fill(stopAccentColor(for: stop).opacity(0.16))
+                    .frame(width: 36, height: 36)
+                Image(systemName: stop.clockOutAt != nil ? "checkmark" : "clock")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(stopAccentColor(for: stop))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(stop.title)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(2)
+                Text(stop.customerName + (stop.address.isEmpty ? "" : " · \(stop.address)"))
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(2)
+                HStack(spacing: 8) {
+                    if stop.totalMinutes > 0 {
+                        Text(Self.formatClockMinutes(stop.totalMinutes))
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textPrimary)
+                    }
+                    if let inAt = stop.clockInAt?.fieldClockTimeOfDay,
+                       let outAt = stop.clockOutAt?.fieldClockTimeOfDay {
+                        Text("\(inAt) – \(outAt)")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    if stop.invoiceId != nil {
+                        Text("Invoiced")
+                            .font(HavenTypography.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(HavenColors.action.opacity(0.12))
+                            .foregroundStyle(HavenColors.action)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func stopAccentColor(for stop: HavenFieldDayStop) -> Color {
+        if stop.clockOutAt != nil { return HavenColors.success }
+        if stop.clockInAt != nil { return HavenColors.warning }
+        return HavenColors.textSecondary
+    }
+
+    @ViewBuilder
+    private func materialsLine(summary: HavenFieldDaySummary) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "wrench.and.screwdriver.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(HavenColors.textPrimary)
+                .frame(width: 36, height: 36)
+                .background(HavenColors.indigo50)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            Text("\(Self.formatCents(summary.today.materialsCostCents)) spent on materials today")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textPrimary)
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    @ViewBuilder
+    private func tomorrowCard(summary: HavenFieldDaySummary) -> some View {
+        let tomorrow = summary.tomorrow
+        FieldSectionCard(kicker: "Tomorrow", title: "What's next") {
+            if tomorrow.stopsCount == 0 {
+                Text("No stops on the calendar for tomorrow.")
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    let stopWord = tomorrow.stopsCount == 1 ? "stop" : "stops"
+                    Text("\(tomorrow.stopsCount) \(stopWord) scheduled")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if let firstAt = tomorrow.firstAt?.trimmedOrNil {
+                        let firstShort = firstAt.fieldShortTime
+                        if let firstCustomer = tomorrow.firstCustomer?.trimmedOrNil {
+                            Text("First at \(firstShort) with \(firstCustomer)")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        } else {
+                            Text("First at \(firstShort)")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        Image(systemName: "cloud.sun")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Weather: —")
+                            .font(HavenTypography.caption)
+                    }
+                    .foregroundStyle(HavenColors.textTertiary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var signOffCTA: some View {
+        Button {
+            Task {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    signedOff = true
+                }
+                // Brief toast then dismiss. No DB write yet — future
+                // timekeeping wave can hook into this CTA.
+                try? await Task.sleep(nanoseconds: 1_400_000_000)
+                dismiss()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "moon.stars.fill")
+                Text("Sign off")
+                    .font(HavenTypography.uiLabel)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(FieldPrimaryButtonStyle())
+        .padding(.top, 6)
+    }
+
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let result = try await HavenFieldService.shared.todaySummary(workspaceId: workspaceId)
+            self.summary = result
+        } catch {
+            self.errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
 private struct FieldRouteHeroPreview: View {
     let visit: HavenFieldVisit
     let home: HavenFieldHome?
@@ -11877,6 +12474,19 @@ private extension String {
     var fieldDateTime: String {
         guard let date = HavenFieldDateParser.parse(self) else { return self }
         return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+    }
+
+    /// Wave M11 — render an ISO timestamp as just the time-of-day in
+    /// device-locale short form ("9:42 AM"). Used by the End of Day
+    /// per-stop summary. Falls back to the raw input string when the
+    /// timestamp can't be parsed (matches the rest of the field-format
+    /// helpers' graceful-degradation pattern).
+    var fieldClockTimeOfDay: String {
+        guard let date = HavenFieldDateParser.parse(self) else { return self }
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f.string(from: date)
     }
 
     var fieldRelativeTime: String {

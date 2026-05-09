@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "../components/chrome/Card";
 import { Pill } from "../components/chrome/Pill";
 import { Avatar, initialsFor } from "../components/chrome/Avatar";
@@ -6,6 +6,7 @@ import { Icon } from "../components/chrome/Icon";
 import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
 import { formatRelativeTime, isToday, postProviderAction } from "../lib/api";
+import type { TodaySummary } from "../lib/types";
 
 export default function CrewScreen() {
   const { dashboard, mode, refresh } = useWorkspace();
@@ -43,7 +44,13 @@ export default function CrewScreen() {
   const isSole = mode === "sole" || members.length === 1;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Wave M11 — today's progress strip. Loads via today_summary so
+          the dispatcher sees the same numbers the field tech sees on iOS
+          before drilling into the roster. */}
+      <WorkloadStrip workspaceId={dashboard.workspace.id} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 24 }}>
       {/* Roster */}
       <Card padding="default">
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
@@ -215,8 +222,115 @@ export default function CrewScreen() {
           />
         )}
       </div>
+      </div>
     </div>
   );
+}
+
+// ─── Wave M11 — Today's progress strip ────────────────────────────────
+//
+// Compact summary of today's stops + clock totals + revenue invoiced
+// for the workspace, with a small tomorrow preview line. Mirrors the
+// hero card the field tech sees on iOS so the dispatcher and the tech
+// see the same numbers. Renders inline above the roster grid; loads
+// on mount via the today_summary action and silently degrades to a
+// muted "0 stops scheduled today" line on read failure.
+
+function WorkloadStrip({ workspaceId }: { workspaceId: string }) {
+  const [summary, setSummary] = useState<TodaySummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    postProviderAction<TodaySummary>("today_summary", { workspaceId })
+      .then((result) => {
+        if (cancelled) return;
+        setSummary(result);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Failed to load today's summary");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
+  if (loading) {
+    return (
+      <Card padding="default">
+        <div style={{ fontSize: 13, color: "var(--text-soft)" }}>Loading today's progress…</div>
+      </Card>
+    );
+  }
+  if (error || !summary) {
+    return (
+      <Card padding="default">
+        <div style={{ fontSize: 13, color: "var(--text-soft)" }}>
+          Today's progress unavailable.
+        </div>
+      </Card>
+    );
+  }
+  const { today, tomorrow } = summary;
+  return (
+    <Card padding="default">
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: "1 1 0", minWidth: 200 }}>
+          <div className="ops-section-label">Today's progress</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", fontFamily: "var(--serif)" }}>
+            {today.stopsCompleted} of {today.stopsCompleted + today.stopsRemaining} {today.stopsCompleted + today.stopsRemaining === 1 ? "stop" : "stops"} done
+          </div>
+        </div>
+        <WorkloadStat label="Clock" value={formatClockMinutes(today.totalClockMinutes)} />
+        <WorkloadStat label="Materials" value={formatCents(today.materialsCostCents)} />
+        <WorkloadStat label="Invoiced" value={formatCents(today.revenueInvoicedCents)} />
+      </div>
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--neutral-200)", fontSize: 12.5, color: "var(--text-muted)" }}>
+        {tomorrow.stopsCount === 0 ? (
+          <span>No stops on the calendar for tomorrow.</span>
+        ) : (
+          <span>
+            Tomorrow: {tomorrow.stopsCount} {tomorrow.stopsCount === 1 ? "stop" : "stops"} scheduled
+            {tomorrow.firstAt ? ` · first at ${tomorrow.firstAt.slice(0, 5)}` : ""}
+            {tomorrow.firstCustomer ? ` with ${tomorrow.firstCustomer}` : ""}
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function WorkloadStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 80 }}>
+      <div style={{ fontSize: 11, color: "var(--text-soft)", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{value}</div>
+    </div>
+  );
+}
+
+function formatClockMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+function formatCents(cents: number): string {
+  if (!cents || cents <= 0) return "$0";
+  const dollars = cents / 100;
+  if (dollars >= 1000) return `$${(dollars / 1000).toFixed(1)}K`;
+  return `$${Math.round(dollars).toLocaleString()}`;
 }
 
 function selectedRosterRowStyle(isSelected: boolean): React.CSSProperties {

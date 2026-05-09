@@ -611,3 +611,45 @@ export interface Dashboard {
    */
   availableWorkspaces?: AvailableWorkspace[];
 }
+
+// ─── Wave M11 — End-of-day summary ───
+//
+// Mirrors the response shape of the `today_summary` action on
+// handyman-provider. Operations Desk Crew screen renders a compact
+// "Today's progress" strip from this so the dispatcher can see the
+// same totals the field tech sees on iOS.
+
+export interface TodaySummaryStop {
+  requestId: string;
+  customerName: string;
+  address: string;
+  title: string;
+  clockInAt: string | null;
+  clockOutAt: string | null;
+  totalMinutes: number;
+  invoiceId: string | null;
+}
+
+export interface TodaySummaryToday {
+  date: string;
+  stopsCompleted: number;
+  stopsRemaining: number;
+  totalClockMinutes: number;
+  materialsCostCents: number;
+  revenueInvoicedCents: number;
+  stops: TodaySummaryStop[];
+}
+
+export interface TodaySummaryTomorrow {
+  date: string;
+  stopsCount: number;
+  firstAt: string | null;
+  firstCustomer: string | null;
+  /** Reserved for a future weather API integration; null today. */
+  weather: string | null;
+}
+
+export interface TodaySummary {
+  today: TodaySummaryToday;
+  tomorrow: TodaySummaryTomorrow;
+}
