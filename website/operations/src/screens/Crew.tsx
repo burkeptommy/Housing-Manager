@@ -7,12 +7,30 @@ import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
 import { formatRelativeTime, isToday, postProviderAction } from "../lib/api";
 import type { TodaySummary } from "../lib/types";
+// Wave M7 — Crew chat sub-tab. Lives in its own component so the
+// roster surface stays unchanged when the operator stays on the
+// default Roster view.
+import { CrewChatPanel } from "../components/CrewChatPanel";
+
+type CrewSubTab = "roster" | "chat";
 
 export default function CrewScreen() {
   const { dashboard, mode, refresh } = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Wave M7 — sub-tab toggle. Roster (default) vs Chat. Persist to
+  // localStorage so an operator who flips to Chat doesn't lose their
+  // place on tab switches. Mirrors the iOS Crew tab → workspace
+  // messaging pattern.
+  const [subTab, setSubTab] = useState<CrewSubTab>(() => {
+    if (typeof window === "undefined") return "roster";
+    return (window.localStorage.getItem("ops:crewSubTab") as CrewSubTab | null) ?? "roster";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("ops:crewSubTab", subTab);
+  }, [subTab]);
 
   const members = useMemo(() => dashboard?.teamMembers ?? [], [dashboard]);
 
@@ -45,6 +63,32 @@ export default function CrewScreen() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Wave M7 — sub-tab switcher. Roster (existing surface) vs
+          Chat (intra-workspace messaging). Lives above the workload
+          strip so it's the first thing the operator sees. */}
+      <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--pearl, #F8F9FA)", borderRadius: 12, alignSelf: "flex-start", border: "1px solid var(--border, #E6E5EE)" }}>
+        <button
+          onClick={() => setSubTab("roster")}
+          style={crewSubTabStyle(subTab === "roster")}
+        >
+          Roster
+        </button>
+        <button
+          onClick={() => setSubTab("chat")}
+          style={crewSubTabStyle(subTab === "chat")}
+        >
+          Chat
+        </button>
+      </div>
+
+      {subTab === "chat" ? (
+        <CrewChatPanel
+          workspaceId={dashboard.workspace.id}
+          members={members}
+          selfMemberId={dashboard.currentUser?.memberId ?? null}
+        />
+      ) : (
+        <>
       {/* Wave M11 — today's progress strip. Loads via today_summary so
           the dispatcher sees the same numbers the field tech sees on iOS
           before drilling into the roster. */}
@@ -223,8 +267,25 @@ export default function CrewScreen() {
         )}
       </div>
       </div>
+        </>
+      )}
     </div>
   );
+}
+
+// Wave M7 — sub-tab pill style. Matches existing ops-button rounded
+// chip pattern but smaller. Active = salmon-50 wash + salmon text.
+function crewSubTabStyle(isActive: boolean): React.CSSProperties {
+  return {
+    padding: "6px 14px",
+    border: "none",
+    background: isActive ? "var(--salmon-50, #FDEDEA)" : "transparent",
+    color: isActive ? "var(--salmon)" : "var(--text-muted)",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: isActive ? 600 : 500,
+    cursor: "pointer",
+  };
 }
 
 // ─── Wave M11 — Today's progress strip ────────────────────────────────

@@ -3391,7 +3391,11 @@ actor HavenFieldService {
         request.httpMethod = "GET"
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+        // Wave M7 — PostgREST requires `apikey: <anon key>` without a
+        // "Bearer " prefix (in contrast to Edge Functions, which are
+        // lenient about it). See `fetchWorkspaceMemberDirectory` for
+        // the full diagnosis.
+        request.setValue(AppConfig.Supabase.anonKey, forHTTPHeaderField: "apikey")
         if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         } else {
@@ -3444,7 +3448,14 @@ actor HavenFieldService {
         request.httpMethod = "GET"
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
+        // Wave M7 — PostgREST is stricter than Edge Functions about the
+        // `apikey` header: it expects the raw anon key WITHOUT a "Bearer "
+        // prefix. The legacy `fetchOpenPause` helper used the Bearer
+        // form and only worked by accident (its RLS policy lets the
+        // anon role read open-pause rows). Use the bare key form here
+        // because `provider_workspace_members`'s RLS hard-requires a
+        // user JWT.
+        request.setValue(AppConfig.Supabase.anonKey, forHTTPHeaderField: "apikey")
         if let accessToken = await HavenSupabase.safeAccessToken(timeout: 3.0) {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         } else {

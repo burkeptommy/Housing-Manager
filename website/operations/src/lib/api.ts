@@ -71,6 +71,41 @@ export async function postProviderAction<T = unknown>(
   return (await res.json()) as T;
 }
 
+// ─── Wave M7 — Crew chat API ────────────────────────────────────
+//
+// Separate edge function (`crew-chat`) so the action discriminator
+// pattern stays clean. Same auth + apikey shape as
+// postProviderAction. Action discriminator routed server-side.
+
+const CREW_CHAT_API_URL = `${
+  PROVIDER_API_URL.split("/functions/v1/")[0]
+}/functions/v1/crew-chat`;
+
+export async function postCrewChatAction<T = unknown>(
+  action: string,
+  body: Record<string, unknown> = {}
+): Promise<T> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session;
+  if (!session) throw new Error("Not signed in");
+
+  const res = await fetch(CREW_CHAT_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey:
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzdWN3bmtudGRyeGh5c29qZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzMxNzksImV4cCI6MjA4ODIwOTE3OX0.TLNwkT3PE4DTMFey1a7utLOROSF8zvu-ZE5us14c9ew",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Crew chat API ${res.status}: ${text || res.statusText}`);
+  }
+  return (await res.json()) as T;
+}
+
 // ─── Currency helpers ───
 
 export function formatCurrency(value: number | string | null | undefined): string {
