@@ -310,9 +310,27 @@ private struct HavenFieldSignInView: View {
                             .keyboardType(.emailAddress)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            // Sprint #3 R3-E-5: clear stale validation
+                            // error as soon as the user edits / pastes
+                            // into the field. Without this the
+                            // "Please enter your email." caption
+                            // persists despite the visible field
+                            // showing a valid pasted value.
+                            .onChange(of: viewModel.email) { _, _ in
+                                if viewModel.errorMessage != nil {
+                                    viewModel.errorMessage = nil
+                                }
+                            }
 
                         HavenTextField(title: "Password", text: $viewModel.password, isSecure: true)
                             .textContentType(.password)
+                            // Sprint #3 R3-E-5: same stale-validation
+                            // clear pattern for password.
+                            .onChange(of: viewModel.password) { _, _ in
+                                if viewModel.errorMessage != nil {
+                                    viewModel.errorMessage = nil
+                                }
+                            }
 
                         if mode == .signUp {
                             HavenTextField(title: "Confirm password", text: $viewModel.confirmPassword, isSecure: true)

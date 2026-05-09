@@ -2492,7 +2492,15 @@ async function loadDashboard(
             createdAt: message.created_at,
           }
         : null,
-      quote: quote
+      // Sprint #3 R3-E-3: per-visit quote envelope on visitRows is the
+      // financial coordination payload (totals, signed-name, signature
+      // path). Field technicians don't manage quote pricing or signature
+      // workflows, so return null for them. Owners/dispatchers continue
+      // to see the full envelope so the visit-detail card can show the
+      // signed-quote summary alongside the sign-off block.
+      quote: permissions.isFieldTechnician
+        ? null
+        : (quote
         ? {
             id: quote.id,
             status: compactString(quote.status),
@@ -2514,7 +2522,7 @@ async function loadDashboard(
             updatedAt: quote.updated_at,
             publicShareUrl: publicQuoteUrl(compactString(quote.public_share_token)),
           }
-        : null,
+        : null),
       // Phase 78: structured punch list. Replaces the legacy notes-bullet
       // text the field app used to regex-parse. Items already filtered to
       // archived_at IS NULL on the server side.
@@ -2699,7 +2707,12 @@ async function loadDashboard(
       assignedMemberName: compactString(visitRow?.assignment?.memberName),
       fieldWorkspaceUrl: compactString(visitRow?.fieldWorkspace?.url),
       recentMessages: threadHistory,
-      quote: visitRow?.quote ?? null,
+      // Sprint #3 R3-E-3: strip financial coordination data (quote totals,
+      // signer names) for technicians. They legitimately see the thread
+      // (it's their visit) but quote pricing + signed-name + invoice
+      // amounts are dispatch / owner concerns, not field-tech concerns.
+      // Owners and dispatchers continue to see the full quote envelope.
+      quote: permissions.isFieldTechnician ? null : (visitRow?.quote ?? null),
     };
   });
 
@@ -2809,7 +2822,10 @@ async function loadDashboard(
     messages: messageThreads,
     recentWork,
     teamMembers: teamMemberRows,
-    quotes: quotes.map((quote) => {
+    // Sprint #3 R3-E-3: technicians don't manage quote pricing or
+    // signature workflows. Strip the array entirely; owners and
+    // dispatchers continue to see the full quote envelope.
+    quotes: permissions.isFieldTechnician ? [] : quotes.map((quote) => {
       const property = propertyById.get(compactString(quote.property_id));
       const lineItems = (Array.isArray(quote.line_items) ? quote.line_items : []).map(mapLineItemForClient);
       const quoteId = compactString(quote.id);
@@ -2906,7 +2922,10 @@ async function loadDashboard(
         })(),
       };
     }),
-    savedQuoteItems: savedItems.map((item) => ({
+    // Sprint #3 R3-E-3: saved quote items are the line-item library
+    // used to BUILD quotes. Technicians don't build quotes, so empty
+    // for them — matches the same role-aware narrowing as quotes / invoices.
+    savedQuoteItems: permissions.isFieldTechnician ? [] : savedItems.map((item) => ({
       id: item.id,
       name: compactString(item.name),
       description: compactString(item.description),
@@ -2916,7 +2935,15 @@ async function loadDashboard(
       sortOrder: numberValue(item.sort_order),
     })),
     // Wave Q (Section 8) — provider invoices.
-    invoices: invoices.map((row) => {
+    //
+    // Sprint #3 R3-E-3: technicians don't manage invoicing (it's a
+    // dispatch / owner concern). The pre-fix flow filtered invoices
+    // to the technician's own visits but still surfaced totals,
+    // subtotals, line items, and amount-paid — financial detail the
+    // field tech doesn't need to do their job. Strip the invoices
+    // array entirely for the technician role; owners and dispatchers
+    // continue to see the full envelope.
+    invoices: permissions.isFieldTechnician ? [] : invoices.map((row) => {
       const property = propertyById.get(compactString(row.property_id));
       const lineItems = (Array.isArray(row.line_items) ? row.line_items : []).map(mapLineItemForClient);
       const status = compactString(row.status) || "draft";

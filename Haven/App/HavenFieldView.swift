@@ -5200,6 +5200,17 @@ struct HavenFieldRootView: View {
         UITabBar.appearance().isHidden = true
     }
 
+    /// Sprint #3 R3-E-4: solo workspaces (single active member) hide
+    /// the Crew tab entirely — there's no one to chat with, and the
+    /// pre-fix "Start a thread → New thread sheet has only you as a
+    /// participant" flow let the user technically chat with themselves.
+    /// Once a second member is invited and active the tab returns
+    /// automatically.
+    private var isSoloWorkspace: Bool {
+        let activeCount = viewModel.dashboard?.workspace?.activeMemberCount ?? 1
+        return activeCount <= 1
+    }
+
     var body: some View {
         TabView(selection: $viewModel.selectedTab) {
             NavigationStack {
@@ -5218,18 +5229,22 @@ struct HavenFieldRootView: View {
             }
             .tag(HavenFieldViewModel.RootTab.visits)
 
-            NavigationStack {
-                // Wave M7 — intra-workspace messaging surface. Distinct
-                // from the Messages tab below (which is the
-                // customer-facing thread). Lives between Visits and
-                // Homes so route-day coordination chats sit next to
-                // the dispatch surface.
-                HavenFieldCrewTab(viewModel: viewModel)
+            // Sprint #3 R3-E-4: gate the Crew tab on having ≥2 active
+            // members. Solo workspaces never see this tab.
+            if !isSoloWorkspace {
+                NavigationStack {
+                    // Wave M7 — intra-workspace messaging surface. Distinct
+                    // from the Messages tab below (which is the
+                    // customer-facing thread). Lives between Visits and
+                    // Homes so route-day coordination chats sit next to
+                    // the dispatch surface.
+                    HavenFieldCrewTab(viewModel: viewModel)
+                }
+                .tabItem {
+                    Label("Crew", systemImage: "person.2.wave.2.fill")
+                }
+                .tag(HavenFieldViewModel.RootTab.crew)
             }
-            .tabItem {
-                Label("Crew", systemImage: "person.2.wave.2.fill")
-            }
-            .tag(HavenFieldViewModel.RootTab.crew)
 
             NavigationStack {
                 HavenFieldClientsTab(viewModel: viewModel)
@@ -5250,7 +5265,10 @@ struct HavenFieldRootView: View {
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !viewModel.bottomTabBarHidden {
-                HavenFieldTabBar(selectedTab: $viewModel.selectedTab)
+                HavenFieldTabBar(
+                    selectedTab: $viewModel.selectedTab,
+                    showCrewTab: !isSoloWorkspace
+                )
             }
         }
         .tint(HavenColors.action)
@@ -5263,6 +5281,15 @@ struct HavenFieldRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .havenFieldVisitChanged)) { _ in
             Task { await viewModel.refresh() }
+        }
+        // Sprint #3 R3-E-4: defensive — if the selected tab gets stuck
+        // on .crew (e.g. user was on a 2-member workspace, the second
+        // member left, and this dashboard refresh hides the Crew tab),
+        // redirect to Overview so we don't render an orphaned selection.
+        .onChange(of: viewModel.dashboard?.workspace?.activeMemberCount) { _, newValue in
+            if (newValue ?? 1) <= 1 && viewModel.selectedTab == .crew {
+                viewModel.selectedTab = .home
+            }
         }
     }
 }
@@ -5587,12 +5614,20 @@ private struct HavenFieldHomeTab: View {
             // OWNER's email and phone displayed under their own name.
             // Now uses the signed-in user's contact info, falling back to
             // workspace contact only when the user info is missing.
+            //
+            // Sprint #3 R3-E-1 fix: phone fell back to workspace.primaryPhone
+            // for non-owner members, leaking the owner's PII (e.g. crew2 saw
+            // "555-1100" — the W2 owner's number). The HavenFieldCurrentUser
+            // model has no phone field, so passing nil is the right answer
+            // until we surface the member's own phone column from the server.
+            // Owners (whose own contact IS the workspace primary) still see
+            // their phone via the dedicated phone-on-member field once it lands.
             FieldWorkspaceSettingsSheet(
                 companyName: viewModel.dashboard?.workspace?.companyName ?? "Chez Field",
                 memberName: viewModel.dashboard?.currentUser?.fullName,
                 email: viewModel.dashboard?.currentUser?.email
                     ?? viewModel.dashboard?.workspace?.primaryEmail,
-                phone: viewModel.dashboard?.workspace?.primaryPhone,
+                phone: nil,
                 providerURL: viewModel.dashboard?.workspace?.providerURL,
                 // N-permission-gating fix: hand the caller's role so the
                 // sheet can hide the desktop-command-center link from
@@ -5823,9 +5858,24 @@ private struct HavenFieldVisitsTab: View {
                     } else {
                         FieldSectionCard(kicker: "Schedule", title: "Confirmed route") {
                             if filteredVisits.isEmpty {
+                                // Sprint #3 R3-E-6: when the user has zero
+                                // upcoming visits but DOES have historical
+                                // work in the dashboard, surface a hint
+                                // about completed visits so the empty
+                                // state doesn't feel like the work disappeared.
+                                let allVisits = viewModel.dashboard?.visits ?? []
+                                let todayStr = DateFormatter.havenISODate.string(from: Date())
+                                let completedCount = allVisits.filter { $0.status == HandymanRequestStatus.completed.rawValue }.count
+                                let staleCount = allVisits.filter {
+                                    $0.status == HandymanRequestStatus.confirmed.rawValue && ($0.routeDate ?? "9999-12-31") < todayStr
+                                }.count
                                 FieldEmptyState(
                                     title: "No confirmed visits yet",
-                                    subtitle: "Once visits are confirmed, they’ll show up here with routing, windows, and homeowner context."
+                                    subtitle: completedCount > 0
+                                        ? "Once visits are confirmed, they'll show up here with routing, windows, and homeowner context. \(completedCount) completed visit\(completedCount == 1 ? "" : "s") in your history."
+                                        : (staleCount > 0
+                                            ? "No confirmed visits today. \(staleCount) older assignment\(staleCount == 1 ? "" : "s") still need cleanup from dispatch."
+                                            : "Once visits are confirmed, they'll show up here with routing, windows, and homeowner context.")
                                 )
                             } else {
                                 VStack(spacing: 16) {
@@ -6315,6 +6365,15 @@ private struct FieldPunchItemRow: View {
         .onChange(of: photoPickerItem) { _, newValue in
             guard let pickItem = newValue else { return }
             Task { await uploadPickedPhoto(pickItem) }
+        }
+        // Sprint #3 R1-E-6: when the recorder hits its 5-minute cap
+        // it auto-stops the AVAudioRecorder and flips this flag. We
+        // observe it here and run the same upload+attach flow that
+        // tapping Stop manually would, so the file gets persisted
+        // instead of dangling in the temp directory.
+        .onChange(of: voiceRecorder.didReachMaxDuration) { _, reached in
+            guard reached else { return }
+            Task { await toggleVoiceRecording() }
         }
         .sheet(item: $lightboxAttachment) { attachment in
             FieldPunchPhotoLightbox(attachment: attachment)
@@ -7789,6 +7848,15 @@ private struct FieldOpenPartRequestsPill: View {
 final class FieldVoiceRecorder: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var elapsedSeconds: Int = 0
+    /// Sprint #3 R1-E-6: hard 5-minute cap. AAC at 22kHz mono medium
+    /// quality runs ~24 KB/sec → ~7 MB cap. Plenty of headroom for
+    /// any realistic voice note while preventing the "tech walked off
+    /// with the mic on" failure mode that would let the file balloon
+    /// to ~85 MB/hour and wedge upload.
+    static let maxDurationSeconds: Int = 300
+    /// Set when the recorder auto-stops itself at maxDurationSeconds.
+    /// The owning view should observe this and run its save handler.
+    @Published private(set) var didReachMaxDuration: Bool = false
 
     private var recorder: AVAudioRecorder?
     private var startedAt: Date?
@@ -7830,13 +7898,26 @@ final class FieldVoiceRecorder: ObservableObject {
         startedAt = Date()
         elapsedSeconds = 0
         isRecording = true
+        didReachMaxDuration = false
         tickTask?.cancel()
         tickTask = Task { [weak self] in
             while !(Task.isCancelled) {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 await MainActor.run {
                     guard let self, let started = self.startedAt else { return }
-                    self.elapsedSeconds = Int(Date().timeIntervalSince(started))
+                    let elapsed = Int(Date().timeIntervalSince(started))
+                    self.elapsedSeconds = elapsed
+                    // Sprint #3 R1-E-6: auto-stop at the 5-minute cap.
+                    // We mark didReachMaxDuration so the owning view
+                    // can pick up the file via its existing onChange
+                    // observer + run the save flow.
+                    if elapsed >= Self.maxDurationSeconds && self.recorder != nil {
+                        self.didReachMaxDuration = true
+                        self.recorder?.stop()
+                        // Leave the file path in place — stopAndReturnFile()
+                        // will pick it up. The view marks didReachMaxDuration
+                        // via onChange and calls stopAndReturnFile().
+                    }
                 }
             }
         }
@@ -7852,6 +7933,10 @@ final class FieldVoiceRecorder: ObservableObject {
         startedAt = nil
         isRecording = false
         elapsedSeconds = 0
+        // Sprint #3 R1-E-6: clear the cap-reached flag once the
+        // owning view has consumed it, so the next start() call
+        // starts from a clean slate.
+        didReachMaxDuration = false
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
         return url
     }
@@ -8358,6 +8443,12 @@ struct HavenFieldOpenPause: Codable, Identifiable, Hashable {
 
 private struct HavenFieldVisitWorkspaceView: View {
     @ObservedObject var viewModel: HavenFieldVisitWorkspaceModel
+    /// Sprint #3 R1-E-7: observe app lifecycle so we can re-pull
+    /// server-truth lifecycle state (open pause, current clock-in
+    /// state, SLA countdown) when the user foregrounds. Without this
+    /// the visit-detail UI would show stale paused/in-progress state
+    /// for an unbounded time after wakeup.
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showCoordinationComposer = false
     @State private var coordinationMode: String = "ask_question"
     @State private var coordinationMessage = ""
@@ -8676,6 +8767,18 @@ private struct HavenFieldVisitWorkspaceView: View {
         }
         .onReceive(lifecycleTimer) { tick in
             nowTick = tick
+        }
+        // Sprint #3 R1-E-7: foreground refresh of lifecycle state.
+        // The lifecycleTimer keeps ticking but only updates nowTick;
+        // a different device closing the pause via the admin portal,
+        // or the SLA flipping while we were backgrounded, won't show
+        // up until the user navigates away and back. Re-pull on every
+        // .background → .active transition so the displayed state
+        // matches server truth on wakeup.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await hydrateLifecycleStateFromServer() }
+            }
         }
         // Wave M8 — present the end-of-visit wizard the FIRST time the
         // lifecycle flips into `.completed` during this view's lifetime.
@@ -9752,8 +9855,18 @@ private struct HavenFieldVisitWorkspaceView: View {
                             Text("Tell the homeowner why")
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textSecondary)
-                            TextField("e.g. waiting on parts", text: $pauseOtherText)
+                            // Sprint #3 R1-E-8: switch to multi-line +
+                            // 500-char cap. The pre-fix single-line
+                            // field scrolled horizontally on long input
+                            // with no length indicator and accepted
+                            // unbounded paste, which would degrade the
+                            // homeowner-facing pause notification copy.
+                            // 500 chars is a generous cap that comfortably
+                            // fits a paragraph of context without making
+                            // the pause notification card unreadable.
+                            TextField("e.g. waiting on parts", text: $pauseOtherText, axis: .vertical)
                                 .textInputAutocapitalization(.sentences)
+                                .lineLimit(2...4)
                                 .padding(12)
                                 .background(HavenColors.surface)
                                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
@@ -9765,10 +9878,26 @@ private struct HavenFieldVisitWorkspaceView: View {
                                 // on screen even after they've satisfied
                                 // it. Mirrors C-3's M3 follow-up pattern.
                                 .onChange(of: pauseOtherText) { _, newValue in
+                                    // Sprint #3 R1-E-8: 500-char hard cap
+                                    // truncates anything pasted past the
+                                    // limit. Doing it in onChange means
+                                    // the displayed text + the bound state
+                                    // both track the truncated value.
+                                    if newValue.count > 500 {
+                                        pauseOtherText = String(newValue.prefix(500))
+                                    }
                                     if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                         pauseValidationError = nil
                                     }
                                 }
+                            // Length counter so the operator knows when
+                            // they're approaching the cap.
+                            if pauseOtherText.count > 400 {
+                                Text("\(pauseOtherText.count) / 500")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(pauseOtherText.count >= 500 ? HavenColors.critical : HavenColors.textTertiary)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
                         }
                     }
 
@@ -12170,6 +12299,11 @@ private struct FieldHeroMetric: View {
 
 private struct HavenFieldTabBar: View {
     @Binding var selectedTab: HavenFieldViewModel.RootTab
+    /// Sprint #3 R3-E-4: solo workspaces (single active member) hide
+    /// the Crew tab. The TabView in HavenFieldRootView gates on the
+    /// same flag so taps via the system tab bar can't sneak in either.
+    /// Default true for backward compat with any other call sites.
+    var showCrewTab: Bool = true
 
     var body: some View {
         // Wave M7 — five-tab bar (was four pre-M7). The new "Crew"
@@ -12177,10 +12311,15 @@ private struct HavenFieldTabBar: View {
         // coordination chats live next to the dispatch surface.
         // Spacing tightened from 10pt to 6pt to keep all five
         // pills inside the capsule on iPhone SE viewports.
-        HStack(spacing: 6) {
+        // Sprint #3 R3-E-4: when Crew is hidden the bar collapses to
+        // four pills with the original spacing, which sits comfortably
+        // on every iPhone width.
+        HStack(spacing: showCrewTab ? 6 : 10) {
             tabButton(tab: .home, icon: "square.grid.2x2.fill", label: "Overview")
             tabButton(tab: .visits, icon: "calendar.badge.clock", label: "Visits")
-            tabButton(tab: .crew, icon: "person.2.wave.2.fill", label: "Crew")
+            if showCrewTab {
+                tabButton(tab: .crew, icon: "person.2.wave.2.fill", label: "Crew")
+            }
             tabButton(tab: .clients, icon: "house.fill", label: "Homes")
             tabButton(tab: .messages, icon: "bubble.left.and.bubble.right.fill", label: "Messages")
         }
@@ -14534,8 +14673,16 @@ private struct FieldBuildQuoteSheet: View {
         let activeLines = multiTierEnabled
             ? tierLineItems.first(where: { !$0.isEmpty }) ?? []
             : lineItems
+        // Sprint #3 R1-E-5: reject negative unit prices / quantities
+        // here too. Guards the build-quote-from-visit flow alongside
+        // the other canSave at the EOD invoice screen.
+        let allLineItemsValid = activeLines.allSatisfy {
+            !$0.name.trimmingCharacters(in: .whitespaces).isEmpty
+                && $0.unitPrice >= 0
+                && $0.quantity >= 0
+        }
         return !activeLines.isEmpty &&
-            activeLines.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty } &&
+            allLineItemsValid &&
             !title.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
@@ -15334,6 +15481,14 @@ private struct FieldQuoteLineItemRow: View {
                         .multilineTextAlignment(.trailing)
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
+                        // Sprint #3 R1-E-5: decimal pad doesn't show a
+                        // minus key but Foundation's .number formatter
+                        // accepts negative numbers from paste. Clamp to
+                        // zero so a negative line item can't ship to the
+                        // homeowner (and never produce a negative subtotal).
+                        .onChange(of: line.unitPrice) { _, newValue in
+                            if newValue < 0 { line.unitPrice = 0 }
+                        }
                 }
 
                 Text("=")
@@ -15866,8 +16021,16 @@ private struct FieldBuildInvoiceSheet: View {
 
     private var canSave: Bool {
         let cleaned = lineItems.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        // Sprint #3 R1-E-5: belt-and-suspenders check that no line item
+        // has a negative unit price and tax rate is in [0, 100]. The
+        // .onChange clamps catch paste-time bugs at the source; this
+        // guards against a programmatic mutation slipping through.
+        let allLineItemsValid = cleaned.allSatisfy { $0.unitPrice >= 0 && $0.quantity >= 0 }
+        let taxValid = taxRatePercent >= 0 && taxRatePercent <= 100
         return !cleaned.isEmpty &&
             !title.trimmingCharacters(in: .whitespaces).isEmpty &&
+            allLineItemsValid &&
+            taxValid &&
             !isSaving && !isSending
     }
 
@@ -16147,6 +16310,15 @@ private struct FieldBuildInvoiceSheet: View {
                             .padding(8)
                             .background(HavenColors.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+                            // Sprint #3 R1-E-5: clamp to 0-100. Decimal
+                            // pad accepts a pasted negative or a "9999"
+                            // typo that would silently bill the homeowner
+                            // millions in tax. 100% is the absolute cap
+                            // since percentages above 100 don't make sense.
+                            .onChange(of: taxRatePercent) { _, newValue in
+                                if newValue < 0 { taxRatePercent = 0 }
+                                else if newValue > 100 { taxRatePercent = 100 }
+                            }
                         Text("%")
                             .font(HavenTypography.body)
                             .foregroundStyle(HavenColors.textSecondary)

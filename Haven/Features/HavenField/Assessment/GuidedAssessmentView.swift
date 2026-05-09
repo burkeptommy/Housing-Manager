@@ -420,6 +420,21 @@ struct SystemCategoryCard: View {
     @State private var installYear: String = ""
     @State private var notes: String = ""
     @State private var isExpanded: Bool = false
+    /// Sprint #3 R1-E-1: validation breadcrumb when user taps the
+    /// add-button with all four fields blank. Pre-fix this silently
+    /// added a ghost {category}-only entry on every tap. Now an
+    /// inline red caption surfaces and the button no-ops.
+    @State private var showValidationError: Bool = false
+
+    /// At least one of the four capture fields must be non-empty
+    /// (after trimming whitespace) before the entry counts as a real
+    /// captured system.
+    private var hasAnyContent: Bool {
+        !manufacturer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !installYear.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
@@ -427,27 +442,42 @@ struct SystemCategoryCard: View {
                 TextField("Manufacturer", text: $manufacturer)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
+                    .onChange(of: manufacturer) { _, _ in showValidationError = false }
                 TextField("Model", text: $model)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
+                    .onChange(of: model) { _, _ in showValidationError = false }
                 TextField("Install year (e.g. 2018)", text: $installYear)
                     .keyboardType(.numberPad)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
+                    .onChange(of: installYear) { _, _ in showValidationError = false }
                 TextField("Notes (optional)", text: $notes, axis: .vertical)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
+                    .onChange(of: notes) { _, _ in showValidationError = false }
                 Button {
+                    // Sprint #3 R1-E-1: require at least one non-empty
+                    // field. Trim before checking so "  " whitespace
+                    // doesn't sneak through.
+                    guard hasAnyContent else {
+                        showValidationError = true
+                        return
+                    }
+                    let trimmedMfr = manufacturer.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
                     let entry = HomeAssessmentSystemEntry(
                         category: category.label,
-                        manufacturer: manufacturer.isEmpty ? nil : manufacturer,
-                        model: model.isEmpty ? nil : model,
-                        installYear: Int(installYear),
+                        manufacturer: trimmedMfr.isEmpty ? nil : trimmedMfr,
+                        model: trimmedModel.isEmpty ? nil : trimmedModel,
+                        installYear: Int(installYear.trimmingCharacters(in: .whitespacesAndNewlines)),
                         subtype: nil, photos: nil,
-                        notes: notes.isEmpty ? nil : notes
+                        notes: trimmedNotes.isEmpty ? nil : trimmedNotes
                     )
                     onAdd(entry)
                     manufacturer = ""; model = ""; installYear = ""; notes = ""
+                    showValidationError = false
                     isExpanded = false
                 } label: {
                     Text("Add this \(category.label.lowercased())")
@@ -460,6 +490,12 @@ struct SystemCategoryCard: View {
                         )
                 }
                 .buttonStyle(.plain)
+                if showValidationError {
+                    Text("Add at least one detail (manufacturer, model, year, or notes) before adding.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.top, 10)
         } label: {
@@ -506,11 +542,16 @@ struct VendorCaptureForm: View {
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
             Button {
-                guard !name.isEmpty else { return }
+                // Sprint #3 R1-E-4: trim before guarding so "   "
+                // whitespace-only doesn't slip through to companyName.
+                let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedName.isEmpty else { return }
                 onAdd(HomeAssessmentContractorEntry(
-                    companyName: name,
-                    category: category.isEmpty ? nil : category,
-                    phone: phone.isEmpty ? nil : phone,
+                    companyName: trimmedName,
+                    category: trimmedCategory.isEmpty ? nil : trimmedCategory,
+                    phone: trimmedPhone.isEmpty ? nil : trimmedPhone,
                     email: nil
                 ))
                 name = ""; category = ""; phone = ""
@@ -525,7 +566,7 @@ struct VendorCaptureForm: View {
                     )
             }
             .buttonStyle(.plain)
-            .disabled(name.isEmpty)
+            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
 }
@@ -539,6 +580,10 @@ struct RoutineCaptureForm: View {
     @State private var label: String = ""
     @State private var vendor: String = ""
     @State private var cadence: String = "weekly"
+    /// Sprint #3 R1-E-3: validation breadcrumb when user taps Add
+    /// without entering a label. Pre-fix this silently created a
+    /// ghost routine where label fell back to the picker default.
+    @State private var showValidationError: Bool = false
 
     private let kinds = ["landscaping", "pool_service", "pest_control", "cleaning", "snow_removal", "trash", "other"]
     private let cadences = ["weekly", "biweekly", "monthly", "quarterly", "annual"]
@@ -552,6 +597,7 @@ struct RoutineCaptureForm: View {
             TextField("Label (e.g. Lawn cut)", text: $label)
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
+                .onChange(of: label) { _, _ in showValidationError = false }
             TextField("Vendor (optional)", text: $vendor)
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(HavenColors.creamLight))
@@ -560,15 +606,25 @@ struct RoutineCaptureForm: View {
             }
             .pickerStyle(.menu)
             Button {
+                // Sprint #3 R1-E-3: require an explicit label. Without
+                // this guard the button silently created a ghost row
+                // every tap with label fallback to picker default.
+                let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedVendor = vendor.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedLabel.isEmpty else {
+                    showValidationError = true
+                    return
+                }
                 onAdd(HomeAssessmentRoutineEntry(
                     kind: kind,
-                    label: label.isEmpty ? kind : label,
-                    vendorName: vendor.isEmpty ? nil : vendor,
+                    label: trimmedLabel,
+                    vendorName: trimmedVendor.isEmpty ? nil : trimmedVendor,
                     cadence: cadence,
                     dayOfWeek: nil,
                     activeMonths: nil
                 ))
                 label = ""; vendor = ""
+                showValidationError = false
             } label: {
                 Text("Add routine")
                     .font(HavenTypography.uiButton)
@@ -580,6 +636,13 @@ struct RoutineCaptureForm: View {
                     )
             }
             .buttonStyle(.plain)
+            .disabled(label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if showValidationError {
+                Text("Add a label (e.g. \"Lawn cut\") before adding this routine.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.critical)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 }
