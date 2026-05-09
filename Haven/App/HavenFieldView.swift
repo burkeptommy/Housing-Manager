@@ -6174,6 +6174,11 @@ private struct HavenFieldVisitWorkspaceView: View {
             techNotes.append(inserted)
             techNoteComposer = ""
             techNotesError = nil
+            // N-7 fix: post the visit-changed notification so the
+            // dashboard's denormalized techNotesCount + the visits-list
+            // pill refresh on tab back-nav. Without this, the list
+            // shows stale "2 notes" until a full tab switch.
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
         } catch {
             techNotesError = friendlyServerError(
                 from: error,
@@ -6374,7 +6379,14 @@ private struct HavenFieldVisitWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     FieldKeyValueRow(label: "Type", value: viewModel.payload?.session.seedPayload.property.propertyType ?? "Home")
                     FieldKeyValueRow(label: "Known systems", value: "\(viewModel.home?.systems.count ?? viewModel.draft?.systemsSnapshot.count ?? 0)")
-                    FieldKeyValueRow(label: "Open work", value: "\(viewModel.home?.openTasks.count ?? 0) items")
+                    // N-4 fix: "1 items" → "1 item".
+                    FieldKeyValueRow(
+                        label: "Open work",
+                        value: {
+                            let count = viewModel.home?.openTasks.count ?? 0
+                            return "\(count) \(count == 1 ? "item" : "items")"
+                        }()
+                    )
                     if let homeownerNotes = viewModel.payload?.session.seedPayload.homeownerNotes, !homeownerNotes.isEmpty {
                         FieldKeyValueRow(label: "Homeowner note", value: homeownerNotes)
                     }
@@ -9036,10 +9048,16 @@ private struct FieldHomeRow: View {
     }
 
     private var summary: String {
+        // N-4 fix: pluralize systems / open tasks correctly so the row
+        // doesn't read "5 systems · 1 open tasks". Helper inline since
+        // there's no other site that needs it yet.
         let lastVisit = home.lastCompletedVisit?.fieldDateTime
-        let homeSummary = "\(home.systemCount) systems • \(home.openTasks.count) open tasks"
+        let systemWord = home.systemCount == 1 ? "system" : "systems"
+        let openCount = home.openTasks.count
+        let openWord = openCount == 1 ? "open task" : "open tasks"
+        let homeSummary = "\(home.systemCount) \(systemWord) · \(openCount) \(openWord)"
         guard let lastVisit else { return homeSummary }
-        return "\(homeSummary) • last visit \(lastVisit)"
+        return "\(homeSummary) · last visit \(lastVisit)"
     }
 }
 
@@ -9773,7 +9791,21 @@ private struct FieldBuildQuoteSheet: View {
     }
 
     private var visitDateLabel: String {
+        // N-9 fix: routeDate arrives as "2026-05-08" (Postgres date
+        // column, no time) most of the time — ISO8601DateFormatter
+        // can't parse those because it requires the time portion.
+        // Try the simple yyyy-MM-dd shape FIRST, fall back to ISO8601
+        // for the rare full-timestamp values, fall back to the raw
+        // string only as a last resort. Output: "Fri May 8".
         guard let routeDate = visit.routeDate, !routeDate.isEmpty else { return "Today" }
+        let dateOnly = DateFormatter()
+        dateOnly.locale = Locale(identifier: "en_US_POSIX")
+        dateOnly.dateFormat = "yyyy-MM-dd"
+        if let parsed = dateOnly.date(from: routeDate) {
+            let display = DateFormatter()
+            display.dateFormat = "EEE MMM d"
+            return display.string(from: parsed)
+        }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let date = formatter.date(from: routeDate) ?? {
