@@ -4,37 +4,41 @@
 
 Source: comprehensive Chez Field iOS app verification subagent (sweep of every tab + every M-wave surface). Result: **PARTIAL** — core flows work, but 3 critical bugs surface and 10 polish bugs queued.
 
-### Critical bugs
+## Bugfix pass — 2026-05-08
 
-| ID | Surface | Severity | Repro |
-|---|---|---|---|
-| **C-1** | M1 `complete_visit` action — visit detail (`HavenFieldVisitWorkspaceView`) | 🔴 blocker | Tap Complete on a clock-in'd visit. UI flips to "Visit complete" with green check + total time. DB cross-check: `provider_visit_assignments.clock_out_at` remains NULL, `handyman_requests.status` remains `in_progress`. The status pill on the same screen still reads "In progress" while the lifecycle card reads "Visit complete". `handyman_request_messages` got the audit row but the canonical state didn't update. Two surfaces inconsistent on the same page. **Data integrity issue.** Likely cause: the `complete_visit` action inserts the audit message but doesn't run the UPDATE on `provider_visit_assignments.clock_out_at` and the request `status` flip. |
-| **C-2** | Auth / navigation — sign-out flow | 🔴 blocker | Sign Out from Settings → welcome screen → tap "Sign in to Chez Field" → empty form renders → long-press email field → instead of summoning paste menu, app dismisses sign-in form and re-enters previous view stack. Subsequent taps trigger destructive actions (verification subagent's session: a Complete Visit fired without intent on visit `aab4c2d0`). Either Sign Out doesn't clear the `HavenSimulatorAuthStorage` UserDefaults entry, the nav stack isn't reset on sign-out, OR long-press in iOS Sim has unintended stack-pop side effects. Likely needs to add `defaults.removeObject` calls for the supabase.auth.* keys on sign-out + a nav-stack reset. |
-| **C-3** | M3 Flag-for-follow-up sheet | 🟡 major (Section 22 C1 violation) | Open any system → Field actions → Flag for follow-up → leave the "Why couldn't you finish today?" input empty → tap Flag in toolbar. Sheet dismisses silently, DB row gets `marked_for_followup_at = now()` but `followup_reason = NULL`. The reason is the entire point of this flow — silently accepting NULL produces useless "flag for follow-up: <unknown>" rows. Add validation: empty body → red inline error "Tell us why so the next visit knows what to do." |
+3 criticals + 5 polish bugs landed. Edge fn handyman-provider redeployed v79; iOS build clean. Outstanding work batched below in updated severity.
+
+### Critical bugs (all fixed)
+
+| ID | Surface | Severity | Status | Fix |
+|---|---|---|---|---|
+| **C-1** | M1 `complete_visit` action — visit detail (`HavenFieldVisitWorkspaceView`) | 🔴 blocker | ✅ FIXED | Restructured `completeVisitForProvider` to (1) close any open pause first, (2) ALWAYS stamp `clock_out_at` (we coalesce with the existing value so retries are idempotent at the semantic level but the field is never left null), (3) run a single atomic UPDATE with the full desired final state, (4) re-read the row to verify `clock_out_at` actually landed before doing anything else, (5) flip request status via `updateRequestStatusForProvider`, (6) re-read the request row to verify status flipped to `completed`. Throws specific errors at every step so audit messages never insert when the canonical writes failed. Backfilled the existing busted assignment `aab4c2d0` + request `6c9c9b5c` via SQL UPDATE. Edge fn handyman-provider redeployed v79. |
+| **C-2** | Auth / navigation — sign-out flow | 🔴 blocker | ✅ FIXED | Promoted `HavenSimulatorAuthStorage` to a shared singleton (so the SDK reads + writes against the same instance the sign-out path can wipe). Added `clearAll()` method that removes every `supabase.auth.*` UserDefaults key. Wired it into the `.signedOut` case in `AuthService.startListening` (under `#if targetEnvironment(simulator)`) AND into `forceLocalSignOut` for symmetry. Device + TestFlight + App Store builds keep using the Keychain path which the SDK's own `signOut` already wipes via delete-class queries. |
+| **C-3** | M3 Flag-for-follow-up sheet | 🟡 major (Section 22 C1 violation) | ✅ FIXED | `HavenFieldFollowupSheet` now validates the reason field on submit. Empty (after trim) → inline `validationError` renders below the TextField in `HavenColors.critical` with copy "Tell us why so the next visit knows what to do." — sheet stays open + onConfirm is NOT called + the DB row never gets stamped. Mirrors the M1 pause modal "Other branch validation" pattern. `onChange(of: reason)` clears the error when the user starts typing. |
 
 ### Non-critical / polish bugs
 
-| ID | Surface | Severity | Description |
-|---|---|---|---|
-| N-1 | Overview hero, Visit detail, Visits list, route table | 🟡 major | Time fields render as raw `HH:MM:SS` (e.g. `10:00:00 to 12:00:00`, `first at 10:00:00`, `Connected home · 10:00:00`). Should be `10:00 AM` or device-locale formatted. Pattern: Postgres time column stringified directly without a Date formatter. |
-| N-2 | Overview, Visits list, Visit detail, Build quote sheet | 🟡 major | Visit type enum leaks: `standard visit: Customer 4`, `repair: Customer 4`, `install: Customer 4`, `quote: Customer 7`. Lowercase + colon-prefix. Should be `Standard visit · Customer 4` or just `Customer 4` with the type as a chip/pill. |
-| N-3 | Overview greeting subtitle | 🟡 major | After completing a visit, dashboard greeting reads `1 stop today · first at next up · 8 requests waiting`. The literal text `next up` appears where a time should — fallback string when `nextUpTime` is empty/null. |
-| N-4 | Overview Recently Serviced Homes + Visit detail House context | 🟢 minor | Pluralization mismatches: `Customer 6 home: 5 systems · 1 open tasks` (should be `1 open task`); `OPEN WORK: 1 items` (should be `1 item`). |
-| N-5 | Overview "Need a response" list (Initial setup row) | 🟡 major | Title shows `Initial setup . O'Brien-Müller 1778176425027` — literal full-stop instead of middle dot for separator AND raw test-stamp number leaks into customer name. (B3 violation: `' . '` instead of `' · '`.) |
-| N-6 | Customer 4 home Systems sub-tab | 🟡 major | Same systems duplicated: AC and Roof appear in both `GAP-FILL — 2 systems missing details` AND `SYSTEMS — Known systems`. Filter inconsistency — gap-fill should exclude systems already in known systems OR known systems should exclude incomplete ones. |
-| N-7 | Visits list (cached after detail navigation) | 🟡 moderate | After adding a tech note from inside a visit (count 2→3) and going back to the Visits list, the `2 notes` pill stays at 2 until the user navigates to a different tab and back. TIME ON-SITE counter on the list also shows the value from when the list was first loaded. Pull-to-refresh on the list also doesn't refresh — only full tab switch. |
-| N-8 | Homes list | 🟢 minor | Two cards show identical `999 Test Avenue` — cannot distinguish them. Either fixture issue or app fails to dedupe by household_id. |
-| N-9 | Build quote sheet header | 🟢 minor | Date renders as raw `2026-05-08` (ISO format) instead of localized `May 8, 2026`. Same bug pattern as N-1. |
-| N-10 | Settings sheet | 🟢 minor | Workspace name displayed as raw fixture stamp `E2E Contractor crew6 1778170662764` — including the unix-millis suffix. |
+| ID | Surface | Severity | Status | Description |
+|---|---|---|---|---|
+| N-1 | Overview hero, Visit detail, Visits list, route table | 🟡 major | ✅ FIXED | Added `String.fieldShortTime` extension that parses `HH:mm:ss` / `HH:mm` and renders via `DateFormatter` with `timeStyle = .short` so "10:00:00" → "10:00 AM" device-locale. Wired into every visible call site (heroSubtitle, previewLine, timeLabel, durationLabel, routeWindow, routeSummary). The sort comparator at line 11666 was deliberately left raw because lexicographic order matches chronological order on `HH:mm:ss`. |
+| N-2 | Overview, Visits list, Visit detail, Build quote sheet | 🟡 major | ✅ FIXED | Added `String.fieldDisplayTitle` extension that strips the `<kind>:` prefix when it matches a known visit-type token (`standard visit` / `standard_visit` / `repair` / `install` / `quote` / `assembly` / `question` / `setup`). Wired into every `Text(visit.title)` site (10 surfaces). Untouched titles pass through unchanged so non-prefixed names still render. |
+| N-3 | Overview greeting subtitle | 🟡 major | ✅ FIXED | `heroSubtitle` rewritten: instead of the raw `?? "next up"` fallback string, the "first at X" segment is now conditional on a non-nil window-start-time. Subtitle is built as `parts.joined(separator: " · ")` so the segment drops out cleanly when no time is on file. Time also now uses the new `fieldShortTime` formatter. |
+| N-4 | Overview Recently Serviced Homes + Visit detail House context | 🟢 minor | OPEN | Pluralization mismatches: `Customer 6 home: 5 systems · 1 open tasks` (should be `1 open task`); `OPEN WORK: 1 items` (should be `1 item`). |
+| N-5 | Overview "Need a response" list (Initial setup row) | 🟡 major | PARTIAL | Stamp number leak (`O'Brien-Müller 1778176425027`) is a fixture issue — household.name has the timestamp baked in by the seed runner. Out of iOS scope; flagged for the fixture owner. The `' . '` separator was actually `' • '` (middle bullet, U+2022) in some surfaces and `' · '` (middle dot, U+00B7) in others — `routeSummary` was normalized to `' · '`; remaining `'· '` and `'• '` mixed-use sites left as-is to keep this commit focused. |
+| N-6 | Customer 4 home Systems sub-tab | 🟡 major | OPEN | Same systems duplicated: AC and Roof appear in both `GAP-FILL — 2 systems missing details` AND `SYSTEMS — Known systems`. Filter inconsistency — gap-fill should exclude systems already in known systems OR known systems should exclude incomplete ones. |
+| N-7 | Visits list (cached after detail navigation) | 🟡 moderate | OPEN | After adding a tech note from inside a visit (count 2→3) and going back to the Visits list, the `2 notes` pill stays at 2 until the user navigates to a different tab and back. TIME ON-SITE counter on the list also shows the value from when the list was first loaded. Pull-to-refresh on the list also doesn't refresh — only full tab switch. |
+| N-8 | Homes list | 🟢 minor | OPEN | Two cards show identical `999 Test Avenue` — cannot distinguish them. Either fixture issue or app fails to dedupe by household_id. |
+| N-9 | Build quote sheet header | 🟢 minor | OPEN | Date renders as raw `2026-05-08` (ISO format) instead of localized `May 8, 2026`. Same bug pattern as N-1. |
+| N-10 | Settings sheet | 🟢 minor | OPEN | Workspace name displayed as raw fixture stamp `E2E Contractor crew6 1778170662764` — including the unix-millis suffix. Likely a fixture issue but the iOS Settings sheet could also clean it up at render time. |
 
 ### Section 22 discipline violations
 
-| Code | Surface | Evidence |
-|---|---|---|
-| **B1** | Customer 4 home → Systems → AC + Roof rows + Gap-fill cards | Caption text `Missing model plate details` renders in salmon. B1: salmon is for primary CTA / active queue accent / salmon-50 wash on selected / fit-meter at success tier / SLA-critical pills only — NOT inline caption text on inactive list rows. |
-| **C1** | M3 Flag-for-follow-up sheet | Empty submit silently accepted (= C-3). |
-| **B9** | Visit detail page | STATUS pill shows `In progress` while VISIT LIFECYCLE shows `Visit complete` on the same page after a Complete tap. Two surfaces inconsistent (= C-1 manifestation). |
-| **B9** | Visits list cache | List shows `2 notes` even after note count is 3 in DB. List shows TIME ON-SITE: 5h 14m even after the actual lifecycle counter is at 5h 30m+. |
+| Code | Surface | Evidence | Status |
+|---|---|---|---|
+| **B1** | Customer 4 home → Systems → AC + Roof rows + Gap-fill cards | Caption text `Missing model plate details` renders in salmon. B1: salmon is for primary CTA / active queue accent / salmon-50 wash on selected / fit-meter at success tier / SLA-critical pills only — NOT inline caption text on inactive list rows. | ✅ FIXED — both `Missing model plate details` and `Voice memo on file` captions changed from `HavenColors.action` to `HavenColors.textSecondary`. |
+| **C1** | M3 Flag-for-follow-up sheet | Empty submit silently accepted (= C-3). | ✅ FIXED via C-3. |
+| **B9** | Visit detail page | STATUS pill shows `In progress` while VISIT LIFECYCLE shows `Visit complete` on the same page after a Complete tap. Two surfaces inconsistent (= C-1 manifestation). | ✅ FIXED via C-1. |
+| **B9** | Visits list cache | List shows `2 notes` even after note count is 3 in DB. List shows TIME ON-SITE: 5h 14m even after the actual lifecycle counter is at 5h 30m+. | OPEN (= N-7). |
 
 ### Untested due to time / blocker
 

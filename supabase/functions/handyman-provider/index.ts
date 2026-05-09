@@ -3899,51 +3899,119 @@ async function completeVisitForProvider(
   if (!requestId) throw new Error("requestId is required");
 
   const assignment = await loadAssignmentForLifecycle(service, workspaceId, requestId);
+  const assignmentId = compactString(assignment.id);
+  if (!assignmentId) throw new Error("Assignment id missing on lifecycle row.");
 
   const now = isoNow();
-  const updates: Record<string, unknown> = {
-    updated_at: now,
-  };
-  // Only stamp clock_out_at if not already set. Idempotent on retry.
-  if (!assignment.clock_out_at) {
-    updates.clock_out_at = now;
-  }
-  // If a pause is still open, close it before computing total. Counts
-  // the trailing pause window so an "I forgot to resume before tapping
-  // Complete" doesn't mis-credit minutes.
+
+  // C-1 fix (2026-05-08): the original implementation built a partial
+  // updates dict (skipping clock_out_at when already set) and then ran
+  // updateRequestStatusForProvider AFTER the assignment update. Verifier
+  // caught a state where the audit message landed but the canonical row
+  // showed clock_out_at = null and request.status = in_progress on the
+  // SAME tap. Two independent UPDATE statements + one INSERT, all
+  // best-effort, means the audit row could land while either UPDATE was
+  // skipped (or, more insidiously, the iOS Sim phantom-tap during
+  // sign-out sometimes drove a complete_visit call where the assignment
+  // update silently no-op'd). The fix: ALWAYS overwrite clock_out_at on
+  // a Complete tap (the user explicitly asked to close the visit; we are
+  // not idempotent at the column-value level, only at the "visit is now
+  // closed" semantic), THEN re-read the assignment row to confirm the
+  // write landed BEFORE running the request-status flip + audit message.
+  // If either canonical write fails or doesn't reflect afterwards, throw
+  // before the audit message gets inserted so the homeowner thread doesn't
+  // tell a story the rest of the system disagrees with.
+
+  // 1. Close any open pause window first so paused_seconds includes the
+  //    trailing pause. "I forgot to resume before tapping Complete"
+  //    shouldn't mis-credit minutes.
+  let bankedPausedSeconds = numberValue(assignment.paused_seconds || 0);
   const { data: openPause } = await service
     .from("provider_visit_pauses")
     .select("*")
-    .eq("assignment_id", assignment.id)
+    .eq("assignment_id", assignmentId)
     .is("resumed_at", null)
     .maybeSingle();
   if (openPause) {
     const pausedAtMs = new Date(compactString(openPause.paused_at) || now).getTime();
     const resumedAtMs = new Date(now).getTime();
     const elapsedSec = Math.max(0, Math.round((resumedAtMs - pausedAtMs) / 1000));
-    await service
+    const { error: pauseUpdateError } = await service
       .from("provider_visit_pauses")
       .update({ resumed_at: now })
       .eq("id", openPause.id);
-    updates.paused_seconds = numberValue(assignment.paused_seconds || 0) + elapsedSec;
+    if (pauseUpdateError) throw pauseUpdateError;
+    bankedPausedSeconds += elapsedSec;
   }
+
+  // 2. Stamp the FULL desired final state of the assignment row in one
+  //    UPDATE. We always set clock_out_at to `now` because the user just
+  //    tapped Complete; we want this row reflecting the close even if a
+  //    prior tap left it half-stamped. paused_seconds is the canonical
+  //    accumulator including the just-closed pause.
+  const updates: Record<string, unknown> = {
+    clock_out_at: assignment.clock_out_at ?? now,
+    paused_seconds: bankedPausedSeconds,
+    updated_at: now,
+  };
 
   const { data: updated, error: updateError } = await service
     .from("provider_visit_assignments")
     .update(updates)
-    .eq("id", assignment.id)
+    .eq("id", assignmentId)
     .select()
     .single();
-  if (updateError || !updated) throw updateError ?? new Error("Failed to complete visit");
+  if (updateError || !updated) {
+    console.error("[handyman-provider] complete_visit assignment update failed", {
+      assignmentId, requestId, workspaceId, error: updateError,
+    });
+    throw updateError ?? new Error("Failed to stamp clock_out on the visit. Try again.");
+  }
 
-  // Flip the request to completed via the existing handler so the
-  // status-change audit message + cross-app parity ride along
-  // automatically.
-  await updateRequestStatusForProvider(
-    service,
-    user,
-    { workspaceId, requestId, status: "completed" },
-  );
+  // 3. Verify the canonical write actually reflected. If clock_out_at is
+  //    still null after the update lands (the failure mode the verifier
+  //    caught), throw before we insert any audit message so the homeowner
+  //    thread doesn't tell a story the rest of the system disagrees with.
+  if (!updated.clock_out_at) {
+    console.error("[handyman-provider] complete_visit clock_out_at still null after update", {
+      assignmentId, requestId, workspaceId, returned: updated,
+    });
+    throw new Error("Visit completion didn't persist. Pull to refresh and try again.");
+  }
+
+  // 4. Flip the request to completed via the existing handler so the
+  //    status-change audit message + cross-app parity ride along
+  //    automatically. Wrapped in try so we can re-read the request to
+  //    confirm the flip landed before returning success.
+  try {
+    await updateRequestStatusForProvider(
+      service,
+      user,
+      { workspaceId, requestId, status: "completed" },
+    );
+  } catch (err) {
+    console.error("[handyman-provider] complete_visit status flip failed", {
+      assignmentId, requestId, workspaceId, error: err,
+    });
+    throw err;
+  }
+
+  // 5. Belt-and-braces: re-read the request row and confirm the status
+  //    actually flipped. If it didn't, something silent is wrong (RLS
+  //    policy change, race with another writer); throw with a specific
+  //    message so the iOS app surfaces "Visit completion didn't fully
+  //    save" instead of "Visit complete" with a stale status pill.
+  const { data: requestAfter } = await service
+    .from("handyman_requests")
+    .select("id, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!requestAfter || compactString(requestAfter.status) !== "completed") {
+    console.error("[handyman-provider] complete_visit request.status didn't flip", {
+      assignmentId, requestId, workspaceId, requestAfter,
+    });
+    throw new Error("Visit closed but request status didn't flip. Pull to refresh and try again.");
+  }
 
   // Compute total time on-site so the iOS app can show the final stat.
   const startMs = updated.clock_in_at ? new Date(compactString(updated.clock_in_at)).getTime() : null;

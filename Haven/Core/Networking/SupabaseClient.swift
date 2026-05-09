@@ -20,7 +20,19 @@ import Auth
 ///   ChezField (Security) errSecMissingEntitlement -34018:
 ///   "Client has neither application-identifier nor
 ///    keychain-access-groups entitlements"
-private final class HavenSimulatorAuthStorage: AuthLocalStorage, @unchecked Sendable {
+final class HavenSimulatorAuthStorage: AuthLocalStorage, @unchecked Sendable {
+    /// Shared singleton so the sign-out path can wipe stale entries on
+    /// the SAME instance the SDK is reading + writing through. The
+    /// Supabase Swift SDK's `signOut` only `remove`s the keys it's
+    /// currently tracking — anything left over from a half-completed
+    /// auth flow (token-refresh failure, partial session, race) stays
+    /// in UserDefaults and gets read back on the next launch as if the
+    /// user is still signed in. Confirmed 2026-05-08: post sign-out tap
+    /// on the welcome screen popped into the previous signed-in view
+    /// stack and a long-press on the email field triggered destructive
+    /// actions on the previous session's screen. C-2 fix.
+    static let shared = HavenSimulatorAuthStorage()
+
     private let defaults = UserDefaults.standard
     private let prefix = "supabase.auth."
 
@@ -35,6 +47,17 @@ private final class HavenSimulatorAuthStorage: AuthLocalStorage, @unchecked Send
     func remove(key: String) throws {
         defaults.removeObject(forKey: prefix + key)
     }
+
+    /// Wipe every UserDefaults key with the supabase.auth.* prefix.
+    /// Called from the .signedOut event listener in AuthService so the
+    /// next launch reads zero auth state and lands on the welcome
+    /// screen instead of bouncing back into the previous session.
+    func clearAll() {
+        let snapshot = defaults.dictionaryRepresentation()
+        for key in snapshot.keys where key.hasPrefix(prefix) {
+            defaults.removeObject(forKey: key)
+        }
+    }
 }
 #endif
 
@@ -43,9 +66,11 @@ private final class HavenSimulatorAuthStorage: AuthLocalStorage, @unchecked Send
 enum HavenSupabase {
     static let client: SupabaseClient = {
         #if targetEnvironment(simulator)
+        // Use the shared singleton so AuthService.signOut can call
+        // clearAll() on the same instance the SDK reads + writes.
         let options = SupabaseClientOptions(
             auth: SupabaseClientOptions.AuthOptions(
-                storage: HavenSimulatorAuthStorage()
+                storage: HavenSimulatorAuthStorage.shared
             )
         )
         return SupabaseClient(

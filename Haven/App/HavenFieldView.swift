@@ -3684,8 +3684,21 @@ private struct HavenFieldHomeTab: View {
 
     private var heroSubtitle: String {
         if let first = todayVisits.first {
-            let when = first.assignment?.windowStartTime?.trimmedOrNil ?? "next up"
-            return "\(todayVisits.count) stop\(todayVisits.count == 1 ? "" : "s") today · first at \(when) · \(requestedVisits.count) request\(requestedVisits.count == 1 ? "" : "s") waiting"
+            // N-1 + N-3 fix: render the visit time as device-locale short
+            // ("10:00 AM" not "10:00:00") AND suppress the "first at X"
+            // segment entirely when no time is on file (was leaking the
+            // literal "first at next up" fallback string).
+            let when = first.assignment?.windowStartTime?.trimmedOrNil?.fieldShortTime
+            let stopCount = todayVisits.count
+            let stopWord = stopCount == 1 ? "stop" : "stops"
+            let waitingCount = requestedVisits.count
+            let waitingWord = waitingCount == 1 ? "request" : "requests"
+            var parts: [String] = ["\(stopCount) \(stopWord) today"]
+            if let when {
+                parts.append("first at \(when)")
+            }
+            parts.append("\(waitingCount) \(waitingWord) waiting")
+            return parts.joined(separator: " · ")
         }
         if let first = upcomingVisits.first {
             return "\(upcomingVisits.count) confirmed visit\(upcomingVisits.count == 1 ? "" : "s") ahead · next \(first.routeDate?.fieldRouteDateLabel ?? "soon")"
@@ -5462,7 +5475,7 @@ private struct HavenFieldVisitWorkspaceView: View {
             .padding(.vertical, 20)
         }
         .background(HavenColors.cream.ignoresSafeArea())
-        .navigationTitle(viewModel.visit.title)
+        .navigationTitle(viewModel.visit.title.fieldDisplayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load()
@@ -5593,7 +5606,7 @@ private struct HavenFieldVisitWorkspaceView: View {
     private var headerCard: some View {
         FieldSectionCard(
             kicker: "Visit",
-            title: viewModel.visit.property?.name ?? viewModel.visit.title,
+            title: viewModel.visit.property?.name ?? viewModel.visit.title.fieldDisplayTitle,
             inverse: true
         ) {
             VStack(alignment: .leading, spacing: 12) {
@@ -6387,7 +6400,7 @@ private struct HavenFieldVisitWorkspaceView: View {
                     VStack(spacing: 12) {
                         ForEach(recentVisits) { visit in
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(visit.title)
+                                Text(visit.title.fieldDisplayTitle)
                                     .font(HavenTypography.headline)
                                     .foregroundStyle(HavenColors.textPrimary)
                                 Text([visit.routeDate?.fieldShortDate, visit.statusLabel].compactMap { $0 }.joined(separator: " • "))
@@ -6783,11 +6796,14 @@ private struct HavenFieldVisitWorkspaceView: View {
 
     private var routeSummary: String {
         let date = (viewModel.visit.assignment?.routeDate ?? viewModel.visit.routeDate ?? viewModel.visit.visit?.scheduledDate)?.fieldShortDate
+        // N-1 fix + N-5 separator fix: render times as "10:00 AM" not
+        // "10:00:00", and use the canonical " · " middle dot separator.
         let window = [viewModel.visit.assignment?.windowStartTime, viewModel.visit.assignment?.windowEndTime]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
+            .map { $0.fieldShortTime }
             .joined(separator: " to ")
-        return [date, window.isEmpty ? nil : window].compactMap { $0 }.joined(separator: " • ").nonEmpty ?? "TBD"
+        return [date, window.isEmpty ? nil : window].compactMap { $0 }.joined(separator: " · ").nonEmpty ?? "TBD"
     }
 }
 
@@ -6999,7 +7015,7 @@ private struct HavenFieldHomeProfileView: View {
                     VStack(spacing: 12) {
                         ForEach(home.recentVisits) { visit in
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(visit.title)
+                                Text(visit.title.fieldDisplayTitle)
                                     .font(HavenTypography.headline)
                                     .foregroundStyle(HavenColors.textPrimary)
                                 Text([visit.routeDate?.fieldShortDate, visit.statusLabel, visit.completedAt?.fieldDateTime].compactMap { $0 }.joined(separator: " • "))
@@ -8392,7 +8408,7 @@ private struct FieldRouteHeroPreview: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(visit.title)
+                Text(visit.title.fieldDisplayTitle)
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textOnNavy)
                 Text(previewLine)
@@ -8413,7 +8429,9 @@ private struct FieldRouteHeroPreview: View {
 
     private var previewLine: String {
         let homeName = home?.name ?? visit.property?.name ?? "Connected home"
-        let time = visit.assignment?.windowStartTime?.trimmedOrNil ?? visit.routeDate?.fieldShortDate ?? "TBD"
+        // N-1 fix: render Postgres time-column as "10:00 AM" not "10:00:00".
+        let time = visit.assignment?.windowStartTime?.trimmedOrNil?.fieldShortTime
+            ?? visit.routeDate?.fieldShortDate ?? "TBD"
         if visit.belongsInRequestQueue {
             return "\(homeName) · Needs a reply"
         }
@@ -8579,7 +8597,7 @@ private struct FieldRequestQueueRow: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(visit.title)
+                    Text(visit.title.fieldDisplayTitle)
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.textPrimary)
                         .multilineTextAlignment(.leading)
@@ -8630,7 +8648,7 @@ private struct FieldRequestQueueRow: View {
     }
 
     private var requestInitials: String {
-        let base = home?.name ?? visit.property?.name ?? visit.title
+        let base = home?.name ?? visit.property?.name ?? visit.title.fieldDisplayTitle
         return base.fieldInitials
     }
 }
@@ -8662,7 +8680,7 @@ private struct FieldScheduledVisitRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(visit.title)
+                        Text(visit.title.fieldDisplayTitle)
                             .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textPrimary)
                         Text(home?.address ?? visit.property?.address ?? home?.name ?? visit.property?.name ?? "Connected home")
@@ -8760,12 +8778,14 @@ private struct FieldScheduledVisitRow: View {
     }
 
     private var timeLabel: String {
-        visit.assignment?.windowStartTime?.trimmedOrNil ?? visit.routeDate?.fieldShortDate ?? "TBD"
+        // N-1 fix: device-locale short time, not raw "10:00:00".
+        visit.assignment?.windowStartTime?.trimmedOrNil?.fieldShortTime
+            ?? visit.routeDate?.fieldShortDate ?? "TBD"
     }
 
     private var durationLabel: String {
         if let end = visit.assignment?.windowEndTime?.trimmedOrNil {
-            return end
+            return end.fieldShortTime
         }
         return visit.statusLabel ?? "Scheduled"
     }
@@ -8933,7 +8953,7 @@ private struct FieldVisitRow: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(visit.title)
+                    Text(visit.title.fieldDisplayTitle)
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.textPrimary)
                     Text(visit.property?.name ?? "Home")
@@ -8980,8 +9000,9 @@ private struct FieldVisitRow: View {
     }
 
     private var routeWindow: String? {
-        let start = visit.assignment?.windowStartTime?.trimmedOrNil
-        let end = visit.assignment?.windowEndTime?.trimmedOrNil
+        // N-1 fix: device-locale short time, not raw "10:00:00 to 12:00:00".
+        let start = visit.assignment?.windowStartTime?.trimmedOrNil?.fieldShortTime
+        let end = visit.assignment?.windowEndTime?.trimmedOrNil?.fieldShortTime
         if let start, let end { return "\(start) to \(end)" }
         return start ?? end
     }
@@ -9744,7 +9765,7 @@ private struct FieldBuildQuoteSheet: View {
     }
 
     private var customerName: String {
-        visit.property?.name ?? visit.title
+        visit.property?.name ?? visit.title.fieldDisplayTitle
     }
 
     private var customerAddress: String {
@@ -10993,14 +11014,18 @@ private struct FieldM3SystemRow: View {
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                 if system.hasIncompleteIdentity, !system.isDecommissioned {
+                    // Section 22 B1 fix: salmon (action) was decorating an
+                    // inactive list-row caption — out of bounds. textSecondary
+                    // for muted info; the tap affordance to fix is the
+                    // chevron + the row tap, not the caption color.
                     Text("Missing model plate details")
                         .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.action)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 if system.voiceNotePath?.nonEmpty != nil {
                     Label("Voice memo on file", systemImage: "waveform")
                         .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.action)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
             }
             Spacer(minLength: 8)
@@ -11103,13 +11128,18 @@ private struct HavenFieldDecommissionSheet: View {
     }
 }
 
-/// Wave M3 — follow-up reason capture. Optional reason; the next-visit
-/// prep checklist surfaces this string verbatim.
+/// Wave M3 — follow-up reason capture. The reason is the entire point
+/// of this flow — silently accepting NULL produces useless
+/// "flag for follow-up: <unknown>" rows on the next visit's prep
+/// checklist. C-3 fix (2026-05-08): added inline validation that
+/// matches the M1 pause modal's "Other branch validation" pattern
+/// (Section 22 C1: empty submit fires visibly).
 private struct HavenFieldFollowupSheet: View {
     let system: HavenFieldHomeSystem
     var onConfirm: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var reason: String = ""
+    @State private var validationError: String?
 
     var body: some View {
         NavigationStack {
@@ -11124,6 +11154,14 @@ private struct HavenFieldFollowupSheet: View {
                 Section("Why couldn't you finish today?") {
                     TextField("e.g. tenant unavailable, attic locked", text: $reason, axis: .vertical)
                         .lineLimit(2...4)
+                        .onChange(of: reason) { _, _ in
+                            validationError = nil
+                        }
+                    if let validationError {
+                        Text(validationError)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                    }
                 }
             }
             .navigationTitle("Flag for follow-up")
@@ -11134,7 +11172,12 @@ private struct HavenFieldFollowupSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Flag") {
-                        onConfirm(reason.trimmingCharacters(in: .whitespacesAndNewlines))
+                        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty {
+                            validationError = "Tell us why so the next visit knows what to do."
+                            return
+                        }
+                        onConfirm(trimmed)
                         dismiss()
                     }
                 }
@@ -11767,6 +11810,38 @@ private extension String {
         return self
     }
 
+    /// N-1 fix: convert Postgres time-column strings ("10:00:00") to a
+    /// device-locale short time ("10:00 AM"). Falls back to the raw
+    /// string if it doesn't parse, so we never blank out a real time
+    /// for an unfamiliar shape. Strips trailing seconds when parsing
+    /// fails too, so "10:00:00" → "10:00" at minimum.
+    var fieldShortTime: String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "HH:mm:ss"
+        if let date = parser.date(from: self) {
+            let f = DateFormatter()
+            f.timeStyle = .short
+            f.dateStyle = .none
+            return f.string(from: date)
+        }
+        // Fallback: try HH:mm
+        parser.dateFormat = "HH:mm"
+        if let date = parser.date(from: self) {
+            let f = DateFormatter()
+            f.timeStyle = .short
+            f.dateStyle = .none
+            return f.string(from: date)
+        }
+        // Last-ditch: strip trailing :SS if present so the worst case is
+        // "10:00" instead of "10:00:00".
+        let parts = split(separator: ":")
+        if parts.count >= 2 {
+            return "\(parts[0]):\(parts[1])"
+        }
+        return self
+    }
+
     var fieldDateTime: String {
         guard let date = HavenFieldDateParser.parse(self) else { return self }
         return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
@@ -11792,6 +11867,30 @@ private extension String {
         let letters = parts.prefix(2).compactMap { $0.first }.map(String.init).joined()
         if !letters.isEmpty { return letters.uppercased() }
         return String(prefix(2)).uppercased()
+    }
+
+    /// N-2 fix: visit titles are sometimes stored as "standard visit:
+    /// Customer 4" / "repair: Customer 4" / "quote: Customer 7" — the
+    /// raw enum bleeds through as a colon-prefixed lowercase prefix.
+    /// Strip the prefix when it matches a known visit-type, leaving the
+    /// human-readable customer / job descriptor. Unknown shapes pass
+    /// through unchanged so we never blank out a real title.
+    var fieldDisplayTitle: String {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return self }
+        let knownPrefixes: Set<String> = [
+            "standard visit", "standard_visit",
+            "repair", "install", "quote", "assembly", "question", "setup",
+        ]
+        for prefix in knownPrefixes {
+            let lowered = trimmed.lowercased()
+            if lowered.hasPrefix("\(prefix):") {
+                let after = trimmed.dropFirst(prefix.count + 1)
+                let stripped = after.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !stripped.isEmpty { return stripped }
+            }
+        }
+        return trimmed
     }
 }
 

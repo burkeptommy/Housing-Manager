@@ -105,6 +105,20 @@ final class AuthService: ObservableObject {
                     Analytics.track(.authSignedOut)
                     Analytics.reset()
                     clearAuthState()
+                    // C-2 fix (2026-05-08): the Supabase Swift SDK's
+                    // .signedOut callback only `remove`s the keys it
+                    // currently knows about. Anything left over from a
+                    // half-completed auth flow (token-refresh failure,
+                    // partial session) stays in UserDefaults and gets
+                    // read back on the next launch. Wipe the entire
+                    // supabase.auth.* prefix on simulator builds
+                    // (UserDefaults-backed) so the welcome screen lands
+                    // clean. Device + TestFlight + App Store builds use
+                    // the Keychain path which the SDK already wipes via
+                    // its own delete-class queries.
+                    #if targetEnvironment(simulator)
+                    HavenSimulatorAuthStorage.shared.clearAll()
+                    #endif
 
                 default:
                     break
@@ -447,6 +461,11 @@ final class AuthService: ObservableObject {
         try? await HavenSupabase.auth.signOut(scope: .local)
         SecureStorageService.shared.delete(key: "biometric_enabled")
         clearAuthState()
+        // C-2 fix: belt-and-braces wipe in case the SDK's local-scope
+        // signOut didn't traverse every key.
+        #if targetEnvironment(simulator)
+        HavenSimulatorAuthStorage.shared.clearAll()
+        #endif
     }
 
     deinit {
