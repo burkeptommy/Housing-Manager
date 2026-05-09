@@ -2447,6 +2447,12 @@ async function loadDashboard(
             parentQuoteId: compactString(quote.parent_quote_id) || null,
             signedAt: quote.signed_at ?? null,
             signedName: compactString(quote.signed_name) || null,
+            // Wave M4 — kitchen-table signature artifact. Operations
+            // Desk + iOS Field both decode this so the post-sign
+            // confirmation strip + the homeowner inbox row both render
+            // the captured PNG inline.
+            signaturePath: compactString(quote.signature_path) || null,
+            signerRole: compactString(quote.signer_role) || null,
             homeownerRevisedAt: quote.homeowner_revised_at ?? null,
             updatedAt: quote.updated_at,
             publicShareUrl: publicQuoteUrl(compactString(quote.public_share_token)),
@@ -5568,14 +5574,22 @@ async function saveQuote(
     : [];
   const sourceLineItems = incomingLineItems ?? fallbackLineItems;
   const lineItems = sourceLineItems
-    .map((item) => ({
-      id: compactString(item.id) || crypto.randomUUID(),
-      name: compactString(item.name),
-      description: compactString(item.description),
-      unit: compactString(item.unit) || "ea",
-      quantity: numberValue(item.quantity || 1),
-      unit_price: numberValue(item.unitPrice || item.unit_price || 0),
-    }))
+    .map((item) => {
+      // Wave M4 — preserve punch_item_id so the operator desk can
+      // render "this line covers <punch item title>" + the photos
+      // when the line was pre-filled from the BuildQuoteSheet.
+      const punchItemId = compactString(item.punch_item_id ?? item.punchItemId) || null;
+      const base: Record<string, unknown> = {
+        id: compactString(item.id) || crypto.randomUUID(),
+        name: compactString(item.name),
+        description: compactString(item.description),
+        unit: compactString(item.unit) || "ea",
+        quantity: numberValue(item.quantity || 1),
+        unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+      };
+      if (punchItemId) base.punch_item_id = punchItemId;
+      return base;
+    })
     .filter((item) => item.name);
   const totals = quoteSummary(lineItems);
   const now = isoNow();
@@ -5936,14 +5950,24 @@ async function saveQuoteBundle(
     .map((t) => ({
       label: compactString(t.label) || "Option",
       lineItems: Array.isArray(t.lineItems)
-        ? (t.lineItems as Array<Record<string, unknown>>).map((item) => ({
-            id: compactString(item.id) || crypto.randomUUID(),
-            name: compactString(item.name),
-            description: compactString(item.description),
-            unit: compactString(item.unit) || "ea",
-            quantity: numberValue(item.quantity || 1),
-            unit_price: numberValue(item.unitPrice || item.unit_price || 0),
-          })).filter((item) => item.name)
+        ? (t.lineItems as Array<Record<string, unknown>>).map((item) => {
+            // Wave M4 — preserve punch_item_id so the operator desk
+            // can render "this line covers <punch item title>" + the
+            // photos when the line was pre-filled from the iOS
+            // BuildQuoteSheet. Without this, bundles strip the
+            // cross-link and the operator only sees a name.
+            const punchItemId = compactString(item.punch_item_id ?? item.punchItemId) || null;
+            const base: Record<string, unknown> = {
+              id: compactString(item.id) || crypto.randomUUID(),
+              name: compactString(item.name),
+              description: compactString(item.description),
+              unit: compactString(item.unit) || "ea",
+              quantity: numberValue(item.quantity || 1),
+              unit_price: numberValue(item.unitPrice || item.unit_price || 0),
+            };
+            if (punchItemId) base.punch_item_id = punchItemId;
+            return base;
+          }).filter((item) => item.name)
         : [],
       scopeNotes: compactString(t.scopeNotes) || undefined,
     }))
@@ -6460,6 +6484,358 @@ async function decideQuoteBundle(
   });
 
   return { parentId, chosenChildId, chosenTierLabel: tierLabel };
+}
+
+/**
+ * Wave M4 — sign a quote (kitchen-table close).
+ *
+ * Field tech presents the draft quote on their iPad, the homeowner
+ * draws their finger across the canvas, the tech taps Submit. iOS
+ * encodes the canvas to a PNG → base64 and ships it here. We upload
+ * to the private quote-signatures bucket, stamp signed_at /
+ * signed_name / signature_path / signer_role, and (when the quote is
+ * still in draft) walk the quote to "approved" so the operator desk +
+ * homeowner inbox treat it as a finalized close.
+ *
+ * Pre-Phase 73b approved quotes were stamped via sign_provider_quote
+ * (the homeowner-typed-name flow). M4 reuses signed_at + signed_name
+ * so the homeowner-side "Approved (Jane Smith)" caption renders
+ * regardless of which channel produced the signature; the new
+ * signature_path adds the visual artifact contractors need at audit
+ * time and signer_role distinguishes a witness signature (e.g. a
+ * spouse who's not the named contract holder) from the principal.
+ */
+async function signQuote(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const quoteId = compactString(body.quoteId);
+  if (!quoteId) throw new Error("quoteId is required");
+
+  const signedName = compactString(body.signedName);
+  if (!signedName) throw new Error("signedName is required");
+
+  const signerRoleRaw = compactString(body.signerRole) || "homeowner";
+  if (signerRoleRaw !== "homeowner" && signerRoleRaw !== "witness") {
+    throw new Error("signerRole must be 'homeowner' or 'witness'");
+  }
+
+  const signatureBase64 = compactString(body.signatureBase64) || compactString(body.base64);
+  if (!signatureBase64) throw new Error("signatureBase64 is required");
+
+  // Verify the quote belongs to this workspace before touching it.
+  const { data: quote, error: quoteErr } = await service
+    .from("provider_quotes")
+    .select(
+      "id, workspace_id, status, household_id, request_id, title, total, parent_quote_id, signature_path",
+    )
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (quoteErr) throw quoteErr;
+  if (!quote) throw new Error("Quote not found");
+  if (compactString(quote.workspace_id) !== workspaceId) {
+    throw new Error("Quote belongs to a different workspace");
+  }
+
+  const householdId = compactString(quote.household_id);
+  if (!householdId) {
+    throw new Error("Cannot sign a prospect quote (no household linked yet)");
+  }
+
+  // Best-effort cleanup of a prior signature on this quote — should be
+  // rare in practice (the field flow only signs once) but if a tech
+  // hits Submit twice we don't want orphaned bytes.
+  const previousPath = compactString(quote.signature_path);
+  if (previousPath) {
+    await service.storage.from("quote-signatures").remove([previousPath]).catch((err) => {
+      console.warn("[handyman-provider] failed to remove prior signature", previousPath, err);
+    });
+  }
+
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // Storage path: <workspace_id>/<quote_id>/<random>.png
+  // workspace_id-first lets us list-all signatures per workspace in
+  // future audits without an index scan.
+  const path = `${workspaceId}/${quoteId}/${stamp}.png`;
+
+  const bytes = decodeBase64Body(signatureBase64);
+  const { error: uploadErr } = await service.storage
+    .from("quote-signatures")
+    .upload(path, bytes, { contentType: "image/png", upsert: false });
+  if (uploadErr) throw new Error(`Signature upload failed: ${uploadErr.message}`);
+
+  const now = isoNow();
+  const currentStatus = compactString(quote.status);
+  // Walk to approved when the quote was sent / viewed / countered /
+  // even draft (kitchen-table close skips the send step because the
+  // tech is sitting next to the homeowner). Already-approved quotes
+  // get a re-stamp without status change. Withdrawn quotes can't be
+  // signed.
+  if (currentStatus === "withdrawn") {
+    throw new Error("Withdrawn quotes can't be signed");
+  }
+  const shouldFlipToApproved = currentStatus !== "approved";
+
+  const updates: Record<string, unknown> = {
+    signature_path: path,
+    signed_at: now,
+    signed_name: signedName,
+    signer_role: signerRoleRaw,
+    updated_by_user_id: userId,
+    updated_at: now,
+  };
+  if (shouldFlipToApproved) {
+    updates.status = "approved";
+    updates.approved_at = now;
+  }
+
+  const { data: updated, error: updErr } = await service
+    .from("provider_quotes")
+    .update(updates)
+    .eq("id", quoteId)
+    .select(
+      "id, status, signature_path, signed_at, signed_name, signer_role, approved_at, total, title, request_id, household_id",
+    )
+    .single();
+  if (updErr || !updated) throw updErr ?? new Error("Failed to stamp signature");
+
+  // Sign a short-lived URL so the iOS app can render the captured
+  // signature back inline as a confirmation strip — same pattern as
+  // punch-item attachments in M2.
+  const { data: signed } = await service.storage
+    .from("quote-signatures")
+    .createSignedUrl(path, 60 * 60);
+  const signedUrl = compactString(signed?.signedUrl);
+
+  // Mirror an audit trail row to the request thread so the operator
+  // desk + homeowner inbox both see "Signed by [Name]" without
+  // round-tripping through the quote panel. Same pattern as
+  // sign_provider_quote in 20260907_phase73b_quote_negotiation.sql.
+  const requestId = compactString(updated.request_id);
+  if (requestId) {
+    await mirrorQuoteMessageToRequestThread(service, {
+      requestId,
+      householdId,
+      senderRole: "vendor",
+      body:
+        signerRoleRaw === "witness"
+          ? `${signedName} witnessed the quote signing.`
+          : `${signedName} signed the quote.`,
+      metadata: {
+        kind: "quote_signed",
+        quote_id: quoteId,
+        signed_name: signedName,
+        signed_at: now,
+        signer_role: signerRoleRaw,
+        total: numberValue(updated.total),
+      },
+    });
+  }
+
+  return {
+    quote: {
+      id: compactString(updated.id),
+      status: compactString(updated.status),
+      signaturePath: compactString(updated.signature_path),
+      signatureSignedUrl: signedUrl,
+      signedAt: updated.signed_at ?? null,
+      signedName: compactString(updated.signed_name) || null,
+      signerRole: compactString(updated.signer_role) || null,
+      approvedAt: updated.approved_at ?? null,
+      total: numberValue(updated.total),
+      title: compactString(updated.title),
+    },
+  };
+}
+
+/**
+ * Wave M4 — pre-fill a quote from a completed visit.
+ *
+ * Walks the visit's punch items, picks the ones that are completed
+ * (status = 'completed' OR has any time tracked OR has materials
+ * recorded), and constructs draft quote line items: one per punch
+ * item, with labor priced at workspace.default_hourly_rate_cents *
+ * (time_spent_seconds / 3600), plus a materials sub-cost rolled
+ * directly into the unit_price (so the line item reads as a single
+ * "labor + materials" row). The `punchItemId` foreign key gets
+ * stamped on each line item so the operator desk's quote detail can
+ * render "this line covers <punch item title>" + the photos.
+ *
+ * Returns the new quote row (status=draft, parent_quote_id=null) +
+ * the unsaved line items so the iOS BuildQuoteSheet can render them
+ * editable. The actual save round-trip happens via save_quote /
+ * send_quote / save_quote_bundle on the user's tap of Send.
+ *
+ * If the visit has no completed punch items, the pre-fill returns
+ * an empty line items array — the field tech can build the quote
+ * from scratch with the customer block + property block already
+ * populated.
+ */
+async function buildQuoteFromVisit(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const requestId = compactString(body.requestId);
+  if (!requestId) throw new Error("requestId is required");
+
+  const { data: request, error: requestErr } = await service
+    .from("handyman_requests")
+    .select(
+      "id, household_id, property_id, contractor_id, visit_task_id, title, status",
+    )
+    .eq("id", requestId)
+    .maybeSingle();
+  if (requestErr) throw requestErr;
+  if (!request) throw new Error("Visit / request not found");
+
+  const householdId = compactString(request.household_id);
+  const propertyId = compactString(request.property_id);
+  const contractorId = compactString(request.contractor_id);
+  const visitTaskId = compactString(request.visit_task_id);
+
+  // Verify the request belongs to this workspace via the contractor link.
+  if (contractorId) {
+    const { data: link } = await service
+      .from("provider_contractor_links")
+      .select("workspace_id")
+      .eq("contractor_id", contractorId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!link) throw new Error("Visit belongs to a different workspace");
+  }
+
+  // Default labor rate from the workspace. Stored as cents to keep
+  // arithmetic integer; convert to dollars-per-second for the per-item
+  // labor pricing math.
+  const { data: workspace } = await service
+    .from("provider_workspaces")
+    .select("default_hourly_rate_cents")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  const hourlyRateCents = numberValue(workspace?.default_hourly_rate_cents ?? 12500);
+  const dollarsPerSecond = hourlyRateCents / 100 / 3600;
+
+  // Pull every non-archived punch item assigned to this visit. We
+  // include all statuses (not just 'completed') so a tech who tracked
+  // time but didn't tap Complete still gets the line item — the
+  // homeowner's pricing should reflect work actually done.
+  let punchItems: Record<string, unknown>[] = [];
+  if (visitTaskId) {
+    const { data: items, error: itemsErr } = await service
+      .from("handyman_punch_items")
+      .select(
+        "id, title, description, status, materials_used, time_spent_seconds, completed_at, archived_at, attachments",
+      )
+      .eq("assigned_visit_task_id", visitTaskId)
+      .is("archived_at", null);
+    if (itemsErr) throw itemsErr;
+    punchItems = (items ?? []) as Record<string, unknown>[];
+  }
+
+  // Filter to "actually-done" rows: status = completed OR time tracked
+  // OR materials recorded. A row that's still pending with no evidence
+  // of work doesn't belong on a kitchen-table quote.
+  const eligible = punchItems.filter((item) => {
+    const status = compactString(item.status);
+    const timeSec = numberValue(item.time_spent_seconds || 0);
+    const materials = Array.isArray(item.materials_used) ? item.materials_used : [];
+    return status === "completed" || timeSec > 0 || materials.length > 0;
+  });
+
+  // Build line items. Each punch item becomes one line:
+  //   name = punch item title
+  //   description = labor minutes + materials breakdown
+  //   quantity = 1, unit_price = labor cost + materials cost
+  //   punchItemId = the source punch item id (for cross-link)
+  const lineItems = eligible.map((item) => {
+    const title = compactString(item.title) || "Visit work";
+    const timeSec = numberValue(item.time_spent_seconds || 0);
+    const laborMinutes = Math.round(timeSec / 60);
+    const laborCost = roundMoney(timeSec * dollarsPerSecond);
+
+    const materials = (Array.isArray(item.materials_used) ? item.materials_used : []) as Array<
+      Record<string, unknown>
+    >;
+    const materialsCost = roundMoney(
+      materials.reduce((sum, m) => {
+        const qty = numberValue(m.qty ?? 1);
+        const unit = numberValue(m.unit_cost ?? m.unitCost ?? 0);
+        return sum + qty * unit;
+      }, 0),
+    );
+
+    const descParts: string[] = [];
+    if (laborMinutes > 0) {
+      descParts.push(
+        `Labor: ${laborMinutes} min @ ${moneyLabel(hourlyRateCents / 100)}/hr`,
+      );
+    }
+    if (materials.length > 0) {
+      const matSummary = materials
+        .map((m) => `${numberValue(m.qty ?? 1)}× ${compactString(m.name) || "item"}`)
+        .join(", ");
+      descParts.push(`Materials: ${matSummary}`);
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      name: title,
+      description: descParts.join(" · "),
+      unit: "ea",
+      quantity: 1,
+      unit_price: roundMoney(laborCost + materialsCost),
+      // Cross-link so the operator desk can render the source punch
+      // item's photos / voice on the quote line.
+      punch_item_id: compactString(item.id),
+    };
+  });
+
+  const totals = quoteSummary(lineItems);
+  const requestTitle = compactString(request.title) || "Visit";
+  const draftTitle = `Quote for ${requestTitle}`;
+
+  // Return the raw shape the iOS BuildQuoteSheet pre-fills its form
+  // with. We deliberately do NOT insert a draft row — the field tech
+  // edits the lines + customer block in-memory, then a tap of Save /
+  // Send round-trips through save_quote / send_quote / save_quote_bundle.
+  return {
+    draft: {
+      requestId,
+      householdId,
+      propertyId,
+      contractorId,
+      visitTaskId,
+      workspaceId,
+      title: draftTitle,
+      lineItems: lineItems.map((line) => ({
+        id: line.id,
+        name: line.name,
+        description: line.description,
+        unit: line.unit,
+        quantity: line.quantity,
+        unitPrice: line.unit_price,
+        punchItemId: line.punch_item_id,
+      })),
+      subtotal: totals.subtotal,
+      taxTotal: totals.taxTotal,
+      total: totals.total,
+      defaultHourlyRateCents: hourlyRateCents,
+      eligibleCount: eligible.length,
+      visitedCount: punchItems.length,
+    },
+  };
 }
 
 async function saveQuoteItem(
@@ -9806,6 +10182,27 @@ serve(async (req) => {
       }
       if (action === "decide_quote_bundle") {
         const result = await decideQuoteBundle(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M4 — kitchen-table close: build a draft quote pre-filled
+      // from the visit's punch items, and capture a signature on
+      // approval. signQuote stamps signature_path / signed_at /
+      // signed_name / signer_role and walks the quote to approved.
+      if (action === "build_quote_from_visit") {
+        const result = await buildQuoteFromVisit(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+      if (action === "sign_quote") {
+        const result = await signQuote(
           service,
           user as unknown as Record<string, unknown>,
           body,

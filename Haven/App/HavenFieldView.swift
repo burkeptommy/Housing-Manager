@@ -3,6 +3,7 @@ import UIKit
 import CoreLocation
 import PhotosUI
 import AVFoundation
+import PencilKit
 import Supabase
 
 // MARK: - Native Haven Field
@@ -19,6 +20,16 @@ extension Notification.Name {
     /// back into the visits list. Avoids threading an `onCoordinated`
     /// callback through every NavigationLink construction site.
     static let havenFieldVisitChanged = Notification.Name("havenFieldVisitChanged")
+}
+
+/// Bounds-safe subscript so closure-based bindings in
+/// `FieldBuildQuoteSheet`'s tier editors can't index out of range
+/// during the brief window between an array mutation and the next
+/// view update. Mirrors the local helper in `QuizKidsInlineForm.swift`.
+fileprivate extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
 
 enum HavenFieldVisitsFilter: String, CaseIterable, Identifiable {
@@ -709,6 +720,258 @@ struct HavenFieldQuoteSummary: Codable, Hashable {
     let total: Double?
     let updatedAt: String?
     let publicShareUrl: String?
+    /// Wave M4 — kitchen-table signature artifact. Server stamps these
+    /// when the field tech captures a finger-drawn signature on the
+    /// iPad. signatureSignedUrl is a 1-hour TTL URL the iOS UI hands
+    /// AsyncImage so the post-sign confirmation strip renders the
+    /// captured PNG inline. Resilient decoder so legacy quote rows
+    /// (pre-M4) without these columns still hydrate cleanly.
+    let signedAt: String?
+    let signedName: String?
+    let signerRole: String?
+    let signaturePath: String?
+    let signatureSignedUrl: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, status, statusLabel, total, updatedAt, publicShareUrl
+        case signedAt, signedName, signerRole, signaturePath, signatureSignedUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? nil
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? nil
+        statusLabel = (try? c.decodeIfPresent(String.self, forKey: .statusLabel)) ?? nil
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? nil
+        updatedAt = (try? c.decodeIfPresent(String.self, forKey: .updatedAt)) ?? nil
+        publicShareUrl = (try? c.decodeIfPresent(String.self, forKey: .publicShareUrl)) ?? nil
+        signedAt = (try? c.decodeIfPresent(String.self, forKey: .signedAt)) ?? nil
+        signedName = (try? c.decodeIfPresent(String.self, forKey: .signedName)) ?? nil
+        signerRole = (try? c.decodeIfPresent(String.self, forKey: .signerRole)) ?? nil
+        signaturePath = (try? c.decodeIfPresent(String.self, forKey: .signaturePath)) ?? nil
+        signatureSignedUrl = (try? c.decodeIfPresent(String.self, forKey: .signatureSignedUrl)) ?? nil
+    }
+}
+
+/// Wave M4 — one editable line on the kitchen-table BuildQuoteSheet.
+/// Mirrors the snake_case shape `provider_quotes.line_items` rounds-trip
+/// in via save_quote_bundle. punchItemId is set when the line was
+/// pre-filled from a punch item; null when the field tech added a
+/// fresh row.
+struct HavenFieldQuoteDraftLine: Identifiable, Hashable, Codable {
+    var id: String
+    var name: String
+    var description: String
+    var unit: String
+    var quantity: Double
+    var unitPrice: Double
+    var punchItemId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, description, unit, quantity, unitPrice, punchItemId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+        description = (try? c.decodeIfPresent(String.self, forKey: .description)) ?? ""
+        unit = (try? c.decodeIfPresent(String.self, forKey: .unit)) ?? "ea"
+        quantity = (try? c.decodeIfPresent(Double.self, forKey: .quantity)) ?? 1
+        unitPrice = (try? c.decodeIfPresent(Double.self, forKey: .unitPrice)) ?? 0
+        punchItemId = (try? c.decodeIfPresent(String.self, forKey: .punchItemId)) ?? nil
+    }
+
+    init(
+        id: String = UUID().uuidString,
+        name: String = "",
+        description: String = "",
+        unit: String = "ea",
+        quantity: Double = 1,
+        unitPrice: Double = 0,
+        punchItemId: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.unit = unit
+        self.quantity = quantity
+        self.unitPrice = unitPrice
+        self.punchItemId = punchItemId
+    }
+
+    /// Computed total for the editor footer + the per-row display.
+    var lineTotal: Double { (quantity * unitPrice * 100.0).rounded() / 100.0 }
+}
+
+/// Wave M4 — pre-fill payload returned by build_quote_from_visit.
+/// The field tech edits these in the BuildQuoteSheet, then the save
+/// round-trips through save_quote_bundle / send_quote_bundle which
+/// owns the canonical quote row insert.
+struct HavenFieldQuoteDraftPayload: Codable, Hashable {
+    let requestId: String?
+    let householdId: String?
+    let propertyId: String?
+    let contractorId: String?
+    let visitTaskId: String?
+    let workspaceId: String?
+    let title: String
+    let lineItems: [HavenFieldQuoteDraftLine]
+    let subtotal: Double
+    let taxTotal: Double
+    let total: Double
+    let defaultHourlyRateCents: Int
+    let eligibleCount: Int
+    let visitedCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case requestId, householdId, propertyId, contractorId, visitTaskId, workspaceId
+        case title, lineItems, subtotal, taxTotal, total
+        case defaultHourlyRateCents, eligibleCount, visitedCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        requestId = (try? c.decodeIfPresent(String.self, forKey: .requestId)) ?? nil
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? nil
+        propertyId = (try? c.decodeIfPresent(String.self, forKey: .propertyId)) ?? nil
+        contractorId = (try? c.decodeIfPresent(String.self, forKey: .contractorId)) ?? nil
+        visitTaskId = (try? c.decodeIfPresent(String.self, forKey: .visitTaskId)) ?? nil
+        workspaceId = (try? c.decodeIfPresent(String.self, forKey: .workspaceId)) ?? nil
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? "Untitled quote"
+        lineItems = (try? c.decodeIfPresent([HavenFieldQuoteDraftLine].self, forKey: .lineItems)) ?? []
+        subtotal = (try? c.decodeIfPresent(Double.self, forKey: .subtotal)) ?? 0
+        taxTotal = (try? c.decodeIfPresent(Double.self, forKey: .taxTotal)) ?? 0
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? 0
+        defaultHourlyRateCents = (try? c.decodeIfPresent(Int.self, forKey: .defaultHourlyRateCents)) ?? 12500
+        eligibleCount = (try? c.decodeIfPresent(Int.self, forKey: .eligibleCount)) ?? 0
+        visitedCount = (try? c.decodeIfPresent(Int.self, forKey: .visitedCount)) ?? 0
+    }
+}
+
+/// Wave M4 — bundle tier payload for save_quote_bundle round-trip.
+/// Used when the field tech adds a good/better/best multi-tier toggle
+/// to the kitchen-table quote. snake_case keys mirror the edge-fn
+/// shape; line items use unit_price for the same reason.
+struct HavenFieldQuoteDraftBundleTier: Codable, Hashable {
+    let label: String
+    let lineItems: [HavenFieldQuoteDraftBundleLine]
+    let scopeNotes: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case label, lineItems, scopeNotes
+    }
+
+    init(label: String, lineItems: [HavenFieldQuoteDraftLine], scopeNotes: String? = nil) {
+        self.label = label
+        self.lineItems = lineItems.map { line in
+            HavenFieldQuoteDraftBundleLine(
+                id: line.id,
+                name: line.name,
+                description: line.description,
+                unit: line.unit,
+                quantity: line.quantity,
+                unitPrice: line.unitPrice,
+                punchItemId: line.punchItemId
+            )
+        }
+        self.scopeNotes = scopeNotes
+    }
+}
+
+struct HavenFieldQuoteDraftBundleLine: Codable, Hashable {
+    let id: String
+    let name: String
+    let description: String
+    let unit: String
+    let quantity: Double
+    let unitPrice: Double
+    let punchItemId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, description, unit, quantity
+        case unitPrice = "unit_price"
+        case punchItemId = "punch_item_id"
+    }
+}
+
+/// Wave M4 — server-side row returned by save_quote / save_quote_bundle.
+/// Resilient decoder so a future schema bump (e.g. new line item
+/// fields) doesn't take the whole save round-trip down.
+struct HavenFieldQuoteDraftSavedRow: Codable, Hashable {
+    let id: String
+    let status: String?
+    let total: Double?
+    let title: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, status, total, title
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? nil
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? nil
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? nil
+    }
+}
+
+struct HavenFieldQuoteDraftDelivery: Codable, Hashable {
+    let sent: Bool
+    let channel: String?
+    let recipientCount: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case sent, channel, recipientCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sent = (try? c.decodeIfPresent(Bool.self, forKey: .sent)) ?? false
+        channel = (try? c.decodeIfPresent(String.self, forKey: .channel)) ?? nil
+        recipientCount = (try? c.decodeIfPresent(Int.self, forKey: .recipientCount)) ?? nil
+    }
+}
+
+struct HavenFieldQuoteDraftSaveResult {
+    let parent: HavenFieldQuoteDraftSavedRow?
+    let children: [HavenFieldQuoteDraftSavedRow]
+    let delivery: HavenFieldQuoteDraftDelivery?
+}
+
+/// Wave M4 — server-side quote shape returned by sign_quote. Renders
+/// in the post-sign confirmation strip of the BuildQuoteSheet.
+struct HavenFieldSignedQuote: Codable, Hashable {
+    let id: String
+    let status: String
+    let signaturePath: String?
+    let signatureSignedUrl: String?
+    let signedAt: String?
+    let signedName: String?
+    let signerRole: String?
+    let approvedAt: String?
+    let total: Double
+    let title: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id, status, signaturePath, signatureSignedUrl
+        case signedAt, signedName, signerRole, approvedAt, total, title
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "approved"
+        signaturePath = (try? c.decodeIfPresent(String.self, forKey: .signaturePath)) ?? nil
+        signatureSignedUrl = (try? c.decodeIfPresent(String.self, forKey: .signatureSignedUrl)) ?? nil
+        signedAt = (try? c.decodeIfPresent(String.self, forKey: .signedAt)) ?? nil
+        signedName = (try? c.decodeIfPresent(String.self, forKey: .signedName)) ?? nil
+        signerRole = (try? c.decodeIfPresent(String.self, forKey: .signerRole)) ?? nil
+        approvedAt = (try? c.decodeIfPresent(String.self, forKey: .approvedAt)) ?? nil
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? 0
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+    }
 }
 
 struct HavenFieldHome: Codable, Identifiable {
@@ -1676,6 +1939,212 @@ actor HavenFieldService {
         let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, requestId: requestId))
         let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: Response.self)
         return (response.assignment, response.totalSeconds ?? 0)
+    }
+
+    // MARK: - Wave M4 kitchen-table close
+
+    /// Wave M4 — pre-fill a draft quote from the visit's completed
+    /// punch items. Returns line items with labor priced off the
+    /// workspace's default hourly rate + materials rolled in. The
+    /// field tech edits these in the BuildQuoteSheet, then save /
+    /// send round-trip through the existing save_quote_bundle action.
+    func buildQuoteFromVisit(
+        workspaceId: String,
+        requestId: String
+    ) async throws -> HavenFieldQuoteDraftPayload {
+        struct Request: Encodable {
+            let action = "build_quote_from_visit"
+            let workspaceId: String
+            let requestId: String
+        }
+        struct Response: Decodable {
+            let draft: HavenFieldQuoteDraftPayload
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.draft
+    }
+
+    /// Wave M4 — save a draft quote bundle (parent + tier children).
+    /// `tiers` is at minimum 1 entry for a single-tier quote (the
+    /// kitchen-table default) and up to 4 for good/better/best/premier.
+    /// Server-side `save_quote_bundle` handles the parent insert and
+    /// child rows in one round-trip.
+    ///
+    /// Note: the existing edge-fn `save_quote_bundle` action requires
+    /// at least 2 tiers. The single-tier kitchen-table flow routes
+    /// through `save_quote` instead — see `saveQuote(...)` below.
+    func saveQuoteBundle(
+        workspaceId: String,
+        requestId: String?,
+        householdId: String?,
+        propertyId: String?,
+        contractorId: String?,
+        title: String,
+        homeownerMessage: String?,
+        tiers: [HavenFieldQuoteDraftBundleTier],
+        send: Bool
+    ) async throws -> HavenFieldQuoteDraftSaveResult {
+        struct Request: Encodable {
+            let action: String
+            let workspaceId: String
+            let requestId: String?
+            let householdId: String?
+            let propertyId: String?
+            let contractorId: String?
+            let title: String
+            let homeownerMessage: String?
+            let tiers: [HavenFieldQuoteDraftBundleTier]
+        }
+        struct Response: Decodable {
+            let parent: HavenFieldQuoteDraftSavedRow?
+            let children: [HavenFieldQuoteDraftSavedRow]?
+            let delivery: HavenFieldQuoteDraftDelivery?
+        }
+        let payload = Request(
+            action: send ? "send_quote_bundle" : "save_quote_bundle",
+            workspaceId: workspaceId,
+            requestId: requestId,
+            householdId: householdId,
+            propertyId: propertyId,
+            contractorId: contractorId,
+            title: title,
+            homeownerMessage: homeownerMessage,
+            tiers: tiers
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return HavenFieldQuoteDraftSaveResult(
+            parent: response.parent,
+            children: response.children ?? [],
+            delivery: response.delivery
+        )
+    }
+
+    /// Wave M4 — single-tier quote save / send. Used when the field
+    /// tech builds a one-tier kitchen-table quote (the default). The
+    /// existing `save_quote` / `send_quote` action handles single-tier
+    /// rows directly without a bundle parent.
+    func saveSingleQuote(
+        workspaceId: String,
+        requestId: String?,
+        householdId: String?,
+        propertyId: String?,
+        contractorId: String?,
+        title: String,
+        homeownerMessage: String?,
+        lineItems: [HavenFieldQuoteDraftLine],
+        send: Bool
+    ) async throws -> HavenFieldQuoteDraftSavedRow {
+        struct LineItemPayload: Encodable {
+            let id: String
+            let name: String
+            let description: String
+            let unit: String
+            let quantity: Double
+            let unit_price: Double
+            let punch_item_id: String?
+        }
+        struct Request: Encodable {
+            let action: String
+            let workspaceId: String
+            let requestId: String?
+            let householdId: String?
+            let propertyId: String?
+            let contractorId: String?
+            let title: String
+            let homeownerMessage: String?
+            let lineItems: [LineItemPayload]
+        }
+        struct Response: Decodable {
+            let quote: HavenFieldQuoteDraftSavedRow?
+        }
+        let payload = Request(
+            action: send ? "send_quote" : "save_quote",
+            workspaceId: workspaceId,
+            requestId: requestId,
+            householdId: householdId,
+            propertyId: propertyId,
+            contractorId: contractorId,
+            title: title,
+            homeownerMessage: homeownerMessage,
+            lineItems: lineItems.map { line in
+                LineItemPayload(
+                    id: line.id,
+                    name: line.name,
+                    description: line.description,
+                    unit: line.unit,
+                    quantity: line.quantity,
+                    unit_price: line.unitPrice,
+                    punch_item_id: line.punchItemId
+                )
+            }
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        guard let quote = response.quote else {
+            throw URLError(.zeroByteResource)
+        }
+        return quote
+    }
+
+    /// Wave M4 — capture a finger-drawn signature on the iPad. Server
+    /// uploads to the private quote-signatures bucket, stamps
+    /// signed_at + signed_name + signature_path + signer_role, walks
+    /// the quote to approved (when not already), and returns the
+    /// signed-URL for the PNG so the post-sign confirmation strip
+    /// renders inline.
+    func signQuote(
+        workspaceId: String,
+        quoteId: String,
+        signatureBase64: String,
+        signedName: String,
+        signerRole: String
+    ) async throws -> HavenFieldSignedQuote {
+        struct Request: Encodable {
+            let action = "sign_quote"
+            let workspaceId: String
+            let quoteId: String
+            let signatureBase64: String
+            let signedName: String
+            let signerRole: String
+        }
+        struct Response: Decodable {
+            let quote: HavenFieldSignedQuote
+        }
+        let payload = Request(
+            workspaceId: workspaceId,
+            quoteId: quoteId,
+            signatureBase64: signatureBase64,
+            signedName: signedName,
+            signerRole: signerRole
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.quote
     }
 
     // MARK: - Wave M6 internal tech notes
@@ -4875,6 +5344,16 @@ private struct HavenFieldVisitWorkspaceView: View {
     /// empty state ("No internal notes yet") doesn't flash on first load.
     @State private var techNotesLoaded: Bool = false
 
+    // MARK: Wave M4 kitchen-table close state
+
+    /// True while the BuildQuoteSheet is presented over the visit
+    /// workspace. Driven by the "Build quote" CTA on the visit-complete
+    /// lifecycle screen.
+    @State private var showBuildQuoteSheet = false
+    /// Pre-fill payload returned by build_quote_from_visit. Cached so a
+    /// second tap on Pre-fill doesn't re-fire the network call.
+    @State private var quoteDraftPayload: HavenFieldQuoteDraftPayload?
+
     /// Phase 78: toggles a punch item between pending and done. Hits the
     /// `update_punch_item_status` edge action; on success, posts
     /// `.havenFieldVisitChanged` so the dashboard refreshes and the
@@ -5076,6 +5555,24 @@ private struct HavenFieldVisitWorkspaceView: View {
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showBuildQuoteSheet) {
+            // Wave M4 — kitchen-table close. Pre-fill from completed
+            // punch items, edit lines, optionally add tiers, capture
+            // signature.
+            FieldBuildQuoteSheet(
+                workspaceId: viewModel.workspaceId ?? "",
+                requestId: viewModel.visit.requestId,
+                visit: viewModel.visit,
+                cachedDraft: quoteDraftPayload,
+                onDraftCached: { draft in
+                    quoteDraftPayload = draft
+                },
+                onClose: {
+                    showBuildQuoteSheet = false
+                    NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+                }
+            )
         }
         .confirmationDialog(
             "Decline this visit?",
@@ -5290,7 +5787,25 @@ private struct HavenFieldVisitWorkspaceView: View {
                 .disabled(lifecycleSyncing)
             }
         case .completed:
-            EmptyView()
+            // Wave M4 — kitchen-table close. Visit is complete; the
+            // primary post-visit action is to build a quote from the
+            // punch list and (optionally) capture a customer signature
+            // right there at the kitchen table.
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    showBuildQuoteSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.text.fill")
+                        Text("Build quote")
+                    }
+                }
+                .buttonStyle(FieldPrimaryButtonStyle())
+
+                Text("Pre-fill from this visit's punch list, edit lines, and have the customer sign on the spot.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
         }
     }
 
@@ -9099,6 +9614,1084 @@ private struct HavenFieldRescheduleSheet: View {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(HavenColors.textPrimary)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Wave M4 kitchen-table close
+
+/// Wave M4 — full-screen sheet from the visit-complete screen. Lets
+/// the field tech build a quote on the spot from the visit's punch
+/// list, optionally add good/better/best tiers, and capture a
+/// finger-drawn customer signature without leaving the kitchen table.
+///
+/// Lifecycle:
+/// 1. On appear: if no cached draft, hit `build_quote_from_visit` to
+///    pre-fill line items from completed punch items + materials.
+/// 2. Tech edits lines, optionally adds bundle tiers, optionally adds
+///    a homeowner message.
+/// 3. Tap "Save draft" or "Send to customer" → routes through
+///    `save_quote` / `send_quote` (single tier) or `save_quote_bundle`
+///    / `send_quote_bundle` (≥ 2 tiers). The returned quote id is
+///    the reference for the next step.
+/// 4. Tap "Have customer sign here" → opens the signature pad over
+///    the saved quote. PencilKit captures strokes; Submit uploads
+///    the PNG via `sign_quote`. The post-sign confirmation strip
+///    renders inline.
+private struct FieldBuildQuoteSheet: View {
+    let workspaceId: String
+    let requestId: String
+    let visit: HavenFieldVisit
+    let cachedDraft: HavenFieldQuoteDraftPayload?
+    let onDraftCached: (HavenFieldQuoteDraftPayload) -> Void
+    let onClose: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    // MARK: - Loading states
+
+    /// Pre-fill payload from build_quote_from_visit. Cached on the
+    /// parent so re-opening the sheet doesn't re-fire the network call.
+    @State private var draftPayload: HavenFieldQuoteDraftPayload?
+    /// True during the initial pre-fill round-trip + during save / send /
+    /// sign actions. Drives the skeleton state.
+    @State private var isLoadingDraft = false
+    /// Most recent error from any network round-trip on this sheet.
+    @State private var errorMessage: String?
+
+    // MARK: - Editor state
+
+    /// Editable line items. Mirrors draftPayload.lineItems on first
+    /// hydrate; the field tech edits in place. Identifiable so SwiftUI
+    /// diffing keeps row identity stable across re-renders.
+    @State private var lineItems: [HavenFieldQuoteDraftLine] = []
+    /// Quote title — pre-filled from "Quote for <visit title>".
+    @State private var title: String = ""
+    /// Optional homeowner-facing message attached to the quote.
+    @State private var homeownerMessage: String = ""
+
+    // MARK: - Tier state (multi-tier toggle)
+
+    /// True after the tech taps "+ Add good / better / best options".
+    /// Splits the editor into 3 sections (Good / Better / Best) each
+    /// with their own line items. Single-tier flow stays the default.
+    @State private var multiTierEnabled = false
+    /// One line-item array per tier. Index 0 = Good, 1 = Better, 2 = Best.
+    /// Initialized by mirroring the single-tier `lineItems` into "Good".
+    @State private var tierLineItems: [[HavenFieldQuoteDraftLine]] = [[], [], []]
+    private let tierLabels = ["Good", "Better", "Best"]
+
+    // MARK: - Save / send result
+
+    /// Quote id returned by save_quote / save_quote_bundle. Set after
+    /// the first save round-trip; gates the "Have customer sign here"
+    /// CTA (can't sign a quote that doesn't exist yet).
+    @State private var savedQuoteId: String?
+    /// True after a successful send_quote. Drives the "Sent to
+    /// customer" status badge.
+    @State private var quoteSentAt: Date?
+    /// True while a save / send round-trip is in flight.
+    @State private var isSaving = false
+    /// True while a sign round-trip is in flight.
+    @State private var isSigning = false
+
+    // MARK: - Signature pad state
+
+    /// True while the signature pad sheet is presented over the quote
+    /// editor.
+    @State private var showSignaturePad = false
+    /// Result of a successful sign_quote call. Drives the post-sign
+    /// confirmation strip.
+    @State private var signedQuote: HavenFieldSignedQuote?
+
+    // MARK: - Computed
+
+    private var totalSubtotal: Double {
+        if multiTierEnabled {
+            return tierLineItems.flatMap { $0 }.reduce(0) { $0 + $1.lineTotal }
+        }
+        return lineItems.reduce(0) { $0 + $1.lineTotal }
+    }
+
+    private var goodTierTotal: Double {
+        tierLineItems[safe: 0]?.reduce(0) { $0 + $1.lineTotal } ?? 0
+    }
+
+    private var betterTierTotal: Double {
+        tierLineItems[safe: 1]?.reduce(0) { $0 + $1.lineTotal } ?? 0
+    }
+
+    private var bestTierTotal: Double {
+        tierLineItems[safe: 2]?.reduce(0) { $0 + $1.lineTotal } ?? 0
+    }
+
+    private var canSave: Bool {
+        let activeLines = multiTierEnabled
+            ? tierLineItems.first(where: { !$0.isEmpty }) ?? []
+            : lineItems
+        return !activeLines.isEmpty &&
+            activeLines.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty } &&
+            !title.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var moneyFormatter: NumberFormatter {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = "USD"
+        f.maximumFractionDigits = 2
+        return f
+    }
+
+    private var customerName: String {
+        visit.property?.name ?? visit.title
+    }
+
+    private var customerAddress: String {
+        visit.property?.address ?? "Address on file"
+    }
+
+    private var visitDateLabel: String {
+        guard let routeDate = visit.routeDate, !routeDate.isEmpty else { return "Today" }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: routeDate) ?? {
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: routeDate)
+        }()
+        guard let date else { return routeDate }
+        let display = DateFormatter()
+        display.dateFormat = "EEE MMM d"
+        return display.string(from: date)
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerCard
+
+                    if isLoadingDraft && draftPayload == nil {
+                        loadingSkeleton
+                    } else if let signed = signedQuote {
+                        signedConfirmationCard(signed)
+                    } else {
+                        prefillCardIfAvailable
+                        editorBody
+                        if let savedQuoteId, signedQuote == nil {
+                            signatureCTACard(quoteId: savedQuoteId)
+                        }
+                    }
+
+                    if let errorMessage {
+                        errorBanner(errorMessage)
+                    }
+                }
+                .padding(20)
+            }
+            .background(HavenColors.background.ignoresSafeArea())
+            .navigationTitle("Build quote")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") {
+                        onClose()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+            .sheet(isPresented: $showSignaturePad) {
+                if let savedQuoteId {
+                    FieldQuoteSignaturePad(
+                        workspaceId: workspaceId,
+                        quoteId: savedQuoteId,
+                        customerName: customerName,
+                        isSigning: $isSigning,
+                        onSigned: { signed in
+                            signedQuote = signed
+                            showSignaturePad = false
+                        },
+                        onCancel: {
+                            showSignaturePad = false
+                        }
+                    )
+                }
+            }
+        }
+        .task {
+            // First-appear hydration. Use cached draft if the parent
+            // already loaded it; otherwise pre-fill from the visit's
+            // punch list.
+            if let cachedDraft {
+                hydrate(from: cachedDraft)
+            } else if draftPayload == nil {
+                await loadDraft()
+            }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("KITCHEN-TABLE CLOSE")
+                .font(HavenTypography.uiSectionHeader)
+                .kerning(1.2)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text(customerName)
+                .font(HavenTypography.title2)
+                .foregroundStyle(HavenColors.textPrimary)
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text(visitDateLabel)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text("·")
+                    .foregroundStyle(HavenColors.textTertiary)
+                FieldQuoteDraftBadge(savedQuoteId: savedQuoteId, sentAt: quoteSentAt)
+            }
+        }
+    }
+
+    private var loadingSkeleton: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(0..<3, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(HavenColors.creamLight.opacity(0.6))
+                    .frame(height: 80)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var prefillCardIfAvailable: some View {
+        if let draft = draftPayload, draft.eligibleCount > 0 {
+            HStack(spacing: 12) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.success)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pre-filled from visit")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("\(draft.eligibleCount) line item\(draft.eligibleCount == 1 ? "" : "s") loaded from completed punch items.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Button {
+                    Task { await loadDraft() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .padding(14)
+            .background(HavenColors.success.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if let draft = draftPayload, draft.eligibleCount == 0 {
+            FieldEmptyState(
+                title: "No punch items yet",
+                subtitle: "Add line items below to build the quote from scratch."
+            )
+            .padding(14)
+            .background(HavenColors.creamLight.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var editorBody: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            // Title + customer block
+            FieldSectionCard(kicker: "Quote", title: "Title and recipient") {
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("Quote title", text: $title)
+                        .textFieldStyle(.roundedBorder)
+                        .font(HavenTypography.body)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sending to")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text(customerName)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(customerAddress)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(HavenColors.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+
+            // Multi-tier toggle
+            multiTierToggle
+
+            // Line items list (single-tier or 3-tier)
+            if multiTierEnabled {
+                ForEach(0..<3, id: \.self) { tierIndex in
+                    tierEditorSection(tierIndex)
+                }
+            } else {
+                singleTierEditorSection
+            }
+
+            // Homeowner message
+            FieldSectionCard(kicker: "Note", title: "Message to customer (optional)") {
+                TextField(
+                    "Thanks for letting us into your home today...",
+                    text: $homeownerMessage,
+                    axis: .vertical
+                )
+                .lineLimit(3...6)
+                .textFieldStyle(.roundedBorder)
+                .font(HavenTypography.body)
+            }
+
+            // Totals + actions
+            totalsCard
+            actionRow
+        }
+    }
+
+    private var multiTierToggle: some View {
+        Toggle(isOn: $multiTierEnabled) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(multiTierEnabled ? "Good / Better / Best options" : "+ Add good / better / best options")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("Present multiple tiers so the customer picks at the table.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+        .tint(HavenColors.action)
+        .padding(14)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onChange(of: multiTierEnabled) { _, isEnabled in
+            if isEnabled, tierLineItems.allSatisfy({ $0.isEmpty }) {
+                // Mirror the single-tier lines into "Good" so the tech
+                // doesn't lose their work toggling on.
+                tierLineItems[0] = lineItems
+                tierLineItems[1] = []
+                tierLineItems[2] = []
+            } else if !isEnabled, lineItems.isEmpty {
+                // Toggling off: pull from the most populated tier so we
+                // don't blank the editor.
+                let firstNonEmpty = tierLineItems.first(where: { !$0.isEmpty }) ?? []
+                lineItems = firstNonEmpty
+            }
+        }
+    }
+
+    private var singleTierEditorSection: some View {
+        FieldSectionCard(kicker: "Line items", title: "What's on the quote") {
+            VStack(alignment: .leading, spacing: 10) {
+                if lineItems.isEmpty {
+                    Text("No items yet. Tap + to add one.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                } else {
+                    ForEach($lineItems) { $line in
+                        FieldQuoteLineItemRow(
+                            line: $line,
+                            moneyFormatter: moneyFormatter,
+                            onDelete: {
+                                lineItems.removeAll { $0.id == line.id }
+                            }
+                        )
+                    }
+                }
+                Button {
+                    lineItems.append(HavenFieldQuoteDraftLine(name: "", description: "", unit: "ea", quantity: 1, unitPrice: 0))
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(HavenColors.action)
+                        Text("Add line")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+        }
+    }
+
+    private func tierEditorSection(_ index: Int) -> some View {
+        FieldSectionCard(
+            kicker: tierLabels[safe: index] ?? "Tier",
+            title: "\(tierLabels[safe: index] ?? "Tier") option"
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                if (tierLineItems[safe: index] ?? []).isEmpty {
+                    Text("No items yet for this tier.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                } else {
+                    ForEach(tierLineItems[index].indices, id: \.self) { lineIndex in
+                        FieldQuoteLineItemRow(
+                            line: $tierLineItems[index][lineIndex],
+                            moneyFormatter: moneyFormatter,
+                            onDelete: {
+                                guard tierLineItems[index].indices.contains(lineIndex) else { return }
+                                tierLineItems[index].remove(at: lineIndex)
+                            }
+                        )
+                    }
+                }
+                Button {
+                    tierLineItems[index].append(
+                        HavenFieldQuoteDraftLine(name: "", description: "", unit: "ea", quantity: 1, unitPrice: 0)
+                    )
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(HavenColors.action)
+                        Text("Add to \(tierLabels[safe: index] ?? "this tier")")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+        }
+    }
+
+    private var totalsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if multiTierEnabled {
+                HStack { Text("Good"); Spacer(); Text(formatMoney(goodTierTotal)) }
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                HStack { Text("Better"); Spacer(); Text(formatMoney(betterTierTotal)) }
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                HStack { Text("Best"); Spacer(); Text(formatMoney(bestTierTotal)) }
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Divider()
+            }
+            HStack {
+                Text("Subtotal")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                Text(formatMoney(totalSubtotal))
+                    .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var actionRow: some View {
+        VStack(spacing: 10) {
+            Button {
+                Task { await save(send: false) }
+            } label: {
+                if isSaving {
+                    ProgressView().tint(HavenColors.textOnAction)
+                } else {
+                    Text("Save draft")
+                }
+            }
+            .buttonStyle(FieldSecondaryButtonStyle())
+            .disabled(!canSave || isSaving)
+
+            Button {
+                Task { await save(send: true) }
+            } label: {
+                if isSaving {
+                    ProgressView().tint(HavenColors.textOnAction)
+                } else {
+                    Text("Send to customer")
+                }
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+            .disabled(!canSave || isSaving)
+        }
+    }
+
+    private func signatureCTACard(quoteId _: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "signature")
+                    .font(.system(size: 18))
+                    .foregroundStyle(HavenColors.action)
+                Text("Have customer sign here")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+            Text("Capture a signature on the iPad to close the deal in person.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+            Button {
+                showSignaturePad = true
+            } label: {
+                Text("Open signature pad")
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.action.opacity(0.06))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(HavenColors.action.opacity(0.2), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func signedConfirmationCard(_ signed: HavenFieldSignedQuote) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(HavenColors.success)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Signed and approved")
+                        .font(HavenTypography.title3)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Signed by \(signed.signedName ?? "the customer")\(signedDateSuffix(signed.signedAt))")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+            }
+
+            if let url = signed.signatureSignedUrl, let parsed = URL(string: url) {
+                AsyncImage(url: parsed) { phase in
+                    switch phase {
+                    case .empty:
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(HavenColors.creamLight.opacity(0.4))
+                            .frame(height: 120)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 140)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    case .failure:
+                        Text("Signature uploaded successfully.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            }
+
+            HStack {
+                Text("Total")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Text(formatMoney(signed.total))
+                    .font(HavenTypography.title2)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+
+            Button {
+                onClose()
+                dismiss()
+            } label: {
+                Text("Done")
+            }
+            .buttonStyle(FieldPrimaryButtonStyle())
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.success.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(HavenColors.success.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(HavenColors.action)
+            Text(message)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
+            Spacer()
+        }
+        .padding(12)
+        .background(HavenColors.action.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Helpers
+
+    private func formatMoney(_ value: Double) -> String {
+        moneyFormatter.string(from: NSNumber(value: value)) ?? "$\(value)"
+    }
+
+    private func signedDateSuffix(_ iso: String?) -> String {
+        guard let iso, let date = parseISO(iso) else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = " on MMM d 'at' h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private func parseISO(_ string: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = f.date(from: string) { return parsed }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: string)
+    }
+
+    private func hydrate(from draft: HavenFieldQuoteDraftPayload) {
+        draftPayload = draft
+        lineItems = draft.lineItems
+        title = draft.title
+    }
+
+    // MARK: - Network
+
+    private func loadDraft() async {
+        guard !workspaceId.isEmpty, !requestId.isEmpty else {
+            errorMessage = "Visit identifier missing."
+            return
+        }
+        errorMessage = nil
+        isLoadingDraft = true
+        defer { isLoadingDraft = false }
+        do {
+            let draft = try await HavenFieldService.shared.buildQuoteFromVisit(
+                workspaceId: workspaceId,
+                requestId: requestId
+            )
+            hydrate(from: draft)
+            onDraftCached(draft)
+        } catch {
+            errorMessage = "Couldn't pre-fill the quote: \(error.localizedDescription)"
+        }
+    }
+
+    private func save(send: Bool) async {
+        guard canSave else { return }
+        errorMessage = nil
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            if multiTierEnabled {
+                let tiers: [HavenFieldQuoteDraftBundleTier] = (0..<3).compactMap { idx in
+                    let lines = tierLineItems[safe: idx] ?? []
+                    let cleaned = lines.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+                    guard !cleaned.isEmpty else { return nil }
+                    return HavenFieldQuoteDraftBundleTier(
+                        label: tierLabels[safe: idx] ?? "Option",
+                        lineItems: cleaned
+                    )
+                }
+                guard tiers.count >= 2 else {
+                    errorMessage = "Add line items to at least two tiers (Good / Better)."
+                    return
+                }
+                let result = try await HavenFieldService.shared.saveQuoteBundle(
+                    workspaceId: workspaceId,
+                    requestId: requestId,
+                    householdId: draftPayload?.householdId,
+                    propertyId: draftPayload?.propertyId,
+                    contractorId: draftPayload?.contractorId,
+                    title: title.trimmingCharacters(in: .whitespaces),
+                    homeownerMessage: homeownerMessage.trimmingCharacters(in: .whitespaces).isEmpty ? nil : homeownerMessage,
+                    tiers: tiers,
+                    send: send
+                )
+                if let parentId = result.parent?.id, !parentId.isEmpty {
+                    savedQuoteId = parentId
+                    if send { quoteSentAt = Date() }
+                }
+            } else {
+                let cleaned = lineItems.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+                let saved = try await HavenFieldService.shared.saveSingleQuote(
+                    workspaceId: workspaceId,
+                    requestId: requestId,
+                    householdId: draftPayload?.householdId,
+                    propertyId: draftPayload?.propertyId,
+                    contractorId: draftPayload?.contractorId,
+                    title: title.trimmingCharacters(in: .whitespaces),
+                    homeownerMessage: homeownerMessage.trimmingCharacters(in: .whitespaces).isEmpty ? nil : homeownerMessage,
+                    lineItems: cleaned,
+                    send: send
+                )
+                if !saved.id.isEmpty {
+                    savedQuoteId = saved.id
+                    if send { quoteSentAt = Date() }
+                }
+            }
+        } catch {
+            errorMessage = "Couldn't \(send ? "send" : "save") the quote: \(error.localizedDescription)"
+        }
+    }
+}
+
+/// Wave M4 — one editable row in the BuildQuoteSheet's line-item list.
+/// Renders title + description + qty stepper + unit price + computed
+/// total + delete button. Bind-driven so edits write back into the
+/// parent's array directly.
+private struct FieldQuoteLineItemRow: View {
+    @Binding var line: HavenFieldQuoteDraftLine
+    let moneyFormatter: NumberFormatter
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("Item name", text: $line.name)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if !line.description.isEmpty {
+                        Text(line.description)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+                Spacer()
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+            }
+
+            HStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Text("Qty")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Stepper(value: $line.quantity, in: 0.5...999, step: 0.5) {
+                        Text(quantityLabel(line.quantity))
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .monospacedDigit()
+                    }
+                    .labelsHidden()
+                }
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text("$")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    TextField("0", value: $line.unitPrice, format: .number)
+                        .keyboardType(.decimalPad)
+                        .frame(width: 70)
+                        .multilineTextAlignment(.trailing)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+
+                Text("=")
+                    .foregroundStyle(HavenColors.textTertiary)
+                Text(moneyFormatter.string(from: NSNumber(value: line.lineTotal)) ?? "$0")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .monospacedDigit()
+            }
+        }
+        .padding(12)
+        .background(HavenColors.surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(HavenColors.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func quantityLabel(_ q: Double) -> String {
+        if q == q.rounded() { return String(format: "%.0f", q) }
+        return String(format: "%.1f", q)
+    }
+}
+
+/// Wave M4 — small status pill on the BuildQuoteSheet header.
+/// Shows "Draft" until a save round-trip lands a quote id, then "Saved",
+/// then "Sent" after send_quote.
+private struct FieldQuoteDraftBadge: View {
+    let savedQuoteId: String?
+    let sentAt: Date?
+
+    var body: some View {
+        let label: String
+        let tone: Color
+        if sentAt != nil {
+            label = "Sent"
+            tone = HavenColors.success
+        } else if savedQuoteId != nil {
+            label = "Saved"
+            tone = HavenColors.action
+        } else {
+            label = "Draft"
+            tone = HavenColors.textSecondary
+        }
+        return Text(label)
+            .font(HavenTypography.caption)
+            .foregroundStyle(tone)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tone.opacity(0.12))
+            .clipShape(Capsule())
+    }
+}
+
+/// Wave M4 — finger-drawn signature pad. Wraps PencilKit's
+/// `PKCanvasView` in a SwiftUI `UIViewRepresentable` so the field
+/// tech can hand the iPad to the customer for a thumb-pen signature.
+/// Captures the canvas as a PNG and routes through `sign_quote`.
+///
+/// Discipline notes:
+/// - Strokes are dark indigo (HavenColors.textPrimary), NEVER salmon
+///   — salmon is reserved for primary CTAs per Section 22 B1.
+/// - The canvas height is fixed at 200pt (~50% of common iPad portrait
+///   width) so there's no awkward zoom on tablets.
+/// - Submit is gated on a non-empty signed name AND at least one
+///   stroke; both validation errors render visibly.
+private struct FieldQuoteSignaturePad: View {
+    let workspaceId: String
+    let quoteId: String
+    let customerName: String
+    @Binding var isSigning: Bool
+    let onSigned: (HavenFieldSignedQuote) -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var canvasView = PKCanvasView()
+    @State private var signedName: String = ""
+    @State private var signerRole: String = "homeowner"
+    @State private var hasStrokes = false
+    @State private var validationError: String?
+    @State private var submissionError: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("HAVE CUSTOMER SIGN")
+                            .font(HavenTypography.uiSectionHeader)
+                            .kerning(1.2)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("Hand them the iPad")
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("They sign with their finger. The signature uploads with the quote so we have it on file.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Signed name")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        TextField("Customer name", text: $signedName)
+                            .textFieldStyle(.roundedBorder)
+                            .font(HavenTypography.body)
+                            .autocorrectionDisabled()
+                            .onAppear {
+                                if signedName.isEmpty {
+                                    signedName = customerName
+                                }
+                            }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Signed by")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Picker("Role", selection: $signerRole) {
+                            Text("Homeowner").tag("homeowner")
+                            Text("Witness").tag("witness")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Signature")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Spacer()
+                            Button {
+                                canvasView.drawing = PKDrawing()
+                                hasStrokes = false
+                            } label: {
+                                Text("Clear")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.action)
+                            }
+                            .frame(minWidth: 44, minHeight: 32)
+                        }
+                        FieldSignatureCanvas(
+                            canvasView: $canvasView,
+                            hasStrokes: $hasStrokes
+                        )
+                        .frame(height: 200)
+                        .background(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(HavenColors.border, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    if let validationError {
+                        Text(validationError)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    if let submissionError {
+                        Text(submissionError)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSigning {
+                            HStack(spacing: 8) {
+                                ProgressView().tint(HavenColors.textOnAction)
+                                Text("Submitting...")
+                            }
+                        } else {
+                            Text("Submit signature")
+                        }
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                    .disabled(isSigning)
+                }
+                .padding(20)
+            }
+            .background(HavenColors.background.ignoresSafeArea())
+            .navigationTitle("Signature")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+        }
+    }
+
+    private func submit() async {
+        validationError = nil
+        submissionError = nil
+
+        let trimmedName = signedName.trimmingCharacters(in: .whitespaces)
+        if trimmedName.isEmpty {
+            validationError = "Type the customer's name above."
+            return
+        }
+        if !hasStrokes {
+            validationError = "Have the customer draw a signature first."
+            return
+        }
+
+        // Render the canvas to a PNG. Use the canvas bounds with white
+        // background so the upload is a clean rectangle ready for inline
+        // rendering on the operator desk + homeowner inbox.
+        let bounds = canvasView.bounds
+        guard bounds.width > 0, bounds.height > 0 else {
+            validationError = "Couldn't render signature. Try again."
+            return
+        }
+        let renderer = UIGraphicsImageRenderer(bounds: bounds)
+        let image = renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(bounds)
+            canvasView.drawHierarchy(in: bounds, afterScreenUpdates: true)
+        }
+        guard let pngData = image.pngData() else {
+            validationError = "Couldn't encode signature. Try again."
+            return
+        }
+        let base64 = pngData.base64EncodedString()
+
+        isSigning = true
+        defer { isSigning = false }
+
+        do {
+            let signed = try await HavenFieldService.shared.signQuote(
+                workspaceId: workspaceId,
+                quoteId: quoteId,
+                signatureBase64: base64,
+                signedName: trimmedName,
+                signerRole: signerRole
+            )
+            onSigned(signed)
+            dismiss()
+        } catch {
+            submissionError = "Couldn't submit signature: \(error.localizedDescription)"
+        }
+    }
+}
+
+/// SwiftUI wrapper for PencilKit's `PKCanvasView`. Tracks a binding so
+/// the parent view can detect "are there any strokes yet?" without
+/// polling. The delegate fires on every stroke change.
+private struct FieldSignatureCanvas: UIViewRepresentable {
+    @Binding var canvasView: PKCanvasView
+    @Binding var hasStrokes: Bool
+
+    func makeUIView(context: Context) -> PKCanvasView {
+        canvasView.delegate = context.coordinator
+        canvasView.drawingPolicy = .anyInput
+        canvasView.tool = PKInkingTool(.pen, color: UIColor(HavenColors.textPrimary), width: 2.5)
+        canvasView.backgroundColor = .white
+        canvasView.isOpaque = true
+        return canvasView
+    }
+
+    func updateUIView(_ uiView: PKCanvasView, context: Context) {
+        // No-op — the canvas drives itself via the user's gestures.
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    final class Coordinator: NSObject, PKCanvasViewDelegate {
+        let parent: FieldSignatureCanvas
+        init(parent: FieldSignatureCanvas) {
+            self.parent = parent
+        }
+        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            DispatchQueue.main.async {
+                self.parent.hasStrokes = !canvasView.drawing.strokes.isEmpty
             }
         }
     }

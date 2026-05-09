@@ -1023,8 +1023,13 @@ function TimelineRow({
     actor = "Homeowner";
     actionLabel = "Countered";
   } else if (status === "approved" && quote.signedAt) {
+    // Wave M4 — distinguish a kitchen-table close (signature_path
+    // present) from a homeowner-typed-name approval. Witness
+    // signatures get their own label so audit trail reads cleanly.
     actor = "Homeowner";
-    actionLabel = `Approved${quote.signedName ? ` (${quote.signedName})` : ""}`;
+    const witnessSuffix = quote.signerRole === "witness" ? " · witnessed" : "";
+    const signatureSuffix = quote.signaturePath ? " · signed in person" : "";
+    actionLabel = `Approved${quote.signedName ? ` (${quote.signedName})` : ""}${signatureSuffix}${witnessSuffix}`;
   } else if (status === "declined") {
     actionLabel = "Declined";
   } else if (status === "sent") {

@@ -163,6 +163,13 @@ export interface VisitQuotePreview {
   parentQuoteId: string | null;
   signedAt: string | null;
   signedName: string | null;
+  /// Wave M4 — kitchen-table signature artifact. signaturePath is the
+  /// raw storage path; the dashboard read path + sign_quote response
+  /// also fold in a signed URL via the same pattern as punch-item
+  /// attachments. signerRole distinguishes a witness signature from
+  /// the principal homeowner signature.
+  signaturePath: string | null;
+  signerRole: string | null;
   homeownerRevisedAt: string | null;
   updatedAt: string;
   publicShareUrl: string;
@@ -474,9 +481,19 @@ export interface Quote {
    * Wave Z.3 — Phase 73b negotiation metadata. signedAt / signedName
    * stamped on homeowner approval; homeownerRevisedAt stamped when the
    * homeowner counters with edited line items.
+   *
+   * Wave M4 — kitchen-table signature artifact. signaturePath is the
+   * raw storage path on the private quote-signatures bucket; the
+   * dashboard read path doesn't currently sign URLs at the provider
+   * /quotes list level (that lives only on the visit-detail payload),
+   * so consumers wanting to render the inline PNG should pull from the
+   * VisitQuotePreview shape on a visit detail. signerRole
+   * distinguishes a witness signature from the principal homeowner.
    */
   signedAt: string | null;
   signedName: string | null;
+  signaturePath: string | null;
+  signerRole: string | null;
   homeownerRevisedAt: string | null;
 }
 
