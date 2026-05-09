@@ -5,7 +5,7 @@ import { Icon } from "../components/chrome/Icon";
 import { EmptyState } from "../components/chrome/EmptyState";
 import { useWorkspace } from "../lib/workspace-context";
 import { fetchQuoteComments, formatCurrency, formatRelativeTime, postProviderAction } from "../lib/api";
-import type { Quote, QuoteComment } from "../lib/types";
+import type { Quote, QuoteComment, HomeRow } from "../lib/types";
 import { useNewQuoteModal } from "../components/NewQuoteModal";
 import { useNewInvoiceModal } from "../components/NewInvoiceModal";
 
@@ -25,8 +25,19 @@ export default function QuotesScreen() {
   const newQuote = useNewQuoteModal();
   const newInvoice = useNewInvoiceModal();
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"send" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"send" | "delete" | "duplicate" | null>(null);
   const [comments, setComments] = useState<QuoteComment[]>([]);
+  // Wave M13 — quote duplication picker for the Operations Desk.
+  // Same `duplicate_quote` action as the iOS BuildQuoteSheet's
+  // duplicate flow. Opens with the operator's source quote already
+  // chosen (the selected quote in the panel); they pick a target
+  // home from the workspace's home list and confirm.
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicateTargetHome, setDuplicateTargetHome] = useState<HomeRow | null>(null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  // Per-quote homeowner search filter so a workspace with 50+ homes
+  // doesn't dump a huge list on the operator.
+  const [duplicateSearch, setDuplicateSearch] = useState("");
   const [commentsBusy, setCommentsBusy] = useState(false);
   const [showSavedForm, setShowSavedForm] = useState(false);
   const [savedFormBusy, setSavedFormBusy] = useState(false);
@@ -122,6 +133,60 @@ export default function QuotesScreen() {
       />
     );
   }
+
+  // Wave M13 — duplicate handler. Walks `duplicate_quote` with the
+  // selected quote as the source + the operator-picked home as the
+  // target. On success, refreshes the dashboard so the new draft
+  // appears in the pipeline list, then jumps the selection to it.
+  // dashboard is guaranteed non-null here because the early-return
+  // bail above runs first when dashboard is missing.
+  async function handleDuplicate() {
+    if (!selected || !dashboard) return;
+    if (!duplicateTargetHome) {
+      setDuplicateError("Pick a home to duplicate to first.");
+      return;
+    }
+    setBusy("duplicate");
+    setDuplicateError(null);
+    try {
+      const result = await postProviderAction<{ duplicate: { id: string; isBundle: boolean; title: string } }>(
+        "duplicate_quote",
+        {
+          workspaceId: dashboard.workspace.id,
+          sourceQuoteId: selected.id,
+          targetHouseholdId: duplicateTargetHome.householdId,
+          targetPropertyId: duplicateTargetHome.propertyId,
+          // No targetRequestId — this is the operator desk, not a
+          // visit-context flow. The duplicate lands as a household-
+          // scoped draft the operator can then attach to a request.
+        },
+      );
+      await refresh();
+      setDuplicateModalOpen(false);
+      setDuplicateTargetHome(null);
+      // Jump to the new duplicate so the operator sees it landed.
+      setSelectedQuoteId(result.duplicate.id);
+    } catch (e) {
+      setDuplicateError(e instanceof Error ? e.message : "Couldn't duplicate the quote.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Workspace's home roster filtered by the search box. Empty search
+  // shows every home alphabetized by name. dashboard is null-checked
+  // by the early-return above, but this branch fires before it; use
+  // optional chaining + empty fallback.
+  const filteredHomes = (dashboard?.homes ?? [])
+    .filter((h) => {
+      if (!duplicateSearch.trim()) return true;
+      const q = duplicateSearch.trim().toLowerCase();
+      return (
+        h.name.toLowerCase().includes(q) ||
+        h.address.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 24, alignItems: "start" }}>
@@ -329,6 +394,22 @@ export default function QuotesScreen() {
                   Edit quote
                 </button>
               )}
+              {/* Wave M13 — kitchen-table efficiency. Same
+                  `duplicate_quote` edge fn action as the iOS
+                  BuildQuoteSheet's duplicate flow. Operator picks a
+                  target home from the workspace's home list. */}
+              <button
+                className="ops-button ops-button--ghost"
+                onClick={() => {
+                  setDuplicateTargetHome(null);
+                  setDuplicateError(null);
+                  setDuplicateSearch("");
+                  setDuplicateModalOpen(true);
+                }}
+                disabled={busy !== null}
+              >
+                Duplicate
+              </button>
               {selected.status === "approved" && (
                 <button
                   className="ops-button ops-button--ghost"
@@ -507,6 +588,137 @@ export default function QuotesScreen() {
           />
         )}
       </Card>
+
+      {/* Wave M13 — quote duplication modal. Renders over the entire
+          screen at z=999 with a darkening backdrop. Operator picks a
+          target home from the workspace's home roster and confirms.
+          The duplicate uses the same `duplicate_quote` edge fn action
+          as the iOS BuildQuoteSheet's duplicate flow. */}
+      {duplicateModalOpen && selected && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setDuplicateModalOpen(false);
+            }
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(42, 34, 82, 0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              maxWidth: 520,
+              width: "100%",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 50px rgba(42, 34, 82, 0.25)",
+            }}
+          >
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--neutral-200)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-soft)", marginBottom: 4 }}>
+                Duplicate quote
+              </div>
+              <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.018em" }}>
+                Pick a target home
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 6 }}>
+                Source: {selected.title} ({formatCurrency(selected.total)}, {selected.itemCount} item{selected.itemCount === 1 ? "" : "s"})
+              </div>
+            </div>
+
+            <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--neutral-200)" }}>
+              <input
+                type="text"
+                placeholder="Search homes by name or address..."
+                value={duplicateSearch}
+                onChange={(e) => setDuplicateSearch(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid var(--neutral-200)",
+                  borderRadius: 10,
+                  background: "var(--pearl)",
+                  fontSize: 13,
+                  fontFamily: "var(--sans)",
+                  color: "var(--text)",
+                }}
+              />
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px" }}>
+              {filteredHomes.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
+                  {duplicateSearch.trim() ? "No matching homes." : "No homes in this workspace yet."}
+                </div>
+              ) : (
+                filteredHomes.map((home) => {
+                  const isSelected = duplicateTargetHome?.propertyId === home.propertyId;
+                  return (
+                    <button
+                      key={home.propertyId}
+                      onClick={() => setDuplicateTargetHome(home)}
+                      style={{
+                        width: "100%",
+                        padding: "12px 14px",
+                        marginBottom: 6,
+                        background: isSelected ? "var(--salmon-50)" : "var(--pearl)",
+                        border: isSelected ? "1px solid var(--salmon)" : "1px solid var(--neutral-200)",
+                        borderRadius: 10,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        minHeight: 56,
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                        {home.name}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                        {home.address}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {duplicateError && (
+              <div style={{ padding: "10px 24px", borderTop: "1px solid var(--neutral-200)", color: "var(--critical)", fontSize: 12.5 }}>
+                {duplicateError}
+              </div>
+            )}
+
+            <div style={{ padding: "16px 24px", borderTop: "1px solid var(--neutral-200)", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                className="ops-button ops-button--ghost"
+                onClick={() => setDuplicateModalOpen(false)}
+                disabled={busy === "duplicate"}
+              >
+                Cancel
+              </button>
+              <button
+                className="ops-button ops-button--salmon"
+                onClick={handleDuplicate}
+                disabled={busy === "duplicate" || !duplicateTargetHome}
+              >
+                {busy === "duplicate" ? "Duplicating..." : "Duplicate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

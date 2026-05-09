@@ -8493,6 +8493,474 @@ async function buildQuoteFromVisit(
   };
 }
 
+/**
+ * Wave M13 — list this workspace's recent quotes for the duplication
+ * picker. Returns up to `limit` quotes (default 50), sorted reverse-
+ * chronologically by `updated_at`. Optional `daysBack` window (default
+ * 30, max 3650 to allow "all time"). Workspace-scoped via the same
+ * permission check as save_quote / build_quote_from_visit so techs
+ * without canBuildQuotes can't enumerate other workspaces' quotes.
+ *
+ * Bundle parents (`parent_quote_id IS NULL` AND has BUNDLE_MARKER) and
+ * standalone quotes show; bundle children are filtered out so the
+ * picker doesn't surface 3 rows per Good/Better/Best bundle. Each row
+ * carries enough metadata for the iOS picker (customer name, total,
+ * date, status pill, line item count) so the field tech can pick the
+ * right quote without a second round-trip.
+ *
+ * The same iOS picker AND the Operations Desk Quotes screen call this
+ * action, so the response shape is generic enough to render in both
+ * contexts.
+ */
+async function listRecentQuotes(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const limitRaw = numberValue(body.limit ?? 50);
+  const limit = Math.max(1, Math.min(200, Math.round(limitRaw)));
+  const daysBackRaw = numberValue(body.daysBack ?? 30);
+  const daysBack = Math.max(1, Math.min(3650, Math.round(daysBackRaw)));
+
+  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+
+  // Fetch one extra row in case we need to skip a bundle child / parent
+  // pair after filtering. Bundle parents always carry the BUNDLE_MARKER
+  // sentinel in scope_notes (Wave V.1) — we keep them and drop the
+  // children so the picker shows one row per bundle.
+  const { data: rows, error } = await service
+    .from("provider_quotes")
+    .select(
+      "id, workspace_id, household_id, property_id, contractor_id, request_id, title, status, total, line_items, prospect_name, scope_notes, parent_quote_id, signed_at, signed_name, signature_path, signer_role, updated_at, created_at",
+    )
+    .eq("workspace_id", workspaceId)
+    .gte("updated_at", cutoff)
+    .order("updated_at", { ascending: false })
+    .limit(limit * 2);
+
+  if (error) throw error;
+
+  // Drop bundle children (parent_quote_id is set on children); keep
+  // bundle parents + standalone quotes.
+  const nonChildren = ((rows ?? []) as Record<string, unknown>[]).filter(
+    (q) => !compactString(q.parent_quote_id),
+  );
+
+  // Resolve display names: prefer prospect_name (standalone quotes),
+  // fall back to property name when household_id is set, fall back to
+  // "Customer". Pull every distinct property_id in one round-trip.
+  const propertyIds = Array.from(
+    new Set(
+      nonChildren
+        .map((q) => compactString(q.property_id))
+        .filter(Boolean),
+    ),
+  );
+  const propertyMap = new Map<string, Record<string, unknown>>();
+  if (propertyIds.length > 0) {
+    const { data: properties } = await service
+      .from("properties")
+      .select("id, name, street, city, state")
+      .in("id", propertyIds);
+    for (const p of (properties ?? []) as Record<string, unknown>[]) {
+      const id = compactString(p.id);
+      if (id) propertyMap.set(id, p);
+    }
+  }
+
+  const summaries = nonChildren.slice(0, limit).map((q) => {
+    const propertyId = compactString(q.property_id);
+    const property = propertyId ? propertyMap.get(propertyId) : undefined;
+    const propertyName = compactString(property?.name);
+    const propertyAddress = [
+      property?.street,
+      property?.city,
+      property?.state,
+    ]
+      .map((v) => compactString(v))
+      .filter(Boolean)
+      .join(", ");
+    const customerName =
+      compactString(q.prospect_name) ||
+      propertyName ||
+      "Customer";
+    const lineItems = Array.isArray(q.line_items) ? q.line_items : [];
+    const isBundleParent = compactString(q.scope_notes).includes("[BUNDLE]");
+
+    return {
+      id: compactString(q.id),
+      title: compactString(q.title),
+      customerName,
+      customerAddress: propertyAddress,
+      total: numberValue(q.total ?? 0),
+      status: compactString(q.status),
+      statusLabel: quoteStatusLabel(compactString(q.status)),
+      lineItemCount: lineItems.length,
+      isBundle: isBundleParent,
+      isSigned: Boolean(compactString(q.signed_at)),
+      signedName: compactString(q.signed_name) || null,
+      updatedAt: q.updated_at ?? null,
+      createdAt: q.created_at ?? null,
+      // Source identifiers so the duplicate flow can pre-fill the
+      // duplicate_quote action without a second lookup.
+      householdId: compactString(q.household_id) || null,
+      propertyId: propertyId || null,
+      requestId: compactString(q.request_id) || null,
+    };
+  });
+
+  return {
+    quotes: summaries,
+    daysBack,
+    limit,
+  };
+}
+
+/**
+ * Wave M13 — duplicate an existing quote into a fresh draft. Kitchen-
+ * table efficiency: "same as the Smith house yesterday." Validates
+ * workspace membership for the source quote (read access via the
+ * source's workspace_id matching the caller's workspace) AND the
+ * target household (the workspace must serve that household via a
+ * provider_contractor_links row).
+ *
+ * Copies line items + scope_notes + tier structure if the source is a
+ * bundle parent (parent + every child re-inserted with new ids and
+ * the new parent's id wired in). Strips signature fields, signed_at,
+ * approval timestamps. Strips `punch_item_id` from each line because
+ * those refer to a different visit's punch items. Stamps
+ * `notes = "Duplicated from quote <invoice_number or id>"` on
+ * scope_notes so the operator desk sees provenance.
+ *
+ * Same action callable from iOS BuildQuoteSheet AND the Operations
+ * Desk Quotes screen — body shape is identical in both clients.
+ *
+ * Returns the new quote id + the unsaved draft payload (matching the
+ * shape of build_quote_from_visit) so the iOS sheet can hydrate
+ * editor state without a second round-trip.
+ */
+async function duplicateQuote(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  assertPermission(membership, "canBuildQuotes");
+
+  const sourceQuoteId = compactString(body.sourceQuoteId);
+  if (!sourceQuoteId) throw new Error("sourceQuoteId is required");
+
+  // Pull the source quote and verify it belongs to this workspace.
+  const { data: source, error: sourceErr } = await service
+    .from("provider_quotes")
+    .select(
+      "id, workspace_id, contractor_id, household_id, property_id, request_id, visit_task_id, title, scope_notes, line_items, parent_quote_id, recipient_kind, prospect_name, prospect_email, prospect_phone, prospect_address",
+    )
+    .eq("id", sourceQuoteId)
+    .maybeSingle();
+  if (sourceErr) throw sourceErr;
+  if (!source) throw new Error("Source quote not found");
+  if (compactString(source.workspace_id) !== workspaceId) {
+    throw new Error("Source quote belongs to a different workspace");
+  }
+
+  // Source can be a bundle parent — pull its children so we duplicate
+  // the whole tier structure. Bundle children carry their tier label
+  // in title (e.g. "Quote for X · Better") + parent_quote_id.
+  const isSourceBundle =
+    !compactString(source.parent_quote_id) &&
+    compactString(source.scope_notes).includes("[BUNDLE]");
+  let sourceChildren: Record<string, unknown>[] = [];
+  if (isSourceBundle) {
+    const { data: kids, error: kidsErr } = await service
+      .from("provider_quotes")
+      .select(
+        "id, title, scope_notes, line_items, prospect_name, prospect_email, prospect_phone, prospect_address",
+      )
+      .eq("parent_quote_id", sourceQuoteId)
+      .order("created_at", { ascending: true });
+    if (kidsErr) throw kidsErr;
+    sourceChildren = (kids ?? []) as Record<string, unknown>[];
+  }
+
+  // Resolve target household + property + request. The target IDs win
+  // over the source's IDs (the whole point of duplication is to send
+  // to a different customer).
+  const targetHouseholdId =
+    compactString(body.targetHouseholdId) || compactString(source.household_id);
+  const targetPropertyId =
+    compactString(body.targetPropertyId) || compactString(source.property_id);
+  const targetRequestId = compactString(body.targetRequestId) || null;
+
+  // Verify the workspace serves the target household via the contractor
+  // link table. This protects against picking a quote and pasting it
+  // onto a household that belongs to a different operator.
+  if (targetHouseholdId) {
+    const { data: contractorLinks } = await service
+      .from("provider_contractor_links")
+      .select("contractor_id, contractors(household_id)")
+      .eq("workspace_id", workspaceId);
+    const linkedHouseholdIds = new Set(
+      ((contractorLinks ?? []) as Record<string, unknown>[])
+        .map((row) => {
+          const c = row.contractors as Record<string, unknown> | undefined;
+          return compactString(c?.household_id);
+        })
+        .filter(Boolean),
+    );
+    if (linkedHouseholdIds.size > 0 && !linkedHouseholdIds.has(targetHouseholdId)) {
+      throw new Error("Workspace does not serve this target household");
+    }
+  }
+
+  // If the targetRequestId is set, verify it belongs to a household
+  // this workspace serves AND pull the contractor_id off it (so the
+  // duplicate's contractor_id is correct).
+  let contractorId = compactString(source.contractor_id);
+  if (targetRequestId) {
+    const { data: targetRequest } = await service
+      .from("handyman_requests")
+      .select("id, household_id, property_id, contractor_id")
+      .eq("id", targetRequestId)
+      .maybeSingle();
+    if (targetRequest) {
+      if (targetHouseholdId && compactString(targetRequest.household_id) !== targetHouseholdId) {
+        throw new Error("targetRequestId belongs to a different household than targetHouseholdId");
+      }
+      contractorId = compactString(targetRequest.contractor_id) || contractorId;
+    }
+  }
+
+  // Strip signature / approval / sent / pricing-status fields when
+  // copying; the new draft starts fresh. Intentionally NOT setting
+  // punch_item_id on the new line items: duplicate doesn't carry
+  // punch item cross-links from the source visit (those refer to a
+  // completed visit's punch items, not this one).
+  const stripLineItem = (item: Record<string, unknown>) => ({
+    id: crypto.randomUUID(),
+    name: compactString(item.name),
+    description: compactString(item.description),
+    unit: compactString(item.unit) || "ea",
+    quantity: numberValue(item.quantity ?? 1),
+    unit_price: numberValue(item.unit_price ?? item.unitPrice ?? 0),
+  });
+
+  // Source quote provenance label that lands in scope_notes so the
+  // operator desk + iOS picker see "Duplicated from quote XYZ".
+  const sourceTitle = compactString(source.title) || "Untitled";
+  const provenanceNote = `Duplicated from quote: ${sourceTitle}`;
+
+  const now = isoNow();
+
+  // Title: pre-fill from source title but the field tech edits it
+  // before sending. Recipient overrides default to the source's prospect
+  // fields when targetHouseholdId is null (pure prospect-to-prospect
+  // duplicate).
+  const newTitle = sourceTitle;
+  const recipientKind = targetHouseholdId ? "linked_home" : "prospect";
+
+  if (isSourceBundle) {
+    // Bundle duplicate: insert new parent + new children with line
+    // items per tier. Mirror the saveQuoteBundle insert sequence.
+    const sourceParentScope = compactString(source.scope_notes);
+    const newParentScope = `${sourceParentScope}\n\n${provenanceNote}`.trim();
+
+    const parentPayload = {
+      workspace_id: workspaceId,
+      contractor_id: contractorId || null,
+      household_id: targetHouseholdId || null,
+      property_id: targetPropertyId || null,
+      request_id: targetRequestId,
+      visit_task_id: null,
+      title: newTitle,
+      recipient_kind: recipientKind,
+      prospect_name: recipientKind === "prospect" ? compactString(source.prospect_name) || null : null,
+      prospect_email: recipientKind === "prospect" ? compactString(source.prospect_email) || null : null,
+      prospect_phone: recipientKind === "prospect" ? compactString(source.prospect_phone) || null : null,
+      prospect_address: recipientKind === "prospect" ? compactString(source.prospect_address) || null : null,
+      status: "draft",
+      currency: "USD",
+      line_items: [],
+      scope_notes: newParentScope,
+      homeowner_message: null,
+      subtotal: 0,
+      tax_total: 0,
+      total: 0,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      updated_at: now,
+      public_share_token: crypto.randomUUID(),
+      // Critical: do NOT carry signature fields, signed_at, sent_at,
+      // approved_at, declined_at — the duplicate is a fresh draft.
+    };
+
+    const { data: parentRow, error: parentErr } = await service
+      .from("provider_quotes")
+      .insert(parentPayload)
+      .select()
+      .single();
+    if (parentErr || !parentRow) throw parentErr ?? new Error("Failed to insert duplicate bundle parent");
+
+    const newChildRows: Record<string, unknown>[] = [];
+    for (const child of sourceChildren) {
+      const sourceChildLines = Array.isArray(child.line_items)
+        ? (child.line_items as Record<string, unknown>[])
+        : [];
+      const newChildLines = sourceChildLines.map(stripLineItem).filter((l) => l.name);
+      const childTotals = quoteSummary(newChildLines);
+
+      const childPayload = {
+        workspace_id: workspaceId,
+        contractor_id: contractorId || null,
+        household_id: targetHouseholdId || null,
+        property_id: targetPropertyId || null,
+        request_id: targetRequestId,
+        visit_task_id: null,
+        title: compactString(child.title) || newTitle,
+        recipient_kind: recipientKind,
+        prospect_name: recipientKind === "prospect" ? compactString(source.prospect_name) || null : null,
+        prospect_email: recipientKind === "prospect" ? compactString(source.prospect_email) || null : null,
+        prospect_phone: recipientKind === "prospect" ? compactString(source.prospect_phone) || null : null,
+        prospect_address: recipientKind === "prospect" ? compactString(source.prospect_address) || null : null,
+        status: "draft",
+        currency: "USD",
+        line_items: newChildLines,
+        scope_notes: compactString(child.scope_notes) || null,
+        homeowner_message: null,
+        subtotal: childTotals.subtotal,
+        tax_total: childTotals.taxTotal,
+        total: childTotals.total,
+        parent_quote_id: parentRow.id,
+        created_by_user_id: userId,
+        updated_by_user_id: userId,
+        updated_at: now,
+        public_share_token: crypto.randomUUID(),
+      };
+      const { data: childRow, error: childErr } = await service
+        .from("provider_quotes")
+        .insert(childPayload)
+        .select()
+        .single();
+      if (childErr || !childRow) {
+        // Roll back parent + any prior children so we don't leave a
+        // half-built bundle.
+        await service.from("provider_quotes").delete().eq("id", parentRow.id);
+        for (const prior of newChildRows) {
+          await service.from("provider_quotes").delete().eq("id", compactString(prior.id));
+        }
+        throw childErr ?? new Error("Failed to insert duplicate bundle child");
+      }
+      newChildRows.push(childRow as Record<string, unknown>);
+    }
+
+    return {
+      duplicate: {
+        id: compactString(parentRow.id),
+        isBundle: true,
+        childIds: newChildRows.map((c) => compactString(c.id)),
+        title: newTitle,
+        sourceQuoteId,
+      },
+    };
+  }
+
+  // Single-tier duplicate: one row, line items copied with stripped
+  // punch_item_id, signature fields cleared.
+  const sourceLines = Array.isArray(source.line_items)
+    ? (source.line_items as Record<string, unknown>[])
+    : [];
+  const newLines = sourceLines.map(stripLineItem).filter((l) => l.name);
+  const totals = quoteSummary(newLines);
+
+  const sourceScope = compactString(source.scope_notes);
+  const newScope = sourceScope
+    ? `${sourceScope}\n\n${provenanceNote}`
+    : provenanceNote;
+
+  const insertPayload = {
+    workspace_id: workspaceId,
+    contractor_id: contractorId || null,
+    household_id: targetHouseholdId || null,
+    property_id: targetPropertyId || null,
+    request_id: targetRequestId,
+    visit_task_id: null,
+    title: newTitle,
+    recipient_kind: recipientKind,
+    prospect_name: recipientKind === "prospect" ? compactString(source.prospect_name) || null : null,
+    prospect_email: recipientKind === "prospect" ? compactString(source.prospect_email) || null : null,
+    prospect_phone: recipientKind === "prospect" ? compactString(source.prospect_phone) || null : null,
+    prospect_address: recipientKind === "prospect" ? compactString(source.prospect_address) || null : null,
+    status: "draft",
+    currency: "USD",
+    line_items: newLines,
+    scope_notes: newScope,
+    homeowner_message: null,
+    subtotal: totals.subtotal,
+    tax_total: totals.taxTotal,
+    total: totals.total,
+    created_by_user_id: userId,
+    updated_by_user_id: userId,
+    updated_at: now,
+    public_share_token: crypto.randomUUID(),
+    // Critical: signature fields, signed_at, signed_name,
+    // signature_path, signer_role, sent_at, approved_at, declined_at,
+    // public_share_token — all NULL / freshly-minted, never copied.
+  };
+
+  const { data: newQuote, error: insertErr } = await service
+    .from("provider_quotes")
+    .insert(insertPayload)
+    .select()
+    .single();
+  if (insertErr || !newQuote) throw insertErr ?? new Error("Failed to insert duplicate quote");
+
+  // Return a draft payload shape that mirrors build_quote_from_visit
+  // so the iOS BuildQuoteSheet's `hydrate(from:)` flow can pick this
+  // up without a second round-trip. The iOS picker will then route the
+  // user back into the editor with the line items pre-loaded.
+  return {
+    duplicate: {
+      id: compactString(newQuote.id),
+      isBundle: false,
+      title: newTitle,
+      sourceQuoteId,
+      // Mirror HavenFieldQuoteDraftPayload shape so the editor can
+      // hydrate without a separate round-trip.
+      draft: {
+        requestId: targetRequestId,
+        householdId: targetHouseholdId || null,
+        propertyId: targetPropertyId || null,
+        contractorId: contractorId || null,
+        visitTaskId: null,
+        workspaceId,
+        title: newTitle,
+        lineItems: newLines.map((line) => ({
+          id: compactString(line.id),
+          name: compactString(line.name),
+          description: compactString(line.description),
+          unit: compactString(line.unit) || "ea",
+          quantity: numberValue(line.quantity ?? 1),
+          unitPrice: numberValue(line.unit_price ?? 0),
+          punchItemId: null,
+        })),
+        subtotal: totals.subtotal,
+        taxTotal: totals.taxTotal,
+        total: totals.total,
+        defaultHourlyRateCents: 12500,
+        eligibleCount: newLines.length,
+        visitedCount: 0,
+      },
+    },
+  };
+}
+
 async function saveQuoteItem(
   service: ServiceClient,
   user: Record<string, unknown>,
@@ -12490,6 +12958,30 @@ serve(async (req) => {
       }
       if (action === "sign_quote") {
         const result = await signQuote(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M13 — kitchen-table efficiency: "same as the Smith house
+      // yesterday." `list_recent_quotes` powers the picker in iOS
+      // BuildQuoteSheet's "Or duplicate from another quote" flow AND
+      // the Operations Desk Quotes screen Duplicate button.
+      // `duplicate_quote` walks the source quote (including bundle
+      // children if any), strips signature + approval + punch-item
+      // cross-links, and inserts a fresh draft.
+      if (action === "list_recent_quotes") {
+        const result = await listRecentQuotes(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+      if (action === "duplicate_quote") {
+        const result = await duplicateQuote(
           service,
           user as unknown as Record<string, unknown>,
           body,

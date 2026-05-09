@@ -1142,6 +1142,142 @@ struct HavenFieldSignedQuote: Codable, Hashable {
     }
 }
 
+// MARK: - Wave M13 — Quote duplication picker models
+//
+// Powers "Or duplicate from another quote" inside M4's
+// FieldBuildQuoteSheet. Single network round-trip per picker open
+// (`list_recent_quotes`) returns up to 50 quotes scoped to the
+// signed-in tech's workspace, sorted reverse-chronologically. Picker
+// row includes everything needed to render the cell without a second
+// hop: customer name + address + total + status pill + signed flag +
+// line item count + bundle flag.
+//
+// Tap-to-pick fires `duplicate_quote` which inserts a fresh draft
+// (signature fields cleared, punch_item_id stripped per line) and
+// returns a draft payload mirroring HavenFieldQuoteDraftPayload so
+// the BuildQuoteSheet hydrates without a second round-trip.
+//
+// Same model type works for both single-tier and bundle source
+// quotes; `isBundle` is the discriminator. The picker shows bundle
+// rows with a small "BUNDLE" pill so the tech knows what they're
+// duplicating.
+
+/// Wave M13 — single quote summary returned by `list_recent_quotes`.
+/// Resilient decoders so a row with a missing field (e.g. legacy
+/// quote without prospect_name) hydrates as best it can without
+/// taking the whole picker list down.
+struct HavenFieldQuoteSummaryRow: Codable, Hashable, Identifiable {
+    let id: String
+    let title: String
+    let customerName: String
+    let customerAddress: String
+    let total: Double
+    let status: String
+    let statusLabel: String
+    let lineItemCount: Int
+    let isBundle: Bool
+    let isSigned: Bool
+    let signedName: String?
+    let updatedAt: String?
+    let createdAt: String?
+    /// Source identifiers stamped at write time so the duplicate flow
+    /// can pre-fill `duplicate_quote` without a second lookup. The
+    /// duplicate routes the new draft to a DIFFERENT household, so
+    /// the iOS picker doesn't surface these to the user; they're
+    /// tucked under the row for analytics + audit only.
+    let householdId: String?
+    let propertyId: String?
+    let requestId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, customerName, customerAddress
+        case total, status, statusLabel, lineItemCount
+        case isBundle, isSigned, signedName, updatedAt, createdAt
+        case householdId, propertyId, requestId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? "Untitled quote"
+        customerName = (try? c.decodeIfPresent(String.self, forKey: .customerName)) ?? "Customer"
+        customerAddress = (try? c.decodeIfPresent(String.self, forKey: .customerAddress)) ?? ""
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? 0
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "draft"
+        statusLabel = (try? c.decodeIfPresent(String.self, forKey: .statusLabel)) ?? "Draft"
+        lineItemCount = (try? c.decodeIfPresent(Int.self, forKey: .lineItemCount)) ?? 0
+        isBundle = (try? c.decodeIfPresent(Bool.self, forKey: .isBundle)) ?? false
+        isSigned = (try? c.decodeIfPresent(Bool.self, forKey: .isSigned)) ?? false
+        signedName = (try? c.decodeIfPresent(String.self, forKey: .signedName)) ?? nil
+        updatedAt = (try? c.decodeIfPresent(String.self, forKey: .updatedAt)) ?? nil
+        createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? nil
+        propertyId = (try? c.decodeIfPresent(String.self, forKey: .propertyId)) ?? nil
+        requestId = (try? c.decodeIfPresent(String.self, forKey: .requestId)) ?? nil
+    }
+}
+
+/// Wave M13 — list_recent_quotes response wrapper. `quotes` is the
+/// recency-sorted slice; `daysBack` + `limit` echo the request params
+/// so the picker UI can render the active filter chip.
+struct HavenFieldQuoteSummaryList: Codable {
+    let quotes: [HavenFieldQuoteSummaryRow]
+    let daysBack: Int
+    let limit: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case quotes, daysBack, limit
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        quotes = (try? c.decodeIfPresent([HavenFieldQuoteSummaryRow].self, forKey: .quotes)) ?? []
+        daysBack = (try? c.decodeIfPresent(Int.self, forKey: .daysBack)) ?? 30
+        limit = (try? c.decodeIfPresent(Int.self, forKey: .limit)) ?? 50
+    }
+}
+
+/// Wave M13 — duplicate_quote response. The new draft id is in
+/// `duplicate.id`; for single-tier sources, `duplicate.draft` is the
+/// hydration payload for the BuildQuoteSheet (mirrors
+/// HavenFieldQuoteDraftPayload). For bundle sources, `draft` is nil
+/// and `childIds` lists the new tier child rows.
+struct HavenFieldQuoteDuplicateResult: Codable {
+    let duplicate: HavenFieldQuoteDuplicatePayload
+
+    private enum CodingKeys: String, CodingKey {
+        case duplicate
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        duplicate = try c.decode(HavenFieldQuoteDuplicatePayload.self, forKey: .duplicate)
+    }
+}
+
+struct HavenFieldQuoteDuplicatePayload: Codable {
+    let id: String
+    let isBundle: Bool
+    let title: String
+    let sourceQuoteId: String
+    let childIds: [String]?
+    let draft: HavenFieldQuoteDraftPayload?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, isBundle, title, sourceQuoteId, childIds, draft
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        isBundle = (try? c.decodeIfPresent(Bool.self, forKey: .isBundle)) ?? false
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? "Untitled"
+        sourceQuoteId = (try? c.decodeIfPresent(String.self, forKey: .sourceQuoteId)) ?? ""
+        childIds = (try? c.decodeIfPresent([String].self, forKey: .childIds)) ?? nil
+        draft = (try? c.decodeIfPresent(HavenFieldQuoteDraftPayload.self, forKey: .draft)) ?? nil
+    }
+}
+
 // MARK: - Wave M11 — End-of-day summary models
 //
 // Mirrors the response shape of the `today_summary` action on
@@ -3143,6 +3279,84 @@ actor HavenFieldService {
             expecting: Response.self
         )
         return response.quote
+    }
+
+    // MARK: - Wave M13 quote duplication
+
+    /// Wave M13 — list this workspace's recent quotes for the duplication
+    /// picker inside FieldBuildQuoteSheet. `daysBack` defaults to 30 to
+    /// match the picker's default filter chip; pass 90 / 365 / 3650 for
+    /// the wider time windows.
+    ///
+    /// Bundle children are filtered server-side so the picker shows ONE
+    /// row per bundle (the parent), not three Good/Better/Best rows.
+    /// Sorted reverse-chronologically by `updated_at`. Capped at 200
+    /// rows server-side; default 50.
+    func listRecentQuotes(
+        workspaceId: String,
+        daysBack: Int = 30,
+        limit: Int = 50
+    ) async throws -> HavenFieldQuoteSummaryList {
+        struct Request: Encodable {
+            let action = "list_recent_quotes"
+            let workspaceId: String
+            let daysBack: Int
+            let limit: Int
+        }
+        let payload = Request(
+            workspaceId: workspaceId,
+            daysBack: daysBack,
+            limit: limit
+        )
+        let data = try JSONEncoder().encode(payload)
+        return try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldQuoteSummaryList.self
+        )
+    }
+
+    /// Wave M13 — duplicate an existing quote into a fresh draft for a
+    /// different customer. Source quote can be a single-tier or a
+    /// bundle parent (children copied with new ids per tier).
+    /// `targetPropertyId` and `targetRequestId` are optional — the
+    /// server falls back to the source's IDs when omitted, but the
+    /// kitchen-table flow always passes the current visit's request +
+    /// property so the duplicate lands on the right context.
+    ///
+    /// Returns the new quote id + (for single-tier) a draft payload
+    /// the BuildQuoteSheet can hydrate without a second round-trip.
+    func duplicateQuote(
+        workspaceId: String,
+        sourceQuoteId: String,
+        targetHouseholdId: String,
+        targetPropertyId: String?,
+        targetRequestId: String?
+    ) async throws -> HavenFieldQuoteDuplicatePayload {
+        struct Request: Encodable {
+            let action = "duplicate_quote"
+            let workspaceId: String
+            let sourceQuoteId: String
+            let targetHouseholdId: String
+            let targetPropertyId: String?
+            let targetRequestId: String?
+        }
+        let payload = Request(
+            workspaceId: workspaceId,
+            sourceQuoteId: sourceQuoteId,
+            targetHouseholdId: targetHouseholdId,
+            targetPropertyId: targetPropertyId,
+            targetRequestId: targetRequestId
+        )
+        let data = try JSONEncoder().encode(payload)
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldQuoteDuplicateResult.self
+        )
+        return response.duplicate
     }
 
     // MARK: - Wave M11 end-of-day summary
@@ -14099,6 +14313,19 @@ private struct FieldBuildQuoteSheet: View {
     /// confirmation strip.
     @State private var signedQuote: HavenFieldSignedQuote?
 
+    // MARK: - Wave M13 — duplicate-from-another-quote state
+
+    /// True while the duplicate picker sheet is presented over the
+    /// editor. Picker is itself a sheet so the field tech can scroll
+    /// past long quote lists without losing the editor underneath.
+    @State private var showDuplicatePicker = false
+    /// True during the duplicate_quote round-trip after the tech taps
+    /// a row in the picker.
+    @State private var isDuplicating = false
+    /// Toast banner text after a successful duplicate (e.g.
+    /// "Duplicated from Smith house quote — review the lines").
+    @State private var duplicateBannerText: String?
+
     // MARK: - Computed
 
     private var totalSubtotal: Double {
@@ -14187,6 +14414,15 @@ private struct FieldBuildQuoteSheet: View {
                         signedConfirmationCard(signed)
                     } else {
                         prefillCardIfAvailable
+                        // Wave M13 — kitchen-table efficiency: "same as
+                        // the Smith house yesterday." Inline link below
+                        // the pre-fill card so the field tech can reach
+                        // the picker without scrolling. Hidden when a
+                        // signed quote is rendered (the close-out path).
+                        duplicateFromAnotherQuoteLink
+                        if let banner = duplicateBannerText {
+                            duplicateBanner(banner)
+                        }
                         editorBody
                         if let savedQuoteId, signedQuote == nil {
                             signatureCTACard(quoteId: savedQuoteId)
@@ -14227,6 +14463,25 @@ private struct FieldBuildQuoteSheet: View {
                         }
                     )
                 }
+            }
+            .sheet(isPresented: $showDuplicatePicker) {
+                // Wave M13 — quote duplication picker. Pass the visit's
+                // household + property + request so the duplicate lands
+                // on the right context. Workspace-scoped server-side.
+                FieldDuplicateQuotePickerSheet(
+                    workspaceId: workspaceId,
+                    targetHouseholdId: visit.householdId ?? "",
+                    targetPropertyId: visit.propertyId,
+                    targetRequestId: requestId,
+                    isDuplicating: $isDuplicating,
+                    onDuplicated: { payload in
+                        applyDuplicate(payload)
+                        showDuplicatePicker = false
+                    },
+                    onCancel: {
+                        showDuplicatePicker = false
+                    }
+                )
             }
         }
         .task {
@@ -14312,6 +14567,86 @@ private struct FieldBuildQuoteSheet: View {
             .background(HavenColors.creamLight.opacity(0.4))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    /// Wave M13 — inline link to open the duplication picker. Renders
+    /// below the pre-fill card (or in its place when no punch items are
+    /// available). Navy chip styling so it doesn't compete with the
+    /// salmon CTAs at the bottom of the editor (Section 22 B1).
+    private var duplicateFromAnotherQuoteLink: some View {
+        Button {
+            showDuplicatePicker = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("Or duplicate from another quote")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(HavenColors.creamLight.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    /// Wave M13 — short-lived success banner after a duplicate lands.
+    /// Auto-clears after 3 seconds. Navy-on-cream so it reads as
+    /// confirmation, not as an error (the error banner is salmon).
+    private func duplicateBanner(_ text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(HavenColors.success)
+            Text(text)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(HavenColors.success.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await MainActor.run {
+                duplicateBannerText = nil
+            }
+        }
+    }
+
+    /// Wave M13 — apply the duplicate_quote response to the editor.
+    /// Hydrates line items + title from the returned draft payload so
+    /// the field tech can edit + send without a second round-trip.
+    /// Bundle duplicates show a banner explaining they need to be
+    /// reviewed in the operator desk (multi-tier editor isn't wired
+    /// for hydration from a duplicate; field tech uses single-tier
+    /// for kitchen-table closes).
+    private func applyDuplicate(_ payload: HavenFieldQuoteDuplicatePayload) {
+        savedQuoteId = payload.id
+        if let draft = payload.draft {
+            // Single-tier: hydrate the editor's line items + title from
+            // the draft payload so the tech sees the duplicate's items
+            // pre-loaded with new ids + signature fields cleared.
+            multiTierEnabled = false
+            lineItems = draft.lineItems
+            title = draft.title
+            duplicateBannerText = "Duplicated \(draft.lineItems.count) line item\(draft.lineItems.count == 1 ? "" : "s") from \(payload.title)"
+        } else {
+            // Bundle: the duplicate is saved but the editor doesn't
+            // re-hydrate (multi-tier editor doesn't support hydration
+            // from a saved bundle). Banner directs the tech to review
+            // in the Operations Desk before sending.
+            duplicateBannerText = "Bundle duplicate saved. Review and edit tiers before sending."
+        }
+        Haptics.success()
     }
 
     private var editorBody: some View {
@@ -14877,6 +15212,415 @@ private struct FieldQuoteDraftBadge: View {
 /// but lands the editable lines on the invoice path. Pre-fills from
 /// `convert_visit_to_invoice` (one Labor + N Materials lines per
 /// completed punch item), lets the field tech edit / add / reorder
+/// Wave M13 — quote duplication picker. Tapped from
+/// `FieldBuildQuoteSheet` via "Or duplicate from another quote ->".
+/// Shows the workspace's recent quotes (last 30 / 90 / all time)
+/// sorted reverse-chronologically. Field tech taps a row to duplicate
+/// that quote's line items into the current visit's draft.
+///
+/// Single network round-trip per filter change (`list_recent_quotes`
+/// returns up to 50 rows). Tap-to-pick fires `duplicate_quote` which
+/// inserts a fresh draft, strips signature + approval + punch_item_id
+/// fields, and returns a hydration payload. The parent's
+/// `applyDuplicate(...)` handler then re-hydrates the editor.
+///
+/// Discipline notes (Section 22):
+/// - Salmon ONLY on the active filter chip + the confirm dialog
+///   primary CTA. No salmon on row backgrounds (navy-on-cream chip
+///   styling for the row container).
+/// - 4 states wired: loading skeleton, empty (no recent quotes),
+///   error with Retry CTA, populated list.
+/// - 44pt min touch on every quote row + filter chip + confirm
+///   buttons.
+/// - Confirm dialog shows source customer + target customer so the
+///   field tech can sanity-check before pasting onto the wrong house.
+private struct FieldDuplicateQuotePickerSheet: View {
+    let workspaceId: String
+    let targetHouseholdId: String
+    let targetPropertyId: String?
+    let targetRequestId: String?
+    @Binding var isDuplicating: Bool
+    let onDuplicated: (HavenFieldQuoteDuplicatePayload) -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    /// Filter window in days. 30 / 90 / 3650 (≈ "all time").
+    @State private var daysBack: Int = 30
+    @State private var quotes: [HavenFieldQuoteSummaryRow] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    /// Quote selected for confirmation. Set on tap; cleared on
+    /// confirm or cancel.
+    @State private var pendingConfirm: HavenFieldQuoteSummaryRow?
+
+    private let service = HavenFieldService.shared
+
+    private let dateFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
+
+    private let isoParser: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    filterChipRow
+                    if isLoading && quotes.isEmpty {
+                        loadingSkeleton
+                    } else if let errorMessage {
+                        errorBanner(errorMessage)
+                    } else if quotes.isEmpty {
+                        emptyState
+                    } else {
+                        quoteList
+                    }
+                }
+                .padding(20)
+            }
+            .background(HavenColors.background.ignoresSafeArea())
+            .navigationTitle("Pick a quote to duplicate")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+            .sheet(item: $pendingConfirm) { selected in
+                confirmDialog(selected)
+            }
+        }
+        .task {
+            await loadQuotes()
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var filterChipRow: some View {
+        HStack(spacing: 8) {
+            chip(label: "Last 30 days", value: 30)
+            chip(label: "Last 90 days", value: 90)
+            chip(label: "All time", value: 3650)
+            Spacer()
+        }
+    }
+
+    private func chip(label: String, value: Int) -> some View {
+        Button {
+            guard daysBack != value else { return }
+            daysBack = value
+            Task { await loadQuotes() }
+        } label: {
+            Text(label)
+                .font(HavenTypography.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(daysBack == value ? HavenColors.textOnAction : HavenColors.textPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(minHeight: 32)
+                .background(
+                    daysBack == value
+                        ? HavenColors.action
+                        : HavenColors.creamLight
+                )
+                .clipShape(Capsule())
+        }
+    }
+
+    private var loadingSkeleton: some View {
+        VStack(spacing: 10) {
+            ForEach(0..<4, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(HavenColors.creamLight.opacity(0.6))
+                    .frame(height: 70)
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        FieldEmptyState(
+            title: "No recent quotes",
+            subtitle: daysBack == 30
+                ? "No quotes in the last 30 days. Try a wider window."
+                : "No quotes in your workspace history yet."
+        )
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(message)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
+            Button {
+                Task { await loadQuotes() }
+            } label: {
+                Text("Retry")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .background(HavenColors.action)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.critical.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var quoteList: some View {
+        VStack(spacing: 8) {
+            ForEach(quotes) { row in
+                quoteRow(row)
+            }
+        }
+    }
+
+    private func quoteRow(_ row: HavenFieldQuoteSummaryRow) -> some View {
+        Button {
+            pendingConfirm = row
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(row.customerName)
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(1)
+                        if row.isBundle {
+                            statusPill(text: "BUNDLE", tint: HavenColors.textPrimary)
+                        }
+                        if row.isSigned {
+                            statusPill(text: "SIGNED", tint: HavenColors.success)
+                        }
+                    }
+                    Text(row.title)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(formattedTotal(row.total))
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("·")
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("\(row.lineItemCount) item\(row.lineItemCount == 1 ? "" : "s")")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("·")
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text(relativeDateLabel(row.updatedAt ?? row.createdAt))
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+                Spacer()
+                statusPill(text: row.statusLabel, tint: tint(for: row.status))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(14)
+            .frame(minHeight: 64)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(HavenColors.creamLight, lineWidth: 1)
+            )
+        }
+    }
+
+    private func statusPill(text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private func tint(for status: String) -> Color {
+        switch status {
+        case "approved": return HavenColors.success
+        case "declined", "withdrawn": return HavenColors.critical
+        case "viewed", "sent": return HavenColors.action
+        default: return HavenColors.textPrimary
+        }
+    }
+
+    private func formattedTotal(_ value: Double) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = "USD"
+        f.maximumFractionDigits = value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+        return f.string(from: NSNumber(value: value)) ?? "$0"
+    }
+
+    private func relativeDateLabel(_ iso: String?) -> String {
+        guard let iso, !iso.isEmpty, let date = isoParser.date(from: iso) else {
+            return ""
+        }
+        return dateFormatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    @ViewBuilder
+    private func confirmDialog(_ selected: HavenFieldQuoteSummaryRow) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("DUPLICATE QUOTE")
+                        .font(HavenTypography.uiSectionHeader)
+                        .kerning(1.2)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    Text("Duplicate quote for \(selected.customerName)?")
+                        .font(HavenTypography.title3)
+                        .foregroundStyle(HavenColors.textPrimary)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        contextRow(label: "Source", value: selected.title)
+                        contextRow(label: "From", value: selected.customerName)
+                        contextRow(label: "Total", value: formattedTotal(selected.total))
+                        contextRow(label: "Items", value: "\(selected.lineItemCount)")
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(HavenColors.creamLight.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    Text("This creates a fresh draft for the current visit. Signature, approval, and any sent state are not copied.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.critical)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(HavenColors.critical.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    VStack(spacing: 10) {
+                        Button {
+                            Task { await confirmDuplicate(selected) }
+                        } label: {
+                            if isDuplicating {
+                                ProgressView().tint(HavenColors.textOnAction)
+                            } else {
+                                Text("Duplicate quote")
+                            }
+                        }
+                        .buttonStyle(FieldPrimaryButtonStyle())
+                        .disabled(isDuplicating)
+
+                        Button {
+                            pendingConfirm = nil
+                        } label: {
+                            Text("Cancel")
+                        }
+                        .buttonStyle(FieldSecondaryButtonStyle())
+                        .disabled(isDuplicating)
+                    }
+                }
+                .padding(20)
+            }
+            .background(HavenColors.background.ignoresSafeArea())
+            .navigationTitle("Confirm")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func contextRow(label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(label)
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+                .frame(width: 60, alignment: .leading)
+            Text(value)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: - Actions
+
+    private func loadQuotes() async {
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        do {
+            let list = try await service.listRecentQuotes(
+                workspaceId: workspaceId,
+                daysBack: daysBack,
+                limit: 50
+            )
+            await MainActor.run {
+                quotes = list.quotes
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Couldn't load recent quotes. \(error.localizedDescription)"
+                isLoading = false
+            }
+        }
+    }
+
+    private func confirmDuplicate(_ selected: HavenFieldQuoteSummaryRow) async {
+        guard !targetHouseholdId.isEmpty else {
+            await MainActor.run {
+                errorMessage = "This visit doesn't have a household linked yet. Try a different visit."
+            }
+            return
+        }
+        await MainActor.run {
+            isDuplicating = true
+            errorMessage = nil
+        }
+        do {
+            let payload = try await service.duplicateQuote(
+                workspaceId: workspaceId,
+                sourceQuoteId: selected.id,
+                targetHouseholdId: targetHouseholdId,
+                targetPropertyId: targetPropertyId,
+                targetRequestId: targetRequestId
+            )
+            await MainActor.run {
+                isDuplicating = false
+                pendingConfirm = nil
+                onDuplicated(payload)
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                isDuplicating = false
+                errorMessage = "Duplicate failed. \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
 /// lines, then save / send through `save_invoice` / `send_invoice`.
 ///
 /// Discipline notes:
