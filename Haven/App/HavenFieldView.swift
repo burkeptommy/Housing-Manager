@@ -684,6 +684,33 @@ struct HavenFieldPropertySummary: Codable, Hashable {
     let id: String?
     let name: String?
     let address: String?
+    /// N-customer-phone fix: served by `loadDashboard` per visit row.
+    /// Resolved server-side from the household's primary family_member
+    /// (or any non-staff family_member fallback). Optional + resilient
+    /// decode so legacy / pre-fix payloads still work.
+    let customerPhone: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case address
+        case customerPhone
+    }
+
+    init(id: String?, name: String?, address: String?, customerPhone: String?) {
+        self.id = id
+        self.name = name
+        self.address = address
+        self.customerPhone = customerPhone
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? nil
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil
+        address = (try? c.decodeIfPresent(String.self, forKey: .address)) ?? nil
+        customerPhone = (try? c.decodeIfPresent(String.self, forKey: .customerPhone)) ?? nil
+    }
 }
 
 struct HavenFieldVisitTask: Codable, Hashable {
@@ -5156,6 +5183,23 @@ struct HavenFieldRootView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel = HavenFieldViewModel()
 
+    init() {
+        // D7 fix: SwiftUI's `.toolbar(.hidden, for: .tabBar)` modifier
+        // on iOS 26 occasionally leaves a faint ghost of the native
+        // tab bar behind the custom HavenFieldTabBar pill on certain
+        // first-render paths (sweep mode, modal dismiss). UIKit
+        // appearance configuration zeroes the bar's frame which makes
+        // the ghost go away regardless of SwiftUI's render order. Safe
+        // here because every Chez Field surface uses the custom pill.
+        let appearance = UITabBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBar.appearance().isHidden = true
+    }
+
     var body: some View {
         TabView(selection: $viewModel.selectedTab) {
             NavigationStack {
@@ -5549,10 +5593,15 @@ private struct HavenFieldHomeTab: View {
                 email: viewModel.dashboard?.currentUser?.email
                     ?? viewModel.dashboard?.workspace?.primaryEmail,
                 phone: viewModel.dashboard?.workspace?.primaryPhone,
-                providerURL: viewModel.dashboard?.workspace?.providerURL
-            ) {
-                appState.authService.signOut()
-            }
+                providerURL: viewModel.dashboard?.workspace?.providerURL,
+                // N-permission-gating fix: hand the caller's role so the
+                // sheet can hide the desktop-command-center link from
+                // crew techs (only owners can open the Operations Desk).
+                role: viewModel.dashboard?.currentUser?.role,
+                onSignOut: {
+                    appState.authService.signOut()
+                }
+            )
         }
         .sheet(isPresented: $showEndOfDay) {
             // Wave M11 — end-of-day summary sheet. Loads its own state
@@ -7899,12 +7948,22 @@ private struct FieldClientBadge: View {
                 .font(.system(size: 11, weight: .semibold))
             Text(label)
                 .font(HavenTypography.uiLabelSmall)
+                // D7 fix: pills wrapped awkwardly when both
+                // upcoming-visits and quotes labels stacked next to a
+                // long home name. Force one-line + tiny scale-down so
+                // they always fit and never wrap.
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
         .foregroundStyle(tint)
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
         .background(tint.opacity(0.10))
         .clipShape(Capsule())
+        // Fixed-width prevents the surrounding HStack from compressing
+        // the label below readable; combined with `minimumScaleFactor`
+        // above the pill never wraps OR clips.
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -8821,7 +8880,9 @@ private struct HavenFieldVisitWorkspaceView: View {
                 method: $accessMethodDraft,
                 notes: $accessNotesDraft,
                 isSubmitting: accessMethodSubmitting,
-                errorMessage: accessMethodError,
+                // N-validation-stale-render fix: pass via Binding so the
+                // sheet can clear the message as the user types.
+                errorMessage: $accessMethodError,
                 onSave: {
                     Task { await saveAccessMethod() }
                 },
@@ -9046,13 +9107,25 @@ private struct HavenFieldVisitWorkspaceView: View {
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 FieldKeyValueRow(label: "Scheduled", value: routeSummary, inverse: true)
-                FieldKeyValueRow(label: "Status", value: viewModel.statusLabel, inverse: true)
+                // C-4 fix: route through `displayedStatusLabel` so the
+                // local `.completed` lifecycle state wins over the stale
+                // payload status when the user just finished the visit.
+                FieldKeyValueRow(label: "Status", value: displayedStatusLabel, inverse: true)
                 // Wave M6 — address renders as a tappable Apple Maps link.
                 // The maps:// URL opens Apple Maps natively on device; the
                 // simulator falls back to Maps if installed, otherwise the
                 // tap is a graceful no-op.
                 if let address = viewModel.visit.property?.address, !address.isEmpty {
                     FieldTappableAddressRow(address: address, inverse: true)
+                }
+                // N-customer-phone fix: tap-to-call row, served by the
+                // workspace dashboard's per-visit `property.customerPhone`
+                // field. Resolves to the household's primary
+                // family_member phone server-side. Renders only when set
+                // so families without a phone on file see a clean header.
+                if let phone = viewModel.visit.property?.customerPhone,
+                   !phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    FieldTappablePhoneRow(phone: phone, inverse: true)
                 }
                 if let notes = viewModel.visit.assignment?.routeNotes, !notes.isEmpty {
                     FieldKeyValueRow(label: "Route notes", value: notes, inverse: true)
@@ -9273,6 +9346,32 @@ private struct HavenFieldVisitWorkspaceView: View {
             assignment: resolvedAssignment,
             currentlyPausedAt: currentlyPausedAt
         )
+    }
+
+    /// C-4 fix — header card "Status" row label.
+    /// When the local `lifecycleState` has flipped to `.completed` (because
+    /// the user just tapped Complete or the M8 wizard auto-completed the
+    /// visit), the server-side `payload?.request?.statusLabel` is still
+    /// stale ("In progress") because the portal payload isn't re-fetched
+    /// after a Phase 78 lifecycle action. Derive the displayed label from
+    /// the same source-of-truth as `lifecycleSection` so both stay in sync.
+    private var displayedStatusLabel: String {
+        if case .completed = lifecycleState {
+            return HandymanRequestStatus.completed.displayLabel
+        }
+        return viewModel.statusLabel
+    }
+
+    /// C-4 fix — actionRow + header CTA branching.
+    /// Same problem as `displayedStatusLabel` — `viewModel.requestStatus`
+    /// reads the stale payload even after the visit completed locally.
+    /// Once `lifecycleState == .completed`, force-route through the
+    /// completed branch so the "Sync now / Complete visit" CTAs disappear.
+    private var displayedRequestStatus: String {
+        if case .completed = lifecycleState {
+            return HandymanRequestStatus.completed.rawValue
+        }
+        return viewModel.requestStatus
     }
 
     @ViewBuilder
@@ -9659,6 +9758,17 @@ private struct HavenFieldVisitWorkspaceView: View {
                                 .background(HavenColors.surface)
                                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
+                                // N-validation-stale-render fix: clear
+                                // the validation message as soon as the
+                                // user starts typing — without this the
+                                // "Tell the homeowner why" error stays
+                                // on screen even after they've satisfied
+                                // it. Mirrors C-3's M3 follow-up pattern.
+                                .onChange(of: pauseOtherText) { _, newValue in
+                                    if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        pauseValidationError = nil
+                                    }
+                                }
                         }
                     }
 
@@ -10127,7 +10237,7 @@ private struct HavenFieldVisitWorkspaceView: View {
                     .buttonStyle(FieldGhostButtonStyle())
                     .disabled(viewModel.isSyncing)
                 }
-            } else if viewModel.requestStatus == HandymanRequestStatus.confirmed.rawValue {
+            } else if displayedRequestStatus == HandymanRequestStatus.confirmed.rawValue {
                 HStack(spacing: 10) {
                     Button("On my way") {
                         Task { await viewModel.markOnMyWay() }
@@ -10144,11 +10254,19 @@ private struct HavenFieldVisitWorkspaceView: View {
                     .buttonStyle(FieldSecondaryButtonStyle())
                     .disabled(viewModel.isSyncing)
                 }
-            } else if viewModel.requestStatus == HandymanRequestStatus.onMyWay.rawValue {
+            } else if displayedRequestStatus == HandymanRequestStatus.onMyWay.rawValue {
                 Button("Check in") {
                     Task { await viewModel.checkIn() }
                 }
                 .buttonStyle(FieldPrimaryButtonStyle())
+            } else if case .completed = lifecycleState {
+                // C-4 fix: once the local lifecycle says completed, hide
+                // the Sync now / Complete visit duo entirely. The lifecycle
+                // section card already shows the green "Visit complete"
+                // marker so we don't need a redundant CTA here. Without
+                // this branch the user kept seeing "Complete visit" on a
+                // visit they just finished.
+                EmptyView()
             } else {
                 HStack(spacing: 10) {
                     Button("Sync now") {
@@ -10810,6 +10928,17 @@ private struct HavenFieldHomeProfileView: View {
         visibleSystems.filter { !$0.isDecommissioned && $0.hasIncompleteIdentity }
     }
 
+    /// N-6 fix — Known systems list excludes anything already surfaced
+    /// in the gap-fill list above so the same row never appears twice.
+    /// Gap-fill is the "TODO" surface; Known systems is the complete
+    /// inventory of systems that have model/serial/manufacturer set. A
+    /// system without those fields belongs in gap-fill OR known systems,
+    /// not both.
+    private var knownSystems: [HavenFieldHomeSystem] {
+        let incompleteIds = Set(incompleteSystems.map(\.id))
+        return visibleSystems.filter { !incompleteIds.contains($0.id) }
+    }
+
     private var followupSystems: [HavenFieldHomeSystem] {
         visibleSystems.filter { $0.needsFollowup && !$0.isDecommissioned }
     }
@@ -10945,11 +11074,27 @@ private struct HavenFieldHomeProfileView: View {
             }
 
             FieldSectionCard(kicker: "Systems", title: "Known systems") {
-                if visibleSystems.isEmpty {
-                    FieldEmptyState(title: "No systems shared yet", subtitle: "Once the homeowner grants access and the first visit captures labels, systems will appear here.")
+                // N-6 fix: render `knownSystems` (visible minus incomplete)
+                // so the same AC / Roof row that already shows in the
+                // GAP-FILL section above doesn't show up here too.
+                if knownSystems.isEmpty {
+                    if !incompleteSystems.isEmpty {
+                        // All systems are incomplete — gap-fill handled
+                        // them, so this section gets a different empty
+                        // copy than the totally-empty case.
+                        FieldEmptyState(
+                            title: "Every system needs details",
+                            subtitle: "Tap a row in Gap-fill to capture model + serial. Once enough fields are populated they'll graduate into Known systems."
+                        )
+                    } else {
+                        FieldEmptyState(
+                            title: "No systems shared yet",
+                            subtitle: "Once the homeowner grants access and the first visit captures labels, systems will appear here."
+                        )
+                    }
                 } else {
                     VStack(spacing: 12) {
-                        ForEach(visibleSystems) { system in
+                        ForEach(knownSystems) { system in
                             Button {
                                 selectedSystem = system
                             } label: {
@@ -12420,7 +12565,9 @@ private struct FieldEndOfDayView: View {
                     }
                     if let inAt = stop.clockInAt?.fieldClockTimeOfDay,
                        let outAt = stop.clockOutAt?.fieldClockTimeOfDay {
-                        Text("\(inAt) – \(outAt)")
+                        // B3 fix: en-dash → " to " keeps the time range
+                        // readable without the AI-flavored typography.
+                        Text("\(inAt) to \(outAt)")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -12496,7 +12643,10 @@ private struct FieldEndOfDayView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "cloud.sun")
                             .font(.system(size: 13, weight: .medium))
-                        Text("Weather: —")
+                        // B3 fix: em-dash placeholder → ellipsis. Reads
+                        // as "weather data still loading" rather than
+                        // the AI-flavored em-dash typography.
+                        Text("Weather: …")
                             .font(HavenTypography.caption)
                     }
                     .foregroundStyle(HavenColors.textTertiary)
@@ -12949,9 +13099,21 @@ private struct FieldWorkspaceSettingsSheet: View {
     let email: String?
     let phone: String?
     let providerURL: String?
+    /// N-permission-gating fix: caller's role on the workspace
+    /// (`owner` / `lead_dispatcher` / `field_technician` / etc.).
+    /// Used to gate the "Open desktop command center" link — only owners
+    /// have access to the desktop Operations Desk; surfacing the link to
+    /// a field tech they can't actually open is confusing and off-brand.
+    /// Sign out stays available for everyone (it's account-scoped, not
+    /// workspace-scoped).
+    let role: String?
     let onSignOut: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+
+    private var isOwner: Bool {
+        (role ?? "").lowercased() == "owner"
+    }
 
     var body: some View {
         NavigationStack {
@@ -12974,9 +13136,16 @@ private struct FieldWorkspaceSettingsSheet: View {
                         }
                     }
 
-                    FieldSectionCard(kicker: "Workspace", title: "Owner tools") {
+                    // N-permission-gating fix: section title swaps to
+                    // "Account" for non-owners since the only thing they
+                    // see is Sign Out. "Owner tools" with no owner tools
+                    // visible felt like a dead label.
+                    FieldSectionCard(
+                        kicker: "Workspace",
+                        title: isOwner ? "Owner tools" : "Account"
+                    ) {
                         VStack(alignment: .leading, spacing: 12) {
-                            if let providerURL, let url = URL(string: providerURL) {
+                            if isOwner, let providerURL, let url = URL(string: providerURL) {
                                 Link(destination: url) {
                                     Label("Open desktop command center", systemImage: "arrow.up.right.square")
                                         .font(HavenTypography.uiButton)
@@ -13964,7 +14133,10 @@ private struct FieldAccessMethodSheet: View {
     @Binding var method: String
     @Binding var notes: String
     let isSubmitting: Bool
-    let errorMessage: String?
+    /// N-validation-stale-render fix: was a `let String?` so the sheet
+    /// couldn't clear the message itself when the user started typing.
+    /// Now a Binding so the on-change of `notes` can reset it locally.
+    @Binding var errorMessage: String?
     let onSave: () -> Void
     let onClose: () -> Void
 
@@ -14023,6 +14195,17 @@ private struct FieldAccessMethodSheet: View {
                             .background(HavenColors.surface)
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
+                            // N-validation-stale-render fix: clear the
+                            // validation banner as soon as the user types
+                            // — when the lockbox-method picker triggers
+                            // "Add the lockbox details" the message used
+                            // to persist even after the user typed valid
+                            // text.
+                            .onChange(of: notes) { _, newValue in
+                                if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    errorMessage = nil
+                                }
+                            }
                     }
 
                     if let errorMessage {
@@ -16854,6 +17037,13 @@ private struct FieldEndOfVisitWizard: View {
                     lineWidth: 1
                 ))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
+                // N-validation-stale-render fix: clear the validation
+                // error as soon as the user starts typing the title.
+                .onChange(of: newTaskTitle) { _, newValue in
+                    if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        newTaskValidationError = nil
+                    }
+                }
 
             if let error = newTaskValidationError {
                 Text(error)
@@ -16915,6 +17105,13 @@ private struct FieldEndOfVisitWizard: View {
                     lineWidth: 1
                 ))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
+                // N-validation-stale-render fix: clear the validation
+                // error as soon as the user starts typing.
+                .onChange(of: newQuoteTitle) { _, newValue in
+                    if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        newQuoteValidationError = nil
+                    }
+                }
 
             if let error = newQuoteValidationError {
                 Text(error)
@@ -16965,6 +17162,13 @@ private struct FieldEndOfVisitWizard: View {
                     lineWidth: 1
                 ))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
+                // N-validation-stale-render fix: clear the validation
+                // error as soon as the user starts typing.
+                .onChange(of: newVisitTitle) { _, newValue in
+                    if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        newVisitValidationError = nil
+                    }
+                }
 
             if let error = newVisitValidationError {
                 Text(error)
@@ -17181,7 +17385,10 @@ private struct FieldEndOfVisitWizard: View {
                     } else {
                         Image(systemName: "paperplane.fill")
                     }
-                    Text(isSubmitting ? "Sending…" : "Done — send suggestions")
+                    // B3 fix: em-dash → period + space. CTA reads as
+                    // "Done. Send suggestions" without the AI-flavored
+                    // dash typography.
+                    Text(isSubmitting ? "Sending…" : "Done. Send suggestions")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -18355,11 +18562,18 @@ struct FieldNearbyCustomersView: View {
     private func mapPlaceholder(message: String) -> some View {
         ZStack {
             HavenColors.surface
+            // D1 fix: replace the ProgressView spinner with a beige
+            // skeleton bar that pulses subtly. Same loading semantics,
+            // less hospital-waiting-room vibe. The list pane underneath
+            // also renders skeleton rows during these stages.
+            if model.stage == .askingPermission || model.stage == .locating || model.stage == .loading {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(HavenColors.beige200.opacity(0.45))
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 48)
+                    .accessibilityHidden(true)
+            }
             VStack(spacing: 14) {
-                if model.stage == .askingPermission || model.stage == .locating || model.stage == .loading {
-                    ProgressView()
-                        .controlSize(.large)
-                }
                 Image(systemName: model.stage == .denied ? "location.slash.fill" : "map")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(HavenColors.textSecondary)
@@ -18424,10 +18638,56 @@ struct FieldNearbyCustomersView: View {
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                } else if model.stage == .loading || model.stage == .locating || model.stage == .askingPermission {
+                    // D1 fix: skeleton placeholder while we look up
+                    // addresses + reverse-geocode. Three ghost rows so
+                    // the surface doesn't go blank under a spinner.
+                    VStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            FieldNearbyCustomerSkeletonRow()
+                        }
+                    }
+                    .padding(.top, 12)
                 }
             }
             .padding(.bottom, 24)
         }
+    }
+}
+
+/// D1 fix — skeleton row for the M10 nearby-customers list while
+/// addresses geocode. Same shape as `FieldNearbyCustomerRow` so the
+/// transition into populated state doesn't reflow the layout. Three of
+/// these stack in `listPane` during the loading stages.
+private struct FieldNearbyCustomerSkeletonRow: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Circle()
+                .fill(HavenColors.beige200)
+                .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(HavenColors.beige200)
+                    .frame(height: 14)
+                    .frame(maxWidth: 160)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(HavenColors.beige200.opacity(0.7))
+                    .frame(height: 12)
+                    .frame(maxWidth: 220)
+            }
+            Spacer()
+            RoundedRectangle(cornerRadius: 12)
+                .fill(HavenColors.beige200)
+                .frame(width: 56, height: 22)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 16)
+        .redacted(reason: .placeholder)
+        .accessibilityHidden(true)
     }
 }
 
@@ -19381,6 +19641,11 @@ private extension String {
         let knownPrefixes: Set<String> = [
             "standard visit", "standard_visit",
             "repair", "install", "quote", "assembly", "question", "setup",
+            // N-2 follow-up: Chez-routed work surfaces with a
+            // "chez_routed:" / "chez routed:" prefix in some seed paths.
+            // Strip it the same way other request_type prefixes get
+            // stripped so the homeowner / customer name leads the title.
+            "chez_routed", "chez routed",
         ]
         for prefix in knownPrefixes {
             let lowered = trimmed.lowercased()

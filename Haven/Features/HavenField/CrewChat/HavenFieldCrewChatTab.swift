@@ -120,6 +120,14 @@ struct HavenFieldCrewTab: View {
                 HavenFieldCrewChatThreadView(
                     workspaceId: workspaceId,
                     thread: selected,
+                    // C-5 fix: hand the dashboard's authoritative
+                    // currentMember.memberId down so the bubble
+                    // alignment doesn't have to infer it from the
+                    // read_by heuristic (which falsely identified the
+                    // OTHER user as "me" when no self-sent messages
+                    // existed yet — every Owner message rendered
+                    // right-aligned salmon for the receiving Crew tech).
+                    currentMemberId: viewModel.dashboard?.currentUser?.memberId,
                     chatModel: chatModel,
                     rootViewModel: viewModel
                 )
@@ -441,6 +449,12 @@ private struct HavenFieldCrewThreadRow: View {
 private struct HavenFieldCrewChatThreadView: View {
     let workspaceId: String
     let thread: HavenFieldCrewChatThread
+    /// C-5 fix: authoritative current-member id served by the dashboard
+    /// payload (`HavenFieldDashboard.currentUser.memberId`). When non-nil
+    /// it takes precedence over the read_by heuristic below — the heuristic
+    /// only applies for the legacy / mid-rollout case where the server
+    /// returned the dashboard without that field populated.
+    var currentMemberId: String? = nil
     @ObservedObject var chatModel: HavenFieldCrewChatModel
     var rootViewModel: HavenFieldViewModel? = nil
 
@@ -448,11 +462,13 @@ private struct HavenFieldCrewChatThreadView: View {
     @State private var isSending = false
     @State private var loadError: String?
     @State private var hasMarkedRead = false
-    /// Captured at .onAppear so the chat model's current member id
-    /// can be inferred from the most recent message they sent. This
-    /// is a heuristic — for a perfect right/left alignment we'd carry
-    /// the caller's `member_id` on the workspace dashboard payload,
-    /// but that requires a server change we'll batch with M9.
+    /// Backup heuristic for the bubble-alignment side. Used ONLY when the
+    /// dashboard payload didn't carry an authoritative `currentMemberId`.
+    /// The heuristic was the source of the C-5 bug (W2 Crew 2 saw every
+    /// W2 Owner message render right-aligned salmon because the only
+    /// message in `read_by` was the Owner's self-stamp at insert time);
+    /// the right fix is to trust the server. Keep the field around as a
+    /// fallback for forward-compat.
     @State private var inferredCurrentMemberId: String?
 
     private var orderedMessages: [HavenFieldCrewChatMessage] {
@@ -660,13 +676,20 @@ private struct HavenFieldCrewChatThreadView: View {
         }
     }
 
-    /// Best-effort right/left alignment. We don't carry the caller's
-    /// `member_id` on the dashboard payload yet, so we infer it from
-    /// the first message we successfully send (or from the
-    /// loadMessages heuristic above). Until we have that signal,
-    /// every message renders left-aligned — preferable to flipping
-    /// the wrong side which would mislead.
+    /// C-5 fix — bubble alignment.
+    /// 1. PRIMARY: authoritative `currentMemberId` plumbed in from the
+    ///    workspace dashboard payload. When non-nil this is the only signal
+    ///    we trust.
+    /// 2. FALLBACK: the read_by heuristic from before the dashboard added
+    ///    `currentMember.memberId`. Kept for forward-compat with old
+    ///    cached dashboards that don't carry the field — the heuristic
+    ///    is wrong for the case where the visible-thread messages are
+    ///    all from one other-user, but at least an unhealthy fallback
+    ///    beats no fallback when the server contract drifts.
     private func isMine(_ message: HavenFieldCrewChatMessage) -> Bool {
+        if let me = currentMemberId, !me.isEmpty {
+            return message.senderMemberId == me
+        }
         guard let me = inferredCurrentMemberId else { return false }
         return message.senderMemberId == me
     }

@@ -54,3 +54,36 @@ Source: comprehensive Chez Field iOS app verification subagent (sweep of every t
 ### Recommendation
 
 Hold demo readiness pending **C-1** + **C-2** + **C-3**. Mobile foundation IS shippable post-fix; current state PARTIAL. Polish bugs (N-1 through N-10) can ship in a separate clean-up pass after the next Pass 2 batch lands.
+
+## Bugfix Sprint #2 — 2026-05-09
+
+Verification Sweep #2 surfaced 2 new criticals + several discipline + polish carry-overs. All addressed in this pass.
+
+### Critical bugs (both fixed)
+
+| ID | Surface | Severity | Status | Fix |
+|---|---|---|---|---|
+| **C-4** | Visit detail header status pill stale after M8 auto-complete | 🔴 blocker | ✅ FIXED | The header card's "Status" row + actionRow CTA branch read `viewModel.statusLabel` / `viewModel.requestStatus`, both of which read from `payload?.request?.statusLabel` — the portal payload that's NEVER refreshed after a Phase 78 lifecycle action (M1 complete_visit / M8 wizard implicit complete). Introduced view-level `displayedStatusLabel` + `displayedRequestStatus` computed properties that derive from the same `lifecycleState` source-of-truth as the lifecycle section card. When `lifecycleState == .completed`, both override to `HandymanRequestStatus.completed.{displayLabel, rawValue}` so the header pill flips to "Completed" and the actionRow renders an `EmptyView()` instead of the dead "Sync now / Complete visit" duo. |
+| **C-5** | M7 crew chat alignment heuristic broken | 🟡 major | ✅ FIXED | The `inferredCurrentMemberId` heuristic falsely identified the OTHER user's messages as "mine" when no self-sent messages existed yet (the Owner's read_by stamp at insert time made `readBy.count == 1` match the heuristic). Edge fn ALREADY served `currentUser.memberId` and the iOS struct ALREADY decoded it — the chat tab just wasn't using it. Plumbed `viewModel.dashboard?.currentUser?.memberId` through `HavenFieldCrewChatThreadView.currentMemberId` (new optional init param). `isMine(_:)` now prefers the authoritative id; the heuristic is preserved as a fallback for forward-compat. |
+
+### Discipline + polish (all fixed)
+
+| ID | Surface | Status | Fix |
+|---|---|---|---|
+| **B3** | em-dash + en-dash in user-facing copy | ✅ FIXED | Three sites: `HavenFieldView.swift:12423` `\(inAt) – \(outAt)` → `\(inAt) to \(outAt)` (M11 per-stop time range). `12499` `Weather: —` → `Weather: …` (M11 TOMORROW card). `17184` `Done — send suggestions` → `Done. Send suggestions` (M8 wizard CTA). Grep for user-facing dashes now returns 0 results. |
+| **D1** | M10 Closest customer uses spinner instead of skeleton | ✅ FIXED | Added `FieldNearbyCustomerSkeletonRow` (3 ghost rows in listPane during loading stages). Map placeholder swaps `ProgressView` → beige skeleton bar. Uses `redacted(reason: .placeholder)` + `accessibilityHidden(true)`. |
+| **D7** | Homes list pill wrap + tab bar double-render | ✅ FIXED | Pill wrap: `.lineLimit(1)` + `.minimumScaleFactor(0.85)` + `.fixedSize(horizontal: true, vertical: false)` on `FieldClientBadge`. Tab bar: added `init()` to `HavenFieldRootView` configuring `UITabBar.appearance().standardAppearance = .transparent` + `.isHidden = true` as belt-and-suspenders alongside the existing `.toolbar(.hidden, for: .tabBar)` modifier. |
+| **N-permission-gating** | W2 Crew 2 sees "Owner tools" section in Settings | ✅ FIXED | Added `role: String?` parameter to `FieldWorkspaceSettingsSheet`. Section title flips to "Account" for non-owners; the desktop-command-center link gates on `isOwner`. Sign Out stays universal. |
+| **N-2** | "chez_routed:" prefix not stripped | ✅ FIXED | Added `chez_routed` and `chez routed` to `String.fieldDisplayTitle`'s known-prefix set. |
+| **N-validation-stale-render** | Validation message persists after typing | ✅ FIXED | Three sites: Pause modal Other branch, Access method Lockbox notes (converted `errorMessage` from `let String?` to `@Binding var String?`), Build quote / wizard Add task title (extended to newQuoteTitle + newVisitTitle for symmetry). All use the M1 pause-segment `.onChange(of:)` pattern. |
+| **N-6** | Customer 4 home Systems sub-tab gap-fill / known-systems duplication | ✅ FIXED | Introduced `knownSystems` computed property = `visibleSystems` minus `incompleteSystems` (matched by id). Known systems list renders `knownSystems`; gap-fill keeps rendering `incompleteSystems`. Added "Every system needs details" empty-state copy for the all-incomplete edge case. |
+| **N-customer-phone** | Phone never surfaces in Visit detail | ✅ FIXED | Edge fn `loadDashboard` now fetches `family_members` for every household in scope, indexed by household_id, primary client preferred (non-staff fallback). Each visit row's `property` JSON now carries `customerPhone: string \| null`. iOS `HavenFieldPropertySummary` extended with optional `customerPhone` (resilient decoder). Visit detail header renders the existing `FieldTappablePhoneRow` (M6 component) when non-nil. Fixtures don't seed phones yet — infrastructure works; production / manual-test households with phones will see the row. |
+
+### Verification
+
+- `xcodebuild -scheme "Chez Field" -sdk iphonesimulator build`: BUILD SUCCEEDED, zero warnings.
+- `supabase functions deploy handyman-provider --no-verify-jwt`: deployed.
+- W2 owner GET `/handyman-provider`: returns `currentUser.memberId: 8bc028f2-...`, `currentUser.role: 'owner'`, every visit's `property` includes `customerPhone` key.
+- W2 Crew 2 GET `/handyman-provider`: returns different `memberId: 3198750f-...` and `currentUser.role: 'technician'` — confirms C-5 + N-permission-gating wiring will land correctly.
+- Sim sanity launched + Overview tab rendered cleanly with single tab bar, no double-render visible.
+

@@ -2063,6 +2063,38 @@ async function loadDashboard(
     chezProfileByHouseholdId.set(compactString(row.id), (row.chez_profile as Record<string, unknown>) ?? null);
   }
 
+  // N-customer-phone fix: pull the primary family_member phone per
+  // household so the visit detail header can render a tap-to-call
+  // FieldTappablePhoneRow. We prefer the row whose relationship is
+  // 'Primary Client' (the homeowner of record) and fall back to any
+  // family_member with a phone on file. Soft-deleted rows are excluded.
+  const { data: familyMembersForPhones } = householdIds.length
+    ? await service
+        .from("family_members")
+        .select("household_id, relationship, phone, first_name, last_name, member_type, deleted_at")
+        .in("household_id", householdIds)
+        .is("deleted_at", null)
+    : { data: [] as Record<string, unknown>[] };
+  const customerPhoneByHouseholdId = new Map<string, string>();
+  for (const row of familyMembersForPhones ?? []) {
+    const householdId = compactString(row.household_id);
+    const phone = compactString(row.phone);
+    if (!householdId || !phone) continue;
+    // Skip rows that are home managers / staff — we want the actual
+    // homeowner's number, not a property manager (different phone tree).
+    const memberType = (compactString(row.member_type) || "family").toLowerCase();
+    if (memberType === "home_manager" || memberType === "staff") continue;
+    const isPrimary = (compactString(row.relationship) || "").toLowerCase() === "primary client";
+    if (isPrimary) {
+      // Primary always wins; overwrite any prior fallback.
+      customerPhoneByHouseholdId.set(householdId, phone);
+      continue;
+    }
+    if (!customerPhoneByHouseholdId.has(householdId)) {
+      customerPhoneByHouseholdId.set(householdId, phone);
+    }
+  }
+
   const quoteIds = quotes.map((row) => compactString(row.id)).filter(Boolean);
 
   const [messagesResult, reportsResult, propertiesResult, systemsResult, visitTasksResult, quoteMessagesResult, openTasksResult, documentsResult, punchItemsResult, techNotesResult] = await Promise.all([
@@ -2379,6 +2411,13 @@ async function loadDashboard(
             id: property.id,
             name: compactString(property.name),
             address: [property.street, property.city, property.state, property.zip_code].filter(Boolean).join(", "),
+            // N-customer-phone fix: customer phone keyed off the
+            // request's household so the iOS visit detail can render a
+            // tap-to-call FieldTappablePhoneRow without a second
+            // round-trip. Resolves from the family_members lookup
+            // populated above (primary client first, any non-staff
+            // family_member fallback).
+            customerPhone: customerPhoneByHouseholdId.get(compactString(request.household_id)) || null,
           }
         : null,
       visit: visit
