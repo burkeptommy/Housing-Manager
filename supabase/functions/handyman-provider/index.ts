@@ -5659,6 +5659,419 @@ async function setPunchTimeSpentForProvider(
   };
 }
 
+// ─── Wave M12 — "Need part" flow ──────────────────────────────────
+//
+// Mid-visit, the field tech realizes they need a part. Tap "Need part"
+// on a visit (or on a specific punch item) → POST create_part_request →
+// row lands in `provider_part_requests` → operator sees it on the Routes
+// screen "Part Requests" sub-section in real time → operator dispatches
+// another tech, marks ordered with supplier ETA, or marks fulfilled.
+//
+// 4 actions:
+//   - create_part_request: insert one row + push to workspace
+//     owners/admins/dispatchers when urgency='blocking_now'
+//   - update_part_status: status walk + supplier metadata
+//   - list_open_part_requests: returns workspace's open rows for the
+//     iOS Today-screen pill + the Operations Desk Routes section
+//   - attach_part_request_photo: upload a photo to the existing
+//     punch-item-attachments bucket under a part-requests/ prefix and
+//     append it to the part request's photos JSONB
+
+/**
+ * Wave M12 — sign a part-request photo path. Mirrors
+ * createSignedPunchAttachmentUrl but kept distinct for traceability.
+ * 1-hour TTL.
+ */
+async function createSignedPartRequestPhotoUrl(service: ServiceClient, path: string) {
+  const cleanPath = compactString(path);
+  if (!cleanPath) return null;
+  const { data, error } = await service.storage
+    .from("punch-item-attachments")
+    .createSignedUrl(cleanPath, 60 * 60);
+  if (error) {
+    console.warn(
+      "[handyman-provider] failed to sign part-request photo",
+      cleanPath,
+      error.message,
+    );
+    return null;
+  }
+  return compactString(data?.signedUrl);
+}
+
+/**
+ * Wave M12 — convert a `provider_part_requests` row into the camelCase
+ * shape iOS' `HavenFieldPartRequest` model expects, with photo paths
+ * resolved to signed URLs so the iOS lightbox / list view can render
+ * inline thumbnails without per-asset round-trips.
+ */
+async function serializePartRequest(
+  service: ServiceClient,
+  row: Record<string, unknown>,
+) {
+  const rawPhotos = Array.isArray(row.photos) ? (row.photos as Record<string, unknown>[]) : [];
+  const signedPhotos = await Promise.all(
+    rawPhotos.map(async (att) => {
+      const p = compactString(att.path);
+      if (!p) return att;
+      const signedUrl = await createSignedPartRequestPhotoUrl(service, p);
+      return { ...att, signedUrl };
+    }),
+  );
+  return {
+    id: compactString(row.id),
+    workspaceId: compactString(row.workspace_id),
+    requestId: compactString(row.request_id) || null,
+    punchItemId: compactString(row.punch_item_id) || null,
+    description: compactString(row.description),
+    urgency: compactString(row.urgency) || "next_visit",
+    photos: signedPhotos,
+    status: compactString(row.status) || "open",
+    supplier: compactString(row.supplier) || null,
+    supplierEta: row.supplier_eta ?? null,
+    fulfilledAt: row.fulfilled_at ?? null,
+    requestedByMemberId: compactString(row.requested_by_member_id),
+    createdAt: row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+/**
+ * Wave M12 — load a part request by id and verify it belongs to a
+ * workspace the calling user is a member of. Mirrors the dual-gate
+ * pattern: assertWorkspaceAccess on the caller-supplied workspaceId,
+ * then a second check that the row's `workspace_id` matches.
+ */
+async function loadPartRequestForWorkspace(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  workspaceId: string,
+  partRequestId: string,
+) {
+  const userId = compactString(user.id);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const { data: row, error } = await service
+    .from("provider_part_requests")
+    .select("*")
+    .eq("id", partRequestId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error("Part request not found");
+
+  const rowWorkspaceId = compactString(row.workspace_id);
+  if (rowWorkspaceId !== workspaceId) {
+    throw new Error("Part request belongs to a different workspace");
+  }
+  return row;
+}
+
+/**
+ * Wave M12 — create a part request. Either `requestId` or `punchItemId`
+ * must be present (one for visit-level, one for punch-item-level —
+ * both can be set if a punch item lives on a specific request). When
+ * urgency='blocking_now', fires a push notification to every active
+ * owner/admin/dispatcher in the workspace so the operator can react in
+ * real time. Returns the new row.
+ */
+async function createPartRequestForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  if (!workspaceId) throw new Error("workspaceId is required");
+
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+  const memberId = compactString(membership.id);
+  if (!memberId) throw new Error("Could not resolve workspace member id");
+
+  const requestId = compactString(body.requestId) || null;
+  const punchItemId = compactString(body.punchItemId) || null;
+  if (!requestId && !punchItemId) {
+    throw new Error("Either requestId or punchItemId is required");
+  }
+
+  const description = compactString(body.description);
+  if (!description) throw new Error("description is required");
+
+  const urgencyRaw = compactString(body.urgency) || "next_visit";
+  const urgency = ["blocking_now", "next_visit", "order_for_stock"].includes(urgencyRaw)
+    ? urgencyRaw
+    : "next_visit";
+
+  // Photos can be passed as an array of { kind, path, signedUrl?, caption? }
+  // already-uploaded objects (the iOS UI uploads via attach_part_request_photo
+  // first, then passes the resolved entries here). We do NOT re-sign here; the
+  // serializer below will fold in fresh signed URLs on the response.
+  const rawPhotos = Array.isArray(body.photos) ? (body.photos as Record<string, unknown>[]) : [];
+  const photos = rawPhotos
+    .map((p) => {
+      const path = compactString(p.path);
+      if (!path) return null;
+      return {
+        kind: compactString(p.kind) || "photo",
+        path,
+        contentType: compactString(p.contentType) || "image/jpeg",
+        caption: compactString(p.caption) || null,
+        uploadedAt: p.uploadedAt ?? isoNow(),
+        uploadedBy: compactString(p.uploadedBy) || userId || null,
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  // If a punchItemId is supplied, optionally hydrate the parent request
+  // for the row so future joins work without back-and-forth lookups.
+  let resolvedRequestId = requestId;
+  if (!resolvedRequestId && punchItemId) {
+    const { data: punch } = await service
+      .from("handyman_punch_items")
+      .select("assigned_visit_task_id")
+      .eq("id", punchItemId)
+      .maybeSingle();
+    const visitTaskId = compactString((punch as Record<string, unknown> | null)?.assigned_visit_task_id);
+    if (visitTaskId) {
+      const { data: linked } = await service
+        .from("handyman_requests")
+        .select("id")
+        .eq("visit_task_id", visitTaskId)
+        .limit(1)
+        .maybeSingle();
+      const linkedRequestId = compactString((linked as Record<string, unknown> | null)?.id);
+      if (linkedRequestId) resolvedRequestId = linkedRequestId;
+    }
+  }
+
+  const now = isoNow();
+  const { data: inserted, error: insErr } = await service
+    .from("provider_part_requests")
+    .insert({
+      workspace_id: workspaceId,
+      request_id: resolvedRequestId,
+      punch_item_id: punchItemId,
+      description,
+      urgency,
+      photos,
+      status: "open",
+      requested_by_member_id: memberId,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("*")
+    .single();
+  if (insErr || !inserted) throw insErr ?? new Error("Failed to create part request");
+
+  // Fire-and-forget push to operations members for the blocking-now
+  // urgency tier. Mirrors the existing notifyProvider pattern but
+  // targets a narrower audience (owners + admins + dispatchers — techs
+  // typically aren't the ones routing inventory).
+  if (urgency === "blocking_now") {
+    notifyOpsMembersForPartRequest(service, workspaceId, {
+      title: "Part needed now",
+      body: description.length > 100 ? `${description.slice(0, 97)}...` : description,
+      partRequestId: compactString(inserted.id),
+      requestId: resolvedRequestId,
+    }).catch((e) => console.error("[handyman-provider:part_request] push failed", e));
+  }
+
+  return { partRequest: await serializePartRequest(service, inserted) };
+}
+
+/**
+ * Wave M12 — update a part request's status + optional supplier metadata.
+ * Status transitions: open → ordered → in_truck → fulfilled (or open →
+ * cancelled). When status flips to fulfilled, stamp `fulfilled_at = now()`.
+ */
+async function updatePartStatusForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const partRequestId = compactString(body.partRequestId);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  if (!partRequestId) throw new Error("partRequestId is required");
+
+  await loadPartRequestForWorkspace(service, user, workspaceId, partRequestId);
+
+  const statusRaw = compactString(body.status);
+  if (!statusRaw) throw new Error("status is required");
+  if (!["open", "ordered", "in_truck", "fulfilled", "cancelled"].includes(statusRaw)) {
+    throw new Error("Invalid status");
+  }
+
+  const supplier = compactString(body.supplier);
+  const supplierEtaRaw = compactString(body.supplierEta);
+  const now = isoNow();
+
+  const update: Record<string, unknown> = {
+    status: statusRaw,
+    updated_at: now,
+  };
+  if (supplier) update.supplier = supplier;
+  if (supplierEtaRaw) update.supplier_eta = supplierEtaRaw;
+  if (statusRaw === "fulfilled") update.fulfilled_at = now;
+
+  const { data: updated, error: updErr } = await service
+    .from("provider_part_requests")
+    .update(update)
+    .eq("id", partRequestId)
+    .select("*")
+    .single();
+  if (updErr || !updated) throw updErr ?? new Error("Failed to update part request");
+
+  return { partRequest: await serializePartRequest(service, updated) };
+}
+
+/**
+ * Wave M12 — list every part request for a workspace, optionally
+ * filtered to status='open'. Defaults to the open-only query so the
+ * Today-screen pill + Routes section render the active queue without
+ * a status param. Caller passes `status: "all"` to fetch everything.
+ */
+async function listPartRequestsForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const statusFilter = compactString(body.status) || "open";
+
+  let query = service
+    .from("provider_part_requests")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (statusFilter !== "all") {
+    query = query.eq("status", statusFilter);
+  }
+
+  const { data: rows, error } = await query;
+  if (error) throw error;
+
+  const partRequests = await Promise.all(
+    (rows ?? []).map((row) => serializePartRequest(service, row as Record<string, unknown>)),
+  );
+  return { partRequests, openCount: partRequests.filter((p) => p.status === "open").length };
+}
+
+/**
+ * Wave M12 — attach a photo to a part request. Mirrors attach_punch_photo
+ * but stores under a `part-requests/` prefix in the same bucket so we
+ * don't have to provision a separate one. The iOS UI typically uploads
+ * BEFORE submitting create_part_request, then passes the returned
+ * `path` + `signedUrl` in the photos array of the create call.
+ */
+async function attachPartRequestPhotoForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const userId = compactString(user.id);
+  if (!workspaceId) throw new Error("workspaceId is required");
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const fileBase64 = compactString(body.base64) || compactString(body.fileBase64);
+  if (!fileBase64) throw new Error("base64 is required");
+  const contentType = compactString(body.contentType) || "image/jpeg";
+  const caption = compactString(body.caption);
+
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const ext = contentType.includes("png") ? "png" : "jpg";
+  // Storage path: part-requests/<workspace_id>/<stamp>.<ext>
+  // No partRequestId in the path because uploads happen BEFORE the
+  // request row exists; the row references the path after create.
+  const path = `part-requests/${workspaceId}/${stamp}.${ext}`;
+
+  const bytes = decodeBase64Body(fileBase64);
+  const { error: uploadError } = await service.storage
+    .from("punch-item-attachments")
+    .upload(path, bytes, { contentType, upsert: false });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const signedUrl = await createSignedPartRequestPhotoUrl(service, path);
+
+  return {
+    photo: {
+      kind: "photo",
+      path,
+      contentType,
+      caption: caption || null,
+      uploadedAt: isoNow(),
+      uploadedBy: userId || null,
+      signedUrl,
+    },
+  };
+}
+
+/**
+ * Wave M12 — fire a push to every active owner/admin/dispatcher in the
+ * workspace when a blocking-now part request lands. Techs are
+ * intentionally skipped — they're field staff, not the inventory
+ * routers. Mirrors notifyProviderForRequest's send-push-notification
+ * call shape but resolves user_ids by joining workspace members on
+ * role.
+ */
+async function notifyOpsMembersForPartRequest(
+  service: ServiceClient,
+  workspaceId: string,
+  payload: {
+    title: string;
+    body: string;
+    partRequestId: string;
+    requestId?: string | null;
+  },
+): Promise<void> {
+  try {
+    const { data: members } = await service
+      .from("provider_workspace_members")
+      .select("user_id, role")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active")
+      .in("role", ["owner", "admin", "dispatcher"]);
+
+    const userIds = ((members ?? []) as Record<string, unknown>[])
+      .map((row) => compactString(row.user_id))
+      .filter(Boolean);
+
+    if (userIds.length === 0) return;
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    const data: Record<string, string> = {
+      type: "part_request_blocking",
+      part_request_id: payload.partRequestId,
+      workspace_id: workspaceId,
+    };
+    if (payload.requestId) data.request_id = payload.requestId;
+
+    await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        recipient_user_ids: userIds,
+        title: payload.title,
+        body: payload.body,
+        data,
+      }),
+    });
+  } catch (pushError) {
+    console.error("[handyman-provider:notifyOpsMembersForPartRequest] push failed", pushError);
+  }
+}
+
 async function assertWorkspaceAccess(service: ServiceClient, userId: string, workspaceId: string) {
   const membership = await getWorkspaceMembership(service, userId);
   if (!membership) throw new Error("No provider workspace found");
@@ -12401,6 +12814,49 @@ serve(async (req) => {
 
       if (action === "set_punch_time_spent") {
         const result = await setPunchTimeSpentForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // Wave M12 — "Need part" flow. Mid-visit, the field tech flags a
+      // needed part for operator coordination. 4 actions cover the
+      // round-trip: upload a photo (returns the storage path + signed
+      // URL), submit the request (creates the row + fires push to ops
+      // members when blocking_now), update its status (operator routes
+      // it / orders it / fulfills it), list the open queue (Today pill
+      // + Operations Desk Routes section).
+      if (action === "attach_part_request_photo") {
+        const result = await attachPartRequestPhotoForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "create_part_request") {
+        const result = await createPartRequestForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "update_part_status") {
+        const result = await updatePartStatusForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      if (action === "list_open_part_requests") {
+        const result = await listPartRequestsForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,

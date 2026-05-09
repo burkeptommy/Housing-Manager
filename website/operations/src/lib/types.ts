@@ -693,6 +693,47 @@ export interface TodaySummary {
   tomorrow: TodaySummaryTomorrow;
 }
 
+// ─── Wave M12 — "Need part" flow ──────────────────────────────────
+//
+// Mirrors the iOS `HavenFieldPartRequest` shape served by the
+// `handyman-provider` edge function's `create_part_request` /
+// `update_part_status` / `list_open_part_requests` actions.
+// Operations Desk's Routes screen renders open requests across techs
+// in a "Part Requests" sub-section.
+
+export type PartRequestUrgency = "blocking_now" | "next_visit" | "order_for_stock";
+
+export type PartRequestStatus = "open" | "ordered" | "in_truck" | "fulfilled" | "cancelled";
+
+export interface PartRequestPhoto {
+  kind: string;
+  path: string;
+  contentType?: string | null;
+  caption?: string | null;
+  uploadedAt?: string | null;
+  uploadedBy?: string | null;
+  signedUrl?: string | null;
+}
+
+export interface PartRequest {
+  id: string;
+  workspaceId: string;
+  /** Visit-level when set; null for punch-item-only requests. */
+  requestId: string | null;
+  /** Punch-item-level when set; null for visit-level requests. */
+  punchItemId: string | null;
+  description: string;
+  urgency: PartRequestUrgency;
+  photos: PartRequestPhoto[];
+  status: PartRequestStatus;
+  supplier: string | null;
+  supplierEta: string | null;
+  fulfilledAt: string | null;
+  requestedByMemberId: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 // ─── Wave M7 — Crew chat ──────────────────────────────────────────
 //
 // Mirrors the iOS `HavenFieldCrewChatThread` / `HavenFieldCrewChatMessage`

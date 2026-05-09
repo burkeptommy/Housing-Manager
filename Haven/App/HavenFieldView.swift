@@ -21,6 +21,12 @@ extension Notification.Name {
     /// back into the visits list. Avoids threading an `onCoordinated`
     /// callback through every NavigationLink construction site.
     static let havenFieldVisitChanged = Notification.Name("havenFieldVisitChanged")
+
+    /// Wave M12 — posted after a successful create_part_request /
+    /// update_part_status round-trip so any open-count surface
+    /// (Today-screen pill, FieldPartRequestsListView) refreshes its
+    /// queue without prop-drilling a callback through every entry point.
+    static let havenFieldPartRequestChanged = Notification.Name("havenFieldPartRequestChanged")
 }
 
 /// Bounds-safe subscript so closure-based bindings in
@@ -548,6 +554,129 @@ struct HavenFieldPunchItem: Codable, Identifiable, Hashable {
     var systemDisplayLabel: String? {
         if let snapshot = systemLabelSnapshot, !snapshot.isEmpty { return snapshot }
         return nil
+    }
+}
+
+// MARK: - Wave M12 — Need part flow
+
+/// Wave M12 — one part request row. Mirrors `provider_part_requests`
+/// table + the camelCase shape `serializePartRequest` returns from the
+/// `handyman-provider` edge function. Resilient decoder so a single
+/// bad field doesn't take down the open-requests list.
+///
+/// Either `requestId` or `punchItemId` is set (or both, if a punch item
+/// lives on a specific request). `urgency` is one of `blocking_now`,
+/// `next_visit`, `order_for_stock`. `status` walks `open` → `ordered`
+/// → `in_truck` → `fulfilled` (or `open` → `cancelled`).
+struct HavenFieldPartRequest: Codable, Identifiable, Hashable {
+    let id: String
+    let workspaceId: String
+    let requestId: String?
+    let punchItemId: String?
+    let description: String
+    let urgency: String
+    let photos: [HavenFieldPunchAttachment]
+    let status: String
+    let supplier: String?
+    let supplierEta: String?
+    let fulfilledAt: String?
+    let requestedByMemberId: String
+    let createdAt: String?
+    let updatedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, workspaceId, requestId, punchItemId, description, urgency, photos, status
+        case supplier, supplierEta, fulfilledAt, requestedByMemberId, createdAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        workspaceId = (try? c.decodeIfPresent(String.self, forKey: .workspaceId)) ?? ""
+        requestId = (try? c.decodeIfPresent(String.self, forKey: .requestId)) ?? nil
+        punchItemId = (try? c.decodeIfPresent(String.self, forKey: .punchItemId)) ?? nil
+        description = (try? c.decodeIfPresent(String.self, forKey: .description)) ?? ""
+        urgency = (try? c.decodeIfPresent(String.self, forKey: .urgency)) ?? "next_visit"
+        photos = (try? c.decodeIfPresent([HavenFieldPunchAttachment].self, forKey: .photos)) ?? []
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "open"
+        supplier = (try? c.decodeIfPresent(String.self, forKey: .supplier)) ?? nil
+        supplierEta = (try? c.decodeIfPresent(String.self, forKey: .supplierEta)) ?? nil
+        fulfilledAt = (try? c.decodeIfPresent(String.self, forKey: .fulfilledAt)) ?? nil
+        requestedByMemberId = (try? c.decodeIfPresent(String.self, forKey: .requestedByMemberId)) ?? ""
+        createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)) ?? nil
+        updatedAt = (try? c.decodeIfPresent(String.self, forKey: .updatedAt)) ?? nil
+    }
+
+    /// Human-readable label for the urgency tier. Drives the chip
+    /// label on the part-request list view + the badge on each row.
+    var urgencyDisplayLabel: String {
+        switch urgency {
+        case "blocking_now": return "Blocking now"
+        case "next_visit": return "Next visit"
+        case "order_for_stock": return "Order for stock"
+        default: return "Next visit"
+        }
+    }
+
+    /// Human-readable label for the status. Drives the status pill on
+    /// the list / detail views.
+    var statusDisplayLabel: String {
+        switch status {
+        case "open": return "Open"
+        case "ordered": return "Ordered"
+        case "in_truck": return "In truck"
+        case "fulfilled": return "Fulfilled"
+        case "cancelled": return "Cancelled"
+        default: return status.capitalized
+        }
+    }
+}
+
+/// Wave M12 — wrapper response shape returned by `list_open_part_requests`.
+/// `openCount` is server-computed (filtered to status='open') so the
+/// Today-screen pill renders without the iOS UI re-counting the array.
+struct HavenFieldPartRequestList: Codable {
+    let partRequests: [HavenFieldPartRequest]
+    let openCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case partRequests, openCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        partRequests = (try? c.decodeIfPresent([HavenFieldPartRequest].self, forKey: .partRequests)) ?? []
+        openCount = (try? c.decodeIfPresent(Int.self, forKey: .openCount)) ?? 0
+    }
+}
+
+/// Wave M12 — wrapper for create / update / attach responses. Every
+/// part-request mutator returns a single `partRequest` field with the
+/// server-canonical row.
+struct HavenFieldPartRequestSingle: Codable {
+    let partRequest: HavenFieldPartRequest
+
+    private enum CodingKeys: String, CodingKey {
+        case partRequest
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        partRequest = try c.decode(HavenFieldPartRequest.self, forKey: .partRequest)
+    }
+}
+
+/// Wave M12 — wrapper for `attach_part_request_photo` response.
+struct HavenFieldPartRequestPhotoUpload: Codable {
+    let photo: HavenFieldPunchAttachment
+
+    private enum CodingKeys: String, CodingKey {
+        case photo
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        photo = try c.decode(HavenFieldPunchAttachment.self, forKey: .photo)
     }
 }
 
@@ -3907,6 +4036,122 @@ actor HavenFieldService {
         return response.item
     }
 
+    // MARK: - Wave M12 Need part flow
+
+    /// Wave M12 — submit a part request. Either `requestId` or `punchItemId`
+    /// is required (or both). When urgency is "blocking_now", server-side
+    /// fires a push to every active owner/admin/dispatcher in the workspace.
+    func createPartRequest(
+        workspaceId: String,
+        requestId: String?,
+        punchItemId: String?,
+        description: String,
+        urgency: String,
+        photos: [HavenFieldPunchAttachment]
+    ) async throws -> HavenFieldPartRequest {
+        struct PhotoBody: Encodable {
+            let kind: String
+            let path: String
+            let contentType: String?
+            let caption: String?
+        }
+        struct Request: Encodable {
+            let action = "create_part_request"
+            let workspaceId: String
+            let requestId: String?
+            let punchItemId: String?
+            let description: String
+            let urgency: String
+            let photos: [PhotoBody]
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            requestId: requestId,
+            punchItemId: punchItemId,
+            description: description,
+            urgency: urgency,
+            photos: photos.map { PhotoBody(kind: $0.kind, path: $0.path, contentType: $0.contentType, caption: $0.caption) }
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: HavenFieldPartRequestSingle.self)
+        return response.partRequest
+    }
+
+    /// Wave M12 — update part request status + optional supplier metadata.
+    /// Status transitions: open → ordered → in_truck → fulfilled (or
+    /// open → cancelled). When status flips to fulfilled, server stamps
+    /// fulfilled_at = now().
+    func updatePartStatus(
+        workspaceId: String,
+        partRequestId: String,
+        status: String,
+        supplier: String?,
+        supplierEta: String?
+    ) async throws -> HavenFieldPartRequest {
+        struct Request: Encodable {
+            let action = "update_part_status"
+            let workspaceId: String
+            let partRequestId: String
+            let status: String
+            let supplier: String?
+            let supplierEta: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            partRequestId: partRequestId,
+            status: status,
+            supplier: supplier,
+            supplierEta: supplierEta
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: HavenFieldPartRequestSingle.self)
+        return response.partRequest
+    }
+
+    /// Wave M12 — list part requests for a workspace. Defaults to the
+    /// open queue (status='open'); pass status="all" to fetch everything.
+    /// Drives the Today-screen pill + the FieldPartRequestsListView surface.
+    func listOpenPartRequests(
+        workspaceId: String,
+        statusFilter: String = "open"
+    ) async throws -> HavenFieldPartRequestList {
+        struct Request: Encodable {
+            let action = "list_open_part_requests"
+            let workspaceId: String
+            let status: String
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            status: statusFilter
+        ))
+        return try await perform(function: "handyman-provider", method: "POST", body: data, expecting: HavenFieldPartRequestList.self)
+    }
+
+    /// Wave M12 — upload a photo to the part-requests bucket prefix.
+    /// Returns `{ kind, path, signedUrl }` so the iOS sheet can render
+    /// the thumbnail before the request row is created. The path is
+    /// then passed in `photos` to `create_part_request`.
+    func attachPartRequestPhoto(
+        workspaceId: String,
+        base64: String,
+        contentType: String,
+        caption: String?
+    ) async throws -> HavenFieldPunchAttachment {
+        struct Request: Encodable {
+            let action = "attach_part_request_photo"
+            let workspaceId: String
+            let base64: String
+            let contentType: String
+            let caption: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            base64: base64,
+            contentType: contentType,
+            caption: caption
+        ))
+        let response = try await perform(function: "handyman-provider", method: "POST", body: data, expecting: HavenFieldPartRequestPhotoUpload.self)
+        return response.photo
+    }
+
     // MARK: - Phase 78 punch list / proposals
 
     /// Toggles a single punch item between status values
@@ -4774,6 +5019,12 @@ private struct HavenFieldHomeTab: View {
     /// — they tap the CTA when ready to sign off; we don't auto-present.
     @State private var showEndOfDay = false
 
+    /// Wave M12 — count of open part requests for this workspace. Drives
+    /// the salmon pill that surfaces below the route summary card.
+    /// Loaded on `.task` and refreshed on `.havenFieldPartRequestChanged`.
+    @State private var openPartRequestCount: Int = 0
+    @State private var showPartRequestsList = false
+
     private var requestedVisits: [HavenFieldVisit] {
         (viewModel.dashboard?.visits ?? [])
             .filter(\.belongsInRequestQueue)
@@ -4952,6 +5203,15 @@ private struct HavenFieldHomeTab: View {
                     )
                 }
 
+                // Wave M12 — open part requests pill. Hidden when 0
+                // open requests so the Today screen stays clean. Tap
+                // routes to FieldPartRequestsListView.
+                if openPartRequestCount > 0 {
+                    FieldOpenPartRequestsPill(count: openPartRequestCount) {
+                        showPartRequestsList = true
+                    }
+                }
+
                 // Wave M11 — End of Day CTA. Visible when the field tech
                 // has finished every today-stop. Salmon pill so it reads
                 // as the natural next action; tap opens a focused sheet
@@ -5085,6 +5345,35 @@ private struct HavenFieldHomeTab: View {
             // off `today_summary`. Presented as a focused sheet so the
             // sign-off motion is intentional.
             FieldEndOfDayView(workspaceId: viewModel.dashboard?.workspace?.id)
+        }
+        .sheet(isPresented: $showPartRequestsList) {
+            // Wave M12 — open part requests list. Pulls from the
+            // edge function on appear + on .havenFieldPartRequestChanged.
+            if let workspaceId = viewModel.dashboard?.workspace?.id, !workspaceId.isEmpty {
+                FieldPartRequestsListView(workspaceId: workspaceId)
+            }
+        }
+        .task(id: viewModel.dashboard?.workspace?.id) {
+            await loadOpenPartRequestCount()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .havenFieldPartRequestChanged)) { _ in
+            Task { await loadOpenPartRequestCount() }
+        }
+    }
+
+    /// Wave M12 — refresh the open-part-request count for the Today
+    /// pill. Failures swallowed (logged to console) so the dashboard
+    /// stays usable even if the edge function is briefly unreachable.
+    private func loadOpenPartRequestCount() async {
+        guard let workspaceId = viewModel.dashboard?.workspace?.id, !workspaceId.isEmpty else {
+            await MainActor.run { openPartRequestCount = 0 }
+            return
+        }
+        do {
+            let response = try await HavenFieldService.shared.listOpenPartRequests(workspaceId: workspaceId)
+            await MainActor.run { openPartRequestCount = response.openCount }
+        } catch {
+            print("[HavenFieldHomeTab] failed to load open part requests:", error.localizedDescription)
         }
     }
 
@@ -5631,6 +5920,11 @@ private struct FieldPunchItemRow: View {
 
     @State private var showMaterialsSheet = false
 
+    /// Wave M12 — true while the punch-item-level Need part sheet is
+    /// presented. The sheet pre-sets `punchItemId = item.id` so the
+    /// operator can trace which line item the part unblocks.
+    @State private var showPartRequestSheet = false
+
     @State private var timerStart: Date?
     @State private var timerNow: Date = Date()
     private let timerTick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -5771,6 +6065,24 @@ private struct FieldPunchItemRow: View {
             )
             .presentationDetents([.large])
         }
+        .sheet(isPresented: $showPartRequestSheet) {
+            // Wave M12 — punch-item-level Need part. punchItemId pre-set
+            // so the operator can trace which line item the part unblocks.
+            // requestId is null here because the punch item already
+            // resolves to its parent visit server-side.
+            if let workspaceId = workspaceIdResolved {
+                FieldPartRequestSheet(
+                    workspaceId: workspaceId,
+                    requestId: nil,
+                    punchItemId: item.id,
+                    contextLabel: "For: \(item.title)",
+                    onCreated: { _ in
+                        showPartRequestSheet = false
+                    }
+                )
+                .presentationDetents([.large])
+            }
+        }
     }
 
     @ViewBuilder
@@ -5834,6 +6146,21 @@ private struct FieldPunchItemRow: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(actionInFlight != .none && actionInFlight != .time)
+
+                // Wave M12 — Need part chip. Pre-sets punchItemId so the
+                // operator knows which line item the part unblocks.
+                Button {
+                    showPartRequestSheet = true
+                } label: {
+                    actionChip(
+                        icon: "wrench.fill",
+                        label: "Part",
+                        inFlight: false,
+                        accent: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(actionInFlight != .none)
             }
         }
     }
@@ -6119,7 +6446,10 @@ private struct FieldPunchItemRow: View {
         }
     }
 
-    private static func downsizeJpeg(rawData: Data, maxEdge: CGFloat, quality: CGFloat) async throws -> Data {
+    /// Wave M12 — relaxed access from `private static` to `static` so the
+    /// part-request sheet (which lives outside this struct) can reuse the
+    /// downsize routine without duplicating it.
+    static func downsizeJpeg(rawData: Data, maxEdge: CGFloat, quality: CGFloat) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let image = UIImage(data: rawData) else {
@@ -6290,6 +6620,904 @@ private struct FieldPunchMaterialsSheet: View {
         }
         onSave(cleaned)
         dismiss()
+    }
+}
+
+// MARK: - Wave M12 Need part flow UI
+
+/// Wave M12 — modal sheet for submitting a part request mid-visit.
+/// Used both at the visit level (whole-visit context) and from a punch
+/// item's wrench chip (`punchItemId` pre-set so the operator can trace
+/// which line item the part unblocks). All three iOS surfaces converge
+/// on this single sheet.
+///
+/// Lifecycle: pickReady → uploading (per photo) → submitting → success
+/// (auto-dismisses) or error (inline retry banner).
+private struct FieldPartRequestSheet: View {
+    let workspaceId: String
+    let requestId: String?
+    let punchItemId: String?
+    /// Caller hands us a starting context label for the kicker so the
+    /// tech sees "For: Brookfield · Boiler" or "For: this visit" before
+    /// they type. Kept optional so the visit-level entry point can
+    /// pass nil and let the sheet decide.
+    let contextLabel: String?
+    /// Fired after a successful create so the parent can refresh state
+    /// (e.g. refresh the open-requests pill on Today).
+    let onCreated: (HavenFieldPartRequest) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var description: String = ""
+    @State private var urgency: String = "next_visit"
+    @State private var photos: [HavenFieldPunchAttachment] = []
+    @State private var photoPickerItem: PhotosPickerItem?
+    @State private var isUploadingPhoto = false
+    @State private var isSubmitting = false
+    @State private var validationError: String?
+    @State private var submitError: String?
+    @State private var didSucceed = false
+    @State private var lightboxAttachment: HavenFieldPunchAttachment?
+
+    private var canSubmit: Bool {
+        !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isSubmitting
+            && !isUploadingPhoto
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerCard
+
+                    descriptionField
+
+                    urgencyPicker
+
+                    photoSection
+
+                    if let validationError {
+                        Text(validationError)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+
+                    if let submitError {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(HavenColors.action)
+                            Text(submitError)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer(minLength: 0)
+                            Button("Retry") { Task { await submit() } }
+                                .buttonStyle(FieldSecondaryButtonStyle(compact: true))
+                        }
+                        .padding(12)
+                        .background(HavenColors.action.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    submitButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+                .padding(.bottom, 60)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Need part")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+            .onChange(of: photoPickerItem) { _, newValue in
+                guard let item = newValue else { return }
+                Task { await uploadPickedPhoto(item) }
+            }
+            .sheet(item: $lightboxAttachment) { attachment in
+                FieldPunchPhotoLightbox(attachment: attachment)
+            }
+            .overlay(alignment: .bottom) {
+                if didSucceed {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Sent to operator")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(HavenColors.textOnNavy)
+                    .background(HavenColors.navy800)
+                    .clipShape(Capsule())
+                    .padding(.bottom, 32)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: didSucceed)
+        }
+    }
+
+    @ViewBuilder
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("PART REQUEST")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text(headerTitle)
+                .font(HavenTypography.title2)
+                .foregroundStyle(HavenColors.textPrimary)
+            Text(headerSubtitle)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(HavenColors.border, lineWidth: 0.5)
+        )
+    }
+
+    private var headerTitle: String {
+        if let label = contextLabel, !label.isEmpty {
+            return label
+        }
+        return punchItemId != nil ? "For this punch item" : "For this visit"
+    }
+
+    private var headerSubtitle: String {
+        "Operator sees this in real time and can dispatch another tech with the part or order it from a supplier."
+    }
+
+    @ViewBuilder
+    private var descriptionField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("WHAT PART DO YOU NEED")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            TextField(
+                "e.g. 1/2-inch copper compression fitting",
+                text: $description,
+                axis: .vertical
+            )
+            .lineLimit(3...6)
+            .font(HavenTypography.body)
+            .foregroundStyle(HavenColors.textPrimary)
+            .padding(12)
+            .background(HavenColors.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        validationError != nil ? HavenColors.action : HavenColors.border,
+                        lineWidth: validationError != nil ? 1.5 : 0.5
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder
+    private var urgencyPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("URGENCY")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            VStack(spacing: 8) {
+                urgencyRow(
+                    value: "blocking_now",
+                    label: "Blocking now",
+                    subtitle: "Visit can't continue without it.",
+                    accentColor: HavenColors.critical
+                )
+                urgencyRow(
+                    value: "next_visit",
+                    label: "Next visit",
+                    subtitle: "Bring it on the next stop here.",
+                    accentColor: HavenColors.warning
+                )
+                urgencyRow(
+                    value: "order_for_stock",
+                    label: "Order for stock",
+                    subtitle: "Restock the truck. No deadline.",
+                    accentColor: HavenColors.textSecondary
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func urgencyRow(value: String, label: String, subtitle: String, accentColor: Color) -> some View {
+        let isSelected = urgency == value
+        Button {
+            urgency = value
+            Haptics.selection()
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isSelected ? accentColor : HavenColors.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text(subtitle)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .background(isSelected ? accentColor.opacity(0.06) : HavenColors.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? accentColor.opacity(0.4) : HavenColors.border, lineWidth: isSelected ? 1.5 : 0.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+    }
+
+    @ViewBuilder
+    private var photoSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("PHOTOS")
+                    .font(HavenTypography.uiSectionHeader)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                PhotosPicker(
+                    selection: $photoPickerItem,
+                    matching: .images,
+                    preferredItemEncoding: .compatible
+                ) {
+                    HStack(spacing: 6) {
+                        if isUploadingPhoto {
+                            ProgressView().scaleEffect(0.6)
+                                .tint(HavenColors.navy700)
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        Text(isUploadingPhoto ? "Uploading" : "Add photo")
+                            .font(HavenTypography.uiLabelSmall)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(HavenColors.indigo50)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(HavenColors.border, lineWidth: 0.5))
+                }
+                .disabled(isUploadingPhoto || isSubmitting)
+            }
+
+            if photos.isEmpty {
+                Text("Optional. A photo helps the operator confirm the part.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(photos) { photo in
+                            Button {
+                                lightboxAttachment = photo
+                            } label: {
+                                photoThumbnail(photo)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func photoThumbnail(_ photo: HavenFieldPunchAttachment) -> some View {
+        ZStack(alignment: .topTrailing) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(HavenColors.indigo50)
+                if let urlString = photo.signedUrl, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty: ProgressView().scaleEffect(0.7)
+                        case .success(let img): img.resizable().scaledToFill()
+                        case .failure: Image(systemName: "photo").foregroundStyle(HavenColors.textSecondary)
+                        @unknown default: EmptyView()
+                        }
+                    }
+                } else {
+                    Image(systemName: "photo")
+                        .font(.system(size: 18))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+            .frame(width: 80, height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(HavenColors.border, lineWidth: 0.5)
+            )
+
+            Button {
+                photos.removeAll { $0.id == photo.id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.navy800)
+                    .background(Circle().fill(.white))
+            }
+            .buttonStyle(.plain)
+            .offset(x: 6, y: -6)
+        }
+    }
+
+    @ViewBuilder
+    private var submitButton: some View {
+        Button {
+            Task { await submit() }
+        } label: {
+            if isSubmitting {
+                HStack(spacing: 8) {
+                    ProgressView().tint(HavenColors.textOnAction)
+                    Text("Sending")
+                }
+            } else {
+                Text("Submit")
+            }
+        }
+        .buttonStyle(FieldPrimaryButtonStyle())
+        .disabled(!canSubmit)
+        .padding(.top, 4)
+    }
+
+    private func uploadPickedPhoto(_ pickerItem: PhotosPickerItem) async {
+        defer { DispatchQueue.main.async { self.photoPickerItem = nil } }
+
+        await MainActor.run { isUploadingPhoto = true; submitError = nil }
+        defer { Task { @MainActor in isUploadingPhoto = false } }
+
+        do {
+            guard let raw = try await pickerItem.loadTransferable(type: Data.self) else {
+                throw NSError(domain: "FieldPart", code: 1, userInfo: [NSLocalizedDescriptionKey: "Couldn't read photo data"])
+            }
+            let downsized = try await FieldPunchItemRow.downsizeJpeg(rawData: raw, maxEdge: 1600, quality: 0.82)
+            let base64 = downsized.base64EncodedString()
+            let uploaded = try await HavenFieldService.shared.attachPartRequestPhoto(
+                workspaceId: workspaceId,
+                base64: base64,
+                contentType: "image/jpeg",
+                caption: nil
+            )
+            await MainActor.run { photos.append(uploaded) }
+        } catch {
+            await MainActor.run {
+                submitError = "Photo upload failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func submit() async {
+        let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            await MainActor.run {
+                validationError = "What part do you need?"
+            }
+            return
+        }
+        await MainActor.run {
+            validationError = nil
+            submitError = nil
+            isSubmitting = true
+        }
+        defer { Task { @MainActor in isSubmitting = false } }
+
+        do {
+            let row = try await HavenFieldService.shared.createPartRequest(
+                workspaceId: workspaceId,
+                requestId: requestId,
+                punchItemId: punchItemId,
+                description: trimmed,
+                urgency: urgency,
+                photos: photos
+            )
+            await MainActor.run {
+                onCreated(row)
+                didSucceed = true
+                Haptics.success()
+                NotificationCenter.default.post(name: .havenFieldPartRequestChanged, object: nil)
+            }
+            // Brief delay so the toast registers before the sheet vanishes.
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            await MainActor.run { dismiss() }
+        } catch {
+            await MainActor.run {
+                submitError = error.localizedDescription
+                Haptics.error()
+            }
+        }
+    }
+}
+
+/// Wave M12 — list of every open part request for the workspace. Tap
+/// the Today-screen pill to land here. Operator can update status,
+/// fulfillment, supplier from each row's detail.
+private struct FieldPartRequestsListView: View {
+    let workspaceId: String
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var partRequests: [HavenFieldPartRequest] = []
+    @State private var isLoading = true
+    @State private var loadError: String?
+    @State private var selected: HavenFieldPartRequest?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if isLoading && partRequests.isEmpty {
+                        ForEach(0..<3, id: \.self) { _ in skeletonRow }
+                    } else if let loadError, partRequests.isEmpty {
+                        FieldErrorBanner(message: loadError)
+                    } else if partRequests.isEmpty {
+                        FieldEmptyState(
+                            title: "No open part requests",
+                            subtitle: "Tap Need part on a visit or punch item to flag one for the operator."
+                        )
+                    } else {
+                        ForEach(partRequests) { req in
+                            Button {
+                                selected = req
+                            } label: {
+                                FieldPartRequestRow(request: req)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+                .padding(.bottom, 60)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Part requests")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(HavenColors.action)
+                }
+            }
+            .task {
+                await load()
+            }
+            .refreshable {
+                await load()
+            }
+            .sheet(item: $selected) { req in
+                FieldPartRequestDetailSheet(request: req, workspaceId: workspaceId) { updated in
+                    if let idx = partRequests.firstIndex(where: { $0.id == updated.id }) {
+                        // Drop fulfilled / cancelled rows from the open list
+                        // so the count + visible rows align with reality.
+                        if updated.status == "fulfilled" || updated.status == "cancelled" {
+                            partRequests.remove(at: idx)
+                        } else {
+                            partRequests[idx] = updated
+                        }
+                    }
+                    selected = nil
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var skeletonRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(HavenColors.indigo50)
+                .frame(height: 16)
+                .frame(maxWidth: 180)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(HavenColors.indigo50.opacity(0.7))
+                .frame(height: 12)
+                .frame(maxWidth: 240)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .redacted(reason: .placeholder)
+    }
+
+    private func load() async {
+        await MainActor.run { isLoading = true; loadError = nil }
+        defer { Task { @MainActor in isLoading = false } }
+        do {
+            let response = try await HavenFieldService.shared.listOpenPartRequests(workspaceId: workspaceId)
+            await MainActor.run {
+                partRequests = response.partRequests.sorted { lhs, rhs in
+                    // Sort by urgency tier descending (blocking_now first)
+                    // then by createdAt descending so newest top.
+                    let lOrder = urgencyOrder(lhs.urgency)
+                    let rOrder = urgencyOrder(rhs.urgency)
+                    if lOrder != rOrder { return lOrder > rOrder }
+                    return (lhs.createdAt ?? "") > (rhs.createdAt ?? "")
+                }
+            }
+        } catch {
+            await MainActor.run { loadError = error.localizedDescription }
+        }
+    }
+
+    private func urgencyOrder(_ urgency: String) -> Int {
+        switch urgency {
+        case "blocking_now": return 3
+        case "next_visit": return 2
+        case "order_for_stock": return 1
+        default: return 0
+        }
+    }
+}
+
+/// Wave M12 — single row in the FieldPartRequestsListView.
+private struct FieldPartRequestRow: View {
+    let request: HavenFieldPartRequest
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(request.description)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+
+            HStack(spacing: 8) {
+                urgencyPill
+                statusPill
+                if let supplier = request.supplier, !supplier.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "shippingbox.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(supplier)
+                            .font(HavenTypography.uiLabelSmall)
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if let eta = request.supplierEta, !eta.isEmpty {
+                Text("ETA \(eta.fieldShortDate ?? eta)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(HavenColors.border, lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var urgencyPill: some View {
+        let color: Color = {
+            switch request.urgency {
+            case "blocking_now": return HavenColors.critical
+            case "next_visit": return HavenColors.warning
+            default: return HavenColors.textSecondary
+            }
+        }()
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(request.urgencyDisplayLabel)
+                .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.10))
+        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var statusPill: some View {
+        Text(request.statusDisplayLabel)
+            .font(HavenTypography.uiLabelSmall.weight(.semibold))
+            .foregroundStyle(HavenColors.navy700)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(HavenColors.indigo50)
+            .clipShape(Capsule())
+    }
+}
+
+/// Wave M12 — detail sheet for a single part request. Shows photos
+/// inline + lets the operator update status / supplier / ETA.
+private struct FieldPartRequestDetailSheet: View {
+    let request: HavenFieldPartRequest
+    let workspaceId: String
+    let onUpdated: (HavenFieldPartRequest) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var status: String
+    @State private var supplier: String
+    @State private var supplierEta: Date
+    @State private var hasEta: Bool
+    @State private var lightboxAttachment: HavenFieldPunchAttachment?
+    @State private var isSubmitting = false
+    @State private var submitError: String?
+
+    init(request: HavenFieldPartRequest, workspaceId: String, onUpdated: @escaping (HavenFieldPartRequest) -> Void) {
+        self.request = request
+        self.workspaceId = workspaceId
+        self.onUpdated = onUpdated
+        _status = State(initialValue: request.status)
+        _supplier = State(initialValue: request.supplier ?? "")
+        let parsed = request.supplierEta.flatMap { ISO8601DateFormatter().date(from: $0) }
+        _supplierEta = State(initialValue: parsed ?? Date().addingTimeInterval(60 * 60 * 24))
+        _hasEta = State(initialValue: parsed != nil)
+    }
+
+    private let statuses: [(value: String, label: String)] = [
+        ("open", "Open"),
+        ("ordered", "Ordered"),
+        ("in_truck", "In truck"),
+        ("fulfilled", "Fulfilled"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    descriptionCard
+
+                    if !request.photos.isEmpty {
+                        photoStrip
+                    }
+
+                    statusSection
+
+                    supplierSection
+
+                    if let submitError {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(HavenColors.action)
+                            Text(submitError)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(HavenColors.action.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if isSubmitting {
+                            HStack(spacing: 8) {
+                                ProgressView().tint(HavenColors.textOnAction)
+                                Text("Saving")
+                            }
+                        } else {
+                            Text("Save changes")
+                        }
+                    }
+                    .buttonStyle(FieldPrimaryButtonStyle())
+                    .disabled(isSubmitting)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+                .padding(.bottom, 60)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Part request")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+            .sheet(item: $lightboxAttachment) { attachment in
+                FieldPunchPhotoLightbox(attachment: attachment)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var descriptionCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("REQUESTED")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            Text(request.description)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(HavenColors.border, lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var photoStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PHOTOS")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(request.photos) { photo in
+                        Button {
+                            lightboxAttachment = photo
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(HavenColors.indigo50)
+                                if let urlString = photo.signedUrl, let url = URL(string: urlString) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .empty: ProgressView().scaleEffect(0.7)
+                                        case .success(let img): img.resizable().scaledToFill()
+                                        case .failure: Image(systemName: "photo").foregroundStyle(HavenColors.textSecondary)
+                                        @unknown default: EmptyView()
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(width: 96, height: 96)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(HavenColors.border, lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var statusSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("STATUS")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            Picker("Status", selection: $status) {
+                ForEach(statuses, id: \.value) { row in
+                    Text(row.label).tag(row.value)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    @ViewBuilder
+    private var supplierSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SUPPLIER")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textSecondary)
+            TextField("Optional supplier name", text: $supplier)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+                .padding(12)
+                .background(HavenColors.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(HavenColors.border, lineWidth: 0.5)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Toggle(isOn: $hasEta) {
+                Text("Has ETA")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textPrimary)
+            }
+            .tint(HavenColors.action)
+
+            if hasEta {
+                DatePicker("ETA", selection: $supplierEta, displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func save() async {
+        await MainActor.run {
+            submitError = nil
+            isSubmitting = true
+        }
+        defer { Task { @MainActor in isSubmitting = false } }
+        do {
+            let etaString: String? = hasEta ? ISO8601DateFormatter().string(from: supplierEta) : nil
+            let trimmedSupplier = supplier.trimmingCharacters(in: .whitespacesAndNewlines)
+            let updated = try await HavenFieldService.shared.updatePartStatus(
+                workspaceId: workspaceId,
+                partRequestId: request.id,
+                status: status,
+                supplier: trimmedSupplier.isEmpty ? nil : trimmedSupplier,
+                supplierEta: etaString
+            )
+            await MainActor.run {
+                onUpdated(updated)
+                Haptics.success()
+                NotificationCenter.default.post(name: .havenFieldPartRequestChanged, object: nil)
+            }
+            await MainActor.run { dismiss() }
+        } catch {
+            await MainActor.run {
+                submitError = error.localizedDescription
+                Haptics.error()
+            }
+        }
+    }
+}
+
+/// Wave M12 — Today-screen pill component. Renders a chip with the
+/// open-request count + a wrench icon. Tap routes to
+/// FieldPartRequestsListView. Hidden when there are 0 open requests.
+private struct FieldOpenPartRequestsPill: View {
+    let count: Int
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Image(systemName: "wrench.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("\(count) part \(count == 1 ? "request" : "requests") open")
+                    .font(HavenTypography.uiLabel)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(HavenColors.action)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(HavenColors.action.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(HavenColors.action.opacity(0.25), lineWidth: 0.75)
+            )
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
     }
 }
 
@@ -6988,6 +8216,13 @@ private struct HavenFieldVisitWorkspaceView: View {
     @State private var coTechSyncing: Bool = false
     @State private var coTechError: String?
 
+    // MARK: Wave M12 Need part state
+
+    /// True while the part-request sheet is presented at the visit level.
+    /// Punch-item-level entry points use a per-row sheet on
+    /// FieldPunchItemRow rather than this flag.
+    @State private var showPartRequestSheet = false
+
     // MARK: Wave M8 end-of-visit suggestion authoring state
 
     /// True after the lifecycle flips into `.completed` for the first
@@ -7403,6 +8638,25 @@ private struct HavenFieldVisitWorkspaceView: View {
             )
             .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showPartRequestSheet) {
+            // Wave M12 — visit-level Need part. requestId set, punchItemId
+            // null so the operator knows this is a whole-visit context.
+            // Punch-item-level entry points (the wrench chip on each
+            // FieldPunchItemRow) present their own sheet with punchItemId
+            // pre-set.
+            if let workspaceId = viewModel.workspaceId, !workspaceId.isEmpty {
+                FieldPartRequestSheet(
+                    workspaceId: workspaceId,
+                    requestId: viewModel.visit.requestId,
+                    punchItemId: nil,
+                    contextLabel: visitContextLabel,
+                    onCreated: { _ in
+                        showPartRequestSheet = false
+                    }
+                )
+                .presentationDetents([.large])
+            }
+        }
         .confirmationDialog(
             "Decline this visit?",
             isPresented: $showDeclineConfirmation,
@@ -7785,6 +9039,21 @@ private struct HavenFieldVisitWorkspaceView: View {
         lifecycleAssignment ?? viewModel.visit.assignment
     }
 
+    /// Wave M12 — the kicker displayed at the top of the part-request
+    /// sheet so the tech sees what visit they're flagging the part for.
+    /// Falls through to the visit title when the home name isn't set.
+    private var visitContextLabel: String {
+        let homeName = viewModel.home?.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let homeName, !homeName.isEmpty {
+            return "For: \(homeName)"
+        }
+        let title = viewModel.visit.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty {
+            return "For: \(title)"
+        }
+        return "For this visit"
+    }
+
     private var lifecycleState: FieldVisitLifecycleState {
         FieldVisitLifecycleState.resolve(
             assignment: resolvedAssignment,
@@ -7849,8 +9118,48 @@ private struct HavenFieldVisitWorkspaceView: View {
                     .background(HavenColors.border)
                 coTechSection
                 accessMethodTile
+
+                // Wave M12 — visit-level Need part button. Always
+                // available so the tech can flag a part request before,
+                // during, or after the lifecycle (sometimes they realize
+                // they need a part during the wrap-up walkthrough).
+                needPartButton
             }
         }
+    }
+
+    /// Wave M12 — visit-level Need part button. Opens the
+    /// FieldPartRequestSheet with `requestId` set + null `punchItemId`
+    /// so the operator knows this is a whole-visit context.
+    @ViewBuilder
+    private var needPartButton: some View {
+        Button {
+            showPartRequestSheet = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "wrench.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Need part")
+                        .font(HavenTypography.bodySmall.weight(.semibold))
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Flag a needed part for the operator.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            .padding(12)
+            .background(HavenColors.cream.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityLabel("Need part. Flag a needed part for the operator.")
     }
 
     /// Wave M9 — access method tile inside the lifecycle section. Tap
