@@ -47,6 +47,13 @@ struct AddVendorSheet: View {
         case phone(String)
         case unknown(String)
 
+        var isActionable: Bool {
+            switch self {
+            case .url, .phone: return true
+            case .unknown: return false
+            }
+        }
+
         var icon: String {
             switch self {
             case .url: return "globe"
@@ -59,7 +66,7 @@ struct AddVendorSheet: View {
             switch self {
             case .url: return "URL on your clipboard"
             case .phone: return "Phone number on your clipboard"
-            case .unknown: return "Use clipboard content?"
+            case .unknown: return "Clipboard preview"
             }
         }
 
@@ -415,7 +422,10 @@ struct AddVendorSheet: View {
             .joined()
         if digits.count >= 7 && digits.count <= 15 {
             clipboardSuggestion = .phone(raw)
+            return
         }
+
+        clipboardSuggestion = .unknown(raw)
     }
 
     /// Notion-inspired clipboard banner. Sits above the three import
@@ -441,19 +451,21 @@ struct AddVendorSheet: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            Button {
-                Haptics.light()
-                applyClipboardSuggestion(suggestion)
-            } label: {
-                Text("Use it")
-                    .font(HavenTypography.uiLabelSmall.weight(.semibold))
-                    .foregroundStyle(HavenColors.textOnNavy)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(HavenColors.navy)
-                    .clipShape(Capsule())
+            if suggestion.isActionable {
+                Button {
+                    Haptics.light()
+                    applyClipboardSuggestion(suggestion)
+                } label: {
+                    Text("Use it")
+                        .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                        .foregroundStyle(HavenColors.textOnNavy)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(HavenColors.navy)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             Button {
                 Haptics.light()
                 clipboardSuggestion = nil
