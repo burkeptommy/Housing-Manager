@@ -62,25 +62,35 @@ struct AddressHookView: View {
                 showInviteCodeSheet = true
             }
         }
-        // Phase 20a — present the new 2-page hook screen as a fullScreenCover
-        // when the user taps "See what we know about your home" on the
-        // preview step.
-        .fullScreenCover(isPresented: $showPropertyHook) {
-            propertyHookCover(for: viewModel)
+        // Phase 20b: keep the hook and account creation gate in one
+        // presentation so the handoff cannot fall back to the address form.
+        .fullScreenCover(isPresented: onboardingCoverBinding) {
+            if showAccountCreation {
+                AccountCreationStep(
+                    address1: viewModel.street,
+                    onCancel: {
+                        showAccountCreation = false
+                        showPropertyHook = false
+                    }
+                )
+            } else {
+                propertyHookCover(for: viewModel)
+            }
         }
-        // Phase 20b — present the hard account creation gate after the
-        // user taps "Get Started with [address]" on PropertyHookView
-        // Page 2. This sequencing relies on a brief delay between the
-        // hook cover dismissing and this cover presenting; SwiftUI
-        // handles that automatically with consecutive fullScreenCovers.
-        .fullScreenCover(isPresented: $showAccountCreation) {
-            AccountCreationStep(
-                address1: viewModel.street,
-                onCancel: {
+    }
+
+    private var onboardingCoverBinding: Binding<Bool> {
+        Binding(
+            get: {
+                showPropertyHook || showAccountCreation
+            },
+            set: { isPresented in
+                if !isPresented {
                     showAccountCreation = false
+                    showPropertyHook = false
                 }
-            )
-        }
+            }
+        )
     }
 
     // MARK: - Address Step
@@ -216,14 +226,10 @@ extension AddressHookView {
                 lookupResult: viewModel.propertyLookupResult,
                 isAuthenticated: false,
                 onContinueToAccountGate: {
-                    // Phase 20b — dismiss this cover, then present the
-                    // hard account creation gate. SwiftUI sequences the
-                    // two covers cleanly: the first dismisses, the
-                    // second presents on the next runloop tick.
+                    // Phase 20b: swap the single onboarding cover from
+                    // the hook into the hard account creation gate.
+                    showAccountCreation = true
                     showPropertyHook = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        showAccountCreation = true
-                    }
                 },
                 onContinueToQuiz: {
                     // Unauthenticated users always go through the gate.
