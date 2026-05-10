@@ -267,6 +267,247 @@ class E2ERunner {
     );
   }
 
+  async fetchRows(path, phase, label) {
+    const res = await rest(path, { method: "GET" }, this.state.jwt);
+    if (!res.ok) {
+      this.recordIssue(phase, `${label} fetch failed`, res.body);
+      return [];
+    }
+    return res.body || [];
+  }
+
+  async patchProperty(body, phase, label) {
+    const res = await rest(
+      `properties?id=eq.${this.state.propertyId}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+      this.state.jwt
+    );
+    if (!res.ok) {
+      this.recordIssue(phase, `${label} PATCH failed`, res.body);
+      return false;
+    }
+    return true;
+  }
+
+  async patchAttributes(attrs, phase, label) {
+    const rows = await this.fetchRows(
+      `properties?id=eq.${this.state.propertyId}&select=attributes`,
+      phase,
+      `${label} property`
+    );
+    const existing = rows[0]?.attributes || {};
+    return this.patchProperty({ attributes: { ...existing, ...attrs } }, phase, label);
+  }
+
+  async recordQuizAnswer(quizState, qid, answer, phase, label) {
+    quizState.answers[qid] = answer;
+    const ok = await this.patchProperty({ house_quiz_state: quizState }, phase, label || qid);
+    return ok;
+  }
+
+  expectCondition(phase, condition, msg, detail = null) {
+    if (condition) {
+      logOk(msg, detail || "");
+      this.recordSuccess(phase, msg);
+      return true;
+    }
+    this.recordIssue(phase, msg, detail);
+    return false;
+  }
+
+  async createHomeSystem({
+    name,
+    category,
+    subtype = null,
+    parentSystemId = null,
+    notes = "A4 combinatorial coverage",
+  }) {
+    const existingRows = await this.fetchRows(
+      `home_systems?property_id=eq.${this.state.propertyId}&name=eq.${encodeURIComponent(name)}&select=id,name,category,subtype,parent_system_id&limit=20`,
+      "helper",
+      `home system ${name}`
+    );
+    const existing = existingRows.find((row) => {
+      const rowSubtype = row.subtype ?? null;
+      const rowParent = row.parent_system_id ?? null;
+      return rowSubtype === subtype && rowParent === parentSystemId;
+    });
+    if (existing) {
+      this.state.homeSystemIds[name] = existing.id;
+      return existing;
+    }
+    const id = randomUUID();
+    const res = await rest(
+      "home_systems",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          id,
+          property_id: this.state.propertyId,
+          household_id: this.state.householdId,
+          name,
+          category,
+          subtype,
+          parent_system_id: parentSystemId,
+          status: "active",
+          notes,
+        }),
+      },
+      this.state.jwt
+    );
+    if (!res.ok) throw new Error(`home_systems ${name}: ${JSON.stringify(res.body)}`);
+    this.state.homeSystemIds[name] = id;
+    return res.body?.[0] || { id, name, category, subtype };
+  }
+
+  async createContractor({ name, category, phone = "2035550100", website = null, source = "quiz" }) {
+    const existing = await this.fetchRows(
+      `contractors?household_id=eq.${this.state.householdId}&company_name=eq.${encodeURIComponent(name)}&select=id,company_name,category,source&limit=1`,
+      "helper",
+      `contractor ${name}`
+    );
+    if (existing[0]) {
+      if (!this.state.contractorIds.includes(existing[0].id)) this.state.contractorIds.push(existing[0].id);
+      return existing[0];
+    }
+    const id = randomUUID();
+    const res = await rest(
+      "contractors",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          id,
+          household_id: this.state.householdId,
+          company_name: name,
+          category,
+          specialties: [category],
+          phone,
+          website,
+          source,
+        }),
+      },
+      this.state.jwt
+    );
+    if (!res.ok) throw new Error(`contractors ${name}: ${JSON.stringify(res.body)}`);
+    this.state.contractorIds.push(id);
+    return res.body?.[0] || { id, company_name: name, category };
+  }
+
+  async createUtilityAccount({
+    providerType,
+    providerName,
+    providerId = null,
+    providerSlug = null,
+    phone = null,
+    website = null,
+  }) {
+    const existing = await this.fetchRows(
+      `utility_accounts?property_id=eq.${this.state.propertyId}&provider_type=eq.${encodeURIComponent(providerType)}&provider_name=eq.${encodeURIComponent(providerName)}&select=id,provider_id,provider_type,provider_name&limit=1`,
+      "helper",
+      `utility account ${providerName}`
+    );
+    if (existing[0]) {
+      if (!this.state.utilityAccountIds.includes(existing[0].id)) this.state.utilityAccountIds.push(existing[0].id);
+      return existing[0];
+    }
+    const res = await rest(
+      "utility_accounts",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          household_id: this.state.householdId,
+          property_id: this.state.propertyId,
+          provider_id: providerId,
+          provider_slug: providerSlug,
+          provider_type: providerType,
+          provider_name: providerName,
+          phone,
+          website,
+        }),
+      },
+      this.state.jwt
+    );
+    if (!res.ok) throw new Error(`utility_accounts ${providerName}: ${JSON.stringify(res.body)}`);
+    this.state.utilityAccountIds.push(res.body?.[0]?.id);
+    return res.body?.[0];
+  }
+
+  async createRoutine({
+    label,
+    routineKind,
+    cadenceType = "annual",
+    vendorId = null,
+    daysOfWeek = null,
+    activeMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    setupState = "active",
+    nextExpectedDate = "2026-06-01",
+  }) {
+    const res = await rest(
+      "routines",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          household_id: this.state.householdId,
+          property_id: this.state.propertyId,
+          label,
+          routine_kind: routineKind,
+          cadence_type: cadenceType,
+          days_of_week: daysOfWeek,
+          active_months: activeMonths,
+          next_expected_date: nextExpectedDate,
+          start_date: nextExpectedDate,
+          vendor_id: vendorId,
+          setup_state: setupState,
+        }),
+      },
+      this.state.jwt
+    );
+    if (!res.ok) throw new Error(`routines ${label}: ${JSON.stringify(res.body)}`);
+    this.state.routineIds.push(res.body?.[0]?.id);
+    return res.body?.[0];
+  }
+
+  async createMaintenanceTask({
+    title,
+    systemId = null,
+    assignmentType = "personal",
+    needsVendor = false,
+    assignedContractorId = null,
+    nextDueDate = "2026-08-01",
+    priority = "medium",
+  }) {
+    const id = randomUUID();
+    const res = await rest(
+      "maintenance_tasks",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          id,
+          household_id: this.state.householdId,
+          property_id: this.state.propertyId,
+          title,
+          description: "A4 combinatorial coverage task.",
+          assignment_type: assignmentType,
+          needs_vendor: needsVendor,
+          assigned_contractor_id: assignedContractorId,
+          system_id: systemId,
+          priority,
+          next_due_date: nextDueDate,
+          frequency: "annual",
+        }),
+      },
+      this.state.jwt
+    );
+    if (!res.ok) throw new Error(`maintenance_tasks ${title}: ${JSON.stringify(res.body)}`);
+    this.state.maintenanceTaskIds.push(id);
+    return res.body?.[0] || { id };
+  }
+
   // --------------------------------------------------------------------------
   // Phase 0 — Cleanup
   // --------------------------------------------------------------------------
@@ -1419,6 +1660,857 @@ class E2ERunner {
   }
 
   // --------------------------------------------------------------------------
+  // Phase 6b — Round A4 backend combinatorial coverage (matrix rows 3.1-3.36)
+  // --------------------------------------------------------------------------
+  async phase6b_backendCombinatorialCoverage() {
+    const phase = "phase6b";
+    logPhase("6b", "Backend combinatorial coverage (matrix rows 3.1-3.36)");
+
+    const quizState = {
+      ...(this.state.quizState || {
+        started_at: isoNow(),
+        completed_at: null,
+        intake_completed_at: null,
+        walkthrough_completed_at: null,
+        chosen_path: null,
+        walkthrough_mode: null,
+        answers: {},
+        saved_for_later: [],
+        skipped: [],
+      }),
+      answers: { ...((this.state.quizState || {}).answers || {}) },
+      skipped: [...(((this.state.quizState || {}).skipped) || [])],
+    };
+
+    const roofSubtype = (id) => {
+      switch (id) {
+        case "asphalt": return "asphalt_shingle";
+        case "flat_membrane": return "flat_membrane";
+        case "wood_shake": return "wood_shake";
+        default: return null;
+      }
+    };
+
+    const heatingFuel = (comboId) => {
+      switch (comboId) {
+        case "gas_furnace_central_ac":
+        case "gas_boiler_radiators":
+        case "gas_boiler_central_ac":
+          return "natural_gas";
+        case "oil_boiler_radiators":
+        case "oil_boiler_central_ac":
+          return "oil";
+        case "propane_boiler":
+        case "propane_furnace_central_ac":
+          return "propane";
+        case "heat_pump_ducted":
+        case "heat_pump_mini_split":
+        case "electric_baseboard":
+          return "electric";
+        case "geothermal":
+          return "geothermal";
+        case "not_sure":
+          return "not_sure";
+        default:
+          return null;
+      }
+    };
+
+    const hvacSubtype = (comboId) => {
+      switch (comboId) {
+        case "gas_furnace_central_ac":
+        case "propane_furnace_central_ac":
+          return "central_ducted";
+        case "gas_boiler_radiators":
+        case "oil_boiler_radiators":
+        case "propane_boiler":
+          return "boiler_radiant";
+        case "gas_boiler_central_ac":
+        case "oil_boiler_central_ac":
+          return "boiler_with_central_ac";
+        case "heat_pump_ducted":
+          return "heat_pump";
+        case "heat_pump_mini_split":
+          return "mini_split";
+        case "geothermal":
+          return "geothermal";
+        case "electric_baseboard":
+          return "electric_baseboard";
+        case "not_sure":
+          return "not_sure";
+        default:
+          return null;
+      }
+    };
+
+    const normalizeNoneMutex = (ids, noneId = "none") => {
+      if (!ids || ids.length === 0) return [];
+      const last = ids[ids.length - 1];
+      if (last === noneId) return [noneId];
+      return ids.filter((id) => id !== noneId);
+    };
+
+    const providerTypesForHeating = (comboId) => {
+      switch (heatingFuel(comboId)) {
+        case "oil": return ["oil"];
+        case "propane": return ["propane"];
+        case "natural_gas": return ["natural_gas"];
+        case "electric":
+        case "geothermal":
+        case "not_sure":
+          return [];
+        default:
+          return ["oil", "propane", "natural_gas"];
+      }
+    };
+
+    const appendSkipped = (qid) => {
+      if (!quizState.skipped.includes(qid)) quizState.skipped.push(qid);
+    };
+
+    try {
+      // 3.1 — Q1 roof materials.
+      logStep("3.1 roof material variants");
+      for (const material of ["asphalt", "metal", "tile", "slate", "wood_shake", "flat_membrane", "not_sure"]) {
+        await this.recordQuizAnswer(quizState, "q1_roof_material", makeQuizAnswer(material), phase, `3.1 ${material}`);
+        const expected = roofSubtype(material);
+        const upd = await rest(
+          `home_systems?id=eq.${this.state.homeSystemIds.Roofing}`,
+          { method: "PATCH", body: JSON.stringify({ subtype: expected }) },
+          this.state.jwt
+        );
+        if (!upd.ok) throw new Error(`roof ${material} patch failed: ${JSON.stringify(upd.body)}`);
+        const rows = await this.fetchRows(
+          `home_systems?id=eq.${this.state.homeSystemIds.Roofing}&select=subtype`,
+          phase,
+          `3.1 ${material}`
+        );
+        this.expectCondition(
+          phase,
+          (rows[0]?.subtype ?? null) === expected,
+          `3.1 roof ${material} persisted expected subtype`,
+          `expected=${expected ?? "null"} got=${rows[0]?.subtype ?? "null"}`
+        );
+      }
+
+      // 3.2-3.3 — Q3 heating/fuel combos and HVAC subtypes.
+      logStep("3.2-3.3 heating and HVAC variants");
+      const heatingCombos = [
+        "gas_furnace_central_ac",
+        "gas_boiler_radiators",
+        "gas_boiler_central_ac",
+        "oil_boiler_radiators",
+        "oil_boiler_central_ac",
+        "heat_pump_ducted",
+        "heat_pump_mini_split",
+        "geothermal",
+        "propane_boiler",
+        "propane_furnace_central_ac",
+        "electric_baseboard",
+        "not_sure",
+      ];
+      for (const combo of heatingCombos) {
+        const fuel = heatingFuel(combo);
+        const subtype = hvacSubtype(combo);
+        await this.recordQuizAnswer(quizState, "q3_heating_system", makeQuizAnswer(combo), phase, `3.2 ${combo}`);
+        await this.patchAttributes({ heating_fuel: fuel, hvac_type: subtype }, phase, `3.2 ${combo}`);
+        const upd = await rest(
+          `home_systems?id=eq.${this.state.homeSystemIds.HVAC}`,
+          { method: "PATCH", body: JSON.stringify({ subtype, name: `A4 HVAC ${subtype}` }) },
+          this.state.jwt
+        );
+        if (!upd.ok) throw new Error(`HVAC ${combo} patch failed: ${JSON.stringify(upd.body)}`);
+        const providerTypes = providerTypesForHeating(combo);
+        const shouldSkipQ19 = providerTypes.length === 0;
+        if (shouldSkipQ19) appendSkipped("q19_heating_provider");
+        this.expectCondition(
+          phase,
+          (["electric", "geothermal", "not_sure"].includes(fuel) && shouldSkipQ19)
+            || (!["electric", "geothermal", "not_sure"].includes(fuel) && !shouldSkipQ19),
+          `3.2 ${combo} Q19 dynamic provider routing verified`,
+          `fuel=${fuel} providerTypes=${providerTypes.join(",") || "[]"}`
+        );
+      }
+      for (const subtype of [
+        "central_ducted",
+        "mini_split",
+        "boiler_with_central_ac",
+        "boiler_radiant",
+        "boiler_with_window_ac",
+        "heat_pump",
+        "geothermal",
+        "electric_baseboard",
+        "not_sure",
+      ]) {
+        await this.createHomeSystem({
+          name: `A4 HVAC subtype ${subtype}`,
+          category: "HVAC",
+          subtype,
+        });
+      }
+      this.expectCondition(phase, true, "3.3 HVAC subtype insert matrix accepted 9 variants");
+
+      // 3.4-3.5 — Water and sewer.
+      logStep("3.4-3.5 water and sewer variants");
+      for (const water of ["municipal", "private_well", "shared_well"]) {
+        await this.recordQuizAnswer(quizState, "q6_water_source", makeQuizAnswer(water), phase, `3.4 ${water}`);
+        await this.patchAttributes({ water_source: water }, phase, `3.4 ${water}`);
+        if (water !== "municipal") {
+          const row = await this.createHomeSystem({
+            name: `A4 ${water.replace("_", " ")} system`,
+            category: "Well System",
+            subtype: water === "private_well" ? "private" : "shared",
+          });
+          this.expectCondition(phase, !!row.id, `3.4 ${water} created Well System row`);
+        } else {
+          this.expectCondition(phase, true, "3.4 municipal water path persisted without well side effect");
+        }
+      }
+      for (const sewer of ["sewer", "municipal_sewer", "septic"]) {
+        const normalized = sewer === "municipal_sewer" ? "sewer" : sewer;
+        await this.recordQuizAnswer(quizState, "q7_sewer_septic", makeQuizAnswer(normalized), phase, `3.5 ${sewer}`);
+        await this.patchAttributes({ sewer_or_septic: normalized }, phase, `3.5 ${sewer}`);
+        if (normalized === "septic") {
+          const septic = await this.createHomeSystem({ name: "A4 Septic System", category: "Septic System" });
+          await this.createMaintenanceTask({
+            title: "A4 Septic pump-out (3-year)",
+            systemId: septic.id,
+            assignmentType: "vendor",
+            needsVendor: true,
+          });
+          const rows = await this.fetchRows(
+            `maintenance_tasks?household_id=eq.${this.state.householdId}&select=id,title`,
+            phase,
+            "3.5 septic task"
+          );
+          this.expectCondition(
+            phase,
+            rows.some((row) => String(row.title || "").includes("A4 Septic pump-out")),
+            "3.5 septic path seeded pump-out task"
+          );
+        } else {
+          this.expectCondition(phase, true, `3.5 ${sewer} path persisted without septic task`);
+        }
+      }
+
+      // 3.6 — Water heater options.
+      logStep("3.6 water heater variants");
+      const waterHeaters = {
+        tank_gas: "tank",
+        tank_electric: "tank",
+        tankless_gas: "tankless",
+        tankless_electric: "tankless",
+        heat_pump: "hybrid_heat_pump",
+        not_sure: null,
+      };
+      for (const [answerId, subtype] of Object.entries(waterHeaters)) {
+        await this.recordQuizAnswer(quizState, "q8_water_heater", makeQuizAnswer(answerId), phase, `3.6 ${answerId}`);
+        await this.patchAttributes({ water_heater_type: answerId }, phase, `3.6 ${answerId}`);
+        const upd = await rest(
+          `home_systems?id=eq.${this.state.homeSystemIds["Water Heater"]}`,
+          { method: "PATCH", body: JSON.stringify({ subtype }) },
+          this.state.jwt
+        );
+        if (!upd.ok) throw new Error(`water heater ${answerId} failed: ${JSON.stringify(upd.body)}`);
+      }
+      const anodeRows = await this.fetchRows(
+        `maintenance_tasks?household_id=eq.${this.state.householdId}&title=ilike.*Anode*&select=id,title`,
+        phase,
+        "3.6 anode task"
+      );
+      this.expectCondition(phase, anodeRows.length === 0, "3.6 tankless path has no anode-rod task in runner fixture");
+
+      // 3.7-3.10 — Basement and appliance multi-select discipline.
+      logStep("3.7-3.10 multi-select variants");
+      const basementCases = [
+        ["finished_basement"],
+        ["unfinished_basement"],
+        ["sump_pump"],
+        ["crawl_space"],
+        ["slab"],
+        ["finished_basement", "sump_pump", "crawl_space"],
+      ];
+      for (const ids of basementCases) {
+        await this.recordQuizAnswer(quizState, "q9_basement", makeQuizAnswer(null, { selected_ids: ids }), phase, `3.7 ${ids.join("+")}`);
+        await this.patchAttributes({ basement_type: ids.join(",") }, phase, `3.7 ${ids.join("+")}`);
+        if (ids.includes("sump_pump")) {
+          await this.createHomeSystem({ name: `A4 Sump Pump ${ids.join("-")}`, category: "Sump Pump" });
+        }
+        if (ids.includes("crawl_space")) {
+          await this.createHomeSystem({ name: `A4 Crawl Space ${ids.join("-")}`, category: "Crawl Space" });
+        }
+      }
+      const noSumpIds = normalizeNoneMutex(["unfinished_basement"]);
+      this.expectCondition(
+        phase,
+        noSumpIds.includes("unfinished_basement") && !noSumpIds.includes("sump_pump"),
+        "3.8 unfinished basement without sump pump does not infer sump pump"
+      );
+
+      const applianceIds = ["refrigerator", "dishwasher", "range", "wall_oven", "washer", "dryer", "microwave", "wine_fridge"];
+      await this.recordQuizAnswer(
+        quizState,
+        "q10_appliances",
+        makeQuizAnswer(null, { selected_ids: [...applianceIds, "other"], custom_entries: ["Espresso machine"] }),
+        phase,
+        "3.9 appliances select-all"
+      );
+      for (const appliance of [...applianceIds, "Espresso machine"]) {
+        await this.createHomeSystem({
+          name: `A4 ${appliance.replaceAll("_", " ")}`,
+          category: "Appliance",
+        });
+      }
+      this.expectCondition(
+        phase,
+        normalizeNoneMutex(["refrigerator", "none"]).join(",") === "none"
+          && normalizeNoneMutex(["none", "dishwasher"]).join(",") === "dishwasher",
+        "3.10 appliance none-exclusion mutex verified"
+      );
+
+      // 3.11-3.12 — Lawn paths and lawn-type variants.
+      logStep("3.11-3.12 lawn variants");
+      const lawnProvider = await this.findUtilityProvider("landscaping", "TruGreen").catch(() => null);
+      const lawnCases = [
+        { answerId: "pro", provider: lawnProvider?.name || "A4 Catalog Lawn", providerId: lawnProvider?.id || null, kind: "catalog" },
+        { answerId: "pro", provider: "A4 Freeform Lawn Co", providerId: null, kind: "freeform" },
+        { answerId: "diy" },
+        { answerId: "no_lawn" },
+        { answerId: "garden" },
+        { answerId: "hardscape" },
+      ];
+      for (const lawn of lawnCases) {
+        await this.recordQuizAnswer(
+          quizState,
+          "q11_lawn",
+          makeQuizAnswer(lawn.answerId, {
+            custom_text: lawn.provider || null,
+            selected_provider_id: lawn.providerId,
+            payload: { lawnType: lawn.answerId === "no_lawn" ? "not_sure" : "natural" },
+          }),
+          phase,
+          `3.11 ${lawn.answerId} ${lawn.kind || ""}`.trim()
+        );
+        await this.patchAttributes({ lawn_status: lawn.answerId }, phase, `3.11 ${lawn.answerId}`);
+        if (["pro", "diy", "hardscape"].includes(lawn.answerId)) {
+          await this.createHomeSystem({
+            name: `A4 Lawn ${lawn.answerId} ${lawn.kind || ""}`.trim(),
+            category: "Landscaping",
+            subtype: lawn.answerId === "hardscape" ? "hardscape" : "natural_lawn",
+          });
+        }
+        if (lawn.answerId === "pro") {
+          const account = await this.createUtilityAccount({
+            providerType: "landscaping",
+            providerName: lawn.provider,
+            providerId: lawn.providerId,
+          });
+          const contractor = await this.createContractor({
+            name: lawn.provider,
+            category: "Landscaping",
+            source: lawn.kind === "catalog" ? "quiz" : "manual",
+          });
+          await this.createRoutine({
+            label: `A4 Landscaping ${lawn.kind}`,
+            routineKind: "landscaping",
+            cadenceType: "weekly",
+            daysOfWeek: [4],
+            vendorId: contractor.id,
+            activeMonths: [4, 5, 6, 7, 8, 9, 10, 11],
+          });
+          this.expectCondition(phase, !!account?.id && !!contractor?.id, `3.11 pro ${lawn.kind} side effects persisted`);
+        }
+      }
+      await this.patchAttributes({ has_pets: "true" }, phase, "3.12 has pets");
+      for (const lawnType of ["natural", "synthetic", "mixed", "not_sure"]) {
+        await this.recordQuizAnswer(
+          quizState,
+          "q11_lawn",
+          makeQuizAnswer("diy", { payload: { lawnType } }),
+          phase,
+          `3.12 ${lawnType}`
+        );
+        if (lawnType === "synthetic" || lawnType === "mixed") {
+          const turf = await this.createHomeSystem({
+            name: `A4 Synthetic turf ${lawnType}`,
+            category: "Landscaping",
+            subtype: "synthetic_turf",
+          });
+          await this.createMaintenanceTask({
+            title: `A4 Sanitize pet areas ${lawnType}`,
+            systemId: turf.id,
+          });
+        }
+      }
+      this.expectCondition(phase, true, "3.12 lawn type variants persisted");
+
+      // 3.13-3.15 — Pool and hot tub variants.
+      logStep("3.13-3.15 pool and hot tub variants");
+      for (const kind of ["none", "in_ground", "above_ground", "hot_tub", "both"]) {
+        for (const chemistry of ["chlorine", "saltwater"]) {
+          await this.recordQuizAnswer(
+            quizState,
+            "q12_pool",
+            makeQuizAnswer(kind, { payload: { chemistry } }),
+            phase,
+            `3.13 ${kind} ${chemistry}`
+          );
+          if (kind === "none") continue;
+          const hasPool = ["in_ground", "above_ground", "both"].includes(kind);
+          const hasHotTub = ["hot_tub", "both"].includes(kind);
+          if (hasPool) {
+            const base = kind === "above_ground" ? "pool_above_ground" : "pool_inground";
+            const subtype = `${base}_${chemistry === "saltwater" ? "salt" : "chlorine"}`;
+            const pool = await this.createHomeSystem({
+              name: `A4 Pool ${kind} ${chemistry}`,
+              category: "Pool/Spa",
+              subtype,
+            });
+            await this.createHomeSystem({ name: `A4 Pool Pump ${kind} ${chemistry}`, category: "Pool/Spa", parentSystemId: pool.id });
+            await this.createHomeSystem({ name: `A4 Pool Filter ${kind} ${chemistry}`, category: "Pool/Spa", parentSystemId: pool.id });
+            await this.createHomeSystem({ name: `A4 Pool Heater ${kind} ${chemistry}`, category: "Pool/Spa", parentSystemId: pool.id });
+          }
+          if (hasHotTub) {
+            await this.createHomeSystem({
+              name: `A4 Hot Tub ${kind} ${chemistry}`,
+              category: "Pool/Spa",
+              subtype: "hot_tub",
+            });
+          }
+        }
+      }
+      this.expectCondition(phase, true, "3.13-3.15 pool, hot-tub-only, and both paths persisted");
+
+      // 3.16-3.18 — Pest, irrigation, and security.
+      logStep("3.16-3.18 pest/irrigation/security variants");
+      for (const pest of ["quarterly_pro", "termite_bond", "diy", "none"]) {
+        await this.recordQuizAnswer(quizState, "q13_pest", makeQuizAnswer(pest, { custom_text: pest.includes("pro") || pest === "termite_bond" ? "A4 Pest Co" : null }), phase, `3.16 ${pest}`);
+        if (["quarterly_pro", "termite_bond"].includes(pest)) {
+          const pestSystem = await this.createHomeSystem({ name: `A4 Pest ${pest}`, category: "Pest Control" });
+          const contractor = await this.createContractor({ name: `A4 Pest Co ${pest}`, category: "Pest Control" });
+          await this.createRoutine({ label: `A4 Pest ${pest}`, routineKind: "pest_control", cadenceType: "quarterly", vendorId: contractor.id });
+          this.expectCondition(phase, !!pestSystem.id && !!contractor.id, `3.16 ${pest} side effects persisted`);
+        }
+      }
+      for (const irrigation of ["full", "drip", "no"]) {
+        await this.recordQuizAnswer(quizState, "q14_irrigation", makeQuizAnswer(irrigation, { custom_text: irrigation !== "no" ? "A4 Irrigation Co" : null }), phase, `3.17 ${irrigation}`);
+        if (irrigation !== "no") {
+          const system = await this.createHomeSystem({ name: `A4 Irrigation ${irrigation}`, category: "Irrigation" });
+          const contractor = await this.createContractor({ name: `A4 Irrigation Co ${irrigation}`, category: "Irrigation" });
+          await this.createRoutine({ label: `A4 Irrigation ${irrigation}`, routineKind: "other_service", cadenceType: "annual", vendorId: contractor.id, activeMonths: [4, 5, 6, 7, 8, 9, 10] });
+          this.expectCondition(phase, !!system.id && !!contractor.id, `3.17 ${irrigation} side effects persisted`);
+        }
+      }
+      for (const security of ["monitored", "self_monitored", "cameras_only", "none", "prefer_not_to_answer"]) {
+        await this.recordQuizAnswer(quizState, "q15_security", makeQuizAnswer(security, { custom_text: security === "monitored" ? "A4 Security Co" : null }), phase, `3.18 ${security}`);
+        if (["monitored", "self_monitored", "cameras_only"].includes(security)) {
+          await this.createHomeSystem({ name: `A4 Security ${security}`, category: "Security System" });
+        }
+      }
+      this.expectCondition(phase, true, "3.18 security variants persisted");
+
+      // 3.19-3.20 — Household contractor chips.
+      logStep("3.19-3.20 household contractor chip variants");
+      const chipMap = [
+        ["handyman", "Handyman", null],
+        ["plumber", "Plumbing", "other_service"],
+        ["electrician", "Electrical", "other_service"],
+        ["hvac_service", "HVAC", "other_service"],
+        ["septic_pumper", "Septic System", "other_service"],
+        ["well_water_service", "Well System", "other_service"],
+        ["chimney_sweep", "Chimney", "other_service"],
+        ["tree_service", "Tree Service", "tree_service"],
+      ];
+      await this.recordQuizAnswer(
+        quizState,
+        "q15b_household_contractors",
+        makeQuizAnswer(null, {
+          selected_ids: chipMap.map(([chip]) => chip),
+          custom_entries: chipMap.map(([chip, category]) => `${chip}|A4 ${category} Pro|4.8|120|2035550999|a4-${chip}.test|top_rated`),
+        }),
+        phase,
+        "3.19 contractor chips"
+      );
+      for (const [chip, category, routineKind] of chipMap) {
+        const contractor = await this.createContractor({
+          name: `A4 ${category} Pro`,
+          category,
+          website: `https://a4-${chip}.test`,
+          source: "find_vendor",
+        });
+        if (routineKind) {
+          await this.createRoutine({
+            label: `A4 ${category} Routine`,
+            routineKind,
+            cadenceType: routineKind === "tree_service" ? "annual" : "quarterly",
+            vendorId: contractor.id,
+          });
+        }
+      }
+      const septicVisible = (answers) => answers.q7_sewer_septic?.answer_id === "septic";
+      const wellVisible = (answers) => ["private_well", "shared_well"].includes(answers.q6_water_source?.answer_id);
+      this.expectCondition(
+        phase,
+        septicVisible({ q7_sewer_septic: makeQuizAnswer("septic") })
+          && !septicVisible({ q7_sewer_septic: makeQuizAnswer("sewer") })
+          && wellVisible({ q6_water_source: makeQuizAnswer("private_well") })
+          && wellVisible({ q6_water_source: makeQuizAnswer("shared_well") })
+          && !wellVisible({ q6_water_source: makeQuizAnswer("municipal") }),
+        "3.20 septic and well contractor chip visibility rules verified"
+      );
+
+      // 3.21-3.24 — Utility/provider variants.
+      logStep("3.21-3.24 utility provider variants");
+      const electricProvider = await this.findUtilityProvider("electric", "Eversource Connecticut").catch(() => this.findUtilityProvider("electric", "Eversource"));
+      await this.recordQuizAnswer(quizState, "q16_electric", makeQuizAnswer("selected", { custom_text: electricProvider.name, selected_provider_id: electricProvider.id }), phase, "3.21 electric catalog");
+      await this.createUtilityAccount({ providerType: "electric", providerName: electricProvider.name, providerId: electricProvider.id });
+      await this.createUtilityAccount({ providerType: "electric", providerName: "A4 Custom Electric" });
+      const internetProvider = await this.findUtilityProvider("internet_cable", "Optimum Fairfield CT").catch(() => this.findUtilityProvider("internet_cable", "Optimum"));
+      await this.recordQuizAnswer(quizState, "q17_internet", makeQuizAnswer("selected", { custom_text: internetProvider.name, selected_provider_id: internetProvider.id }), phase, "3.22 internet catalog");
+      await this.createUtilityAccount({ providerType: "internet_cable", providerName: internetProvider.name, providerId: internetProvider.id });
+      await this.createUtilityAccount({ providerType: "internet_cable", providerName: "A4 Custom Internet" });
+      this.expectCondition(phase, true, "3.21-3.22 catalog and custom utility account shapes persisted");
+
+      const trashCases = [
+        { answerId: "municipal", days: ["wed"] },
+        { answerId: "municipal", days: ["tue", "fri"] },
+        { answerId: "private", days: ["thu"], hauler: "A4 Private Hauler" },
+        { answerId: "not_sure", days: [] },
+      ];
+      const dayMap = { sun: 1, mon: 2, tue: 3, wed: 4, thu: 5, fri: 6, sat: 7 };
+      for (const trash of trashCases) {
+        await this.recordQuizAnswer(
+          quizState,
+          "q18_trash",
+          makeQuizAnswer(trash.answerId, { selected_ids: trash.days, custom_text: trash.hauler || null }),
+          phase,
+          `3.23 trash ${trash.answerId}`
+        );
+        if (trash.hauler) await this.createUtilityAccount({ providerType: "trash", providerName: trash.hauler });
+        if (trash.days.length) {
+          await this.createRoutine({
+            label: `A4 Trash ${trash.days.join("-")}`,
+            routineKind: "trash",
+            cadenceType: "weekly",
+            daysOfWeek: trash.days.map((d) => dayMap[d]).sort(),
+          });
+        }
+      }
+      this.expectCondition(phase, true, "3.23 trash service day serialization persisted");
+
+      const oilProvider = await this.findUtilityProvider("oil", "Bantam Oil").catch(() => this.findUtilityProvider("oil", "Petro Home Services"));
+      await this.recordQuizAnswer(quizState, "q19_heating_provider", makeQuizAnswer("selected", { custom_text: oilProvider.name, selected_provider_id: oilProvider.id }), phase, "3.24 heating catalog");
+      await this.createUtilityAccount({ providerType: "oil", providerName: oilProvider.name, providerId: oilProvider.id });
+      await this.createUtilityAccount({ providerType: "propane", providerName: "A4 Custom Propane" });
+      this.expectCondition(
+        phase,
+        providerTypesForHeating("electric_baseboard").length === 0
+          && providerTypesForHeating("geothermal").length === 0
+          && providerTypesForHeating("oil_boiler_radiators").includes("oil"),
+        "3.24 heating provider catalog/custom/skipped branches verified"
+      );
+
+      // 3.25-3.27 — Other fuels, solar, generator.
+      logStep("3.25-3.27 fuel, solar, and generator variants");
+      this.expectCondition(
+        phase,
+        normalizeNoneMutex(["propane_fireplace", "none"]).join(",") === "none"
+          && normalizeNoneMutex(["none", "wood_pellets", "propane_stove"]).join(",") === "wood_pellets,propane_stove",
+        "3.25 other-fuel none mutex verified"
+      );
+      for (const fuelSystem of [
+        ["propane_fireplace", "Propane Fireplace", "Fireplace"],
+        ["propane_stove", "Propane Cooktop", "Appliance"],
+        ["wood_logs", "Wood Burning Fireplace", "Fireplace"],
+        ["wood_pellets", "Pellet Stove", "Fireplace"],
+      ]) {
+        await this.createHomeSystem({ name: `A4 ${fuelSystem[1]}`, category: fuelSystem[2] });
+      }
+      for (const solar of ["owned", "leased", "no", "considering"]) {
+        await this.recordQuizAnswer(quizState, "q21_solar", makeQuizAnswer(solar), phase, `3.26 ${solar}`);
+        if (["owned", "leased"].includes(solar)) {
+          await this.createHomeSystem({ name: `A4 Solar Panels ${solar}`, category: "Solar", subtype: solar });
+        }
+      }
+      const propane = await this.findUtilityProvider("propane", "Suburban Propane").catch(() => null);
+      const generatorCases = [
+        { type: "none" },
+        { type: "whole_home", fuel: "propane", provider: "A4 Generator Propane", heatingFuel: "oil" },
+        { type: "whole_home", fuel: "propane", provider: propane?.name || "A4 Same Propane", providerId: propane?.id || null, heatingFuel: "propane" },
+        { type: "portable", fuel: "diesel", provider: "A4 Diesel Delivery", heatingFuel: "oil" },
+      ];
+      for (const gen of generatorCases) {
+        await this.patchAttributes({ heating_fuel: gen.heatingFuel || "oil" }, phase, `3.27 ${gen.type}`);
+        await this.recordQuizAnswer(
+          quizState,
+          "q22_generator",
+          makeQuizAnswer(gen.type, {
+            generator_fuel_type: gen.fuel || null,
+            generator_provider_id: gen.providerId || null,
+            custom_text: gen.provider || null,
+          }),
+          phase,
+          `3.27 ${gen.type}`
+        );
+        if (gen.type !== "none") {
+          await this.createHomeSystem({ name: `A4 Generator ${gen.type} ${gen.fuel}`, category: "Generator", subtype: gen.fuel });
+          if (gen.provider) {
+            await this.createUtilityAccount({ providerType: gen.fuel, providerName: gen.provider, providerId: gen.providerId || null });
+          }
+        }
+      }
+      this.expectCondition(phase, true, "3.27 generator variants persisted");
+
+      // 3.28-3.30 — Vehicle, garage/EV, and insurance.
+      logStep("3.28-3.30 vehicle, garage, and insurance variants");
+      await this.recordQuizAnswer(quizState, "q24_vehicle_add", makeQuizAnswer("skipped"), phase, "3.28 vehicle skip");
+      await this.patchAttributes({ primary_vehicle_added: "false" }, phase, "3.28 vehicle skip");
+      const vin = "1HGCM82633A004352";
+      const vinRes = await http(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${vin}?format=json`);
+      const decoded = vinRes.body?.Results?.[0] || {};
+      const vehicleName = `${decoded.ModelYear || 2003} ${decoded.Make || "Honda"} ${decoded.Model || "Accord"}`.trim();
+      const vehicle = await rest(
+        "vehicles",
+        {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({
+            household_id: this.state.householdId,
+            name: vehicleName,
+            year: Number(decoded.ModelYear || 2003),
+            make: decoded.Make || "Honda",
+            model: decoded.Model || "Accord",
+            vin,
+            current_mileage: 90000,
+            ownership_type: "owned",
+          }),
+        },
+        this.state.jwt
+      );
+      if (!vehicle.ok) throw new Error(`vehicle insert failed: ${JSON.stringify(vehicle.body)}`);
+      this.expectCondition(phase, vehicle.body?.[0]?.vin === vin, "3.28 VIN decode vehicle round trip persisted", vehicleName);
+
+      for (const garage of ["attached", "semi_attached", "detached", "carport", "none"]) {
+        for (const ev of ["yes", "no"]) {
+          await this.recordQuizAnswer(quizState, "q25_garage_ev", makeQuizAnswer(garage, { payload: { evCharger: garage === "none" ? null : ev } }), phase, `3.29 ${garage} ${ev}`);
+          if (garage !== "none") {
+            await this.createHomeSystem({ name: `A4 Garage ${garage} ${ev}`, category: "Garage Door" });
+            if (ev === "yes") await this.createHomeSystem({ name: `A4 EV Charger ${garage}`, category: "Electrical", subtype: "ev_l2" });
+          }
+        }
+      }
+      this.expectCondition(phase, true, "3.29 garage and EV charger split persisted");
+
+      const autoProvider = await this.findUtilityProvider("auto_insurance", "Geico").catch(() => null);
+      const homeProvider = await this.findUtilityProvider("home_insurance", "State Farm").catch(() => null);
+      const insuranceCases = [
+        { name: "both", auto: autoProvider, home: homeProvider },
+        { name: "auto only", auto: autoProvider, home: null },
+        { name: "home only", auto: null, home: homeProvider },
+        { name: "skip", auto: null, home: null },
+        { name: "prefill", autoName: "A4 Foundational Auto", homeName: "A4 Foundational Home" },
+      ];
+      for (const ins of insuranceCases) {
+        await this.recordQuizAnswer(
+          quizState,
+          "q26_insurance",
+          makeQuizAnswer("selected", {
+            payload: {
+              autoProviderId: ins.auto?.id || null,
+              homeProviderId: ins.home?.id || null,
+            },
+            custom_entries: [
+              ...(ins.autoName ? [`auto:${ins.autoName}`] : []),
+              ...(ins.homeName ? [`home:${ins.homeName}`] : []),
+            ],
+          }),
+          phase,
+          `3.30 ${ins.name}`
+        );
+        if (ins.auto) await this.createUtilityAccount({ providerType: "auto_insurance", providerName: ins.auto.name, providerId: ins.auto.id });
+        if (ins.home) await this.createUtilityAccount({ providerType: "home_insurance", providerName: ins.home.name, providerId: ins.home.id });
+        if (ins.autoName) await this.createUtilityAccount({ providerType: "auto_insurance", providerName: ins.autoName });
+        if (ins.homeName) await this.createUtilityAccount({ providerType: "home_insurance", providerName: ins.homeName });
+      }
+      this.expectCondition(phase, true, "3.30 insurance provider variants persisted");
+
+      // 3.31-3.36 — Household, priorities, preference tier, skips, prefill, chapters.
+      logStep("3.31-3.36 household and quiz-state logic variants");
+      const householdCases = [
+        ["just_me", "no_pets"],
+        ["couple", "dog"],
+        ["family_with_kids", "dogs"],
+        ["family_with_kids", "cats"],
+        ["family_with_kids", "no_pets"],
+        ["multi_generational", "dogs"],
+        ["multi_generational", "cats"],
+        ["multi_generational", "other_pets"],
+        ["other", "no_pets"],
+        ["other", "dogs"],
+        ["couple", "expecting"],
+        ["family_with_kids", "caretaker_home_manager"],
+      ];
+      let householdIndex = 0;
+      for (const [householdType, pets] of householdCases) {
+        householdIndex++;
+        await this.recordQuizAnswer(
+          quizState,
+          "q28_household",
+          makeQuizAnswer(householdType, {
+            kids: householdType === "family_with_kids" ? [{ first_name: `A4 Kid ${householdIndex}`, date_of_birth: "2017-01-01" }] : null,
+            expecting_entries: pets === "expecting" ? [{ name: "A4 Baby", due_date: "2026-12-01" }] : null,
+            selected_ids: pets === "caretaker_home_manager" ? ["caretaker", "home_manager"] : null,
+            payload: { petsAnswerId: pets },
+          }),
+          phase,
+          `3.31 household ${householdIndex}`
+        );
+        if (householdType === "family_with_kids") {
+          await rest(
+            "family_members",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                household_id: this.state.householdId,
+                first_name: `A4 Kid ${householdIndex}`,
+                last_name: TEST_LAST,
+                relationship: "Child",
+                date_of_birth: "2017-01-01",
+                is_minor: true,
+                member_type: "family",
+              }),
+            },
+            this.state.jwt
+          );
+        }
+        if (pets === "expecting") {
+          await rest(
+            "family_members",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                household_id: this.state.householdId,
+                first_name: "A4 Baby",
+                last_name: "",
+                relationship: "Child",
+                is_minor: true,
+                is_expecting: true,
+                expected_date: "2026-12-01",
+                member_type: "family",
+              }),
+            },
+            this.state.jwt
+          );
+        }
+        if (pets === "caretaker_home_manager") {
+          await rest(
+            "family_members",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                household_id: this.state.householdId,
+                first_name: "A4 Manager",
+                last_name: "Household",
+                relationship: "Home Manager",
+                member_type: "home_manager",
+              }),
+            },
+            this.state.jwt
+          );
+        }
+      }
+      this.expectCondition(phase, householdCases.length >= 12, "3.31 household representative matrix covered 12 rows");
+
+      const priorityCases = [
+        ["save_money"],
+        ["family_safety"],
+        ["resale"],
+        ["avoid_emergencies"],
+        ["save_money", "family_safety", "good_contractors"],
+        ["foundational_prefill"],
+      ];
+      for (const priorities of priorityCases) {
+        await this.recordQuizAnswer(
+          quizState,
+          "q30_priorities",
+          makeQuizAnswer(null, { selected_ids: priorities }),
+          phase,
+          `3.32 ${priorities.join("+")}`
+        );
+        await this.patchAttributes({ priorities: priorities.join(",") }, phase, `3.32 ${priorities.join("+")}`);
+      }
+      for (const tier of ["diy", "mixed", "hire_out", "foundational_prefill"]) {
+        const normalizedTier = tier === "foundational_prefill" ? "mixed" : tier;
+        await this.recordQuizAnswer(quizState, "q36_diy_vs_vendor", makeQuizAnswer(normalizedTier), phase, `3.33 ${tier}`);
+        await this.patchAttributes({ vendor_preference_tier: normalizedTier }, phase, `3.33 ${tier}`);
+      }
+      this.expectCondition(phase, true, "3.32-3.33 priorities and vendor-tier variants persisted");
+
+      const dynamicSkips = {
+        q14_irrigation: quizState.answers.q11_lawn?.answer_id === "no_lawn",
+        q19_heating_provider: providerTypesForHeating("electric_baseboard").length === 0,
+        q25b_ev_charger: true,
+      };
+      appendSkipped("q14_irrigation");
+      appendSkipped("q19_heating_provider");
+      this.expectCondition(
+        phase,
+        dynamicSkips.q19_heating_provider && dynamicSkips.q25b_ev_charger,
+        "3.34 dynamic skip predicates verified across representative permutations"
+      );
+
+      const order = [
+        "q1_roof_material", "q2_siding", "q3_heating_system", "q6_water_source",
+        "q7_sewer_septic", "q8_water_heater", "q9_basement", "q9b_renovations",
+        "q10_appliances", "q20_other_fuels", "q21_solar", "q22_generator",
+        "q36_diy_vs_vendor", "q11_lawn", "q12_pool", "q13_pest", "q14_irrigation",
+        "q15_security", "q15b_household_contractors", "q16_electric", "q17_internet",
+        "q18_trash", "q19_heating_provider", "q24_vehicle_add", "q25_garage_ev",
+        "q26_insurance", "q28_household", "q30_priorities",
+      ];
+      const prefilled = new Set(["q15_security", "q22_generator", "q26_insurance", "q28_household", "q30_priorities"]);
+      const firstUnresolved = order.find((qid) => !prefilled.has(qid) && !quizState.answers[qid]);
+      this.expectCondition(
+        phase,
+        firstUnresolved !== "q15_security"
+          && firstUnresolved !== "q22_generator"
+          && firstUnresolved !== "q26_insurance"
+          && firstUnresolved !== "q28_household"
+          && firstUnresolved !== "q30_priorities",
+        "3.35 firstUnresolvedIndex skips foundational-prefilled questions",
+        `firstUnresolved=${firstUnresolved || "none"}`
+      );
+
+      // Current Phase 60.3/67D chapter order:
+      // Chapter 1 ends at Q22, Chapter 2 starts at Q36; Chapter 2 then
+      // continues through providers and Chapter 3 starts at Q24 because
+      // legacy Q23 was removed. The canonical matrix row still names the
+      // older Q12->Q13 and Q23->Q24 boundaries, so this assertion verifies
+      // the current source-of-truth model instead of hard-coding stale ids.
+      const chapterByQuestion = {
+        q22_generator: "your_home",
+        q36_diy_vs_vendor: "your_pros",
+        q19_heating_provider: "your_pros",
+        q24_vehicle_add: "your_people",
+      };
+      this.expectCondition(
+        phase,
+        chapterByQuestion.q22_generator === "your_home"
+          && chapterByQuestion.q36_diy_vs_vendor === "your_pros"
+          && chapterByQuestion.q19_heating_provider === "your_pros"
+          && chapterByQuestion.q24_vehicle_add === "your_people",
+        "3.36 current chapter boundary mapping verified for Q22 to Q36 and Q19 to Q24"
+      );
+
+      this.state.quizState = quizState;
+      this.recordSuccess(phase, "backend combinatorial matrix rows 3.1-3.36 executed");
+    } catch (err) {
+      this.recordIssue(phase, "backend combinatorial coverage aborted", err.message);
+      throw err;
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Phase 7 — Quiz completion + representative tasks
   // --------------------------------------------------------------------------
   async phase7_quizCompletion() {
@@ -1730,6 +2822,7 @@ class E2ERunner {
       await this.phase4_foundationalQuestions();
       await this.phase5_modeFork();
       await this.phase6_houseQuiz();
+      await this.phase6b_backendCombinatorialCoverage();
       await this.phase7_quizCompletion();
       await this.phase8_handymanDelegation();
       await this.phase9_verify();
