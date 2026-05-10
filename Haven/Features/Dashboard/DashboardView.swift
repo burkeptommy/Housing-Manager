@@ -382,7 +382,7 @@ struct DashboardView: View {
                 // provider with water & well services) or add a new
                 // one. Both paths link the contractor to the system
                 // via `preferredContractorId`.
-                if let coverageItem = viewModel.uncoveredCoverageItems.first(where: { $0.systemName == action.systemName }),
+                if let coverageItem = viewModel.uncoveredCoverageItems.first(where: { $0.systemName == action.systemName || $0.id == action.systemName }),
                    let householdId = viewModel.primaryHouseholdId {
                     VendorCoveragePickerSheet(
                         coverageItem: coverageItem,
@@ -1616,18 +1616,18 @@ struct DashboardView: View {
     /// when no `needs_vendor` task exists yet. When a task does exist,
     /// we pass it through so the adoption pass has a concrete anchor.
     private func resolveFindVendorContext(
-        for systemName: String,
+        for systemNameOrCategory: String,
         property: PropertyRow
     ) -> (task: MaintenanceTaskDBRow?, category: String)? {
         let candidate = (viewModel.uncoveredCoverageItems + viewModel.coveredCoverageItems)
-            .first(where: { $0.systemName == systemName })
+            .first(where: { $0.systemName == systemNameOrCategory || $0.id == systemNameOrCategory })
 
         // Prefer the category key from the coverage item — it's the
         // canonical token used across the registry + reconciler.
         let category: String? = {
             if let c = candidate, !c.id.isEmpty { return c.id }
             return viewModel.homeSystems
-                .first(where: { $0.name == systemName })?.category
+                .first(where: { $0.name == systemNameOrCategory || $0.category == systemNameOrCategory })?.category
         }()
 
         guard let resolvedCategory = category else { return nil }
@@ -1635,7 +1635,7 @@ struct DashboardView: View {
         let task: MaintenanceTaskDBRow? = {
             // Exact match by systemId first (strongest signal).
             if let systemId = candidate?.systemId ?? viewModel.homeSystems
-                .first(where: { $0.name == systemName })?.id {
+                .first(where: { $0.name == systemNameOrCategory || $0.category == systemNameOrCategory })?.id {
                 if let t = MaintenanceViewModel.shared.tasks.first(where: {
                     $0.systemId == systemId && $0.needsVendor == true
                 }) {

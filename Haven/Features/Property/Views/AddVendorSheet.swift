@@ -154,6 +154,7 @@ struct AddVendorSheet: View {
                             Haptics.light()
                             Analytics.track(.contractorCreated, ["source": "manual"])
                             importedVendor = ImportedVendorData() // Reset
+                            applyPrefilledCategory()
                             showManualForm = true
                         }
                     }
@@ -171,10 +172,7 @@ struct AddVendorSheet: View {
                 // with the right specialty highlighted. Runs once per
                 // sheet presentation and survives the three import
                 // method transitions because state is view-level.
-                if let cat = prefilledCategory,
-                   importedVendor.prefilledCategory == nil {
-                    importedVendor.prefilledCategory = cat
-                }
+                applyPrefilledCategory()
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -196,6 +194,7 @@ struct AddVendorSheet: View {
                         address: formatContactAddress(contact),
                         source: .contacts
                     )
+                    applyPrefilledCategory()
                     showContactPicker = false
                     // Go straight to the review/save form
                     showManualForm = true
@@ -206,6 +205,7 @@ struct AddVendorSheet: View {
                     prefilledUrl: importedVendor.website.isEmpty ? nil : importedVendor.website
                 ) { result in
                     importedVendor = result
+                    applyPrefilledCategory()
                     showWebsiteImport = false
                     showManualForm = true
                 }
@@ -377,6 +377,13 @@ struct AddVendorSheet: View {
 
     // MARK: - Phase 56.1 Clipboard detection
 
+    private func applyPrefilledCategory() {
+        guard let cat = prefilledCategory,
+              importedVendor.prefilledCategory == nil
+        else { return }
+        importedVendor.prefilledCategory = cat
+    }
+
     /// Inspect the clipboard once on sheet open. If the string looks
     /// like a URL or phone number, surface a banner offering a one-tap
     /// import path. Reads the clipboard locally only — no polling,
@@ -467,11 +474,13 @@ struct AddVendorSheet: View {
         case .url(let url):
             importedVendor = ImportedVendorData()
             importedVendor.website = url
+            applyPrefilledCategory()
             Analytics.track(.contractorWebsiteImport, ["source": "clipboard"])
             showWebsiteImport = true
         case .phone(let phone):
             importedVendor = ImportedVendorData()
             importedVendor.phone = phone
+            applyPrefilledCategory()
             Analytics.track(.contractorCreated, ["source": "manual_clipboard_phone"])
             showManualForm = true
         case .unknown:

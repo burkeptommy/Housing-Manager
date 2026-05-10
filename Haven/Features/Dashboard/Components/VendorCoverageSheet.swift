@@ -117,7 +117,7 @@ struct VendorCoverageSheet: View {
             HStack(spacing: HavenTheme.spacing8) {
                 Button {
                     Haptics.medium()
-                    onFindVendor(item.systemName)
+                    onFindVendor(item.id)
                 } label: {
                     Text("Find a pro")
                         .font(HavenTypography.uiLabel.weight(.semibold))
@@ -131,7 +131,7 @@ struct VendorCoverageSheet: View {
 
                 Button {
                     Haptics.light()
-                    onAddVendor(item.systemName)
+                    onAddVendor(item.id)
                 } label: {
                     Text("I have one")
                         .font(HavenTypography.uiLabel.weight(.semibold))
