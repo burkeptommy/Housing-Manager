@@ -767,7 +767,21 @@ final class MaintenanceViewModel: ObservableObject {
     }
 
     func convertToVendorManaged(taskId: UUID, contractor: ContractorRow) async {
-        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
+        let task: MaintenanceTaskDBRow
+        if let cached = tasks.first(where: { $0.id == taskId }) {
+            task = cached
+        } else {
+            do {
+                guard let fetched = try await db.fetchAllMaintenanceTasks()
+                    .first(where: { $0.id == taskId })
+                else { return }
+                task = fetched
+            } catch {
+                self.error = error.localizedDescription
+                Haptics.error()
+                return
+            }
+        }
 
         let originalTemplate = task.templateId.flatMap { MaintenanceTemplates.template(forKey: $0) }
         let originalTitle = originalTemplate?.title ?? task.title
@@ -792,6 +806,8 @@ final class MaintenanceViewModel: ObservableObject {
             let saved = try await db.updateMaintenanceTask(id: taskId, update)
             if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
                 tasks[idx] = saved
+            } else {
+                tasks.append(saved)
             }
             Haptics.success()
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
