@@ -329,7 +329,7 @@ struct VendorReviewForm: View {
                 NotificationCenter.default.post(
                     name: .contractorAdded,
                     object: nil,
-                    userInfo: ["contractor_id": contractor.id.uuidString]
+                    userInfo: ["contractorId": contractor.id.uuidString]
                 )
                 onSave?()
                 dismiss()
@@ -398,6 +398,11 @@ struct VendorReviewForm: View {
         NotificationCenter.default.post(name: .contractorChanged, object: nil)
         NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        NotificationCenter.default.post(
+            name: .contractorAdded,
+            object: nil,
+            userInfo: ["contractorId": contractorId.uuidString]
+        )
         onSave?()
         dismiss()
     }

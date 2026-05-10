@@ -55,20 +55,9 @@ DELETE FROM public.routines
       AND u.household_id IS NOT NULL
   );
 
-DELETE FROM public.contractors
-  WHERE household_id IN (
-    SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
-      AND u.household_id IS NOT NULL
-  );
-
-DELETE FROM public.utility_accounts
-  WHERE household_id IN (
-    SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
-      AND u.household_id IS NOT NULL
-  );
-
+-- Home systems and vehicles can point at contractors via preferred vendor
+-- columns. Delete those owners before contractors so a full UI vendor
+-- assignment run does not leave cleanup blocked on FK restrictions.
 DELETE FROM public.home_systems
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
@@ -77,6 +66,20 @@ DELETE FROM public.home_systems
   );
 
 DELETE FROM public.vehicles
+  WHERE household_id IN (
+    SELECT u.household_id FROM public.users u
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
+      AND u.household_id IS NOT NULL
+  );
+
+DELETE FROM public.contractors
+  WHERE household_id IN (
+    SELECT u.household_id FROM public.users u
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
+      AND u.household_id IS NOT NULL
+  );
+
+DELETE FROM public.utility_accounts
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
     WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
