@@ -7,6 +7,8 @@ struct VendorActionItem: Identifiable {
 }
 
 struct DashboardView: View {
+    private static let phase66ReleaseDate = ISO8601DateFormatter().date(from: "2026-04-20T00:00:00Z") ?? Date.distantPast
+
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = DashboardViewModel()
     @State private var showSettings = false
@@ -851,10 +853,9 @@ struct DashboardView: View {
         // overnight E2E (W4S16 — card was dominating first-launch
         // viewport on the seeded test user, who was created after
         // Phase 66 shipped).
-        let phase66ReleaseDate = ISO8601DateFormatter().date(from: "2026-04-20T00:00:00Z") ?? Date.distantPast
         if viewModel.hasCompletedAnyQuiz,
            let accountCreated = viewModel.accountCreatedAt,
-           accountCreated < phase66ReleaseDate {
+           accountCreated < Self.phase66ReleaseDate {
             MaintenanceReorganizedCard(
                 onLearnMore: {
                     NotificationCenter.default.post(
@@ -1060,7 +1061,9 @@ struct DashboardView: View {
         // Renders only when the household has archived tasks
         // AND the user hasn't dismissed. Tapping opens the
         // LegacyTasksView sheet directly from the Dashboard.
-        if viewModel.hasCompletedAnyQuiz {
+        if viewModel.hasCompletedAnyQuiz,
+           let accountCreated = viewModel.accountCreatedAt,
+           accountCreated < Self.phase66ReleaseDate {
             LegacyTasksNotificationCard(
                 legacyCount: viewModel.legacyTaskCount,
                 onViewDetails: { showLegacyTasks = true }
