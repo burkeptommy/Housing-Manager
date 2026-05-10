@@ -386,9 +386,9 @@ final class HouseQuizViewModel: ObservableObject {
         skipDynamicallyHiddenQuestion()
 
         // Phase 19 — defensive background refresh: the dashboard's cached
-        // PropertyRow may be stale (e.g. multi-device, fast resume). If the
-        // DB has more answers than our in-memory state, adopt the DB state
-        // and re-resolve our cursor.
+        // PropertyRow may be stale (e.g. multi-device, fast resume). Adopt
+        // any canonical DB state change, even when the answer count is the
+        // same, so same-question edits do not keep showing stale local data.
         Task { @MainActor [weak self] in
             await self?.refreshAdminCatalog()
         }
@@ -515,14 +515,15 @@ final class HouseQuizViewModel: ObservableObject {
         do {
             let fresh = try await db.fetchProperty(id: property.id)
             guard let freshState = fresh.houseQuizState else { return }
-            if freshState.answers.count > state.answers.count {
-                state = freshState
-                currentIndex = firstUnresolvedIndex()
-                skipDynamicallyUnreachableQuestion()
-                // Phase 19j — same protection on the background refresh path.
-                skipDynamicallyHiddenQuestion()
-                print("[HouseQuiz] Refreshed state from DB: \(freshState.answers.count) answers, resume index \(currentIndex)")
-            }
+            guard freshState != state else { return }
+
+            property = fresh
+            state = freshState
+            currentIndex = firstUnresolvedIndex()
+            skipDynamicallyUnreachableQuestion()
+            // Phase 19j — same protection on the background refresh path.
+            skipDynamicallyHiddenQuestion()
+            print("[HouseQuiz] Refreshed state from DB: \(freshState.answers.count) answers, resume index \(currentIndex)")
         } catch {
             print("[HouseQuiz] Background state refresh failed: \(error)")
         }

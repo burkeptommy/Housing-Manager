@@ -247,6 +247,26 @@ class E2ERunner {
     }
   }
 
+  async findUtilityProvider(providerType, name) {
+    const exact = await rest(
+      `utility_providers?provider_type=eq.${encodeURIComponent(providerType)}&name=eq.${encodeURIComponent(name)}&select=id,name,provider_type&limit=1`,
+      { method: "GET" },
+      this.state.jwt
+    );
+    if (exact.ok && exact.body?.[0]) return exact.body[0];
+
+    const fuzzy = await rest(
+      `utility_providers?provider_type=eq.${encodeURIComponent(providerType)}&name=ilike.*${encodeURIComponent(name)}*&select=id,name,provider_type&limit=1`,
+      { method: "GET" },
+      this.state.jwt
+    );
+    if (fuzzy.ok && fuzzy.body?.[0]) return fuzzy.body[0];
+
+    throw new Error(
+      `No utility provider found for ${providerType} / ${name}: ${JSON.stringify(fuzzy.body || exact.body)}`
+    );
+  }
+
   // --------------------------------------------------------------------------
   // Phase 0 — Cleanup
   // --------------------------------------------------------------------------
@@ -1187,10 +1207,14 @@ class E2ERunner {
     );
 
     // Q16 — electric provider
-    logStep("Q16 q16_electric → free-form name");
+    logStep("Q16 q16_electric → catalog provider");
+    const electricProvider = await this.findUtilityProvider("electric", "Eversource Connecticut");
     await recordAnswer(
       "q16_electric",
-      makeQuizAnswer(null, { custom_text: "Eversource" }),
+      makeQuizAnswer("selected", {
+        custom_text: electricProvider.name,
+        selected_provider_id: electricProvider.id,
+      }),
       async () => {
         const ins = await rest(
           "utility_accounts",
@@ -1200,7 +1224,8 @@ class E2ERunner {
             body: JSON.stringify({
               household_id: this.state.householdId,
               property_id: this.state.propertyId,
-              provider_name: "Eversource",
+              provider_id: electricProvider.id,
+              provider_name: electricProvider.name,
               provider_type: "electric",
             }),
           },
@@ -1213,9 +1238,13 @@ class E2ERunner {
 
     // Q17 — internet provider
     logStep("Q17 q17_internet → Optimum");
+    const internetProvider = await this.findUtilityProvider("internet_cable", "Optimum Fairfield CT");
     await recordAnswer(
       "q17_internet",
-      makeQuizAnswer(null, { custom_text: "Optimum" }),
+      makeQuizAnswer("selected", {
+        custom_text: internetProvider.name,
+        selected_provider_id: internetProvider.id,
+      }),
       async () => {
         const ins = await rest(
           "utility_accounts",
@@ -1225,7 +1254,8 @@ class E2ERunner {
             body: JSON.stringify({
               household_id: this.state.householdId,
               property_id: this.state.propertyId,
-              provider_name: "Optimum",
+              provider_id: internetProvider.id,
+              provider_name: internetProvider.name,
               provider_type: "internet_cable",
             }),
           },
@@ -1244,10 +1274,14 @@ class E2ERunner {
     );
 
     // Q19 — heating fuel provider (oil delivery)
-    logStep("Q19 q19_heating_provider → free-form oil delivery");
+    logStep("Q19 q19_heating_provider → catalog oil delivery");
+    const heatingProvider = await this.findUtilityProvider("oil", "Bantam Oil");
     await recordAnswer(
       "q19_heating_provider",
-      makeQuizAnswer(null, { custom_text: "Petro Home Services" }),
+      makeQuizAnswer("selected", {
+        custom_text: heatingProvider.name,
+        selected_provider_id: heatingProvider.id,
+      }),
       async () => {
         const ins = await rest(
           "utility_accounts",
@@ -1257,7 +1291,8 @@ class E2ERunner {
             body: JSON.stringify({
               household_id: this.state.householdId,
               property_id: this.state.propertyId,
-              provider_name: "Petro Home Services",
+              provider_id: heatingProvider.id,
+              provider_name: heatingProvider.name,
               provider_type: "oil",
             }),
           },
@@ -1300,16 +1335,21 @@ class E2ERunner {
     );
 
     // Q26 — insurance (dual)
-    logStep("Q26 q26_insurance → free-form auto + home");
+    logStep("Q26 q26_insurance → catalog auto + home");
+    const autoProvider = await this.findUtilityProvider("auto_insurance", "Geico");
+    const homeProvider = await this.findUtilityProvider("home_insurance", "State Farm");
     await recordAnswer(
       "q26_insurance",
-      makeQuizAnswer(null, {
-        custom_entries: ["auto|Geico", "home|State Farm"],
+      makeQuizAnswer("selected", {
+        payload: {
+          autoProviderId: autoProvider.id,
+          homeProviderId: homeProvider.id,
+        },
       }),
       async () => {
         for (const u of [
-          { name: "Geico", type: "auto_insurance" },
-          { name: "State Farm", type: "home_insurance" },
+          { provider: autoProvider, type: "auto_insurance" },
+          { provider: homeProvider, type: "home_insurance" },
         ]) {
           const ins = await rest(
             "utility_accounts",
@@ -1319,13 +1359,14 @@ class E2ERunner {
               body: JSON.stringify({
                 household_id: this.state.householdId,
                 property_id: this.state.propertyId,
-                provider_name: u.name,
+                provider_id: u.provider.id,
+                provider_name: u.provider.name,
                 provider_type: u.type,
               }),
             },
             this.state.jwt
           );
-          if (!ins.ok) throw new Error(`insurance utility ${u.name}: ${JSON.stringify(ins.body)}`);
+          if (!ins.ok) throw new Error(`insurance utility ${u.provider.name}: ${JSON.stringify(ins.body)}`);
           this.state.utilityAccountIds.push(ins.body?.[0]?.id);
         }
       }

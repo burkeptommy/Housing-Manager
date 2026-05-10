@@ -106,6 +106,7 @@ struct HouseQuizView: View {
     @State private var q22GeneratorType: String? = nil
     @State private var q22GeneratorFuel: String? = nil
     @State private var q22GeneratorProvider: UtilityProviderRow? = nil
+    @State private var q22GeneratorUserEdited: Bool = false
 
     /// Build 86 — Q22 "same supplier?" confirmation card state.
     /// `q22MatchedHeatingProvider` is the resolved Q19 provider when
@@ -630,6 +631,12 @@ struct HouseQuizView: View {
                 hydrateDraft(for: q)
             }
         }
+        .onChange(of: viewModel.state) { _, _ in
+            if let q = viewModel.currentQuestion {
+                hydrateEntryState(for: q)
+                hydrateDraft(for: q)
+            }
+        }
         // Phase 95 (gap #10) — debounced draft persistence. Each
         // `.onChange` fires whenever the homeowner edits a tracked
         // field, and `persistCurrentDraft()` writes the merged blob
@@ -667,6 +674,10 @@ struct HouseQuizView: View {
         )
     }
 
+    private func committedAnswer(for q: HouseQuizQuestion) -> HouseQuizAnswer? {
+        viewModel.state.answers[q.id] ?? viewModel.property.houseQuizState?.answers[q.id]
+    }
+
     /// Phase 95 (gap #10) — restores any persisted draft for the
     /// active question after `hydrateEntryState(for:)` runs. The
     /// answered-state path takes precedence (a committed answer
@@ -680,6 +691,13 @@ struct HouseQuizView: View {
             propertyId: viewModel.property.id,
             questionId: q.id
         ) else { return }
+        guard committedAnswer(for: q) == nil else {
+            QuizDraftStore.clear(
+                propertyId: viewModel.property.id,
+                questionId: q.id
+            )
+            return
+        }
 
         if currencyText.isEmpty, let saved = draft.currencyText {
             currencyText = saved
@@ -948,6 +966,10 @@ struct HouseQuizView: View {
             questionScreen(q)
                 .id(q.id)
                 .houseQuizAdvanceTransition()
+        }
+        .onAppear {
+            hydrateEntryState(for: q)
+            hydrateDraft(for: q)
         }
         .animation(HavenTheme.animationStandard, value: q.id)
         .overlay(alignment: .top) {
@@ -2002,6 +2024,23 @@ struct HouseQuizView: View {
                     .padding(HavenTheme.spacing16)
                     .background(HavenColors.creamLight)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                } else if !progressiveAutoCustomName.isEmpty {
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Text(progressiveAutoCustomName)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Button {
+                            progressiveAutoCustomName = ""
+                        } label: {
+                            Text("Change")
+                                .font(HavenTypography.uiLabelMedium)
+                                .foregroundStyle(HavenColors.action)
+                        }
+                    }
+                    .padding(HavenTheme.spacing16)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 } else {
                     UtilityProviderSearchPicker(
                         providerTypes: ["auto_insurance"],
@@ -2034,6 +2073,23 @@ struct HouseQuizView: View {
                         Spacer()
                         Button {
                             progressiveHomeProvider = nil
+                        } label: {
+                            Text("Change")
+                                .font(HavenTypography.uiLabelMedium)
+                                .foregroundStyle(HavenColors.action)
+                        }
+                    }
+                    .padding(HavenTheme.spacing16)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                } else if !progressiveHomeCustomName.isEmpty {
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Text(progressiveHomeCustomName)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Button {
+                            progressiveHomeCustomName = ""
                         } label: {
                             Text("Change")
                                 .font(HavenTypography.uiLabelMedium)
@@ -3049,6 +3105,18 @@ struct HouseQuizView: View {
 
     // MARK: - Q22 generator inline form (Phase 19i)
 
+    private var q22CommittedAnswer: HouseQuizAnswer? {
+        viewModel.state.answers["q22_generator"] ?? viewModel.property.houseQuizState?.answers["q22_generator"]
+    }
+
+    private var q22EffectiveGeneratorType: String? {
+        q22GeneratorUserEdited ? q22GeneratorType : (q22CommittedAnswer?.answerId ?? q22GeneratorType)
+    }
+
+    private var q22EffectiveGeneratorFuel: String? {
+        q22GeneratorUserEdited ? q22GeneratorFuel : (q22CommittedAnswer?.generatorFuelType ?? q22GeneratorFuel)
+    }
+
     /// Q22 captures: generator type → fuel type → optional provider.
     /// Each step expands inline once the previous step is set. The Continue
     /// button only enables when a valid combination is captured.
@@ -3077,7 +3145,7 @@ struct HouseQuizView: View {
             }
 
             // Step 2 — fuel type chips (only when type is whole_home or portable)
-            if let type = q22GeneratorType, type != "none" {
+            if let type = q22EffectiveGeneratorType, type != "none" {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     HStack(spacing: 0) {
                         Text("WHAT FUEL DOES IT RUN ON?")
@@ -3105,7 +3173,7 @@ struct HouseQuizView: View {
             //      to confirm against (no Q19 provider, or different fuels).
             //   3. Nothing — user said "Yes same supplier" so the provider is
             //      already captured (q22GeneratorProvider == matched).
-            if let fuel = q22GeneratorFuel, q22GeneratorType != "none" {
+            if let fuel = q22EffectiveGeneratorFuel, q22EffectiveGeneratorType != "none" {
                 if let matched = q22MatchedHeatingProvider, q22UseSameProvider == nil {
                     providerConfirmationCard(provider: matched, fuel: fuel)
                         .transition(.opacity)
@@ -3122,8 +3190,8 @@ struct HouseQuizView: View {
                 action: {
                     Task {
                         await viewModel.recordGeneratorAnswer(
-                            type: q22GeneratorType ?? "none",
-                            fuelType: q22GeneratorFuel,
+                            type: q22EffectiveGeneratorType ?? "none",
+                            fuelType: q22EffectiveGeneratorFuel,
                             provider: q22GeneratorProvider
                         )
                     }
@@ -3152,11 +3220,11 @@ struct HouseQuizView: View {
     /// who haven't answered Yes / Different see a clear nudge instead of a
     /// silent grey.
     private var generatorDisabledReason: String? {
-        guard q22GeneratorType != nil else {
+        guard q22EffectiveGeneratorType != nil else {
             return "Pick a generator type to continue."
         }
-        if q22GeneratorType == "none" { return nil }
-        guard let fuel = q22GeneratorFuel else {
+        if q22EffectiveGeneratorType == "none" { return nil }
+        guard let fuel = q22EffectiveGeneratorFuel else {
             return "Pick the fuel it runs on."
         }
         if q22MatchedHeatingProvider != nil && q22UseSameProvider == nil {
@@ -3222,11 +3290,13 @@ struct HouseQuizView: View {
     private func generatorTypeChip(_ option: AnswerOption) -> some View {
         // Build 86: dim unselected siblings to 55% so the selected chip
         // pops, matching `singleChoiceBody`.
-        let isSelected = q22GeneratorType == option.id
-        let anySelected = q22GeneratorType != nil
+        let selectedType = q22EffectiveGeneratorType
+        let isSelected = selectedType == option.id
+        let anySelected = selectedType != nil
         return Button {
             Haptics.selection()
             withAnimation(HavenTheme.animationStandard) {
+                q22GeneratorUserEdited = true
                 q22GeneratorType = option.id
                 // Selecting "none" clears the rest.
                 if option.id == "none" {
@@ -3273,11 +3343,13 @@ struct HouseQuizView: View {
     private func generatorFuelChip(id: String, label: String, icon: String) -> some View {
         // Build 86: dim unselected siblings to 55% so the selected chip
         // pops, matching `singleChoiceBody`.
-        let isSelected = q22GeneratorFuel == id
-        let anySelected = q22GeneratorFuel != nil
+        let selectedFuel = q22EffectiveGeneratorFuel
+        let isSelected = selectedFuel == id
+        let anySelected = selectedFuel != nil
         return Button {
             Haptics.selection()
             withAnimation(HavenTheme.animationStandard) {
+                q22GeneratorUserEdited = true
                 q22GeneratorFuel = id
                 // Reset provider AND the same-supplier confirmation state
                 // so the picker re-loads for the new fuel type and the
@@ -5314,6 +5386,7 @@ struct HouseQuizView: View {
         q22GeneratorType = nil
         q22GeneratorFuel = nil
         q22GeneratorProvider = nil
+        q22GeneratorUserEdited = false
         // Build 86 — clear the Q22 same-supplier confirmation cache so the
         // next visit re-fetches Q19's provider against the (possibly
         // updated) heating fuel choice.
@@ -5401,7 +5474,7 @@ struct HouseQuizView: View {
     }
 
     private func hydrateEntryState(for q: HouseQuizQuestion) {
-        guard let prior = viewModel.state.answers[q.id] else {
+        guard let prior = committedAnswer(for: q) else {
             resetEntryState()
             return
         }
@@ -5579,10 +5652,28 @@ struct HouseQuizView: View {
             progressiveGarageType = prior.answerId
             progressiveEVCharger = prior.payload?["evCharger"]
         case .dualInsurance:
-            // Hydration of the picker rows themselves is async — the
-            // body fetches by id from `prior.payload` on appear. We
-            // don't keep the UtilityProviderRow in @State on hydration
-            // because it requires a network round-trip.
+            if let autoIdString = prior.payload?["autoProviderId"],
+               let autoId = UUID(uuidString: autoIdString) {
+                Task {
+                    do {
+                        let fetched = try await DatabaseService.shared.fetchUtilityProvider(id: autoId)
+                        await MainActor.run { progressiveAutoProvider = fetched }
+                    } catch {
+                        print("[HouseQuiz] Q26 auto provider hydration failed: \(error)")
+                    }
+                }
+            }
+            if let homeIdString = prior.payload?["homeProviderId"],
+               let homeId = UUID(uuidString: homeIdString) {
+                Task {
+                    do {
+                        let fetched = try await DatabaseService.shared.fetchUtilityProvider(id: homeId)
+                        await MainActor.run { progressiveHomeProvider = fetched }
+                    } catch {
+                        print("[HouseQuiz] Q26 home provider hydration failed: \(error)")
+                    }
+                }
+            }
             if let custom = prior.customEntries {
                 for entry in custom {
                     if entry.hasPrefix("auto:") {
