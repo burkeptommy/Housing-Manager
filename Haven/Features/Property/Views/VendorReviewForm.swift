@@ -276,6 +276,7 @@ struct VendorReviewForm: View {
             )
             insert.website = vendor.website.isEmpty ? nil : vendor.website
             insert.category = resolvedCategory
+            insert.source = vendor.source == .website ? "find_vendor" : "manual"
 
             var contractor = try await DatabaseService.shared.createContractor(insert)
 
