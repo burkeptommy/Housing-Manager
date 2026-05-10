@@ -69,7 +69,7 @@ Branch: `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG`
 - Evidence: A3.1 reached only unauthenticated auth/welcome screens, so rows 2.96-2.99 and 2.101-2.105 were not exercised in UI. The ad hoc fixture script also used a stale anon key and failed signup with 401 in `/tmp/codex-logs/a3-fixture-20260510152550.log`.
 - Reproduction: Launch the simulator without a pre-seeded authenticated homeowner fixture and attempt to drive PropertyDetailView/RoutineEditSheet from a fresh app state.
 - Suggested fix: Use the debug-simulator e2e login bootstrap with a seeded `e2e-test-*` homeowner before running simulator QA. Main-session evidence: `/tmp/codex-screenshots/auth-bootstrap-dashboard-2.png`.
-- Status: `open` pending A3.1 rerun, commit, and push
+- Status: `fixed` by `5aa507fc` and verified by direct A3.1 simulator rerun.
 
 ### Row 2.96 - Authenticated dashboard crash on duplicate Landscaping routine categories
 
@@ -78,34 +78,52 @@ Branch: `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG`
 - Evidence: A3.1 rerun launched with the seeded fixture and crashed before PropertyDetailView. `/tmp/codex-logs/a3-rerun-crash-summary.log` shows `Swift/NativeDictionary.swift:792: Fatal error: Duplicate values for key: 'Landscaping'`.
 - Reproduction: Seed the A4 combinatorial homeowner fixture, launch the iOS app with the e2e login bootstrap, and wait for dashboard bootstrap. The fixture has multiple Landscaping-family routines, which previously trapped in `Day1TaskCurator`.
 - Suggested fix: Use duplicate-tolerant dictionary construction for active/pending vendor routines keyed by primary category. Main-session patch applied in `Haven/Features/Property/Services/Day1TaskCurator.swift` and verified by relaunch screenshot `/tmp/codex-screenshots/day1-duplicate-routine-dashboard.png`.
-- Status: `open` pending A3.1 rerun, commit, and push
+- Status: `fixed` by `5aa507fc` and verified by direct A3.1 simulator rerun.
 
 ### Rows 2.97-2.98 - Weekly trash routine created, reminder not enabled in partial run
 
 - Category: `persistence_finding`
 - Severity: `major`
-- Evidence: A3.1 rerun created `A3 Trash Wed 1556` with `routine_kind=trash`, `cadence_type=weekly`, and `days_of_week=[4]`, but `evening_before_reminder=false`. DB evidence: `/tmp/codex-logs/a3-db-trash-created.json`.
+- Evidence: Initial A3.1 rerun created `A3 Trash Wed 1556` with `evening_before_reminder=false` because the worker did not reach the control before save. Direct rerun created `A3R Trash Wed 1617` with `routine_kind=trash`, `cadence_type=weekly`, `days_of_week=[4]`, and `evening_before_reminder=true`. DB evidence: `/tmp/codex-logs/a3-db-evidence-1778444632.json`.
 - Reproduction: Add a weekly Wednesday trash routine from Property > Maintenance > Add routine and verify the evening-before reminder toggle before saving.
-- Suggested fix: Rerun the row and explicitly scroll to/enable the reminder control before save. No code fix is indicated yet because the worker did not reach the control before first save.
-- Status: `open`
+- Suggested fix: None remaining for this row.
+- Status: `not_reproduced`
 
 ### Rows 2.99-2.100 - Contractor picker fell back to unrelated vendors for cleaning
 
 - Category: `ui_quality_finding`
 - Severity: `major`
-- Evidence: A3.1 rerun opened `ContractorPickerSheet` for a cleaning routine and saw mixed categories including Chimney, Electrical, Landscaping, HVAC, Pest, Plumbing, and Trash & Recycling. With no cleaning contractor present, it selected a lawn vendor only to verify persistence.
+- Evidence: A3.1 rerun opened `ContractorPickerSheet` for a cleaning routine and saw mixed categories including Chimney, Electrical, Landscaping, HVAC, Pest, Plumbing, and Trash & Recycling. Direct rerun after rebuilding and reinstalling the `5aa507fc` app showed `No Matching Contractors` for Cleaning Service, then the add-contractor path created `A3R Cleaning Co 1629` and saved `A3R Cleaning Biweekly 1631` with `cadence_type=biweekly` and a Cleaning Service vendor. Screenshots: `/tmp/codex-screenshots/a3-direct/03-cleaning-picker-strict-empty.png`, `/tmp/codex-screenshots/a3-direct/04-cleaning-biweekly-saved.png`. DB evidence: `/tmp/codex-logs/a3-db-evidence-cleaning-1778445249.json`.
 - Reproduction: Add a biweekly cleaning routine and open the contractor picker when the household has no Cleaning Service contractor.
 - Suggested fix: Keep category filtering strict and show the empty/add-contractor state when no category match exists. Main-session patch applied in `Haven/Features/Property/Views/ContractorPickerSheet.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc` and verified by direct A3.1 simulator rerun.
 
 ### Rows 2.101-2.105 - A3.1 seasonal/edit rows incomplete
 
 - Category: `verification`
 - Severity: `major`
-- Evidence: A3.1 rerun reached snow routine annual cadence and active-month chip editing but cancelled the unsaved draft at stop time; rows 2.103-2.105 were not completed before the partial stop.
+- Evidence: Initial A3.1 rerun reached snow routine annual cadence and active-month chip editing but cancelled the unsaved draft at stop time. Direct rerun saved `A3R Snow Dec Apr 1636` with `cadence_type=annual` and `active_months=[1,2,3,4,12]`, verified the chip summary `Active December through April`, and edited the same row to `A3R Snow Dec Apr Edited 1641` without creating a duplicate. Screenshots: `/tmp/codex-screenshots/a3-direct/05-snow-dec-apr-summary.png`, `/tmp/codex-screenshots/a3-direct/06-snow-saved-active-programs.png`. DB evidence: `/tmp/codex-logs/a3-db-evidence-snow-1778445540.json`, `/tmp/codex-logs/a3-db-evidence-edit-1778445758.json`.
 - Reproduction: Continue A3.1/A3.2 after current fixes, saving snow Dec-Apr, quick presets, active month exclusion, and edit-without-duplicate behavior.
-- Suggested fix: Rerun the remaining routine rows after the build with strict contractor filtering.
-- Status: `open`
+- Suggested fix: None remaining for A3.1.
+- Status: `not_reproduced`
+
+### Rows 2.109-2.110 - PickupDayBanner evening/morning windows not live-verifiable in current simulator window
+
+- Category: `verification`
+- Severity: `none`
+- Evidence: A3.2 was driven between 16:56 and 17:24 EDT on 2026-05-10. `PickupDayBanner` gates evening-before display at `hour >= 18` and morning-of display at `hour < 10` using live `Date()`, with no debug test-clock override. The waste routine reminder persistence itself is verified in `/tmp/codex-logs/a3-db-evidence-1778444632.json`.
+- Reproduction: Launch the same fixture after 18:00 local time for evening-before behavior or before 10:00 local time on pickup morning for morning-of behavior, or add an explicit DEBUG-only clock override for `PickupDayBanner`.
+- Suggested fix: No product fix is indicated from this run. Add test-clock plumbing if these rows need deterministic simulator verification outside the natural time windows.
+- Status: `deferred`
+
+### Rows 2.114-2.115 - Paused routines still projected upcoming visits until the detail view refreshed
+
+- Category: `persistence_finding`
+- Severity: `major`
+- Evidence: Before the fix, `A3R Cleaning Biweekly 1631` persisted `setup_state='paused'` and `is_paused=true` in `/tmp/codex-logs/a3-db-evidence-routine-paused-1778446734.json`, but Routine Detail still showed projected upcoming visits (`/tmp/codex-screenshots/a3-direct/13-paused-detail-still-shows-upcoming.png`). After `1524529d`, pause immediately renders `Paused` with `No visits projected yet` (`/tmp/codex-screenshots/a3-direct/17-pause-save-refreshes-detail-immediately.png`), and resume immediately renders `Active` with projected visits (`/tmp/codex-screenshots/a3-direct/18-resume-save-refreshes-detail-immediately.png`). DB evidence: `/tmp/codex-logs/a3-db-evidence-refresh-pause-1778448072.json`, `/tmp/codex-logs/a3-db-evidence-refresh-resume-1778448311.json`.
+- Reproduction: Open `A3R Cleaning Biweekly 1631`, edit the routine, toggle Pause on, save, then observe the open detail screen. Repeat by toggling Pause off and saving.
+- Suggested fix: Suppress upcoming previews for paused/archived routines and refetch the routine row when Routine Detail reloads after an edit save. Main-session patch applied in `Haven/Features/Property/Models/Routine.swift` and `Haven/Features/Property/Views/RoutineDetailView.swift`.
+- Status: `fixed` by `1524529d`
 
 ## Section 3 - Backend Combinatorial Coverage
 
@@ -120,7 +138,7 @@ No current-run findings yet.
 - Evidence: Static scan found custom icon circles in `ChezProfileView` and `ChezDelegationsListView` using `HavenColors.action` salmon for non-CTA decorative Settings-style icons.
 - Reproduction: Open Settings > Your Chez profile / View what Chez owns and inspect the icon tint/background on the hero, list rows, and empty state.
 - Suggested fix: Use navy icons with the indigo wash for non-CTA icon compositions. Main-session patch applied in `Haven/Features/ChezRequests/Views/ChezProfileView.swift` and `Haven/Features/ChezRequests/Views/ChezDelegationsListView.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
 
 ### Row 14.2 - Profile edit scope exceeds current model
 
@@ -138,7 +156,7 @@ No current-run findings yet.
 - Evidence: `HouseholdAccessView` sharing explainer used `\u{2014}` in user-facing copy.
 - Reproduction: Open Settings > Household & Access and inspect Linked accounts explainer copy.
 - Suggested fix: Rephrase without em dash. Main-session patch applied in `Haven/Features/Settings/HouseholdAccessView.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
 
 ### Row 14.7 - Security dashboard copy contained em dashes
 
@@ -147,7 +165,7 @@ No current-run findings yet.
 - Evidence: `SecurityDashboardView` had four user-facing `\u{2014}` strings in security and Vault Lock copy.
 - Reproduction: Open Settings > Security and inspect the security dashboard and Vault Lock explanatory sections.
 - Suggested fix: Rephrase without em dashes. Main-session patch applied in `Haven/Features/Security/SecurityDashboardView.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
 
 ### Row 14.10 - Visit reminders preference was hidden from Settings
 
@@ -156,7 +174,7 @@ No current-run findings yet.
 - Evidence: `NotificationPreferences` includes `visitReminders` and `NotificationScheduler` honors it, but `NotificationSettingsView` did not expose a toggle.
 - Reproduction: Open Settings > Notifications. Document, property, and digest toggles are visible, but Visit Reminders is absent.
 - Suggested fix: Add a Visit Reminders toggle bound to `prefs.visitReminders`. Main-session patch applied in `Haven/Features/Notifications/NotificationSettingsView.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
 
 ### Row 14.16 - Contact Support used Tom address
 
@@ -165,7 +183,7 @@ No current-run findings yet.
 - Evidence: `SettingsView` linked Contact Support to `tom@getchez.com` while `AppConfig.supportEmail` is `support@getchez.com`.
 - Reproduction: Open Settings > About > Contact Support and inspect the mailto destination.
 - Suggested fix: Use `AppConfig.supportEmail`. Main-session patch applied in `Haven/Features/Settings/SettingsView.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
 
 ### Unknown Settings row - RequestAssessmentView appears unreachable
 
@@ -194,7 +212,7 @@ No current-run findings yet.
 - Evidence: Static scan found the live `ThisWeekSection` See all action appended `maintenance`, while `maintenance_calendar` is the route that opens `MaintenanceScheduleView(initialLayout: .calendar)`.
 - Reproduction: On Dashboard, tap Needs Your Attention > See all and observe it routes to the maintenance hub instead of the calendar layout.
 - Suggested fix: Route both full-schedule affordances to `maintenance_calendar`. Main-session patch applied in `Haven/Features/Dashboard/DashboardView.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A6 interaction verification remains pending.
 
 ### Row 19.7 - Snooze button nested inside row navigation
 
@@ -203,7 +221,7 @@ No current-run findings yet.
 - Evidence: Static scan found `ThisWeekSection` wrapped the full row in a `Button`, then placed the snooze `Button` inside that row label. The persistence path itself exists in `DashboardViewModel.snoozeTask`.
 - Reproduction: On Dashboard Needs Your Attention, tap the zzz affordance and verify whether it snoozes or opens task detail.
 - Suggested fix: Split the row tap target and snooze button into sibling controls. Main-session patch applied in `Haven/Features/Dashboard/Components/ThisWeekSection.swift`.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc`; runtime A6 interaction verification remains pending.
 
 ### Row 19.12 - Recent Activity visible count and source coverage incomplete
 
@@ -212,7 +230,7 @@ No current-run findings yet.
 - Evidence: `DashboardView` passed only the first 3 events to `RecentActivityFeed`, and static scan found TODOs for scenario, recall, and gap-analysis event sources.
 - Reproduction: On a post-quiz Dashboard with many events, inspect Recent Activity visible count and event types.
 - Suggested fix: Pass up to 7 events from Dashboard; add missing sources in a later product-backed pass. Main-session patch applied for the visible count in `Haven/Features/Dashboard/DashboardView.swift`; missing event sources remain deferred.
-- Status: `open` pending build, simulator verification, commit, and push
+- Status: `fixed` by `5aa507fc` for visible count; missing event sources remain `deferred` and runtime A6 interaction verification remains pending.
 
 ### Row 19.14 - Dashboard bottom sections appear unrendered
 
