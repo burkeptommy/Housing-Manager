@@ -206,7 +206,10 @@ struct UnifiedTaskCard: View {
     var onSkipVisit: (() -> Void)?
     var onResumeService: (() -> Void)?
 
+    @State private var isDelegatingToChez: Bool = false
+
     private var isRecurring: Bool { task.standingAppointmentId != nil }
+    private var hasDelegatedToChez: Bool { task.isChezOwned || task.chezRequestId != nil || isDelegatingToChez }
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -943,7 +946,9 @@ struct UnifiedTaskCard: View {
                 // schedules. Caption is muted so it reads as the
                 // assisted alternative, not a competing primary CTA.
                 Button {
+                    guard !hasDelegatedToChez else { return }
                     Haptics.medium()
+                    isDelegatingToChez = true
                     Task {
                         do {
                             try await HavenSupabase.delegateTaskToChez(
@@ -962,19 +967,21 @@ struct UnifiedTaskCard: View {
                                 name: .maintenanceTaskChanged, object: nil
                             )
                         } catch {
+                            isDelegatingToChez = false
                             Haptics.error()
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "person.fill.questionmark")
+                        Image(systemName: hasDelegatedToChez ? "checkmark.circle.fill" : "person.fill.questionmark")
                             .font(.system(size: 10, weight: .semibold))
-                        Text("Or have Chez source one")
+                        Text(hasDelegatedToChez ? "Chez is sourcing this" : "Or have Chez source one")
                             .font(HavenTypography.uiCaption)
                     }
-                    .foregroundStyle(HavenColors.action)
+                    .foregroundStyle(hasDelegatedToChez ? HavenColors.success : HavenColors.action)
                 }
                 .buttonStyle(.plain)
+                .disabled(hasDelegatedToChez)
                 .padding(.top, 4)
 
                 // Phase 56.6: "Or add to handyman list" secondary link

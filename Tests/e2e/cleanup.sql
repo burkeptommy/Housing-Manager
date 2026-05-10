@@ -72,6 +72,15 @@ DELETE FROM public.vehicles
       AND u.household_id IS NOT NULL
   );
 
+-- Service history references contractors. Wipe it before contractors so
+-- vendor-history E2E fixtures do not block cleanup.
+DELETE FROM public.service_records
+  WHERE household_id IN (
+    SELECT u.household_id FROM public.users u
+    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
+      AND u.household_id IS NOT NULL
+  );
+
 DELETE FROM public.contractors
   WHERE household_id IN (
     SELECT u.household_id FROM public.users u
