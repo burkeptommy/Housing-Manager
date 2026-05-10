@@ -66,6 +66,14 @@ struct QuizCinematicReveal: View {
         .frame(minHeight: 640)
         .background(HavenColors.background.ignoresSafeArea(edges: .top))
         .onAppear { startIfNeeded() }
+        .onChange(of: protectionValue) { _, newValue in
+            guard hasStarted,
+                  let value = newValue,
+                  value > 0,
+                  displayValue != value
+            else { return }
+            displayValue = value
+        }
     }
 
     @ViewBuilder
