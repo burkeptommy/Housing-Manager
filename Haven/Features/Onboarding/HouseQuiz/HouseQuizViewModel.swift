@@ -878,7 +878,7 @@ final class HouseQuizViewModel: ObservableObject {
         advance()
     }
 
-    /// Save the current question for later — appears in the dashboard
+    /// Save the current question for later - appears in the dashboard
     /// "X saved questions" hint and resurfaces next launch.
     func saveForLater() {
         guard let q = currentQuestion else { return }
@@ -890,7 +890,34 @@ final class HouseQuizViewModel: ObservableObject {
         advance()
     }
 
-    /// Skip forever — never resurface, user will add the data manually.
+    /// Exit path for the visible "Save for later" action.
+    func saveCurrentQuestionForLaterAndExit() async {
+        guard let q = currentQuestion else { return }
+        isSaving = true
+        savedAndReady = false
+        saveErrorMessage = nil
+        defer { isSaving = false }
+
+        if !state.savedForLater.contains(q.id) {
+            state.savedForLater.append(q.id)
+        }
+        state.skipped.removeAll { $0 == q.id }
+
+        do {
+            try await persistStateThrowing()
+            savedAndReady = true
+            Analytics.track(.quizSavedForLater, ["question_id": q.id])
+            Analytics.track(.quizSavedAndExited, [
+                "answered": state.answers.count,
+                "saved_for_later": state.savedForLater.count,
+            ])
+        } catch {
+            saveErrorMessage = "Couldn't save your progress. Check your connection and try again."
+            Analytics.track(.quizSaveAndExitFailed, ["error": "\(error)"])
+        }
+    }
+
+    /// Skip forever - never resurface, user will add the data manually.
     func skipForever() {
         guard let q = currentQuestion else { return }
         if !state.skipped.contains(q.id) {

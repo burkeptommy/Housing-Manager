@@ -36,6 +36,7 @@ struct HouseQuizView: View {
     @State private var inlineSelectedProvider: UtilityProviderRow? = nil
     @State private var showSaveAndExit = false
     @State private var showSavedToast = false
+    @State private var showSaveForLaterConfirm = false
     @State private var showSkipForeverConfirm = false
     @State private var showDocumentUpload = false
     @State private var pendingProviderForAnswer: String?
@@ -1102,12 +1103,30 @@ struct HouseQuizView: View {
                 HStack(spacing: HavenTheme.spacing12) {
                     Spacer()
                     Button {
-                        viewModel.saveForLater()
-                        resetEntryState()
+                        showSaveForLaterConfirm = true
                     } label: {
                         Text("Save for later")
                             .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .confirmationDialog(
+                        "Save this question for later?",
+                        isPresented: $showSaveForLaterConfirm,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Save for later") {
+                            Task {
+                                await viewModel.saveCurrentQuestionForLaterAndExit()
+                                if viewModel.savedAndReady {
+                                    showSavedToast = true
+                                    try? await Task.sleep(nanoseconds: 900_000_000)
+                                    dismiss()
+                                }
+                            }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("We'll save your place and bring you back to the next unanswered question when you continue.")
                     }
 
                     Menu {
