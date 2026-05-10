@@ -1838,6 +1838,13 @@ enum VendorCategories {
         return canonicalSelection.first
     }
 
+    static func pickerLabel(for category: String) -> String {
+        let canonical = canonicalCategory(category)
+        return all.first {
+            canonicalCategory($0).caseInsensitiveCompare(canonical) == .orderedSame
+        } ?? category
+    }
+
     private static func canonicalCategory(_ category: String) -> String {
         SystemCategoryRegistry.canonical(category: category) ?? category
     }
@@ -2058,9 +2065,10 @@ struct EditContractorSheet: View {
         let resolvedType = detectedType ?? "Contractor / Service Provider"
         let categoryValues: Set<String> = {
             if let detected = detectedType {
-                return Set(raw.dropFirst().filter { $0 != detected })
+                return Set(raw.dropFirst().filter { $0 != detected }.map(VendorCategories.pickerLabel))
             }
-            return Set(raw)
+            let savedCategories = raw.isEmpty ? [contractor.category].compactMap { $0 } : raw
+            return Set(savedCategories.map(VendorCategories.pickerLabel))
         }()
 
         _companyName = State(initialValue: contractor.companyName)
