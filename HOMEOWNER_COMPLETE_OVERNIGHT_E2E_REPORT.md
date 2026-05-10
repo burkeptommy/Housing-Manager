@@ -6,19 +6,19 @@ Canonical matrix: `Tests/e2e/HOMEOWNER_COMPLETE_TEST_MATRIX.md`
 
 ## TL;DR
 
-Round A is in progress. The login wall is no longer blocking simulator QA: a fresh backend fixture was seeded, the app was launched through a simulator-only e2e login bootstrap, and the UI landed on the authenticated homeowner Dashboard. A3 routine create/edit/lifecycle verification is complete except the two PickupDayBanner rows, which are deferred to a valid clock window or future test-clock hook.
+Round A execution is complete and stopped before Round C. The login wall is no longer blocking simulator QA: fresh backend fixtures now launch through the simulator-only e2e login bootstrap and reach authenticated homeowner UI. A1 and A4 are PASS; A3 is PASS except the two time-windowed PickupDayBanner rows; A5 and A6 have runtime evidence with deferred product/spec gaps documented.
 
 ## Round A Status
 
 | Batch | Matrix rows | Status | Evidence |
 |---|---:|---|---|
 | Prior locked evidence | See below | Prior PASS | Prior commits trusted unless regression surfaces |
-| A1 - Section 1d chapter intro card | 1.19-1.23 | PARTIAL | `/tmp/codex-logs/a1-build-20260510150822.log`, `/tmp/codex-logs/a1-seed-20260510150822.log`; no UI screenshots before minute-25 stop |
+| A1 - Section 1d chapter intro card | 1.19-1.23 | PASS | Direct simulator rerun with `e2e-a1-chapter-intro-1778449061906@havenhome.test`; screenshots in `/tmp/codex-screenshots/a1-direct/` verify Chapter 1, Chapter 2 resume, same-chapter suppression, and Chapter 3 resume |
 | A2 - Section 2c mode fork waitlist path | 2.34-2.37 | FAIL | `/tmp/codex-logs/a2-xcodebuild.log`, `/tmp/codex-screenshots/a2/address-no-address-found.png` |
 | A3 - Section 2i routines lifecycle | 2.96-2.115 | PASS except 2.109-2.110 DEFERRED | Create/edit rows 2.96-2.105 verified by direct simulator run; archive/Chez/pause/resume rows verified with DB and screenshots; PickupDayBanner rows deferred because the simulator was outside required time windows |
 | A4 - Section 3 backend combinatorial | 3.1-3.36 | PASS | `/tmp/codex-logs/run-1778439978.log` |
-| A5 - Section 14 settings subscreens | 14.1-14.19 | Static PARTIAL | Static scan complete; low-risk tint/copy/toggle/support fixes shipped in `5aa507fc`; simulator navigation/persistence pass pending |
-| A6 - Section 19 dashboard interactions | 19.1-19.28 | Static PARTIAL | Static scan complete; low-risk route/count/snooze fixes shipped in `5aa507fc`; simulator interaction pass pending |
+| A5 - Section 14 settings subscreens | 14.1-14.19 | Runtime PARTIAL | Simulator navigation covered Settings subscreens and bottom confirmation popovers; low-risk fixes from `5aa507fc` verified; row 14.8 controls gap and row 14.2 profile-scope gap remain deferred |
+| A6 - Section 19 dashboard interactions | 19.1-19.28 | Runtime PARTIAL | Runtime pass covered Dashboard order, coverage hero, schedule navigation, snooze persistence, quick actions, Recent Activity, hero destination, tab reset, and fresh-signup cleanup-card fix; global FAB/bottom-section product gaps remain deferred |
 
 ## Prior Locked Evidence
 
@@ -43,6 +43,7 @@ These Round A items are treated as prior-pass evidence per the run plan and are 
 - `97e16e86 Fix: cover homeowner backend combinatorics`
 - `5aa507fc Fix: unblock homeowner Round A simulator QA`
 - `1524529d Fix: refresh paused routine lifecycle previews`
+- `b0dbc64c Fix: hide legacy cleanup card for new homeowners`
 
 ## Bugs Found And Fixed
 
@@ -53,6 +54,7 @@ These Round A items are treated as prior-pass evidence per the run plan and are 
 - A5 static scan found authorized low-risk Settings fixes. Main-session patches replaced salmon decorative Chez delegation icons with navy styling, removed em dashes from security/access copy, switched Contact Support to `AppConfig.supportEmail`, and exposed the existing Visit Reminders notification preference. These shipped in `5aa507fc`.
 - A6 static scan found authorized low-risk Dashboard fixes. Main-session patches route Needs Your Attention schedule links to the calendar, show up to seven Recent Activity events, and split the snooze button out of nested row navigation. These shipped in `5aa507fc`.
 - A3.2 pause/resume exposed a lifecycle preview bug. Paused routines persisted correctly but still projected upcoming visits on Routine Detail, and the open detail screen kept stale status after edit saves. The main session suppressed previews for paused/archived routines and made Routine Detail refetch its routine row after reload. This shipped in `1524529d`.
+- A6 runtime verification exposed a fresh-signup cleanup card regression. `LegacyTasksNotificationCard` used archived-task count only, while `MaintenanceReorganizedCard` already had an account-age gate. The main session applied the same Phase 66 account-created-before-release gate and verified the card disappears for the May 10 fixture. This shipped in `b0dbc64c`.
 
 ## Persistence Audit
 
@@ -72,15 +74,17 @@ A3.2 persistence is verified:
 
 ## UI Quality Audit
 
-A1 has no UI quality evidence yet because the simulator worker stopped before active UI driving.
+A1 UI quality evidence now exists from direct simulator screenshots. Dashboard, property recap, and chapter intro/question screens use Chez branding, and the chapter intro controls render with stable full-width touch targets. Screenshot set: `/tmp/codex-screenshots/a1-direct/00-dashboard-start-quiz.png` through `/tmp/codex-screenshots/a1-direct/08-q24-after-ch3-intro.png`.
 
-Authenticated Dashboard smoke evidence exists at `/tmp/codex-screenshots/auth-bootstrap-dashboard-2.png`. The screen uses Chez branding and confirms the simulator is no longer stuck on login before A3/A5/A6.
+Authenticated Dashboard smoke evidence also exists at `/tmp/codex-screenshots/auth-bootstrap-dashboard-2.png`. The screen uses Chez branding and confirms the simulator is no longer stuck on login before A3/A5/A6.
 
-A5 static scan found Settings UI quality issues now shipped in `5aa507fc`: salmon decorative icons in Chez profile/delegations, em dashes in Security and Household Access copy, and the Tom support email link. Runtime visual confirmation is still pending.
+A5 runtime verification confirmed Settings navigation and local navy list-row icon styling across the visited rows. Evidence set: `/tmp/codex-screenshots/a5-settings/00-settings-top.png` through `/tmp/codex-screenshots/a5-settings/19-delete-account-confirmation.png`. The fixed Chez profile/delegation icons, Household Access copy, Security Dashboard copy, Visit Reminders toggle, and Contact Support area were all revisited after `5aa507fc`.
 
-A6 static scan found Dashboard issues now shipped in `5aa507fc`: schedule link routing, Recent Activity visible count, and nested snooze control behavior. Runtime interaction confirmation is still pending.
+A6 Dashboard issues shipped in `5aa507fc` and were verified at runtime: schedule link routing, Recent Activity visible count, and nested snooze control behavior.
 
 A3.2 visual behavior is verified after `1524529d`: the same open Routine Detail screen switches to `Paused` with `No visits projected yet` after pause, then back to `Active` with projected visits after resume. Screenshots: `/tmp/codex-screenshots/a3-direct/17-pause-save-refreshes-detail-immediately.png`, `/tmp/codex-screenshots/a3-direct/18-resume-save-refreshes-detail-immediately.png`.
+
+A6 runtime evidence now covers the Dashboard top and mid-scroll order, coverage hero, Needs Your Attention, Upcoming, quick actions, activity feed, and post-fix cleanup-card absence. Key screenshots: `/tmp/codex-screenshots/a6-dashboard/00-dashboard-top-loaded.png`, `/tmp/codex-screenshots/a6-dashboard/02-dashboard-needs-upcoming.png`, `/tmp/codex-screenshots/a6-dashboard/09-recent-activity-log.png`, and `/tmp/codex-screenshots/a6-dashboard/12-dashboard-after-legacy-card-fix.png`.
 
 ## Product Gaps
 
@@ -91,11 +95,15 @@ A2 found four deferred gaps in the mode-fork waitlist path:
 - Row 2.36: mode fork lacks a back affordance to return to foundational questions.
 - Row 2.37: the optional decide-later path exists in the component but is not wired from production onboarding.
 
-A5 static scan found deferred Settings/product gaps:
+A5 found deferred Settings/product gaps:
 
 - Row 14.2: Profile currently edits full name only; email/phone/avatar require model/product support.
+- Row 14.8: Security Settings only exposes Change Password; biometric toggle, vault timeout, and passcode controls expected by the matrix are absent or moved.
 - Unknown Settings row: `RequestAssessmentView` appears unreachable from production Settings.
 - Row 14.6: Alfred copy in a Settings-linked household email surface needs product confirmation before broad brand replacement.
+
+A6 found deferred Dashboard product/spec gaps:
+
 - Row 19.14: Dashboard bottom-section composition appears to omit matrix-listed surfaces and needs product/spec confirmation.
 - Row 19.18: global What If FAB was intentionally removed in code but remains in the matrix; restoring it needs product confirmation.
 
@@ -107,13 +115,13 @@ A3.2 verification constraint:
 
 Control ledger: `/tmp/codex-results/round-a-ledger.jsonl`.
 
-Section 1d chapter intro rows 1.19-1.23 are PARTIAL. The app build and fixture seed succeeded, but the worker did not reach simulator UI verification before the bounded stop.
+Section 1d chapter intro rows 1.19-1.23 are PASS. The first bounded worker stopped before UI driving, so the coordinator reran with a fresh fixture. Evidence covers Dashboard quiz launch, property recap, Chapter 1 intro before Q1, Chapter 2 intro on resume, no repeat intro on the next Chapter 2 question, and Chapter 3 intro on resume.
 
 Section 2c mode fork waitlist rows 2.34-2.37 failed. The failures are documented in `Tests/e2e/HOMEOWNER_GAPS.md`; coverage matching/RLS/lifecycle behavior are deferred under the Round A fix policy.
 
-Section 2i A3.1 rows 2.96-2.105 were PARTIAL on the first attempt because the worker did not get past unauthenticated screens. Main-session auth unblocking is verified and the A3.1 rerun is in progress.
+Section 2i A3.1 rows 2.96-2.105 were PARTIAL on the first attempt because the worker did not get past unauthenticated screens. Main-session auth unblocking was verified, then the coordinator reran the batch directly.
 
-The first authenticated A3.1 rerun failed on a dashboard bootstrap crash before PropertyDetailView. The crash is fixed locally and verified by relaunch; A3.1 routine UI verification still needs rerun evidence.
+The first authenticated A3.1 rerun failed on a dashboard bootstrap crash before PropertyDetailView. The crash was fixed and verified by relaunch before the successful direct A3.1 pass.
 
 A3.1 after the crash fix is now PASS by direct simulator verification. Rows 2.96-2.105 covered Add routine, weekly trash with reminder persistence, strict cleaning vendor filtering plus add-contractor path, biweekly cleaning persistence, snow Dec-Apr active months via preset plus Apr chip, and edit-without-duplicate persistence.
 
@@ -121,9 +129,9 @@ A3.2 rows 2.106-2.108 and 2.111-2.115 are PASS by direct simulator and DB verifi
 
 Section 3 backend combinatorial rows 3.1-3.36 passed through `Tests/e2e/run.mjs`. Some matrix labels are older than the current merged-question model, so the runner verifies the current persisted equivalents: Q3 includes the former Q3b HVAC subtype, Q11 includes the former Q11b lawn type payload, Q22 supports natural gas/propane/diesel generator fuel, Q25 includes EV charger payload, Q26 combines auto/home insurance, and the current chapter boundaries are Q22 to Q36 and Q19 to Q24.
 
-Section 14 Settings rows 14.1-14.19 have static PARTIAL evidence. Simulator navigation, visual tint verification, and persistence checks remain pending.
+Section 14 Settings rows 14.1-14.19 have runtime PARTIAL evidence. A5 covered Your Chez Profile, Profile, Family Members, Household & Access, Household Staff, Household Email, Security Dashboard, Security Settings, Trusted Contacts, Notifications, Home Details, Maintenance Preferences, Handyman Preference, Task Routing, Family Reference Binder, About rows, Sign Out confirmation, Delete Account first warning, and whole-list navy icon tint. Full-name profile edit persistence was confirmed in `/tmp/codex-logs/a5-profile-db-evidence-admin-1778451562.json`. Deferred gaps remain for profile edit scope, Security Settings expected controls, unreachable RequestAssessmentView, and Alfred naming confirmation.
 
-Section 19 Dashboard rows 19.1-19.28 have static PARTIAL evidence. Low-risk issues are fixed locally; simulator quick-action, snooze, schedule, activity, and FAB verification remains pending.
+Section 19 Dashboard rows 19.1-19.28 have runtime PARTIAL evidence. PASS evidence covers compact greeting and seasonal tip, HomeCoverageHero numbers and destination navigation, QuickActionsRow and all four quick-action destinations, 60-day Needs Your Attention/Upcoming surfaces, `View schedule` to Maintenance calendar, snooze persistence to 2026-05-22, Recent Activity visible count plus activity log route, and tab-tap reset to Dashboard root. Row 19.25 is fixed by `b0dbc64c`. Deferred product/spec gaps remain for bottom-section composition and the removed global What If FAB.
 
 ## Backend Regression Status
 
@@ -135,4 +143,4 @@ None from this Round A session yet.
 
 ## Next-Session Priority
 
-Continue Round A only: finish A1 chapter-intro simulator verification, A5 Settings runtime verification, and A6 Dashboard runtime verification before starting Round C.
+Round A is signed off for this bounded run. Next session priority is Round C, only if explicitly instructed to continue.

@@ -13,14 +13,14 @@ Branch: `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG`
 
 ## Section 1d - Chapter Intro Card
 
-### A1 partial verification - rows 1.19-1.23
+### Rows 1.19-1.23 - Chapter intro cards render once per chapter
 
 - Category: `verification`
 - Severity: `none`
-- Evidence: A1 simulator worker built the Chez app and seeded `e2e-a1-chapter-intro-20260510150822@havenhome.test`, but stopped at the minute-25 rule before driving the quiz UI or capturing screenshots.
-- Reproduction: Use the seeded fixture or a fresh e2e homeowner, start the House Quiz, and verify chapter intro rendering before Q1, before Chapter 2, before Chapter 3, same-chapter suppression, and save/resume suppression behavior.
-- Suggested fix: No product fix is indicated yet. Resume simulator verification for rows 1.19-1.23 if Round A requires true PASS/FAIL evidence.
-- Status: `deferred`
+- Evidence: The initial A1 worker stopped before active UI driving, but the coordinator reran A1 with fresh fixture `e2e-a1-chapter-intro-1778449061906@havenhome.test`. The app launched through the simulator e2e login bootstrap to Dashboard, opened the quiz card, showed the property recap, rendered Chapter 1 before Q1, rendered Chapter 2 from a saved DB resume state, suppressed the Chapter 2 intro on the next in-chapter question, and rendered Chapter 3 from a saved DB resume state. Screenshots: `/tmp/codex-screenshots/a1-direct/00-dashboard-start-quiz.png`, `/tmp/codex-screenshots/a1-direct/02-chapter-1-intro.png`, `/tmp/codex-screenshots/a1-direct/03-q1-after-ch1-intro.png`, `/tmp/codex-screenshots/a1-direct/04-chapter-2-intro-resume.png`, `/tmp/codex-screenshots/a1-direct/06-q11-no-repeat-ch2-intro.png`, `/tmp/codex-screenshots/a1-direct/07-chapter-3-intro-resume.png`.
+- Reproduction: Seed a fresh incomplete homeowner property, launch with the simulator e2e login bootstrap, start the House Quiz from Dashboard, and then resume the same property with Chapter 1 and Chapter 1+2 answer maps to verify chapter-boundary behavior.
+- Suggested fix: None.
+- Status: `not_reproduced`
 
 ## Section 2c - Mode Fork Waitlist Path
 
@@ -138,13 +138,13 @@ No current-run findings yet.
 - Evidence: Static scan found custom icon circles in `ChezProfileView` and `ChezDelegationsListView` using `HavenColors.action` salmon for non-CTA decorative Settings-style icons.
 - Reproduction: Open Settings > Your Chez profile / View what Chez owns and inspect the icon tint/background on the hero, list rows, and empty state.
 - Suggested fix: Use navy icons with the indigo wash for non-CTA icon compositions. Main-session patch applied in `Haven/Features/ChezRequests/Views/ChezProfileView.swift` and `Haven/Features/ChezRequests/Views/ChezDelegationsListView.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A5 verification captured in `/tmp/codex-screenshots/a5-settings/01-chez-profile.png` and `/tmp/codex-screenshots/a5-settings/02-profile-view.png`.
 
 ### Row 14.2 - Profile edit scope exceeds current model
 
 - Category: `gap_found`
 - Severity: `major`
-- Evidence: Matrix expects edit name/email/phone/avatar, but `ProfileView` only edits full name. `UserRow` / `UserUpdate` do not expose phone or avatar fields.
+- Evidence: Matrix expects edit name/email/phone/avatar, but `ProfileView` only edits full name. `UserRow` / `UserUpdate` do not expose phone or avatar fields. Runtime A5 verified the supported full-name edit persisted to `users.full_name='A1 ChapterIntro QA'`; evidence: `/tmp/codex-logs/a5-profile-db-evidence-admin-1778451562.json`.
 - Reproduction: Open Settings > Profile. Email and role render read-only; no phone/avatar edit controls exist.
 - Suggested fix: Either narrow row 14.2 to name-only or add supported user profile fields plus edit UI/persistence for email, phone, and avatar.
 - Status: `deferred`
@@ -156,7 +156,7 @@ No current-run findings yet.
 - Evidence: `HouseholdAccessView` sharing explainer used `\u{2014}` in user-facing copy.
 - Reproduction: Open Settings > Household & Access and inspect Linked accounts explainer copy.
 - Suggested fix: Rephrase without em dash. Main-session patch applied in `Haven/Features/Settings/HouseholdAccessView.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A5 verification captured in `/tmp/codex-screenshots/a5-settings/04-household-access.png`.
 
 ### Row 14.7 - Security dashboard copy contained em dashes
 
@@ -165,7 +165,16 @@ No current-run findings yet.
 - Evidence: `SecurityDashboardView` had four user-facing `\u{2014}` strings in security and Vault Lock copy.
 - Reproduction: Open Settings > Security and inspect the security dashboard and Vault Lock explanatory sections.
 - Suggested fix: Rephrase without em dashes. Main-session patch applied in `Haven/Features/Security/SecurityDashboardView.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A5 verification captured in `/tmp/codex-screenshots/a5-settings/07-security-dashboard.png`.
+
+### Row 14.8 - Security Settings missing expected controls
+
+- Category: `gap_found`
+- Severity: `moderate`
+- Evidence: Runtime A5 navigation reached Settings > Security Settings, but the screen only exposed `Change Password`. The matrix expects biometric toggle, vault timeout, and passcode controls. Screenshot: `/tmp/codex-screenshots/a5-settings/09-security-settings.png`.
+- Reproduction: Open Settings > Security Settings on an authenticated homeowner account.
+- Suggested fix: Add and wire the biometric, vault timeout, and passcode controls if still required, or update row 14.8 if those controls moved or were intentionally removed.
+- Status: `deferred`
 
 ### Row 14.10 - Visit reminders preference was hidden from Settings
 
@@ -174,7 +183,7 @@ No current-run findings yet.
 - Evidence: `NotificationPreferences` includes `visitReminders` and `NotificationScheduler` honors it, but `NotificationSettingsView` did not expose a toggle.
 - Reproduction: Open Settings > Notifications. Document, property, and digest toggles are visible, but Visit Reminders is absent.
 - Suggested fix: Add a Visit Reminders toggle bound to `prefs.visitReminders`. Main-session patch applied in `Haven/Features/Notifications/NotificationSettingsView.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A5 verification captured in `/tmp/codex-screenshots/a5-settings/11-notifications-visit-reminders.png`.
 
 ### Row 14.16 - Contact Support used Tom address
 
@@ -183,7 +192,7 @@ No current-run findings yet.
 - Evidence: `SettingsView` linked Contact Support to `tom@getchez.com` while `AppConfig.supportEmail` is `support@getchez.com`.
 - Reproduction: Open Settings > About > Contact Support and inspect the mailto destination.
 - Suggested fix: Use `AppConfig.supportEmail`. Main-session patch applied in `Haven/Features/Settings/SettingsView.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A5 navigation verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A5 bottom-section verification captured in `/tmp/codex-screenshots/a5-settings/17-settings-about-actions.png`, `/tmp/codex-screenshots/a5-settings/18-sign-out-confirmation.png`, and `/tmp/codex-screenshots/a5-settings/19-delete-account-confirmation.png`.
 
 ### Unknown Settings row - RequestAssessmentView appears unreachable
 
@@ -212,7 +221,7 @@ No current-run findings yet.
 - Evidence: Static scan found the live `ThisWeekSection` See all action appended `maintenance`, while `maintenance_calendar` is the route that opens `MaintenanceScheduleView(initialLayout: .calendar)`.
 - Reproduction: On Dashboard, tap Needs Your Attention > See all and observe it routes to the maintenance hub instead of the calendar layout.
 - Suggested fix: Route both full-schedule affordances to `maintenance_calendar`. Main-session patch applied in `Haven/Features/Dashboard/DashboardView.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A6 interaction verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A6 verified `View schedule` lands on `MaintenanceScheduleView` calendar layout in `/tmp/codex-screenshots/a6-dashboard/01-view-schedule-calendar.png`.
 
 ### Row 19.7 - Snooze button nested inside row navigation
 
@@ -221,7 +230,7 @@ No current-run findings yet.
 - Evidence: Static scan found `ThisWeekSection` wrapped the full row in a `Button`, then placed the snooze `Button` inside that row label. The persistence path itself exists in `DashboardViewModel.snoozeTask`.
 - Reproduction: On Dashboard Needs Your Attention, tap the zzz affordance and verify whether it snoozes or opens task detail.
 - Suggested fix: Split the row tap target and snooze button into sibling controls. Main-session patch applied in `Haven/Features/Dashboard/Components/ThisWeekSection.swift`.
-- Status: `fixed` by `5aa507fc`; runtime A6 interaction verification remains pending.
+- Status: `fixed` by `5aa507fc`; runtime A6 verified snooze persisted `Spring cleanup` from 2026-05-15 to 2026-05-22 in `/tmp/codex-logs/a6-snooze-db-evidence-1778451950.json`.
 
 ### Row 19.12 - Recent Activity visible count and source coverage incomplete
 
@@ -230,7 +239,7 @@ No current-run findings yet.
 - Evidence: `DashboardView` passed only the first 3 events to `RecentActivityFeed`, and static scan found TODOs for scenario, recall, and gap-analysis event sources.
 - Reproduction: On a post-quiz Dashboard with many events, inspect Recent Activity visible count and event types.
 - Suggested fix: Pass up to 7 events from Dashboard; add missing sources in a later product-backed pass. Main-session patch applied for the visible count in `Haven/Features/Dashboard/DashboardView.swift`; missing event sources remain deferred.
-- Status: `fixed` by `5aa507fc` for visible count; missing event sources remain `deferred` and runtime A6 interaction verification remains pending.
+- Status: `fixed` by `5aa507fc` for visible count; runtime A6 verified seven visible events and `View all` activity navigation in `/tmp/codex-screenshots/a6-dashboard/09-recent-activity-log.png`. Missing event sources remain `deferred`.
 
 ### Row 19.14 - Dashboard bottom sections appear unrendered
 
@@ -249,6 +258,15 @@ No current-run findings yet.
 - Reproduction: Open non-Alfred tabs and inspect for the global sparkles FAB.
 - Suggested fix: Restore the global FAB using the existing `.openScenarioStudio` full-screen route if this remains the product requirement.
 - Status: `deferred`
+
+### Row 19.25 - Legacy cleanup card shown to new signup
+
+- Category: `ui_quality_finding`
+- Severity: `moderate`
+- Evidence: Runtime A6 showed the `WE TIDIED YOUR LIST` legacy cleanup card on a fresh fixture created 2026-05-10, even though the account was created after the Phase 66 release gate. Before-fix screenshot: `/tmp/codex-screenshots/a6-dashboard/02-dashboard-needs-upcoming.png`. After `b0dbc64c`, the same fixture relaunch no longer shows the card; evidence: `/tmp/codex-screenshots/a6-dashboard/12-dashboard-after-legacy-card-fix.png`.
+- Reproduction: Launch post-quiz fixture `e2e-test-1778441875084@havenhome.test` and scroll below the quick actions.
+- Suggested fix: Apply the same `accountCreatedAt < phase66ReleaseDate` gate used by `MaintenanceReorganizedCard` to `LegacyTasksNotificationCard`.
+- Status: `fixed` by `b0dbc64c`
 
 ## Other Round A Notes
 
