@@ -5052,6 +5052,12 @@ struct HouseQuizView: View {
                     // VendorCoverageSheet; we also need to remove it
                     // from our state so re-renders don't bring it back.
                     coverageUncovered.removeAll { $0.id == item.id }
+                    Task {
+                        try? await DatabaseService.shared.dismissCategory(
+                            householdId: viewModel.property.householdId,
+                            category: item.id
+                        )
+                    }
                 },
                 onManageVendors: nil // Completion view is modal —
                                       // routing to Contacts mid-reveal
@@ -5196,14 +5202,6 @@ struct HouseQuizView: View {
 
             await MainActor.run {
                 self.delegationCandidates = candidates
-                if !candidates.isEmpty {
-                    // Brief delay so the user has a beat to register the
-                    // celebration before the sheet slides up.
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(700))
-                        showDelegationSheet = true
-                    }
-                }
             }
         } catch {
             print("[Phase19l] Failed to load delegation candidates: \(error)")
