@@ -534,7 +534,7 @@ class E2ERunner {
       heating_fuel: "oil",
       water_source: "private_well",
       sewer_or_septic: "septic",
-      household_residents: "couple_with_kids",
+      household_residents: "family_with_kids",
       pets: "dogs",
       vendor_preference_tier: "mixed",
     };
@@ -819,7 +819,7 @@ class E2ERunner {
               heating_fuel: "oil",
               water_source: "private_well",
               sewer_or_septic: "septic",
-              household_residents: "couple_with_kids",
+              household_residents: "family_with_kids",
               pets: "dogs",
               vendor_preference_tier: "mixed",
             },
@@ -838,10 +838,10 @@ class E2ERunner {
   }
 
   // --------------------------------------------------------------------------
-  // Phase 6 — Full House Quiz (37 questions in order, with side effects)
+  // Phase 6 — Full House Quiz (current homeowner intake, with side effects)
   // --------------------------------------------------------------------------
   async phase6_houseQuiz() {
-    logPhase(6, "Full House Quiz (37 questions)");
+    logPhase(6, "Full House Quiz (current homeowner intake)");
 
     // We build up the house_quiz_state JSONB as we go and PATCH it after
     // every question — same incremental persistence the iOS app does. Side
@@ -915,10 +915,10 @@ class E2ERunner {
     );
 
     // Q3 — heating system
-    logStep("Q3 q3_heating_system → oil_boiler");
+    logStep("Q3 q3_heating_system → oil_boiler_radiators");
     await recordAnswer(
       "q3_heating_system",
-      makeQuizAnswer("oil_boiler"),
+      makeQuizAnswer("oil_boiler_radiators"),
       async () => {
         await rest(
           `home_systems?id=eq.${this.state.homeSystemIds.HVAC}`,
@@ -984,16 +984,16 @@ class E2ERunner {
     );
 
     // Q8 — water heater type
-    logStep("Q8 q8_water_heater → oil_indirect");
+    logStep("Q8 q8_water_heater → tank_gas");
     await recordAnswer(
       "q8_water_heater",
-      makeQuizAnswer("oil_indirect"),
+      makeQuizAnswer("tank_gas"),
       async () => {
         await rest(
           `home_systems?id=eq.${this.state.homeSystemIds["Water Heater"]}`,
           {
             method: "PATCH",
-            body: JSON.stringify({ subtype: "oil_indirect", name: "Oil Indirect Water Heater" }),
+            body: JSON.stringify({ subtype: "tank_gas", name: "Gas Water Heater" }),
           },
           this.state.jwt
         );
@@ -1067,8 +1067,8 @@ class E2ERunner {
     await recordAnswer("q20_other_fuels", makeQuizAnswer(null, { selected_ids: ["none"] }));
 
     // Q21 — solar
-    logStep("Q21 q21_solar → none");
-    await recordAnswer("q21_solar", makeQuizAnswer("none"));
+    logStep("Q21 q21_solar → no");
+    await recordAnswer("q21_solar", makeQuizAnswer("no"));
 
     // Q22 — generator (no generator)
     logStep("Q22 q22_generator → none");
@@ -1139,8 +1139,8 @@ class E2ERunner {
     await recordAnswer("q13_pest", makeQuizAnswer("diy"));
 
     // Q14 — irrigation (no irrigation)
-    logStep("Q14 q14_irrigation → none");
-    await recordAnswer("q14_irrigation", makeQuizAnswer("none"));
+    logStep("Q14 q14_irrigation → no");
+    await recordAnswer("q14_irrigation", makeQuizAnswer("no"));
 
     // Q15 — security
     logStep("Q15 q15_security → cameras_only");
@@ -1201,12 +1201,13 @@ class E2ERunner {
               household_id: this.state.householdId,
               property_id: this.state.propertyId,
               provider_name: "Eversource",
-              account_type: "electric",
+              provider_type: "electric",
             }),
           },
           this.state.jwt
         );
-        if (ins.ok) this.state.utilityAccountIds.push(ins.body?.[0]?.id);
+        if (!ins.ok) throw new Error(`electric utility: ${JSON.stringify(ins.body)}`);
+        this.state.utilityAccountIds.push(ins.body?.[0]?.id);
       }
     );
 
@@ -1225,12 +1226,13 @@ class E2ERunner {
               household_id: this.state.householdId,
               property_id: this.state.propertyId,
               provider_name: "Optimum",
-              account_type: "internet_cable",
+              provider_type: "internet_cable",
             }),
           },
           this.state.jwt
         );
-        if (ins.ok) this.state.utilityAccountIds.push(ins.body?.[0]?.id);
+        if (!ins.ok) throw new Error(`internet utility: ${JSON.stringify(ins.body)}`);
+        this.state.utilityAccountIds.push(ins.body?.[0]?.id);
       }
     );
 
@@ -1256,12 +1258,13 @@ class E2ERunner {
               household_id: this.state.householdId,
               property_id: this.state.propertyId,
               provider_name: "Petro Home Services",
-              account_type: "oil",
+              provider_type: "oil",
             }),
           },
           this.state.jwt
         );
-        if (ins.ok) this.state.utilityAccountIds.push(ins.body?.[0]?.id);
+        if (!ins.ok) throw new Error(`heating utility: ${JSON.stringify(ins.body)}`);
+        this.state.utilityAccountIds.push(ins.body?.[0]?.id);
       }
     );
 
@@ -1317,25 +1320,26 @@ class E2ERunner {
                 household_id: this.state.householdId,
                 property_id: this.state.propertyId,
                 provider_name: u.name,
-                account_type: u.type,
+                provider_type: u.type,
               }),
             },
             this.state.jwt
           );
-          if (ins.ok) this.state.utilityAccountIds.push(ins.body?.[0]?.id);
+          if (!ins.ok) throw new Error(`insurance utility ${u.name}: ${JSON.stringify(ins.body)}`);
+          this.state.utilityAccountIds.push(ins.body?.[0]?.id);
         }
       }
     );
 
-    // Q28 — household composition (couple_with_kids → 1 kid)
-    logStep("Q28 q28_household → couple_with_kids + 1 child + dogs");
+    // Q28 — household composition (family_with_kids → 1 kid)
+    logStep("Q28 q28_household → family_with_kids + 1 child + dogs");
     const kid = {
       first_name: "Sam",
       date_of_birth: "2018-06-15",
     };
     await recordAnswer(
       "q28_household",
-      makeQuizAnswer("couple_with_kids", {
+      makeQuizAnswer("family_with_kids", {
         kids: [kid],
         payload: { petsAnswerId: "dogs" },
       }),
@@ -1362,10 +1366,10 @@ class E2ERunner {
     );
 
     // Q30 — priorities
-    logStep("Q30 q30_priorities → home value + safety");
+    logStep("Q30 q30_priorities → resale + family_safety");
     await recordAnswer(
       "q30_priorities",
-      makeQuizAnswer(null, { selected_ids: ["home_value", "safety"] })
+      makeQuizAnswer(null, { selected_ids: ["resale", "family_safety"] })
     );
 
     logOk(`${Object.keys(quizState.answers).length} questions answered + persisted`);
