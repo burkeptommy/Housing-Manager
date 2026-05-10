@@ -189,6 +189,9 @@ struct AddressHookView: View {
                     Task {
                         viewModel.cacheToUserDefaults()
                         await viewModel.lookupProperty()
+                        // Cache again after lookup so the post-auth onboarding
+                        // step receives the ATTOM result shown on the hook.
+                        viewModel.cacheToUserDefaults()
                         // Open the hook view as soon as the lookup resolves,
                         // even if it returned no result — PropertyHookView
                         // handles the nil-lookup case by synthesizing a

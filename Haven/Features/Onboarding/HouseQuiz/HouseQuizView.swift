@@ -445,6 +445,15 @@ struct HouseQuizView: View {
                         } label: {
                             Image(systemName: "chevron.left")
                         }
+                    } else if recapConfirmed && viewModel.currentQuestion?.id == "q1_roof_material" {
+                        Button {
+                            withAnimation(HavenTheme.animationStandard) {
+                                recapConfirmed = false
+                            }
+                            resetEntryState()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                        }
                     }
                 }
                 ToolbarItem(placement: .principal) {
@@ -589,10 +598,10 @@ struct HouseQuizView: View {
             await viewModel.loadForwardingEmailIfNeeded()
             // Phase 60.1 — resumed quizzes skip the recap card entirely.
             // The card is a first-impression trust anchor; users who are
-            // mid-quiz have already committed. Without this, back-navigation
-            // or cold resume would re-land users on the recap between
-            // answers.
-            if !viewModel.state.answers.isEmpty {
+            // mid-quiz have already committed. Foundational onboarding
+            // answers are collected before the full house quiz, so they
+            // do not count as "mid-quiz" for this gate.
+            if hasNonFoundationalHouseQuizAnswers {
                 recapConfirmed = true
             }
         }
@@ -701,10 +710,27 @@ struct HouseQuizView: View {
     // MARK: - Property Recap (Phase 60.1)
 
     /// Phase 60.1: true when the quiz should show "Here's what we found" as
-    /// the first screen. Gated on (1) the user not having confirmed yet AND
-    /// (2) no quiz answers on file (fresh quiz, not a mid-quiz resume).
+    /// the first screen. Foundational onboarding answers are stamped into the
+    /// same JSONB answer map before the full house quiz starts, so ignore
+    /// them here and only suppress the recap once the house quiz has a real
+    /// answer in progress.
     private var shouldShowRecap: Bool {
-        !recapConfirmed && viewModel.state.answers.isEmpty
+        !recapConfirmed && !hasNonFoundationalHouseQuizAnswers
+    }
+
+    /// These are collected in FoundationalQuestionsForm before the user
+    /// chooses self-serve vs contractor setup. They intentionally prefill
+    /// later quiz rows, but should not make a brand-new self-serve user skip
+    /// the property recap.
+    private static let foundationalPreQuizAnswerIds: Set<String> = [
+        "q18_trash",
+        "q28_household",
+        "q30_priorities",
+        "q36_diy_vs_vendor",
+    ]
+
+    private var hasNonFoundationalHouseQuizAnswers: Bool {
+        viewModel.state.answers.keys.contains { !Self.foundationalPreQuizAnswerIds.contains($0) }
     }
 
     // MARK: - ATTOM Hello Card (Phase 67E/F)

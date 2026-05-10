@@ -746,6 +746,18 @@ final class OnboardingViewModel: ObservableObject {
                     )
                 }
 
+                // The AppState property was stamped immediately after the
+                // insert so routing could continue without an RLS-sensitive
+                // refetch. Rehydrate it after ATTOM attributes are merged so
+                // PropertyRecapCard sees the same facts the hook just showed.
+                if let appState,
+                   let refreshed = try? await DatabaseService.shared.fetchProperty(id: property.id) {
+                    appState.primaryProperty = refreshed
+                    appState.pendingQuizProperty = refreshed
+                    appState.hasCheckedPrimaryProperty = true
+                    print("[Onboarding] runComplete: AppState.primaryProperty refreshed after ATTOM attributes id=\(refreshed.id)")
+                }
+
                 // Build 89: Pre-quiz task creation removed. Tasks are now
                 // created exclusively by the MaintenanceTaskReconciler during
                 // and after quiz completion, ensuring proper assignmentType,
