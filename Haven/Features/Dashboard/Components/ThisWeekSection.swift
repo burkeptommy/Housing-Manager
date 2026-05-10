@@ -34,13 +34,7 @@ struct ThisWeekSection: View {
                 HavenCard {
                     VStack(spacing: 0) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            Button {
-                                Haptics.light()
-                                onItemTapped(item)
-                            } label: {
-                                itemRow(item)
-                            }
-                            .buttonStyle(.plain)
+                            itemRow(item)
 
                             if index < items.count - 1 {
                                 Divider()
@@ -82,29 +76,38 @@ struct ThisWeekSection: View {
 
     private func itemRow(_ item: ThisWeekItem) -> some View {
         HStack(spacing: HavenTheme.spacing12) {
-            Image(systemName: item.icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(item.urgencyColor)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            Button {
+                Haptics.light()
+                onItemTapped(item)
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(item.urgencyColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
 
-                if let subtitle = item.subtitle {
-                    Text(subtitle)
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textSecondary)
-                        .lineLimit(2)
+                        if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+
+                    Spacer()
                 }
             }
-
-            Spacer()
+            .buttonStyle(.plain)
 
             if item.task != nil {
                 Button {

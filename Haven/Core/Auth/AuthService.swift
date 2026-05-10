@@ -129,7 +129,14 @@ final class AuthService: ObservableObject {
 
     func signIn(email: String, password: String) async throws {
         Analytics.track(.authLoginEmail)
-        try await HavenSupabase.auth.signIn(email: email, password: password)
+        let session = try await HavenSupabase.auth.signIn(email: email, password: password)
+        currentUserId = session.user.id
+        isAuthenticated = true
+        pendingConfirmation = false
+        await ensureUserRecord(session: session)
+        await checkOnboardingStatus()
+        let user = try? await DatabaseService.shared.fetchCurrentUser()
+        Analytics.identify(userId: session.user.id, householdId: user?.householdId)
     }
 
     func signUp(email: String, password: String, firstName: String, lastName: String) async throws {

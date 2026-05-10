@@ -569,6 +569,58 @@ struct RoutineEditSheet: View {
         }
     }
 
+    private func nextExpectedDateString(
+        startingFrom start: Date,
+        cadenceType: RoutineCadenceType,
+        selectedWeekdays: Set<Int>,
+        activeMonths: Set<Int>
+    ) -> String {
+        let calendar = Calendar.current
+        let startDay = calendar.startOfDay(for: start)
+        let activeMonthsOut = activeMonths.isEmpty ? Set(1...12) : activeMonths
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        let weeklyInterval: Int?
+        switch cadenceType {
+        case .weekly:
+            weeklyInterval = 1
+        case .biweekly:
+            weeklyInterval = 2
+        case .triweekly:
+            weeklyInterval = 3
+        default:
+            weeklyInterval = nil
+        }
+
+        if let weeklyInterval, !selectedWeekdays.isEmpty {
+            for offset in 0...400 {
+                guard let candidate = calendar.date(byAdding: .day, value: offset, to: startDay) else { break }
+                let weekday = calendar.component(.weekday, from: candidate)
+                let month = calendar.component(.month, from: candidate)
+                guard selectedWeekdays.contains(weekday), activeMonthsOut.contains(month) else { continue }
+                if weeklyInterval == 1 {
+                    return formatter.string(from: candidate)
+                }
+                let days = calendar.dateComponents([.day], from: startDay, to: candidate).day ?? 0
+                if (days / 7) % weeklyInterval == 0 {
+                    return formatter.string(from: candidate)
+                }
+            }
+        }
+
+        if activeMonthsOut.contains(calendar.component(.month, from: startDay)) {
+            return formatter.string(from: startDay)
+        }
+        for offset in 0...400 {
+            guard let candidate = calendar.date(byAdding: .day, value: offset, to: startDay) else { break }
+            if activeMonthsOut.contains(calendar.component(.month, from: candidate)) {
+                return formatter.string(from: candidate)
+            }
+        }
+        return formatter.string(from: startDay)
+    }
+
     /// Phase 55.3: Soft-delete via archive. Archived routines are
     /// filtered out of `fetchRoutines` so the row disappears from
     /// every surface immediately; `routine_visits` and any
@@ -625,6 +677,12 @@ struct RoutineEditSheet: View {
             : nil
         let intervalDaysOut: Int? = cadenceType == .customDays ? customIntervalDays : nil
         let activeMonthsOut = Array(activeMonths).sorted()
+        let nextExpectedString = nextExpectedDateString(
+            startingFrom: startDate,
+            cadenceType: cadenceType,
+            selectedWeekdays: selectedWeekdays,
+            activeMonths: activeMonths
+        )
         let vendorIdOut = routineKind.supportsVendorLink ? selectedVendor?.id : nil
 
         do {
@@ -635,6 +693,7 @@ struct RoutineEditSheet: View {
             // Non-vendor routines (trash, recycling) stay `active` —
             // they don't need a vendor.
             let derivedSetupState: String = {
+                if isPaused { return RoutineSetupState.paused.rawValue }
                 if !routineKind.isVendorBased { return "active" }
                 if vendorIdOut != nil { return "active" }
                 return existing?.setupState ?? "pending_vendor"
@@ -652,7 +711,7 @@ struct RoutineEditSheet: View {
                 update.vendorId = vendorIdOut
                 update.activeMonths = activeMonthsOut
                 update.startDate = startString
-                update.nextExpectedDate = startString
+                update.nextExpectedDate = nextExpectedString
                 update.eveningBeforeReminder = eveningBefore
                 update.morningOfReminder = morningOf
                 update.estimatedCostPerVisitCents = costCents
@@ -673,7 +732,7 @@ struct RoutineEditSheet: View {
                 insert.daysOfWeek = daysOut
                 insert.timeOfDay = timeString
                 insert.startDate = startString
-                insert.nextExpectedDate = startString
+                insert.nextExpectedDate = nextExpectedString
                 insert.activeMonths = activeMonthsOut
                 insert.eveningBeforeReminder = eveningBefore
                 insert.morningOfReminder = morningOf

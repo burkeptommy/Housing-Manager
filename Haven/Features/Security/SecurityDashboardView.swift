@@ -245,7 +245,7 @@ struct SecurityDashboardView: View {
 
             // Trust callout
             VStack(alignment: .leading, spacing: 8) {
-                Text("This isn't a promise \u{2014} it's how Chez is built. Your encryption keys are stored in an isolated vault with no human access. There is no admin panel to view your files. There is no back door. If you want to verify this, your access log above shows every single interaction with your data, and it cannot be edited or deleted by anyone \u{2014} including us.")
+                Text("This isn't a promise. It's how Chez is built. Your encryption keys are stored in an isolated vault with no human access. There is no admin panel to view your files. There is no back door. If you want to verify this, your access log above shows every single interaction with your data, and it cannot be edited or deleted by anyone, including us.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .italic()
@@ -277,7 +277,7 @@ struct SecurityDashboardView: View {
                 .font(HavenTypography.fraunces(size: 14, weight: 600))
                 .foregroundStyle(HavenColors.textPrimary)
 
-            Text("For documents you consider too sensitive for any system to touch, Vault Lock adds device-only encryption that even Chez's servers can't break. Vault Locked documents are invisible to the AI \u{2014} they can't be analyzed, summarized, or referenced in chat. They exist in your inventory and nowhere else.")
+            Text("For documents you consider too sensitive for any system to touch, Vault Lock adds device-only encryption that even Chez's servers can't break. Vault Locked documents are invisible to the AI. They can't be analyzed, summarized, or referenced in chat. They exist in your inventory and nowhere else.")
                 .font(HavenTypography.bodySmall)
                 .foregroundStyle(HavenColors.textSecondary)
 
@@ -374,11 +374,11 @@ struct SecurityDashboardView: View {
             Group {
                 Text("Your documents are encrypted at rest using AES-256 encryption. Encryption keys are stored in an isolated vault with no direct human access. Your document content is only decrypted in temporary, sealed processing environments for the purpose of serving your requests and providing AI analysis. Raw document content is never persisted in decrypted form.")
 
-                Text("Every interaction with your data is recorded in a tamper-proof access log visible to you at all times. This log is append-only \u{2014} entries cannot be edited or deleted by anyone, including Chez staff.")
+                Text("Every interaction with your data is recorded in a tamper-proof access log visible to you at all times. This log is append-only, so entries cannot be edited or deleted by anyone, including Chez staff.")
 
                 Text("Chez does not sell, share, license, or monetize your data in any form. Your documents are used exclusively to provide you the Chez service.")
 
-                Text("For documents requiring maximum protection, Vault Lock provides device-only encryption that no server \u{2014} including ours \u{2014} can decrypt.")
+                Text("For documents requiring maximum protection, Vault Lock provides device-only encryption that no server, including ours, can decrypt.")
             }
             .font(HavenTypography.bodySmall)
             .foregroundStyle(HavenColors.textSecondary)

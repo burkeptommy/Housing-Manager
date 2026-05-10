@@ -54,11 +54,11 @@ struct ChezDelegationsListView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(HavenColors.action.opacity(0.14))
+                    .fill(HavenColors.indigo50)
                     .frame(width: 36, height: 36)
                 Image(systemName: "person.fill.questionmark")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(HavenColors.action)
+                    .foregroundStyle(HavenColors.navy)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(viewModel.totalCount) handed to Chez")
@@ -138,11 +138,11 @@ struct ChezDelegationsListView: View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(HavenColors.action.opacity(0.12))
+                    .fill(HavenColors.indigo50)
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(HavenColors.action)
+                    .foregroundStyle(HavenColors.navy)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -192,11 +192,11 @@ struct ChezDelegationsListView: View {
             Spacer().frame(height: 60)
             ZStack {
                 Circle()
-                    .fill(HavenColors.action.opacity(0.12))
+                    .fill(HavenColors.indigo50)
                     .frame(width: 64, height: 64)
                 Image(systemName: "person.fill.questionmark")
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(HavenColors.action)
+                    .foregroundStyle(HavenColors.navy)
             }
             VStack(spacing: 8) {
                 Text("Nothing handed off yet")

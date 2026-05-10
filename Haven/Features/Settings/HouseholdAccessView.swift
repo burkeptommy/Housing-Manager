@@ -306,7 +306,7 @@ struct HouseholdAccessView: View {
                     icon: "link.circle.fill",
                     iconColor: HavenColors.success,
                     title: "Linked accounts",
-                    detail: "Share everything \u{2014} all properties, documents, maintenance tasks, and systems. Both users can create, edit, and assign tasks to each other."
+                    detail: "Share everything: all properties, documents, maintenance tasks, and systems. Both users can create, edit, and assign tasks to each other."
                 )
                 sharingInfoRow(
                     icon: "person.badge.key.fill",

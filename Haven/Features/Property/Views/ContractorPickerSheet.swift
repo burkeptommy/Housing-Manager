@@ -11,13 +11,25 @@ struct ContractorPickerSheet: View {
     @State private var showAddContractor = false
 
     private var filteredContractors: [ContractorRow] {
-        if searchText.isEmpty { return contractors }
+        let categoryScoped = categoryFilteredContractors
+        if searchText.isEmpty { return categoryScoped }
         let query = searchText.lowercased()
-        return contractors.filter {
+        return categoryScoped.filter {
             $0.companyName.lowercased().contains(query) ||
             ($0.contactName?.lowercased().contains(query) ?? false) ||
+            ($0.category?.lowercased().contains(query) ?? false) ||
             ($0.specialties?.contains { $0.lowercased().contains(query) } ?? false)
         }
+    }
+
+    private var categoryFilteredContractors: [ContractorRow] {
+        guard let target = Self.canonicalContractorCategory(systemCategory) else {
+            return contractors
+        }
+        let matches = contractors.filter { contractor in
+            Self.contractor(contractor, matchesCategory: target)
+        }
+        return matches
     }
 
     var body: some View {
@@ -30,6 +42,15 @@ struct ContractorPickerSheet: View {
                         Label("No Contractors", systemImage: "person.crop.circle.badge.questionmark")
                     } description: {
                         Text("Add a contractor to your directory first.")
+                    } actions: {
+                        Button("Add Contractor") { showAddContractor = true }
+                            .buttonStyle(.bordered)
+                    }
+                } else if filteredContractors.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Matching Contractors", systemImage: "person.crop.circle.badge.questionmark")
+                    } description: {
+                        Text("Try another search or add a contractor.")
                     } actions: {
                         Button("Add Contractor") { showAddContractor = true }
                             .buttonStyle(.bordered)
@@ -76,6 +97,25 @@ struct ContractorPickerSheet: View {
                 })
             }
         }
+    }
+
+    private static func contractor(_ contractor: ContractorRow, matchesCategory target: String) -> Bool {
+        var candidates: [String?] = [contractor.category]
+        candidates.append(contentsOf: (contractor.specialties ?? []).map { Optional.some($0) })
+        return candidates
+            .compactMap { canonicalContractorCategory($0) }
+            .contains(target)
+    }
+
+    private static func canonicalContractorCategory(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let displayReady = raw
+            .replacingOccurrences(of: "_", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if displayReady.caseInsensitiveCompare("mosquito tick") == .orderedSame {
+            return "Mosquito & Tick"
+        }
+        return SystemCategoryRegistry.canonical(category: displayReady)
     }
 
     private func contractorRow(_ contractor: ContractorRow) -> some View {

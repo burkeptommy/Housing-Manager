@@ -322,7 +322,7 @@ struct SettingsView: View {
                         .foregroundStyle(HavenColors.textPrimary)
                 }
 
-                Link(destination: URL(string: "mailto:tom@getchez.com")!) {
+                Link(destination: URL(string: "mailto:\(AppConfig.supportEmail)")!) {
                     Label("Contact Support", systemImage: "envelope.fill")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)

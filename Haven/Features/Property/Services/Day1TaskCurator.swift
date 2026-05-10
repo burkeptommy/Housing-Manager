@@ -116,7 +116,7 @@ enum Day1TaskCurator {
             $0.typedScope == .property && ($0.propertyId == propertyId || $0.propertyId == nil)
         }
         let activeVendorRoutinesByCategory: [String: RoutineRow] = Dictionary(
-            uniqueKeysWithValues: propertyRoutines.compactMap { routine -> (String, RoutineRow)? in
+            propertyRoutines.compactMap { routine -> (String, RoutineRow)? in
                 guard routine.typedSetupState == .active,
                       let kind = routine.typedKind,
                       kind.isVendorBased,
@@ -128,17 +128,19 @@ enum Day1TaskCurator {
                 let categories = RoutineGroupingEngine.systemCategoriesFor(routineKind: kind)
                 guard let primary = categories.first else { return nil }
                 return (primary, routine)
-            }
+            },
+            uniquingKeysWith: { current, _ in current }
         )
         var pendingVendorRoutinesByCategory: [String: RoutineRow] = Dictionary(
-            uniqueKeysWithValues: propertyRoutines.compactMap { routine -> (String, RoutineRow)? in
+            propertyRoutines.compactMap { routine -> (String, RoutineRow)? in
                 guard routine.typedSetupState == .pendingVendor,
                       let kind = routine.typedKind
                 else { return nil }
                 let categories = RoutineGroupingEngine.systemCategoriesFor(routineKind: kind)
                 guard let primary = categories.first else { return nil }
                 return (primary, routine)
-            }
+            },
+            uniquingKeysWith: { current, _ in current }
         )
 
         let preferredHandymanId = (try? await db.fetchHousehold(id: householdId))?

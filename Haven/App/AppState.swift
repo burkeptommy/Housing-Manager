@@ -58,6 +58,10 @@ final class AppState: ObservableObject {
     let authService = AuthService()
     let sessionManager = SessionManager()
 
+    #if DEBUG && targetEnvironment(simulator)
+    private var didAttemptE2ELoginBootstrap = false
+    #endif
+
     private var isRunningFieldApp: Bool {
         (Bundle.main.bundleIdentifier ?? "").lowercased() == "com.havenhome.field"
     }
@@ -184,6 +188,27 @@ final class AppState: ObservableObject {
             for await resolved in authService.$hasResolvedInitialSession.values {
                 if resolved { break }
             }
+
+            #if DEBUG && targetEnvironment(simulator)
+            let environment = ProcessInfo.processInfo.environment
+            let arguments = ProcessInfo.processInfo.arguments
+            if !didAttemptE2ELoginBootstrap,
+               environment["CHEZ_E2E_LOGIN"] == "1" || arguments.contains("--chez-e2e-login") {
+                didAttemptE2ELoginBootstrap = true
+                let email = environment["CHEZ_E2E_EMAIL"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let password = environment["CHEZ_E2E_PASSWORD"] ?? ""
+                if email.isEmpty || password.isEmpty {
+                    print("[E2E] CHEZ_E2E_LOGIN requested but email/password were missing.")
+                } else {
+                    do {
+                        try await authService.signIn(email: email, password: password)
+                        print("[E2E] Signed in fixture user \(email).")
+                    } catch {
+                        print("[E2E] Fixture sign-in failed for \(email): \(error)")
+                    }
+                }
+            }
+            #endif
 
             // Now we definitively know the auth state
             isAuthenticated = authService.isAuthenticated

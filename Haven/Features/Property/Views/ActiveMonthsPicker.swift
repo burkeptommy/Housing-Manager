@@ -120,9 +120,20 @@ struct ActiveMonthsPicker: View {
         }
         ranges.append((currentStart, currentEnd))
 
+        if ranges.count > 1,
+           let first = ranges.first,
+           let last = ranges.last,
+           first.0 == 1,
+           last.1 == 12 {
+            ranges.removeLast()
+            ranges.removeFirst()
+            ranges.insert((last.0, first.1), at: 0)
+        }
+
         let monthNames = Calendar.current.monthSymbols
         let formatted = ranges.map { (start, end) -> String in
             if start == end { return monthNames[start - 1] }
+            if start > end { return "\(monthNames[start - 1]) through \(monthNames[end - 1])" }
             return "\(monthNames[start - 1]) through \(monthNames[end - 1])"
         }
         return "Active " + formatted.joined(separator: ", ")

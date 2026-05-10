@@ -66,6 +66,10 @@ struct NotificationSettingsView: View {
                         .font(HavenTypography.body)
                         .tint(HavenColors.action)
                         .onChange(of: prefs.maintenanceDue) { _, _ in saveAndReschedule() }
+                    Toggle("Visit Reminders", isOn: $prefs.visitReminders)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.action)
+                        .onChange(of: prefs.visitReminders) { _, _ in saveAndReschedule() }
                     Toggle("Overdue Items", isOn: $prefs.overdueItems)
                         .font(HavenTypography.body)
                         .tint(HavenColors.action)

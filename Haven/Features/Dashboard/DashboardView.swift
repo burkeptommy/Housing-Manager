@@ -1120,7 +1120,7 @@ struct DashboardView: View {
         // "View all activity" → ActivityLogView.
         if viewModel.hasCompletedAnyQuiz && !viewModel.dashboardActivityEvents.isEmpty {
             RecentActivityFeed(
-                events: Array(viewModel.dashboardActivityEvents.prefix(3)),
+                events: Array(viewModel.dashboardActivityEvents.prefix(7)),
                 totalEventCount: viewModel.allActivityEvents.count,
                 onTap: { event in
                     handleActivityTap(event)
@@ -1497,7 +1497,7 @@ struct DashboardView: View {
     private var viewFullScheduleLink: some View {
         Button {
             Haptics.light()
-            navigationPath.append("maintenance")
+            navigationPath.append("maintenance_calendar")
         } label: {
             HStack(spacing: 4) {
                 Text("View full schedule")
@@ -1598,8 +1598,7 @@ struct DashboardView: View {
                 }
             },
             onSeeAll: {
-                // TODO: Navigate to MaintenanceScheduleView with .mine filter
-                navigationPath.append("maintenance")
+                navigationPath.append("maintenance_calendar")
             },
             onSnooze: { item in
                 Task {

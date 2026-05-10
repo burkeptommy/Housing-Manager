@@ -78,11 +78,11 @@ struct ChezProfileView: View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(HavenColors.action.opacity(0.14))
+                    .fill(HavenColors.indigo50)
                     .frame(width: 44, height: 44)
                 Image(systemName: "person.fill.questionmark")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(HavenColors.action)
+                    .foregroundStyle(HavenColors.navy)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Standing instructions")
@@ -474,11 +474,11 @@ struct ChezProfileView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(HavenColors.action.opacity(0.12))
+                            .fill(HavenColors.indigo50)
                             .frame(width: 32, height: 32)
                         Image(systemName: "person.fill.questionmark")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(HavenColors.action)
+                            .foregroundStyle(HavenColors.navy)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("View what Chez owns")
