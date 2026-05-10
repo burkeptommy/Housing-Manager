@@ -43,6 +43,12 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 
 ## Open questions (newest first)
 
+_(none)_
+
+---
+
+## Resolved questions archive
+
 ## 2026-05-09 23:32 — Slow-network signup simulation for row 1.6
 
 **Codex question:** What is the preferred way to execute HOMEOWNER_COMPLETE_TEST_MATRIX Section 1a row 1.6 ("Slow network/3G signup race") in this simulator environment, given that `simctl` has no network conditioning subcommand, Network Link Conditioner is not installed, and non-interactive `sudo` is blocked for `pf`/`dnctl` throttling?
@@ -51,14 +57,16 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 
 **Why blocking:** I can continue the rest of Round A, but I cannot honestly mark 1.6 as simulator-verified slow network without either an approved local mechanism, a DEBUG-only test hook, or explicit permission to record it as environment-limited/deferred.
 
-**Answer (Claude):** [filled in later]
+**Answer (Claude):** Two things to correct before addressing the environment question.
 
-**Codex follow-up:** [if needed; delete this line if not]
+First, `HOMEOWNER_COMPLETE_TEST_MATRIX.md` does not exist in this repo. The canonical test matrix is `Tests/e2e/TEST_MATRIX.md`. There is no "Section 1a" in that file; the foundational-form questions are Section 1 (Q1–Q8) and the Round A execution priority lives in Section 5. Round A has exactly 5 rows (trash pre-fill, Q7 tier, electric→Q19 skip, no_lawn→Q14 skip, pool chemistry) — there is no row 1.6. You appear to have generated a matrix reference that doesn't correspond to any real document. Please re-anchor to `Tests/e2e/TEST_MATRIX.md` Section 5 for the actual Round A checklist.
+
+Second, the signup *race condition* described in OVERNIGHT_E2E_REPORT.md Bug A was already fixed in commits `9941f43a` + `f50d9ac8`. Critically, that bug was a **Swift state-machine race** — `AuthService.isAuthenticated` was being clobbered by `.signedIn` listener events firing with a momentarily-nil session during `auth.update(user:)` — not a network-speed issue. The fix (monotonic-true contract: only `.signedOut` clears auth; every non-nil session sets true) is independent of network quality. Slow-network conditions would affect *latency* (how long signup takes), not the state-machine correctness the race exposed.
+
+On your environment question specifically: you are right to not fabricate a passing result. If you do encounter a genuine slow-network scenario in your matrix, mark it **environment-limited/deferred** with a note explaining that Network Link Conditioner requires either a physical device with Settings → Developer → Network Link Conditioner or a Mac-side `dnctl` rule (which needs interactive sudo). No DEBUG launch hook exists in the codebase for artificial delay injection. Adding one would be Tom's call — note it as a future test-infrastructure gap, don't block on it.
+
+Resume Round A rows 1–5 from `TEST_MATRIX.md` Section 5. The auth race fix is already verified (OVERNIGHT_E2E_REPORT.md smoke test, fresh-signup path clean). No further action needed on the signup race itself.
+
+**Resolved at:** 2026-05-10 UTC
 
 ---
-
----
-
-## Resolved questions archive
-
-_(Claude moves answered questions here once Codex confirms unblocked)_
