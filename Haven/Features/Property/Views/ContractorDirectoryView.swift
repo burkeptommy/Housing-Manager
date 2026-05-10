@@ -1818,6 +1818,29 @@ enum VendorCategories {
 
     static let all: [String] = (homeCategories + vehicleCategories + professionalCategories + ["Other"])
         .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+    static func orderedSelection(from selected: Set<String>) -> [String] {
+        let known = all.filter { selected.contains($0) }
+        let extras = selected
+            .filter { !all.contains($0) }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return known + extras
+    }
+
+    static func primaryCategory(for orderedSelection: [String], preserving current: String? = nil) -> String? {
+        let canonicalSelection = orderedSelection.map { canonicalCategory($0) }
+        if let current {
+            let canonicalCurrent = canonicalCategory(current)
+            if canonicalSelection.contains(where: { $0.caseInsensitiveCompare(canonicalCurrent) == .orderedSame }) {
+                return canonicalCurrent
+            }
+        }
+        return canonicalSelection.first
+    }
+
+    private static func canonicalCategory(_ category: String) -> String {
+        SystemCategoryRegistry.canonical(category: category) ?? category
+    }
 }
 
 // MARK: - Add Contractor
@@ -1935,12 +1958,13 @@ struct AddContractorView: View {
                 isSaving = false
                 return
             }
-            var allSpecialties = Array(selectedSpecialties)
+            let orderedSpecialties = VendorCategories.orderedSelection(from: selectedSpecialties)
+            var allSpecialties = orderedSpecialties
             if contactType != "Contractor / Service Provider" {
                 allSpecialties.insert(contactType, at: 0)
             }
 
-            let insert = ContractorInsert(
+            var insert = ContractorInsert(
                 householdId: householdId,
                 companyName: companyName,
                 phone: phone,
@@ -1950,6 +1974,9 @@ struct AddContractorView: View {
                 address: address.isEmpty ? nil : address,
                 licenseNumber: licenseNumber.isEmpty ? nil : licenseNumber
             )
+            insert.category = contactType == "Contractor / Service Provider"
+                ? VendorCategories.primaryCategory(for: orderedSpecialties)
+                : contactType
             let createdContractor = try await DatabaseService.shared.createContractor(insert)
             Analytics.track(.contractorCreated, ["company_name": companyName, "contact_type": contactType])
             // Phase 19l: notify the dashboard so it can re-fire the post-quiz
@@ -2148,7 +2175,8 @@ struct EditContractorSheet: View {
         isSaving = true
         error = nil
         do {
-            var allSpecialties = Array(selectedSpecialties)
+            let orderedSpecialties = VendorCategories.orderedSelection(from: selectedSpecialties)
+            var allSpecialties = orderedSpecialties
             if contactType != "Contractor / Service Provider" {
                 allSpecialties.insert(contactType, at: 0)
             }
@@ -2162,6 +2190,9 @@ struct EditContractorSheet: View {
             update.website = website.isEmpty ? nil : website
             update.licenseNumber = licenseNumber.isEmpty ? nil : licenseNumber
             update.specialties = allSpecialties.isEmpty ? nil : allSpecialties
+            update.category = contactType == "Contractor / Service Provider"
+                ? VendorCategories.primaryCategory(for: orderedSpecialties, preserving: contractor.category)
+                : contactType
 
             // Fetch brand logo if website was added/changed or no logo yet
             let websiteChanged = website != (contractor.website ?? "")
