@@ -1930,6 +1930,11 @@ struct AddContractorView: View {
                     TextField("License Number", text: $licenseNumber)
                 }
 
+                Section("Notes") {
+                    TextField("Notes", text: $notes, axis: .vertical)
+                        .lineLimit(4...8)
+                }
+
                 if let error {
                     Section {
                         Text(error)
@@ -1981,6 +1986,7 @@ struct AddContractorView: View {
                 address: address.isEmpty ? nil : address,
                 licenseNumber: licenseNumber.isEmpty ? nil : licenseNumber
             )
+            insert.notes = notes.isEmpty ? nil : notes
             insert.category = contactType == "Contractor / Service Provider"
                 ? VendorCategories.primaryCategory(for: orderedSpecialties)
                 : contactType
@@ -2032,6 +2038,7 @@ struct EditContractorSheet: View {
     @State private var address: String
     @State private var website: String
     @State private var licenseNumber: String
+    @State private var notes: String
     @State private var contactType: String
     @State private var selectedSpecialties: Set<String>
     @State private var isSaving = false
@@ -2078,6 +2085,7 @@ struct EditContractorSheet: View {
         _address = State(initialValue: contractor.address ?? "")
         _website = State(initialValue: contractor.website ?? "")
         _licenseNumber = State(initialValue: contractor.licenseNumber ?? "")
+        _notes = State(initialValue: contractor.notes ?? "")
         _contactType = State(initialValue: resolvedType)
         _selectedSpecialties = State(initialValue: categoryValues)
     }
@@ -2154,6 +2162,11 @@ struct EditContractorSheet: View {
                     TextField("License Number", text: $licenseNumber)
                 }
 
+                Section("Notes") {
+                    TextField("Notes", text: $notes, axis: .vertical)
+                        .lineLimit(4...8)
+                }
+
                 if let error {
                     Section {
                         Text(error)
@@ -2198,6 +2211,7 @@ struct EditContractorSheet: View {
             update.website = website.isEmpty ? nil : website
             update.licenseNumber = licenseNumber.isEmpty ? nil : licenseNumber
             update.specialties = allSpecialties.isEmpty ? nil : allSpecialties
+            update.notes = notes.isEmpty ? nil : notes
             update.category = contactType == "Contractor / Service Provider"
                 ? VendorCategories.primaryCategory(for: orderedSpecialties, preserving: contractor.category)
                 : contactType
