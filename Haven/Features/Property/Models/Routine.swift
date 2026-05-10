@@ -553,6 +553,7 @@ struct RoutineRow: Codable, Identifiable {
         from referenceDate: Date = Date()
     ) -> [RoutineUpcomingVisitPreview] {
         guard limit > 0 else { return [] }
+        guard !isPaused, archivedAt == nil else { return [] }
 
         let today = RoutineForecastDates.startOfDay(referenceDate)
         var previews = existingVisits

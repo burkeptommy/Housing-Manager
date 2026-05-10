@@ -5,11 +5,11 @@ import SwiftUI
 /// is coming up next, what happened recently, what files belong to it, and
 /// what it costs without getting dropped straight into edit mode.
 struct RoutineDetailView: View {
-    let routine: RoutineRow
     let householdId: UUID
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var routine: RoutineRow
     @State private var allVisits: [RoutineVisitRow] = []
     @State private var upcomingVisits: [RoutineUpcomingVisitPreview] = []
     @State private var recentVisits: [RoutineVisitRow] = []
@@ -28,6 +28,11 @@ struct RoutineDetailView: View {
     @State private var showRequestSlotSheet = false
 
     private let db = DatabaseService.shared
+
+    init(routine: RoutineRow, householdId: UUID) {
+        _routine = State(initialValue: routine)
+        self.householdId = householdId
+    }
 
     var body: some View {
         Group {
@@ -836,10 +841,15 @@ struct RoutineDetailView: View {
         isLoading = true
         defer { isLoading = false }
 
-        async let visitsTask = db.fetchRoutineVisits(routineId: routine.id)
-        async let tasksTask = db.fetchTasksForRoutine(routineId: routine.id)
+        let routineId = routine.id
+        async let routineTask = db.fetchRoutine(id: routineId)
+        async let visitsTask = db.fetchRoutineVisits(routineId: routineId)
+        async let tasksTask = db.fetchTasksForRoutine(routineId: routineId)
 
-        if let vendorId = routine.vendorId {
+        let loadedRoutine = (try? await routineTask) ?? routine
+        routine = loadedRoutine
+
+        if let vendorId = loadedRoutine.vendorId {
             async let vendorTask = db.fetchContractor(id: vendorId)
             async let docsTask = db.fetchDocumentsByContractor(vendorId)
             async let contractsTask = db.fetchServiceContracts(contractorId: vendorId)
@@ -853,7 +863,7 @@ struct RoutineDetailView: View {
             serviceContracts = []
         }
 
-        if let sourceUtilityAccountId = routine.sourceUtilityAccountId {
+        if let sourceUtilityAccountId = loadedRoutine.sourceUtilityAccountId {
             linkedUtilityAccount = try? await db.fetchUtilityAccount(id: sourceUtilityAccountId)
         } else {
             linkedUtilityAccount = nil
@@ -863,7 +873,7 @@ struct RoutineDetailView: View {
         allVisits = loadedVisits.sorted { $0.scheduledDate > $1.scheduledDate }
 
         let activeVisits = loadedVisits.filter { $0.typedVisitState.isActive }
-        upcomingVisits = routine.upcomingVisitPreviews(existingVisits: activeVisits, limit: 5)
+        upcomingVisits = loadedRoutine.upcomingVisitPreviews(existingVisits: activeVisits, limit: 5)
 
         recentVisits = loadedVisits
             .filter { visit in
@@ -876,10 +886,10 @@ struct RoutineDetailView: View {
             .filter { $0.isArchived != true }
 
         Analytics.track(.routineDetailOpened, [
-            "routine_id": routine.id.uuidString,
-            "routine_kind": routine.routineKind,
-            "scope": routine.scope,
-            "setup_state": routine.setupState,
+            "routine_id": loadedRoutine.id.uuidString,
+            "routine_kind": loadedRoutine.routineKind,
+            "scope": loadedRoutine.scope,
+            "setup_state": loadedRoutine.setupState,
             "visit_count": upcomingVisits.count,
             "child_task_count": childTasks.count
         ])
