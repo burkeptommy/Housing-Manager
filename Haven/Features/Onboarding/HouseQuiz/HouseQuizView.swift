@@ -4644,7 +4644,7 @@ struct HouseQuizView: View {
         switch answerId {
         case "couple": return "Spouse/Partner"
         case "family_with_kids": return "Spouse/Partner"
-        case "multi_generational": return "Spouse/Partner"
+        case "multi_generational": return "Relative"
         default: return "Spouse/Partner"
         }
     }
