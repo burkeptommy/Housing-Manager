@@ -270,4 +270,11 @@ No current-run findings yet.
 
 ## Other Round A Notes
 
-No current-run findings yet.
+### Follow-up - Tasks season counts inflated by admin catalog seeding
+
+- Category: `ui_quality_finding`
+- Severity: `major`
+- Evidence: Runtime A6 fixture `e2e-test-1778441875084@havenhome.test` showed the Tasks season ribbon at Spring 144, Summer 27, Fall 26, Winter 18. DB evidence in `/tmp/codex-logs/a6-season-rest-dump-1778453468.json` reproduced the app arithmetic: Spring = 121 unparented active tasks + 23 routines. Of the active tasks, 132 were due in `2027-05`, and 106 had `Admin:` template ids. Admin catalog evidence in `/tmp/codex-logs/admin-catalog-task-breakdown-1778453706.json` showed 142 active admin task rows, most without explicit system metadata or essential flags.
+- Reproduction: Complete homeowner onboarding with the A6 fixture, open the Tasks tab, and inspect the seasonal count ribbon.
+- Suggested fix: Make admin-authored task catalog rows opt in to Day 1 essential task seeding instead of defaulting every active admin task to essential.
+- Status: `fixed` by follow-up patch in `Haven/Core/Services/AdminCatalogService.swift`; build verified in `/tmp/codex-logs/build-admin-essential-default-1778453862.log`.

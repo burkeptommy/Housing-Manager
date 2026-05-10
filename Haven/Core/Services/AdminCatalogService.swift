@@ -240,6 +240,11 @@ final class AdminCatalogService {
             ?? payload.bool("professionalRequired")
             ?? (safetyFloor || assignment == .vendor)
 
+        // Admin-authored catalog tasks are opt-in for Day 1 seeding. Treating
+        // every active admin task as essential makes broad service catalog rows
+        // become mandatory homeowner tasks during reconciliation.
+        let isEssential = payload.bool("essential") ?? payload.bool("isEssential") ?? false
+
         return MaintenanceTemplate(
             systemCategory: systemCategory,
             title: item.title,
@@ -252,7 +257,7 @@ final class AdminCatalogService {
             professionalRequired: proRequired,
             notes: payload.string("notes"),
             requiredSubtypes: Set(payload.stringArray("requiredSubtypes") ?? []),
-            isEssential: payload.bool("essential") ?? payload.bool("isEssential") ?? true,
+            isEssential: isEssential,
             equipmentKeywords: payload.stringArray("equipmentKeywords") ?? [],
             assignmentType: assignment,
             diyEffortMinutes: payload.int("diyMinutes") ?? payload.int("diyEffortMinutes"),
