@@ -14,6 +14,12 @@
 
 BEGIN;
 
+CREATE TEMP TABLE e2e_households_to_delete ON COMMIT DROP AS
+  SELECT DISTINCT u.household_id AS id
+  FROM public.users u
+  WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
+    AND u.household_id IS NOT NULL;
+
 -- 1. Identify the e2e test users by email pattern.
 WITH e2e_users AS (
   SELECT id, email FROM auth.users
@@ -145,11 +151,14 @@ UPDATE public.users SET household_id = NULL
 
 -- 5. Delete the households (no rows reference them now).
 DELETE FROM public.households
-  WHERE id IN (
-    SELECT u.household_id FROM public.users u
-    WHERE u.id IN (SELECT id FROM auth.users WHERE email LIKE 'e2e-%@havenhome.test')
-      AND u.household_id IS NOT NULL
-  );
+  WHERE id IN (SELECT id FROM e2e_households_to_delete);
+
+-- Legacy UI e2e runs used household-name-only cleanup markers and can leave
+-- empty households if the auth user was already removed. The verification
+-- below has always counted these as e2e residue, so delete the same scope.
+DELETE FROM public.households
+  WHERE name LIKE 'The E2E%'
+     OR name LIKE 'The UI%';
 
 -- 6. Delete the public.users rows for the test users (auth.users delete will
 --    cascade to identities/sessions/etc. but public.users is its own table
