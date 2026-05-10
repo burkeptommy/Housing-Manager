@@ -257,6 +257,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "finished_basement", label: "Finished basement"),
                 AnswerOption(id: "unfinished_basement", label: "Unfinished basement"),
                 AnswerOption(id: "crawl_space", label: "Crawl space"),
+                AnswerOption(id: "sump_pump", label: "Sump pump", icon: "drop.fill"),
                 AnswerOption(id: "slab", label: "Slab"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
             ]

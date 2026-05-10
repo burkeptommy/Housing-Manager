@@ -532,7 +532,7 @@ class E2ERunner {
     const answers = {
       roof_material: "asphalt",
       heating_fuel: "oil",
-      water_source: "well",
+      water_source: "private_well",
       sewer_or_septic: "septic",
       household_residents: "couple_with_kids",
       pets: "dogs",
@@ -817,7 +817,7 @@ class E2ERunner {
             ...{
               roof_material: "asphalt",
               heating_fuel: "oil",
-              water_source: "well",
+              water_source: "private_well",
               sewer_or_septic: "septic",
               household_residents: "couple_with_kids",
               pets: "dogs",
@@ -930,10 +930,10 @@ class E2ERunner {
 
     // Q6 — water source → already have well system from Phase 3? No, we didn't
     // create a Well. Create it here.
-    logStep("Q6 q6_water_source → well");
+    logStep("Q6 q6_water_source → private_well");
     await recordAnswer(
       "q6_water_source",
-      makeQuizAnswer("well"),
+      makeQuizAnswer("private_well"),
       async () => {
         const ins = await rest(
           "home_systems",
@@ -1001,10 +1001,10 @@ class E2ERunner {
     );
 
     // Q9 — basement (multi-select)
-    logStep("Q9 q9_basement → finished + sump_pump");
+    logStep("Q9 q9_basement → finished_basement + sump_pump");
     await recordAnswer(
       "q9_basement",
-      makeQuizAnswer(null, { selected_ids: ["finished", "sump_pump"] }),
+      makeQuizAnswer(null, { selected_ids: ["finished_basement", "sump_pump"] }),
       async () => {
         const ins = await rest(
           "home_systems",
@@ -1143,8 +1143,8 @@ class E2ERunner {
     await recordAnswer("q14_irrigation", makeQuizAnswer("none"));
 
     // Q15 — security
-    logStep("Q15 q15_security → diy_cameras");
-    await recordAnswer("q15_security", makeQuizAnswer("diy_cameras"));
+    logStep("Q15 q15_security → cameras_only");
+    await recordAnswer("q15_security", makeQuizAnswer("cameras_only"));
 
     // Q15b — household contractors (multi-select chips)
     logStep("Q15b q15b_household_contractors → handyman + plumber chips");
