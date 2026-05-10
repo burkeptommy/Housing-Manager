@@ -137,6 +137,9 @@ final class AuthService: ObservableObject {
         let trimmedFirst = firstName.trimmingCharacters(in: .whitespaces)
         let trimmedLast = lastName.trimmingCharacters(in: .whitespaces)
         let fullName = [trimmedFirst, trimmedLast].filter { !$0.isEmpty }.joined(separator: " ")
+        pendingFirstName = trimmedFirst
+        pendingLastName = trimmedLast
+        pendingFullName = fullName.isEmpty ? nil : fullName
 
         let result = try await HavenSupabase.auth.signUp(email: email, password: password)
 
@@ -153,17 +156,11 @@ final class AuthService: ObservableObject {
         if result.session != nil {
             // No email confirmation required — create user record immediately
             let userId = result.user.id
-            let userInsert = UserInsert(
-                id: userId,
-                householdId: nil,
+            try await createUserProfileIfNeeded(
+                userId: userId,
                 email: email,
-                fullName: fullName.isEmpty ? nil : fullName,
-                role: "member"
+                fullName: fullName.isEmpty ? nil : fullName
             )
-            _ = try await DatabaseService.shared.createUser(userInsert)
-            pendingFirstName = trimmedFirst
-            pendingLastName = trimmedLast
-            pendingFullName = fullName.isEmpty ? nil : fullName
             needsOnboarding = true
 
             // Defensive: explicitly mark the session authenticated in-memory.
@@ -181,9 +178,6 @@ final class AuthService: ObservableObject {
             pendingConfirmation = false
         } else {
             // Email confirmation required — store name for later, show confirmation UI
-            pendingFirstName = trimmedFirst
-            pendingLastName = trimmedLast
-            pendingFullName = fullName.isEmpty ? nil : fullName
             pendingConfirmation = true
         }
     }
@@ -420,15 +414,12 @@ final class AuthService: ObservableObject {
         } catch {
             // User record doesn't exist yet — create it
             let fullName = pendingFullName ?? session.user.userMetadata["full_name"]?.value as? String
-            let userInsert = UserInsert(
-                id: userId,
-                householdId: nil,
-                email: email,
-                fullName: fullName,
-                role: "member"
-            )
             do {
-                _ = try await DatabaseService.shared.createUser(userInsert)
+                try await createUserProfileIfNeeded(
+                    userId: userId,
+                    email: email,
+                    fullName: fullName
+                )
             } catch {
                 print("[Auth] Failed to create user record: \(error)")
                 // If we can't fetch or create a user record, auth is broken — sign out
@@ -437,6 +428,38 @@ final class AuthService: ObservableObject {
             }
             pendingFullName = nil
         }
+    }
+
+    private func createUserProfileIfNeeded(userId: UUID, email: String, fullName: String?) async throws {
+        let userInsert = UserInsert(
+            id: userId,
+            householdId: nil,
+            email: email,
+            fullName: fullName,
+            role: "member"
+        )
+
+        do {
+            try await DatabaseService.shared.createUserWithoutReturn(userInsert)
+        } catch {
+            guard isDuplicateUserProfileInsert(error) else {
+                throw error
+            }
+
+            if let fullName, !fullName.isEmpty {
+                _ = try? await DatabaseService.shared.updateUser(
+                    id: userId,
+                    UserUpdate(householdId: nil, fullName: fullName, role: nil)
+                )
+            }
+        }
+    }
+
+    private func isDuplicateUserProfileInsert(_ error: Error) -> Bool {
+        let description = String(describing: error).lowercased()
+        return description.contains("23505")
+            || description.contains("duplicate")
+            || description.contains("409")
     }
 
     private func checkOnboardingStatus() async {

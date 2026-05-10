@@ -58,9 +58,11 @@ struct PropertyHookView: View {
             page2PersonalizationAndEstate
                 .tag(1)
         }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
+        .tabViewStyle(.page(indexDisplayMode: .never))
         .background(HavenColors.background.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            bottomCTA
+        }
         .onAppear {
             // Slight delay so the screen settles before cards begin to
             // stagger in.
@@ -90,6 +92,44 @@ struct PropertyHookView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen("PropertyHookView")
+    }
+
+    private var bottomCTA: some View {
+        VStack(spacing: HavenTheme.spacing8) {
+            HavenButton(
+                title: currentPage == 0 ? HookContent.Page1.ctaLabel : page2CTALabel,
+                action: handlePrimaryCTA,
+                icon: "arrow.right"
+            )
+
+            HStack(spacing: HavenTheme.spacing8) {
+                ForEach(0..<2, id: \.self) { index in
+                    Circle()
+                        .fill(index == currentPage ? HavenColors.navy800 : HavenColors.navy800.opacity(0.25))
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .accessibilityLabel("Page \(currentPage + 1) of 2")
+        }
+        .padding(.horizontal, HavenTheme.pageMargin)
+        .padding(.top, HavenTheme.spacing8)
+        .padding(.bottom, HavenTheme.spacing8)
+        .background(HavenColors.background.opacity(0.97))
+    }
+
+    private func handlePrimaryCTA() {
+        if currentPage == 0 {
+            Haptics.light()
+            withAnimation(HavenTheme.animationStandard) {
+                currentPage = 1
+            }
+        } else if isAuthenticated {
+            Haptics.medium()
+            onContinueToQuiz()
+        } else {
+            Haptics.medium()
+            onContinueToAccountGate()
+        }
     }
 
     // MARK: - Page 1: Value Anchor
@@ -194,16 +234,7 @@ struct PropertyHookView: View {
                     .animation(.easeOut(duration: 0.45).delay(0.29), value: pageOneCardsVisible)
                 }
 
-                // CTA: scroll to Page 2
-                HavenButton(title: HookContent.Page1.ctaLabel, action: {
-                    Haptics.light()
-                    withAnimation(HavenTheme.animationStandard) {
-                        currentPage = 1
-                    }
-                }, icon: "arrow.right")
-                .padding(.top, HavenTheme.spacing4)
-
-                Spacer().frame(height: HavenTheme.spacing32)
+                Spacer().frame(height: HavenTheme.spacing48 + HavenTheme.spacing48)
             }
             .padding(.horizontal, HavenTheme.pageMargin)
         }
@@ -324,25 +355,7 @@ struct PropertyHookView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, HavenTheme.spacing4)
 
-                // CTA
-                HavenButton(
-                    title: page2CTALabel,
-                    action: {
-                        Haptics.medium()
-                        if isAuthenticated {
-                            onContinueToQuiz()
-                        } else {
-                            onContinueToAccountGate()
-                        }
-                    },
-                    icon: "arrow.right"
-                )
-                .padding(.top, HavenTheme.spacing12)
-
-                // Phase 20 polish: extra bottom padding so the legacy line
-                // and CTA don't collide with the TabView page indicator dots
-                // that float at the bottom of the screen.
-                Spacer().frame(height: HavenTheme.spacing48)
+                Spacer().frame(height: HavenTheme.spacing48 + HavenTheme.spacing48)
             }
             .padding(.horizontal, HavenTheme.pageMargin)
         }
