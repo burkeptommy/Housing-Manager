@@ -197,7 +197,7 @@ struct OnboardingView: View {
 
                 Button {
                     Haptics.success()
-                    viewModel.dismissHandymanConfirmation(authService: appState.authService)
+                    dismissHandymanBookingConfirmation()
                 } label: {
                     Text("Got it")
                         .font(HavenTypography.uiButton)
@@ -222,10 +222,18 @@ struct OnboardingView: View {
             // acknowledge sooner; either way the same dismiss path runs.
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 if viewModel.showHandymanBookingConfirmation {
-                    viewModel.dismissHandymanConfirmation(authService: appState.authService)
+                    dismissHandymanBookingConfirmation()
                 }
             }
         }
+    }
+
+    /// The post-auth property creation flow primes `pendingQuizProperty`
+    /// so DIY homeowners land in the quiz after onboarding. Contractor
+    /// onboarding should land on the pending-assessment dashboard instead.
+    private func dismissHandymanBookingConfirmation() {
+        appState.pendingQuizProperty = nil
+        viewModel.dismissHandymanConfirmation(authService: appState.authService)
     }
 
     // MARK: - Setup Splash
