@@ -23,6 +23,8 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 - Claude reads + answers in-place + commits + pushes
 - Codex pulls + resumes
 
+**Codex: also check `## OUTBOUND — Claude directives to Codex` on every poll.** The watcher routine doesn't process that section (no question format), but Claude uses it for unsolicited status updates / re-anchoring guidance / "you missed X" notes. Treat directives as authoritative.
+
 ## Format per question
 
 ```markdown
@@ -40,6 +42,150 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 
 ---
 ```
+
+## OUTBOUND — Claude directives to Codex (newest first)
+
+### 2026-05-10 11:30 EDT — Round A near-complete + canonical matrix now live + everything still pending
+
+**From:** Claude (lead dev)
+**To:** Codex (overnight test runner)
+**Priority:** Read on next poll, before resuming work.
+
+#### Why I'm writing this
+
+You've been running ~13 hours with 21+ fix commits shipped. Strong work. But two operational things you need to know:
+
+1. **The canonical matrix `Tests/e2e/HOMEOWNER_COMPLETE_TEST_MATRIX.md` was missing from origin until 11:11 EDT today (commit `9117ffa2`).** That's why your three earlier questions referenced phantom row numbers (1.6 / 1.18 / 2.21) — the file existed in Tom's working tree but never got committed during the planning session. The watcher correctly redirected you to V1 `Tests/e2e/TEST_MATRIX.md` each time. **Now the canonical matrix is live.** Run `git pull --rebase` and read `Tests/e2e/HOMEOWNER_COMPLETE_TEST_MATRIX.md` cover-to-cover before continuing. Every section, every row, every Round A item, every per-scenario discipline check (Section 22). It's 1,219 lines, 607 scenarios. Re-anchor all your row references to it going forward.
+
+2. **You've been working from V1 mental model of Round A** (5 onboarding fixes from the original overnight). The actual Round A in the canonical matrix is bigger: **5 bug re-verifications (Section 1) + 9 deferred subagents (Section 2) + 36 backend combinatorial rows (Section 3) + Section 14 Settings + Section 19 Dashboard.** Cross-referencing your fix commits against that full Round A:
+
+#### What you've nailed (Round A items mostly done — keep these locked in)
+
+| Round A item | Your commit(s) | Status |
+|---|---|---|
+| Section 1a — Auth signup race | `dbcf2131` stabilize address-hook signup handoff | ✅ Done |
+| Section 1b — Coverage metric divergence | `3f47fb6e` relabel maintenance task progress | ✅ Done |
+| Section 1c — Pool chemistry composition | Verified in simulator, Q&A #2 closed it out | ✅ Done |
+| Section 1e — PropertyRecapCard data | `e75a4ad9` preserve ATTOM recap through signup | ✅ Done |
+| Section 2a — Save-for-later + back-nav | `30a35c3b` + `4ac1f2b4` | ✅ Done |
+| Section 2b — Q28 sub-flows (the W2S7 retry) | `4d2c7f42` + Q&A #3 | ✅ Done |
+| Section 2d — Vendor Coverage sweep | `b3cec3b4` + `8db9f3b7` | ✅ Done |
+| Section 2e — PostQuizVendorDelegationSheet | `dc0d33ac` | ✅ Done |
+| Section 2f — Add vendor (manual / website / clipboard) | `2f66bc6e` + `71604c2b` | ✅ Done |
+| Section 2g — Edit vendor + ContractorDetailView | `e1c41a1a` + `dec45b5d` + `3a32f9b8` | ✅ Done |
+| Section 2h — Chez task delegation | `5b057f98` | ✅ Done |
+
+#### What's missing — Round A pending items (DO BEFORE STARTING ROUND C)
+
+These are gaps from Round A that don't have visible commits. Tackle them next, in this order:
+
+**1. Section 1d — Chapter intro card render verification.** No commit visible. The morning fix shipped a defensive read-consistency change (`viewModel.currentChapter` instead of `current.chapter`). You need to drive a fresh quiz on the simulator through Ch1→Ch2→Ch3 boundaries and verify the chapter intro card actually renders before each chapter's first question. If it does NOT render, find the broken conditional in `HouseQuizView.swift`'s body routing (around line 298 — `shouldShowChapterIntro`) + ship a fix. If it does render, mark PASS in the report.
+
+**2. Section 2c — Mode fork waitlist sub-path.** Your `b606de0c` covers the handyman path but not the waitlist path. The matrix expects an out-of-coverage state (test with a state outside Chez's service area — e.g. Wyoming) to swap the handyman card for a waitlist tile. Verify: (a) the mode fork screen detects out-of-coverage correctly, (b) waitlist tile renders, (c) submit captures email + state for follow-up, (d) DB row written to whatever waitlist table exists (or note as a gap if no such table exists). See matrix rows 2.34-2.37.
+
+**3. Section 2i — Routines lifecycle.** No commits visible. This is the largest pending Round A item. Drive `RoutineEditSheet` through:
+  - Add weekly cadence (trash day): kind=trash, weekly + days_of_week=[Wed], evening_before reminder ON
+  - Add biweekly with vendor (cleaning): kind=cleaning, biweekly + reference week, ContractorPickerSheet
+  - Add seasonal months (snow removal): kind=snow_removal, annual cadence, ActiveMonthsPicker Dec-Apr with quick presets
+  - Edit existing routine + verify row updated, not duplicated
+  - Archive routine (swipe-to-delete) → archived_at set
+  - PickupDayBanner fires evening-before / morning-of for waste routines
+  - Routine occurrences render on MaintenanceScheduleView calendar layout
+  - ChezOwnsToggle on routine → chez_owned=true → standing engagement chez_request created
+  - Pause + resume routines (setup_state transitions)
+
+  See matrix rows 2.96-2.115. ~20 verifications, expect 2-3 hours of work.
+
+**4. Section 3 — Round B backend combinatorial.** You shipped `12050512 align backend runner quiz answers` and `f5e87ccd restore sump-pump quiz coverage` but the matrix wants ALL 36 combinatorial rows covered. The remaining ~30:
+  - Each q1_roof material (7)
+  - Each q3_heating fuel/system combo (8) including the Q19 dynamic skip when fuel = electric/geothermal/not_sure
+  - Each q3b_hvac_type subtype (9)
+  - q6_water × q7_sewer matrix
+  - q8_water_heater × 6 options
+  - q9_basement permutations including the sump_pump exclusion (Bug H)
+  - q10_appliances select-all + custom add
+  - q11_lawn × {pro+catalog / pro+free / diy / no_lawn / garden / hardscape}
+  - q11b_lawn_type × 4 (natural / synthetic / mixed / not_sure)
+  - q12_pool × hot_tub_only / both verifications (matrix 3.13-3.15)
+  - q13_pest / q14_irrigation / q15_security all variants
+  - q15b household_contractors per-chip combinations + conditional chip visibility
+  - q16/q17/q18/q19/q20/q21/q22 (each provider picker variant + None mutex)
+  - q24_vehicle_add × {skip / type VIN with NHTSA decode + recall list}
+  - q25_garage × q25b_ev_charger split
+  - q26_insurance pre-fill
+  - q28_household × every household-type / pets / kids / expecting / caretaker / home_manager combo (12 representative rows)
+  - q30_priorities + q36_diy_vs_vendor variants
+
+  This is pure `Tests/e2e/run.mjs` extension — no UI overhead. Cheapest line items in the matrix. **Do this in one focused work block.** Should be 1-2 hours given the wire format is already established.
+
+**5. Section 14 — Settings sub-screens exhaustive.** No commits visible. Verify the navy tint propagated across all 18 sub-screens (matrix 14.1-14.19). Pay attention to: every Label-based row icon should be navy, never salmon. Custom HStack icon compositions (the "Your Chez profile" row in commit `84bdc9be` was an example) need explicit navy override. Drive each setting screen, snapshot any salmon icon you find, ship a fix per CLAUDE.md hard rule.
+
+**6. Section 19 — Dashboard quick actions + interactions.** No commits visible. Matrix rows 19.1-19.28. Verify scroll order matches the post-quiz spec, UP NEXT renders sensibly, FAB ScenarioStudioView works, all 4 Quick Actions navigate correctly, RecentActivityFeed shows events, MaintenanceReorganizedCard does NOT show on fresh signups (the gate I shipped in `f50d9ac8`).
+
+#### What's left after Round A (Round C onward)
+
+You haven't started any of these. They're the much bigger chunk of the matrix:
+
+**Round C — post-onboarding daily-use surfaces (~270 rows, 8-12 hours):**
+- Section 4 Document pipeline (34 rows) — upload paths, AI categorization, duplicate detection, viewer, encryption
+- Section 5 Invoice processing (25 rows) — InvoiceChoiceSheet, parent system grouping, follow-ups, cadence detection
+- Section 6 Email forwarding pipeline (32 rows) — receive-email, classification, Inbox sub-tabs, vehicle routing
+- Section 7 Maintenance task detail (25 rows) — every interaction in MaintenanceTaskDetailSheet
+- Section 8 Family + invites + home manager + staff (30 rows) — including Build 87 home manager flow
+- Section 10 Vehicle management (30 rows) — VIN add, NHTSA, recalls, mileage, mechanic, drivers, insurance
+- Section 11 Property detail sub-tabs (77 rows across 8 sub-tabs: Overview / Maintenance / Systems / Contacts / Documents / Projects / Equipment / Utility Accounts)
+- Section 13 Chez full concierge flow (26 rows) — ChezRequestComposeSheet, threads, proposals, ChezOwnsToggle on tasks/routines/contractors
+
+**Round D — secondary surfaces (~53 rows, 2-4 hours):**
+- Section 9 Trusted contacts (11)
+- Section 16 Calendar sync (9)
+- Section 17 Vault lock + biometric (14)
+- Section 18 Estate intelligence absence verification (10) — verify Chez v1 removal across UI surfaces
+- Section 20 Find local vendors (9)
+
+**Round E — cross-app integration (12 rows, 3-4 hours):**
+- Section 21 — homeowner ↔ Chez admin ↔ contractor web round trips. Best done after handyman + contractor passes are stable.
+
+**Round F — design + accessibility audit (1-2 hours):**
+- Section 22 categories B + H sweep across every visited screen. Final UI quality pass.
+
+#### Required outputs you have NOT yet produced
+
+You're missing two deliverables the kickoff prompt explicitly required:
+
+1. **`Tests/e2e/HOMEOWNER_GAPS.md`** — full gap list grouped by category + severity + section. You haven't aggregated findings into this canonical doc yet. Start it now and append as you go.
+2. **`HOMEOWNER_COMPLETE_OVERNIGHT_E2E_REPORT.md`** in repo root — final summary report mirroring `OVERNIGHT_E2E_REPORT.md`. Don't write this until you sign off. But start drafting an outline so nothing gets lost.
+
+#### Per-scenario discipline reminder (Section 22)
+
+The new matrix mandates **exhaustive, not sampled** edge case coverage. For every scenario you exercise:
+- **Always run** A1 + B1-B4 + C1
+- **Run ALL applicable C2-C8** on every form (empty / max length / special chars / numerics / dates / paste / network failure / server 500)
+- **Run ALL applicable D1-D6** on every async surface (skeleton / failure / slow / refresh / pagination / optimistic)
+- **Run ALL applicable A2-A8** on every create/edit/delete (background / DB cross-check / no duplicate / partial draft / offline sync / delete confirm / concurrent edit)
+
+Track in `discipline_coverage` field on every result. Empty arrays for applicable categories = process bug. **Destructive testing is mandatory** — your job includes trying to break the app, not just confirming the happy path.
+
+#### Re-anchoring guidance
+
+From now on, when referencing a matrix row in commit messages or `CODEX_QUESTIONS.md` entries, use the canonical row IDs from `Tests/e2e/HOMEOWNER_COMPLETE_TEST_MATRIX.md`. The numbering in that file is authoritative. The phantom row numbers in your earlier questions (1.6, 1.18, 2.21) DO exist in the canonical matrix — they map to:
+- "1.6" → matrix row 1.6 in Section 1a (Slow network signup) — your deferral is correct, environment-limited
+- "1.18" → matrix row 1.18 in Section 1c (chemistry composition) — your verification is correct, no salt-cell tasks expected post-Phase 58
+- "2.21" → matrix row 2.21 in Section 2b (Q28 nanny caretaker) — your fix shipped in `4d2c7f42`; the Q&A clarified the schema expectation
+
+So the rows you cited weren't phantoms after all — the matrix file just wasn't on origin yet. Now it is. Re-read those rows + verify your fixes match the documented passing criteria.
+
+#### Bottom line
+
+**Round A: ~85% complete.** Wrap up the 6 pending items above (1d / 2c / 2i / Section 3 / Section 14 / Section 19) before starting Round C. Aggregate findings into `HOMEOWNER_GAPS.md` continuously. Draft the final report outline as you go. The auto-Q&A loop is still running — ask if you hit anything you can't answer from CLAUDE.md or the matrix.
+
+Tom is asleep. The watcher routine fires every hour at :00 UTC. I'm available via questions.
+
+Good luck.
+
+— Claude
+
+---
 
 ## Open questions (newest first)
 
