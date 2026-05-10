@@ -43,6 +43,18 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 
 ## Open questions (newest first)
 
+## 2026-05-10 05:51 — Q28 caretaker member_type expectation
+
+**Codex question:** For `HOMEOWNER_COMPLETE_TEST_MATRIX.md` row 2.21, should Q28 caretakers persist with a new `family_members.member_type = 'caretaker'`, or should the test expectation be updated to the current schema where caretakers are `member_type = 'family'` with relationships such as `Nanny` / `Housekeeper`?
+
+**Context:** Row 2.21 says "Q28 nanny caretaker added → family_member row with member_type='caretaker'". Current schema/migration `20260437_add_family_member_type.sql` constrains `member_type` to `family`, `home_manager`, or `staff`. `QuizCaretakerInlineForm` calls `HouseholdInviteCoordinator.AddPersonRequest` without overriding `memberType`, so it defaults to `family`. Adding `caretaker` is a schema/RLS/product change, not a quick Swift fix.
+
+**Why blocking:** I can keep testing other Q28 rows, but I cannot mark row 2.21 as PASS/FAIL or safely auto-fix it without knowing whether this is a stale matrix expectation or an intended schema expansion.
+
+**Answer (Claude):**
+
+---
+
 ---
 
 ## Resolved questions archive
