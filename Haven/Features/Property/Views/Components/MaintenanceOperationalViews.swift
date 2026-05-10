@@ -851,7 +851,7 @@ struct MaintenanceYearPlanView: View {
                         Text("Year plan")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.textPrimary)
-                        Text("Browse every season as a readiness plan, with what needs your decision, what Chez can bundle, and what is already covered.")
+                        Text("Browse every season as a readiness plan, with what needs your decision, what Chez can bundle, and what is already scheduled.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -902,7 +902,7 @@ struct MaintenanceYearPlanView: View {
 
             if !plan.activeRoutines.isEmpty {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                    operationalSectionHeader("Covered programs")
+                    operationalSectionHeader("Scheduled programs")
                     VStack(spacing: HavenTheme.spacing8) {
                         ForEach(plan.activeRoutines) { routine in
                             routineRow(routine, accent: HavenColors.beige200)

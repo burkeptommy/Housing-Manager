@@ -71,7 +71,7 @@ struct IndigoGradientCard<Content: View>: View {
 // MARK: - Maintenance MiniHero content
 
 /// V5 Maintenance MiniHero — sits below the YearRibbon. Three stats stacked
-/// inside an `IndigoGradientCard.hero`. Coverage headline + progress bar +
+/// inside an `IndigoGradientCard.hero`. Scheduling headline + progress bar +
 /// programs / decisions / bundle-ready stat row.
 struct MiniHeroContent: View {
     let scopeLabel: String                  // "this year" or "this spring"
@@ -90,7 +90,7 @@ struct MiniHeroContent: View {
         VStack(alignment: .leading, spacing: 0) {
             // Top row: headline + count
             HStack(alignment: .firstTextBaseline) {
-                Text("\(pct)% covered \(scopeLabel)")
+                Text("\(pct)% scheduled \(scopeLabel)")
                     .font(HavenTypography.fraunces(size: 17, weight: 500))
                     .tracking(-0.25)
                     .foregroundStyle(.white)

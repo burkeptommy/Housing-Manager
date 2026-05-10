@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Homeowner-facing seasonal plan surfaced from Year at a Glance.
 /// The sheet answers three questions:
-///  1. How covered is this season?
+///  1. How scheduled is this season?
 ///  2. What still needs a decision?
 ///  3. What is Haven already handling?
 struct SeasonTasksSheet: View {
@@ -10,7 +10,7 @@ struct SeasonTasksSheet: View {
         case all = "All"
         case needsAction = "Needs action"
         case readyToBundle = "Ready to bundle"
-        case covered = "Covered"
+        case covered = "Scheduled"
 
         var id: String { rawValue }
     }
@@ -97,8 +97,8 @@ struct SeasonTasksSheet: View {
 
                 if showsCovered && (!scheduledPrograms.isEmpty || !coveredServices.isEmpty) {
                     planSectionHeader(
-                        title: "Scheduled & covered",
-                        meta: "\(plan.coveredItemCount) covered"
+                        title: "Scheduled & on track",
+                        meta: "\(plan.coveredItemCount) scheduled"
                     )
 
                     VStack(spacing: HavenTheme.spacing12) {
@@ -141,7 +141,7 @@ struct SeasonTasksSheet: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(plan.coveredItemCount) of \(plan.totalItemCount) covered")
+                        Text("\(plan.coveredItemCount) of \(plan.totalItemCount) tasks scheduled")
                             .font(HavenTypography.fraunces(size: 28, weight: 700))
                             .foregroundStyle(HavenColors.textPrimary)
                         Text(plan.actionSummary)
@@ -169,7 +169,7 @@ struct SeasonTasksSheet: View {
                     .tint(HavenColors.action)
 
                 HStack(spacing: HavenTheme.spacing8) {
-                    summaryPill(value: "\(plan.coveragePercent)%", label: "covered")
+                    summaryPill(value: "\(plan.coveragePercent)%", label: "scheduled")
                     summaryPill(value: "\(plan.decisionCount)", label: "need decision")
                     summaryPill(value: "\(plan.bundleOpportunityCount)", label: "ready to bundle")
                 }
@@ -178,7 +178,7 @@ struct SeasonTasksSheet: View {
                     Button {
                         selectedFilter = plan.decisionCount > 0 ? .needsAction : .covered
                     } label: {
-                        Text(plan.decisionCount > 0 ? "Handle open items" : "View covered work")
+                        Text(plan.decisionCount > 0 ? "Handle open items" : "View scheduled work")
                             .font(HavenTypography.uiLabel.weight(.semibold))
                             .foregroundStyle(HavenColors.textOnAction)
                             .multilineTextAlignment(.center)

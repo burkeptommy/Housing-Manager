@@ -61,7 +61,7 @@ struct MaintenanceStatusSection: View {
 
                         Spacer()
 
-                        Text("\(plan.coveragePercent)% covered")
+                        Text("\(plan.coveragePercent)% scheduled")
                             .font(HavenTypography.uiLabelSmall.weight(.semibold))
                             .foregroundStyle(HavenColors.textOnNavy.opacity(0.78))
                     }
@@ -1101,7 +1101,7 @@ struct ThisSeasonSection: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(plan.coveredItemCount) of \(plan.totalItemCount) covered")
+                            Text("\(plan.coveredItemCount) of \(plan.totalItemCount) tasks scheduled")
                                 .font(HavenTypography.fraunces(size: 20, weight: 700))
                                 .foregroundStyle(HavenColors.textPrimary)
                             Text(plan.actionSummary)
@@ -1116,7 +1116,7 @@ struct ThisSeasonSection: View {
                             Text("\(plan.coveragePercent)%")
                                 .font(HavenTypography.fraunces(size: 20, weight: 700))
                                 .foregroundStyle(HavenColors.textPrimary)
-                            Text("covered")
+                            Text("scheduled")
                                 .font(HavenTypography.caption)
                                 .foregroundStyle(HavenColors.textSecondary)
                         }

@@ -71,7 +71,7 @@ struct YearRibbon: View {
 
     private func accessibilityLabel(for season: Season) -> String {
         let summary = summaries[season] ?? YearRibbonSummary(totalItems: 0, actionItems: 0)
-        let action = summary.actionItems > 0 ? "\(summary.actionItems) need attention" : "all covered"
+        let action = summary.actionItems > 0 ? "\(summary.actionItems) need attention" : "all scheduled"
         let current = season == currentSeason ? ", current season" : ""
         return "\(season.displayName), \(summary.totalItems) items, \(action)\(current)"
     }
@@ -150,7 +150,7 @@ private struct SeasonTile: View {
     }
 
     private var actionLine: String {
-        summary.actionItems > 0 ? "\(summary.actionItems) action" : "covered"
+        summary.actionItems > 0 ? "\(summary.actionItems) action" : "scheduled"
     }
 
     private var actionColor: Color {

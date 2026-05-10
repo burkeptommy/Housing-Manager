@@ -92,9 +92,9 @@ struct YearAtAGlanceCard: View {
                 return "\(actionCount) need action"
             }
             if coveredCount >= count {
-                return "All covered"
+                return "All scheduled"
             }
-            return "\(coveredCount) covered"
+            return "\(coveredCount) scheduled"
         }
 
         var itemsLine: String {

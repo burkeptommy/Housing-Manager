@@ -208,9 +208,9 @@ extension MaintenanceSeasonPlan {
 
         switch coverageRatio {
         case 0.9...:
-            return "\(season.displayLabel) maintenance is well covered."
+            return "\(season.displayLabel) maintenance is well scheduled."
         case 0.65...:
-            return "\(season.displayLabel) maintenance is mostly covered."
+            return "\(season.displayLabel) maintenance is mostly scheduled."
         default:
             return "\(season.displayLabel) maintenance needs a few decisions."
         }
