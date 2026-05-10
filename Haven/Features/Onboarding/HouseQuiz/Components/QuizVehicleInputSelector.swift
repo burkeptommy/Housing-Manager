@@ -13,16 +13,31 @@ import SwiftUI
 /// The skip option is always visible at the bottom and is framed
 /// positively: "I'll add cars later".
 struct QuizVehicleInputSelector: View {
-    /// Called when the user finishes a path (added a vehicle, skipped, or
-    /// dismissed the confirmation). The quiz advances after this fires.
+    /// Called when the user finishes adding a vehicle.
     let onComplete: () -> Void
+    /// Called when the user chooses to add cars later.
+    let onSkip: () -> Void
+    /// Called when the insurance-card path should hand off to document upload.
+    let onInsuranceUpload: (() -> Void)?
+    let isSkipped: Bool
 
     @State private var showVINScanner: Bool = false
-    @State private var showInsuranceUpload: Bool = false
     @State private var showManualEntry: Bool = false
     @State private var captured: CapturedVehicle? = nil
     @State private var isLookingUp: Bool = false
     @State private var lookupError: String? = nil
+
+    init(
+        isSkipped: Bool = false,
+        onComplete: @escaping () -> Void,
+        onSkip: (() -> Void)? = nil,
+        onInsuranceUpload: (() -> Void)? = nil
+    ) {
+        self.isSkipped = isSkipped
+        self.onComplete = onComplete
+        self.onSkip = onSkip ?? onComplete
+        self.onInsuranceUpload = onInsuranceUpload
+    }
 
     private struct CapturedVehicle: Equatable {
         let year: Int?
@@ -61,7 +76,7 @@ struct QuizVehicleInputSelector: View {
                     title: "Upload insurance card",
                     benefit: "We'll pull every car on the policy.",
                     badge: nil,
-                    action: { showInsuranceUpload = true }
+                    action: { onInsuranceUpload?() ?? onComplete() }
                 )
                 pathCard(
                     icon: "keyboard",
@@ -86,11 +101,28 @@ struct QuizVehicleInputSelector: View {
                 }
 
                 Button {
-                    onComplete()
+                    Haptics.light()
+                    onSkip()
                 } label: {
-                    Text("I'll add cars later")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textTertiary)
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Text("I'll add cars later")
+                            .font(HavenTypography.uiLabel)
+                        if isSkipped {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(isSkipped ? HavenColors.textPrimary : HavenColors.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .background(isSkipped ? HavenColors.creamLight : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .overlay {
+                        if isSkipped {
+                            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                                .strokeBorder(HavenColors.navy.opacity(0.22), lineWidth: 1)
+                        }
+                    }
                 }
                 .padding(.top, HavenTheme.spacing8)
             }
@@ -102,15 +134,6 @@ struct QuizVehicleInputSelector: View {
             .sheet(isPresented: $showManualEntry) {
                 NavigationStack {
                     AddVehicleView()
-                }
-            }
-            // Insurance card upload routes through DocumentUploadView with the
-            // auto insurance category preselected. The view presents on its
-            // own — we just need to dismiss this picker once the doc upload
-            // sheet closes (handled by Q24 since it owns showDocumentUpload).
-            .onChange(of: showInsuranceUpload) { _, newValue in
-                if newValue {
-                    onComplete()
                 }
             }
         }

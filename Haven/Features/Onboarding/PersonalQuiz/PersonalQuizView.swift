@@ -123,6 +123,9 @@ struct PersonalQuizView: View {
         QuizVehicleInputSelector(
             onComplete: {
                 viewModel.recordAnswer("added")
+            },
+            onSkip: {
+                viewModel.recordAnswer("skipped")
             }
         )
     }

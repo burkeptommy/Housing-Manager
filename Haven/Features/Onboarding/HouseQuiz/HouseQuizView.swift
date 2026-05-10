@@ -3080,26 +3080,17 @@ struct HouseQuizView: View {
     private func vehicleAddBody(_ q: HouseQuizQuestion) -> some View {
         VStack(spacing: HavenTheme.spacing16) {
             QuizVehicleInputSelector(
+                isSkipped: committedAnswer(for: q)?.answerId == "skipped",
                 onComplete: {
                     Task { await viewModel.recordAnswer("primary_vehicle_added") }
+                },
+                onSkip: {
+                    Task { await viewModel.recordAnswer("skipped") }
+                },
+                onInsuranceUpload: {
+                    showDocumentUpload = true
                 }
             )
-            // Phase 67D (A2): Q23 vehicle count was dropped; users with
-            // no car or who prefer not to add it now need an explicit
-            // skip path. Records "skipped" so the mapper still stamps
-            // `primary_vehicle_added: false` and the question doesn't
-            // re-surface on resume.
-            Button {
-                Haptics.light()
-                Task { await viewModel.recordAnswer("skipped") }
-            } label: {
-                Text("Skip for now")
-                    .font(HavenTypography.uiLabel.weight(.semibold))
-                    .foregroundStyle(HavenColors.textTertiary)
-                    .padding(.vertical, HavenTheme.spacing8)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain)
         }
     }
 
