@@ -5167,104 +5167,14 @@ struct PropertyDetailView: View {
         }
     }
 
-    // MARK: - Phase 54C.3: Recommended for your home row
-
-    /// Phase 95 (gap #40) — recommended-SYSTEMS row. Sits below the
-    /// recommended-services row; same low-key chrome but routes to
-    /// `RecommendedSystemsView`. Renders a sheet because the entry
-    /// is purely additive — users typically tap, add a system,
-    /// land back on Property Detail with the new system reflected.
-    @ViewBuilder
-    private var recommendedSystemsRow: some View {
-        if viewModel.property?.id != nil {
-            Button {
-                Haptics.light()
-                showRecommendedSystems = true
-            } label: {
-                HStack(spacing: HavenTheme.spacing12) {
-                    Image(systemName: "rectangle.stack.fill.badge.plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy700)
-                        .frame(width: 36, height: 36)
-                        .background(HavenColors.beige200)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Add what we missed")
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.textPrimary)
-                        Text("Browse systems by tier and add what we don't have on file yet")
-                            .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
-                .padding(HavenTheme.spacing12)
-                .background(HavenColors.creamLight)
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-                .overlay(
-                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                        .stroke(HavenColors.beige200, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-            .sheet(isPresented: $showRecommendedSystems) {
-                if let propId = viewModel.property?.id {
-                    RecommendedSystemsView(propertyId: propId) {
-                        Task { await viewModel.loadProperty(id: propId) }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Low-key entry point into the "Recommended for your home"
-    /// browsing surface. Always visible (no badge count) because the
-    /// destination's empty state handles the zero-recommendation
-    /// case, and the value-preservation templates aren't a backlog
-    /// that needs urgency framing — they're a library.
-    @ViewBuilder
-    private var recommendedServicesRow: some View {
-        if viewModel.property?.householdId != nil {
-            Button {
-                Haptics.light()
-                showRecommendedServices = true
-            } label: {
-                HStack(spacing: HavenTheme.spacing12) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy700)
-                        .frame(width: 36, height: 36)
-                        .background(HavenColors.beige200)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Recommended services")
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.textPrimary)
-                        Text("Ways to protect the home and avoid surprises")
-                            .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
-                .padding(HavenTheme.spacing12)
-                .background(HavenColors.creamLight)
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-                .overlay(
-                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                        .stroke(HavenColors.beige200, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-        }
-    }
+    // Wave C-9 #2 cleanup (audit 2026-05-11): deleted dead private
+    // view builders `recommendedSystemsRow` and `recommendedServicesRow`.
+    // The actual UI entry points live above at lines ~4197-4215 via
+    // `maintenanceRecordRow(icon:title:subtitle:)` which flips
+    // `showRecommendedServices` / `showRecommendedSystems` and routes
+    // through the existing sheet / navigationDestination at lines
+    // 286-300. State vars + sheets retained — only the unused view-
+    // builder stubs removed.
 
     // MARK: - Phase 50: View Full Schedule Link
 
