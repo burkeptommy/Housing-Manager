@@ -224,7 +224,13 @@ struct PropertySystemsCategoryTile: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(1)
+                    // Wave C-9 #6 fix: was lineLimit(1) which clipped
+                    // "Electrical & Safety" to "Electrical & Safe..."
+                    // on standard tile widths. lineLimit(2) lets the
+                    // full label wrap to a second line on the widest
+                    // group names without changing the grid layout.
+                    // Safety connotation preserved.
+                    .lineLimit(2)
                     .padding(.top, 12)
 
                 Text("\(systemCount) system\(systemCount == 1 ? "" : "s")")

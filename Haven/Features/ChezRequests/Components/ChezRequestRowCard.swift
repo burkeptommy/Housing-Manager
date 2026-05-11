@@ -29,7 +29,7 @@ struct ChezRequestRowCard: View {
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(request.summary)
+                Text(displaySummary)
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textPrimary)
                     .lineLimit(3)
@@ -71,5 +71,38 @@ struct ChezRequestRowCard: View {
             for: request.lastMessageAt,
             relativeTo: Date()
         )
+    }
+
+    /// Wave C-5 #3 fix: auto-generated request titles often lead with
+    /// "Find a vendor for: ..." or "Get a quote for: ..." — the category
+    /// icon on the left already implies that action, so the prefix
+    /// burns ~20 chars of the user's lineLimit(3) budget on signal
+    /// they already see. Strip the known prefixes when present and
+    /// title-case the surviving fragment so it reads as a real title,
+    /// not a fragment. The raw `request.summary` is unchanged in the
+    /// database — this is render-time only.
+    private var displaySummary: String {
+        let raw = request.summary
+        let knownPrefixes = [
+            "Find a vendor for: ",
+            "Find a vendor for ",
+            "Get a quote for: ",
+            "Get a quote for ",
+            "Schedule a visit for: ",
+            "Schedule a visit for ",
+            "Coordinate task: ",
+            "Coordinate this task: ",
+        ]
+        for prefix in knownPrefixes {
+            if raw.lowercased().hasPrefix(prefix.lowercased()) {
+                let stripped = String(raw.dropFirst(prefix.count))
+                // Capitalize first letter of the stripped fragment so it
+                // reads as a sentence opener ("Sanitize pet areas...")
+                // not a mid-sentence fragment.
+                guard let first = stripped.first else { return raw }
+                return String(first).uppercased() + stripped.dropFirst()
+            }
+        }
+        return raw
     }
 }

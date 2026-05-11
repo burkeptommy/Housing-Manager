@@ -200,11 +200,36 @@ struct HomeCoverageHero: View {
                     .foregroundStyle(HavenColors.textOnNavy.opacity(0.62))
             }
 
-            Text("\(visit.taskTitle) · \(formatHeroDate(visit.date)) · \(visit.vendorName)")
+            Text(nextServiceDisplayText(for: visit))
                 .font(HavenTypography.uiLabel)
                 .foregroundStyle(HavenColors.textOnNavy.opacity(0.88))
                 .lineLimit(2)
         }
+    }
+
+    /// Wave C-12 #5 fix: the row format used to be
+    /// `"{taskTitle} · {date} · {vendorName}"` which rendered
+    /// `"Schedule Bethel Lawn Care: spring cleanup · May 15 · Bethel Lawn Care"`
+    /// when the vendor-reframed task title already contains the vendor
+    /// name. Drop the trailing vendor pill when the title contains the
+    /// vendor's display name (case-insensitive), since it's already
+    /// signposted in the title. Falls back to the original 3-segment
+    /// format when the title doesn't reference the vendor.
+    private func nextServiceDisplayText(
+        for visit: (vendorName: String, date: String, taskTitle: String)
+    ) -> String {
+        let title = visit.taskTitle
+        let date = formatHeroDate(visit.date)
+        let vendor = visit.vendorName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !vendor.isEmpty,
+           title.range(of: vendor, options: .caseInsensitive) != nil {
+            return "\(title) · \(date)"
+        }
+        if vendor.isEmpty {
+            return "\(title) · \(date)"
+        }
+        return "\(title) · \(date) · \(vendor)"
     }
 
     private func heroMetaPill(_ text: String) -> some View {

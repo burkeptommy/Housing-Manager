@@ -445,6 +445,15 @@ struct AddUtilitySheet: View {
     @State private var providers: [UtilityProviderRow] = []
     @State private var selectedProvider: UtilityProviderRow?
 
+    // Wave C-11 #4: cached city + state so the provider list ranks
+    // regional carriers (Eversource for CT, Con Edison for NY) ahead
+    // of alphabetical noise (Alabama Power, Alliant). Loaded once on
+    // first .task. Mirrors the Phase 19h algorithm in
+    // `UtilityProviderSearchPicker.relevanceScore` — town hit (3) >
+    // state or 'US' national (2) > nothing (0).
+    @State private var propertyCity: String?
+    @State private var propertyState: String?
+
     private let utilityTypes = [
         ("electric", "Electric"),
         ("internet_cable", "Internet / Cable"),
@@ -555,7 +564,8 @@ struct AddUtilitySheet: View {
             .onChange(of: providerType) { _, newType in
                 guard !newType.isEmpty else { return }
                 Task {
-                    providers = (try? await DatabaseService.shared.fetchUtilityProviders(type: newType)) ?? []
+                    let raw = (try? await DatabaseService.shared.fetchUtilityProviders(type: newType)) ?? []
+                    providers = sortedByRelevance(raw)
                     // Auto-select matching provider by slug
                     if let slug = prefillProviderSlug, selectedProvider == nil {
                         if let match = providers.first(where: { $0.slug == slug }) {
@@ -568,9 +578,21 @@ struct AddUtilitySheet: View {
                 }
             }
             .task {
+                // Wave C-11 #4: fetch property city/state ONCE so the
+                // provider list sort knows the user's region. Cheap
+                // fetch (one row by id, hits the resilient PropertyRow
+                // decoder) and only fires when both are nil.
+                if propertyCity == nil && propertyState == nil {
+                    if let property = try? await DatabaseService.shared.fetchProperty(id: propertyId) {
+                        propertyCity = property.city
+                        propertyState = property.state
+                    }
+                }
+
                 let type = prefillProviderType ?? preselectedType
                 if let type, !type.isEmpty {
-                    providers = (try? await DatabaseService.shared.fetchUtilityProviders(type: type)) ?? []
+                    let raw = (try? await DatabaseService.shared.fetchUtilityProviders(type: type)) ?? []
+                    providers = sortedByRelevance(raw)
                     // Auto-select matching provider by slug
                     if let slug = prefillProviderSlug, selectedProvider == nil {
                         if let match = providers.first(where: { $0.slug == slug }) {
@@ -582,6 +604,39 @@ struct AddUtilitySheet: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Wave C-11 #4 fix — port of Phase 19h `relevanceScore` from
+    /// `UtilityProviderSearchPicker`. Ranks providers by how well they
+    /// match the property's location before applying the visible-list
+    /// order. Score:
+    ///   3 = town/city match (e.g. property in Bethel, provider serves Bethel)
+    ///   2 = state match (CT, NY, etc.) OR national 'US' carrier
+    ///   0 = no regional signal
+    /// Within the same score, fall back to alphabetical by name.
+    private func relevanceScore(for provider: UtilityProviderRow) -> Int {
+        let regions = provider.regions ?? []
+        if let town = propertyCity, !town.isEmpty,
+           regions.contains(where: { $0.caseInsensitiveCompare(town) == .orderedSame }) {
+            return 3
+        }
+        if let st = propertyState, !st.isEmpty,
+           regions.contains(where: { $0.caseInsensitiveCompare(st) == .orderedSame }) {
+            return 2
+        }
+        if regions.contains(where: { $0.caseInsensitiveCompare("US") == .orderedSame }) {
+            return 2
+        }
+        return 0
+    }
+
+    private func sortedByRelevance(_ providers: [UtilityProviderRow]) -> [UtilityProviderRow] {
+        providers.sorted { a, b in
+            let sa = relevanceScore(for: a)
+            let sb = relevanceScore(for: b)
+            if sa != sb { return sa > sb }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
     }
 

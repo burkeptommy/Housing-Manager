@@ -1288,19 +1288,52 @@ struct PropertyDetailView: View {
         }
     }
 
-    /// "Priorities" count rendered in the hero's third stat. Counts:
-    ///   - tasks needing a vendor decision (`needs_vendor == true`)
-    ///   - overdue tasks not already counted
-    ///   - systems missing a primary vendor (a proxy for "needs profile")
+    /// "Priorities" count rendered in the hero's third stat.
+    ///
+    /// Wave C-12 #4 fix: the previous formula summed three independent
+    /// counts (`needsVendorTasks` + `extraOverdue` + `systemsMissing`)
+    /// which over-counted any time a single system carried multiple
+    /// priority signals — e.g. a system missing a contractor whose task
+    /// was also overdue would contribute 2 priorities for ONE system,
+    /// producing the trust-breaking "100 Systems · 104 Priorities"
+    /// the C-12 audit caught. The new model treats each system as at
+    /// most ONE priority and counts orphan (system-less) tasks
+    /// separately so the count can never exceed `systems.count +
+    /// orphan-task-count`.
+    ///
+    /// A system contributes 1 to priorities if ANY of:
+    ///   - it has an overdue task on it
+    ///   - it has a `needs_vendor == true` task on it
+    ///   - it has no `preferredContractorId` (needs vendor setup)
+    /// A task contributes 1 to priorities if it has NO systemId AND
+    /// either is overdue OR needs a vendor.
     private var prioritiesCount: Int {
         let needsVendorTasks = needsVendorTasksForDecisionCard
-        let overdueIds = Set(viewModel.overdueTasks.map { $0.id })
+        let overdueTasks = viewModel.overdueTasks
+
+        var prioritySystemIds = Set<UUID>()
+        for task in needsVendorTasks {
+            if let sid = task.systemId { prioritySystemIds.insert(sid) }
+        }
+        for task in overdueTasks {
+            if let sid = task.systemId { prioritySystemIds.insert(sid) }
+        }
+        for system in viewModel.systems where system.preferredContractorId == nil {
+            prioritySystemIds.insert(system.id)
+        }
+
+        // Orphan tasks (no system) — count them once each, deduped
+        // across overdue + needsVendor so a task that is both doesn't
+        // count twice.
         let needsVendorIds = Set(needsVendorTasks.map { $0.id })
-        let extraOverdue = overdueIds.subtracting(needsVendorIds).count
-        let systemsMissing = viewModel.systems.filter {
-            $0.preferredContractorId == nil
+        let overdueIds = Set(overdueTasks.map { $0.id })
+        let allPriorityTaskIds = needsVendorIds.union(overdueIds)
+        let orphanCount = allPriorityTaskIds.filter { taskId in
+            let t = viewModel.maintenanceTasks.first { $0.id == taskId }
+            return t?.systemId == nil
         }.count
-        return needsVendorTasks.count + extraOverdue + systemsMissing
+
+        return prioritySystemIds.count + orphanCount
     }
 
     /// Systems whose `SystemProfileAudit` checklist is non-empty AND
