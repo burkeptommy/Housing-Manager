@@ -288,3 +288,45 @@ No current-run findings yet.
 - Reproduction: Complete homeowner onboarding with the A6 fixture, open the Tasks tab, and inspect the seasonal count ribbon.
 - Suggested fix: Make admin-authored task catalog rows opt in to Day 1 essential task seeding instead of defaulting every active admin task to essential.
 - Status: `fixed` by follow-up patch in `Haven/Core/Services/AdminCatalogService.swift`; build verified in `/tmp/codex-logs/build-admin-essential-default-1778453862.log`.
+
+---
+
+## Round C — Wave C-1 (Section 13 Chez full concierge)
+
+### Wave C-1 verification summary
+
+- Subagent: c1-section-13-chez-concierge, returned PASS
+- All 16 ChezEntryButton call sites verified for A1+ contract — every site passes explicit `source_entity_type` + `source_entity_label`. Codex's `ee5f7ee0` fix (`contextWithFallbackSource` + inference) is the safety net but no call site relies solely on inference. Audit table at `/tmp/claude-c-evidence/c1-section-13/00-chez-entry-button-audit.md`.
+- Rows verified via source-code audit (computer-use was unavailable for direct simulator tap): 13.1-13.3, 13.5-13.7, 13.16-13.23, 13.25, 13.26
+- Rows deferred: 13.4 (SendGrid not testable from sim), 13.8-13.11 (reply / system messages / status transitions need admin-side data), 13.12-13.15 (proposals require admin-side setup), 13.24 (inbox sub-tab list rendering not visually verified)
+
+### Wave C-1 Finding 1 — B3 em-dash class-wide sweep — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` per instance, escalates to `major` when class-wide
+- Surfaces affected: 10 files, 11 em-dash instances total
+  - Onboarding sentence em-dashes: `IntroExplainerView.swift` (3 instances on lines 84 / 101 / 105)
+  - Security explainer sentence em-dashes: `SecurityExplainerView.swift` (4 instances on lines 13 / 20 / 34 / 42)
+  - Currency / value placeholder em-dashes: `ChezProposalCard.swift:190`, `PropertyEnhancedSections.swift:385+393`, `PropertyHeroHeader.swift:117`, `PropertyDetailView.swift:1546`, `QuoteComparisonView.swift:303`, `QuoteDetailView.swift:173`, `UtilityAccountsSection.swift:1070+1075+1080`, `VehicleDetailView.swift:1236`
+- Evidence: Subagent flagged `ChezProposalCard.swift:190` explicitly (`Text(opt.label ?? opt.iso ?? "—")` — em dash as date-slot fallback). Main-thread sweep found 10 more class-wide instances of the same anti-pattern (sentence em-dashes + currency/value placeholder em-dashes).
+- Suggested fix: applied as a single batch commit. Sentence em-dashes replaced with appropriate punctuation (comma / period / colon). Currency placeholders replaced with empty string `""` (the label provides context — empty value reads naturally). Vehicle estimated-value hero replaced with `"Not estimated yet"` since empty would collapse the hero row.
+- Status: `fixed` in commit `f9480aa1`. Build verified clean on iPhone 16e iOS 26.2 sim. Reinstalled binary.
+
+### Wave C-1 Finding 2 — A1+ ChezEntryButton context contract — PASS
+
+- Category: `verification`
+- Matrix rows: 13.1 (and applies to every Section 7 / 13 / 20 ChezEntryButton tap)
+- All 16 ChezEntryButton call sites in `Haven/` stamp `source_entity_type` + `source_entity_label` explicitly. Receiver side (`ChezRequestComposeViewModel.sourceEntityTitle`) renders as "Type: Label" (e.g. "Routine: Bethel Lawn Care") instead of generic category.
+- `MainTabView.normalizedChezContext` (added in `ee5f7ee0`) provides a second-layer fallback inference for the 3 direct `.openChezRequestComposer` callers (`ChatView`, `ContractorDirectoryView`, `EquipmentIdentifySheet`).
+- Tom's "generic 'Roofing' RE: header from routine context" Round A bug is now fixed end-to-end with double-layer fallback.
+- Evidence: `/tmp/claude-c-evidence/c1-section-13/00-chez-entry-button-audit.md`
+- Status: `verified pass`
+
+### Wave C-1 Finding 3 — Section 13 Chez Profile Spending Authority morning fix verified
+
+- Category: `verification`
+- Matrix row: 13.19
+- `ChezProfileView.swift` line 183-195 spending-authority background renders with `HavenColors.creamLight` + `beige300` strokeBorder (settings-card styling). No salmon decoration. Morning fix `5aa507fc` is in place.
+- Default tiers verified: `autoApproveUnder` falls back to 200, `pingUnder` to 500, `explicitAbove` to 500 (row 13.17).
+- Status: `verified pass`
+

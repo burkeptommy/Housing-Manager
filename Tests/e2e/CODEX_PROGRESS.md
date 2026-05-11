@@ -126,3 +126,29 @@ _(Codex appends here.)_
 - author: Claude (continuing from Codex)
 
 ---
+
+## 2026-05-11 02:08:00 UTC — batch_end: Wave C-1 Section 13 Chez full concierge
+
+- batch_id: round-c-c1-section-13-chez-concierge
+- last_commit: f9480aa1 (em-dash batch fix)
+- result: PASS — Section 13 verified end-to-end via source-code audit + B3 sweep fix
+- next_planned: Wave C-2 Section 7 Maintenance task detail (with A1+ on every ChezEntryButton)
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 5, "B": 4, "C": 0, "D": 0, "E": 2 }
+- findings_this_batch: { verification_pass: 17, verification_fail: 0, gap_found: 0, ui_quality: 1, persistence: 0 }
+- fix_shipped: f9480aa1 em-dash sweep across 10 user-facing surfaces
+- author: Claude (continuing from Codex)
+
+---
+
+## 2026-05-11 02:09:00 UTC — fix_shipped: B3 em-dash sweep across 10 surfaces
+
+- batch_id: claude-em-dash-class-wide
+- last_commit: f9480aa1
+- next_planned: Wave C-2 subagent for Section 7
+- Sentence em-dashes (7 instances): IntroExplainerView + SecurityExplainerView
+- Currency/value placeholder em-dashes (4 instances + 6 strings): ChezProposalCard, PropertyEnhancedSections, PropertyHeroHeader, PropertyDetailView, QuoteComparisonView, QuoteDetailView, UtilityAccountsSection, VehicleDetailView
+- Build clean on F9946648 iPhone 16e iOS 26.2; binary reinstalled
+- author: Claude
+
+---
