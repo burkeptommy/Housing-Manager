@@ -100,3 +100,29 @@ _(Codex appends here.)_
 - findings_this_batch: { verification_pass: 0, verification_fail: 0, gap_found: 0, ui_quality: 0, persistence: 0 }
 
 ---
+
+## 2026-05-11 01:35:00 UTC — batch_start: Claude Code autonomous Round C continuation
+
+- batch_id: claude-round-c-init
+- last_commit: d098bf8662b7d8f9f1c47a247a1bc7d83f8f1b08
+- next_planned: audit Codex P0-1/P0-2/P0-3, run pre-flight verification, spawn Wave C-1 subagent for Section 13
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 0, "B": 0, "C": 0, "D": 0, "E": 0 }
+- findings_this_batch: { verification_pass: 0, verification_fail: 0, gap_found: 0, ui_quality: 0, persistence: 0 }
+- author: Claude (continuing from Codex)
+
+---
+
+## 2026-05-11 01:37:00 UTC — audit_passed: P0-1 + P0-2 + P0-3 verified clean
+
+- batch_id: claude-round-c-init
+- last_commit: d098bf8662b7d8f9f1c47a247a1bc7d83f8f1b08
+- next_planned: pre-flight (build, backend, sim) then Wave C-1 subagent
+- P0-1 (840a9f52): RoutineDetailView CTA — verified `HavenColors.action` + `textOnAction` pairing replaces ambiguous `.borderedProminent.tint(navy)`
+- P0-2 (ee5f7ee0): ChezEntryButton context — verified `contextWithFallbackSource` + `inferredSourceEntityType` + `inferredSourceEntityLabel` helpers in ChezEntryButton.swift. Spot-checked MaintenanceTaskDetailSheet, RoutineDetailView, HandymanPunchListView — all pass rich source_entity_type/label
+- P0-3 (3dfd7f02): Dashboard simplification — verified HOMEOWNER_GAPS.md entry at line 217: category=ui_quality_finding, severity=moderate, tag=needs-simplification, status=deferred, 4 simplification options listed
+- discipline_coverage_running: { "A": 0, "B": 0, "C": 0, "D": 0, "E": 0 }
+- findings_this_batch: { verification_pass: 3, verification_fail: 0, gap_found: 0, ui_quality: 0, persistence: 0 }
+- author: Claude (continuing from Codex)
+
+---
