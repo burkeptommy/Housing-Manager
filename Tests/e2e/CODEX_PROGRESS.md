@@ -285,3 +285,22 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 12:50:00 UTC — batch_end: Wave C-5 REDO Section 6 — PASS + 1 follow-up fix
+
+- batch_id: round-c-c5-redo-section-6-sim
+- last_commit: 61a5ac97
+- result: PASS — all 3 C-5 fixes verified live in sim. 1 follow-up fix shipped (SettingsView section header was still labeled ALFRED above Household Email row).
+- next_planned: Wave C-6 REDO Section 8 (Family — was source-only first time, needs real sim)
+- author: Claude
+
+---
+
+## 2026-05-11 12:51:00 UTC — fix_shipped: SettingsView ALFRED section header
+
+- batch_id: claude-c5-redo-settings-alfred
+- files: SettingsView.swift:175-191 (Section header ALFRED -> HOUSEHOLD INTAKE; footer Alfred processes -> Chez processes)
+- Build clean; binary reinstalled
+- author: Claude
+
+---

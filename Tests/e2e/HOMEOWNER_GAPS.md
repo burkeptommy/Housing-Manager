@@ -650,3 +650,22 @@ Sim drive confirmed all source verdicts hold. Fixture has 0 documents in Vault s
   OR use a separate `displayName` field if one exists. OR display the system's category (always clean) instead of name.
 - Status: `deferred` — needs decision on whether to humanize at render or fix in quiz mapper writes.
 
+
+---
+
+## Round C — Wave C-5 REDO (Section 6 Email forwarding — brief sim verification) — PASS
+
+All 3 Wave C-5 fixes verified live in sim:
+- **ProjectEmailView Alfred→Chez rebrand**: pitch text reads "Chez will automatically extract...", section header "WHAT CHEZ DOES", contact saves as "Chez Home" — verified
+- **Inbox sub-tab "Action" label**: 4 sub-tabs read Action / Unread / All / Chez (not "Needs Action") — verified
+- **ChezMessageBubble system message**: clean rounded rectangle, multi-line uncropped — verified
+
+### Wave C-5 REDO Finding 1 — SettingsView "ALFRED" section header on Household Email — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `medium` (brand consistency)
+- Surface: `Haven/Features/Settings/SettingsView.swift:175-191`
+- Evidence: REDO subagent spotted that Settings tab's section ABOVE the "Household Email" row reads "ALFRED" — but Household Email IS Chez's ingestion path (forwarding → vendor + project + document creation = concierge work). After Wave C-5's ProjectEmailView Alfred→Chez rebrand, the parent SettingsView section was still pointing at Alfred. Inconsistent.
+- Fix: changed section header "ALFRED" → "HOUSEHOLD INTAKE" (neutral, descriptive, doesn't bake either brand into the section label). Updated footer "Alfred processes and organizes" → "Chez processes and organizes" to match the now-Chez-branded ProjectEmailView destination.
+- Status: `fixed` in batch commit. Build clean.
+

@@ -180,12 +180,12 @@ struct SettingsView: View {
                         .font(HavenTypography.body)
                 }
             } header: {
-                Text("ALFRED")
+                Text("HOUSEHOLD INTAKE")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.5)
                     .foregroundStyle(HavenColors.textTertiary)
             } footer: {
-                Text("Forward quotes, documents, vendor info, and anything home related. Alfred processes and organizes everything automatically.")
+                Text("Forward quotes, documents, vendor info, and anything home related. Chez processes and organizes everything automatically.")
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)
             }
