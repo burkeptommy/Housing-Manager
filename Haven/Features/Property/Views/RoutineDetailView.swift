@@ -309,10 +309,13 @@ struct RoutineDetailView: View {
                         Text("Log visit and spend")
                             .fontWeight(.semibold)
                     }
+                    .foregroundStyle(HavenColors.textOnAction)
                     .frame(maxWidth: .infinity)
+                    .frame(minHeight: 50)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(HavenColors.navy)
+                .buttonStyle(.plain)
             }
         }
     }

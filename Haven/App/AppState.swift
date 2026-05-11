@@ -183,17 +183,25 @@ final class AppState: ObservableObject {
         Task { await AdminCatalogService.shared.refreshPublishedCatalog() }
 
         Task {
-            // Wait for the initial session to be fully resolved before showing any UI.
-            // This prevents the flash of unauthenticated screens while auth is still loading.
-            for await resolved in authService.$hasResolvedInitialSession.values {
-                if resolved { break }
-            }
-
             #if DEBUG && targetEnvironment(simulator)
             let environment = ProcessInfo.processInfo.environment
             let arguments = ProcessInfo.processInfo.arguments
-            if !didAttemptE2ELoginBootstrap,
-               environment["CHEZ_E2E_LOGIN"] == "1" || arguments.contains("--chez-e2e-login") {
+            let shouldAttemptE2ELoginBootstrap = !didAttemptE2ELoginBootstrap &&
+                (environment["CHEZ_E2E_LOGIN"] == "1" || arguments.contains("--chez-e2e-login"))
+            #else
+            let shouldAttemptE2ELoginBootstrap = false
+            #endif
+
+            // Wait for the initial session to be fully resolved before showing any UI.
+            // This prevents the flash of unauthenticated screens while auth is still loading.
+            if !shouldAttemptE2ELoginBootstrap && !authService.hasResolvedInitialSession {
+                for await resolved in authService.$hasResolvedInitialSession.values {
+                    if resolved { break }
+                }
+            }
+
+            #if DEBUG && targetEnvironment(simulator)
+            if shouldAttemptE2ELoginBootstrap {
                 didAttemptE2ELoginBootstrap = true
                 let email = environment["CHEZ_E2E_EMAIL"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let password = environment["CHEZ_E2E_PASSWORD"] ?? ""
