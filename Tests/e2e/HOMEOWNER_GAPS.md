@@ -482,14 +482,14 @@ No current-run findings yet.
 - Fix: added `InboxFilter.pickerLabel` computed property that maps `.needsAction → "Action"` and preserves all other labels at their full length. The Picker now uses `pickerLabel` while `rawValue` stays "Needs Action" for analytics + persistence + code lookups. Single change, no callsite breakage.
 - Status: `fixed` in batch commit.
 
-### Wave C-5 Finding 3 — Chez request titles truncate in list cells + nav — DEFERRED
+### Wave C-5 Finding 3 — Chez request titles truncate in list cells + nav — FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `low`
 - Surface: ChezRequestRowCard list-cell title `lineLimit(2)`; ChezRequestDetailView nav title single-line
 - Evidence: Auto-generated request titles ("Find a vendor for: A4 Sanitize pet areas synthetic turf", "Find a vendor for: Septic pumping every 3 years") clip at the line limit. The "Find a vendor for:" prefix is redundant when the category icon already implies the action.
 - Suggested fix: either bump list-cell title to lineLimit(3), or strip the "Find a vendor for:" prefix when category icon is present, or generate shorter task-focused titles on the server side.
-- Status: `deferred` — multi-file design call; not blocking Round C signoff. Logged for product/design follow-up.
+- Status: `fixed` in `c3a15af5`. ChezRequestRowCard.swift `displaySummary` strips "Find a vendor for:" / "Get a quote for:" / "Schedule a visit for:" / "Coordinate task:" prefixes and re-capitalizes the surviving fragment. Raw `request.summary` unchanged in DB; render-time only. C-1 REDO #3 (consolidated finding) is also closed by this commit.
 
 ### Wave C-5 Finding 4 — ChezMessageBubble system message bubble shape — FIXED
 
@@ -539,12 +539,12 @@ After the user moved the Simulator to the primary monitor, this REDO subagent ac
 - Fix: added `@State showArchiveConfirm = false` + `.confirmationDialog("Archive this routine?", titleVisibility: .visible)` wrapping the archive button. Dialog has explicit "Archive routine" destructive button + "Cancel" + a body message explaining what archiving does ("hides its schedule and unlinks any vendor tasks. You can restore it later from the archived routines list").
 - Status: `fixed` in commit (next). Build clean.
 
-### Wave C-1 REDO Finding 3 — Chez request title truncation — DEFERRED
+### Wave C-1 REDO Finding 3 — Chez request title truncation — FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `minor`
-- Same finding as Wave C-5 #3 (re-confirmed). "Find a vendor for: A4 Sanitize pet areas mix..." and "syn..." are indistinguishable after truncation. Already documented as deferred to product/design.
-- Status: `deferred` (consolidated with Wave C-5 finding)
+- Same finding as Wave C-5 #3 (re-confirmed). "Find a vendor for: A4 Sanitize pet areas mix..." and "syn..." are indistinguishable after truncation.
+- Status: `fixed` in `c3a15af5` (consolidated with Wave C-5 finding).
 
 ### Wave C-1 REDO Finding 4 — Spec vs implementation gap on RoutineDetailView Chez delegation
 
@@ -580,7 +580,7 @@ After Wave C-1 REDO sim drive worked, C-2 REDO confirmed fixes hold:
 - **Em-dash sweep** — verified VehicleDetailView shows "Not estimated yet" not "—".
 - **Brand voice** — compose header "Ask Chez · Chez replies within 1 business day" intact, no Alfred / Tom leakage.
 
-### Wave C-2 REDO Finding 1 — Maintenance hub vehicle row navigates to blank view — NEW GAP
+### Wave C-2 REDO Finding 1 — Maintenance hub vehicle row navigates to blank view — VERIFIED FIXED
 
 - Category: `gap_found`
 - Severity: `moderate`
@@ -588,7 +588,7 @@ After Wave C-1 REDO sim drive worked, C-2 REDO confirmed fixes hold:
 - Evidence: Subagent reported "Tapping the '2003 HONDA Accord — needs shop / Set up >' row from the Maintenance hub's Vehicles section navigates to a blank white view (back-arrow only, no body)." Reachable VehicleDetailView is via Property tab → vehicle row.
 - Reproduction: Open Maintenance tab → scroll to Vehicles section → tap a vehicle row → blank view appears
 - Suggested fix: check the navigationDestination handler for the Maintenance hub's vehicle row. The Property tab path works correctly (subagent navigated there fine for the rest of the test). The Maintenance hub path is missing the destination view binding.
-- Status: `deferred` — out of scope for C-2 REDO; logged for follow-up task.
+- Status: `fixed` (verified at audit 2026-05-11). `MaintenanceTabView.vehiclesSection` (lines 257-295) no longer uses `pushTarget = .vehicle`; tap closure now posts `.navigateToVehicle` + `.switchToTab` notifications directly so the navigation is immediate. Inline comment at MaintenanceTabView.swift:269-276 documents the C-2 REDO finding rationale.
 
 
 ---
@@ -648,7 +648,7 @@ Sim drive confirmed all source verdicts hold. Fixture has 0 documents in Vault s
   }
   ```
   OR use a separate `displayName` field if one exists. OR display the system's category (always clean) instead of name.
-- Status: `deferred` — needs decision on whether to humanize at render or fix in quiz mapper writes.
+- Status: `fixed` (verified at audit 2026-05-11). `systemsMissingProfilePreview` at PropertyDetailView.swift:1335 already uses `.humanizedSystemName`. The render-time humanization was landed alongside `HomeSystemRow.displayName` in commit `8d99a046` ("HomeSystemRow.displayName wraps humanize() — Round C verification follow-up").
 
 
 ---
@@ -755,14 +755,14 @@ Sim drive completed across the full VehicleDetailView (12+ sections), all sheet 
 - Suggested fix: filter contractors by canonical category matching "Mechanic" / "Automotive" / "Auto Repair". Or split into "AUTOMOTIVE" section + "OTHER CONTRACTORS (likely not mechanics)" section. Or just show empty state + "Add New Mechanic" affordance when no automotive contractors exist.
 - Status: `deferred` — not a 1-line fix; SystemCategoryRegistry doesn't have an automotive category. Needs design decision. Documented for product follow-up.
 
-### Wave C-7 Finding 4 — EditVehicleSheet mileage field has no visible label when populated — DEFERRED
+### Wave C-7 Finding 4 — EditVehicleSheet mileage field has no visible label when populated — VERIFIED FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `minor` (contextual)
 - Surface: `Haven/Features/Property/Views/EditVehicleSheet.swift:42`
 - Evidence: `TextField("Current Mileage", text: $currentMileage)` — placeholder "Current Mileage" hidden when value is set (standard iOS behavior). Subagent saw populated value "90000" with no visible label, between Color and Ownership rows.
 - Suggested fix: convert to HStack pattern with leading label Text + trailing TextField, OR use SwiftUI's LabeledContent (iOS 16+). Same pattern would benefit License Plate / Color when populated.
-- Status: `deferred` — minor polish, contextual issue (placeholder works fine when empty).
+- Status: `fixed` (verified at audit 2026-05-11). EditVehicleSheet.swift:37-52 uses `LabeledContent("License Plate")`, `LabeledContent("Color")`, `LabeledContent("Mileage")` so labels persist on the left when the TextField is populated. Trailing-aligned `TextField("Optional", text: $...)`.
 
 ### Wave C-7 Finding 5 — CLAUDE.md says Recalls DisclosureGroup "always shown" but code is conditional — DEFERRED
 
@@ -906,14 +906,14 @@ Sim drive surfaced 2 fail-level findings + multiple polish/spec drift items.
 - Suggested fix: humanize `system.name` and `contractor.companyName` at render time. Replace underscores/hyphens with spaces, title-case, strip suffix slugs.
 - Status: `deferred` — already in gaps doc from C-4 REDO finding #2. Add note linking the two.
 
-### Wave C-9 Finding 6 — "Electrical & Safe..." truncation in category tile — DEFERRED
+### Wave C-9 Finding 6 — "Electrical & Safe..." truncation in category tile — FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `minor` (layout)
 - Surface: System category tile rendering
 - Evidence: Full label "Electrical & Safety" clipped to "Electrical & Safe..." in the systems tile grid.
 - Suggested fix: either widen tile (changes grid), shrink font, lineLimit(2), or shorten label to "Electrical" (loses safety connotation).
-- Status: `deferred` — layout-level decision
+- Status: `fixed` in `c3a15af5`. PropertyEnhancedSections.swift:227 changed from `.lineLimit(1)` to `.lineLimit(2)` on `PropertySystemsCategoryTile.title`. Single-line names unaffected; long labels wrap to a second line. Grid layout unchanged. Safety connotation preserved.
 
 ### Wave C-9 verified passes
 
@@ -990,14 +990,14 @@ Sim drive verified 19 rows. Section 11e Documents per-property covered by Wave C
 
 Sim drive verified 11 of 13 rows. Equipment catalog flow + Utility account flow both functional.
 
-### Wave C-11 Finding 1 — Equipment catalog double-brand prefix on results — DEFERRED
+### Wave C-11 Finding 1 — Equipment catalog double-brand prefix on results — VERIFIED FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `minor`
 - Surface: Equipment catalog search result rows
 - Evidence: "Bosch Bosch 800 Series Dishwas..." — manufacturer field already contains "Bosch" and model name also starts with "Bosch", display concatenates them.
 - Suggested fix: catalog row display should detect when model name already starts with manufacturer and dedupe.
-- Status: `deferred` — affects all Bosch entries observed; needs investigation of all brand × model concat patterns
+- Status: `fixed` (verified at audit 2026-05-11). `EquipmentSearchResult.init(from:)` in EquipmentSearchResult.swift:48-58 dedupes the manufacturer prefix at decode time: if `display_name` starts with `"{Mfr} {Mfr} "`, strips the duplicate. Inline comment documents the Round C C-11 finding.
 
 ### Wave C-11 Finding 2 — Equipment catalog pick doesn't update Category — DEFERRED
 
@@ -1017,14 +1017,14 @@ Sim drive verified 11 of 13 rows. Equipment catalog flow + Utility account flow 
 - Suggested fix: either rename sheet "Add Utility or Recurring Service" or split into two sheets.
 - Status: `deferred` — taxonomy decision
 
-### Wave C-11 Finding 4 — AddUtilitySheet provider list lacks region-aware sort — DEFERRED
+### Wave C-11 Finding 4 — AddUtilitySheet provider list lacks region-aware sort — FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `moderate` (UX friction)
 - Surface: Add Utility → Provider list (Electric)
 - Evidence: No search field, no state/region filter, no most-likely-provider-first sort. Property is in Bethel CT but list shows alphabetical: Alabama Power → Alliant → Ameren → long scroll to Eversource. CLAUDE.md documents region-aware ranking (Phase 19h) for quiz `UtilityProviderSearchPicker` but AddUtilitySheet picker doesn't appear to use it.
 - Suggested fix: port the Phase 19h region-aware sort to AddUtilitySheet provider picker.
-- Status: `deferred` — could be ported in a single commit if Phase 19h logic is extracted
+- Status: `fixed` in `c3a15af5`. Ported `relevanceScore` to UtilityAccountsSection.swift `AddUtilitySheet`: fetches property city + state in `.task`, applies `sortedByRelevance` after each provider load (.onChange + .task paths). Town hit (3) > state OR US national (2) > nothing (0); alphabetical tiebreak. No init param changes; both call sites (UtilityAccountsSection + InboxItemDetailView) benefit automatically.
 
 ### Wave C-11 Finding 5 — Duplicate providers in utility_providers table — DEFERRED
 
@@ -1081,23 +1081,23 @@ Sim drive sampled 4 surfaces (Dashboard / Tasks V5 / Property Overview / Inbox C
 - Suggested fix: audit Text() / Label() usages in MainTabView's TabView for fixed `.font(.system(size:N))` calls and replace with HavenTypography token that respects Dynamic Type.
 - Status: `deferred` — accessibility wave needed
 
-### Wave C-12 Finding 4 — Property Overview "100 Systems · 104 Priorities" doesn't reconcile — DEFERRED
+### Wave C-12 Finding 4 — Property Overview "100 Systems · 104 Priorities" doesn't reconcile — FIXED
 
 - Category: `gap_found` (data aggregation)
 - Severity: `moderate` (trust failure)
 - Surface: Property hero card on PropertyDetailView
 - Evidence: Hero shows "100 Systems · 104 Priorities" — priority count is higher than total systems. Either duplicate counting or stale aggregation.
 - Suggested fix: investigate `priorityCount` computation in `PropertyDetailViewModel` to ensure each system contributes max once.
-- Status: `deferred` — data investigation needed
+- Status: `fixed` in `c3a15af5`. PropertyDetailView.swift `prioritiesCount` rewritten: was `needsVendorTasks.count + extraOverdue + systemsMissing` (summed three independent counts and over-counted systems with multiple signals). Now collects priority signals into a `Set<UUID>` of system IDs, so each system contributes at most ONE priority. Orphan tasks (no `systemId`) count separately. Result: priorities ≤ systems.count + orphan-tasks.count by construction. Matches user mental model "each system = at most one decision needed".
 
-### Wave C-12 Finding 5 — Dashboard vendor name duplication "Schedule Bethel Lawn Care: spring cleanup · May 15 · Bethel Lawn Care" — DEFERRED
+### Wave C-12 Finding 5 — Dashboard vendor name duplication "Schedule Bethel Lawn Care: spring cleanup · May 15 · Bethel Lawn Care" — FIXED
 
 - Category: `ui_quality_finding`
 - Severity: `minor` (redundancy)
 - Surface: Dashboard "Spring readiness" card
 - Evidence: Vendor name "Bethel Lawn Care" appears TWICE in one card row — once in the title ("Schedule Bethel Lawn Care: spring cleanup") and once as a trailing metadata pill.
 - Suggested fix: apply the `truncatedVendorName` resolver pattern from Phase 56.6 / Build 94 to remove the trailing pill when the title already contains the vendor name.
-- Status: `deferred` — needs Pattern-67-style render-time resolver
+- Status: `fixed` in `c3a15af5`. HomeCoverageHero.swift `nextServiceDisplayText(for:)` drops the trailing vendor pill when `visit.taskTitle.range(of: vendor, options: .caseInsensitive) != nil`. Falls back to the original 3-segment format when title doesn't reference the vendor.
 
 ### Wave C-12 Finding 6 — Subtype slugs in Property Overview (compound) — DEFERRED
 
