@@ -1290,3 +1290,42 @@ CRITICAL: estate intelligence cleanup verified end-to-end.
 - 20.4 AddVendorSheet `prefilledCategory` propagation
 - B1+ legibility / B3 zero em-dashes / B4 brand voice / B11 density / Phase 56.3 typography all PASS
 
+
+---
+
+## Round E — Wave E-1 (Section 21 rows 21.1-21.6 customer-initiated cross-app flows) — PARTIAL PASS
+
+Sim drive verified 4 customer-side flows + source-verified 2 more. Cross-app side (handyman / contractor receiving) deferred for cross-app sims.
+
+### Wave E-1 Finding 1 — B4 brand voice "Alfred Context Id" leaks into ChezRequestComposeSheet — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `medium` (B4 violation, breaks Chez brand isolation)
+- Surface: `Haven/Features/Chat/Views/ChatView.swift:307-322` `chezContextFromAlfred`
+- Evidence: When the customer taps "Ask Chez" from the Alfred chat overflow menu, the resulting ChezRequestComposeSheet's RE: card renders the labels "Alfred Context Id" and "Alfred Context Type" — because the context dict keys `alfred_context_type` / `alfred_context_id` were being naively capitalized by `ChezRequestComposeViewModel.contextLines` (key.replacingOccurrences(of: "_", with: " ").capitalized).
+- Fix: prefixed all three Alfred-specific context keys with underscore (`_alfred_context_type` / `_alfred_context_id` / `_alfred_context_name`). The existing `contextLines` filter at ChezRequestComposeViewModel.swift line 43 already drops keys starting with `_`, so these are now hidden from the user-facing RE: card while still being passed to the Edge Function / admin portal context. Updated MainTabView.swift:326 (`_alfred_context_name`) to match.
+- Build clean, binary reinstalled.
+- Status: `fixed`
+
+### Wave E-1 verified passes (customer-side)
+
+- 21.1 Customer Compose flow: Alfred → menu → Ask Chez → category "Get a quote" (salmon fill) → adaptive subtitle "Chez gathers competitive numbers and a fair-market read" → Inbox Chez sub-tab shows live Open requests with SLA captions
+- 21.2 ChezOwnsToggle present on ContractorDetailView with proper customer-facing copy "Chez handles all scheduling and follow-ups with this vendor on your behalf"
+- 21.3 ChezRequestDetailView renders system message as centered gray rounded rect (C-5 REDO fix verified again) + reply composer "Reply to Chez..."
+- 21.5 HandymanTabView "+" menu correctly limited to Add punch-list item + Schedule a visit when handyman is linked (no quote affordance = design intent; quotes go via universal ChezEntryButton)
+
+### Wave E-1 deferred / cross-app blocked
+
+- 21.1 submit, 21.2 toggle flip, 21.3 reply send — all mutating
+- 21.4 ChezOwnsBadge on task — fixture has chez-owned task but outside dashboard window; source-verified UnifiedTaskCard.swift:363 renders badge when `task.isChezOwned`
+- 21.6 QuoteAnalysisView — no projects with quotes in fixture; source-verified Draft negotiation email button + Chez get-a-second-quote ChezEntryButton
+
+### Wave E-1 cross-app blocks (need handyman/contractor sims)
+
+- 21.1 — handyman receives quote request: needs admin / contractor portal sim
+- 21.2 — Chez-owned routine creates standing engagement parent request: needs admin portal sim
+- 21.3 — admin reply creates `chez_reply_action_needed` inbox_item: needs admin portal sim
+- 21.4 — task delegation creates parent chez_request with smart category routing: needs admin portal sim
+- 21.5 — handyman receives quote in Field app: needs handyman sim
+- 21.6 — counter offer back-and-forth: needs both sides
+

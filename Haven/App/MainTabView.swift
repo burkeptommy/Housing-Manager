@@ -323,7 +323,7 @@ struct MainTabView: View {
             "property_name",
             "vehicle",
             "title",
-            "alfred_context_name",
+            "_alfred_context_name",
         ] {
             if let value = context[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
                !value.isEmpty {

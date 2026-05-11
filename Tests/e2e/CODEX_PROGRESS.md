@@ -435,3 +435,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 18:55:00 UTC — batch_end: Round E Wave E-1 PARTIAL PASS + 1 B4 fix shipped
+
+- batch_id: round-e-e1-customer-side
+- last_commit: cb574609
+- result: PARTIAL PASS — 4 customer-side flows verified, 2 source-verified, 6 cross-app blocked. 1 real B4 brand-voice fix shipped.
+- key_finding: ChezRequestComposeSheet RE: card was leaking 'Alfred Context Id' / 'Alfred Context Type' as customer-facing labels when launched from Alfred chat. Fixed by prefixing keys with underscore so contextLines filter hides them.
+- next_planned: Round E Wave E-2 (Section 21 rows 21.7-21.12, handyman-initiated + revoke flows)
+- author: Claude
+
+---

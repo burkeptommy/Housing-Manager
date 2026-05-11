@@ -304,14 +304,21 @@ struct ChatView: View {
             "source_entity_type": "chat",
             "source_entity_label": "Chez chat",
         ]
+        // Round E Wave E-1 fix: prefix Alfred-specific context keys with
+        // underscore so ChezRequestComposeViewModel.contextLines filter
+        // (which drops keys starting with '_') hides them from the
+        // customer-facing RE: card. The keys are still in the context
+        // dict for Chez admin / Edge Function consumption, just not
+        // surfaced as user-visible "Alfred Context Id" / "Alfred Context
+        // Type" labels.
         if let contextType, !contextType.isEmpty {
-            c["alfred_context_type"] = contextType
+            c["_alfred_context_type"] = contextType
         }
         if let contextId {
-            c["alfred_context_id"] = contextId.uuidString
+            c["_alfred_context_id"] = contextId.uuidString
         }
         if let contextName, !contextName.isEmpty {
-            c["alfred_context_name"] = contextName
+            c["_alfred_context_name"] = contextName
             c["source_entity_label"] = contextName
         }
         // If there's a recent message thread, attach the user's last
