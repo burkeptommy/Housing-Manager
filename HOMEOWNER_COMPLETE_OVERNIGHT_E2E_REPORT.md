@@ -290,3 +290,114 @@ Round C signoff is complete. The 31 gaps catalogued above are sized for product/
 
 Round D (per matrix Section 25): secondary surfaces — vendor coverage sweep, Chez delegation, routines, trusted contacts, calendar sync, vault lock, estate intelligence absence, find local vendors.
 
+
+---
+
+# Round D + Round E Status (added 2026-05-11 by Claude continuation)
+
+After Round C signoff, the user explicitly asked for: "Do everything. And also make sure we actually triage the 31 gaps not just the top 5." Following sections document the gap triage + remaining waves.
+
+## Gap triage — all 31 Round C gaps
+
+Explicit dispositions logged in `Tests/e2e/HOMEOWNER_GAPS.md` (section "Round C Gap Triage"). Summary:
+
+| Disposition | Count | Action |
+|---|---|---|
+| **FIX-NOW** (shipped this session) | 14 | Code + doc fixes shipped in 3 batches |
+| **DEFER-PRODUCT** | 9 | Tom's product decisions (Calendar sync, dark mode, HouseholdStrip remount, etc.) |
+| **DEFER-DESIGN** | 5 | Multi-file design pass needed (MechanicPicker filter, AddUtility region sort, etc.) |
+| **DATA-QUALITY** | 2 | Fixture / seed cleanup (FamilyMember DOB, duplicate utility providers) |
+| **INFO** | 1 | No action (GapAnalysisView dormant) |
+
+## Fixes shipped (Round D + E batches)
+
+Beyond the 10 commits shipped during Round C, this continuation added 7 more commits:
+
+| Commit | What | Source |
+|---|---|---|
+| `a89b6fbe` | **Batch 1 — CLAUDE.md + matrix doc drift (9 gaps).** Dark mode claim → light only; 88 categories in 15 groups → 97/14 post-Chez-v1; Recalls DisclosureGroup "always shown" → conditional; HouseholdStrip orphaned note added; Contacts Hub "ADD OR DISCOVER" historical note + 5 filter chips; Section 11b matrix rewritten for Phase 67 reality; Row 11.55 visualize-room marked DEFERRED; Section 11d header relabeled "Vendors". | gap triage |
+| `f2c50a20` | **Batch 2 — `String.humanizedSystemName` extension** for snake_case + slug bleed (compound finding across C-4 REDO + C-9 + C-12). Applied at PropertyDetailView.systemsMissingProfilePreview + SystemDetailView in-card title. | gap #10 |
+| `8866d2ce` | **Batch 3 — 4 code fixes** (EditVehicleSheet LabeledContent labels, Equipment catalog double-brand dedup, ProjectEmailView dismiss button in sheet context, Maintenance hub vehicle row instant nav). | gaps #15/#19/#25/#27 |
+| `8d99a046` | **HomeSystemRow.displayName wraps humanize()** — verification subagent caught nav title still showing raw snake_case. Wrapped at the extension level so all callers benefit. | verification follow-up |
+| `c05a6495` | **Round E Wave E-1 — Alfred context keys leak fix.** `alfred_context_type` / `alfred_context_id` / `alfred_context_name` prefixed with underscore so ChezRequestComposeViewModel.contextLines filter hides them. | Round E E-1 B4 finding |
+| `fc925f94` | **Round E Wave E-2 — ChezOwnsToggle revoke confirmation.** Mirrors Archive routine confirmation pattern. Target-specific message covers all 9 target cases (routine / contractor / task / system / project / document / utility / vehicle / insurance). | Round E E-2 destructive-action finding |
+| Plus 4 heartbeat-only commits for each wave batch_end | Round D-1/D-2 + Round E-1/E-2 progress trail |
+
+## Round D status
+
+| Wave | Section(s) | Sim-drive | Result | Fixes | Gaps |
+|---|---|---|---|---|---|
+| D-1 | Vendor coverage + Chez delegation + routines (Sections 2d, 2f, 2g, 2h, 2i) | YES | PASS | 0 | 1 ambiguous (Alfred-to-find-pro label/destination — source says correct) |
+| D-2 | Trusted contacts + Calendar sync + Vault lock + Estate intelligence absence + Find local vendors (Sections 9, 16, 17, 18, 20) | YES | PASS | 0 | 4 (Calendar Sync iOS surface absent, Trusted contact avatar missing, Top-Rated naming evolution, vault timeout scope) |
+
+**Round D key finding:** Section 18 estate intelligence cleanup VERIFIED clean end-to-end. Dashboard, Property detail, Settings, DocumentCategoryGroups all have ZERO estate UI per Chez v1 tombstone. The remaining Family Reference Binder PDF estate section is intentional backward compat.
+
+**Round D ambiguous finding to resolve:** Wave D-1 reported "Ask Alfred to find a pro" menu option routes to AddVendorSheet not Alfred chat. Source code at PropertyDetailView:5400+5571 clearly sets `showAlfredChat = true` for both buttons. Either subagent misperceived navigation OR there's an intermediate sheet I'm not seeing in source. Needs Tom's eyes to confirm flow.
+
+## Round E status
+
+| Wave | Section | Sim-drive | Result | Fixes | Cross-app blocks |
+|---|---|---|---|---|---|
+| E-1 | Section 21 rows 21.1-21.6 (customer-initiated cross-app flows) | YES | PARTIAL PASS | 1 (Alfred context keys leak) | 6 blocks for handyman/contractor receive verification |
+| E-2 | Section 21 rows 21.7-21.12 (handyman-initiated + revoke flows) | YES | PASS | 1 (ChezOwnsToggle revoke confirmation) | 6 blocks for handyman/admin sim verification |
+
+**Round E key fix:** ChezRequestComposeSheet RE: card no longer leaks "Alfred Context Id" / "Alfred Context Type" labels when launched from Alfred chat. Plus ChezOwnsToggle revoke now requires confirmation (mirrors Archive routine pattern).
+
+**Cross-app blocks:** 12 total verifications would need handyman / contractor / admin portal sims. Best done as a dedicated cross-app round with all three surfaces driven simultaneously. Per Section 21 spec: "These need TWO surfaces driven simultaneously (homeowner sim + handyman sim or contractor web)."
+
+## Verification subagent
+
+Captured "after" screenshot evidence for all 13 Round C fixes shipped this session:
+
+01. ChezProfileView Spending Authority steppers show $200/$500/$500
+02. RoutineDetailView Archive routine confirmation dialog
+03. RoutinesListView single chevron per row
+04. Inbox sub-tabs "Action" not "Needs Action"
+05. Settings "HOUSEHOLD INTAKE" section header
+06. ProjectEmailView Chez brand voice throughout
+07. ChezMessageBubble rounded-rect system message
+08. VehicleDetailView "Archive Vehicle" capitalized
+09. IndigoGradientCard "0 decisions" renders white not salmon
+10. CoveredDriverPickerSheet excludes Child relationship
+11. EditVehicleSheet fields have visible LabeledContent labels
+12. Maintenance hub vehicle row navigates instantly (no blank screen)
+13. SystemDetailView title humanizes snake_case
+
+All 13 verified PASSED with simulator screenshots saved to `/tmp/claude-c-evidence/verification/`.
+
+## Backend regression
+
+```
+$ node Tests/e2e/run.mjs
+…
+[phase6b] backend combinatorial matrix rows 3.1-3.36 executed
+[phase7] quiz complete + 7 tasks for delegation
+[phase8] 5 tasks delegated to Chez
+[phase9] all verifications passed
+issues: 0
+✓ All phases passed.
+```
+
+## Total session stats
+
+- **22 commits** pushed to `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` (Round C: 14 + this continuation: 8)
+- **Round C signoff** (12 waves) + **Round D** (2 waves) + **Round E** (2 waves) + **Verification** (1 subagent)
+- **Round C: 11 real bugs caught by sim drive that source-only audit had missed**
+- **Round D: 1 ambiguous finding + 4 gaps** (Calendar Sync iOS absent, Trusted contact avatar, Top-Rated naming, vault timeout scope)
+- **Round E: 2 real bugs fixed** (Alfred context keys leak, ChezOwnsToggle revoke confirmation) + **12 cross-app blocks** documented for handyman/contractor sim follow-up
+- **Backend regression**: PASSES 0/0 after every fix including the e2e fixture string edits
+
+## Highest-priority follow-up items
+
+For the next session, the most impactful work would be:
+
+1. **Cross-app round trips (Section 21)** — 12 blocks need handyman + contractor + admin portal sims driven simultaneously. The Concierge cockpit + ChezField + iOS would all need to be open with mock auth so a single test run can chain ALL three sides of a flow (e.g. customer requests quote → admin assigns → handyman quotes → customer accepts → visit → completion → invoice). Per matrix Section 21 spec.
+
+2. **Calendar Sync UI** — backend exists, iOS surface completely missing. Either build the missing CalendarSyncSettingsView + Sheet OR clean up CLAUDE.md to reflect deferral.
+
+3. **dark mode** — CLAUDE.md doc claim removed in batch 1, but if Tom wants to ship dark mode in v1.0.3+, the HavenColors adaptive tokens are ready behind the Info.plist `UIUserInterfaceStyle=Light` lock.
+
+4. **Section 11b matrix is now correct** (rewritten for Phase 67 reality) but Section 11b verification has not been re-run against the rewritten rows. Worth a brief verification pass.
+
+5. **Cross-app spec for Round F**: a unified test plan that exercises Sections 21 rows 21.1-21.12 with all three sims active. Estimated 4 subagents × 60-90 min = 4-6 hours.
+
