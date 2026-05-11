@@ -386,3 +386,56 @@ No current-run findings yet.
 - The matrix says these warnings fire on MaintenanceTaskDetailSheet's frequency editor, but the actual implementation lives on `SystemDetailView`'s `FrequencyPickerSheet` (maxIntervalDays + warrantyLinked warnings). MaintenanceTaskDetailSheet's `editFrequencySheet` (line 1594) is a simpler preset list with no caps — that's by design per the CLAUDE.md "System frequency overrides" doc. Worth checking on SystemDetailView in a future wave (Section 11c).
 - Status: matrix can be updated; not a code bug
 
+
+---
+
+## Round C — Wave C-3 (Section 4 Document pipeline)
+
+### Wave C-3 verification summary
+
+- Subagent: c3-section-4-document-pipeline, returned PARTIAL
+- 12 rows fully verified + 4 partially via source — all 7 critical source-code contracts PASS: SHA-256 dedup in all 4 upload paths, analyze-document `visible_to_home_managers` writeback (Build 87), per-document Access pill gate (Build 87), DocumentAccessSheet family-vs-staff render, VIN auto-link, AES-256-GCM encryption, document_content search index, view-document zero-access streaming
+- Sim verified: Documents tab empty state (Upload + Scan dual CTA + SUGGESTED catalog), Property tab Documents sub-tab, search bar, post-Chez-v1 SUGGESTED list (no estate docs)
+- 18 rows deferred (would mutate fixture or need admin context)
+
+### Wave C-3 Finding 1 — GapAnalysisView "estate readiness" stale copy — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `medium`
+- Surface: `Haven/Features/Documents/Views/GapAnalysisView.swift:90`
+- Evidence: Loading state copy "Alfred is reviewing your entire portfolio against best practices for **estate readiness**." references estate readiness which was removed from product scope per Chez v1 (`20260901_chez_v1_estate_removal.sql` dropped estate_state table).
+- Fix: rephrased to "household best practices" (no estate connotation). Alfred reference intentionally kept — Alfred IS the analysis agent (per Haven brand model: Alfred = chat/analysis/Q&A, Chez = scheduling/concierge/coordination).
+- Status: `fixed` in batch commit. Build clean.
+
+### Wave C-3 Finding 2 — Subagent over-flagged Alfred references — NO ACTION
+
+- Category: `verification` (false-positive triage)
+- Subagent flagged 6 Alfred user-facing references (DocumentUploadView×4, GapAnalysisView line 43, DocumentDetailView:136) as B4 brand voice violations. Re-reviewed all 6 in context:
+  - DocumentUploadView:192 "Alfred will automatically categorize it" — analysis context, Alfred correct
+  - DocumentUploadView:297 "Alfred is analyzing your document" — analysis, Alfred correct
+  - DocumentUploadView:331 "Alfred analyzed your document" — analysis, Alfred correct
+  - DocumentUploadView:653 "Alfred found these people" — analysis (party extraction), Alfred correct
+  - GapAnalysisView:43 "Alfred will analyze your document vault" — analysis, Alfred correct
+  - DocumentDetailView:136 "accessible to Alfred for analysis and chat" — both Alfred domains, correct
+- Haven has two distinct AI brand surfaces: **Alfred** (chat/analysis/Q&A in `Haven/Features/Chat/`) and **Chez** (concierge/scheduling/coordination in `Haven/Features/ChezRequests/`). Document analysis is Alfred's wheelhouse; only when the copy talks about scheduling / vendor coordination / hand-off should it say "Chez".
+- Wave C-2's MaintenanceTaskDetailSheet:2043 fix (Alfred → Chez) was correct because that line was about scheduling. This nuance worth adding to a future B4 discipline definition.
+- Status: `no action needed`. Subagent finding closed as false-positive.
+
+### Wave C-3 Finding 3 — FamilyReferenceBinder Estate Planning Summary — INTENTIONAL BACKWARD COMPAT
+
+- Category: `verification` (subagent triage)
+- Surface: `Haven/Features/Documents/Views/FamilyReferenceBinder.swift:52, 248, 309, 348`
+- Subagent flagged the "Estate Planning Summary" PDF section as Chez v1 stale. Re-reviewed: per CLAUDE.md "Estate Intelligence — REMOVED (Chez v1)" section: "DocumentCategory.swift still declares Will / Trust / POA / Healthcare Directive / Guardianship Designation / Letter of Intent / Living Will / HIPAA Authorization / Prenup / Postnup / Disposition of Remains / Deed in Trust so any documents already uploaded with those categories still decode."
+- The PDF section iterates over those same categories. For pre-Chez-v1 uploaded documents, the section correctly surfaces them in the binder. For new users with no estate documents, the section renders "No estate planning documents uploaded yet." which is informationally accurate.
+- This is INTENTIONAL backward compat per the Chez v1 cutover. Not a bug.
+- Status: `no action needed`. Subagent finding closed as intentional.
+
+### Wave C-3 Finding 4 — CLAUDE.md drift "88 categories / 15 groups" — DEFERRED DOC UPDATE
+
+- Category: `gap_found`
+- Severity: `low`
+- Surface: `CLAUDE.md` Email Ingestion Pipeline section
+- Subagent counted 14 groups + ~97 category strings post-Chez-v1 (Estate Planning group removed). CLAUDE.md says "88 categories in 15 groups".
+- Suggested fix: update CLAUDE.md numbers to reflect post-Chez-v1 state. Low-priority documentation hygiene.
+- Status: `deferred` — documentation drift, not a code bug. Not blocking Round C signoff.
+

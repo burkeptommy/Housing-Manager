@@ -87,7 +87,7 @@ struct GapAnalysisView: View {
                 .scaleEffect(1.5)
             Text("Analyzing your document vault...")
                 .font(HavenTypography.headline)
-            Text("Alfred is reviewing your entire portfolio against best practices for estate readiness.")
+            Text("Alfred is reviewing your entire document portfolio against household best practices.")
                 .font(HavenTypography.subheadline)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)

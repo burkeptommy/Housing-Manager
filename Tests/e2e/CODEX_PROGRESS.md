@@ -175,3 +175,18 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 03:35:00 UTC — batch_end: Wave C-3 Section 4 Document pipeline
+
+- batch_id: round-c-c3-section-4-document-pipeline
+- last_commit: 7f8c22e2 (Wave C-2 fixes)
+- result: PARTIAL — 12 rows fully verified + 4 partial; 18 rows deferred (mutation or admin context). All 7 critical source-code contracts PASS.
+- next_planned: Wave C-4 Section 5 Invoice processing
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 7, "B": 9, "C": 1, "D": 3, "E": 2 }
+- findings_this_batch: { verification_pass: 12, verification_fail: 0, gap_found: 1, ui_quality: 1, persistence: 0, false_positives_triaged: 7 }
+- key_finding: Haven brand-voice nuance — Alfred = analysis/chat domain; Chez = scheduling/concierge domain. Subagent over-flagged 6 Alfred references; only "estate readiness" copy on GapAnalysisView:90 was a real issue.
+- fix_shipped: GapAnalysisView:90 estate readiness rewording
+- author: Claude
+
+---
