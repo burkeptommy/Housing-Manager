@@ -741,7 +741,7 @@ struct SystemDetailRowView: View {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(system.name)
+                        Text(system.name.humanizedSystemName)
                             .font(HavenTypography.title2)
                             .foregroundStyle(HavenColors.textPrimary)
                         Text(system.category)

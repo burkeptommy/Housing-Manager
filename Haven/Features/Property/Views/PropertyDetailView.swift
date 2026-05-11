@@ -1334,7 +1334,7 @@ struct PropertyDetailView: View {
     private var systemsMissingProfilePreview: String {
         systemsMissingProfileEntries
             .prefix(3)
-            .map { $0.system.name }
+            .map { $0.system.name.humanizedSystemName }
             .joined(separator: " · ")
     }
 

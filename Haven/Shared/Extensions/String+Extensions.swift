@@ -36,4 +36,43 @@ extension String {
         }
         return String(trimmed).appending("...")
     }
+
+    /// Humanize a system / contractor name that may contain snake_case or
+    /// kebab-case subtype slugs. Splits on underscore + hyphen-between-letters,
+    /// title-cases each word, and preserves a known set of acronyms so
+    /// "boiler_with_central_ac" becomes "Boiler With Central AC" instead of
+    /// "Boiler With Central Ac".
+    ///
+    /// Caught by Round C Waves C-4 REDO + C-9 + C-12 (compound finding):
+    /// home_systems.name values like "A4 HVAC subtype boiler_with_central_ac"
+    /// and "Crawl Space finished_basement-sump_pump-crawl_space" leaked into
+    /// the user-facing UI. Apply this at render time to defensively humanize.
+    var humanizedSystemName: String {
+        // Known acronyms to upcase after title-casing.
+        let acronyms: Set<String> = [
+            "Hvac", "Ac", "Ev", "Hoa", "Hvac", "Diy", "Tv", "Llc",
+            "Pdf", "Ssn", "Url", "Api", "Pin", "Ftc", "Faq",
+        ]
+        // Replace underscores + slug-style hyphens-between-letters with spaces.
+        // Keep hyphens that look like compound modifiers ("12-month"," " spans).
+        var working = self.replacingOccurrences(of: "_", with: " ")
+        // Replace hyphen between two lowercase letters with space.
+        working = working.replacingOccurrences(
+            of: "(?<=[a-z])-(?=[a-z])",
+            with: " ",
+            options: .regularExpression
+        )
+        // Collapse multiple spaces.
+        working = working.replacingOccurrences(
+            of: " {2,}",
+            with: " ",
+            options: .regularExpression
+        )
+        // Title-case each word, then upcase known acronyms.
+        let parts = working.split(separator: " ").map { word -> String in
+            let titled = word.prefix(1).uppercased() + word.dropFirst().lowercased()
+            return acronyms.contains(titled) ? titled.uppercased() : titled
+        }
+        return parts.joined(separator: " ")
+    }
 }
