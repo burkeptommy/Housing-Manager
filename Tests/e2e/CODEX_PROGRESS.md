@@ -304,3 +304,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 13:08:00 UTC — batch_end: Wave C-6 REDO Section 8 — PASS + significant gaps
+
+- batch_id: round-c-c6-redo-section-8-sim
+- last_commit: d76a0a57 (C-5 REDO follow-up)
+- result: PASS — 12 sim-verified passes; 3 gaps surfaced
+- key_finding: HouseholdStrip + HouseholdStaffStrip components exist as Swift files but have ZERO callsites — orphaned by Phase 80+ Chez-first Dashboard restructure. CLAUDE.md scroll-order spec is stale. Matrix Row 8.11 (profile tap from HouseholdStrip) is broken; profile still reachable via Settings.
+- next_planned: Wave C-7 Section 10 Vehicle management (fresh)
+- author: Claude
+
+---

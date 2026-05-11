@@ -669,3 +669,55 @@ All 3 Wave C-5 fixes verified live in sim:
 - Fix: changed section header "ALFRED" → "HOUSEHOLD INTAKE" (neutral, descriptive, doesn't bake either brand into the section label). Updated footer "Alfred processes and organizes" → "Chez processes and organizes" to match the now-Chez-branded ProjectEmailView destination.
 - Status: `fixed` in batch commit. Build clean.
 
+
+---
+
+## Round C — Wave C-6 REDO (Section 8 Family — REAL SIM DRIVE) — PASS with gaps
+
+Sim drive confirmed all Build 86 + Build 87 contracts hold. The first C-6 was source-only; this REDO actually drove the sim through 18 screenshots and validated the user-facing UX. 12 verified passes (AddFamilyMemberChooserSheet 2-card chooser, FamilyMemberFormView regular + expecting modes, Settings → Family Members + Household Staff separation, AddHouseholdStaffSheet with Chez brand voice).
+
+### Wave C-6 REDO Finding 1 — HouseholdStrip + HouseholdStaffStrip orphaned in code — DOCUMENTATION DRIFT
+
+- Category: `gap_found`
+- Severity: `moderate`
+- Surface: `Haven/Features/Dashboard/Components/HouseholdStrip.swift` + `HouseholdStaffStrip.swift` (Swift files exist) vs `Haven/Features/Dashboard/DashboardView.swift` (zero call sites for either)
+- Evidence: REDO subagent's Dashboard screenshot confirmed neither strip is rendered. `grep -rn "HouseholdStrip("` and `grep -rn "HouseholdStaffStrip("` both return ZERO callsites across the entire codebase. The Phase 80+ Chez-first restructure surfaced "Chez handles 5 things" + "Spring readiness" cards as the primary post-quiz layout and replaced the family-prominent strip.
+- CLAUDE.md spec says: "Scroll order (post-quiz): ... > HouseholdStrip > HouseholdStaffStrip > ..." — this is stale.
+- Impact: matrix Row 8.11 "FamilyMemberProfileView opens on tap from HouseholdStrip" is broken — entry point doesn't exist on Dashboard. Profile is still reachable via Settings → Family Members → tap row, but the Dashboard tap path is gone.
+- Suggested fix: Either (a) update CLAUDE.md scroll order to reflect Phase 80+ reality, or (b) decide if HouseholdStrip should be re-instated below the Chez cards. This is a product decision.
+- Status: `deferred` to product/design. Worth noting as significant doc drift.
+
+### Wave C-6 REDO Finding 2 — Family Member sort order anomaly with adult — MINOR
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (likely fixture data quirk)
+- Surface: Family Members list rendered order
+- Evidence: Fixture shows 4 kids age 9 (sorted), then E2E Tester adult, then Sam Tester (age 7). Adult should be either first (if DOB indicates oldest) or last (if no DOB per sortedByAge no-DOB rule).
+- `sortedByAge()` implementation at DatabaseModels:205 is correct: DOB-known sorted ascending (oldest first), no-DOB rows go to the END alphabetically. Either E2E Tester has a DOB that places them in the middle (unlikely for an adult unless the year-of-birth got truncated) OR something in the fixture data is off.
+- Suggested fix: investigate fixture data. Not a code bug.
+- Status: `deferred` — fixture data quirk, not a code regression.
+
+### Wave C-6 REDO Finding 3 — FamilyMemberFormView opinionated defaults — POLISH
+
+- Category: `ui_quality_finding`
+- Severity: `minor`
+- Surface: `Haven/Features/Settings/Views/FamilyMemberFormView.swift` Add Family Member regular mode
+- Evidence: Form defaults Relationship=Child + Gender=Male when opening fresh. Could be confusing for users adding a spouse — they have to actively change both before saving.
+- Suggested fix: either (a) leave Relationship/Gender unselected with a placeholder ("Choose…"), or (b) use Picker(...).pickerStyle(.menu) with no preselected option until user picks one.
+- Status: `deferred` — minor polish, not blocking.
+
+### Wave C-6 REDO verified passes (sim screenshot evidence)
+
+- **Settings list** renders Family Members + Household Staff rows under correct sections (Account vs Household)
+- **CHEZ CONCIERGE section** with "Your Chez profile" row exists
+- **Family Members list** has EXPECTING section (A4 Baby, due Dec 1 2026, 203 days, View Preparation Checklist 0/15) above family rows
+- **AddFamilyMemberChooserSheet** (Build 86): 2 cards with correct routing — verified
+- **FamilyMemberFormView regular**: title "Add Family Member", BASIC INFO + LEGAL NAME + SCHOOL sections — verified
+- **FamilyMemberFormView expecting**: title "Add Expecting", EXPECTING section with Chez-branded helper rows ("Chez will create a preparation checklist", "Track documents like birth certificate, 529, updated will", "Get reminders as your due date approaches") — verified
+- **FamilyMemberFormView edit mode**: title "Edit Member", loads existing data populated — verified
+- **Household Staff** (Build 87): list renders separately, 1 fixture row "A4 Manager Household / Home Manager" — verified
+- **Staff member NOT in Family Members list** — confirms Build 87 member_type filtering at read path
+- **AddHouseholdStaffSheet** (Build 87): NAME + CONTACT sections, "Send invite to join Chez" toggle salmon-default-on, helper copy "When enabled, your home manager gets a Chez invite by email..." — verified
+- **Brand voice throughout** — every Chez reference correct, zero Alfred refs in family/staff invite copy, zero "Tom"
+- **Phase 56.3 typography**: Fraunces serif for screen titles ("Settings", "Family Members", "Add Family Member", "Add Expecting", "Add Home Manager", "Edit Member", "Household Staff") — verified
+
