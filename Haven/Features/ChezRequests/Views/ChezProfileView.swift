@@ -214,13 +214,17 @@ struct ChezProfileView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Stepper(value: amount, in: range, step: step) {
-                    Text("$\(amount.wrappedValue)")
-                        .font(HavenTypography.title3)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .frame(minWidth: 64, alignment: .trailing)
-                }
-                .labelsHidden()
+                // Render the dollar value as a sibling of the Stepper so it
+                // actually appears. Stepper(...).labelsHidden() hides the
+                // closure content entirely — putting the Text inside the
+                // Stepper closure with labelsHidden was the Round C C-1
+                // bug where users saw "- +" with no visible amount.
+                Text("$\(amount.wrappedValue)")
+                    .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .frame(minWidth: 64, alignment: .trailing)
+                Stepper("", value: amount, in: range, step: step)
+                    .labelsHidden()
             }
         }
     }

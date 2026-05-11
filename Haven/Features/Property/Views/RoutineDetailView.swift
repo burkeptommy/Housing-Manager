@@ -19,6 +19,7 @@ struct RoutineDetailView: View {
     @State private var vendorDocuments: [DocumentRow] = []
     @State private var serviceContracts: [ServiceContractRow] = []
     @State private var isEditing = false
+    @State private var showArchiveConfirm = false
     @State private var isLoading = false
     @State private var showDocumentUpload = false
     @State private var uploadCategory: DocumentCategory = .homeBillInvoice
@@ -464,12 +465,24 @@ struct RoutineDetailView: View {
                 .tint(HavenColors.navy)
 
                 Button(role: .destructive) {
-                    Task { await archive() }
+                    showArchiveConfirm = true
                 } label: {
                     Label("Archive routine", systemImage: "archivebox")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
+                .confirmationDialog(
+                    "Archive this routine?",
+                    isPresented: $showArchiveConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Archive routine", role: .destructive) {
+                        Task { await archive() }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Archiving \(routine.presentationLabel) hides its schedule and unlinks any vendor tasks. You can restore it later from the archived routines list.")
+                }
             }
         }
     }

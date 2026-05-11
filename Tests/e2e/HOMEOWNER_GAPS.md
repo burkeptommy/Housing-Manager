@@ -514,3 +514,57 @@ No current-run findings yet.
 - B3 zero em dashes in user-facing copy
 - Phase 95 gap #55 verified: SettingsView.swift:347-369 wraps "Delete My Account" in `if !appState.isStaffUser`; AppState.swift:22+41 caches isStaffUser from member_type
 
+
+---
+
+## Round C — Wave C-1 REDO (Section 13 Chez full concierge — REAL SIM DRIVE)
+
+After the user moved the Simulator to the primary monitor, this REDO subagent actually drove the sim with real taps. The Wave C-1 source-only audit had PASS'd everything; the sim drive found 2 real bugs the source audit missed, plus several PASS validations.
+
+### Wave C-1 REDO Finding 1 — Spending Authority stepper hides dollar value — CRITICAL — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `major`
+- Surface: `Haven/Features/ChezRequests/Views/ChezProfileView.swift:198-226` `tierStepper` private func
+- Evidence: All three Spending Authority steppers render as bare `- | +` buttons with NO visible dollar value. Default $200 / $500 / $500 are invisible because the Stepper's label closure (where the Text was placed) is hidden by `.labelsHidden()`. Homeowner lands on Your Chez profile, sees `- +` controls, and cannot tell what spending authority they've granted Chez. Screenshot: `/tmp/claude-c-evidence/c1-section-13-redo/13-chez-profile.png`.
+- Fix: restructured the stepper layout. Moved `Text("$\(amount.wrappedValue)")` out of the Stepper's content closure into a sibling Text in the HStack. Stepper now uses an empty-string label which `.labelsHidden()` correctly collapses, while the dollar value renders as its own widget aligned trailing before the +/- buttons.
+- Status: `fixed` in commit (next). Build clean.
+
+### Wave C-1 REDO Finding 2 — RoutineDetailView Archive routine is one-tap destructive without confirmation — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `major` (data hazard)
+- Surface: `Haven/Features/Property/Views/RoutineDetailView.swift:466-472` Archive Button
+- Evidence: REDO subagent accidentally archived a routine twice while attempting to tap Edit (the buttons are stacked closely and the simulator window is small). Routine count dropped 16→15→14 from misclicks. No safety net — `archive()` fires immediately on tap.
+- Fix: added `@State showArchiveConfirm = false` + `.confirmationDialog("Archive this routine?", titleVisibility: .visible)` wrapping the archive button. Dialog has explicit "Archive routine" destructive button + "Cancel" + a body message explaining what archiving does ("hides its schedule and unlinks any vendor tasks. You can restore it later from the archived routines list").
+- Status: `fixed` in commit (next). Build clean.
+
+### Wave C-1 REDO Finding 3 — Chez request title truncation — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor`
+- Same finding as Wave C-5 #3 (re-confirmed). "Find a vendor for: A4 Sanitize pet areas mix..." and "syn..." are indistinguishable after truncation. Already documented as deferred to product/design.
+- Status: `deferred` (consolidated with Wave C-5 finding)
+
+### Wave C-1 REDO Finding 4 — Spec vs implementation gap on RoutineDetailView Chez delegation
+
+- Category: `verification` (spec interpretation)
+- The matrix Row 13.20 says "ChezOwnsToggle on routine". Actual implementation has TWO surfaces:
+  1. RoutineDetailView: a ChezEntryButton card labeled "Have Chez handle this routine" (opens Compose sheet for context-rich asks)
+  2. RoutineEditSheet:236: a ChezOwnsToggle for blind/standing delegation
+- This is intentional UX separation (richness vs simplicity). Not a code bug. Matrix could note both surfaces.
+- Status: `no action needed` — matrix could be updated to reflect both delegation surfaces.
+
+### Wave C-1 REDO verified passes (sim screenshot evidence)
+
+- **Dashboard ChezEntryButton** "Need help? Ask Chez" → opens Compose sheet with correct context source_entity_type "dashboard" + source_entity_label "Dashboard concierge request"
+- **Compose sheet** renders 6 category chips with "General help" salmon-fill default
+- **Inbox 4 sub-tabs** in correct order: Action / Unread / All / Chez (note: "Action" not "Needs Action" — Wave C-5 fix confirmed in sim)
+- **Chez sub-tab** renders "Chez Home Manager" header + "Ask a quick question" CTA + ACTIVE section with fixture requests
+- **ChezRequestDetailView system message bubble** is centered gray ROUNDED RECT, not circular — commit 7a1811ed fix CONFIRMED IN SIM
+- **Settings → Your Chez profile** row exists with correct caption
+- **ChezProfileView** all 6 sections render (About / Spending / Communication / Vendor Prefs / Logistics / Standing Engagements)
+- **Spending Authority card background** is creamLight, NOT salmon — morning fix `5aa507fc` CONFIRMED IN SIM
+- **RoutineDetailView "Log visit and spend" button** is salmon fill with white text — Codex P0-1 fix `840a9f52` CONFIRMED IN SIM
+- **Brand voice clean throughout** — every user-facing string says "Chez", no "Tom" anywhere
+

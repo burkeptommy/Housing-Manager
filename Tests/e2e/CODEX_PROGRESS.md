@@ -232,3 +232,24 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 11:55:00 UTC — batch_end: Wave C-1 REDO Section 13 — SIM DRIVE
+
+- batch_id: round-c-c1-redo-section-13-sim
+- last_commit: eb0d493c
+- result: PARTIAL — sim-drive verification surfaced 2 real bugs missed by source audit
+- next_planned: Wave C-2 REDO Section 7 (brief — sim already drove this)
+- key_finding: Spending Authority stepper hides $ values due to .labelsHidden() on closure-bound Text. Critical homeowner-facing bug.
+- secondary_finding: RoutineDetailView Archive routine button has no confirmation — accidentally archived twice during testing.
+- author: Claude
+
+---
+
+## 2026-05-11 11:56:00 UTC — fix_shipped: C-1 REDO 2 critical fixes
+
+- batch_id: claude-c1-redo-fixes
+- files: ChezProfileView.swift:198-226 (restructure tierStepper to render $ value outside Stepper closure), RoutineDetailView.swift:21-22+466-485 (add showArchiveConfirm state + confirmationDialog around Archive button)
+- Build clean on F9946648; binary reinstalled + relaunched with fixture user
+- author: Claude
+
+---
