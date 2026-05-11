@@ -41,6 +41,13 @@ struct CoveredDriverPickerSheet: View {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         return familyMembers.filter { member in
+            // Hard exclude 'Child' relationship regardless of DOB — a child
+            // is never a legitimate insured driver, even if DOB is missing.
+            // Caught by Round C Wave C-7 sim audit where A4 Baby (no DOB)
+            // surfaced as a selectable driver.
+            if member.relationship.lowercased() == "child" {
+                return false
+            }
             guard let dobStr = member.dateOfBirth, let dob = df.date(from: dobStr) else {
                 return true // No DOB on file, include them
             }

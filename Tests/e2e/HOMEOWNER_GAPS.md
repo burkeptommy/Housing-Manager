@@ -721,3 +721,82 @@ Sim drive confirmed all Build 86 + Build 87 contracts hold. The first C-6 was so
 - **Brand voice throughout** — every Chez reference correct, zero Alfred refs in family/staff invite copy, zero "Tom"
 - **Phase 56.3 typography**: Fraunces serif for screen titles ("Settings", "Family Members", "Add Family Member", "Add Expecting", "Add Home Manager", "Edit Member", "Household Staff") — verified
 
+
+---
+
+## Round C — Wave C-7 (Section 10 Vehicle management) — PASS with gaps
+
+Sim drive completed across the full VehicleDetailView (12+ sections), all sheet entry points, brand hero, mechanic picker, edit/archive/purchase-date sheets. 19+ verified passes. 6 polish/UX issues surfaced.
+
+### Wave C-7 Finding 1 — CoveredDriverPickerSheet shows 'Child' relationship as eligible driver — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (data hazard)
+- Surface: `Haven/Features/Property/Views/CoveredDriverPickerSheet.swift:39-50` `eligibleDrivers`
+- Evidence: A4 Baby (relationship='Child', no DOB) appeared as a selectable driver. The filter intentionally includes no-DOB rows but didn't check relationship type. A child is never a legitimate insured driver even with no DOB on file.
+- Fix: added a hard pre-check for `member.relationship.lowercased() == "child"` that returns false regardless of DOB state.
+- Status: `fixed` in batch commit.
+
+### Wave C-7 Finding 2 — VehicleDetailView overflow menu "Archive vehicle" capitalization inconsistent — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `minor`
+- Surface: `Haven/Features/Property/Views/VehicleDetailView.swift:75`
+- Evidence: Three-dot overflow menu had "Edit Vehicle" + "Delete Vehicle" (title case) but "Archive vehicle" (lowercase v).
+- Fix: aligned to "Archive Vehicle" (title case to match siblings).
+- Status: `fixed` in batch commit.
+
+### Wave C-7 Finding 3 — MechanicPickerSheet shows ALL contractors regardless of trade — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (functional risk)
+- Surface: `Haven/Features/Property/Views/VehicleDetailView.swift:2521+` `MechanicPickerSheet`
+- Evidence: Picker lists all household contractors (A4 Chimney Pro, A4 Electrical Pro, A4 Freeform Lawn Co, Putnam Plumbing, TruGreen, etc.) when adding a mechanic. None of those are mechanics.
+- Suggested fix: filter contractors by canonical category matching "Mechanic" / "Automotive" / "Auto Repair". Or split into "AUTOMOTIVE" section + "OTHER CONTRACTORS (likely not mechanics)" section. Or just show empty state + "Add New Mechanic" affordance when no automotive contractors exist.
+- Status: `deferred` — not a 1-line fix; SystemCategoryRegistry doesn't have an automotive category. Needs design decision. Documented for product follow-up.
+
+### Wave C-7 Finding 4 — EditVehicleSheet mileage field has no visible label when populated — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (contextual)
+- Surface: `Haven/Features/Property/Views/EditVehicleSheet.swift:42`
+- Evidence: `TextField("Current Mileage", text: $currentMileage)` — placeholder "Current Mileage" hidden when value is set (standard iOS behavior). Subagent saw populated value "90000" with no visible label, between Color and Ownership rows.
+- Suggested fix: convert to HStack pattern with leading label Text + trailing TextField, OR use SwiftUI's LabeledContent (iOS 16+). Same pattern would benefit License Plate / Color when populated.
+- Status: `deferred` — minor polish, contextual issue (placeholder works fine when empty).
+
+### Wave C-7 Finding 5 — CLAUDE.md says Recalls DisclosureGroup "always shown" but code is conditional — DEFERRED
+
+- Category: `gap_found`
+- Severity: `minor` (doc drift)
+- Surface: `Haven/Features/Property/Views/VehicleDetailView.swift:756` (`if !viewModel.recalls.isEmpty`)
+- Evidence: CLAUDE.md says "Recalls — DisclosureGroup, always shown" but code gates on non-empty recalls list. Unified Attention banner already covers the no-recalls case, so option (a) update CLAUDE.md to describe the conditional render is the simpler fix.
+- Status: `deferred` — doc-only update.
+
+### Wave C-7 Finding 6 — Phase 95 PR 29 three-state recall acknowledgment NOT implemented — DEFERRED
+
+- Category: `gap_found`
+- Severity: `moderate` (matrix discrepancy)
+- Evidence: Code search for "acknowledged" / "recallState" / "RecallStatus" returns ZERO results. VehicleDetailView.swift:761-784 renders only TWO states (Resolved / Open). Matrix Row 10.16 describes a three-state acknowledgment (open / acknowledged / fixed) per Phase 95 PR 29 that was never shipped.
+- Suggested fix: either (a) descope Phase 95 PR 29 from spec/test matrix, OR (b) ship the three-state UI: add `acknowledged_at TIMESTAMPTZ` column to `vehicle_recalls`, expose `acknowledge()` / `markFixed()` view-model actions, render three capsules.
+- Status: `deferred` — product decision needed.
+
+### Wave C-7 verified passes (sim screenshot evidence)
+
+- Properties → Your Garage with "+" button (10.1)
+- Add Vehicle sheet: Scan VIN + Enter VIN + Add Manually (10.2-10.4)
+- Brand Hero: Honda gradient, logo, VIN monospaced, mileage pill, ownership pill (10.8)
+- MileageUpdateSheet opens with salmon Update CTA (10.9)
+- Covered Drivers section + CoveredDriverPickerSheet (10.10-10.11)
+- Mechanic Card with "Add your mechanic / One-tap calling" (10.12)
+- MechanicPickerSheet with "Add New Mechanic" affordance (10.13)
+- Stats Row: Total Spent / Services / Last Svc (10.14)
+- Unified Attention "All good" with green check (10.15)
+- Registration/Insurance/Ownership 3-card layout (10.19)
+- Service History card with empty state + "Log" button (10.22)
+- Vehicle Documents card with Upload + categorized rows (10.23)
+- Ask Alfred (vehicle context) personalized (10.25) — correct Alfred branding for chat AI
+- EditVehicleSheet (10.26)
+- PurchaseDatePickerSheet (10.27)
+- ArchiveVehicleSheet (10.29) with reassuring copy "every service record, recall, and document stays on file"
+- B1 legibility, B3 no em-dashes, B4 brand voice (Chez for concierge / Alfred for chat), B11 density acceptable
+

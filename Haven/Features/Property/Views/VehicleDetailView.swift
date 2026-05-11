@@ -72,7 +72,7 @@ struct VehicleDetailView: View {
                     // traded / totaled). Preserves history and
                     // takes the vehicle off the active garage list.
                     Button { showArchiveSheet = true } label: {
-                        Label("Archive vehicle", systemImage: "archivebox")
+                        Label("Archive Vehicle", systemImage: "archivebox")
                     }
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label("Delete Vehicle", systemImage: "trash")

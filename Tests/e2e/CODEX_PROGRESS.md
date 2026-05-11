@@ -315,3 +315,15 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 13:40:00 UTC — batch_end: Wave C-7 Section 10 Vehicle — PASS + 2 fixes shipped
+
+- batch_id: round-c-c7-section-10-sim
+- last_commit: 7511215c (C-6 REDO)
+- result: PASS — 19 verified passes; 6 polish/UX findings (2 fixed, 4 deferred)
+- next_planned: Wave C-8 Section 11a (Property Overview + Maintenance sub-tabs)
+- fix_shipped: 1) CoveredDriverPickerSheet now hard-excludes 'Child' relationship regardless of DOB. 2) VehicleDetailView overflow menu 'Archive vehicle' -> 'Archive Vehicle' for capitalization consistency.
+- gaps: MechanicPickerSheet trade filter (functional risk), EditVehicleSheet mileage label (polish), Recalls DisclosureGroup spec drift (doc), Phase 95 PR 29 three-state acknowledgment unimplemented (matrix discrepancy)
+- author: Claude
+
+---
