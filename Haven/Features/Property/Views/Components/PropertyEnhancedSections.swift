@@ -382,7 +382,7 @@ struct PropertyVendorSpendStrip: View {
         HStack(spacing: 14) {
             statColumn(
                 eyebrow: "Recurring spend",
-                value: recurringMonthly.map { $0.formattedCompactCurrency() } ?? "—",
+                value: recurringMonthly.map { $0.formattedCompactCurrency() } ?? "",
                 suffix: recurringMonthly == nil ? nil : " /mo"
             )
             Rectangle()
@@ -390,7 +390,7 @@ struct PropertyVendorSpendStrip: View {
                 .frame(width: 1, height: 36)
             statColumn(
                 eyebrow: "This year",
-                value: yearToDate.map { $0.formattedCompactCurrency() } ?? "—",
+                value: yearToDate.map { $0.formattedCompactCurrency() } ?? "",
                 suffix: nil
             )
         }

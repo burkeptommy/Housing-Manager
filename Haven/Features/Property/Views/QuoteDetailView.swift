@@ -170,7 +170,7 @@ struct QuoteDetailView: View {
                     .font(HavenTypography.headline)
                     .foregroundStyle(color)
             } else {
-                Text("—")
+                Text("")
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textTertiary)
             }

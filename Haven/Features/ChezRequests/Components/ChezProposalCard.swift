@@ -187,7 +187,7 @@ struct ChezProposalCard: View {
                     Image(systemName: "calendar")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(HavenColors.action)
-                    Text(opt.label ?? opt.iso ?? "—")
+                    Text(opt.label ?? opt.iso ?? "TBD")
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.textPrimary)
                     Spacer()

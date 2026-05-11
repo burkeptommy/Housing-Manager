@@ -114,7 +114,7 @@ struct PropertyHeroHeader: View {
     }
 
     private var formattedValue: String {
-        guard let value = estimatedValue, value > 0 else { return "—" }
+        guard let value = estimatedValue, value > 0 else { return "" }
         return value.formattedCompactCurrency()
     }
 }

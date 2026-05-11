@@ -1067,17 +1067,17 @@ struct UtilityRelationshipDetailView: View {
                 HStack(spacing: 10) {
                     billingMetricCard(
                         title: "Latest",
-                        value: latestBillAmount?.formattedCompactCurrency() ?? "—",
+                        value: latestBillAmount?.formattedCompactCurrency() ?? "",
                         subtitle: latestBillDateLabel ?? "No bill yet"
                     )
                     billingMetricCard(
                         title: "Average",
-                        value: averageMonthlySpend?.formattedCompactCurrency() ?? "—",
+                        value: averageMonthlySpend?.formattedCompactCurrency() ?? "",
                         subtitle: billCount > 1 ? "monthly" : "Forward bills"
                     )
                     billingMetricCard(
                         title: "This year",
-                        value: yearToDateSpend > 0 ? yearToDateSpend.formattedCompactCurrency() : "—",
+                        value: yearToDateSpend > 0 ? yearToDateSpend.formattedCompactCurrency() : "",
                         subtitle: billCount > 0 ? "\(billCount) tracked" : "No spend history"
                     )
                 }

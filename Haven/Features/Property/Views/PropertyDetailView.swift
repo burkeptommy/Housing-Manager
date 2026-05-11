@@ -1543,7 +1543,7 @@ struct PropertyDetailView: View {
 
     private func timelineDay(for task: MaintenanceTaskDBRow) -> String {
         guard let date = MaintenanceDateFormatting.date(from: task.scheduledDate ?? task.nextDueDate) else {
-            return "—"
+            return ""
         }
         return String(Calendar.current.component(.day, from: date))
     }

@@ -81,7 +81,7 @@ struct IntroExplainerView: View {
             icon: "house.and.flag.fill",
             iconColor: HavenColors.navy800,
             headline: "Your home, handled.",
-            subheadline: "Everything you need to manage your property \u{2014} from systems and maintenance to vendors and warranties.",
+            subheadline: "Everything you need to manage your property, from systems and maintenance to vendors and warranties.",
             features: [
                 IntroFeature(icon: "wrench.and.screwdriver.fill", text: "Automated maintenance schedules with smart reminders"),
                 IntroFeature(icon: "person.2.fill", text: "Vendor directory with ratings, service history, and one-tap calling"),
@@ -98,11 +98,11 @@ struct IntroExplainerView: View {
             icon: "sparkles",
             iconColor: HavenColors.navy800,
             headline: "Alfred, at your service.",
-            subheadline: "Your built-in AI concierge reads your documents, answers questions, runs scenarios, and helps you plan \u{2014} backed by real human support when you need it.",
+            subheadline: "Your built-in AI concierge reads your documents, answers questions, runs scenarios, and helps you plan, backed by real human support when you need it.",
             features: [
                 IntroFeature(icon: "bubble.left.and.bubble.right.fill", text: "Ask anything about your home, finances, or family"),
                 IntroFeature(icon: "lightbulb.fill", text: "\u{201C}What If?\u{201D} scenarios powered by your real data"),
-                IntroFeature(icon: "doc.badge.plus", text: "Upload documents by photo, scan, or file \u{2014} Alfred handles the rest"),
+                IntroFeature(icon: "doc.badge.plus", text: "Upload documents by photo, scan, or file. Alfred handles the rest"),
                 IntroFeature(icon: "calendar.badge.clock", text: "Schedule maintenance, draft emails, and find vendors for you"),
             ]
         )

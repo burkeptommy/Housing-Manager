@@ -1233,9 +1233,9 @@ struct VehicleDetailView: View {
                     .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textSecondary)
             } else {
-                Text("—")
-                    .font(HavenTypography.title)
-                    .foregroundStyle(HavenColors.textTertiary)
+                Text("Not estimated yet")
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textSecondary)
                 Text("Tap refresh to estimate")
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)

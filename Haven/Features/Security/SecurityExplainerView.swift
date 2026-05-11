@@ -10,14 +10,14 @@ struct SecurityExplainerView: View {
             icon: "lock.shield.fill",
             iconAnimation: .shield,
             headline: "Your Vault Is Sealed",
-            body: "Every document you upload is immediately encrypted with AES-256 \u{2014} the same standard used by banks and government agencies. Your files are never stored unencrypted. Not for a second.",
+            body: "Every document you upload is immediately encrypted with AES-256, the same standard used by banks and government agencies. Your files are never stored unencrypted. Not for a second.",
             secondaryText: nil
         ),
         SecurityExplainerPage(
             icon: "eye.slash.fill",
             iconAnimation: .crossedEye,
             headline: "No One Can Snoop",
-            body: "Chez Staff Cannot Access Your Documents. This isn't a policy \u{2014} it's how the system is built. Your documents are encrypted with keys stored in an isolated vault that no person can access directly. There is no 'View All Documents' button on our end. There is no back door.",
+            body: "Chez Staff Cannot Access Your Documents. This isn't a policy. It's how the system is built. Your documents are encrypted with keys stored in an isolated vault that no person can access directly. There is no 'View All Documents' button on our end. There is no back door.",
             secondaryText: "Chez employees can see your account status and document category counts to provide you service, but they cannot open, read, or download your actual files."
         ),
         SecurityExplainerPage(
@@ -31,7 +31,7 @@ struct SecurityExplainerView: View {
             icon: "text.book.closed.fill",
             iconAnimation: .log,
             headline: "You're Always Watching",
-            body: "Your Security Dashboard shows a complete, tamper-proof record of every time anything touches your data \u{2014} when you viewed a document, when the AI ran an analysis, when a proactive scan checked your insurance expirations. Nothing happens in the dark.",
+            body: "Your Security Dashboard shows a complete, tamper-proof record of every time anything touches your data: when you viewed a document, when the AI ran an analysis, when a proactive scan checked your insurance expirations. Nothing happens in the dark.",
             secondaryText: nil
         ),
         SecurityExplainerPage(
@@ -39,7 +39,7 @@ struct SecurityExplainerView: View {
             iconAnimation: .vaultLock,
             headline: "The Nuclear Option",
             body: "For any document you consider ultra-sensitive, you can enable Vault Lock. This adds a second layer of encryption using a key that exists only on your device. Not even Chez's servers can decrypt a Vault Locked document. The tradeoff: the AI can't analyze Vault Locked files. But they're there, they're counted in your document inventory, and they are untouchable by anyone but you.",
-            secondaryText: "Most clients don't need Vault Lock for everything \u{2014} the standard encryption is extremely strong. But it's there if you want it."
+            secondaryText: "Most clients don't need Vault Lock for everything. The standard encryption is extremely strong. But it's there if you want it."
         ),
     ]
 

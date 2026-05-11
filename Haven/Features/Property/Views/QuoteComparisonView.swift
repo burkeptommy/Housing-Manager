@@ -300,7 +300,7 @@ struct QuoteComparisonView: View {
                     .foregroundStyle(HavenColors.navy.opacity(0.6))
                     .frame(width: 80)
             } else {
-                Text("—")
+                Text("")
                     .font(.system(size: 10))
                     .foregroundStyle(HavenColors.textTertiary)
                     .frame(width: 80)
