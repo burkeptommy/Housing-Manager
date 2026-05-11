@@ -152,3 +152,26 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 02:55:00 UTC — batch_end: Wave C-2 Section 7 Maintenance task detail
+
+- batch_id: round-c-c2-section-7-maintenance-task-detail
+- last_commit: 9cb76e51 (Wave C-1 heartbeat)
+- result: PARTIAL — 11 rows verified in sim + A1+ contract validated in sim (Wave C-1 follow-up); 9 rows deferred (would mutate fixture or wrong surface)
+- next_planned: Wave C-3 Section 4 Document pipeline
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 6, "B": 7, "C": 1, "D": 2, "E": 2 }
+- findings_this_batch: { verification_pass: 11, verification_fail: 0, gap_found: 1, ui_quality: 2, persistence: 0 }
+- key_finding: A1+ ChezEntryButton context contract VERIFIED IN SIMULATOR end-to-end (Tom's "generic Roofing" bug fully fixed with sim screenshot evidence at /tmp/claude-c-evidence/c2-section-7/15-chez-compose-opened.png)
+- author: Claude
+
+---
+
+## 2026-05-11 02:56:00 UTC — fix_shipped: Alfred→Chez B4 brand voice + run.mjs em dash fixture
+
+- batch_id: claude-c2-brand-voice
+- files: MaintenanceTaskDetailSheet.swift:2043 (Alfred → Chez, "Add a HVAC" → "Add a vendor for this HVAC"), Tests/e2e/run.mjs:2587+2598 (em dash → comma in task descriptions)
+- Build clean on F9946648; binary reinstalled
+- author: Claude
+
+---

@@ -2584,7 +2584,7 @@ class E2ERunner {
       },
       {
         title: "Replace HVAC air filters",
-        description: "Quarterly filter swap — 16x25x1 MERV 11.",
+        description: "Quarterly filter swap, 16x25x1 MERV 11.",
         assignment_type: "personal",
         needs_vendor: false,
         assigned_contractor_id: null,
@@ -2595,7 +2595,7 @@ class E2ERunner {
       },
       {
         title: "Schedule Bethel Lawn Care: spring cleanup",
-        description: "Lawn cleanup + first mow — coordinate with Bethel Lawn Care.",
+        description: "Lawn cleanup + first mow, coordinate with Bethel Lawn Care.",
         assignment_type: "vendor",
         needs_vendor: false,
         assigned_contractor_id: this.state.contractorIds[0], // Bethel Lawn Care

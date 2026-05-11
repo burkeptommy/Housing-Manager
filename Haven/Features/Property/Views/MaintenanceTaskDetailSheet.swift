@@ -2040,7 +2040,7 @@ struct MaintenanceTaskDetailSheet: View {
                                 .foregroundStyle(HavenColors.textPrimary)
                         }
 
-                        Text("Add a \(categoryLabel) vendor and Alfred can automatically schedule your maintenance tasks.")
+                        Text("Add a vendor for this \(categoryLabel) and Chez can automatically schedule your maintenance tasks.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
 

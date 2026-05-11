@@ -330,3 +330,59 @@ No current-run findings yet.
 - Default tiers verified: `autoApproveUnder` falls back to 200, `pingUnder` to 500, `explicitAbove` to 500 (row 13.17).
 - Status: `verified pass`
 
+
+---
+
+## Round C — Wave C-2 (Section 7 Maintenance task detail)
+
+### Wave C-2 verification summary
+
+- Subagent: c2-section-7-maintenance-task-detail, returned PARTIAL
+- A1+ ChezEntryButton context contract VERIFIED IN SIMULATOR (Wave C-1 source audit follow-up). MaintenanceTaskDetailSheet line 2084 tap opens Ask Chez Compose sheet with task_title as RE: header — Tom's "generic Roofing" Round A bug is fixed end-to-end with simulator evidence.
+- Rows verified in simulator: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.13, 7.20, 7.21 — plus the A1+ ChezEntryButton tap
+- ChezOwnsToggle (Phase 80.2) smart label branching confirmed: personal task shows "Have Chez source a vendor", vendor task shows "Have Chez handle this task"
+- Rows deferred (would mutate fixture or wrong surface): 7.9-7.12, 7.14-7.17, 7.18-7.19 (wrong surface, lives on SystemDetailView FrequencyPickerSheet), 7.22, 7.25
+- Rows flagged as gap: 7.23 photo evidence + 7.24 voice note absent from MarkCompleteForm
+
+### Wave C-2 Finding 1 — B4 brand-voice "Alfred" in vendor scheduling copy — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `medium`
+- Surface: `Haven/Features/Property/Views/MaintenanceTaskDetailSheet.swift:2043` (no-vendor SCHEDULING section caption)
+- Evidence: Subagent flagged source string `"Add a \(categoryLabel) vendor and Alfred can automatically schedule your maintenance tasks."`. Every other Chez-handling copy in the same file correctly uses "Chez" (line 1914 "Chez to schedule it automatically", line 2087 "Chez finds the pro, schedules, and follows up"). Lone "Alfred" reference creates confusion about which AI agent owns scheduling — Alfred is the chat assistant, Chez is the concierge / scheduling brand.
+- Suggested fix: rename "Alfred" → "Chez". Also fix grammar "Add a \(categoryLabel)" → "Add a vendor for this \(categoryLabel)" to avoid "Add a HVAC" article error.
+- Status: `fixed` — applied in batch commit (single-line edit). Build verified clean; binary reinstalled.
+
+### Wave C-2 Finding 2 — Test fixture em dashes bleed into UI — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `low`
+- Surface: `Tests/e2e/run.mjs:2587, 2598` test fixture data
+- Evidence: Two task `description` strings in the e2e fixture contain em dashes that render in the actual UI when the fixture is loaded ("Quarterly filter swap — 16x25x1 MERV 11.", "Lawn cleanup + first mow — coordinate with Bethel Lawn Care."). Not a production code bug, but trips B3 audits and represents the test infrastructure violating its own rules.
+- Suggested fix: replace em dashes with commas in fixture description strings.
+- Status: `fixed` in same batch commit.
+
+### Wave C-2 Finding 3 — A1+ ChezEntryButton context contract — VERIFIED IN SIM
+
+- Category: `verification`
+- Matrix row: 7.13 + A1+ contract
+- Tapping ChezEntryButton on a personal task opens Ask Chez Compose sheet with: Task ID, Task Title ("Replace HVAC air filters"), Due 2026-06-01, Property ID, System Category (HVAC), System ID, Notes — all populated. RE: card renders task-specific header. Category badge correctly shows "Coordinate a task".
+- This is the Wave C-1 sim-verification follow-up that computer-use timed out on. Tom's Round A "generic Roofing RE: header from routine context" bug is fully resolved end-to-end with simulator screenshot evidence.
+- Evidence: `/tmp/claude-c-evidence/c2-section-7/15-chez-compose-opened.png`
+- Status: `verified pass`
+
+### Wave C-2 Finding 4 — Photo evidence + voice note absent from MarkCompleteForm — DEFERRED
+
+- Category: `gap_found`
+- Severity: `minor` (depends on v1 scope)
+- Surface: MaintenanceTaskDetailSheet `MarkCompleteForm` (line ~2899-2911)
+- Evidence: Matrix rows 7.23 (photo evidence on completion) and 7.24 (voice note on completion) describe features absent from MarkCompleteForm. The form has Date / Cost / Notes sections only. Most HNW property-management apps allow photo capture at completion for warranty / dispute documentation.
+- Suggested fix: Product/design decision — if v1 scope includes these, wire PhotosPicker + AVFoundation recorder into MarkCompleteForm. Defer.
+- Status: `deferred` to Tom/product. Not blocking Round C signoff.
+
+### Wave C-2 Finding 5 — Row 7.18 + 7.19 frequency warning rows describe wrong surface
+
+- Category: `verification` (matrix correction, not a bug)
+- The matrix says these warnings fire on MaintenanceTaskDetailSheet's frequency editor, but the actual implementation lives on `SystemDetailView`'s `FrequencyPickerSheet` (maxIntervalDays + warrantyLinked warnings). MaintenanceTaskDetailSheet's `editFrequencySheet` (line 1594) is a simpler preset list with no caps — that's by design per the CLAUDE.md "System frequency overrides" doc. Worth checking on SystemDetailView in a future wave (Section 11c).
+- Status: matrix can be updated; not a code bug
+
