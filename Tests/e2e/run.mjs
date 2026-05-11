@@ -2562,7 +2562,7 @@ class E2ERunner {
       },
       {
         title: "Septic pump-out (3-year cycle)",
-        description: "Get the septic tank pumped — required every 3 years for a private system.",
+        description: "Get the septic tank pumped, required every 3 years for a private system.",
         assignment_type: "vendor",
         needs_vendor: true,
         assigned_contractor_id: null,

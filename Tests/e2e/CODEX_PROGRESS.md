@@ -380,3 +380,24 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 16:30:00 UTC — batch_end: Wave C-12 Design + accessibility audit — PARTIAL
+
+- batch_id: round-c-c12-design-audit
+- last_commit: e55714f6 (C-11)
+- result: PARTIAL — 8 verified passes; 1 fix shipped (third em-dash at run.mjs:2565); 5 gaps deferred
+- key_findings: Dark mode claimed in CLAUDE.md but Info.plist locks Light. Tab bar labels don't scale with Dynamic Type. Property hero "100 Systems · 104 Priorities" doesn't reconcile. Subtype slugs leak across multiple surfaces (compound from C-4 REDO + C-9).
+- next_planned: Round C signoff report
+- author: Claude
+
+---
+
+## 2026-05-11 16:31:00 UTC — fix_shipped: third em-dash in run.mjs:2565
+
+- batch_id: claude-c12-emdash-final
+- file: Tests/e2e/run.mjs:2565 (Septic pump-out description em-dash to comma)
+- same class as Wave C-2 patches; cleans up the last visible em-dash in e2e fixture data
+- Build clean
+- author: Claude
+
+---

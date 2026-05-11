@@ -1048,3 +1048,74 @@ Sim drive verified 11 of 13 rows. Equipment catalog flow + Utility account flow 
 - Row 11.77 Bill detection from email: utility detail captions "Forward bills to tester65@alfred.getchez.com and Chez will track monthly spend, account details, and optimization opportunities automatically"
 - Brand voice: "Have Chez manage this system" + "Chez logs service, schedules maintenance visits" + "Chez matches statements from..." all correct
 
+
+---
+
+## Round C — Wave C-12 (Final design + accessibility audit) — PARTIAL
+
+Sim drive sampled 4 surfaces (Dashboard / Tasks V5 / Property Overview / Inbox Chez request detail) + iOS sim accessibility features (Dynamic Type XXXL / Dark Mode). 8 verified passes + 6 findings (1 fixed, 5 deferred).
+
+### Wave C-12 Finding 1 — Third em-dash in test fixture run.mjs:2565 — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (test artifact bleeding into UI)
+- Surface: `Tests/e2e/run.mjs:2565` (Septic pump-out task description)
+- Evidence: "Get the septic tank pumped — required every 3 years for a private system." Same class as Wave C-2 patches at lines 2587 + 2598. Visible in Chez request detail screenshots.
+- Fix: em-dash → comma. Consistent with prior fixes.
+- Status: `fixed` in batch commit.
+
+### Wave C-12 Finding 2 — Dark mode claimed but Info.plist locks Light — DEFERRED
+
+- Category: `gap_found`
+- Severity: `major` (doc / product mismatch)
+- Surface: `Haven/Config/Info.plist:90-91` `UIUserInterfaceStyle = Light`
+- Evidence: CLAUDE.md "Brand & Design System" section says "Full dark mode support with adaptive indigo-purple dark surfaces". Production app's Info.plist hardcodes Light mode — ignores OS dark mode toggle. HavenColors HAS adaptive tokens but they're locked behind the plist value.
+- Suggested fix: either (a) remove the dark-mode claim from CLAUDE.md as not-yet-shipped, OR (b) remove the Info.plist lock and qualify any dark-broken theme calls.
+- Status: `deferred` — needs product decision
+
+### Wave C-12 Finding 3 — Tab bar labels don't scale with Dynamic Type — DEFERRED
+
+- Category: `ui_quality_finding` (accessibility)
+- Severity: `moderate` (H2 violation)
+- Evidence: With Dynamic Type set to Larger Accessibility / Extra-Extra-Extra-Large, body text + card titles + captions scale up correctly. However, nav title "Chez" stays small and tab bar labels (Dashboard / Property / Tasks / Alfred) don't scale. Suggests some Text() calls use fixed system font instead of HavenTypography token.
+- Suggested fix: audit Text() / Label() usages in MainTabView's TabView for fixed `.font(.system(size:N))` calls and replace with HavenTypography token that respects Dynamic Type.
+- Status: `deferred` — accessibility wave needed
+
+### Wave C-12 Finding 4 — Property Overview "100 Systems · 104 Priorities" doesn't reconcile — DEFERRED
+
+- Category: `gap_found` (data aggregation)
+- Severity: `moderate` (trust failure)
+- Surface: Property hero card on PropertyDetailView
+- Evidence: Hero shows "100 Systems · 104 Priorities" — priority count is higher than total systems. Either duplicate counting or stale aggregation.
+- Suggested fix: investigate `priorityCount` computation in `PropertyDetailViewModel` to ensure each system contributes max once.
+- Status: `deferred` — data investigation needed
+
+### Wave C-12 Finding 5 — Dashboard vendor name duplication "Schedule Bethel Lawn Care: spring cleanup · May 15 · Bethel Lawn Care" — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (redundancy)
+- Surface: Dashboard "Spring readiness" card
+- Evidence: Vendor name "Bethel Lawn Care" appears TWICE in one card row — once in the title ("Schedule Bethel Lawn Care: spring cleanup") and once as a trailing metadata pill.
+- Suggested fix: apply the `truncatedVendorName` resolver pattern from Phase 56.6 / Build 94 to remove the trailing pill when the title already contains the vendor name.
+- Status: `deferred` — needs Pattern-67-style render-time resolver
+
+### Wave C-12 Finding 6 — Subtype slugs in Property Overview (compound) — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `moderate` (already flagged in C-4 REDO + C-9 — compound finding)
+- Evidence: "80 systems missing profile" card subtitle leaks raw underscore slugs: "A4 Crawl Space crawl_space · A4 Crawl Space finished-basement-sump_pump-crawl_space · A4 dish..."
+- Compound finding: this surfaced in C-4 REDO + C-9 + now C-12. Three independent waves found it.
+- Suggested fix: add a `humanize(_:)` String extension that splits on `_` and `-`, title-cases each word, strips trailing slug suffixes. Apply to system.name and contractor.companyName at render time.
+- Status: `deferred` — multi-surface fix needed
+
+### Wave C-12 verified passes
+
+- B1 Salmon discipline holds across 4 sampled surfaces
+- B2 Typography serif/sans split clean (serif 18pt+, sans below)
+- B4 Brand voice 100% "Chez" — zero "Tom" leakage on customer-facing screens
+- B5 Spacing tokens applied consistently (card 16pt radius, button 14pt radius, 50pt button height, 20pt page margin)
+- B7 Indigo-tinted shadows, no pure-black
+- B9 Inbox Action tab empty state uses friendly copy + recovery CTA
+- Dynamic Type scales body text and card titles at XXXL (tab bar caveat noted)
+- Salmon-on-white WCAG ratio 3.11:1 — passes 3:1 for large text, fails 4.5:1 for small body (matches codebase rule "Salmon for actions only")
+
