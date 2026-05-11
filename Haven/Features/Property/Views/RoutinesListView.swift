@@ -157,9 +157,10 @@ struct RoutinesListView: View {
                         .foregroundStyle(HavenColors.textTertiary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(HavenColors.textTertiary)
+                // Note: no manual chevron — NavigationLink in a List
+                // context renders its own disclosure indicator. Adding a
+                // manual chevron here produced double chevrons on every
+                // row (caught by Round C Wave C-8 sim audit).
             }
         }
     }

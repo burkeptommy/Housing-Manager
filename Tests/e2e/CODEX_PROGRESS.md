@@ -327,3 +327,23 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 14:25:00 UTC — batch_end: Wave C-8 Section 11a+11b — PASS + 1 fix + 3 spec drifts
+
+- batch_id: round-c-c8-section-11a-sim
+- last_commit: 8c3809b1 (C-7)
+- result: PASS — 14 sim-verified passes; 1 polish bug fixed (RoutinesListView double chevron); 3 significant spec drifts surfaced
+- key_finding: Section 11b matrix is FUNDAMENTALLY STALE — PropertyDetailTab enum has no .maintenance case; the entire Maintenance sub-tab was removed and split into Tasks tab V5 + MaintenanceScheduleView Phase 60. Matrix needs rewrite.
+- next_planned: Wave C-9 Section 11b+11c (Systems + Contacts)
+- author: Claude
+
+---
+
+## 2026-05-11 14:26:00 UTC — fix_shipped: RoutinesListView double chevron
+
+- batch_id: claude-c8-routine-chevron
+- file: Haven/Features/Property/Views/RoutinesListView.swift (removed manual chevron at line 160-162; NavigationLink in List provides its own disclosure)
+- Build clean; binary reinstalled
+- author: Claude
+
+---

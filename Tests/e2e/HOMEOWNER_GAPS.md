@@ -800,3 +800,62 @@ Sim drive completed across the full VehicleDetailView (12+ sections), all sheet 
 - ArchiveVehicleSheet (10.29) with reassuring copy "every service record, recall, and document stays on file"
 - B1 legibility, B3 no em-dashes, B4 brand voice (Chez for concierge / Alfred for chat), B11 density acceptable
 
+
+---
+
+## Round C — Wave C-8 (Section 11a Overview + 11b Maintenance — REAL SIM DRIVE)
+
+Sim drive verified 14 rows across Property tab Overview and Maintenance surfaces. 1 polish bug fixed inline; 3 significant SPEC DRIFTS surfaced.
+
+### Wave C-8 Finding 1 — RoutinesListView double chevron on every row — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (polish)
+- Surface: `Haven/Features/Property/Views/RoutinesListView.swift:160-162`
+- Evidence: Every routine row in RoutinesListView renders TWO chevron-right indicators — one manual at the right edge of the white HavenCard, one outside the card on the far right (NavigationLink's auto-disclosure in a List context). `.buttonStyle(.plain)` does not suppress the List auto-chevron.
+- Fix: removed the manual chevron; NavigationLink in List provides its own disclosure indicator.
+- Status: `fixed` in batch commit.
+
+### Wave C-8 Finding 2 — Section 11b spec is fundamentally STALE — DOC DRIFT MAJOR
+
+- Category: `gap_found`
+- Severity: `major` (matrix vs reality)
+- Surface: `Haven/Features/Property/Views/PropertyDetailView.swift:3-8`
+- Evidence: PropertyDetailTab enum is `[overview, systems, projects, vendors, documents]` — NO "maintenance" case. The Phase 50/Build 89 Maintenance sub-tab described in CLAUDE.md no longer exists. Matrix Section 11b's 9 rows (11.10-11.18) describe a removed UI.
+- Current state: Maintenance work is split across (1) Tasks tab → MaintenanceTabView (Phase 67 V5) and (2) MaintenanceScheduleView (Phase 60 day-by-day + month-card layouts).
+- Suggested fix: Rewrite matrix Section 11b to describe the post-Phase-67 V5 architecture. Update CLAUDE.md "PropertyDetailView Maintenance tab" reference to point to the current Tasks tab flow.
+- Status: `deferred` to spec maintenance pass
+
+### Wave C-8 Finding 3 — Phase 56.5 two-bucket UI dead code — DOC DRIFT
+
+- Category: `gap_found`
+- Severity: `minor` (dead code + stale spec)
+- Surface: `Haven/Features/Property/Views/MaintenanceScheduleView.swift:2055,2952-2972`
+- Evidence: Code still defines `personalBucketBody` ("To Schedule" bucket) and `scheduledBucketBody` ("Scheduled" bucket) for Phase 56.5, but the layout switch at lines 1051-1056 routes both `.list` → timelineContent (Phase 60 day-by-day agenda) and `.calendar` → calendarContent (month cards). Neither calls the bucket bodies. Phase 60 effectively replaced Phase 56.5 with a time-window-driven UI.
+- Sim observation: neither "Scheduled" nor "To Schedule" header bar visible in either layout.
+- Suggested fix: either restore the bucket UI (if Phase 56.5 product intent stands), or remove the dead `personalBucketBody`/`scheduledBucketBody` code + update matrix Row 11.14.
+- Status: `deferred` — product decision
+
+### Wave C-8 Finding 4 — MaintenanceLayout enum naming reversed — COSMETIC
+
+- Category: `verification` (cosmetic)
+- Surface: `Haven/Features/Property/Views/MaintenanceScheduleView.swift` `MaintenanceLayout` enum
+- Evidence: `.list` (user label "List") renders `timelineContent`; `.calendar` (user label "Timeline") renders `calendarContent`. Phase 56.4 deliberately relabeled the user-facing string without renaming the enum case for persisted UserDefaults compatibility. Then Phase 60 swapped what `.list` renders, making the naming drift more pronounced. Functional; cosmetic only.
+- Status: `deferred` — cleanup task for next phase touching this view
+
+### Wave C-8 verified passes (sim screenshot evidence)
+
+- **InvestmentSummaryCard hero (Row 11.1)**: $969K estimated value + range $872K-$1.1M + "From public market data" + +35.1% vs invested gain pill — verified
+- **Stacked bar (Row 11.3)**: Purchase $660K + Surplus $232K — verified
+- **Bottom summary (Row 11.4)**: Net after sale $891,618 + Unrealized gain $231,618 — verified
+- **Expand toggle waterfall (Row 11.5)**: "See breakdown" → Purchase + Total invested + Estimated value + Selling costs -$77,532 + Net after sale + Unrealized gain — verified
+- **equityUpsellCard (Row 11.6)**: PROTECTED EQUITY navy gradient sub-card "Homes maintained well sell for ~7.4% more" + "$72K in equity Chez helps you protect" + "Source: NAR Remodeling Impact Report" — verified
+- **Sale simulator (Row 11.7)**: "What if I sold for..." button — verified
+- **PRIMARY RESIDENCE eyebrow (Row 11.8)**: salmon-light foreground per PropertyHeroHeader.swift:13-14 INTENTIONAL design (not morning-fix regression)
+- **Priorities stat (Row 11.9)**: salmon-light foreground INTENTIONAL design (not regression)
+- **Stats-pill filter (Row 11.11)**: Overdue / This Week / This Month / Later, navy-fill active state on tap
+- **"Showing X" caption + Clear (Row 11.12)**: appears below stats pills on active filter
+- **Layout toggle (Row 11.13)**: List / Timeline icon toggle, two distinct layouts render
+- **Inline handyman quick-add (Row 11.17)**: "Have someone else do it →" + "Or have Chez source one" salmon links on findContractor cards
+- **Compact routines strip (Row 11.18)**: "ONGOING ROUTINES · 14" horizontal scroll of routine pills
+
