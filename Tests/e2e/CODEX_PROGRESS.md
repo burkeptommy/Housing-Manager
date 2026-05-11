@@ -46,6 +46,17 @@ _(Codex maintains. Format: bullet list of open question topics + age in hours.)_
 
 _(Codex appends here.)_
 
+## 2026-05-11 01:24:30 UTC — batch_start: Round C C-1 Section 13 Chez concierge
+
+- batch_id: round-c-c1-section-13-chez-concierge
+- last_commit: 9f0d7496542d6f8921c52b5bcb4a3cf3c93316da
+- next_planned: Section 13 worker verification, rows 13.1-13.26, with A1+, B1+, B11 discipline
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 4, "B": 2, "C": 0, "D": 0, "E": 2 }
+- findings_this_batch: { verification_pass: 0, verification_fail: 0, gap_found: 0, ui_quality: 0, persistence: 0 }
+
+---
+
 ## 2026-05-11 01:22:47 UTC — fix_shipped: P0-3 dashboard simplification documented
 
 - batch_id: p0-3-dashboard-density
