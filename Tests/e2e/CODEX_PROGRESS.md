@@ -253,3 +253,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 12:08:00 UTC — batch_end: Wave C-2 REDO Section 7 — PASS
+
+- batch_id: round-c-c2-redo-section-7-sim
+- last_commit: 49c776eb (C-1 REDO fixes)
+- result: PASS — sim drive confirmed A1+ context contract on VehicleDetailView; B4 brand-voice fix source-verified
+- next_planned: Wave C-3 REDO Section 4 (Documents)
+- new_gap: Maintenance hub Vehicles row → blank navigation view (deferred)
+- author: Claude
+
+---

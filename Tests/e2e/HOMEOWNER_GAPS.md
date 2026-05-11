@@ -568,3 +568,25 @@ After the user moved the Simulator to the primary monitor, this REDO subagent ac
 - **RoutineDetailView "Log visit and spend" button** is salmon fill with white text — Codex P0-1 fix `840a9f52` CONFIRMED IN SIM
 - **Brand voice clean throughout** — every user-facing string says "Chez", no "Tom" anywhere
 
+
+---
+
+## Round C — Wave C-2 REDO (Section 7 brief sim verification)
+
+After Wave C-1 REDO sim drive worked, C-2 REDO confirmed fixes hold:
+
+- **B4 brand voice fix at MaintenanceTaskDetailSheet:2043** — source-verified (the no-vendor SCHEDULING surface wasn't reachable in this fixture since all systems are vendor-covered, but the source string change is correct).
+- **A1+ ChezEntryButton context contract** — verified LIVE on VehicleDetailView's "Have Chez find me a mechanic" button. Compose sheet RE: card shows `Vehicle: 2003 HONDA Accord`, mileage 90000, vehicle ID populated. Smart category routing (vehicle without shop → `find_vendor`) confirmed via salmon-tinted "Find a vendor" badge. Phase 80.2 routing rule fires correctly.
+- **Em-dash sweep** — verified VehicleDetailView shows "Not estimated yet" not "—".
+- **Brand voice** — compose header "Ask Chez · Chez replies within 1 business day" intact, no Alfred / Tom leakage.
+
+### Wave C-2 REDO Finding 1 — Maintenance hub vehicle row navigates to blank view — NEW GAP
+
+- Category: `gap_found`
+- Severity: `moderate`
+- Surface: Maintenance hub "Vehicles" section row tap → blank navigation destination
+- Evidence: Subagent reported "Tapping the '2003 HONDA Accord — needs shop / Set up >' row from the Maintenance hub's Vehicles section navigates to a blank white view (back-arrow only, no body)." Reachable VehicleDetailView is via Property tab → vehicle row.
+- Reproduction: Open Maintenance tab → scroll to Vehicles section → tap a vehicle row → blank view appears
+- Suggested fix: check the navigationDestination handler for the Maintenance hub's vehicle row. The Property tab path works correctly (subagent navigated there fine for the rest of the test). The Maintenance hub path is missing the destination view binding.
+- Status: `deferred` — out of scope for C-2 REDO; logged for follow-up task.
+
