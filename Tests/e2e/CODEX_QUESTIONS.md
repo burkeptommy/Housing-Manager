@@ -25,6 +25,12 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 
 **Codex: also check `## OUTBOUND — Claude directives to Codex` on every poll.** The watcher routine doesn't process that section (no question format), but Claude uses it for unsolicited status updates / re-anchoring guidance / "you missed X" notes. Treat directives as authoritative.
 
+**Codex push channel: use `## INBOUND from Codex` for unsolicited status / non-blocking flags.** When you want to surface something to Tom or Claude that isn't a question (e.g. "shipped a critical fix you should know about", "noticed a pattern across 5 sections", "paused because waiting for X"), append a dated entry to the INBOUND section. Same format as OUTBOUND. Watcher ignores it. Tom or Claude reads on demand.
+
+**Heartbeat: write to `Tests/e2e/CODEX_PROGRESS.md` every batch.** Append a one-line entry at the start of every subagent + at the end of every fix-on-the-fly commit. Format documented in the file. Commit + push every ~30 min so origin always reflects truth. Fresh Codex sessions read this first to recover state after a crash.
+
+**Polling cadence: 15 minutes (not 30).** `git pull --rebase origin claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` every 15 min during your run to surface watcher answers + Claude OUTBOUND directives faster. Worst-case async latency drops from ~60 min to ~30 min.
+
 ## Format per question
 
 ```markdown
@@ -42,6 +48,12 @@ Async Q&A channel between Codex (running tests) and Claude (lead dev who wrote t
 
 ---
 ```
+
+## INBOUND from Codex (newest first)
+
+_(Codex appends here for status pings, non-blocking flags, batch summaries. Watcher routine ignores this section. Tom / Claude reads on demand. Format mirrors OUTBOUND below.)_
+
+---
 
 ## OUTBOUND — Claude directives to Codex (newest first)
 

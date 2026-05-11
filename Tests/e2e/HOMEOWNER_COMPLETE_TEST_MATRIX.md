@@ -973,6 +973,7 @@ Mirror of [HANDYMAN_TEST_MATRIX.md](HANDYMAN_TEST_MATRIX.md) Section 21 — ever
 | Check | What to verify |
 |---|---|
 | A1 Save → relaunch | Create entity, terminate app, relaunch, confirm entity persists with all fields |
+| **A1+ ChezEntryButton context contract** (post-Round-A) | **Every ChezEntryButton tap MUST: (a) pass non-empty `context` dict at the call site, (b) the dict must include `source_entity_type` (task / routine / system / vendor / project / etc.) AND `source_entity_label` (human-readable display name), (c) the resulting ChezRequestComposeSheet's RE: section must render `source_entity_label` as primary header, not just generic category. Audit all 17 entry points from CLAUDE.md. Failures = `ui_quality_finding` severity `major` (Tom's support team can't source without context). Caught generic "Roofing" RE: from a routine context in the Round A audit.** |
 | A2 Save → background → foreground | Create, background 30s, return, confirm persistence |
 | A3 Save → DB cross-check | Curl PostgREST with service-role JWT, confirm row + shape |
 | A4 Edit existing → no duplicate | Open existing, edit, save. Confirm UPDATED not duplicated |
@@ -986,6 +987,7 @@ Mirror of [HANDYMAN_TEST_MATRIX.md](HANDYMAN_TEST_MATRIX.md) Section 21 — ever
 | Check | What to verify |
 |---|---|
 | B1 Salmon discipline | CTAs only — never decoration / inactive icon / background wash |
+| **B1+ CTA legibility (post-Round-A addition)** | **Every filled button / pill / chip MUST use one of these valid foreground/background pairs: `textOnAction` on `action` (white on salmon, primary CTA), `textOnNavy` on `navy` / `navy800` (white on navy, secondary), `textPrimary` on `creamLight` / `surface` (navy on white, outlined), or `textPrimary` on `beige200` / `cream` (navy on light gray, chip). Anything else (e.g. navy text on navy fill) fails — file a `ui_quality_finding` severity `major` because the user can't read the affordance. Caught the "Log visit and spend" purple-on-purple button on RoutineDetailView in the Round A audit.** |
 | B2 Typography mix | New York serif 18pt+, SF Pro 16pt and below |
 | B3 Em dashes (`—`) in user-facing copy | Hard rule — flag every one |
 | B4 Brand voice | "Chez" never operator name |
@@ -995,6 +997,7 @@ Mirror of [HANDYMAN_TEST_MATRIX.md](HANDYMAN_TEST_MATRIX.md) Section 21 — ever
 | B8 Animation quality | Smooth, high-damping, ~0.35s response |
 | B9 Empty / loading / error / populated states | Skeleton loading not spinners |
 | B10 Layout under content extremes | Test 3 content lengths: short / typical / long |
+| **B11 Information density / visual hierarchy (post-Round-A addition)** | **Every screen with 3+ distinct content sections (cards, lists, hero blocks) gets a "screen feels overwhelming?" assessment. If a screen has 4+ sections vying for attention OR feels visually dense, file `ui_quality_finding` severity `moderate` with tag `needs-simplification`. Don't propose a specific simplification — defer to product. Aggregates into a "screens needing simplification" list across the app. Caught the Dashboard UPCOMING + NEEDS YOUR ATTENTION + RECENT ACTIVITY overload in the Round A audit.** |
 
 ### C. Edge case input checks (mandatory on every form)
 
@@ -1052,7 +1055,7 @@ Mirror of [HANDYMAN_TEST_MATRIX.md](HANDYMAN_TEST_MATRIX.md) Section 21 — ever
 | H4 Color contrast (WCAG AA) | Salmon-on-white borderline 3:1 — flag if used for body |
 | H5 Reduced motion | Animations gracefully disabled |
 
-### Required coverage per scenario — EXHAUSTIVE, NOT SAMPLED
+### Required coverage per scenario — EXHAUSTIVE, NOT SAMPLED + per-section matrix
 
 The discipline is built around the principle that **edge cases are mandatory, not optional**. Happy-path-only testing is a known anti-pattern; this matrix exists specifically because the V1 matrix sampled too lightly. Apply the FULL set of applicable categories to each scenario:
 
@@ -1060,12 +1063,39 @@ The discipline is built around the principle that **edge cases are mandatory, no
 
 | Scenario type | Mandatory categories (full sweep, not sampled) |
 |---|---|
-| **Creates / edits / deletes any entity** | A1-A8 (full persistence sweep) + B1-B10 + applicable C + D + E1-E2 |
+| **Creates / edits / deletes any entity** | A1-A8 (full persistence sweep) + B1-B11 + applicable C + D + E1-E2 |
 | **Has any form input** | C1-C8 (full input edge case sweep — empty / whitespace / max length / special chars / numerics / dates / paste / network failure / server 500) + B + applicable A |
 | **Loads data from network** | D1-D6 (full async/network state sweep — skeleton / failure / slow / refresh / pagination / optimistic) + B |
-| **Visible screen** | B1-B10 (full UI quality sweep) on every distinct screen visited |
+| **Visible screen** | B1-B11 (full UI quality sweep, including B1+ legibility and B11 density) on every distinct screen visited |
 | **Multi-step flow** | E1-E5 (lifecycle: background / kill / push / modal / interruption) — at minimum E1 + E2 |
 | **Read-only view** | B + sampled G (performance only if list is involved) |
+| **Any ChezEntryButton tap** | **A1+ context contract MANDATORY — verify dict + RE: rendering at all 17 entry points** |
+
+### Per-section discipline matrix (no judgment calls)
+
+To eliminate the "did this category apply?" judgment ambiguity that produced gaps in Round A, each Round C section gets an explicit checklist:
+
+| Section | Mandatory checks per scenario |
+|---|---|
+| 4 Document pipeline | A1-A8 + B1-B11 + C1-C8 + D1-D6 + E1-E2 |
+| 5 Invoice processing | A1-A8 + B1-B11 + C1-C8 + D1-D6 |
+| 6 Email forwarding pipeline | A1-A8 + B1-B11 + D1-D6 |
+| 7 Maintenance task detail | A1-A8 + B1-B11 + C1-C8 + D1-D6 + **A1+ on every ChezEntryButton** |
+| 8 Family + invites | A1-A8 + B1-B11 + C1-C8 |
+| 9 Trusted contacts | A1-A8 + B1-B11 + C1-C8 |
+| 10 Vehicle management | A1-A8 + B1-B11 + C1-C8 + D1-D6 |
+| 11 Property detail sub-tabs | B1-B11 on every sub-tab + A/C/D where applicable |
+| 13 Chez full concierge | A1-A8 + **A1+ MANDATORY** + B1-B11 + C1-C8 + D1-D6 + E1-E2 |
+| 14 Settings | B1-B11 (all 19 sub-screens) + A on save paths |
+| 15 Push notifications | E3-E4 (deep link with cold + at destination) on every event |
+| 16 Calendar sync | A6 (offline sync) + D1-D6 |
+| 17 Vault lock | E1-E5 + persistence |
+| 18 Estate intelligence absence | B11 (verify NO estate UI surfaces) |
+| 19 Dashboard | B1-B11 (especially B11 density given known overload) |
+| 20 Find local vendors | A1+ (if it exposes ChezEntryButton) + B1-B11 |
+| 21 Cross-app integration | F (concurrent / multi-device) on every round trip |
+
+If a scenario in section X doesn't touch a category in the table (e.g. read-only view in Section 11 has no C inputs), say so explicitly in the result. Don't silently skip.
 
 **Sampled (do NOT skip if applicable, but don't run on every scenario):**
 - F (concurrent / multi-device) — sample on shared-state scenarios (~25% of applicable rows)
