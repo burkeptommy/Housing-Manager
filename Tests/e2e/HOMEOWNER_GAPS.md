@@ -439,3 +439,17 @@ No current-run findings yet.
 - Suggested fix: update CLAUDE.md numbers to reflect post-Chez-v1 state. Low-priority documentation hygiene.
 - Status: `deferred` — documentation drift, not a code bug. Not blocking Round C signoff.
 
+
+---
+
+## Round C — Wave C-4 (Section 5 Invoice processing) — PASS
+
+### Wave C-4 verification summary
+
+- Subagent: c4-section-5-invoice-processing, returned PASS — no fixes needed
+- All 25 rows verified (20 PASS via source, 4 deferred-source-pass, 1 partial on DB write verification)
+- All 10 critical contracts PASS: analyze-document→InvoiceChoiceSheet wiring, home/vehicle toggle gate, InvoiceReviewSheet sections, Phase 50 cadence_detected extraction, CadenceSuggestionCard accept/dismiss paths, deterministic parent grouping (12 categories), Phase 52b specialty inference (11 rules), household_dismissed_suggestions writeback, vendor follow-up task stamping (`assignmentType=vendor` + `assignedContractorId` + `needsVendor` + `Vendor follow-up:` notes prefix), Phase 95 PR 43 vehicle mileage section
+- B3 em dashes: zero in user-facing copy (3 in code comments only)
+- B4 brand voice: correct nuance — Alfred not invoked in invoice ingestion (presented as system "Invoice Intelligence"); Chez correctly used for concierge action copy; neutral "we" voice on suggestion cards
+- B11 density: 8 conditional sections in InvoiceReviewSheet but real-world render is 2-4; gated correctly
+
