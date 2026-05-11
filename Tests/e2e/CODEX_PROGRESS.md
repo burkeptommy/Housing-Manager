@@ -275,3 +275,13 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 12:34:00 UTC — batch_end: Wave C-4 REDO Section 5 — PASS
+
+- batch_id: round-c-c4-redo-section-5-sim
+- last_commit: 98f871a7
+- result: PASS — sim drive confirmed all C-4 source verdicts hold; fixture is empty (0 docs) so live processing deferred. 2 new gaps flagged (TasksHubView label drift + PropertyDetailView raw slugs).
+- next_planned: Wave C-5 REDO Section 6 (Email forwarding — brief)
+- author: Claude
+
+---

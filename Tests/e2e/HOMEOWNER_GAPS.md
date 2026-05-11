@@ -608,3 +608,45 @@ Sim drive confirmed all C-3 verdicts hold:
 - `SmartRecommendations.swift:187` notes "Chez v1: estate-readiness, gap-analysis-prompt, scenario-prompt" were intentionally retired from the active surface set.
 - Status: `no action needed` — fix is correct for when/if GapAnalysisView is reintroduced. Worth noting in matrix that Row 4.32 "Document gap analysis" is partly v1-deferred.
 
+
+---
+
+## Round C — Wave C-4 REDO (Section 5 Invoice processing — REAL SIM DRIVE) — PASS
+
+Sim drive confirmed all source verdicts hold. Fixture has 0 documents in Vault so live processing scenarios deferred. 7 verified passes via source + visible UI:
+- Row 5.1 DocumentDetailView "Scan for Maintenance & Systems" affordance
+- Row 5.2 InvoiceChoiceSheet clean Chez voice
+- Row 5.4 InvoiceReviewSheet + SpecialtySuggestionCard wiring
+- Row 5.8 CadenceSuggestionCard wired at 2 dashboard sites
+- Row 5.18 SpecialtySuggestionCard with Phase 52b copy
+- Row 5.21 Scan affordance copy at DocumentDetailView:842
+- B3/B4/B11 all clean on invoice surfaces
+
+### Wave C-4 REDO Finding 1 — TasksHubView label drift "Contractor" vs "Handyman" — DEFERRED
+
+- Category: `gap_found`
+- Severity: `minor`
+- Surface: `Haven/Features/Tasks/Views/TasksHubView.swift:21+56`
+- Evidence: The title-switcher button reads "Contractor" but calls `setMode(.handyman)`. CLAUDE.md spec + every other surface in the codebase (`HandymanTabView`, `HandymanPunchListView`, `handyman_punch_items` table) uses "Handyman" canonically.
+- Suggested fix: Tom decides — either (a) align UI label "Contractor" → "Handyman" to match spec + rest of codebase, or (b) update CLAUDE.md to note "Contractor" is the user-facing brand and Handyman is the internal term.
+- Status: `deferred` to product/design decision. Not blocking signoff but creates inconsistency in user mental model.
+
+### Wave C-4 REDO Finding 2 — PropertyDetailView "systems missing profile" shows raw engineering slugs — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `moderate`
+- Surface: `Haven/Features/Property/Views/PropertyDetailView.swift:1334-1339` `systemsMissingProfilePreview`
+- Evidence: The card subtitle preview directly renders `system.name` values like "A4 Crawl Space finished_basement-sump_pump-crawl_space" — raw composite slug from the quiz mapper. Users should see human-friendly names.
+- Reproduction: Open Property tab → first property → Overview sub-tab → look for "X systems missing profile" card subtitle. Preview shows engineering-style hyphenated/underscored slugs.
+- Suggested fix: Apply a humanization transform to system.name display:
+  ```swift
+  private var systemsMissingProfilePreview: String {
+      systemsMissingProfileEntries
+          .prefix(3)
+          .map { $0.system.name.humanizedSystemName }  // strip slug suffix, title-case
+          .joined(separator: " · ")
+  }
+  ```
+  OR use a separate `displayName` field if one exists. OR display the system's category (always clean) instead of name.
+- Status: `deferred` — needs decision on whether to humanize at render or fix in quiz mapper writes.
+
