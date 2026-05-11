@@ -2542,42 +2542,61 @@ struct MechanicPickerSheet: View {
         _selectedId = State(initialValue: currentMechanicId)
     }
 
+    /// Round C Wave C-7 finding: MechanicPickerSheet was showing every household
+    /// contractor (chimney pros, plumbers, lawn care) as a selectable mechanic.
+    /// Split the contractor list into a likely-mechanics section (filtered by
+    /// keyword) + an "Other contractors" section so the user can still find a
+    /// legitimate mechanic stored under a generic category, but the most likely
+    /// matches surface first.
+    private static let mechanicKeywords: Set<String> = [
+        "mechanic", "auto", "automotive", "auto repair", "auto body",
+        "tire", "tires", "transmission", "garage",
+    ]
+
+    private func isLikelyMechanic(_ contractor: ContractorRow) -> Bool {
+        let bag = [
+            contractor.category ?? "",
+            contractor.companyName,
+            (contractor.specialties ?? []).joined(separator: " "),
+        ].joined(separator: " ").lowercased()
+        return Self.mechanicKeywords.contains { bag.contains($0) }
+    }
+
+    private var likelyMechanics: [ContractorRow] { contractors.filter { isLikelyMechanic($0) } }
+    private var otherContractors: [ContractorRow] { contractors.filter { !isLikelyMechanic($0) } }
+
     var body: some View {
         List {
-            if !contractors.isEmpty {
+            if !likelyMechanics.isEmpty {
                 Section {
-                    ForEach(contractors) { contractor in
-                        Button {
-                            Haptics.selection()
-                            selectedId = contractor.id
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: selectedId == contractor.id ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(selectedId == contractor.id ? HavenColors.navy800 : HavenColors.beige300)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(contractor.companyName)
-                                        .font(HavenTypography.uiLabel)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                    if !contractor.phone.isEmpty {
-                                        Text(contractor.phone)
-                                            .font(HavenTypography.uiCaption)
-                                            .foregroundStyle(HavenColors.textSecondary)
-                                    }
-                                }
-
-                                Spacer()
-                            }
-                        }
-                        .buttonStyle(.plain)
+                    ForEach(likelyMechanics) { contractor in
+                        contractorRow(contractor)
                     }
                 } header: {
-                    Text("YOUR CONTRACTORS")
+                    Text("LIKELY MECHANICS")
                         .font(HavenTypography.uiSectionHeader)
                         .tracking(1.5)
                 }
             }
+            if !otherContractors.isEmpty {
+                Section {
+                    ForEach(otherContractors) { contractor in
+                        contractorRow(contractor)
+                    }
+                } header: {
+                    Text(likelyMechanics.isEmpty ? "YOUR CONTRACTORS" : "OTHER CONTRACTORS")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                } footer: {
+                    if !likelyMechanics.isEmpty {
+                        Text("None of your other contractors look like mechanics, but pick one if it fits.")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+            }
+
+
 
             Section {
                 if showAddNew {
@@ -2654,6 +2673,34 @@ struct MechanicPickerSheet: View {
             }
         }
         .tint(HavenColors.navy)
+    }
+
+    @ViewBuilder
+    private func contractorRow(_ contractor: ContractorRow) -> some View {
+        Button {
+            Haptics.selection()
+            selectedId = contractor.id
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: selectedId == contractor.id ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(selectedId == contractor.id ? HavenColors.navy800 : HavenColors.beige300)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(contractor.companyName)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if !contractor.phone.isEmpty {
+                        Text(contractor.phone)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func createAndSelect() async {

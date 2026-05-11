@@ -3,9 +3,11 @@ import Supabase
 
 /// Manages Supabase Realtime channel subscriptions for dashboard live updates.
 /// Subscribes to Postgres changes on documents, maintenance_tasks, home_systems,
-/// and contractors. On change events, posts the corresponding NotificationCenter
-/// notification so the DashboardViewModel's existing `subscribeToChanges()` handler
-/// triggers a refresh.
+/// contractors, AND handyman_punch_items (Round F G-F-1 fix — handyman writes
+/// from Chez Field now propagate live to the homeowner punch list). On change
+/// events, posts the corresponding NotificationCenter notification so the
+/// DashboardViewModel's existing `subscribeToChanges()` handler triggers a
+/// refresh.
 ///
 /// Lifecycle: call `subscribe()` after auth, `unsubscribe()` on sign out.
 @MainActor
@@ -32,6 +34,14 @@ final class RealtimeService {
         let taskUpdates = channel.postgresChange(UpdateAction.self, schema: "public", table: "maintenance_tasks")
         let systemInserts = channel.postgresChange(InsertAction.self, schema: "public", table: "home_systems")
         let contractorInserts = channel.postgresChange(InsertAction.self, schema: "public", table: "contractors")
+        // Round F G-F-1 fix: subscribe to handyman_punch_items so a handyman
+        // writing a punch from Chez Field propagates live to the homeowner's
+        // HandymanPunchListView. Previously the table was shared between apps
+        // but only HandymanTabView subscribed to handyman_request_messages —
+        // the punch list relied entirely on local notification posts triggered
+        // by the homeowner's own writes.
+        let punchInserts = channel.postgresChange(InsertAction.self, schema: "public", table: "handyman_punch_items")
+        let punchUpdates = channel.postgresChange(UpdateAction.self, schema: "public", table: "handyman_punch_items")
 
         self.channel = channel
 
@@ -70,9 +80,21 @@ final class RealtimeService {
                     NotificationCenter.default.post(name: .contractorChanged, object: nil)
                 }
             }
+            // Round F G-F-1: handyman punch list inserts (handyman adds a punch
+            // from Chez Field mid-visit) + updates (status flip, completion).
+            let t6 = Task {
+                for await _ in punchInserts {
+                    NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
+                }
+            }
+            let t7 = Task {
+                for await _ in punchUpdates {
+                    NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
+                }
+            }
 
             await MainActor.run { [weak self] in
-                self?.listenerTasks = [t1, t2, t3, t4, t5]
+                self?.listenerTasks = [t1, t2, t3, t4, t5, t6, t7]
             }
         }
         listenerTasks.append(subscribeTask)
