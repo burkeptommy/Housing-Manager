@@ -369,3 +369,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 15:55:00 UTC — batch_end: Wave C-11 Section 11g+11h — PASS
+
+- batch_id: round-c-c11-section-11d-sim
+- last_commit: ab1de907 (C-10)
+- result: PASS — 11 sim-verified passes; 5 polish/UX findings (all deferred)
+- key_findings: Equipment catalog double-brand prefix on Bosch entries; catalog pick doesn't update system Category; AddUtilitySheet lacks region-aware provider sort
+- next_planned: Wave C-12 Final design + accessibility audit
+- author: Claude
+
+---

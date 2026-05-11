@@ -983,3 +983,68 @@ Sim drive verified 19 rows. Section 11e Documents per-property covered by Wave C
 - Salmon discipline: empty-state hero "Start" CTA actionLight intentional; row chevrons navy500
 - Double chevrons: none (C-8 RoutinesListView fix held)
 
+
+---
+
+## Round C — Wave C-11 (Section 11g Equipment + 11h Utility Accounts) — PASS
+
+Sim drive verified 11 of 13 rows. Equipment catalog flow + Utility account flow both functional.
+
+### Wave C-11 Finding 1 — Equipment catalog double-brand prefix on results — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor`
+- Surface: Equipment catalog search result rows
+- Evidence: "Bosch Bosch 800 Series Dishwas..." — manufacturer field already contains "Bosch" and model name also starts with "Bosch", display concatenates them.
+- Suggested fix: catalog row display should detect when model name already starts with manufacturer and dedupe.
+- Status: `deferred` — affects all Bosch entries observed; needs investigation of all brand × model concat patterns
+
+### Wave C-11 Finding 2 — Equipment catalog pick doesn't update Category — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `moderate` (data integrity risk)
+- Surface: Edit System sheet → Find in Equipment Catalog → select result
+- Evidence: Picking a Bosch Dishwasher result in an HVAC system context populates manufacturer/model/notes but does NOT update Category. Result: HVAC system with appliance metadata attached.
+- Suggested fix: either (a) update category to match catalog entry's category, OR (b) show "Category mismatch — switch to Appliances?" warning before save.
+- Status: `deferred` — needs guard logic
+
+### Wave C-11 Finding 3 — Add Utility type picker mixes utilities + services — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (taxonomy)
+- Surface: Add Utility → Type picker
+- Evidence: 11 categories mix utilities (Electric/Internet/Gas/Water/Propane/Oil/Solar) with service categories (Security System/Pest Control/Landscaping). "Pest Control" and "Landscaping" are contractor services not utility accounts.
+- Suggested fix: either rename sheet "Add Utility or Recurring Service" or split into two sheets.
+- Status: `deferred` — taxonomy decision
+
+### Wave C-11 Finding 4 — AddUtilitySheet provider list lacks region-aware sort — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `moderate` (UX friction)
+- Surface: Add Utility → Provider list (Electric)
+- Evidence: No search field, no state/region filter, no most-likely-provider-first sort. Property is in Bethel CT but list shows alphabetical: Alabama Power → Alliant → Ameren → long scroll to Eversource. CLAUDE.md documents region-aware ranking (Phase 19h) for quiz `UtilityProviderSearchPicker` but AddUtilitySheet picker doesn't appear to use it.
+- Suggested fix: port the Phase 19h region-aware sort to AddUtilitySheet provider picker.
+- Status: `deferred` — could be ported in a single commit if Phase 19h logic is extracted
+
+### Wave C-11 Finding 5 — Duplicate providers in utility_providers table — DEFERRED
+
+- Category: `gap_found`
+- Severity: `low` (data quality)
+- Evidence: "Atlantic City Electric" + "Atlantic Electric (Atlantic City)" appear as separate rows in the provider list.
+- Suggested fix: one-off SQL sweep on `utility_providers` for near-duplicate names.
+- Status: `deferred` — data quality / catalog hygiene
+
+### Wave C-11 verified passes
+
+- Row 11.65 Equipment catalog browse via SystemDetailView → Edit System → Find in Equipment Catalog → search returns 9+ Bosch dishwasher entries with specs
+- Row 11.66 search-equipment Edge Function wired (live result return)
+- Row 11.67 Identify Your Equipment sheet: Search by Name + Take a Photo + Choose from Photos
+- Row 11.69 score-equipment: each result row shows green "85" score badge
+- Row 11.70 enrich-catalog: search results show enriched specs (CrystalDry / MyWay rack / AutoAir drying) + Premium tier pill
+- Row 11.72 Utility accounts list: 13 utilities & policies in Vendors directory, filter chip "Utilities & policies" isolates them
+- Row 11.73 AddUtilitySheet with Type picker (11 categories) → Electric reveals Provider list
+- Row 11.75 Account number field captured
+- Row 11.76 Cost tracking (Monthly cost field + BILL INTELLIGENCE Latest/Average/This year tiles)
+- Row 11.77 Bill detection from email: utility detail captions "Forward bills to tester65@alfred.getchez.com and Chez will track monthly spend, account details, and optimization opportunities automatically"
+- Brand voice: "Have Chez manage this system" + "Chez logs service, schedules maintenance visits" + "Chez matches statements from..." all correct
+
