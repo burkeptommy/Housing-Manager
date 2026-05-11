@@ -859,3 +859,73 @@ Sim drive verified 14 rows across Property tab Overview and Maintenance surfaces
 - **Inline handyman quick-add (Row 11.17)**: "Have someone else do it →" + "Or have Chez source one" salmon links on findContractor cards
 - **Compact routines strip (Row 11.18)**: "ONGOING ROUTINES · 14" horizontal scroll of routine pills
 
+
+---
+
+## Round C — Wave C-9 (Section 11c Systems + 11d Contacts — REAL SIM DRIVE)
+
+Sim drive surfaced 2 fail-level findings + multiple polish/spec drift items.
+
+### Wave C-9 Finding 1 — IndigoGradientCard "decisions" stat renders salmon even when 0 — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (B11 salmon discipline)
+- Surface: `Haven/Features/Tasks/Views/Components/IndigoGradientCard.swift:136-149`
+- Evidence: `statColumn(value: decisionCount, label: "decisions", isWarning: true)` always renders the number in `HavenColors.actionLight` regardless of value. When decisionCount=0, "0" still renders salmon — reads as action-needed when in fact the user has no pending decisions.
+- Fix: gate the warning color on `value > 0`. If `isWarning && value > 0`, render salmon (legitimate action signal). Otherwise render white (neutral).
+- Status: `fixed` in batch commit. Build clean.
+
+### Wave C-9 Finding 2 — recommendedServicesRow defined but NOT MOUNTED — DEFERRED
+
+- Category: `gap_found`
+- Severity: `moderate` (dead code OR missing wiring)
+- Surface: `Haven/Features/Property/Views/PropertyDetailView.swift:5145+, 5197+`
+- Evidence: `recommendedServicesRow` and `recommendedSystemsRow` are defined but never instantiated in any sub-tab body. Matrix Row 11.26 ("'Recommended for your home' sparkles row → RecommendedServicesView") shows ZERO surface in current build.
+- Suggested fix: either (a) wire these rows into Property → Systems or Contacts sub-tab, OR (b) remove the dead code if RecommendedServicesView is exclusively reachable via Tasks tab's BrowseBand.
+- Status: `deferred` — needs product decision on where this entry-point should live post-Phase-67
+
+### Wave C-9 Finding 3 — "ADD OR DISCOVER" section described in CLAUDE.md doesn't exist — DOC DRIFT
+
+- Category: `gap_found`
+- Severity: `minor` (doc drift)
+- Evidence: `grep -rn "ADD OR DISCOVER" Haven/` returns ZERO matches. The CLAUDE.md "Contacts Hub (Phase 56 Section 1)" section describes "ADD OR DISCOVER" with 5 entries (Add a vendor / Browse specialty systems / Add a custom system / Add a routine / See recommended services) but the actual current build shows an Add button action sheet with 3 options: 'Add vendor or advisor' / 'Add utility or policy' / 'Ask Alfred to find a pro'.
+- Status: `deferred` — CLAUDE.md needs update OR feature was intentionally trimmed
+
+### Wave C-9 Finding 4 — Contacts sub-tab labeled "Vendors" in app — NAMING DRIFT
+
+- Category: `verification` (cosmetic)
+- Evidence: Sub-tab label is "Vendors" in app; CLAUDE.md / matrix call it "Contacts". ContactsFilter enum has 5 cases (not 4 as matrix says). Cosmetic; could be either rename direction.
+- Status: `deferred` — needs spec consistency decision
+
+### Wave C-9 Finding 5 — snake_case + slug bleed across system names — RELATED TO C-4 REDO
+
+- Category: `ui_quality_finding`
+- Severity: `moderate` (already flagged in C-4 REDO as "systems missing profile" preview)
+- Evidence: System names display "A4 HVAC not_sure", "subtype boiler_with_central_ac", "Crawl Space finished_basement-sump_pump-crawl_space" — raw snake/kebab debug strings. Vendor names show "A4 Pest Co quarterly_pro", "A4 Irrigation Co drip" with descriptor suffix mid-name.
+- Compound issue: both fixture data quality AND missing humanization at render. Real-user data with cleaner names would mask much of this, but UI should defensively humanize.
+- Suggested fix: humanize `system.name` and `contractor.companyName` at render time. Replace underscores/hyphens with spaces, title-case, strip suffix slugs.
+- Status: `deferred` — already in gaps doc from C-4 REDO finding #2. Add note linking the two.
+
+### Wave C-9 Finding 6 — "Electrical & Safe..." truncation in category tile — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `minor` (layout)
+- Surface: System category tile rendering
+- Evidence: Full label "Electrical & Safety" clipped to "Electrical & Safe..." in the systems tile grid.
+- Suggested fix: either widen tile (changes grid), shrink font, lineLimit(2), or shorten label to "Electrical" (loses safety connotation).
+- Status: `deferred` — layout-level decision
+
+### Wave C-9 verified passes
+
+- Row 11.19 SystemCoverageCard progress dot is dark/indigo, NOT salmon — morning fix landed
+- Row 11.20 Category notification dots are AMBER, NOT salmon — morning fix landed
+- Row 11.21 Tap category → list of systems
+- Row 11.22 SystemDetailView (with profile-to-finish card + service freq row)
+- Row 11.23 Add details (Take label photo + Enter details)
+- Row 11.25 FrequencyPickerSheet (Weekly through Annually + Custom + Apply-to-existing toggle)
+- Row 11.31 AddSystemView form
+- Row 11.32 Contacts sub-tab structure (header + Add + subtitle + search + filter chips + vendor rows)
+- Row 11.34 Search bar present
+- Row 11.35 Routine chip cross-references routineVendorIds (filtered to 5 routine vendors with "Recurring" badge)
+- Row 11.36 Apple Contacts-style row layout (32pt logo + name + caption + chevron)
+

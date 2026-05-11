@@ -347,3 +347,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 15:00:00 UTC — batch_end: Wave C-9 Section 11c+11d — PASS + 1 fix + 5 gaps
+
+- batch_id: round-c-c9-section-11b-sim
+- last_commit: f292d636 (C-8)
+- result: PASS — 11 sim-verified passes; 1 polish fix shipped (IndigoGradientCard decisions salmon when 0); 5 gaps documented
+- key_finding: PropertyDetailView has dead `recommendedServicesRow` + `recommendedSystemsRow` not mounted anywhere. CLAUDE.md "ADD OR DISCOVER" section doesn't exist. Plus system/vendor snake_case + slug bleed continues from C-4 REDO.
+- next_planned: Wave C-10 Section 11c+11d (Documents + Projects)
+- author: Claude
+
+---

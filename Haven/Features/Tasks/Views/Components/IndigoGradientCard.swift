@@ -134,11 +134,16 @@ struct MiniHeroContent: View {
     }
 
     private func statColumn(value: Int, label: String, isWarning: Bool) -> some View {
-        VStack(spacing: 3) {
+        // Salmon discipline (B11): only render the warning color when there
+        // is an actual decision to make. A "0" rendered in salmon reads as
+        // action-needed when in fact the user has nothing pending —
+        // caught by Round C Wave C-9 sim audit.
+        let shouldHighlight = isWarning && value > 0
+        return VStack(spacing: 3) {
             Text("\(value)")
                 .font(HavenTypography.fraunces(size: 22, weight: 700))
                 .tracking(-0.4)
-                .foregroundStyle(isWarning ? HavenColors.actionLight : Color.white)
+                .foregroundStyle(shouldHighlight ? HavenColors.actionLight : Color.white)
                 .lineLimit(1)
             Text(label)
                 .font(.system(size: 10.5))
