@@ -359,3 +359,47 @@ If you want to keep extending E2E coverage:
 - [Tests/e2e/cleanup.sql](Tests/e2e/cleanup.sql) — widened email pattern from `e2e-test-%` to `e2e-%`
 
 Total: 7 files, 5 commits, 0 regressions, 0 issues introduced.
+
+## Final closure — 2026-05-11 audit
+
+Re-audited the entire overnight + morning plan against the current `main` state (commit `bc837440` and ancestors). Findings:
+
+**16 of 17 plan steps are landed in main.** Phase 95.1 + Round C / D / E / F commits between 2026-05-06 and 2026-05-10 picked up every fix in the original plan. Verified per-file:
+
+| Plan step | Status | Evidence |
+|---|---|---|
+| 1. Em-dash sweep (136 across 57 files) | Landed | `49702205`, `f9480aa1`, `9cb76e51`, `a136e56d`, `7f8c22e2` |
+| 2. View schedule navigation → `maintenance_calendar` | Landed | DashboardView.swift:1407 |
+| 3. Q2 pets default to nil | Landed | HomeAssessment.swift:168 (`var hasPets: Bool?`) |
+| 4. Sump pump rule gated on explicit selection | Landed | HouseQuizAnswerMapper.swift:202 (`basementSelections.contains("sump_pump")`) |
+| 5. Salmon decoration (7 surfaces) | Landed | Phase 95.1 fixes in SystemCoverageCard.swift, PropertyEnhancedSections.swift, ChezOwnershipHeroCard.swift, ChezEntryButton.swift, ChezProfileView.swift |
+| 6. Inbox CTA hierarchy flip | Landed | InboxView.swift:246 (Phase 95.1 comment block) |
+| 7. Coverage metric divergence | Landed | MaintenanceHubView.swift:222 (relabel to "5 of 14 systems covered") |
+| 8. Pool/Spa chemistry composite | Landed | HouseQuizView.swift:233-235 (progressivePoolChemistry persists into composite subtype) |
+| 9. Chapter intro cards rendering | Landed | HouseQuizView.swift:907-913 + 936-943 |
+| 10. PropertyRecapCard data source | Landed | Phase 67D B1 — PropertyRecapCard.swift:23 |
+| 11. Auth race monotonic-true contract | Landed | AuthService.swift:50-100 (`.signedIn` / `.tokenRefreshed` / `.userUpdated` all monotonic-true; only `.signedOut` clears) |
+| 12. First-launch modal de-blocker | Landed | MaintenanceReorganizedCard.swift:17-18 (`@AppStorage("maintenanceReorganizedCardDismissed_v1")`) |
+| 13. Quick Actions row hierarchy | Deferred | Per Section "Recommended priority order" — Alfred mascot is a deliberate brand affordance; product call, not mechanical |
+| 14. Notification dots (covered by #5) | Landed | PropertyEnhancedSections.swift:217 (`HavenColors.warning`) |
+| 15. Per-group build + verify | Done | Every Round C/D/E/F batch built clean per heartbeat |
+| 16. Push to branch | Done | All commits on `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` |
+| 17. Update this report | Done | This section |
+
+**1 of 17 plan steps shipped this audit pass.** Final em-dash violation hiding in [`ScenarioResultView.swift:854`](Haven/Features/Scenarios/ScenarioResultView.swift) (`Text("— \(note)")` confidence note prefix). Now `Text("(\(note))")` — parens read as a natural parenthetical and obey the no-em-dash rule. Build clean. Commit `bc837440`, pushed.
+
+**Final em-dash count across `Haven/Features/**/*.swift`:** 0 user-facing string-literal violations. The remaining 2 hits are both in code comments (`MaintenanceHubView.swift:225` and `MaintenanceTaskDetailSheet.swift:2660`) — comments are not user-facing and CLAUDE.md's rule explicitly scopes "user-facing copy."
+
+**Open items NOT addressed by this plan (deferred to product/design):**
+
+The 11 remaining `status: deferred` entries in [`Tests/e2e/HOMEOWNER_GAPS.md`](Tests/e2e/HOMEOWNER_GAPS.md) are concentrated in Section 2c (Mode Fork Waitlist Path) and Section 2 lifecycle behaviors:
+
+- **2c.34** — Out-of-coverage waitlist tile unreachable (needs real state/zip/provider workspace lookup + fallback address path)
+- **2c.35** — Waitlist insert blocked for homeowners (needs constrained authenticated insert/upsert RLS policy)
+- **2.36** — Mode fork has no back affordance (needs design decision on whether to allow back-nav from mode fork to foundational answers)
+- **2.37** — Decide-later path not wired (needs lifecycle decision on leaving onboarding incomplete)
+- **Bug J** — Decision card placement between Q28 and cinematic reveal (still flagged as a CLAUDE.md design-rule call: cinematic moment vs decision fork)
+
+These were intentionally scoped out of "fix every bug from the overnight E2E report" since they require product decisions and backend RLS migrations rather than mechanical iOS fixes.
+
+**Verification:** Build clean on `iOS Simulator UDID 8F2D8FF0-919D-416E-A704-A88E513937CF` with `xcodebuild -project Haven.xcodeproj -scheme Chez build`. The `Tests/e2e/run.mjs` backend regression passed all 11 phases in the most recent Round F signoff (commit `90c1da21`).
