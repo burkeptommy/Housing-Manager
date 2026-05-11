@@ -267,7 +267,23 @@ struct MaintenanceTabView: View {
                         meta: viewModel.vehicleMeta(for: vehicle),
                         needsSetup: viewModel.vehicleNeedsShop(vehicle)
                     ) {
-                        pushTarget = .vehicle(vehicle.id)
+                        // Round C Wave C-2 REDO finding: routing through
+                        // pushTarget = .vehicle here briefly rendered the
+                        // EmptyView() destination as a blank white screen
+                        // before the .onAppear handler fired the
+                        // switchToTab + navigateToVehicle notifications.
+                        // Post the notifications directly from the tap
+                        // closure so the navigation is immediate.
+                        NotificationCenter.default.post(
+                            name: .navigateToVehicle,
+                            object: nil,
+                            userInfo: ["vehicleId": vehicle.id.uuidString]
+                        )
+                        NotificationCenter.default.post(
+                            name: .switchToTab,
+                            object: nil,
+                            userInfo: ["tab": 1]
+                        )
                     }
                 }
             }

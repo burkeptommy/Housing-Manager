@@ -43,9 +43,20 @@ struct EquipmentSearchResult: Codable, Identifiable {
         self.id = try c.decode(UUID.self, forKey: .id)
         self.modelNumber = try c.decode(String.self, forKey: .modelNumber)
         self.modelName = try? c.decodeIfPresent(String.self, forKey: .modelName)
-        self.displayName = (try? c.decode(String.self, forKey: .displayName)) ?? self.modelNumber
-        self.subtitle = (try? c.decode(String.self, forKey: .subtitle)) ?? ""
+        let rawDisplayName = (try? c.decode(String.self, forKey: .displayName)) ?? self.modelNumber
         self.manufacturer = try c.decode(EquipmentManufacturer.self, forKey: .manufacturer)
+        // Round C Wave C-11 finding: server-side display_name occasionally
+        // returns 'Bosch Bosch 800 Series' where the manufacturer prefix is
+        // doubled. Dedupe defensively at decode time: if display_name starts
+        // with the manufacturer name AND the manufacturer name appears twice
+        // back-to-back at the start, strip the duplicate.
+        let manufacturerPrefix = "\(self.manufacturer.name) \(self.manufacturer.name) "
+        if rawDisplayName.hasPrefix(manufacturerPrefix) {
+            self.displayName = String(self.manufacturer.name) + " " + String(rawDisplayName.dropFirst(manufacturerPrefix.count))
+        } else {
+            self.displayName = rawDisplayName
+        }
+        self.subtitle = (try? c.decode(String.self, forKey: .subtitle)) ?? ""
         self.category = try c.decode(EquipmentCategory.self, forKey: .category)
         self.specs = (try? c.decode(EquipmentSpecs.self, forKey: .specs)) ?? EquipmentSpecs(
             series: nil, fuelType: nil, installationType: nil,

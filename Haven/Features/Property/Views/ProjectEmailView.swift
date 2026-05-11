@@ -5,6 +5,8 @@ import Contacts
 /// Users can forward contractor quotes, documents, vendor info, and anything
 /// home related. Chez processes and organizes everything automatically.
 struct ProjectEmailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
     @State private var emailAddress: String?
     @State private var isLoading = true
     @State private var isGenerating = false
@@ -20,6 +22,14 @@ struct ProjectEmailView: View {
     @State private var senderError: String?
 
     private let maxSenders = 20
+
+    /// When ProjectEmailView is shown as a sheet (from PropertyDetailView's
+    /// import-email entry), iOS auto-provides swipe-down dismissal but no
+    /// explicit Done button — discoverability is weak. When shown via push
+    /// navigation from Settings, the system back-arrow handles dismissal.
+    /// Caller can pass `isSheet: true` to force-show the Done toolbar item.
+    /// Round C Wave C-10 finding.
+    var isSheet: Bool = false
 
     var body: some View {
         ScrollView {
@@ -101,6 +111,13 @@ struct ProjectEmailView: View {
         .background(HavenColors.background)
         .navigationTitle("Household Email")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isSheet {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
         .task {
             await loadEmailAddress()
             await loadAllowedSenders()

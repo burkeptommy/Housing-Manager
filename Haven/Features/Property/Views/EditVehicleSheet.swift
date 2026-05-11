@@ -35,12 +35,21 @@ struct EditVehicleSheet: View {
             }
 
             Section {
-                TextField("License Plate", text: $licensePlate)
-                    .textInputAutocapitalization(.characters)
-                TextField("Color", text: $color)
-                    .textInputAutocapitalization(.words)
-                TextField("Current Mileage", text: $currentMileage)
-                    .keyboardType(.numberPad)
+                LabeledContent("License Plate") {
+                    TextField("Optional", text: $licensePlate)
+                        .textInputAutocapitalization(.characters)
+                        .multilineTextAlignment(.trailing)
+                }
+                LabeledContent("Color") {
+                    TextField("Optional", text: $color)
+                        .textInputAutocapitalization(.words)
+                        .multilineTextAlignment(.trailing)
+                }
+                LabeledContent("Mileage") {
+                    TextField("Optional", text: $currentMileage)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
                 Picker("Ownership", selection: $ownershipType) {
                     Text("Owned").tag("owned")
                     Text("Leased").tag("leased")

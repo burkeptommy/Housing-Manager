@@ -405,7 +405,7 @@ struct PropertyDetailView: View {
             }
             .sheet(isPresented: $showProjectEmail) {
                 NavigationStack {
-                    ProjectEmailView()
+                    ProjectEmailView(isSheet: true)
                 }
             }
             .sheet(item: $editingServiceRoutine) { routine in
