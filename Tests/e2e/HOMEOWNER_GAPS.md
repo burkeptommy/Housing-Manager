@@ -1228,3 +1228,65 @@ Sim drive verified 15 rows across Vendor coverage sweep, AddVendorSheet variants
 - B3 zero em-dashes across all visited vendor + routine surfaces
 - B4 Chez brand voice consistent throughout
 
+
+---
+
+## Round D — Wave D-2 (Sections 9, 16, 17, 18, 20 — secondary surfaces) — PASS
+
+Sim drive across Settings → Trusted Contacts / Security Settings / Estate-absence verification. 17 sim-verified rows + 4 gaps surfaced (3 docs/scope, 1 missing feature).
+
+### Wave D-2 Finding 1 — Calendar Sync UI completely absent from iOS surface — MAJOR DOC DRIFT
+
+- Category: `gap_found`
+- Severity: `major` (CLAUDE.md doc drift; entire feature missing)
+- Evidence: `find Haven -iname "*CalendarSync*"` returns ZERO matches. No `CalendarSyncSheet`, `CalendarSyncView`, `CalendarSyncService` exists in the iOS codebase. Settings has no Calendar Sync row anywhere. DatabaseService still has `synced_calendars` CRUD methods (`fetchSyncedCalendars` / `upsertSyncedCalendar` / `deactivateSyncedCalendar` / `updateLastSync`) and `SyncedCalendarRow` model exists in DatabaseModels.swift, but no view consumes them. CLAUDE.md "Project Structure" lists `Core/Services/CalendarSyncService` and references "Family Inbox" surfaces that don't exist.
+- Suggested fix: either (a) clean up CLAUDE.md to reflect that Calendar Sync was removed from v1 iOS surface (matrix Section 16 rows 16.1-16.9 marked DEFERRED), OR (b) build `CalendarSyncSettingsView` + `CalendarSyncSheet` that consume the existing DatabaseService methods + add a row in Settings between Trusted Contacts and Preferences.
+- Status: `deferred` to product/design
+
+### Wave D-2 Finding 2 — Trusted contact avatar upload missing — MINOR
+
+- Category: `gap_found`
+- Severity: `minor` (incomplete feature)
+- Surface: `TrustedContactFormView` + `TrustedContactDetailView`
+- Evidence: DB column `trusted_contacts.avatar_url` exists per spec. iOS form has no PhotosPicker, no AvatarPhotoService integration, no avatar preview / upload row. `grep "avatar|PhotosPicker|image" Haven/Features/Settings/Views/TrustedContact*.swift` returns zero matches.
+- Suggested fix: mirror FamilyMemberFormView's avatar upload pattern. Roughly 60-80 lines added (PhotosPicker, AvatarPhotoService.uploadAvatar with 400px resize + avatars bucket + 1-year signed URL).
+- Status: `deferred` to product/design
+
+### Wave D-2 Finding 3 — Phase 71 "Haven Certified" renamed to "Top-Rated"; Phase 72 added separate Chez Certified tier — DOC UPDATE NEEDED
+
+- Category: `verification` (naming evolution)
+- Evidence: `FindLocalVendorSheet` renders THREE tiers per source: **Chez Certified** (navy badge, human-verified via `vendor_applications.status='chez_certified'`) → **Top-Rated** (green badge, Google heuristic: 4.7+ stars + 25+ reviews + non-chain) → **Suggested** (no badge). Matrix Row 20.2 still says "Haven Certified" (pre-Phase-71 language).
+- Suggested fix: update matrix Section 20 to reflect 3-tier badge system: Chez Certified (real review) / Top-Rated (heuristic) / Suggested.
+- Status: doc update on next matrix maintenance pass
+
+### Wave D-2 Finding 4 — Vault timeout caps at 1 hour; spec mentioned 24hr/never — MINOR SCOPE GAP
+
+- Category: `verification` (spec vs reality)
+- Evidence: SecuritySettingsView vault timeout picker has 5 options: 1 min / 5 min / 15 min / 30 min / 1 hour. Matrix Row 17.2 mentioned 24hr / never which are NOT present.
+- Status: matrix update — current behavior is correct for the implementation; spec was aspirational.
+
+### Wave D-2 verified passes (Section 18 Estate Intelligence Absence — Chez v1)
+
+CRITICAL: estate intelligence cleanup verified end-to-end.
+
+- ✅ Dashboard full-scroll: zero estate cards (no EstateIntakeDripCard, no EstateOverviewCard, no FiduciaryRoleCard)
+- ✅ Property detail tabs: [Overview, Systems, Projects, Vendors, Documents] — NO Estate tab, NO linked attorney field, NO estate overview
+- ✅ DocumentCategoryGroups.swift line 7 explicit comment: "Chez v1: Estate Planning group removed from the picker. Estate categories still exist as raw values so legacy uploads decode, but they're no longer offered to users." The `all` array has 12 groups; Estate Planning is not among them.
+- ✅ Family Reference Binder PDF still has `drawEstatePlanning()` section per CLAUDE.md "Estate intelligence remains valid future work; the audit + reintroduction will land as a fresh phase" tombstone — intentional backward compat
+- ✅ Settings full-scroll: zero estate-related rows
+
+### Wave D-2 verified passes (other)
+
+- 9.1 Trusted contacts list + empty state ("Your Trusted Circle")
+- 9.2 Add trusted contact form (name / email / phone / role / company / notes)
+- 9.4 Per-contact document access wired (`revokeDocumentAccess` + `trusted_contact_documents` junction)
+- 9.5 Invitation flow (`inviteStatusCard` + `updateContact` with `inviteStatus: 'sent'`)
+- 17.1 Biometric toggle (source-verified, gated on `isBiometricAvailable`)
+- 17.3 Change Password row + ChangePasswordSheet
+- 17.4 Per-document Vault Lock toggle in DocumentDetailView with confirmation dialog
+- 20.1 find-local-vendors returns up to 4 vendors (2 Top-Rated + 2 Suggested)
+- 20.2 3-tier badge system (Chez Certified / Top-Rated / Suggested)
+- 20.3 FindLocalVendorSheet.swift exists with full render
+- 20.4 AddVendorSheet `prefilledCategory` propagation
+- B1+ legibility / B3 zero em-dashes / B4 brand voice / B11 density / Phase 56.3 typography all PASS
+

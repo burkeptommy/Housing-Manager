@@ -424,3 +424,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 18:10:00 UTC — batch_end: Round D Wave D-2 PASS
+
+- batch_id: round-d-d2-trusted-vault-estate
+- last_commit: 80432ece
+- result: PASS — 17 sim-verified rows + 4 gaps (Calendar Sync iOS surface absent, Trusted contact avatar missing, Top-Rated naming evolution, vault timeout scope)
+- key_finding: Estate intelligence cleanup VERIFIED clean (Section 18) — Dashboard / Property / Settings / DocumentCategoryGroups all have zero estate UI per Chez v1
+- next_planned: Round E Wave E-1 (Homeowner-handyman round trips, Section 21 first half)
+- author: Claude
+
+---
