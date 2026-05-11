@@ -1329,3 +1329,37 @@ Sim drive verified 4 customer-side flows + source-verified 2 more. Cross-app sid
 - 21.5 — handyman receives quote in Field app: needs handyman sim
 - 21.6 — counter offer back-and-forth: needs both sides
 
+
+---
+
+## Round E — Wave E-2 (Section 21 rows 21.7-21.12 handyman-initiated + revoke flows) — PASS
+
+Sim drive verified 6 homeowner-side surfaces + source-verified cross-app blocks. Critical finding caught + fixed inline.
+
+### Wave E-2 Finding 1 — ChezOwnsToggle revoke fired immediately without confirmation — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `medium` (destructive action without confirmation)
+- Surface: `Haven/Features/ChezRequests/Components/ChezOwnsToggle.swift:137-152` Toggle binding
+- Evidence: The tap-ON flow correctly prompted with `showNotesPrompt = true` (alert with optional notes field). The tap-OFF flow fired `commit(delegated: false, notes: nil)` immediately. Revoking active Chez engagement mid-flight is destructive (in-flight requests stay open but the routine/vendor/task is returned to manual coordination); should be confirmed.
+- Fix: added `@State showRevokeConfirm` flag + `.confirmationDialog("Hand this back to you?")` modifier. Mirrors C-1 REDO Archive routine confirmation pattern. Target-specific message switch covers all 9 target cases (routine / contractor / task / system / project / document / utility / vehicle / insurance) with appropriate copy explaining what Chez will stop doing.
+- Status: `fixed`. Build clean, binary reinstalled.
+
+### Wave E-2 verified passes (homeowner-side)
+
+- 21.7 HomeAssessmentRow + DashboardViewModel.loadHomeAssessment + HomeAssessmentPendingCard / HomeAssessmentPrepCard source-verified (no live data in fixture)
+- 21.8 Inbox 4-sub-tab structure (Action/Unread/All/Chez); chez_reply_action_needed path source-verified in chez-concierge edge function
+- 21.9 HandymanPunchListView + AddPunchItemSheet form verified (Title / Details / Rough effort 5min/15min/30min/1hr / Notes + common-items chip prefill)
+- 21.10 VisitHistoryEmptyCard renders empty state ("No completed visits yet. Once your contractor finishes a visit it shows up here.")
+- 21.11 ChezProposalCard source-verified with 4 kinds (vendor / dateSlot / cost / quote); VENDOR PROPOSAL label with building.2.fill icon for vendor-kind
+- 21.12 ChezOwnsToggle source path through `commit(delegated:notes:)` verified — fires HavenSupabase.delegateRoutineToChez + posts `.chezDelegationChanged` / `.chezRequestChanged` / `.maintenanceTaskChanged` / `.homeSystemChanged` / etc.
+
+### Wave E-2 cross-app blocks (need handyman / contractor sims)
+
+- 21.7 Handyman Field-app assessment submission → homeowner Dashboard populated with imported systems / vendors / routines
+- 21.8 Handyman suggests task via admin → chez_reply_action_needed inbox_item with accept/decline → task lands on Maintenance list on accept
+- 21.9 Live punch-item updates to in-progress visit (realtime subscription from ChezField)
+- 21.10 Visit summary generation + customer review flow
+- 21.11 Admin posts structured vendor proposal via chez-concierge.propose with kind=vendor
+- 21.12 Admin queue receives system message + status flip after homeowner revokes
+

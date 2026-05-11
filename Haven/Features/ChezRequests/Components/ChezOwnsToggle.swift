@@ -42,6 +42,7 @@ struct ChezOwnsToggle: View {
     @State private var isUpdating: Bool = false
     @State private var errorMessage: String?
     @State private var showNotesPrompt: Bool = false
+    @State private var showRevokeConfirm: Bool = false
     @State private var pendingNotes: String = ""
     /// Phase 95 — transient confirmation flash so the user gets visible
     /// feedback after a successful flip (haptic alone is too quiet on
@@ -139,11 +140,15 @@ struct ChezOwnsToggle: View {
                         set: { newVal in
                             // Tap-on flow: prompt for one-line context
                             // before kicking off so Chez has a starting
-                            // point. Tap-off flow: revoke immediately.
+                            // point. Tap-off flow: confirm before revoke
+                            // (Round E Wave E-2 finding — revoking active
+                            // Chez engagement mid-flight should not be a
+                            // one-tap action; mirrors the C-1 REDO
+                            // Archive routine confirmation pattern).
                             if newVal {
                                 showNotesPrompt = true
                             } else {
-                                Task { await commit(delegated: false, notes: nil) }
+                                showRevokeConfirm = true
                             }
                         }
                     ))
@@ -208,6 +213,37 @@ struct ChezOwnsToggle: View {
                 Text("Chez will own the whole vehicle (\(label)). Service, recalls, registration, insurance.")
             case .insurance(_, _, let label):
                 Text("Chez will manage your \(label). Claims, coverage audits, renewal shopping.")
+            }
+        }
+        .confirmationDialog(
+            "Hand this back to you?",
+            isPresented: $showRevokeConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Hand back to me", role: .destructive) {
+                Task { await commit(delegated: false, notes: nil) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            switch target {
+            case .routine(_, let routineLabel):
+                Text("Chez will stop owning scheduling for \(routineLabel). Any in-flight Chez requests stay open, but no new visits will be coordinated automatically.")
+            case .contractor(_, let name):
+                Text("Chez will stop being your point of contact for \(name). You'll handle scheduling and follow-ups directly.")
+            case .task(_, let title, _):
+                Text("Chez will stop coordinating this task: \(title). You'll handle it yourself or assign a vendor manually.")
+            case .system(_, let name):
+                Text("Chez will stop owning end-to-end management of \(name).")
+            case .project(_, let name):
+                Text("Chez will stop running the project: \(name). Any in-flight quotes and contractor conversations stay where they are.")
+            case .document(_, let filename):
+                Text("Chez will stop managing this document: \(filename).")
+            case .utility(_, let providerName):
+                Text("Chez will stop auditing \(providerName) bills and negotiating rates.")
+            case .vehicle(_, let label):
+                Text("Chez will stop owning the vehicle (\(label)). Service, recalls, registration, and insurance return to you.")
+            case .insurance(_, _, let label):
+                Text("Chez will stop managing your \(label).")
             }
         }
     }

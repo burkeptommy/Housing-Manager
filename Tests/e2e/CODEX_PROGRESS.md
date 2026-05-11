@@ -446,3 +446,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 19:30:00 UTC — batch_end: Round E Wave E-2 PASS + 1 destructive-action fix
+
+- batch_id: round-e-e2-handyman-side
+- last_commit: c05a6495
+- result: PASS — 6 homeowner-side surfaces verified + 6 cross-app blocks documented. 1 destructive-action confirmation fix shipped.
+- key_finding: ChezOwnsToggle revoke (tap-off) fired immediately without confirmation; mirrored the C-1 REDO Archive routine pattern with target-specific confirmationDialog.
+- next_planned: Final Round D + Round E signoff report
+- author: Claude
+
+---
