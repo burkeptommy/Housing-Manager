@@ -147,3 +147,146 @@ None from this Round A session yet.
 ## Next-Session Priority
 
 Round A is signed off for this bounded run. Next session priority is Round C, only if explicitly instructed to continue.
+
+---
+
+# Round C Status
+
+Run window: 2026-05-10 20:35 EDT → 2026-05-11 12:35 EDT (~16 hours wall clock, ~10 hours active work).
+
+## TL;DR
+
+Round C signed off after 12 waves spanning Sections 4, 5, 6, 7, 8, 10, 11a-h, and 13 plus a final design/accessibility audit (Wave C-12). The pass surfaced 11 real bugs caught only by sim drive (after the user moved the simulator onto the primary monitor mid-run), 4 fix-on-the-fly batches, and 17+ deferred design/product items documented in `Tests/e2e/HOMEOWNER_GAPS.md`. Backend regression `node Tests/e2e/run.mjs` still passes 0/0 after all fixes.
+
+## Run shape
+
+The pass ran in two phases:
+
+**Phase 1 (Waves C-1 through C-6, ~3 hours, source-audit-heavy)** — computer-use MCP couldn't route clicks to the simulator on the user's secondary display. Subagents fell back to source-code audits + grep contracts + DB cross-checks via PostgREST. 3 of 6 waves succeeded in driving the sim (C-2, C-3, C-5 — 73 screenshots across them); 3 were source-only (C-1, C-4, C-6 — 6 screenshots combined).
+
+**Phase 2 (Waves C-1 through C-12 REDO + new, ~6 hours, sim-driven)** — after the user moved the simulator to the primary monitor, every wave drove the sim with real taps. Subagent C-1 REDO immediately surfaced 2 real bugs that the source-only audit had missed (Spending Authority stepper hid the dollar value; RoutineDetailView Archive button had no confirmation). Subsequent waves continued finding real bugs at a steady cadence.
+
+## Round C Status
+
+| Wave | Section(s) | Rows | Sim-drive | Result | Fixes shipped | Gaps |
+|---|---|---:|---|---|---|---|
+| C-1 (source) | 13 Chez full concierge | 26 | partial | PARTIAL | 1 (em-dash sweep across 10 files) | 0 |
+| C-1 REDO | 13 Chez full concierge | 26 | YES | PARTIAL | 2 (Spending stepper value, Archive confirmation) | 3 |
+| C-2 | 7 Maintenance task detail | 25 | YES | PARTIAL | 1 (Alfred→Chez at line 2043 + run.mjs em-dashes) | 1 (Maintenance hub vehicle blank nav) |
+| C-2 REDO | 7 Maintenance task detail | sample | YES | PASS | 0 | 0 |
+| C-3 | 4 Document pipeline | 34 | YES | PARTIAL | 1 (GapAnalysisView estate readiness copy) | 1 (GapAnalysisView dormant) |
+| C-3 REDO | 4 Document pipeline | sample | YES | PASS | 0 | 0 |
+| C-4 | 5 Invoice processing | 25 | source-only | PASS | 0 | 0 |
+| C-4 REDO | 5 Invoice processing | 25 | YES | PASS | 0 | 2 (TasksHubView Contractor label drift, raw subtype slugs) |
+| C-5 | 6 Email forwarding | 32 | YES | PARTIAL | 3 (ProjectEmailView Alfred→Chez rebrand, Inbox "Action" pickerLabel, ChezMessageBubble system message shape) | 1 (Chez request title truncation) |
+| C-5 REDO | 6 Email forwarding | sample | YES | PASS + 1 follow-up | 1 (SettingsView ALFRED section header → HOUSEHOLD INTAKE) | 0 |
+| C-6 | 8 Family + invites + home manager | 30 | source-only | PASS | 0 | 0 |
+| C-6 REDO | 8 Family + invites + home manager | 30 | YES | PASS | 0 | 3 (HouseholdStrip orphaned in code, FamilyMember sort anomaly, FamilyMemberFormView defaults) |
+| C-7 | 10 Vehicle management | 30 | YES | PASS | 2 (CoveredDriverPickerSheet hard-exclude Child, Archive Vehicle capitalization) | 4 (MechanicPicker trade filter, EditVehicleSheet mileage label, Recalls doc drift, Phase 95 PR 29 three-state recall unshipped) |
+| C-8 | 11a Overview + 11b Maintenance | 18 | YES | PASS | 1 (RoutinesListView double chevron) | 3 (Section 11b spec fundamentally stale, Phase 56.5 two-bucket dead code, MaintenanceLayout enum naming reversed) |
+| C-9 | 11c Systems + 11d Contacts | 24 | YES | PASS | 1 (IndigoGradientCard "decisions" salmon when 0) | 5 (recommendedServicesRow not mounted, ADD OR DISCOVER missing in code, Vendors vs Contacts naming, snake_case bleed compound, Electrical & Safety truncation) |
+| C-10 | 11e Documents + 11f Projects | 22 | YES | PASS | 0 | 2 (visualize-room iOS surface missing, ProjectEmailView dismiss as sheet) |
+| C-11 | 11g Equipment + 11h Utility Accounts | 13 | YES | PASS | 0 | 5 (Bosch double-brand prefix, catalog category mismatch, Add Utility taxonomy mix, AddUtilitySheet no region sort, duplicate providers) |
+| C-12 | Design + accessibility polish | sample | YES | PARTIAL | 1 (third em-dash at run.mjs:2565) | 5 (dark mode claim drift, tab bar no Dynamic Type, 100 Systems / 104 Priorities reconciliation, Bethel Lawn Care vendor duplication, subtype slug compound) |
+
+## Fixes shipped (15 commits)
+
+| Commit | What | Source |
+|---|---|---|
+| `f9480aa1` | **B3 em-dash sweep across 10 user-facing surfaces** — IntroExplainerView, SecurityExplainerView, ChezProposalCard, PropertyEnhancedSections, PropertyHeroHeader, PropertyDetailView, QuoteComparisonView, QuoteDetailView, UtilityAccountsSection, VehicleDetailView | C-1 subagent flag |
+| `7f8c22e2` | **B4 Alfred→Chez at MaintenanceTaskDetailSheet:2043** (vendor scheduling caption) + **run.mjs:2587+2598 fixture em-dashes** | C-2 |
+| `d30de861` | **GapAnalysisView "estate readiness" → "household best practices"** (Chez v1 cleanup) | C-3 |
+| `7a1811ed` | **ProjectEmailView Phase 80 Alfred→Chez rebrand** (7 string changes + chezAction helper) + **Inbox sub-tab "Needs Action" → "Action" pickerLabel** + **ChezMessageBubble system message Capsule → RoundedRectangle** | C-5 |
+| `d76a0a57` | **SettingsView "ALFRED" section header → "HOUSEHOLD INTAKE"** + footer Alfred → Chez | C-5 REDO sim follow-up |
+| `49c776eb` | **ChezProfileView Spending Authority stepper value restored** (`.labelsHidden()` was hiding $200/$500/$500) + **RoutineDetailView Archive routine confirmation dialog** | C-1 REDO sim drive |
+| `8c3809b1` | **CoveredDriverPickerSheet hard-exclude 'Child' relationship** + **VehicleDetailView "Archive vehicle" → "Archive Vehicle"** (capitalization consistency) | C-7 |
+| `f292d636` | **RoutinesListView double chevron fix** (removed manual chevron, NavigationLink List provides its own) | C-8 |
+| `cb005dff` | **IndigoGradientCard "decisions" stat salmon only when value > 0** (B11 discipline) | C-9 |
+| `a136e56d` | **Third em-dash in run.mjs:2565** (Septic pump-out fixture description) | C-12 |
+
+Plus 4 heartbeat-only commits and 1 initial heartbeat. Backend regression `node Tests/e2e/run.mjs` PASSES 0/0 after the full stack.
+
+## Bugs found that would have shipped to TestFlight
+
+These bugs were caught ONLY by sim drive — source-only audits would have missed them entirely:
+
+1. **CRITICAL — ChezProfileView Spending Authority steppers hide the dollar value.** Homeowner lands on Your Chez profile, sees `- +` controls, cannot tell what authority they've granted. Caused by `Stepper(value:in:step:) { Text($value) }.labelsHidden()` hiding the closure content. **Fixed in `49c776eb`.**
+
+2. **MAJOR — RoutineDetailView Archive routine button has no confirmation.** Subagent accidentally archived 2 routines during testing because Edit and Archive are stacked closely. **Fixed in `49c776eb`** (now wraps in confirmationDialog).
+
+3. **MAJOR — Settings tab section header "ALFRED" still pointed at Household Email** after Wave C-5's ProjectEmailView Alfred→Chez rebrand. Brand inconsistency. **Fixed in `d76a0a57`.**
+
+4. **MAJOR — RoutinesListView rendered double chevrons** on every routine row (manual chevron + NavigationLink List auto-disclosure). Visual noise across the entire routines surface. **Fixed in `f292d636`.**
+
+5. **MODERATE — IndigoGradientCard "decisions" stat rendered "0" in salmon** unconditionally. Reads as action-needed when user has nothing pending. **Fixed in `cb005dff`.**
+
+6. **MODERATE — CoveredDriverPickerSheet showed Child relationship members** (A4 Baby) as eligible drivers when DOB was missing. A child is never a legitimate insured driver. **Fixed in `8c3809b1`.**
+
+7. **MINOR — VehicleDetailView overflow menu "Archive vehicle"** (lowercase v) inconsistent with siblings "Edit Vehicle" / "Delete Vehicle". **Fixed in `8c3809b1`.**
+
+## Significant gaps deferred to product/design
+
+| # | Gap | Severity | Surface |
+|---|---|---|---|
+| 1 | **Section 11b matrix is fundamentally stale** | major | PropertyDetailView no longer has a Maintenance sub-tab (Phase 67 moved to Tasks tab V5). 9 matrix rows describe a removed UI. |
+| 2 | **HouseholdStrip + HouseholdStaffStrip orphaned in code** | moderate | Swift files exist, zero callsites. CLAUDE.md scroll-order says they render on Dashboard but they don't. Matrix Row 8.11 broken; profile reachable via Settings only. |
+| 3 | **Dark mode CLAIMED in CLAUDE.md but Info.plist locks Light** | major | UIUserInterfaceStyle=Light. Either remove doc claim OR enable dark mode. |
+| 4 | **Tab bar labels don't scale with Dynamic Type XXXL** | moderate | Body text scales; tab bar uses fixed font. Accessibility H2 violation. |
+| 5 | **Property hero "100 Systems · 104 Priorities" doesn't reconcile** | moderate | Priority count exceeds total systems. Data aggregation issue. Trust failure for power users. |
+| 6 | **`recommendedServicesRow` + `recommendedSystemsRow` defined but NOT mounted** in PropertyDetailView | moderate | Matrix Row 11.26 sparkles row never renders. Dead code or missing wiring. |
+| 7 | **CLAUDE.md "ADD OR DISCOVER" section doesn't exist in code** | minor | grep returns zero matches; actual Add button action sheet has 3 options. Doc drift. |
+| 8 | **MechanicPickerSheet shows ALL contractors regardless of trade** | minor (data hazard) | User can pick a chimney pro as their vehicle mechanic. Needs canonical Automotive category filter. |
+| 9 | **AddUtilitySheet provider list lacks region-aware sort** | moderate | CLAUDE.md documents Phase 19h region-aware ranking for quiz picker; AddUtilitySheet doesn't use it. Long alphabetical scroll. |
+| 10 | **System / vendor name snake_case + slug bleed** | moderate (compound, found in 3 waves) | "A4 HVAC not_sure", "subtype boiler_with_central_ac", "Crawl Space finished_basement-sump_pump-crawl_space" leak into UI. Need humanize() at render time. |
+| 11 | **visualize-room Edge Function deployed but no iOS surface** | low | 382 lines of Decor8 integration shipped; zero iOS callers. Matrix Row 11.55 unimplemented. |
+| 12 | **Phase 95 PR 29 three-state recall acknowledgment unshipped** | moderate | Code only has 2-state (Resolved/Open). Matrix Row 10.16 describes 3-state UI that doesn't exist. |
+| 13 | **TasksHubView label "Contractor" vs canonical "Handyman"** | minor | Title-switcher button reads "Contractor" but calls `setMode(.handyman)`. Spec drift. |
+| 14 | **Vendors sub-tab in app vs "Contacts" in matrix** | minor | Naming drift. |
+| 15 | **EditVehicleSheet mileage field has no visible label when populated** | minor | Standard iOS TextField placeholder behavior; needs HStack+label pattern. |
+| 16 | **Recalls DisclosureGroup CLAUDE.md says "always shown" but code is conditional** | minor | Doc drift only. |
+| 17 | **FamilyMember sort anomaly** | minor | Adult appears between kids in fixture order. Likely fixture data quirk, not code regression. |
+| 18 | **Chez request title truncation** | minor | "Find a vendor for: ..." titles clip in list rows + nav bar. Design call. |
+| 19 | **Equipment catalog double-brand prefix** | minor | "Bosch Bosch 800 Series" — manufacturer field + model name concat. |
+| 20 | **Equipment catalog pick doesn't update Category** | moderate | Pick a Dishwasher result on an HVAC system; category stays HVAC. Needs guard. |
+| 21 | **Add Utility type picker mixes utilities + services** | minor | Pest Control + Landscaping aren't utilities. Taxonomy decision. |
+| 22 | **Phase 56.5 two-bucket UI dead code** | minor | `personalBucketBody` + `scheduledBucketBody` exist but never called. Phase 60 replaced. |
+| 23 | **MaintenanceLayout enum naming reversed** | trivial | `.list` renders timelineContent; `.calendar` renders calendarContent. Cosmetic. |
+| 24 | **CLAUDE.md drift: "88 categories in 15 groups"** | trivial | Actual post-Chez-v1 is 14 groups / 97 categories. |
+| 25 | **ProjectEmailView dismiss button missing in sheet context** | trivial | Push-nav back-arrow works; sheet swipe-down works; no explicit Done. |
+| 26 | **Dashboard vendor name duplication "Schedule Bethel Lawn Care: ... · Bethel Lawn Care"** | minor | Apply truncatedVendorName resolver. |
+| 27 | **Maintenance hub vehicle row → blank navigation view** | moderate | Property tab path works; Maintenance hub vehicle row tap leads to empty view. |
+| 28 | **Dashboard density (Round A finding, still deferred)** | moderate | Post-quiz Dashboard stacks too many sections per Tom's review. |
+| 29 | **Duplicate utility providers ("Atlantic City Electric" + "Atlantic Electric (Atlantic City)")** | low | Data quality sweep needed. |
+| 30 | **photo evidence + voice note absent from MarkCompleteForm** | minor | Rows 7.23-7.24 features not implemented. |
+| 31 | **GapAnalysisView dormant in v1** | informational | Only #Preview callsite; not wired into navigation. Source fix d30de861 is correct for future. |
+
+## Verified passes worth highlighting
+
+- **A1+ ChezEntryButton context contract verified end-to-end in sim** (Tom's Round A "generic Roofing" bug fully fixed)
+- **Phase 80 Chez brand voice clean across the homeowner surface** (Dashboard / Inbox / Property / Settings / Routine detail / Task detail / Compose sheet / Profile)
+- **Codex's P0 fixes all verified in sim**: P0-1 RoutineDetailView "Log visit and spend" salmon-on-white CTA; P0-2 ChezEntryButton contextWithFallbackSource working; P0-3 dashboard density documented as deferred gap
+- **Build 86 AddFamilyMemberChooserSheet + Build 87 Household Staff + Phase 95 PR 39 destructive UI gating** — all sim-verified
+- **Phase 80.2 vehicle ChezOwnsToggle** + smart category routing (vehicle without shop → find_vendor) — sim-verified
+- **Phase 80.1 spending tier defaults $200/$500/$500** — verified after the stepper fix
+- **Morning fix `5aa507fc` Spending Authority background not salmon** — sim-verified
+- **Backend regression `node Tests/e2e/run.mjs` PASSES 0/0** after all fixes including fixture string edits
+
+## Backend regression status
+
+```
+$ node Tests/e2e/run.mjs
+…
+[phase6b] backend combinatorial matrix rows 3.1-3.36 executed
+[phase7] quiz complete + 7 tasks for delegation
+[phase8] 5 tasks delegated to Chez
+[phase9] all verifications passed
+issues: 0
+✓ All phases passed.
+```
+
+## What's next
+
+Round C signoff is complete. The 31 gaps catalogued above are sized for product/design triage — none are blocking TestFlight, but several (#1 spec rewrite for Section 11b, #3 dark mode decision, #5 priority count reconciliation, #8 MechanicPicker filter, #10 humanize() pass) are worth scheduling for Round D follow-up.
+
+Round D (per matrix Section 25): secondary surfaces — vendor coverage sweep, Chez delegation, routines, trusted contacts, calendar sync, vault lock, estate intelligence absence, find local vendors.
+

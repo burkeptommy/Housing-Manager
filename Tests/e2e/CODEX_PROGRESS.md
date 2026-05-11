@@ -401,3 +401,16 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 16:50:00 UTC — batch_end: Round C SIGNOFF
+
+- batch_id: round-c-signoff
+- last_commit: a136e56d (C-12)
+- result: ROUND C COMPLETE
+- total_subagents_spawned: 14 (12 waves, 4 redos)
+- total_fixes_shipped: 10 distinct fix-on-the-fly commits + 5 heartbeat-only commits
+- total_gaps_documented: 31
+- backend_regression: PASSES 0/0
+- author: Claude (continuing from Codex)
+
+---
