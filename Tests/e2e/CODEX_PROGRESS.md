@@ -218,3 +218,17 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 05:13:00 UTC — batch_end: Wave C-6 Section 8 Family — PASS
+
+- batch_id: round-c-c6-section-8-family
+- last_commit: 7a1811ed (Wave C-5 batch)
+- result: PASS — 22 rows verified, 8 deferred, 0 fixes needed
+- next_planned: Wave C-7 Section 10 Vehicle management
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 8, "B": 20, "C": 1, "D": 3, "E": 2 }
+- findings_this_batch: { verification_pass: 22, verification_fail: 0, gap_found: 0, ui_quality: 0, persistence: 0 }
+- key_observation: Build 86 (chooser) + Build 87 (staff/home manager) + Phase 95 (destructive UI gating) all implemented per CLAUDE.md. Brand-voice nuance consistently correct in Family + Staff copy.
+- author: Claude
+
+---

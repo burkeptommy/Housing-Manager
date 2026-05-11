@@ -500,3 +500,17 @@ No current-run findings yet.
 - Fix: switched from `Capsule()` to `RoundedRectangle(cornerRadius: 12, style: .continuous)`. Added `.fixedSize(horizontal: false, vertical: true)` so multi-line text breaks correctly without collapsing the rectangle. Bumped horizontal padding 12 → 14 and vertical 6 → 8 for breathing room. Added `Spacer(minLength: 32)` on both sides so wider system messages don't span the full content width.
 - Status: `fixed` in batch commit.
 
+
+---
+
+## Round C — Wave C-6 (Section 8 Family + invites + home manager + staff) — PASS
+
+### Wave C-6 verification summary
+
+- Subagent: c6-section-8-family, returned PASS — no fixes needed
+- All 30 rows verified: 22 PASS via source + 8 deferred (would-mutate / admin-only / email-infra / onboarding-only)
+- All major contracts PASS: Build 86 AddFamilyMemberChooserSheet two-card chooser, FamilyMemberFormView regular vs expecting modes, AvatarPhotoService 400px resize → avatars bucket → 1-year signed URL, AddHouseholdStaffSheet `memberType:'home_manager'` routing through HouseholdInviteCoordinator, Phase 95 PR 39 destructive-UI gating (`isStaffUser` hides Delete Account), MaintenanceViewModel.assignedUserName " · Home Manager" / " · Staff" suffix, fetchFamilyMembers server-side filter `member_type IN ('family', NULL)`, sortedByAge extension, photoUrl field (not profilePhotoUrl per MEMORY.md gotcha)
+- B4 brand voice CORRECT throughout: "Add family members so Alfred and Chez can match documents..." (Alfred = matching/analysis, Chez = task coordination); "Send invite to join Chez" (concierge brand for invitations)
+- B3 zero em dashes in user-facing copy
+- Phase 95 gap #55 verified: SettingsView.swift:347-369 wraps "Delete My Account" in `if !appState.isStaffUser`; AppState.swift:22+41 caches isStaffUser from member_type
+
