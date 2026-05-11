@@ -1197,3 +1197,34 @@ Verification subagent captured `before / after` screenshot evidence for all 13 f
 
 Verification subagent noted that fix 13 covered the in-card title (`Text(system.name.humanizedSystemName)` at SystemDetailView.swift:744) but the nav-bar title (`navigationTitle(system.displayName)` at line 135) still rendered the raw snake_case via the existing `displayName` computed property. Updated `HomeSystemRow.displayName` extension in `DatabaseModels.swift:1004-1018` to apply `.humanizedSystemName` as the final transform after manufacturer + model stripping. Nav title + every other call site of `system.displayName` (1298 SystemDetailView, 6485 PropertyDetailView, ContractorDirectoryView, AddRecurringServiceSheet, VendorReviewForm) now picks up the humanization automatically.
 
+
+---
+
+## Round D — Wave D-1 (Sections 2d, 2f, 2g, 2h, 2i — Vendor coverage + Chez delegation + routines lifecycle) — PASS
+
+Sim drive verified 15 rows across Vendor coverage sweep, AddVendorSheet variants, ContractorDetailView with ChezOwnsToggle, RoutineDetailView, RoutineEditSheet add + edit modes, Archive routine confirmation (C-1 REDO fix verified working). 11 screenshots saved to `/tmp/claude-c-evidence/d1-vendor-routines/`.
+
+### Wave D-1 Finding 1 — "Ask Alfred to find a pro" label/destination — INVESTIGATE
+
+- Category: `verification` (subagent ambiguity)
+- Severity: `low`
+- Surface: PropertyDetailView.swift:5400 + 5571 — both buttons labeled "Ask Alfred to find a pro" call `showAlfredChat = true` per source
+- Subagent reported the button "routes to AddVendorSheet chooser, not Alfred chat" — but source code shows it should open Alfred chat sheet. Either (a) the subagent misperceived (chat may suggest AddVendor as a follow-up), OR (b) there's an intermediate sheet I'm not seeing in source.
+- Suggested action: confirm flow in sim — if it does indeed land on AddVendorSheet, label is wrong (should say "Have Chez find a pro" or "Add Vendor" since it's not actually Alfred chat). If it lands on Alfred chat with helpful prefill, label is correct.
+- Status: `deferred` — needs Tom's eyes on the actual flow
+
+### Wave D-1 verified passes
+
+- Vendor Coverage "Tasks needing a vendor" sheet with 3 uncovered category cards
+- FindLocalVendorSheet renders top-rated + suggested vendors for Bethel CT + DO IT FOR ME card with ChezEntryButton "Have a Chez Home Manager find one for me — Chez researches vetted local pros and replies within 1 business day"
+- AddVendorSheet chooser with 4 paths (Import from Contacts / Website / Browse local pros / Enter Manually)
+- Enter Manually form with canonical SystemCategoryRegistry specialty picker
+- ContractorDetailView: header card + 4 contact actions + Schedule a visit (salmon CTA) + Ask a question (secondary) + Make Chez point of contact toggle + ROUTINES section + ADD A BILL section
+- RoutineDetailView with rich ChezEntryButton context (routine_id + kind + cadence + vendor + setup_state)
+- RoutinesListView with 5 routines + "+" → Add program sheet
+- RoutineEditSheet add-mode: Type picker + Service provider + Cadence (weekly with S-M-T-W-T-F-S day chips) + Time of day toggle + 12-chip Active months strip with All/Apr-Nov/May-Sep/Dec-Mar presets + Reminders + Notes
+- RoutineEditSheet edit-mode: all above + Service provider with linked contractor + 'Have Chez own scheduling' ChezOwnsToggle + 'Pause routine' toggle + Delete routine destructive button
+- Archive routine confirmation dialog (C-1 REDO fix verified): "Archive this routine? — Archiving A4 Chimney Routine hides its schedule and unlinks any vendor tasks..."
+- B3 zero em-dashes across all visited vendor + routine surfaces
+- B4 Chez brand voice consistent throughout
+
