@@ -851,7 +851,12 @@ struct ScenarioResultView: View {
                 .foregroundStyle(HavenColors.textSecondary)
 
             if let note = result.confidenceNote {
-                Text("— \(note)")
+                // Phase 95.1 fix: was `Text("— \(note)")`. Em dashes in
+                // user-facing copy violate CLAUDE.md ("read as AI-
+                // generated to Tom's audience"). Parens read as a
+                // natural parenthetical explanation and preserve the
+                // visual hierarchy without the typographic tell.
+                Text("(\(note))")
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)
                     .lineLimit(2)
