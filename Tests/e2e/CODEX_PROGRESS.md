@@ -46,6 +46,17 @@ _(Codex maintains. Format: bullet list of open question topics + age in hours.)_
 
 _(Codex appends here.)_
 
+## 2026-05-11 01:20:29 UTC — fix_shipped: P0-2 Chez request source context
+
+- batch_id: p0-2-chez-entry-context
+- last_commit: ee5f7ee03eafc6543119c1a838108de7e56948ca
+- next_planned: P0-3 dashboard simplification gap documentation
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 4, "B": 1, "C": 0, "D": 0, "E": 2 }
+- findings_this_batch: { verification_pass: 4, verification_fail: 0, gap_found: 0, ui_quality: 1, persistence: 0 }
+
+---
+
 ## 2026-05-11 00:49:08 UTC — fix_shipped: P0-1 RoutineDetailView CTA legibility
 
 - batch_id: p0-1-routine-detail-cta
