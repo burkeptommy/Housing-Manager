@@ -46,6 +46,17 @@ _(Codex maintains. Format: bullet list of open question topics + age in hours.)_
 
 _(Codex appends here.)_
 
+## 2026-05-11 00:49:08 UTC — fix_shipped: P0-1 RoutineDetailView CTA legibility
+
+- batch_id: p0-1-routine-detail-cta
+- last_commit: 840a9f52f476ebb31b24be3f286352d497f93608
+- next_planned: P0-2 ChezEntryButton context audit and RE: rendering fixes
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 0, "B": 1, "C": 0, "D": 0, "E": 1 }
+- findings_this_batch: { verification_pass: 1, verification_fail: 0, gap_found: 0, ui_quality: 1, persistence: 0 }
+
+---
+
 ## 2026-05-11 00:27:45 UTC — batch_start: Round C kickoff
 
 - batch_id: round-c-init
