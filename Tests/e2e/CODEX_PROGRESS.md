@@ -204,3 +204,17 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 04:42:00 UTC — batch_end: Wave C-5 Section 6 Email forwarding
+
+- batch_id: round-c-c5-section-6-email-forwarding
+- last_commit: 065136bc (Wave C-4 heartbeat)
+- result: PARTIAL — 19 rows verified, 4 findings (3 fixed, 1 deferred)
+- next_planned: Wave C-6 Section 8 Family + invites + home manager + staff
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 7, "B": 16, "C": 1, "D": 3, "E": 2 }
+- findings_this_batch: { verification_pass: 19, verification_fail: 0, gap_found: 0, ui_quality: 4, persistence: 0 }
+- fix_shipped: ProjectEmailView Alfred→Chez rebrand + Inbox sub-tab "Needs Action" picker-label shortening + ChezMessageBubble system message rectangle shape
+- author: Claude
+
+---

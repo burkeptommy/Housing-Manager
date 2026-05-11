@@ -1,9 +1,9 @@
 import SwiftUI
 import Contacts
 
-/// Shows the household's forwarding email address for Alfred.
+/// Shows the household's forwarding email address for Chez.
 /// Users can forward contractor quotes, documents, vendor info, and anything
-/// home/estate related. Alfred processes and organizes everything automatically.
+/// home related. Chez processes and organizes everything automatically.
 struct ProjectEmailView: View {
     @State private var emailAddress: String?
     @State private var isLoading = true
@@ -37,7 +37,7 @@ struct ProjectEmailView: View {
                         .foregroundStyle(HavenColors.textPrimary)
                         .multilineTextAlignment(.center)
 
-                    Text("Forward anything related to your home, vendors, or family to this address. Alfred will automatically extract vendors, analyze quotes, categorize documents, and create projects for you.")
+                    Text("Forward anything related to your home, vendors, or family to this address. Chez will automatically extract vendors, analyze quotes, categorize documents, and create projects for you.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -64,19 +64,19 @@ struct ProjectEmailView: View {
                 // Allowed senders whitelist
                 allowedSendersCard
 
-                // What Alfred does with forwarded emails
+                // What Chez does with forwarded emails
                 HavenCard {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-                        Text("WHAT ALFRED DOES")
+                        Text("WHAT CHEZ DOES")
                             .font(HavenTypography.uiSectionHeader)
                             .tracking(1.5)
                             .foregroundStyle(HavenColors.textTertiary)
 
-                        alfredAction(icon: "doc.text.magnifyingglass", title: "Contractor Quotes", detail: "Analyzes every line item against market rates, creates a project, and adds the vendor")
-                        alfredAction(icon: "doc.fill", title: "Documents", detail: "Categorizes insurance, tax, vehicle, and home documents. Extracts dates and key details.")
-                        alfredAction(icon: "person.crop.circle.badge.plus", title: "Vendor Info", detail: "Adds contractors and service providers to your vendor directory automatically")
-                        alfredAction(icon: "wrench.and.screwdriver.fill", title: "Home Systems", detail: "Extracts appliance details, model numbers, and warranty info from manuals and inspections")
-                        alfredAction(icon: "calendar.badge.clock", title: "Maintenance", detail: "Creates maintenance tasks from inspection reports and service recommendations")
+                        chezAction(icon: "doc.text.magnifyingglass", title: "Contractor Quotes", detail: "Analyzes every line item against market rates, creates a project, and adds the vendor")
+                        chezAction(icon: "doc.fill", title: "Documents", detail: "Categorizes insurance, tax, vehicle, and home documents. Extracts dates and key details.")
+                        chezAction(icon: "person.crop.circle.badge.plus", title: "Vendor Info", detail: "Adds contractors and service providers to your vendor directory automatically")
+                        chezAction(icon: "wrench.and.screwdriver.fill", title: "Home Systems", detail: "Extracts appliance details, model numbers, and warranty info from manuals and inspections")
+                        chezAction(icon: "calendar.badge.clock", title: "Maintenance", detail: "Creates maintenance tasks from inspection reports and service recommendations")
                     }
                 }
 
@@ -90,7 +90,7 @@ struct ProjectEmailView: View {
 
                         howItWorksStep(number: "1", text: "You receive an email with a quote, document, or vendor info")
                         howItWorksStep(number: "2", text: "Forward it to your household email above")
-                        howItWorksStep(number: "3", text: "Alfred reads it, extracts everything useful, and organizes it in Chez")
+                        howItWorksStep(number: "3", text: "Chez reads it, extracts everything useful, and organizes it for you")
                         howItWorksStep(number: "4", text: "Check your dashboard for a summary of what was created")
                     }
                 }
@@ -376,7 +376,7 @@ struct ProjectEmailView: View {
 
     // MARK: - Helpers
 
-    private func alfredAction(icon: String, title: String, detail: String) -> some View {
+    private func chezAction(icon: String, title: String, detail: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
@@ -489,12 +489,12 @@ struct ProjectEmailView: View {
     private func saveAsContact(email: String) {
         let contact = CNMutableContact()
         contact.givenName = "Chez"
-        contact.familyName = "Alfred"
+        contact.familyName = "Home"
         contact.organizationName = "Chez Home"
         contact.emailAddresses = [
             CNLabeledValue(label: CNLabelWork, value: email as NSString)
         ]
-        contact.note = "Forward contractor quotes, home documents, insurance, vendor info, and anything related to your home to this address. Alfred processes everything automatically."
+        contact.note = "Forward contractor quotes, home documents, insurance, vendor info, and anything related to your home to this address. Chez processes everything automatically."
 
         let store = CNContactStore()
         store.requestAccess(for: .contacts) { granted, _ in

@@ -15,6 +15,18 @@ struct InboxView: View {
         /// dedicated browse surface for everything they've handed off
         /// to the Chez Home Manager.
         case chez = "Chez"
+
+        /// Short label used in the segmented Picker so 4 segments fit
+        /// without truncating. The raw value stays "Needs Action" for
+        /// analytics + persistence + code lookups.
+        var pickerLabel: String {
+            switch self {
+            case .needsAction: return "Action"
+            case .unread: return "Unread"
+            case .all: return "All"
+            case .chez: return "Chez"
+            }
+        }
     }
 
     @State private var showDeleteConfirm = false
@@ -52,7 +64,7 @@ struct InboxView: View {
     private var filterPicker: some View {
         Picker("Filter", selection: $filter) {
             ForEach(InboxFilter.allCases, id: \.self) { f in
-                Text(f.rawValue).tag(f)
+                Text(f.pickerLabel).tag(f)
             }
         }
         .pickerStyle(.segmented)

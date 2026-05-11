@@ -27,17 +27,19 @@ struct ChezMessageBubble: View {
     // MARK: System (centered)
     private var systemBody: some View {
         HStack {
-            Spacer()
+            Spacer(minLength: 32)
             Text(message.content)
                 .font(HavenTypography.caption)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
                 .background(
-                    Capsule().fill(HavenColors.beige200.opacity(0.6))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(HavenColors.beige200.opacity(0.6))
                 )
-            Spacer()
+            Spacer(minLength: 32)
         }
         .padding(.vertical, 4)
     }

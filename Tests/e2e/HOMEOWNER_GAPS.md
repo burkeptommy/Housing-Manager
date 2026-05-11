@@ -453,3 +453,50 @@ No current-run findings yet.
 - B4 brand voice: correct nuance — Alfred not invoked in invoice ingestion (presented as system "Invoice Intelligence"); Chez correctly used for concierge action copy; neutral "we" voice on suggestion cards
 - B11 density: 8 conditional sections in InvoiceReviewSheet but real-world render is 2-4; gated correctly
 
+
+---
+
+## Round C — Wave C-5 (Section 6 Email forwarding pipeline)
+
+### Wave C-5 verification summary
+
+- Subagent: c5-section-6-email-forwarding, returned PARTIAL with 4 findings
+- 19 rows verified via source; 4 found and triaged; 7 deferred per scope (would need SendGrid forwarding or mutate fixture)
+- Sim verified rows 6.14 (Inbox empty-state CTA pair — primary salmon "View Your Chez Email" + secondary ChezEntryButton); 6.27 (4 sub-tabs visible); 6.28 (Chez sub-tab renders ChezRequestsListView with ACTIVE section)
+
+### Wave C-5 Finding 1 — ProjectEmailView Phase 80 brand-voice misses — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `major` (whole user-facing surface still on pre-Chez-v1 brand)
+- Surface: `Haven/Features/Property/Views/ProjectEmailView.swift` lines 4, 6 (comments), 40, 70, 75-79 (incl. function helper `alfredAction`), 93, 492, 497
+- Evidence: The Household Email view's pitch text still says "Alfred will automatically extract vendors, analyze quotes, categorize documents, and create projects for you" and the section header says "WHAT ALFRED DOES". This is the Chez ingestion pipeline (forwarding → extraction → project/vendor/document creation) — Chez's concierge domain, not Alfred's chat/analysis domain. Line 93 was the clearest mixed-brand sentence: "Alfred reads it, extracts everything useful, and organizes it in Chez". The contacts-save flow saved a contact named "Chez Alfred" with a note that said "Alfred processes everything automatically."
+- Fix: renamed all 7 references to Chez. Renamed helper `alfredAction(...)` → `chezAction(...)`. Contact lastName "Alfred" → "Home" (so the saved contact is "Chez Home", organization stays "Chez Home"). All copy now consistently positions email forwarding as Chez concierge work.
+- Status: `fixed` in batch commit. Build clean.
+
+### Wave C-5 Finding 2 — Inbox sub-tab "Needs Action" truncates to "Needs Acti..." — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `low`
+- Surface: `Haven/Features/Inbox/InboxView.swift:53` segmented Picker
+- Evidence: 4 sub-tabs at fixed segment width — "Needs Action" 11 chars exceeds segment, truncates. Confirmed in screenshots `/tmp/claude-c-evidence/c5-section-6/02-04-inbox-*.png`.
+- Fix: added `InboxFilter.pickerLabel` computed property that maps `.needsAction → "Action"` and preserves all other labels at their full length. The Picker now uses `pickerLabel` while `rawValue` stays "Needs Action" for analytics + persistence + code lookups. Single change, no callsite breakage.
+- Status: `fixed` in batch commit.
+
+### Wave C-5 Finding 3 — Chez request titles truncate in list cells + nav — DEFERRED
+
+- Category: `ui_quality_finding`
+- Severity: `low`
+- Surface: ChezRequestRowCard list-cell title `lineLimit(2)`; ChezRequestDetailView nav title single-line
+- Evidence: Auto-generated request titles ("Find a vendor for: A4 Sanitize pet areas synthetic turf", "Find a vendor for: Septic pumping every 3 years") clip at the line limit. The "Find a vendor for:" prefix is redundant when the category icon already implies the action.
+- Suggested fix: either bump list-cell title to lineLimit(3), or strip the "Find a vendor for:" prefix when category icon is present, or generate shorter task-focused titles on the server side.
+- Status: `deferred` — multi-file design call; not blocking Round C signoff. Logged for product/design follow-up.
+
+### Wave C-5 Finding 4 — ChezMessageBubble system message bubble shape — FIXED
+
+- Category: `ui_quality_finding`
+- Severity: `low`
+- Surface: `Haven/Features/ChezRequests/Components/ChezMessageBubble.swift:28-43` system body
+- Evidence: The system-role audit-trail message ("Customer asked Chez to source a vendor for this task...") used `Capsule().fill(...)` background. Capsule's corner radius is min(width,height)/2 — for multi-line text the geometry forces an oval / circular look with cropped corners. Screenshot: `/tmp/claude-c-evidence/c5-section-6/06-chez-request-detail.png`.
+- Fix: switched from `Capsule()` to `RoundedRectangle(cornerRadius: 12, style: .continuous)`. Added `.fixedSize(horizontal: false, vertical: true)` so multi-line text breaks correctly without collapsing the rectangle. Bumped horizontal padding 12 → 14 and vertical 6 → 8 for breathing room. Added `Spacer(minLength: 32)` on both sides so wider system messages don't span the full content width.
+- Status: `fixed` in batch commit.
+
