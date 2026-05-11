@@ -214,6 +214,16 @@ No current-run findings yet.
 
 ## Section 19 - Dashboard Quick Actions And Interactions
 
+### Section 22 B11 - Dashboard simplification needed
+
+- Category: `ui_quality_finding`
+- Severity: `moderate`
+- Tags: `needs-simplification`
+- Evidence: Tom's hands-on Round C kickoff review flagged the post-quiz Dashboard as visually overwhelming when `HomeCoverageHero`, Chez ownership card, `NEEDS YOUR ATTENTION`, `UPCOMING`, and `RECENT ACTIVITY` all stack in one scroll. Current simulator evidence: `/tmp/codex-evidence/p0/p0-3-dashboard-density.png`.
+- Reproduction: Launch a seeded post-quiz homeowner, land on Dashboard, and scroll through the first viewport plus immediately following sections. The page presents several dense decision and activity surfaces before the user reaches lower-dashboard actions.
+- Suggested fix: Product/design decision required. Options: merge related status surfaces into one prioritized home-status module; demote secondary activity modules below primary actions; use progressive disclosure for less urgent lists; or split competing sections behind focused tabs/segments.
+- Status: `deferred` to Tom/product
+
 ### Row 19.6 - Needs Your Attention See all route landed on hub, not calendar
 
 - Category: `gap_found`
