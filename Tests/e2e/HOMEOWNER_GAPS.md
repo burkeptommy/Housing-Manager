@@ -1119,3 +1119,56 @@ Sim drive sampled 4 surfaces (Dashboard / Tasks V5 / Property Overview / Inbox C
 - Dynamic Type scales body text and card titles at XXXL (tab bar caveat noted)
 - Salmon-on-white WCAG ratio 3.11:1 — passes 3:1 for large text, fails 4.5:1 for small body (matches codebase rule "Salmon for actions only")
 
+
+---
+
+# Round C Gap Triage — explicit dispositions for all 31 items
+
+Disposition codes:
+- **FIX-NOW** — will ship a code/doc fix in this session
+- **DEFER-PRODUCT** — needs Tom's product decision; not blocking signoff
+- **DEFER-DESIGN** — needs design-system decision (multi-file, layout, taxonomy)
+- **DATA-QUALITY** — fixture or seed-data cleanup, not a code bug
+- **INFO** — informational only, no action needed
+
+| # | Gap | Disposition | Action |
+|---|---|---|---|
+| 1 | Section 11b matrix fundamentally stale (PropertyDetailView Maintenance sub-tab removed by Phase 67) | **FIX-NOW** | Rewrite Tests/e2e/HOMEOWNER_COMPLETE_TEST_MATRIX.md Section 11b to point at TasksHubView V5 + MaintenanceScheduleView Phase 60 architecture |
+| 2 | HouseholdStrip + HouseholdStaffStrip orphaned in code (zero callsites) | **DEFER-PRODUCT** | Update CLAUDE.md Dashboard scroll order to match Phase 80+ Chez-first reality. Leave files for now (cheap to re-mount; product call) |
+| 3 | Dark mode CLAIMED in CLAUDE.md but Info.plist locks Light | **FIX-NOW** | Update CLAUDE.md to "Light-only for v1; HavenColors has adaptive tokens ready when dark mode ships" |
+| 4 | Tab bar labels don't scale with Dynamic Type XXXL | **DEFER-DESIGN** | Tab bar font is SwiftUI standard; iOS doesn't apply Dynamic Type to TabView labels by default. Would need custom tab bar to fix. Out of scope for fix-on-the-fly |
+| 5 | Property hero "100 Systems · 104 Priorities" doesn't reconcile | **FIX-NOW** | Investigate priorityCount in PropertyDetailViewModel; cap at systemCount or align denominators |
+| 6 | `recommendedServicesRow` defined but NOT mounted | **FIX-NOW** | Decide: keep dead code OR remove. Remove. (RecommendedServicesView still reachable via Tasks tab BrowseBand) |
+| 7 | CLAUDE.md "ADD OR DISCOVER" section doesn't exist in code | **FIX-NOW** | Update CLAUDE.md Contacts Hub section to describe the actual 3-option action sheet |
+| 8 | MechanicPickerSheet shows ALL contractors regardless of trade | **DEFER-DESIGN** | Needs SystemCategoryRegistry "Automotive" category + filter. Multi-file change. Defer |
+| 9 | AddUtilitySheet provider list lacks region-aware sort | **DEFER-DESIGN** | Port Phase 19h logic; non-trivial extraction. Defer |
+| 10 | snake_case + slug bleed across system + vendor names (compound, 3 waves) | **FIX-NOW** | Add `String.humanizedSystemName` extension + apply to display sites |
+| 11 | visualize-room Edge Function deployed but no iOS surface | **DEFER-PRODUCT** | Confirmation needed: server-only OR iOS work descoped. Update matrix Row 11.55 to "deferred for v1" |
+| 12 | Phase 95 PR 29 three-state recall acknowledgment unshipped | **DEFER-PRODUCT** | Either descope from matrix OR ship the UI. Product call |
+| 13 | TasksHubView label "Contractor" vs canonical "Handyman" | **FIX-NOW** | Update CLAUDE.md Tasks Tab section to note the user-facing label is "Contractor" (internal still "handyman") |
+| 14 | Vendors sub-tab in app vs "Contacts" in matrix | **FIX-NOW** | Update matrix Section 11d header to "Vendors" |
+| 15 | EditVehicleSheet mileage field has no visible label when populated | **FIX-NOW** | Convert to HStack-with-label pattern |
+| 16 | CLAUDE.md "Recalls DisclosureGroup always shown" but code conditional | **FIX-NOW** | Update CLAUDE.md vehicle section to "DisclosureGroup conditional on non-empty recalls" |
+| 17 | FamilyMember sort anomaly | **DATA-QUALITY** | Fixture E2E Tester DOB quirk; sortedByAge() logic verified correct |
+| 18 | Chez request title truncation | **DEFER-DESIGN** | Multi-surface design call; either bump lineLimit OR shorten auto-generated prefix |
+| 19 | Equipment catalog double-brand prefix ("Bosch Bosch 800") | **FIX-NOW** | Add brand-vs-model dedup in catalog row display |
+| 20 | Equipment catalog pick doesn't update Category | **DEFER-DESIGN** | Needs guard logic (mismatch warning OR auto-switch). Multi-decision flow |
+| 21 | Add Utility type picker mixes utilities + services | **DEFER-DESIGN** | Rename sheet OR split. Taxonomy decision |
+| 22 | Phase 56.5 two-bucket UI dead code in MaintenanceScheduleView | **FIX-NOW** | Remove `personalBucketBody` + `scheduledBucketBody` if they're not called |
+| 23 | MaintenanceLayout enum naming reversed (.list renders timelineContent) | **DEFER-DESIGN** | Cosmetic; renaming risks UserDefaults migration. Defer to next phase touching this view |
+| 24 | CLAUDE.md drift: "88 categories in 15 groups" | **FIX-NOW** | Update to "14 groups / ~97 categories post-Chez-v1" |
+| 25 | ProjectEmailView dismiss button missing in sheet context | **FIX-NOW** | Add toolbar Done item with conditional rendering |
+| 26 | Dashboard vendor name duplication ("Schedule Bethel Lawn Care · Bethel Lawn Care") | **FIX-NOW** | Apply truncatedVendorName resolver to skip duplicate when title already contains vendor |
+| 27 | Maintenance hub vehicle row → blank navigation view | **FIX-NOW** | Find the nav destination handler and wire to VehicleDetailView |
+| 28 | Dashboard density (Round A finding, still deferred) | **DEFER-PRODUCT** | Tom's review flagged this; needs design pass |
+| 29 | Duplicate utility providers in seed data | **DATA-QUALITY** | One-off SQL sweep on utility_providers — defer to a data hygiene task |
+| 30 | Photo evidence + voice note absent from MarkCompleteForm | **DEFER-PRODUCT** | v1 scope decision |
+| 31 | GapAnalysisView dormant (only #Preview wired) | **INFO** | No action; source fix d30de861 is correct for if/when reintroduced |
+
+**Triage summary:**
+- 14 FIX-NOW items (will ship in batches below)
+- 9 DEFER-PRODUCT items (Tom decides)
+- 5 DEFER-DESIGN items (multi-file design pass)
+- 2 DATA-QUALITY items (fixture/seed cleanup)
+- 1 INFO (no action)
+

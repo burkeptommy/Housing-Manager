@@ -639,19 +639,27 @@ For each sub-tab: open → render → exercise primary interactions → close.
 | 11.8 | "PRIMARY RESIDENCE" eyebrow — should NOT be salmon (the morning fix) | UI | |
 | 11.9 | "X Priorities" stat — should NOT be salmon (the morning fix) | UI | |
 
-### 11b. Maintenance
+### 11b. Maintenance — REWRITTEN POST-PHASE-67 (Round C C-8 finding)
+
+⚠️ PropertyDetailView no longer has a `.maintenance` sub-tab case. `PropertyDetailTab` enum is `[overview, systems, projects, vendors, documents]`. The Phase 50/Build 89 Maintenance sub-tab described in prior versions of this matrix was REMOVED by Phase 67. Maintenance work now lives in TWO surfaces, each reachable from the Tasks tab:
+
+- **TasksHubView V5 → MaintenanceTabView** (Phase 67): HeaderSwitcher (Maintenance / Contractor) → YearRibbon (4 season tiles + NOW pill) → IndigoGradientCard MiniHero (programs / decisions / bundle-ready stats) → Active Programs list → Vehicles row → BrowseBand (Recommended for your home)
+- **MaintenanceScheduleView** (Phase 60): season-tile or "View full schedule" deep-link → Year-at-a-glance hero → stats-pill filter (Overdue / This Week / This Month / Later) → "+ N recurring" footnote → ONGOING ROUTINES horizontal strip → List or Timeline layout content
+
+Rows to verify on those two surfaces:
 
 | # | Scenario | Owner | Notes |
 |---|---|---|---|
-| 11.10 | Maintenance tab order: overdue banner → upcoming vendor visits → your tasks → vendor follow-ups → routines row → handyman punch list row → recommended services → home systems → seasonal overview → view-full-schedule footer → service history | UI | |
-| 11.11 | Stats-pill filter (Overdue / This Week / This Month / Later) — tap to toggle | UI | |
-| 11.12 | "Showing {label}" caption with Clear button | UI | |
-| 11.13 | Layout toggle (List / Timeline) per Phase 56.4 | UI | |
-| 11.14 | Two-bucket UI: To Schedule + Scheduled (Phase 56.5 / Build 92) | UI | |
-| 11.15 | DuplicateReviewBanner (Phase 56.5 / Build 92, patched Build 93) | UI | |
+| 11.10 | Tasks tab V5 hero section order (HeaderSwitcher → YearRibbon → MiniHero → Active Programs → Vehicles → BrowseBand) | UI | |
+| 11.11 | MaintenanceScheduleView stats-pill filter (Overdue / This Week / This Month / Later) — tap to toggle | UI | |
+| 11.12 | MaintenanceScheduleView "Showing {label}" caption with Clear button when filter active | UI | |
+| 11.13 | MaintenanceScheduleView layout toggle (List / Timeline icon) — note enum naming reversed (`.list` renders timelineContent, `.calendar` renders calendarContent — Phase 56.4 deliberate to preserve UserDefaults) | UI | |
+| 11.14 | ~~Two-bucket UI: To Schedule + Scheduled (Phase 56.5)~~ — **DEAD CODE post-Phase-60.** `personalBucketBody` + `scheduledBucketBody` exist in source but neither is called. Phase 60 replaced with timeline content. | DEPRECATED | |
+| 11.15 | MaintenanceScheduleView DuplicateReviewBanner (Phase 56.5 / Build 92, patched Build 93) — gated on non-empty detectedDuplicates | UI | |
 | 11.16 | Tap a duplicate match → MaintenanceDuplicateSheet → "Keep both" / "Merge into..." with progress indicator | UI | |
-| 11.17 | Inline handyman quick-add per Phase 56.6 (Build 94) — "Or add to handyman list" link on findContractor card | UI | |
-| 11.18 | Compact routines strip (Phase 56.6 / Build 94) — horizontal scroll of ~44pt pills | UI | |
+| 11.17 | Inline handyman quick-add (Phase 56.6 / Build 94) — "Or add to handyman list" / "Or have Chez source one" link on findContractor card | UI | |
+| 11.18 | MaintenanceScheduleView compact routines strip (Phase 56.6 / Build 94) — "ONGOING ROUTINES · N" horizontal scroll of ~44pt routine pills | UI | |
+| 11.18b | IndigoGradientCard "decisions" stat in MiniHero shows salmon ONLY when value > 0 (Round C C-9 fix `cb005dff`) | UI | |
 
 ### 11c. Systems
 
@@ -671,7 +679,7 @@ For each sub-tab: open → render → exercise primary interactions → close.
 | 11.30 | Sub-system hierarchy (parent_system_id) renders correctly | UI | |
 | 11.31 | Add new system via AddSystemView → category picker → required-fields form | UI | |
 
-### 11d. Contacts (Phase 56)
+### 11d. Vendors (in-app label; called "Contacts" historically — Phase 56)
 
 | # | Scenario | Owner | Notes |
 |---|---|---|---|
@@ -707,7 +715,7 @@ Per Section 4 above. Sub-tab is filtered to documents linked to this property.
 | 11.52 | Project documents linked via document.project_id | UI | |
 | 11.53 | Project files via project_files table | UI | |
 | 11.54 | Project contacts via project_contacts table | UI | |
-| 11.55 | Project visualizations via visualize-room | UI | |
+| 11.55 | ~~Project visualizations via visualize-room~~ — **Edge Function deployed (`supabase/functions/visualize-room/index.ts`, 382 lines Decor8 integration) but NO iOS surface** (Round C C-10 finding). No `ProjectVisualization` data model, no view, no service caller. Either server-only / API-only for v1, or iOS wiring descoped. | DEFERRED | |
 | 11.56 | Email forwarding to project (project-specific email address per ProjectEmailView) | Cross | |
 | 11.57 | Email→Project matching multi-signal (sender + subject + category) | E2E | |
 | 11.58 | Insurance claim sub-projects | UI | |
