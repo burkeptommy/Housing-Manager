@@ -223,6 +223,8 @@ struct QuoteAnalysisView: View {
         var c: [String: String] = [
             "project_id": project.id.uuidString,
             "project_name": project.name,
+            "source_entity_type": "quote",
+            "source_entity_label": analysis.vendor?.name.map { "Quote from \($0)" } ?? "Quote for \(project.name)",
         ]
         if let vendor = analysis.vendor?.name { c["vendor"] = vendor }
         if let total = analysis.overallAssessment?.totalQuoted {

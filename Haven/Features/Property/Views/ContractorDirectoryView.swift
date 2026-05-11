@@ -307,9 +307,14 @@ struct ContractorDirectoryView: View {
                     if let context = delegationContext {
                         ctx["task_id"] = context.task.id.uuidString
                         ctx["task_title"] = context.task.title
+                        ctx["source_entity_type"] = "vendor_search"
+                        ctx["source_entity_label"] = "Vendor search for \(context.task.title)"
                         if let cat = context.systemCategory {
                             ctx["system_category"] = cat
                         }
+                    } else {
+                        ctx["source_entity_type"] = "vendor_search"
+                        ctx["source_entity_label"] = "Vendor search"
                     }
                     NotificationCenter.default.post(
                         name: .openChezRequestComposer,

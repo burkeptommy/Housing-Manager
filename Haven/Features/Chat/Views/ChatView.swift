@@ -299,7 +299,11 @@ struct ChatView: View {
     /// Includes the active conversation context (when set) so Tom can
     /// pick up the thread without asking the user to recap.
     private var chezContextFromAlfred: [String: String] {
-        var c: [String: String] = ["_source": "alfred_chat"]
+        var c: [String: String] = [
+            "_source": "alfred_chat",
+            "source_entity_type": "chat",
+            "source_entity_label": "Chez chat",
+        ]
         if let contextType, !contextType.isEmpty {
             c["alfred_context_type"] = contextType
         }
@@ -308,6 +312,7 @@ struct ChatView: View {
         }
         if let contextName, !contextName.isEmpty {
             c["alfred_context_name"] = contextName
+            c["source_entity_label"] = contextName
         }
         // If there's a recent message thread, attach the user's last
         // question so Tom has the gist of what they were asking.

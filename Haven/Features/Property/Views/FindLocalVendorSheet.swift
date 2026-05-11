@@ -849,6 +849,8 @@ struct FindLocalVendorSheet: View {
             "town": town,
             "state": state,
             "system_category": systemCategory,
+            "source_entity_type": "vendor_search",
+            "source_entity_label": "\(categoryDisplayName) in \(town), \(state)",
         ]
         if let task {
             c["task_title"] = task.title

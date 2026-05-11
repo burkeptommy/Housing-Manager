@@ -37,7 +37,7 @@ struct ChezRequestComposeSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     heroCard
-                    if !viewModel.contextLines.isEmpty {
+                    if viewModel.hasContextCard {
                         contextCard
                     }
                     if !viewModel.isCategoryFixed {
@@ -152,6 +152,12 @@ struct ChezRequestComposeSheet: View {
             Text("RE:")
                 .font(HavenTypography.uiSectionHeader)
                 .foregroundStyle(HavenColors.textSecondary)
+            if let sourceEntityTitle = viewModel.sourceEntityTitle {
+                Text(sourceEntityTitle)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ForEach(viewModel.contextLines, id: \.key) { pair in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(pair.key)

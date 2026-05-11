@@ -159,6 +159,8 @@ struct VendorCoverageSheet: View {
                         "context": [
                             "system_category": item.systemName,
                             "_source": "vendor_coverage_sheet",
+                            "source_entity_type": "system",
+                            "source_entity_label": item.systemName,
                         ],
                     ]
                 )

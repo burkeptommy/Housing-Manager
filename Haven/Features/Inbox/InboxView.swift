@@ -261,7 +261,11 @@ struct InboxView: View {
                 category: .general,
                 label: "Need help with anything? Ask Chez",
                 caption: "Chez replies within 1 business day.",
-                context: ["_source": "inbox_empty_state"]
+                context: [
+                    "_source": "inbox_empty_state",
+                    "source_entity_type": "inbox",
+                    "source_entity_label": "Inbox",
+                ]
             )
             .padding(.top, 8)
 

@@ -63,6 +63,8 @@ struct QuoteComparisonView: View {
     private var chezQuoteComparisonContext: [String: String] {
         var c: [String: String] = [
             "_source": "quote_comparison",
+            "source_entity_type": "quote_comparison",
+            "source_entity_label": "Quote comparison",
             "quote_count": String(quotes.count),
         ]
         let names = quotes.compactMap { $0.vendorName }.joined(separator: ", ")

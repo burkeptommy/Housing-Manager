@@ -1152,7 +1152,11 @@ struct DashboardView: View {
                 category: .general,
                 label: "Need help? Ask Chez",
                 caption: "Chez replies within 1 business day.",
-                context: [:]
+                context: [
+                    "_source": "dashboard_post_quiz",
+                    "source_entity_type": "dashboard",
+                    "source_entity_label": "Dashboard concierge request",
+                ]
             )
             .padding(.top, HavenTheme.spacing4)
         }

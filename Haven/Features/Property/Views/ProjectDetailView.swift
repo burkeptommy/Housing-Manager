@@ -1612,6 +1612,8 @@ struct ProjectDetailView: View {
             "project_name": liveProject.name,
             "project_category": liveProject.category,
             "project_status": liveProject.status,
+            "source_entity_type": "project",
+            "source_entity_label": liveProject.name,
         ]
         if isInsuranceClaim { c["entry_type"] = "insurance_claim" }
         if isDIY { c["diy"] = "true" }
@@ -1894,4 +1896,3 @@ struct ProjectDetailView: View {
         .clipShape(Capsule())
     }
 }
-

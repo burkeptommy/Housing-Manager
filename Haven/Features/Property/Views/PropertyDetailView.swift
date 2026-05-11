@@ -1481,6 +1481,8 @@ struct PropertyDetailView: View {
         var ctx: [String: String] = [
             "property_id": property.id.uuidString,
             "property_name": property.name,
+            "source_entity_type": "property",
+            "source_entity_label": property.name,
         ]
         if let town = property.city, !town.isEmpty { ctx["town"] = town }
         if let state = property.state, !state.isEmpty { ctx["state"] = state }

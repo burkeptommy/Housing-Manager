@@ -1036,27 +1036,41 @@ struct VehicleDetailView: View {
     }
 
     private var chezVehicleMechanicContext: [String: String] {
-        var c: [String: String] = ["_source": "vehicle_mechanic_card"]
+        var c: [String: String] = [
+            "_source": "vehicle_mechanic_card",
+            "source_entity_type": "vehicle",
+        ]
         if let v = viewModel.vehicle {
             c["vehicle_id"] = v.id.uuidString
             let parts = [v.year.map(String.init), v.make, v.model].compactMap { $0 }
-            if !parts.isEmpty { c["vehicle"] = parts.joined(separator: " ") }
+            if !parts.isEmpty {
+                let vehicleLabel = parts.joined(separator: " ")
+                c["vehicle"] = vehicleLabel
+                c["source_entity_label"] = vehicleLabel
+            }
             if let trim = v.trim, !trim.isEmpty { c["trim"] = trim }
             if let mileage = v.currentMileage { c["mileage"] = "\(mileage)" }
         }
+        if c["source_entity_label"] == nil { c["source_entity_label"] = "Vehicle" }
         return c
     }
 
     private func chezVehicleRecallContext(openCount: Int) -> [String: String] {
         var c: [String: String] = [
             "_source": "vehicle_recall",
+            "source_entity_type": "vehicle_recall",
             "open_recall_count": String(openCount),
         ]
         if let v = viewModel.vehicle {
             c["vehicle_id"] = v.id.uuidString
             let parts = [v.year.map(String.init), v.make, v.model].compactMap { $0 }
-            if !parts.isEmpty { c["vehicle"] = parts.joined(separator: " ") }
+            if !parts.isEmpty {
+                let vehicleLabel = parts.joined(separator: " ")
+                c["vehicle"] = vehicleLabel
+                c["source_entity_label"] = "\(vehicleLabel) recalls"
+            }
         }
+        if c["source_entity_label"] == nil { c["source_entity_label"] = "Vehicle recalls" }
         let openRecalls = viewModel.recalls.filter { !$0.isResolved }.prefix(5)
         let titles = openRecalls.compactMap { $0.component }.joined(separator: ", ")
         if !titles.isEmpty { c["recall_components"] = titles }

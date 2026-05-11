@@ -286,7 +286,11 @@ struct MaintenanceScheduleView: View {
                             category: .general,
                             label: "Not sure where to start? Ask Chez",
                             caption: "Chez maps your home, sets up vendors, and builds your schedule.",
-                            context: ["_source": "maintenance_schedule_empty"]
+                            context: [
+                                "_source": "maintenance_schedule_empty",
+                                "source_entity_type": "maintenance_schedule",
+                                "source_entity_label": "Maintenance schedule",
+                            ]
                         )
                         .padding(.top, 12)
                     }

@@ -445,6 +445,15 @@ struct RoutineDetailView: View {
                     .tint(HavenColors.action)
                 }
 
+                ChezEntryButton(
+                    category: .coordinateTask,
+                    label: routine.chezOwned ? "Ask Chez about this routine" : "Have Chez handle this routine",
+                    caption: routine.chezOwned
+                        ? "Send notes or follow-up context for this standing routine."
+                        : "Chez coordinates scheduling, vendor follow-up, and reminders.",
+                    context: chezRoutineContext
+                )
+
                 Button {
                     isEditing = true
                 } label: {
@@ -661,6 +670,25 @@ struct RoutineDetailView: View {
             return "No vendor assigned yet"
         }
         return "Self-managed"
+    }
+
+    private var chezRoutineContext: [String: String] {
+        var context: [String: String] = [
+            "source_entity_type": "routine",
+            "source_entity_label": routine.presentationLabel,
+            "routine_id": routine.id.uuidString,
+            "routine_label": routine.presentationLabel,
+            "routine_kind": routine.routineKind,
+            "cadence_type": routine.cadenceType,
+            "setup_state": routine.setupState,
+        ]
+        if let propertyId = routine.propertyId {
+            context["property_id"] = propertyId.uuidString
+        }
+        if let vendor {
+            context["vendor_name"] = vendor.companyName
+        }
+        return context
     }
 
     private var primaryContractSubtitle: String? {

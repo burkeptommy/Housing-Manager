@@ -258,7 +258,8 @@ struct MainTabView: View {
             guard let info = notification.userInfo else { return }
             let categoryRaw = info["category"] as? String ?? ChezCategory.general.rawValue
             let category = ChezCategory(rawValue: categoryRaw) ?? .general
-            let context = info["context"] as? [String: String] ?? [:]
+            let rawContext = info["context"] as? [String: String] ?? [:]
+            let context = normalizedChezContext(rawContext, category: category)
             // Lock the picker for every category except `.general` — the
             // user landed there from a specific surface, so flipping the
             // category mid-compose breaks the prefilled context.
@@ -282,6 +283,61 @@ struct MainTabView: View {
         let category: ChezCategory
         let contextHints: [String: String]
         let isCategoryFixed: Bool
+    }
+
+    private func normalizedChezContext(_ rawContext: [String: String], category: ChezCategory) -> [String: String] {
+        var context = rawContext
+        if context["source_entity_type"]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            context["source_entity_type"] = inferredSourceEntityType(from: context, category: category)
+        }
+        if context["source_entity_label"]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            context["source_entity_label"] = inferredSourceEntityLabel(from: context, category: category)
+        }
+        return context
+    }
+
+    private func inferredSourceEntityType(from context: [String: String], category: ChezCategory) -> String {
+        if context["task_id"] != nil { return "task" }
+        if context["routine_id"] != nil { return "routine" }
+        if context["contractor_id"] != nil || context["vendor"] != nil || context["vendor_name"] != nil { return "vendor" }
+        if context["system_id"] != nil || context["system_category"] != nil { return "system" }
+        if context["project_id"] != nil { return "project" }
+        if context["property_id"] != nil { return "property" }
+        if context["vehicle_id"] != nil { return "vehicle" }
+        if context["document_id"] != nil { return "document" }
+        if context["inbox_item_id"] != nil { return "inbox_item" }
+        if let source = context["_source"], !source.isEmpty { return source }
+        return category.rawValue
+    }
+
+    private func inferredSourceEntityLabel(from context: [String: String], category: ChezCategory) -> String {
+        for key in [
+            "task_title",
+            "routine_label",
+            "contractor_name",
+            "vendor_name",
+            "vendor",
+            "system_name",
+            "system_category",
+            "project_name",
+            "property_name",
+            "vehicle",
+            "title",
+            "alfred_context_name",
+        ] {
+            if let value = context[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !value.isEmpty {
+                return value
+            }
+        }
+        switch category {
+        case .findVendor: return "Vendor search"
+        case .getQuote: return "Quote request"
+        case .scheduleVisit: return "Visit scheduling"
+        case .coordinateTask: return "Task coordination"
+        case .findHandyman: return "Handyman request"
+        case .general: return "General Chez request"
+        }
     }
 
     // MARK: - Custom Tab Bar

@@ -203,7 +203,11 @@ struct ChezRequestsListView: View {
                     object: nil,
                     userInfo: [
                         "category": ChezCategory.general.rawValue,
-                        "context": [String: String]()
+                        "context": [
+                            "_source": "chez_requests_empty_state",
+                            "source_entity_type": "chez_requests",
+                            "source_entity_label": "Chez requests"
+                        ]
                     ]
                 )
             } label: {

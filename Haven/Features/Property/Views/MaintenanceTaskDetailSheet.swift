@@ -2101,6 +2101,8 @@ struct MaintenanceTaskDetailSheet: View {
         var c: [String: String] = [
             "task_id": task.id.uuidString,
             "task_title": task.title,
+            "source_entity_type": "task",
+            "source_entity_label": task.title,
         ]
         if let cat = systemCategory, !cat.isEmpty {
             c["system_category"] = cat

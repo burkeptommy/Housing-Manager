@@ -357,6 +357,8 @@ struct HandymanPunchListView: View {
     private var chezPunchContext: [String: String] {
         let pending = viewModel.entries
         var c: [String: String] = [
+            "source_entity_type": "handyman_punch_list",
+            "source_entity_label": "Handyman punch list",
             "punch_item_count": String(pending.count),
             "property_id": propertyId?.uuidString ?? "",
         ]

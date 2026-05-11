@@ -41,8 +41,31 @@ final class ChezRequestComposeViewModel: ObservableObject {
     var contextLines: [(key: String, value: String)] {
         contextHints
             .filter { !$0.key.hasPrefix("_") }  // hide internal keys
+            .filter { $0.key != "source_entity_type" && $0.key != "source_entity_label" }
             .sorted(by: { $0.key < $1.key })
             .map { ($0.key.replacingOccurrences(of: "_", with: " ").capitalized, $0.value) }
+    }
+
+    var hasContextCard: Bool {
+        sourceEntityTitle != nil || !contextLines.isEmpty
+    }
+
+    var sourceEntityTitle: String? {
+        guard let label = trimmedContextValue("source_entity_label") else { return nil }
+        if let type = trimmedContextValue("source_entity_type") {
+            return "\(formattedContextKey(type)): \(label)"
+        }
+        return label
+    }
+
+    private func trimmedContextValue(_ key: String) -> String? {
+        guard let value = contextHints[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
+    }
+
+    private func formattedContextKey(_ raw: String) -> String {
+        raw.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     // MARK: - Photo upload pipeline

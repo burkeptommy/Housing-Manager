@@ -29,6 +29,8 @@ struct NewProjectView: View {
         var c: [String: String] = [
             "property_id": propertyID.uuidString,
             "_source": "new_project_view",
+            "source_entity_type": "project_draft",
+            "source_entity_label": name.isEmpty ? "New \(category.rawValue) project" : name,
         ]
         if !name.isEmpty { c["draft_project_name"] = name }
         c["category"] = category.rawValue

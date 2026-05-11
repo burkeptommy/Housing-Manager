@@ -69,12 +69,64 @@ struct ChezEntryButton: View {
     private func presentComposer() {
         Haptics.light()
         var info: [String: Any] = ["category": category.rawValue]
-        info["context"] = context
+        info["context"] = contextWithFallbackSource
         NotificationCenter.default.post(
             name: .openChezRequestComposer,
             object: nil,
             userInfo: info
         )
+    }
+
+    private var contextWithFallbackSource: [String: String] {
+        var c = context
+        if c["source_entity_type"]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            c["source_entity_type"] = inferredSourceEntityType
+        }
+        if c["source_entity_label"]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            c["source_entity_label"] = inferredSourceEntityLabel
+        }
+        return c
+    }
+
+    private var inferredSourceEntityType: String {
+        if context["task_id"] != nil { return "task" }
+        if context["routine_id"] != nil { return "routine" }
+        if context["contractor_id"] != nil || context["vendor"] != nil { return "vendor" }
+        if context["system_id"] != nil || context["system_category"] != nil { return "system" }
+        if context["project_id"] != nil { return "project" }
+        if context["vehicle_id"] != nil { return "vehicle" }
+        if context["document_id"] != nil { return "document" }
+        if context["inbox_item_id"] != nil { return "inbox_item" }
+        return "chez_request"
+    }
+
+    private var inferredSourceEntityLabel: String {
+        if let value = firstNonEmptyContextValue([
+            "task_title",
+            "routine_label",
+            "contractor_name",
+            "vendor_name",
+            "vendor",
+            "system_name",
+            "system_category",
+            "project_name",
+            "property_name",
+            "vehicle",
+            "title",
+        ]) {
+            return value
+        }
+        return label
+    }
+
+    private func firstNonEmptyContextValue(_ keys: [String]) -> String? {
+        for key in keys {
+            if let value = context[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !value.isEmpty {
+                return value
+            }
+        }
+        return nil
     }
 }
 
@@ -138,6 +190,8 @@ enum ChezInboxEntryHelper {
             "inbox_item_id": item.id.uuidString,
             "inbox_type": type,
             "title": item.title,
+            "source_entity_type": "inbox_item",
+            "source_entity_label": item.title,
         ]
         if let summary = item.summary, !summary.isEmpty {
             c["summary"] = String(summary.prefix(400))

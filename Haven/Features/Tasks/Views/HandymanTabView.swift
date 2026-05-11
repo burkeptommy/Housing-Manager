@@ -558,7 +558,10 @@ struct HandymanTabView: View {
     }
 
     private var chezHandymanContext: [String: String] {
-        var c: [String: String] = [:]
+        var c: [String: String] = [
+            "source_entity_type": "handyman_punch_list",
+            "source_entity_label": "Handyman punch list",
+        ]
         if let propertyId { c["property_id"] = propertyId.uuidString }
         c["punch_item_count"] = String(punchListVM.entries.count)
         if !punchListVM.entries.isEmpty {
