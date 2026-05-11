@@ -45,3 +45,14 @@ _(Codex maintains. Format: bullet list of open question topics + age in hours.)_
 ## Heartbeat log (newest first)
 
 _(Codex appends here.)_
+
+## 2026-05-11 00:27:45 UTC — batch_start: Round C kickoff
+
+- batch_id: round-c-init
+- last_commit: 51c6315e24de1937a80dc4b799980aa9fa3d1ea6
+- next_planned: P0-1 RoutineDetailView purple-on-purple button fix
+- blocked_on_questions: none
+- discipline_coverage_running: { "A": 0, "B": 0, "C": 0, "D": 0, "E": 0 }
+- findings_this_batch: { verification_pass: 0, verification_fail: 0, gap_found: 0, ui_quality: 0, persistence: 0 }
+
+---
