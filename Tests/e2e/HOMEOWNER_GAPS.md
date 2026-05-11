@@ -929,3 +929,57 @@ Sim drive surfaced 2 fail-level findings + multiple polish/spec drift items.
 - Row 11.35 Routine chip cross-references routineVendorIds (filtered to 5 routine vendors with "Recurring" badge)
 - Row 11.36 Apple Contacts-style row layout (32pt logo + name + caption + chevron)
 
+
+---
+
+## Round C — Wave C-10 (Section 11e Documents + 11f Projects) — PASS
+
+Sim drive verified 19 rows. Section 11e Documents per-property covered by Wave C-3 REDO already. Section 11f Projects: 18 of 22 rows verified via source + UI inspection. Fixture has 0 projects so populated states verified via code path.
+
+### Wave C-10 Finding 1 — visualize-room Edge Function deployed but no iOS surface
+
+- Category: `gap_found`
+- Severity: `low`
+- Surface: `supabase/functions/visualize-room/index.ts` (382 lines, Decor8 integration) vs ZERO iOS callers
+- Evidence: Matrix Row 11.55 lists "Project visualizations via visualize-room". The Edge Function is deployed and operational, but `grep -rn "visualize-room\|VisualizationView\|projectVisualizations" Haven/` returns ZERO results. No data model, no view, no service caller.
+- Suggested fix: either (a) Confirm visualize-room is server-only / API-only for v1 and matrix Row 11.55 is aspirational, OR (b) Build iOS surface — `ProjectVisualization` Codable type + `VisualizationView` + service call. Worth confirming intent before sinking implementation time.
+- Status: `deferred` — product confirmation needed
+
+### Wave C-10 Finding 2 — ProjectEmailView lacks dismiss when shown as sheet
+
+- Category: `ui_quality_finding`
+- Severity: `trivial`
+- Surface: `Haven/Features/Property/Views/ProjectEmailView.swift:102-103`
+- Evidence: ProjectEmailView is shown via push-navigation from Settings (back-arrow works) AND as a sheet from PropertyDetailView's import-email entry. In the sheet context, only iOS swipe-down-to-dismiss is available — no toolbar Done button. Slightly weak discoverability.
+- Suggested fix: add a `Done` toolbar item gated on sheet presentation. Could use `@Environment(\.isPresented)` heuristic OR explicit `onDismiss` closure pattern. Trivial.
+- Status: `deferred` — minor polish; trade-off between sheet-mode discoverability and Settings push-nav cleanliness
+
+### Wave C-10 verified passes
+
+- Row 11.43 Add Project confirmation dialog ("Plan New Project" / "Log Completed Project")
+- Row 11.44 NewProjectView form with category grid + DIY/Pro picker
+- Row 11.45 project-feasibility AI wired via viewModel.loadFeasibility
+- Row 11.46 Active quote concept (activeQuoteId + "Active" green badge)
+- Row 11.47 First quote auto-activates in ProjectsViewModel loadQuotes
+- Row 11.48 Long-press / star button to change active quote
+- Row 11.49 QuoteComparisonView exists (415 lines)
+- Row 11.50 QuoteAnalysisView lineItemsSection + DIY alternative
+- Row 11.51 NegotiationEmailSheet wired in QuoteAnalysisView
+- Row 11.52 projectDocumentsSection + LinkDocumentToProjectSheet
+- Row 11.53 projectFiles array + service methods (load/upload/delete)
+- Row 11.54 projectContacts via addProjectContact / deleteProjectContact
+- Row 11.58 isInsuranceClaim branch + parentProjectId FK pattern
+- Row 11.59 Phase 95 PR 34 two-button "Link existing" / "Add new" on claim view
+- Row 11.60 LogHistoricalProjectView (year picker OR exact-date toggle)
+- Row 11.61 Historical save path skips loadFeasibility
+- Row 11.62 Historical project body branches at line 61
+- Row 11.63 LinkDocumentToProjectSheet (92 lines, searchable list)
+- Row 11.64 InvestmentSummaryCard.inFlightProjectSpend amber line in waterfall (Phase 95 PR 40)
+
+### Discipline coverage
+
+- B3 em-dashes: zero in user-facing copy (only in code comments)
+- B4 brand voice: Chez/Alfred split correct
+- Salmon discipline: empty-state hero "Start" CTA actionLight intentional; row chevrons navy500
+- Double chevrons: none (C-8 RoutinesListView fix held)
+

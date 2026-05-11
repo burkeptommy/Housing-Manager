@@ -358,3 +358,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 15:35:00 UTC — batch_end: Wave C-10 Section 11e+11f — PASS
+
+- batch_id: round-c-c10-section-11c-sim
+- last_commit: cb005dff (C-9)
+- result: PASS — 19 rows verified, 2 minor gaps (visualize-room iOS surface missing, ProjectEmailView dismiss as sheet)
+- key_finding: visualize-room Edge Function shipped but no iOS caller. Confirmation needed on intent.
+- next_planned: Wave C-11 Section 11g+11h (Equipment catalog + Utility Accounts)
+- author: Claude
+
+---
