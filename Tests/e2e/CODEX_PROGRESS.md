@@ -264,3 +264,14 @@ _(Codex appends here.)_
 - author: Claude
 
 ---
+
+## 2026-05-11 12:15:00 UTC — batch_end: Wave C-3 REDO Section 4 — PASS
+
+- batch_id: round-c-c3-redo-section-4-sim
+- last_commit: 3a8a1d8c (C-2 REDO)
+- result: PASS — sim drive confirmed all C-3 fixes hold. Documents empty state intact. Chez v1 estate cutover intact. No em-dashes.
+- key_finding: GapAnalysisView is dormant in v1 (only #Preview wired). Source fix is correct but doesn't affect user-reachable surface. Matrix Row 4.32 partly v1-deferred per SmartRecommendations:187.
+- next_planned: Wave C-4 REDO Section 5 (Invoice processing — was source-only first time, needs real sim)
+- author: Claude
+
+---

@@ -590,3 +590,21 @@ After Wave C-1 REDO sim drive worked, C-2 REDO confirmed fixes hold:
 - Suggested fix: check the navigationDestination handler for the Maintenance hub's vehicle row. The Property tab path works correctly (subagent navigated there fine for the rest of the test). The Maintenance hub path is missing the destination view binding.
 - Status: `deferred` — out of scope for C-2 REDO; logged for follow-up task.
 
+
+---
+
+## Round C — Wave C-3 REDO (Section 4 Documents — brief sim verification) — PASS
+
+Sim drive confirmed all C-3 verdicts hold:
+- Documents tab empty state: Vault hero + Upload/Scan CTAs + 7-item SUGGESTED catalog (correctly EXCLUDES Will/Trust/POA/etc per Chez v1 estate removal)
+- DocumentUploadView 4 "Alfred" refs verified as analysis-context (correct B4 — Alfred IS the analyzer)
+- Zero em-dashes in any visible Documents tab or Alfred tab copy
+- No new bugs from C-1 REDO changes
+
+### Wave C-3 REDO Finding 1 — GapAnalysisView is dormant in v1 — NOTE
+
+- Category: `verification` (informational)
+- The Wave C-3 fix `d30de861` to GapAnalysisView line 90 ("Alfred is reviewing... household best practices") is correct source-side, but the view itself is NOT wired into v1 navigation. `grep -rn 'GapAnalysisView('` returns only the SwiftUI #Preview callsite.
+- `SmartRecommendations.swift:187` notes "Chez v1: estate-readiness, gap-analysis-prompt, scenario-prompt" were intentionally retired from the active surface set.
+- Status: `no action needed` — fix is correct for when/if GapAnalysisView is reintroduced. Worth noting in matrix that Row 4.32 "Document gap analysis" is partly v1-deferred.
+
