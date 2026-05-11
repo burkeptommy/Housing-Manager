@@ -1002,7 +1002,9 @@ extension HomeSystemRow {
 extension HomeSystemRow: Encodable {}
 
 extension HomeSystemRow {
-    /// Functional display name — strips manufacturer and model from the name if present.
+    /// Functional display name — strips manufacturer and model from the name if present,
+    /// then humanizes any remaining snake_case / kebab-case slug tokens that leaked from
+    /// the quiz mapper or seed data (Round C gap #10).
     var displayName: String {
         var result = name
         if let mfr = manufacturer, !mfr.isEmpty {
@@ -1013,7 +1015,8 @@ extension HomeSystemRow {
         }
         result = result.replacingOccurrences(of: "  ", with: " ")
             .trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-\u{2014}")))
-        return result.isEmpty ? name : result
+        let cleaned = result.isEmpty ? name : result
+        return cleaned.humanizedSystemName
     }
 }
 

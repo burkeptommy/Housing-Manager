@@ -1172,3 +1172,28 @@ Disposition codes:
 - 2 DATA-QUALITY items (fixture/seed cleanup)
 - 1 INFO (no action)
 
+
+---
+
+## Round C — Verification subagent + post-verification follow-up
+
+Verification subagent captured `before / after` screenshot evidence for all 13 fixes shipped during Round C. All 13 verified passed with simulator screenshots saved to `/tmp/claude-c-evidence/verification/`:
+
+01. ChezProfileView Spending Authority steppers show $200/$500/$500
+02. RoutineDetailView Archive routine shows confirmation dialog
+03. RoutinesListView single chevron per row
+04. Inbox sub-tabs read "Action" not "Needs Action"
+05. Settings section header "HOUSEHOLD INTAKE" above Household Email
+06. ProjectEmailView pitch + "WHAT CHEZ DOES" say Chez not Alfred
+07. ChezMessageBubble system message renders as rounded rectangle
+08. VehicleDetailView overflow menu "Archive Vehicle" capitalized
+09. IndigoGradientCard "decisions" stat shows white when 0
+10. CoveredDriverPickerSheet excludes Child relationship
+11. EditVehicleSheet fields have visible LabeledContent labels
+12. Maintenance hub vehicle row navigates instantly (no blank screen)
+13. SystemDetailView in-card title renders via humanize()
+
+### Follow-up patch — `HomeSystemRow.displayName` humanize wrap
+
+Verification subagent noted that fix 13 covered the in-card title (`Text(system.name.humanizedSystemName)` at SystemDetailView.swift:744) but the nav-bar title (`navigationTitle(system.displayName)` at line 135) still rendered the raw snake_case via the existing `displayName` computed property. Updated `HomeSystemRow.displayName` extension in `DatabaseModels.swift:1004-1018` to apply `.humanizedSystemName` as the final transform after manufacturer + model stripping. Nav title + every other call site of `system.displayName` (1298 SystemDetailView, 6485 PropertyDetailView, ContractorDirectoryView, AddRecurringServiceSheet, VendorReviewForm) now picks up the humanization automatically.
+
