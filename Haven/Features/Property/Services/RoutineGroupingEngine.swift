@@ -250,6 +250,10 @@ enum RoutineGroupingEngine {
         case "Tree Service": return .treeService
         case "Cleaning Service": return .cleaning
         case "Handyman": return .handymanRecurring
+        // Phase 1.1: Painting reuses .otherService — no enum change
+        // needed. RoutineSeeder.defaults(for:) maps the painter chip
+        // onto serviceKey="painting_program" with annual cadence.
+        case "Painting": return .otherService
         default: return nil
         }
     }

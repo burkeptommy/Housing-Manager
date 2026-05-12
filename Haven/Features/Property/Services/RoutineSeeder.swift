@@ -36,6 +36,26 @@ final class RoutineSeeder {
     func defaults(for category: String) -> SeedDefaults? {
         let lower = category.lowercased()
 
+        // Phase 1.1: Gutter cleaning — semi-annual year-round. Must be
+        // checked BEFORE the cleaning branch below because "Gutter
+        // Cleaning".lowercased() contains "clean" and the cleaning
+        // branch would otherwise route gutter vendors to a biweekly
+        // housekeeping cadence.
+        if lower.contains("gutter") {
+            return SeedDefaults(
+                kind: .gutterCleaning,
+                serviceKey: "gutter_cleaning_program",
+                label: "gutter cleaning",
+                cadenceType: .semiannual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: Array(1...12),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
         // Cleaning / housekeeping — biweekly year-round, morning reminder.
         if lower.contains("clean") || lower.contains("housekeep") || lower.contains("maid") {
             return SeedDefaults(
@@ -237,6 +257,47 @@ final class RoutineSeeder {
                 daysOfWeek: nil,
                 timeOfDay: nil,
                 activeMonths: Array(1...12),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
+        // Phase 1.1: Painter — annual cadence year-round. Reuses
+        // .otherService for resilient-decode safety (no enum change).
+        // The painter chip on Q15b maps to "Painting" via
+        // householdContractorCategoryFor; the contractor mirror then
+        // hits this branch via seedIfNeeded.
+        if lower.contains("paint") {
+            return SeedDefaults(
+                kind: .otherService,
+                serviceKey: "painting_program",
+                label: "painting refresh",
+                cadenceType: .annual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: Array(1...12),
+                eveningBeforeReminder: false,
+                morningOfReminder: false,
+                cadenceIntervalDays: nil
+            )
+        }
+
+        // Phase 1.5: Smoke + CO detector check — universal semi-annual
+        // cadence in March and September. No vendor required; the
+        // routine lives systemless via `ensureSystemlessRoutines` so
+        // the homeowner sees an inline reminder twice a year to test
+        // batteries and run a function check. Reuses .otherService for
+        // resilient-decode safety.
+        if lower.contains("smoke") || lower.contains("co detect") || lower.contains("co alarm") || lower.contains("smoke_co") {
+            return SeedDefaults(
+                kind: .otherService,
+                serviceKey: "smoke_co_program",
+                label: "smoke and CO detector check",
+                cadenceType: .semiannual,
+                daysOfWeek: nil,
+                timeOfDay: nil,
+                activeMonths: [3, 9],
                 eveningBeforeReminder: false,
                 morningOfReminder: false,
                 cadenceIntervalDays: nil

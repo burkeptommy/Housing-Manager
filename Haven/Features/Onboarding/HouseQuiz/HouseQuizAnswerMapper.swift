@@ -1902,6 +1902,12 @@ final class HouseQuizAnswerMapper {
         // verbose contractor labels ("Waterproofing & Basement",
         // "Basement Waterproofing") onto the same canonical key.
         case "waterproofing":      return "Crawl Space"
+        // Phase 1.1: gutter_cleaning and painter chips. Both categories
+        // already live in SystemCategoryRegistry; the canonical key here
+        // routes vendor coverage, routine seeding, and contractor
+        // mirroring without any registry change.
+        case "gutter_cleaning":    return "Gutter Cleaning"
+        case "painter":            return "Painting"
         default:                   return nil
         }
     }

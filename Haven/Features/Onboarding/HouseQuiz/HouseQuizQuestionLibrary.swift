@@ -508,6 +508,14 @@ enum HouseQuizQuestionLibrary {
                 // templates auto-route. Examples: American Dry
                 // Basements, Connecticut Basement Systems.
                 AnswerOption(id: "waterproofing", label: "Waterproofing & basement", icon: "drop.fill"),
+                // Phase 1.1: universal-visibility chips. Gutter cleaning and
+                // exterior painting are common standing vendor relationships
+                // for HNW homeowners. Both map to existing
+                // SystemCategoryRegistry categories so the contractor mirror,
+                // vendor coverage, and post-quiz delegation surfaces pick
+                // them up automatically.
+                AnswerOption(id: "gutter_cleaning", label: "Gutter cleaning", icon: "arrow.down.to.line"),
+                AnswerOption(id: "painter", label: "Painter", icon: "paintbrush.fill"),
             ],
             dynamicSkip: { _ in false },  // never skip — empty answers are allowed
             whyAsked: "Adding the people already taking care of your home lets us coordinate their visits, link their invoices automatically when they email you, and stop asking you who handles what. Skip any you don't have — we'll fill the gaps later."
