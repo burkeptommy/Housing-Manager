@@ -327,6 +327,14 @@ final class AppState: ObservableObject {
                         // are about to be archived.
                         await Self.runServiceSystemArchiveOnceIfNeeded()
 
+                        // Phase 1.5: backfill the universal smoke + CO
+                        // detector check routine for pre-existing
+                        // households whose quiz completed before the
+                        // rule was added. Idempotent via UserDefaults
+                        // gate + RoutineSeeder.ensureSystemlessRoutines
+                        // dedup.
+                        await Self.ensureSmokeCoRoutineOnceIfNeeded()
+
                         // Chez v1: pre-fill install_date for systems
                         // whose category correlates with year_built
                         // (roof, foundation, structural shells). The
@@ -1121,6 +1129,60 @@ final class AppState: ObservableObject {
             "OH", "MI", "WI", "MN", "IA", "IL", "IN",
             "CO", "UT", "WY", "ID", "MT", "ND", "SD", "NE", "AK",
         ].contains(s)
+    }
+
+    /// Phase 1.5: One-time backfill that ensures a semi-annual smoke +
+    /// CO detector check routine exists for every household whose quiz
+    /// has already completed. New-quiz households pick it up naturally
+    /// via `HouseQuizAnswerMapper.ensureAutoCreatedSystems` calling
+    /// `RoutineSeeder.ensureSystemlessRoutines`; this helper covers
+    /// pre-Phase-1.5 households that completed the quiz before the
+    /// rule existed. Mid-quiz users (no completion timestamp) are
+    /// skipped so the next reminder doesn't appear out of nowhere
+    /// while they're still finishing setup.
+    ///
+    /// Gated on `hasEnsuredSmokeCoRoutine_v1` UserDefaults flag so the
+    /// fetchProperties pass fires at most once per install. The seeder
+    /// itself is idempotent (skips if a routine for the kind already
+    /// exists), so even with the gate bypassed we never double-create.
+    static func ensureSmokeCoRoutineOnceIfNeeded() async {
+        let key = "hasEnsuredSmokeCoRoutine_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            print("[AppState] smokeCo backfill fetchProperties failed: \(error)")
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        for property in properties {
+            let quizState = property.houseQuizState
+            let quizDone = (quizState?.completedAt != nil)
+                || (quizState?.walkthroughCompletedAt != nil)
+                || (quizState?.intakeCompletedAt != nil)
+            guard quizDone else { continue }
+
+            let petsRaw = property.attributes?["has_pets"]?.stringValue.lowercased() ?? ""
+            let hasPets = (petsRaw == "true" || petsRaw == "yes")
+            let isSnow = isSnowState(property.state)
+
+            await RoutineSeeder.shared.ensureSystemlessRoutines(
+                propertyId: property.id,
+                householdId: property.householdId,
+                hasPets: hasPets,
+                isSnowState: isSnow
+            )
+        }
+
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     /// Chez v1: walks every existing property and pre-fills install

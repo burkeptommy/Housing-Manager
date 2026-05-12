@@ -481,6 +481,9 @@ final class RoutineSeeder {
             Rule(category: "mosquito", label: "mosquito & tick spraying", shouldCreate: true),
             Rule(category: "pet waste", label: "pet waste pickup", shouldCreate: hasPets),
             Rule(category: "snow", label: "snow removal", shouldCreate: isSnowState),
+            // Phase 1.5: universal semi-annual smoke + CO detector check.
+            // No vendor; the routine is a self-serve reminder.
+            Rule(category: "smoke_co", label: "smoke and CO detector check", shouldCreate: true),
         ]
 
         let existing = (try? await db.fetchRoutines(householdId: householdId)) ?? []
