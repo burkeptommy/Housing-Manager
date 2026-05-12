@@ -262,18 +262,33 @@ final class HouseQuizAnswerMapper {
                         return estimatedFallback
                     }()
                     let source = pickedYear > 0 ? "user_renovation" : "estimated"
+                    // Phase 1.6: Propagate captured renovation year to
+                    // home_systems.install_date. The original TODO
+                    // referenced a `last_replaced_date` column that was
+                    // never shipped — install_date with provenance is
+                    // the canonical place. Guards:
+                    //   1. Never overwrite a user-confirmed install
+                    //      date (installDateConfirmedAt set).
+                    //   2. Only overwrite if the new date is more
+                    //      recent than the existing one (back-nav with
+                    //      an older year shouldn't regress data).
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withFullDate]
+                    let newDateString = formatter.string(from: replacedDate)
                     for system in matching {
-                        // TODO Phase 67D (B3): re-enable once
-                        // HomeSystemUpdate.lastReplacedDate +
-                        // lastReplacedDateSource ship + the schema gets a
-                        // matching `home_systems.last_replaced_date` column.
-                        // Stubbed to make the build pass; the renovation
-                        // capture itself still works (the multiSelect
-                        // answer + year payload persists), this just
-                        // skips the per-system propagation.
-                        _ = system
-                        _ = replacedDate
-                        _ = source
+                        let shouldOverwrite: Bool = {
+                            if system.installDateConfirmedAt != nil { return false }
+                            guard let existingISO = system.installDate,
+                                  let existingDate = formatter.date(from: existingISO) else {
+                                return true
+                            }
+                            return replacedDate > existingDate
+                        }()
+                        guard shouldOverwrite else { continue }
+                        var update = HomeSystemUpdate()
+                        update.installDate = newDateString
+                        update.installDateSource = source
+                        _ = try? await db.updateHomeSystem(id: system.id, update)
                     }
                 }
 
