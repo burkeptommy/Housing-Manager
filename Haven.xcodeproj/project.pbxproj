@@ -60,6 +60,7 @@
 		0D15EA5FFC86A659709CBFE7 /* ChezDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B96EE37657BD097DB98878 /* ChezDirectoryService.swift */; };
 		0D4FCA19890236EE25EADC05 /* InviteResultConfirmationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB386522CE4AF7EE8845F7F /* InviteResultConfirmationCard.swift */; };
 		0D5FE5529D59154E9C865A35 /* ServiceVendorInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EB11D57E1E1F2AF761331B /* ServiceVendorInquirySheet.swift */; };
+		0DA21DC88ACEBACAD25304BB /* LibraryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0777F76F2FE223391F32380E /* LibraryPicker.swift */; };
 		0E18DAC5A34E8DE3D4847614 /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 92FA1BB2ACAD067BEEE1857A /* CLAUDE.md */; };
 		0E1B140D96F6075D860380D5 /* BrandColors.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A4D29A1CB91EBA42DFC0519 /* BrandColors.json */; };
 		0E71FADFFA9696BBA2485BDC /* Font+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E819F4A1BD46D5CE48E9E1A /* Font+Haven.swift */; };
@@ -275,6 +276,7 @@
 		48A03C21573D6CED2282E056 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216CE36DEDB939EEC1D458C2 /* AppConfig.swift */; };
 		48EBBCEBB43FC343DEA44810 /* ExpirationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB1E595AC46EC435723506 /* ExpirationBadge.swift */; };
 		48F02347E056AD2C02E2EFB0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E5AB75E21903A9833695E4FA /* Assets.xcassets */; };
+		4923D58BDCCA15DDA53B4234 /* LibraryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0777F76F2FE223391F32380E /* LibraryPicker.swift */; };
 		4A67D195FB30C8FC75BCD0AF /* HavenColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AA43272E274ADD62E2592 /* HavenColors.swift */; };
 		4A69C6EB06F4487D7BF2443C /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */; };
 		4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */; };
@@ -949,6 +951,7 @@
 		065CD0193255DF7812606891 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		06F9CE46C0EBA474B006D574 /* HandymanVisitDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanVisitDetailSheet.swift; sourceTree = "<group>"; };
 		07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCaretakerInlineForm.swift; sourceTree = "<group>"; };
+		0777F76F2FE223391F32380E /* LibraryPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryPicker.swift; sourceTree = "<group>"; };
 		077DCD83BD7C719A6BAB5E25 /* FamilyMemberProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberProfileView.swift; sourceTree = "<group>"; };
 		0787BB580C28578F9F427589 /* DuplicateDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDetectionService.swift; sourceTree = "<group>"; };
 		08DA5522314F0D8EFA2B08D8 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
@@ -2134,6 +2137,7 @@
 				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
 				77E305136BBADF35A4473FE8 /* HouseQuizTransition.swift */,
 				A0938C9921AE566F16F6CE67 /* InlineInsightPill.swift */,
+				0777F76F2FE223391F32380E /* LibraryPicker.swift */,
 				4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */,
 				500D254BE1B20353EADE8828 /* PropertyRecapCard.swift */,
 				D2F129CDD280D74351336791 /* PropertyRecapEditors.swift */,
@@ -2880,6 +2884,7 @@
 				074F3FF2A4E958276DD8435E /* JailbreakDetection.swift in Sources */,
 				228AA0B7F6AC66A97E84687A /* LegacyTasksNotificationCard.swift in Sources */,
 				E084EF6ECC6247BA9314EB25 /* LegacyTasksView.swift in Sources */,
+				4923D58BDCCA15DDA53B4234 /* LibraryPicker.swift in Sources */,
 				8642A4872399D9AB3358993C /* LinkDocumentToProjectSheet.swift in Sources */,
 				AD2F8F6B4F3A53889D53398C /* LoadingView.swift in Sources */,
 				D844043A66B8175E097112F4 /* LogHistoricalProjectView.swift in Sources */,
@@ -3349,6 +3354,7 @@
 				1E65FBEB97BCF8B58E4E39BE /* JailbreakDetection.swift in Sources */,
 				22BF0DA63A2A880747C5E6D6 /* LegacyTasksNotificationCard.swift in Sources */,
 				BE71B890A6F59B6C84E2EE04 /* LegacyTasksView.swift in Sources */,
+				0DA21DC88ACEBACAD25304BB /* LibraryPicker.swift in Sources */,
 				027097D17D1F1EDE5EB9260F /* LinkDocumentToProjectSheet.swift in Sources */,
 				F51ECF5E04C7BADB5CD09CB0 /* LoadingView.swift in Sources */,
 				4897CA3689B892704D0F5902 /* LogHistoricalProjectView.swift in Sources */,
