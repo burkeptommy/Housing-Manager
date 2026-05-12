@@ -516,6 +516,13 @@ enum HouseQuizQuestionLibrary {
                 // them up automatically.
                 AnswerOption(id: "gutter_cleaning", label: "Gutter cleaning", icon: "arrow.down.to.line"),
                 AnswerOption(id: "painter", label: "Painter", icon: "paintbrush.fill"),
+                // Phase 1.3: terminal chip that opens a LibraryPicker for
+                // any SystemCategoryRegistry category not already represented
+                // as a chip above. Picks become `lib:<category>` synthetic
+                // chips with the standard QuizLocalContractorPicker
+                // affordance. HouseQuizView intercepts this chip's tap and
+                // never adds `anything_else` to contractorChipsSelected.
+                AnswerOption(id: "anything_else", label: "Anything else?", icon: "plus.circle"),
             ],
             dynamicSkip: { _ in false },  // never skip — empty answers are allowed
             whyAsked: "Adding the people already taking care of your home lets us coordinate their visits, link their invoices automatically when they email you, and stop asking you who handles what. Skip any you don't have — we'll fill the gaps later."

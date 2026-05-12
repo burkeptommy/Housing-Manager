@@ -208,6 +208,11 @@ struct HouseQuizView: View {
     @State private var contractorChipsExtraVendors: [String: [HavenSupabase.LocalVendorResult]] = [:]
     @State private var contractorChipsExtraManualNames: [String: [String]] = [:]
     @State private var contractorChipsExpanded: String? = nil
+    /// Phase 1.3: tracks whether the Q15b "Anything else?" library
+    /// sheet is on screen. The sheet itself reads
+    /// `SystemCategoryRegistry.all` at render time so any new entry
+    /// added to the registry auto-surfaces without a quiz-side change.
+    @State private var showQ15bLibrary: Bool = false
 
     /// Build 84 — Q17 forwarding-email milestone "Copied" badge state. The
     /// reveal card flips the copy button to a check + "Copied" for ~2 seconds
@@ -3814,6 +3819,33 @@ struct HouseQuizView: View {
         }
         .animation(HavenTheme.animationStandard, value: contractorChipsExpanded)
         .animation(HavenTheme.animationStandard, value: contractorChipsSelected)
+        // Phase 1.3: terminal "Anything else?" sheet. Library entries
+        // are recomputed on every present via `q15bLibraryEntries` so
+        // categories already added on this session are filtered out.
+        .sheet(isPresented: $showQ15bLibrary) {
+            LibraryPicker(
+                entries: q15bLibraryEntries,
+                title: "Add another vendor",
+                searchPlaceholder: "Search vendor types",
+                onSelect: { entry in
+                    Haptics.selection()
+                    let chipId = "lib:\(entry.category)"
+                    if !contractorChipsSelected.contains(chipId) {
+                        contractorChipsSelected.insert(chipId)
+                        // Auto-expand the new chip's inline picker so
+                        // the user can attach a vendor immediately
+                        // without an extra tap.
+                        contractorChipsExpanded = chipId
+                    }
+                    Analytics.track(.quizContractorChipExpanded, [
+                        "chip_id": chipId,
+                        "source": "library_picker",
+                    ])
+                    showQ15bLibrary = false
+                },
+                onDismiss: { showQ15bLibrary = false }
+            )
+        }
     }
 
     /// Build 83: serialize the per-chip selections into the pipe-delimited
@@ -3890,7 +3922,15 @@ struct HouseQuizView: View {
     /// lifestyle service with no meaning in FL/TX/CA.
     private func visibleContractorChips(for q: HouseQuizQuestion) -> [AnswerOption] {
         let answers = viewModel.state.answers
-        return q.answerOptions.filter { option in
+        // Phase 1.3: split into three layers so library-sourced chips
+        // can render alongside the static ones AND the "Anything else?"
+        // terminal entry always lives at the end of the list. The
+        // static-filter switch keeps existing conditional visibility
+        // rules intact.
+        let staticChips: [AnswerOption] = q.answerOptions.filter { option in
+            // The terminal library trigger is rendered separately at the
+            // end — never as a regular chip in the static list.
+            if option.id == "anything_else" { return false }
             switch option.id {
             case "septic_pumper":
                 // Only show when q7 said septic. q7 must have been answered
@@ -3989,9 +4029,121 @@ struct HouseQuizView: View {
                 return true
             }
         }
+
+        // Phase 1.3: synthesize chips for any `lib:<category>` ids
+        // already in `contractorChipsSelected` (added via the library
+        // picker OR hydrated from prior customEntries). Each chip
+        // pulls its label + icon from SystemCategoryRegistry; if the
+        // category isn't recognized we fall back to the raw key as
+        // the label and a wrench icon so a stale prefix doesn't crash
+        // the layout.
+        let libraryChipIds = contractorChipsSelected.filter { $0.hasPrefix("lib:") }
+        let libraryChips: [AnswerOption] = libraryChipIds
+            .sorted()
+            .map { id -> AnswerOption in
+                let key = String(id.dropFirst(4))
+                let meta = SystemCategoryRegistry.all.first(where: { $0.categoryKey == key })
+                let label = meta?.displayName ?? key
+                let icon = meta?.icon ?? "wrench.fill"
+                return AnswerOption(id: id, label: label, icon: icon)
+            }
+
+        var combined = staticChips + libraryChips
+
+        // Always append the terminal "Anything else?" chip last so the
+        // entry point lives at the bottom of the list. Use the
+        // declared answerOptions value so future label / icon changes
+        // in HouseQuizQuestionLibrary flow through automatically.
+        if let terminal = q.answerOptions.first(where: { $0.id == "anything_else" }) {
+            combined.append(terminal)
+        }
+        return combined
     }
 
+    /// Phase 1.3: entries the LibraryPicker shows. Filters out any
+    /// SystemCategoryRegistry category already represented by a
+    /// declared Q15b chip (via `householdContractorCategoryForExternal`)
+    /// AND any category already added via the library picker on this
+    /// session. Subsystem-tier and vendor-coverage-hidden entries are
+    /// also excluded — they aren't standing vendor relationships.
+    private var q15bLibraryEntries: [LibraryEntry] {
+        guard let q = viewModel.currentQuestion, q.id == "q15b_household_contractors" else {
+            return []
+        }
+        let coveredByChip: Set<String> = Set(
+            q.answerOptions.compactMap { opt -> String? in
+                if opt.id == "anything_else" { return nil }
+                return HouseQuizAnswerMapper.householdContractorCategoryForExternal(chipId: opt.id)
+            }
+        )
+        let alreadyAdded: Set<String> = Set(
+            contractorChipsSelected
+                .filter { $0.hasPrefix("lib:") }
+                .map { String($0.dropFirst(4)) }
+        )
+        return SystemCategoryRegistry.all
+            .filter { meta in
+                meta.tier != .subSystem
+                    && meta.showInVendorCoverage
+                    && !coveredByChip.contains(meta.categoryKey)
+                    && !alreadyAdded.contains(meta.categoryKey)
+            }
+            .sorted { $0.displayName < $1.displayName }
+            .map { meta in
+                LibraryEntry(
+                    id: meta.categoryKey,
+                    label: meta.displayName,
+                    icon: meta.icon,
+                    category: meta.categoryKey
+                )
+            }
+    }
+
+    @ViewBuilder
     private func contractorChipRow(_ option: AnswerOption) -> some View {
+        // Phase 1.3: the terminal "Anything else?" row never toggles
+        // selection; tapping it opens a LibraryPicker sheet. Picks land
+        // as `lib:<category>` synthesized chips that flow through the
+        // rest of contractorChipRow on the next render via
+        // visibleContractorChips.
+        if option.id == "anything_else" {
+            anythingElseLibraryRow(option)
+        } else {
+            regularContractorChipRow(option)
+        }
+    }
+
+    @ViewBuilder
+    private func anythingElseLibraryRow(_ option: AnswerOption) -> some View {
+        Button {
+            Haptics.light()
+            showQ15bLibrary = true
+        } label: {
+            HStack(spacing: 12) {
+                if let icon = option.icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 24)
+                }
+                Text(option.label)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing16)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    private func regularContractorChipRow(_ option: AnswerOption) -> some View {
         let isSelected = contractorChipsSelected.contains(option.id)
         let isExpanded = contractorChipsExpanded == option.id
         // Build 83: a chip can carry exactly one of three vendor sources.

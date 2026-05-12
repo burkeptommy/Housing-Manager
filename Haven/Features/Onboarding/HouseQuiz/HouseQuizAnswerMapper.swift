@@ -1841,7 +1841,26 @@ final class HouseQuizAnswerMapper {
     /// `household_contractor_chips` attribute so it survives, but no
     /// contractor row gets created until the user assigns the handyman to
     /// a specific task themselves.
+    /// Phase 1.3: Public wrapper for the file-private chip → category
+    /// switch. HouseQuizView uses it at render time to decide which
+    /// SystemCategoryRegistry categories are already covered by a Q15b
+    /// chip (so the LibraryPicker can omit them).
+    static func householdContractorCategoryForExternal(chipId: String) -> String? {
+        return householdContractorCategoryFor(chipId: chipId)
+    }
+
     private static func householdContractorCategoryFor(chipId: String) -> String? {
+        // Phase 1.3: library-sourced chip IDs carry a "lib:" prefix and
+        // the canonical category key as the suffix. Route them through
+        // SystemCategoryRegistry.canonical so verbose / aliased / cased
+        // variants collapse to the same canonical category that the
+        // existing contractor mirroring + vendor coverage flow expects.
+        // Older clients that don't know the prefix harmlessly return nil
+        // and skip the chip at apply time.
+        if chipId.hasPrefix("lib:") {
+            let raw = String(chipId.dropFirst(4))
+            return SystemCategoryRegistry.canonical(category: raw) ?? raw
+        }
         switch chipId {
         case "hvac_service":       return "HVAC"
         case "plumber":            return "Plumbing"
