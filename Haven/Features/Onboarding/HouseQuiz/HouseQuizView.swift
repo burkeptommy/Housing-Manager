@@ -41,6 +41,10 @@ struct HouseQuizView: View {
     @State private var multiSelectIds: Set<String> = []
     @State private var multiSelectCustomDraft: String = ""
     @State private var multiSelectCustomEntries: [String] = []
+    /// Phase 1.4: presents the appliance library picker when Q10's
+    /// "Anything else?" row is tapped. Selections from the picker land
+    /// in `multiSelectCustomEntries` with a `lib:` prefix.
+    @State private var showApplianceLibrary: Bool = false
     @State private var providerNameText: String = ""
     /// Build 87: Tracks a provider selected via the inline search picker
     /// in Q11-Q15's follow-up. When non-nil, the Continue button commits
@@ -2462,9 +2466,27 @@ struct HouseQuizView: View {
                 onToggle: { _, _ in },
                 customDraft: $multiSelectCustomDraft,
                 customEntries: $multiSelectCustomEntries,
-                onCommitCustom: { commitCustomEntryDraft() }
+                onCommitCustom: { commitCustomEntryDraft() },
+                onLibraryRequested: {
+                    showApplianceLibrary = true
+                }
             )
             multiSelectContinueButton(q)
+        }
+        .sheet(isPresented: $showApplianceLibrary) {
+            LibraryPicker(
+                entries: HouseQuizQuestionLibrary.applianceLibrary,
+                title: "Anything else?",
+                searchPlaceholder: "Search appliances",
+                onSelect: { entry in
+                    let marker = "lib:\(entry.label)"
+                    if !multiSelectCustomEntries.contains(marker) {
+                        multiSelectCustomEntries.append(marker)
+                    }
+                    showApplianceLibrary = false
+                },
+                onDismiss: { showApplianceLibrary = false }
+            )
         }
     }
 

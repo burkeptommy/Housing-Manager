@@ -25,6 +25,13 @@ struct AppliancePictogramGrid: View {
     /// Fires when the user hits the + button on the custom-input row
     /// with a non-empty draft. The host appends to `customEntries`.
     var onCommitCustom: (() -> Void)? = nil
+    /// Phase 1.4: optional callback for the "Anything else?" library
+    /// entry. When set, a separate row appears below the custom-input
+    /// row and tapping it opens a LibraryPicker on the host. The grid
+    /// itself never toggles selectedIds for the library chip — the
+    /// host owns the sheet lifecycle and appends library picks to
+    /// `customEntries` with a "lib:" prefix.
+    var onLibraryRequested: (() -> Void)? = nil
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -44,6 +51,11 @@ struct AppliancePictogramGrid: View {
                 otherRow(otherOption)
             }
 
+            if let libraryOption = options.first(where: { $0.id == "anything_else_appliance" }),
+               onLibraryRequested != nil {
+                libraryRow(libraryOption)
+            }
+
             if let noneOption = options.first(where: { $0.id == "none" }) {
                 noneRow(noneOption)
             }
@@ -51,7 +63,11 @@ struct AppliancePictogramGrid: View {
     }
 
     private var pictogramOptions: [AnswerOption] {
-        options.filter { !$0.acceptsCustomInput && $0.id != "none" }
+        options.filter {
+            !$0.acceptsCustomInput
+                && $0.id != "none"
+                && $0.id != "anything_else_appliance"
+        }
     }
 
     @ViewBuilder
@@ -139,7 +155,11 @@ struct AppliancePictogramGrid: View {
                 FlowLayout(spacing: 6) {
                     ForEach(customEntries, id: \.self) { entry in
                         HStack(spacing: 4) {
-                            Text(entry)
+                            // Phase 1.4: strip "lib:" prefix in display so
+                            // library-sourced picks show as their plain
+                            // label. Storage still carries the prefix as
+                            // a forward-compat marker.
+                            Text(entry.hasPrefix("lib:") ? String(entry.dropFirst(4)) : entry)
                                 .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textPrimary)
                             Button {
@@ -160,6 +180,38 @@ struct AppliancePictogramGrid: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func libraryRow(_ option: AnswerOption) -> some View {
+        Button {
+            Haptics.light()
+            onLibraryRequested?()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: option.icon ?? "plus.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.navy700)
+                Text(option.label)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing12)
+            .frame(minHeight: 52)
+            .background(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .fill(HavenColors.creamLight)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.beige300, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

@@ -281,7 +281,12 @@ final class HouseQuizAnswerMapper {
                 if let selected = answer.selectedIds {
                     // The "other" id is just a placeholder that triggers the
                     // free-form text input — never persist it as an appliance.
-                    let realSelections = selected.filter { $0 != "other" }
+                    // Phase 1.4: same treatment for `anything_else_appliance`,
+                    // which is a UI trigger for the LibraryPicker sheet. Its
+                    // chip should never become a home_systems row.
+                    let realSelections = selected.filter {
+                        $0 != "other" && $0 != "anything_else_appliance"
+                    }
                     let customEntries = answer.customEntries ?? []
                     let combined = realSelections + customEntries
                     if !combined.isEmpty {
@@ -300,8 +305,19 @@ final class HouseQuizAnswerMapper {
                     // its own home_system row in the Appliances group so it
                     // shows up alongside the picker-based ones in the Property
                     // -> Maintenance tab.
+                    // Phase 1.4: library-sourced entries arrive with a "lib:"
+                    // forward-compat prefix that we strip before creating
+                    // the row. Stale clients that don't strip the prefix
+                    // would still create a `lib:Wine cellar / cooler`
+                    // home_system — annoying but non-fatal.
                     for custom in customEntries {
-                        let trimmed = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let cleaned: String
+                        if custom.hasPrefix("lib:") {
+                            cleaned = String(custom.dropFirst(4))
+                        } else {
+                            cleaned = custom
+                        }
+                        let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { continue }
                         try await ensureHomeSystem(name: trimmed, category: "Appliance")
                     }

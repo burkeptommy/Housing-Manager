@@ -306,11 +306,36 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "microwave", label: "Microwave"),
                 AnswerOption(id: "wine_fridge", label: "Wine fridge"),
                 AnswerOption(id: "other", label: "Other", icon: "plus.circle", acceptsCustomInput: true),
+                // Phase 1.4: opens LibraryPicker with curated HNW appliance
+                // subtypes (wine cellar, built-in grill, kegerator, etc.).
+                // Tapping does NOT toggle selectedIds — HouseQuizView
+                // intercepts and presents `LibraryPicker`. Selections land
+                // in `customEntries` with a `lib:` prefix for forward
+                // compat with older clients that ignore the prefix.
+                AnswerOption(id: "anything_else_appliance", label: "Anything else?", icon: "plus.circle"),
                 AnswerOption(id: "none", label: "None of these"),
             ],
             documentUploadCategory: .applianceManual,
             supportsSelectAll: true
         ),
+    ]
+
+    // Phase 1.4: Curated HNW appliance library surfaced via Q10's
+    // "Anything else?" affordance. Each entry persists into
+    // `customEntries` with a `lib:` prefix (forward-compat marker) and
+    // creates a home_systems row under category "Appliance" at apply
+    // time. Add new entries here; no other code change needed.
+    static let applianceLibrary: [LibraryEntry] = [
+        LibraryEntry(id: "wine_cellar_appliance", label: "Wine cellar / cooler", icon: "wineglass.fill", category: "Appliance"),
+        LibraryEntry(id: "ice_maker", label: "Standalone ice maker", icon: "snowflake", category: "Appliance"),
+        LibraryEntry(id: "built_in_grill", label: "Built-in grill", icon: "flame", category: "Appliance"),
+        LibraryEntry(id: "kegerator", label: "Kegerator", icon: "drop.fill", category: "Appliance"),
+        LibraryEntry(id: "outdoor_fridge", label: "Outdoor fridge / fridge drawer", icon: "snow", category: "Appliance"),
+        LibraryEntry(id: "warming_drawer", label: "Warming drawer", icon: "oven", category: "Appliance"),
+        LibraryEntry(id: "trash_compactor", label: "Trash compactor", icon: "trash", category: "Appliance"),
+        LibraryEntry(id: "second_oven", label: "Second oven / steam oven", icon: "oven.fill", category: "Appliance"),
+        LibraryEntry(id: "freezer_standalone", label: "Standalone freezer", icon: "snowflake.circle", category: "Appliance"),
+        LibraryEntry(id: "central_vacuum_appliance", label: "Central vacuum", icon: "wind", category: "Appliance"),
     ]
 
     // MARK: - Section 3 — Outside & Landscaping
