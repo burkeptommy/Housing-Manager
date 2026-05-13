@@ -19,21 +19,12 @@ struct ChezRequestDetailView: View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if let req = viewModel.request {
-                            headerCard(for: req)
-                            if let context = req.context, !context.isEmpty {
-                                detailsCard(context: context)
-                            }
-                            messagesSection
-                            // Anchor at the very bottom so we can scroll-to-end on appear / new message.
-                            Color.clear.frame(height: 1).id("bottom")
-                        } else if viewModel.isLoading {
-                            loadingState
-                        } else {
-                            errorState
-                        }
-                    }
+                    // Phase 86E.3 — extracted the inner VStack into a
+                    // ViewBuilder property to keep the SwiftUI type-checker
+                    // happy (same fix Tom applied to DashboardView). Adding
+                    // the merged-into-banner branch pushed the inferred
+                    // expression past the timeout budget on macos-15 runners.
+                    scrollContent
                     .padding(.horizontal, HavenTheme.pageMargin)
                     .padding(.top, 16)
                     .padding(.bottom, 24)
@@ -115,6 +106,83 @@ struct ChezRequestDetailView: View {
             handleFileImport(result)
         }
         .trackScreen("ChezRequestDetailView")
+    }
+
+    // MARK: - Scroll content (Phase 86E.3 — type-check budget extraction)
+    //
+    // Pulling the inner VStack out of the body lets the SwiftUI type-
+    // checker chew on a smaller expression. Same fix Tom applied to
+    // DashboardView (PROGRESS.md, 2026-05-05 entry).
+    @ViewBuilder
+    private var scrollContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let req = viewModel.request {
+                // Phase 86E.3 — when this case was merged into another
+                // one, surface a banner so the homeowner can tap through
+                // to the surviving conversation. A bookmarked link or
+                // old push payload could land them here otherwise with
+                // no obvious next step.
+                if let mergedInto = req.mergedIntoRequestId {
+                    mergedIntoBanner(mergedIntoRequestId: mergedInto)
+                }
+                headerCard(for: req)
+                if let context = req.context, !context.isEmpty {
+                    detailsCard(context: context)
+                }
+                messagesSection
+                // Anchor at the very bottom so we can scroll-to-end on appear / new message.
+                Color.clear.frame(height: 1).id("bottom")
+            } else if viewModel.isLoading {
+                loadingState
+            } else {
+                errorState
+            }
+        }
+    }
+
+    // MARK: - Merged-into banner (Phase 86E.3)
+    //
+    // When the operator merges this case into another in the cockpit
+    // (handleMergeCases edge action), the source row keeps its
+    // `merged_into_request_id` pointed at the surviving case + status
+    // forced to resolved by trigger. This banner makes that intentional
+    // for the homeowner: shows "This conversation was merged" + a tap
+    // affordance to jump to the surviving thread.
+
+    @ViewBuilder
+    private func mergedIntoBanner(mergedIntoRequestId: UUID) -> some View {
+        NavigationLink(destination: ChezRequestDetailView(requestId: mergedIntoRequestId)) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: "arrow.triangle.merge")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.indigo)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("This conversation was merged")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Tap to open the current conversation.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(HavenColors.indigo.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(HavenColors.indigo.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("This conversation was merged. Tap to open the current conversation.")
     }
 
     // MARK: - Header

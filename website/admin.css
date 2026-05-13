@@ -5745,6 +5745,78 @@
   text-transform: uppercase;
 }
 
+/* Phase 86A.1 — primary (Daily) group sits at the top with no label; the
+   eye lands on Today / Homes / Concierge first, every reload. Adds a
+   subtle divider before the first collapsible group below so the
+   primary set reads as a distinct block. */
+.admin-nav__group--primary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+}
+
+/* Collapsible groups (Catalog / Reference / Notes & history / Tools)
+   render with a clickable header that doubles as the collapse toggle.
+   When `is-collapsed`, the body is hidden via `[hidden]` (set by the
+   renderer); the chevron flips from "−" to "+". */
+.admin-nav__group--collapsible {
+  margin-bottom: 8px;
+}
+
+.admin-nav__group-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 8px 4px;
+  padding: 4px 4px;
+  text-align: left;
+  width: calc(100% - 16px);
+  transition: color 120ms ease, background 120ms ease;
+}
+.admin-nav__group-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.admin-nav__group-toggle:hover .admin-nav__group-label,
+.admin-nav__group-toggle:hover .admin-nav__group-chevron {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.admin-nav__group-toggle .admin-nav__group-label {
+  margin: 0;
+}
+
+.admin-nav__group-chevron {
+  color: rgba(255, 255, 255, 0.35);
+  font: 700 12px / 1 var(--sans);
+}
+
+.admin-nav__group--collapsible.is-collapsed .admin-nav__group-toggle {
+  /* Subtle dimmer treatment when collapsed so the eye skips past unless
+     intentionally seeking. */
+  opacity: 0.6;
+}
+.admin-nav__group--collapsible.is-collapsed .admin-nav__group-toggle:hover {
+  opacity: 1;
+}
+
+.admin-nav__group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* [hidden] attribute is normally `display: none` by UA stylesheet, but
+   our `display: flex` rule above overrides it. Re-apply explicitly so
+   collapsed groups actually hide their children. */
+.admin-nav__group-body[hidden] {
+  display: none;
+}
+
 /* =============================================================================
    Phase 5z+18 — Coverage Audit view
    ============================================================================= */
@@ -11899,4 +11971,39 @@ details.admin-chez__analysis-section pre {
 .cockpit-vendor__form-feedback {
   font-size: 12px;
   margin-top: 8px;
+}
+
+/* ============================================================================
+ * Phase 86E.2 — Queue rail tag chip filter
+ * ============================================================================
+ * Renders below the All/Mine/Urgent tabs on the cockpit queue rail.
+ * Each chip toggles a tag-scoped filter on the queue list.
+ * ============================================================================ */
+.cockpit-queue__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+
+.cockpit-queue-tag {
+  cursor: pointer;
+  font-size: 10px;
+  padding: 3px 8px;
+  transition: opacity 120ms ease, box-shadow 120ms ease;
+}
+.cockpit-queue-tag:hover { opacity: 0.85; }
+.cockpit-queue-tag.is-active {
+  box-shadow: 0 0 0 2px var(--indigo-700, #524580);
+}
+
+.cockpit-queue-tag--clear {
+  background: transparent;
+  border: 1px dashed var(--neutral-300, #D8DADF);
+  color: var(--text-muted, #6F6A88);
+}
+.cockpit-queue-tag--clear:hover {
+  background: var(--indigo-50, #F2EFF8);
+  color: var(--indigo, #453A70);
 }

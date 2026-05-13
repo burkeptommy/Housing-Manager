@@ -283,12 +283,23 @@ const VIEWS = [
 
 // Phase 5z+18 — Group labels for the left nav. Order here = render order.
 const VIEW_GROUPS = [
-  { id: "action",    label: "Needs attention" },
-  { id: "catalog",   label: "Catalog" },
-  { id: "reference", label: "Reference" },
-  { id: "archive",   label: "Notes & history" },
-  { id: "tools",     label: "Tools" },
+  // Phase 86A.1 — Nav rationalization. Per Tom's "easily navigable"
+  // ask: only the operator's daily surfaces stay always-visible at the
+  // top. The four catalog/reference/archive/tools groups collapse by
+  // default so the sidebar reads as a customer-service tool, not a
+  // catalog editor. Collapse state persists to localStorage so the
+  // operator's pinning choices survive reloads. Default-collapsed
+  // groups auto-expand when the active view lives inside them (so
+  // deep-links / "back to where I was" don't strand the user with no
+  // visual breadcrumb to their current section).
+  { id: "action",    label: "Daily",           collapsible: false },
+  { id: "catalog",   label: "Catalog",         collapsible: true, defaultCollapsed: true },
+  { id: "reference", label: "Reference",       collapsible: true, defaultCollapsed: true },
+  { id: "archive",   label: "Notes & history", collapsible: true, defaultCollapsed: true },
+  { id: "tools",     label: "Tools",           collapsible: true, defaultCollapsed: true },
 ];
+
+const NAV_COLLAPSE_KEY = "chez-admin-nav-collapsed-v1";
 
 const DEFAULT_ROUTINES = [
   ["Cleaning / housekeeping", "Biweekly", "Wednesday 9:00 AM", "Year-round", "housekeeping_program"],
@@ -645,6 +656,7 @@ const state = {
       density: "comfortable",
     },
     queueFilter: "all",       // all | mine | urgent
+    queueTagFilter: null,     // null | tag-slug — Phase 86E.2 chip-filter
     searchQuery: "",
     queueMode: "list",        // list | case (master-detail; case = chat takes the queue rail)
     briefTab: {},             // { [requestId]: 'analysis' | 'considerations' | ... }
@@ -682,6 +694,11 @@ const state = {
     tagDefinitions: [],
     tagDefinitionsLoadedAt: 0,
     appliedTagsByRequest: {},  // { [requestId]: [{ tag_definition_id, slug, label, color }] }
+    // Phase 86E.2 — batch-loaded map of every applied tag across visible
+    // cases so the queue rail can filter by tag without an N+1 fetch.
+    // Keyed by request_id; value is an array of tag_definition_ids.
+    allTagsByRequest: {},
+    allTagsLoadedAt: 0,
     // Slash-picker UI state (transient — not persisted).
     slashOpen: false,
     slashQuery: "",
@@ -2185,10 +2202,7 @@ function jumpToRoutine(kind) {
 
 function renderNav() {
   const counts = countByView();
-  // Phase 5z+18 — Render the nav grouped by section. Groups appear in
-  // VIEW_GROUPS order; within each group, VIEWS preserves its source
-  // order. The section header is a small uppercase label between
-  // groups so the eye chunks the long list.
+  const collapsed = loadNavCollapsedState();
   const renderButton = (view) => {
     const c = counts[view.id];
     let badge = "";
@@ -2209,10 +2223,31 @@ function renderNav() {
   const groupHtml = VIEW_GROUPS.map((group) => {
     const views = VIEWS.filter((v) => (v.group || "catalog") === group.id);
     if (views.length === 0) return "";
+    // Phase 86A.1 — auto-expand any group that contains the currently
+    // selected view, regardless of saved collapse state. Prevents the
+    // sidebar from hiding the user's current location when they
+    // deep-link or refresh on a deep page.
+    const containsActive = views.some((v) => v.id === state.view);
+    const isCollapsed = group.collapsible && !containsActive && collapsed[group.id];
+    if (!group.collapsible) {
+      // Non-collapsible (Daily) — no header, no toggle, always shown.
+      // Headerless reads as "this is the home base" — anything below
+      // a header is a secondary surface the operator visits less often.
+      return `
+        <div class="admin-nav__group admin-nav__group--primary">
+          ${views.map(renderButton).join("")}
+        </div>
+      `;
+    }
     return `
-      <div class="admin-nav__group">
-        <span class="admin-nav__group-label">${escapeHtml(group.label)}</span>
-        ${views.map(renderButton).join("")}
+      <div class="admin-nav__group admin-nav__group--collapsible ${isCollapsed ? "is-collapsed" : ""}">
+        <button type="button" class="admin-nav__group-toggle" data-nav-group-toggle="${escapeHtml(group.id)}" aria-expanded="${!isCollapsed}">
+          <span class="admin-nav__group-label">${escapeHtml(group.label)}</span>
+          <span class="admin-nav__group-chevron" aria-hidden="true">${isCollapsed ? "+" : "−"}</span>
+        </button>
+        <div class="admin-nav__group-body" ${isCollapsed ? "hidden" : ""}>
+          ${views.map(renderButton).join("")}
+        </div>
       </div>
     `;
   }).join("");
@@ -2233,6 +2268,40 @@ function renderNav() {
       render();
     });
   });
+  // Phase 86A.1 — collapsible group toggles. Persist state via
+  // localStorage so the operator's pinning survives reloads.
+  el.nav.querySelectorAll("[data-nav-group-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const groupId = btn.dataset.navGroupToggle;
+      const next = !collapsed[groupId];
+      collapsed[groupId] = next;
+      saveNavCollapsedState(collapsed);
+      renderNav();
+    });
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Phase 86A.1 — nav collapse state persistence
+// ----------------------------------------------------------------------------
+function loadNavCollapsedState() {
+  // Default to each group's `defaultCollapsed` if no localStorage value
+  // is present. Once the user toggles, the saved object takes over.
+  try {
+    const raw = localStorage.getItem(NAV_COLLAPSE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  } catch (_e) { /* localStorage unavailable */ }
+  const defaults = {};
+  for (const g of VIEW_GROUPS) {
+    if (g.collapsible) defaults[g.id] = !!g.defaultCollapsed;
+  }
+  return defaults;
+}
+function saveNavCollapsedState(state) {
+  try { localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(state)); } catch (_e) {}
 }
 
 function renderList() {
@@ -5120,6 +5189,13 @@ function renderConciergeCockpit() {
 
   const search = (state.concierge.searchQuery || "").toLowerCase().trim();
   const filterMode = state.concierge.queueFilter || "all";
+  // Phase 86E.2 — chip filter narrows the queue to cases with that tag.
+  // Resolves the slug to its tag_definition_id once, then applies the
+  // bulk-loaded `allTagsByRequest` map to each case.
+  const tagFilterSlug = state.concierge.queueTagFilter || null;
+  const tagFilterId = tagFilterSlug
+    ? (state.crm.tagDefinitions.find((d) => d.slug === tagFilterSlug)?.id || null)
+    : null;
   const filtered = requests.filter((r) => {
     if (filterMode === "urgent") {
       const sla = chezSlaPill(r);
@@ -5129,6 +5205,10 @@ function renderConciergeCockpit() {
       // Single-agent system for v1 — every open case is "mine". Filter to
       // active so the bucket label still feels useful.
       if (r.status === "resolved") return false;
+    }
+    if (tagFilterId) {
+      const applied = state.crm.allTagsByRequest[r.id] || [];
+      if (!applied.includes(tagFilterId)) return false;
     }
     if (search) {
       const summary = (r.summary || "").toLowerCase();
@@ -5302,6 +5382,7 @@ function renderConciergeQueueRailHtml(filtered, allRequests, activeReq) {
             </button>
           `).join("")}
         </div>
+        ${renderQueueTagChipsHtml()}
       </div>
       <div class="cockpit-queue__stats">
         ${renderConciergeStatTile("Open", open, "indigo")}
@@ -7775,6 +7856,25 @@ async function ensureCrmReferenceData() {
         .catch((e) => console.warn("[crm] tag defs load failed", e))
     );
   }
+  // Phase 86E.2 — batch-load every applied tag across the queue so the
+  // queue rail can filter by tag without a per-row fetch. RLS gates by
+  // admin allowlist; the response is small (one row per tag-application).
+  if (Object.keys(state.crm.allTagsByRequest).length === 0 || stale(state.crm.allTagsLoadedAt)) {
+    promises.push(
+      supabase.from("chez_request_tags")
+        .select("request_id, tag_definition_id")
+        .then(({ data, error }) => {
+          if (error) throw error;
+          const map = {};
+          for (const row of (data || [])) {
+            (map[row.request_id] = map[row.request_id] || []).push(row.tag_definition_id);
+          }
+          state.crm.allTagsByRequest = map;
+          state.crm.allTagsLoadedAt = Date.now();
+        })
+        .catch((e) => console.warn("[crm] tag bulk load failed", e))
+    );
+  }
   if (promises.length > 0) {
     await Promise.allSettled(promises);
     // Re-render with the freshly-loaded data, but only if we're still on
@@ -7941,6 +8041,39 @@ function buildSnippetTokenContext(activeReq) {
 // ----------------------------------------------------------------------------
 // Tag chip strip — renders in the case header below the existing chips.
 // ----------------------------------------------------------------------------
+// Phase 86E.2 — queue rail tag chip strip. Renders below the All/Mine/
+// Urgent tabs. Each chip is a tag definition; clicking toggles the
+// active filter (state.concierge.queueTagFilter). Only renders chips
+// that have at least one applied case — keeps the strip tight when the
+// taxonomy hasn't been used yet.
+function renderQueueTagChipsHtml() {
+  const defs = state.crm.tagDefinitions || [];
+  if (defs.length === 0) return ""; // not loaded yet, or empty taxonomy
+  const tagsInUse = new Set();
+  for (const list of Object.values(state.crm.allTagsByRequest || {})) {
+    for (const id of list) tagsInUse.add(id);
+  }
+  const visible = defs.filter((d) => tagsInUse.has(d.id));
+  if (visible.length === 0) return "";
+  const active = state.concierge.queueTagFilter;
+  const chips = visible.map((d) => `
+    <button type="button"
+      class="cockpit-queue-tag cockpit-tag-chip cockpit-tag-chip--${escapeHtml(d.color || "muted")} ${active === d.slug ? "is-active" : ""}"
+      data-queue-tag-filter="${escapeHtml(d.slug)}">
+      ${escapeHtml(d.label)}
+    </button>
+  `).join("");
+  const clear = active
+    ? `<button type="button" class="cockpit-queue-tag cockpit-queue-tag--clear" data-queue-tag-filter="__clear">Clear</button>`
+    : "";
+  return `
+    <div class="cockpit-queue__tags">
+      ${chips}
+      ${clear}
+    </div>
+  `;
+}
+
 function renderTagChipsHtml(activeReq) {
   if (!activeReq) return "";
   // Trigger load if we haven't yet.
@@ -8071,6 +8204,23 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
   host.querySelectorAll("[data-cockpit-queue-filter]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.concierge.queueFilter = btn.dataset.cockpitQueueFilter;
+      renderConciergeCockpit();
+    });
+  });
+
+  // Phase 86E.2 — queue tag chip toggles. Clicking an active chip clears
+  // it (so the strip doubles as a toggle); clicking another swaps the
+  // filter. "Clear" button explicitly resets to null.
+  host.querySelectorAll("[data-queue-tag-filter]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const slug = chip.dataset.queueTagFilter;
+      if (slug === "__clear") {
+        state.concierge.queueTagFilter = null;
+      } else if (state.concierge.queueTagFilter === slug) {
+        state.concierge.queueTagFilter = null;
+      } else {
+        state.concierge.queueTagFilter = slug;
+      }
       renderConciergeCockpit();
     });
   });

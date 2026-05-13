@@ -103,6 +103,12 @@ struct ChezRequestRow: Codable, Identifiable {
     let resolvedAt: Date?
     let createdAt: Date
     let updatedAt: Date?
+    /// Phase 86E.3 — when the operator merges a stray duplicate case
+    /// into this one's "twin", the duplicate row gets this column
+    /// pointed at the surviving case. iOS shows a "merged into…" banner
+    /// + tap-to-jump so the homeowner doesn't get a 404 if they have a
+    /// link bookmarked to the old conversation.
+    let mergedIntoRequestId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id, category, summary, context, status
@@ -115,6 +121,7 @@ struct ChezRequestRow: Codable, Identifiable {
         case resolvedAt = "resolved_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case mergedIntoRequestId = "merged_into_request_id"
     }
 
     init(from decoder: Decoder) throws {
@@ -138,6 +145,7 @@ struct ChezRequestRow: Codable, Identifiable {
         resolvedAt = (try? c.decodeIfPresent(Date.self, forKey: .resolvedAt)) ?? nil
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
         updatedAt = (try? c.decodeIfPresent(Date.self, forKey: .updatedAt)) ?? nil
+        mergedIntoRequestId = (try? c.decodeIfPresent(UUID.self, forKey: .mergedIntoRequestId)) ?? nil
     }
 
     /// Encode context back as a dict of strings — sufficient for any
@@ -158,6 +166,7 @@ struct ChezRequestRow: Codable, Identifiable {
         try c.encodeIfPresent(resolvedAt, forKey: .resolvedAt)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
+        try c.encodeIfPresent(mergedIntoRequestId, forKey: .mergedIntoRequestId)
     }
 
     var typedCategory: ChezCategory {

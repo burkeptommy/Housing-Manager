@@ -488,30 +488,23 @@ function firstTouchMessageForCategory(category: string, summary: string): string
 }
 
 async function playbookFindVendor(ctx: PlaybookContext): Promise<void> {
-  // Kick off vendor research in the background. The analyze_request
-  // handler does the heavy lift — Claude infers category, drafts call
-  // script + key questions, matches existing household network, and
-  // pre-fetches Google Places candidates. We don't await the full
-  // result because it can take 5-10s; we just fire the side effect
-  // so the cache is warm when the operator opens the cockpit.
+  // Phase 86E.4 — fire the real analyze pipeline (Claude inference +
+  // existing-vendor match + Places lookup + cache write) so when the
+  // operator opens the cockpit the brief panel is already populated.
+  // The whole pipeline is await-ed here because the parent caller
+  // awaits the playbook inside a Promise.all alongside the admin push
+  // + email; the submit response goes out as soon as all three
+  // resolve. analyze takes 3-6s end-to-end so this adds modest latency
+  // to the submit; the value is worth it (operator opens to a
+  // pre-warmed brief, not a "loading…" state).
   //
-  // analyze_request stores its result in chez_request_analyses
-  // (the existing Phase 81.1 cache). The operator's cockpit reads
-  // from that cache; we don't need to plumb a value back here.
+  // serviceUrl falls back to the Supabase URL env var so the
+  // find-local-vendors fetch can resolve.
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return; // no key → skip silently; sentinel from prior code path keeps the cache stub
+  const serviceUrl = Deno.env.get("SUPABASE_URL") ?? "";
   try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) return;
-    // Direct call to the existing analyzer rather than re-routing
-    // through the dispatch. Mirrors what the cockpit does on rerun.
-    // We don't block the submit response on this — fire and walk away.
-    await runChezAnalysisForRequest({
-      service: ctx.service,
-      requestId: ctx.requestId,
-      householdId: ctx.householdId,
-      apiKey,
-      operatorOverrideCategory: null,
-      force: false,
-    });
+    await runAnalysisCore(ctx.service, ctx.requestId, false, serviceUrl, ctx.user.id);
   } catch (e) {
     console.warn("[playbook:find_vendor] analyze failed:", e);
   }
@@ -540,41 +533,10 @@ async function playbookGetQuote(ctx: PlaybookContext): Promise<void> {
   return;
 }
 
-// ----------------------------------------------------------------------------
-// runChezAnalysisForRequest — extracted from the analyze_request handler
-// so playbooks can fire it without going through the action dispatcher.
-// Internal helper; signature matches the public action body shape.
-// ----------------------------------------------------------------------------
-async function runChezAnalysisForRequest(args: {
-  service: ServiceClient;
-  requestId: string;
-  householdId: string;
-  apiKey: string;
-  operatorOverrideCategory: string | null;
-  force: boolean;
-}): Promise<void> {
-  // The existing analyze_request handler does its work via the dispatch
-  // switch path; rather than duplicating the full pipeline here, we
-  // invoke it through the same service-role POST so the analysis row
-  // lands in the same cache the cockpit reads.
-  //
-  // For v1 of Phase 86D we just stamp a sentinel row in
-  // chez_request_analyses that tells the operator "playbook fired —
-  // open the cockpit to see fresh research." The full
-  // background-analyzer plumbing comes in Phase 86E alongside outbound-
-  // email drafts.
-  try {
-    await args.service.from("chez_request_analyses").upsert({
-      request_id: args.requestId,
-      household_id: args.householdId,
-      analysis: { _kind: "playbook_pending", queued_at: new Date().toISOString() },
-      status: "queued_by_playbook",
-    }, { onConflict: "request_id" });
-  } catch (e) {
-    // chez_request_analyses may not be present on every env; non-fatal.
-    console.warn("[playbook] analysis sentinel insert (non-fatal):", e);
-  }
-}
+// Phase 86E.4 — runChezAnalysisForRequest sentinel removed. The
+// find_vendor playbook now calls runAnalysisCore directly so the cockpit
+// opens with a real cached brief (Claude + Places + matched vendors),
+// not a placeholder. See playbookFindVendor + handleAnalyzeRequest.
 
 // ============================================================================
 // Action: reply
@@ -1104,27 +1066,44 @@ async function handleDelegateRoutine(
         content: `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
         attachments: [],
       });
-      await sendPush(
-        serviceUrl,
-        serviceRoleKey,
-        adminUserIds(),
-        "Customer delegated a routine to Chez",
+
+      // Phase 86E — playbook fires here too so the homeowner sees
+      // "Chez is on it" immediately on the new standing-engagement
+      // thread, same as a fresh submit. Best-effort + non-fatal.
+      const playbookPromise = runChezPlaybookForRequest({
+        service,
+        user,
+        requestId: r.id,
+        householdId,
+        category: "coordinate_task",
         summary,
-        { type: "chez_admin_request", request_id: r.id }
-      );
-      await sendAdminEmail(
-        adminEmails(),
-        `[Chez] New standing engagement: ${(routine as { label: string }).label}`,
-        `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
-        emailBody({
-          preview: "Customer handed off a recurring routine to Chez.",
-          heading: "New standing engagement",
-          intro: `The customer wants Chez to own scheduling for "${(routine as { label: string }).label}" from now on.`,
-          bodyText: payload.notes ?? "(no additional notes)",
-          ctaLabel: "Open in admin portal",
-          ctaUrl: adminPortalUrl(r.id),
-        })
-      );
+        description: payload.notes ?? "",
+      }).catch((e) => console.warn("[playbook] delegate_routine failed:", e));
+
+      await Promise.all([
+        sendPush(
+          serviceUrl,
+          serviceRoleKey,
+          adminUserIds(),
+          "Customer delegated a routine to Chez",
+          summary,
+          { type: "chez_admin_request", request_id: r.id }
+        ),
+        sendAdminEmail(
+          adminEmails(),
+          `[Chez] New standing engagement: ${(routine as { label: string }).label}`,
+          `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          emailBody({
+            preview: "Customer handed off a recurring routine to Chez.",
+            heading: "New standing engagement",
+            intro: `The customer wants Chez to own scheduling for "${(routine as { label: string }).label}" from now on.`,
+            bodyText: payload.notes ?? "(no additional notes)",
+            ctaLabel: "Open in admin portal",
+            ctaUrl: adminPortalUrl(r.id),
+          })
+        ),
+        playbookPromise,
+      ]);
     }
   }
   return json({ ok: true });
@@ -1199,27 +1178,42 @@ async function handleDelegateContractor(
         content: `Customer set Chez as point of contact for ${c.company_name}. From now on, you handle scheduling and follow-ups directly with this vendor.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
         attachments: [],
       });
-      await sendPush(
-        serviceUrl,
-        serviceRoleKey,
-        adminUserIds(),
-        "Customer made Chez point of contact for a vendor",
+
+      // Phase 86E — playbook fires here too (contractor delegation).
+      const playbookPromise = runChezPlaybookForRequest({
+        service,
+        user,
+        requestId: r.id,
+        householdId,
+        category: "coordinate_task",
         summary,
-        { type: "chez_admin_request", request_id: r.id }
-      );
-      await sendAdminEmail(
-        adminEmails(),
-        `[Chez] New standing engagement: ${c.company_name}`,
-        `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
-        emailBody({
-          preview: `Customer made Chez point of contact for ${c.company_name}.`,
-          heading: "New standing engagement",
-          intro: `The customer wants Chez to be point of contact for ${c.company_name} from now on.`,
-          bodyText: payload.notes ?? "(no additional notes)",
-          ctaLabel: "Open in admin portal",
-          ctaUrl: adminPortalUrl(r.id),
-        })
-      );
+        description: payload.notes ?? "",
+      }).catch((e) => console.warn("[playbook] delegate_contractor failed:", e));
+
+      await Promise.all([
+        sendPush(
+          serviceUrl,
+          serviceRoleKey,
+          adminUserIds(),
+          "Customer made Chez point of contact for a vendor",
+          summary,
+          { type: "chez_admin_request", request_id: r.id }
+        ),
+        sendAdminEmail(
+          adminEmails(),
+          `[Chez] New standing engagement: ${c.company_name}`,
+          `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          emailBody({
+            preview: `Customer made Chez point of contact for ${c.company_name}.`,
+            heading: "New standing engagement",
+            intro: `The customer wants Chez to be point of contact for ${c.company_name} from now on.`,
+            bodyText: payload.notes ?? "(no additional notes)",
+            ctaLabel: "Open in admin portal",
+            ctaUrl: adminPortalUrl(r.id),
+          })
+        ),
+        playbookPromise,
+      ]);
     }
   }
   return json({ ok: true });
@@ -2120,13 +2114,34 @@ async function handleAnalyzeRequest(
   const requestId = compactString(payload.request_id);
   if (!requestId) return json({ error: "request_id required" }, 400);
 
+  // Phase 86E.4 — extracted core to a separate fn so the playbook can
+  // call it without going through the admin auth gate (which doesn't
+  // apply to internal server-to-server invocation). The handler still
+  // owns the response shape; the helper just returns the payload.
+  try {
+    const result = await runAnalysisCore(service, requestId, !!payload.force, serviceUrl, user.id);
+    if (result.kind === "not_found") return json({ error: "request not found" }, 404);
+    return json(result.payload);
+  } catch (e) {
+    console.error("[analyze] core failed:", e);
+    return json({ error: String(e) }, 500);
+  }
+}
+
+async function runAnalysisCore(
+  service: ServiceClient,
+  requestId: string,
+  force: boolean,
+  serviceUrl: string,
+  forUserId: string
+): Promise<{ kind: "ok"; payload: Record<string, unknown> } | { kind: "not_found" }> {
   // 1. Fetch the request + household scope.
   const { data: requestRow, error: reqErr } = await service
     .from("chez_requests")
     .select("*")
     .eq("id", requestId)
     .maybeSingle();
-  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+  if (reqErr || !requestRow) return { kind: "not_found" };
   const request = requestRow as ConciergeRequestRow & {
     analysis_cache?: Record<string, unknown> | null;
     analysis_cache_at?: string | null;
@@ -2140,14 +2155,14 @@ async function handleAnalyzeRequest(
   //     written (so the situation hasn't changed)
   // This is the biggest single cost reduction in the cockpit because
   // the previous behavior fired Claude on every browser refresh.
-  if (!payload.force && request.analysis_cache && request.analysis_cache_at) {
+  if (!force && request.analysis_cache && request.analysis_cache_at) {
     const cacheTime = new Date(request.analysis_cache_at).getTime();
     const lastMessageTime = request.last_message_at
       ? new Date(request.last_message_at).getTime()
       : 0;
     if (lastMessageTime <= cacheTime) {
       console.log(`[analyze] cache hit for ${requestId} (saved 1 Claude call)`);
-      return json(request.analysis_cache);
+      return { kind: "ok", payload: request.analysis_cache as Record<string, unknown> };
     }
   }
 
@@ -2230,7 +2245,7 @@ Return ONLY the JSON. No preamble.`;
       messages: [{ role: "user", content: userPrompt }],
       request_id: requestId,
       household_id: request.household_id,
-      user_id: user.id,
+      user_id: forUserId,
     });
     if (result?.text) {
       try {
@@ -2305,7 +2320,7 @@ Return ONLY the JSON. No preamble.`;
       if (error) console.warn("[analyze] cache write failed:", error.message);
     });
 
-  return json(responsePayload);
+  return { kind: "ok", payload: responsePayload as Record<string, unknown> };
 }
 
 interface AnalysisResult {
@@ -2920,27 +2935,47 @@ async function handleDelegateEntity(
         content: `${instruction}${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
         attachments: [],
       });
-      await sendPush(
-        serviceUrl,
-        serviceRoleKey,
-        adminUserIds(),
-        `Customer delegated a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez`,
+
+      // Phase 86E — playbook fires here too for delegate_entity. Same
+      // category mapping as the other delegation paths so the operator
+      // gets a consistent thread experience. project entities map to
+      // get_quote (vendors + bids); everything else maps to
+      // coordinate_task.
+      const playbookCategory = entityType === "project" ? "get_quote" : "coordinate_task";
+      const playbookPromise = runChezPlaybookForRequest({
+        service,
+        user,
+        requestId: r.id,
+        householdId,
+        category: playbookCategory,
         summary,
-        { type: "chez_admin_request", request_id: r.id }
-      );
-      await sendAdminEmail(
-        adminEmails(),
-        `[Chez] New standing engagement: ${labelForThread}`,
-        `${instruction}\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
-        emailBody({
-          preview: `Customer handed off a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez.`,
-          heading: "New standing engagement",
-          intro: `The customer wants Chez to own management of "${labelForThread}" from now on.`,
-          bodyText: payload.notes ?? "(no additional notes)",
-          ctaLabel: "Open in admin portal",
-          ctaUrl: adminPortalUrl(r.id),
-        })
-      );
+        description: payload.notes ?? instruction,
+      }).catch((e) => console.warn(`[playbook] delegate_entity (${entityType}) failed:`, e));
+
+      await Promise.all([
+        sendPush(
+          serviceUrl,
+          serviceRoleKey,
+          adminUserIds(),
+          `Customer delegated a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez`,
+          summary,
+          { type: "chez_admin_request", request_id: r.id }
+        ),
+        sendAdminEmail(
+          adminEmails(),
+          `[Chez] New standing engagement: ${labelForThread}`,
+          `${instruction}\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          emailBody({
+            preview: `Customer handed off a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez.`,
+            heading: "New standing engagement",
+            intro: `The customer wants Chez to own management of "${labelForThread}" from now on.`,
+            bodyText: payload.notes ?? "(no additional notes)",
+            ctaLabel: "Open in admin portal",
+            ctaUrl: adminPortalUrl(r.id),
+          })
+        ),
+        playbookPromise,
+      ]);
     }
   }
 
