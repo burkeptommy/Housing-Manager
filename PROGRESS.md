@@ -40,6 +40,38 @@ Round 1 Item 6 (dashboard density) deferred — friend said "let me think on it"
 - HavenTests target-wide compile cleanup so the test action runs (existing tests have nil-context and missing-argument errors unrelated to my changes).
 - Alfred Phase 9b TestFlight verification — only exercise will reveal whether the tool_use round-trips correctly under real Anthropic + chez-concierge auth.
 
+## Quiz Enhancement Phase 1: Scope Expansion (2026-05-12)
+
+Six-work-item additive expansion to the House Quiz vendor / system / routine capture. No schema changes, no Supabase migrations, no RLS changes. All persisted shapes back- and forward-compatible.
+
+- **1.5 — Smoke/CO auto-seed routine** (c938a443). Universal semi-annual (March + September) smoke + CO detector check seeded via `RoutineSeeder.ensureSystemlessRoutines`. New-quiz households get it via the existing `ensureAutoCreatedSystems` call; existing households back-fill via `AppState.ensureSmokeCoRoutineOnceIfNeeded` (gated on `hasEnsuredSmokeCoRoutine_v1`). Reuses `RoutineKind.otherService` with `serviceKey="smoke_co_program"` so legacy clients decode cleanly.
+- **1.6 — Q9b renovation year fix** (fa1b0c1a). Replaced the TODO stub in `HouseQuizAnswerMapper` so captured renovation years actually propagate to `home_systems.install_date` with `install_date_source = "user_renovation"`. Guards prevent overwriting user-confirmed dates and older dates on back-nav.
+- **1.1 — gutter_cleaning + painter chips on Q15b** (53c79bfd). Two universal-visibility contractor chips. Both categories already lived in `SystemCategoryRegistry`; mapper + `RoutineSeeder.defaults(for:)` + `RoutineGroupingEngine.routineKindFor` wired so the contractor mirror, vendor coverage, and routine seeding all light up. Deviation note: gutter check inserted ABOVE the cleaning branch because `"Gutter Cleaning".lowercased()` contains `"clean"`.
+- **1.2 — LibraryPicker component** (5df47107). Reusable searchable picker at `Haven/Features/Onboarding/HouseQuiz/Components/LibraryPicker.swift`. Modeled on UtilityProviderSearchPicker. Consumed by 1.3 and 1.4.
+- **1.4 — Q10 "Anything else?" appliance library** (10788636). New `anything_else_appliance` chip on Q10 opens LibraryPicker with 10 curated HNW appliances (wine cellar, ice maker, kegerator, etc.). Selections persist with a `lib:` prefix; mapper strips it before calling `ensureHomeSystem`.
+- **1.3 — Q15b terminal "Anything else?" chip** (d4d7a95c). Terminal chip opens LibraryPicker with every `SystemCategoryRegistry` entry not already a Q15b chip. Picks become synthetic `lib:<category>` chips with the standard `QuizLocalContractorPicker` affordance. Forward-compatible: future registry additions auto-surface.
+
+Build green throughout. SQL / UI functional verification deferred to the manual TestFlight pass.
+
+## Quiz Enhancement Phase 2: Universal "Have Chez Handle This" (2026-05-12)
+
+Five work items wiring a "Have Chez handle this" affordance into ~15 quiz surfaces and batching the captured intents into `chez_requests` rows at quiz completion. No schema changes, no migrations, no RLS changes. Each `chez_requests` row carries `context.source = "house_quiz"` plus the question id, slot key, system category, town, and state.
+
+- **2.1 — Capture intent on quiz surfaces** (56e0af43). New `ChezHandleButton` reusable component. Wired onto Q11/Q12/Q13/Q14/Q15/Q15b chips (per-chip)/Q16/Q17/Q18/Q19/Q21/Q22/Q26 (auto + home). Single-question intents persist to `state.answers[qid].payload["chezHandles"]`; Q26 uses `chezHandlesAuto` / `chezHandlesHome` for per-slot capture; Q15b chips persist as `"chez:<chipId>"` in `customEntries`. The mapper's `parseContractorChipEntry` was extended to skip `"chez:"` entries so they don't create stub contractor rows. Hard rule 4 satisfied: button does NOT advance the question.
+- **2.2 — Batch-create chez_requests at completion** (ba220c1a). New `ChezQuizRequestSubmitter` walks the captured state, synthesizes `QuizIntent`s, and submits each one via `HavenSupabase.submitChezRequest`. Idempotent two ways: per-intent attribute flags on `properties.attributes` (so partial failures retry cleanly on next launch) + an in-memory `didFireChezQuizSubmission` flag. Detached so the persist call returns immediately. Publishes `chezQuizRequestsSubmittedCount` and posts `.chezQuizRequestsSubmitted` notification.
+- **2.4 — End-of-quiz Chez summary card** (0d1e37e4). `HouseQuizChezSummaryCard` renders above `QuizCinematicReveal` whenever the quiz captured 1+ intents. One row per intent (icon + label + "in progress" + chevron). Continue collapses the card; tapping a row routes to the Chez inbox tab. Zero-intent quizzes render the reveal unchanged.
+- **2.5 — Admin cockpit Quiz pill** (e90bf7cc). Salmon-tinted "Quiz" badge in the concierge queue case header for any request whose `context.source` equals `"house_quiz"`. Legacy requests render no pill (no layout shift).
+
+Note: 2.3 was subsumed by 2.2 (context source stamping happens inside the submitter).
+
+## Quiz Enhancement Phase 3: Deferrable Enhancements (2026-05-12)
+
+Three small wins layered on top of Phase 1 + 2. No schema changes, no migrations.
+
+- **3.2 — ChezOwnsBadge on contractor directory rows** (1e296b52). Surfaces the existing compact `ChezOwnsBadge` next to `companyName` in `ContractorDirectoryView.contractorCard` when `contractor.isChezOwned == true`. Already-populated from `contractors.chez_owned`; no fetch added.
+- **3.1 — HNW Subtype Review Dashboard card** (95c98d22). New `HNWSubtypeReviewCard` modeled on `WhatsNewPhase57Card`. Renders for properties created within the last 14 days (new onboards) and opens the existing `UpdateHomeDetailsSheet` with the 10 HNW toggles. Per-property dismissal under `hnwSubtypeReviewDismissed` (comma-joined UUID list) so multi-property households can review each one independently.
+- **3.3 — Push when Chez schedules a chez_owned routine visit** (b7e0f5f0). Edge function `chez-concierge` `schedule_visit` case now fetches the routine row after the visit insert, checks `chez_owned`, and fires a push to every linked household user. Title: "Chez scheduled a visit". Body: "{vendor} is booked for {date}". Wrapped in try/catch so push failure never fails the schedule. iOS `HavenApp.userNotificationCenter` gained an explicit `chez_routine_visit_scheduled` case BEFORE the `chez_` catch-all so empty `request_id` doesn't fall through to `.openChezRequest`. **Requires edge function deploy:** `supabase functions deploy chez-concierge --no-verify-jwt`.
+
 ## CI Fix: DashboardView type-checker timeout (2026-05-05)
 
 The `Admin Apply Validate` workflow had been failing on every push to `claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` (latest run [25410326911](https://github.com/burkeptommy/Housing-Manager/actions/runs/25410326911), exit code 65). Root cause: `DashboardView.swift:83` triggered Swift's "the compiler is unable to type-check this expression in reasonable time" error. The dashboard's `body` was a single ~400-line expression with skeleton placeholders + ~30 conditional branches. Apple-silicon Xcode chewed through it; the macos-15 GitHub runner blew the type-checker's budget.
