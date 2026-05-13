@@ -112,6 +112,19 @@ Tom asked for a full audit of the Chez admin panel from a customer-service stand
 - Tag chips on the queue rail (currently chips only render on the focused case header).
 - Per-operator queue ownership UI (Phase 86B added the column; admin UI for "Assign" / "Unassigned" filter still to wire).
 
+**Phase 86E + nav rationalization shipped 2026-05-12 (commit 971e5a39):**
+- Sidebar nav rationalized: 6 "Daily" entries always visible at top with divider, 4 collapsible groups below (Catalog / Reference / Notes & history / Tools) default collapsed, persisted to localStorage, auto-expand if active view lives inside.
+- Delegation playbook parity: routine + contractor + entity delegations now fire the same first-touch + reminder flow as task delegation.
+- Queue-rail tag chip filter: chips render below All/Mine/Urgent tabs (only for tags with applied cases); click toggles filter, batch-load via single query on cockpit first render.
+- iOS merged-with banner shipped (with the inner-VStack extracted into a `scrollContent` @ViewBuilder to dodge the SwiftUI type-checker timeout — same fix Tom used on DashboardView).
+- find_vendor playbook now calls the real `runAnalysisCore` (Claude + Places + cache write) so the cockpit opens to a pre-warmed brief instead of a sentinel placeholder.
+- Migrations 20261313 + 20261314 applied via `db query --linked -f` (push wrapper tripped on a pre-existing 20261212 schema_migrations log gap; repaired with `migration repair --status applied`). All 4 new tables verified live with seed data.
+- Three edge functions deployed: send-chez-vendor-email (new), chez-concierge + receive-email (updated). Smoke test returns the expected admin-only 403 from anon — gating works.
+
+**Still pending (Phase 86E.2):**
+- 86E remaining per-category automation: auto-draft intro email to existing contractor on coordinate_task delegation; parse date hints on schedule_visit; pre-load comparable rates on get_quote (the runAnalysisCore extraction unblocks these — the work is now plumbing each playbook into its category-specific Claude prompt).
+- Per-operator queue ownership UI (column exists; "Assign" / "Unassigned" filter still to wire — single-operator solo for now).
+
 ---
 
 ## CI Fix: DashboardView type-checker timeout (2026-05-05)
