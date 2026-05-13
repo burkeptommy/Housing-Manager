@@ -7660,6 +7660,16 @@ details.admin-chez__analysis-section pre {
 .cockpit-pill--indigo   { background: var(--indigo-50, #F2EFF8); color: var(--indigo, #453A70); }
 .cockpit-pill--neutral  { background: #F1F2F4; color: var(--text-muted, #6F6A88); }
 .cockpit-pill--solid-salmon { background: var(--salmon, #ED6955); color: #fff; }
+/* Phase 2.5: salmon-tinted "Quiz" badge on requests sourced from the
+ * homeowner's House Quiz. Distinct from `salmon` so operators can tell
+ * the wave apart at a glance without crowding the other tones. */
+.cockpit-pill--quiz {
+  background: rgba(237, 105, 85, 0.12);
+  color: var(--salmon-dark, #D14E3E);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
 
 .cockpit-aichip {
   display: inline-flex;

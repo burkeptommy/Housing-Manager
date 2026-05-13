@@ -5426,6 +5426,15 @@ function renderConciergeQueueCaseHtml(req, isActive) {
   // cases ("Margaret Ashley") more than by household label.
   const homeownerName = (req.user && (req.user.full_name || req.user.email)) || "";
 
+  // Phase 2.5: visual marker for requests sourced from the homeowner's
+  // House Quiz. Lets the operator triage the new-user wave separately
+  // from inbound replies. Older requests without context.source fall
+  // through with no pill rendered, so the layout doesn't shift.
+  const isQuizSourced = (req.context || {}).source === "house_quiz";
+  const quizPill = isQuizSourced
+    ? `<span class="cockpit-pill cockpit-pill--xs cockpit-pill--quiz" title="Sourced from House Quiz">Quiz</span>`
+    : "";
+
   return `
     <button type="button" class="cockpit-queue__case ${isActive ? "is-active" : ""}" data-cockpit-case-id="${escapeHtml(req.id)}">
       ${isActive ? `<span class="cockpit-queue__case-accent"></span>` : ""}
@@ -5435,6 +5444,7 @@ function renderConciergeQueueCaseHtml(req, isActive) {
       <div class="cockpit-queue__case-top">
         <span class="cockpit-queue__case-icon">${CHEZ_CATEGORY_ICONS[cat] || "💬"}</span>
         <span class="cockpit-queue__case-type">${escapeHtml(catLabel)}</span>
+        ${quizPill}
         <span class="cockpit-queue__case-id">${escapeHtml(req.id.slice(0, 8))}</span>
       </div>
       <div class="cockpit-queue__case-title">${escapeHtml(req.summary || "(no summary)")}</div>
