@@ -346,6 +346,29 @@
   padding: 24px 30px 44px;
 }
 
+/* Phase 86A — Today command center wants the full viewport so the
+   cards and three-section layout have room to breathe. The right-side
+   detail rail is hidden by renderTodayView, the search + status filter
+   row hides too (entity-list controls don't apply here), and stat tiles
+   spread out into a 5-up row. */
+.admin-layout.admin-layout--single {
+  grid-template-columns: 1fr;
+}
+.admin-layout.admin-layout--single .admin-detail-panel {
+  display: none;
+}
+.admin-layout.admin-layout--single .admin-list-tools {
+  display: none;
+}
+.admin-layout.admin-layout--single .admin-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  .admin-layout.admin-layout--single .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .admin-list-panel,
 .admin-detail-panel {
   min-width: 0;
@@ -11146,6 +11169,474 @@ details.admin-chez__analysis-section pre {
 
 /* Notes block — homeowner notes / description / etc. */
 .admin-focused__notes-block {
+/* ============================================================================
+ * Phase 86A — Today command center + Home Overview
+ * ============================================================================
+ * Today is the new default landing — cross-home triage replacing the old
+ * Quiz Builder default. Three stacked sections (Needs you now, Today's
+ * visits, Coming up). Home Overview is the new default workbench tab —
+ * address as masthead, contacts, standing instructions, coverage tiles,
+ * open cases, recent activity. Both surfaces lean on the same shared
+ * tones (red / amber / muted / green) defined earlier; new tones below.
+ * ============================================================================ */
+
+/* --- Extra pill tones used by Today + Overview. The base
+   .admin-pill[data-tone="red|amber|muted|green"] rules live around L6045;
+   we add `indigo` and `yellow` here so urgency steps read clearly. --- */
+.admin-pill[data-tone="indigo"] {
+  background: var(--indigo-100, #E8E4F2);
+  color: var(--indigo, #453A70);
+}
+.admin-pill[data-tone="yellow"] {
+  background: rgba(199, 126, 46, 0.10);
+  color: #95621F;
+}
+
+/* --- Today greeting card --- */
+.admin-today {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.admin-today__greeting {
+  align-items: center;
+  background: linear-gradient(135deg, var(--indigo) 0%, var(--indigo-700) 100%);
+  border-radius: var(--radius);
+  color: #fff;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 28px 32px;
+}
+
+.admin-today__greeting-text { flex: 1; }
+
+.admin-today__greeting-eyebrow {
+  color: rgba(255, 255, 255, 0.7);
+  display: block;
+  font: 700 11px / 1 var(--sans);
+  letter-spacing: 0.14em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.admin-today__greeting h2 {
+  color: #fff;
+  font: 700 28px / 1.15 var(--serif);
+  margin: 0 0 6px;
+}
+
+.admin-today__greeting p {
+  color: rgba(255, 255, 255, 0.85);
+  font: 400 15px / 1.4 var(--sans);
+  margin: 0;
+}
+
+.admin-today__refresh {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  padding: 10px 14px;
+  transition: background 160ms ease;
+}
+.admin-today__refresh:hover { background: rgba(255, 255, 255, 0.22); }
+
+/* --- Today sections --- */
+.admin-today__section {
+  background: var(--white);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.admin-today__sec-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-today__sec-head h3 {
+  color: var(--text);
+  font: 700 17px / 1 var(--serif);
+  margin: 0;
+}
+
+.admin-today__sec-count {
+  background: var(--indigo-50);
+  border-radius: 999px;
+  color: var(--indigo);
+  font: 700 11px / 1 var(--sans);
+  padding: 4px 10px;
+}
+
+.admin-today__empty {
+  color: var(--text-muted);
+  font: 400 14px / 1.5 var(--sans);
+  margin: 0;
+  padding: 12px 0;
+}
+
+/* --- Today row (case / visit / message) --- */
+.admin-today__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-today__row {
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, transform 80ms ease;
+  width: 100%;
+}
+
+.admin-today__row:hover {
+  background: var(--indigo-50);
+  border-color: var(--indigo-100);
+}
+.admin-today__row:active { transform: scale(0.997); }
+
+/* SLA-overdue rows get a salmon left-border per brand discipline: salmon is
+   reserved for action/urgency. Uses :has() — graceful no-op on browsers
+   without support; the pill itself still communicates severity. */
+.admin-today__row:has(.admin-pill[data-tone="red"]) {
+  background: var(--salmon-50);
+  border-color: var(--salmon-pale);
+  box-shadow: inset 3px 0 0 var(--salmon);
+}
+
+.admin-today__row-left {
+  align-items: flex-start;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-today__row-right {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.admin-today__row-title {
+  color: var(--text);
+  font: 600 14px / 1.3 var(--sans);
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-today__row-sub {
+  color: var(--text-muted);
+  font: 400 12px / 1.4 var(--sans);
+}
+
+.admin-today__row-excerpt {
+  color: var(--text-soft);
+  font: 400 12px / 1.4 var(--sans);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.admin-today__row-time {
+  color: var(--indigo);
+  font: 700 13px / 1 var(--sans);
+}
+
+.admin-today__row-time--compact {
+  background: var(--indigo-50);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+
+.admin-today__chip {
+  background: var(--indigo-50);
+  border-radius: 999px;
+  color: var(--indigo);
+  font: 600 11px / 1 var(--sans);
+  padding: 4px 8px;
+}
+
+.admin-today__chevron {
+  color: var(--text-muted);
+  font: 600 16px / 1 var(--sans);
+}
+
+.admin-today__row--compact { padding: 10px 14px; }
+
+.admin-today__day-block { margin-bottom: 16px; }
+.admin-today__day-block:last-child { margin-bottom: 0; }
+
+.admin-today__day-label {
+  color: var(--text-muted);
+  font: 700 11px / 1 var(--sans);
+  letter-spacing: 0.12em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.admin-today__view-all {
+  background: transparent;
+  border: none;
+  color: var(--indigo);
+  cursor: pointer;
+  display: block;
+  font: 600 13px var(--sans);
+  margin-top: 16px;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+.admin-today__view-all:hover { color: var(--indigo-700); }
+
+/* Stat tile clickable variant — used by the Today header tiles that jump
+   the page to their matching section. */
+.admin-stat.admin-stat--clickable {
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.admin-stat.admin-stat--clickable:hover {
+  background: var(--indigo-50);
+}
+
+/* ============================================================================
+ * Phase 86A — Home Overview (workbench's default tab)
+ * ============================================================================ */
+.admin-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-overview__masthead {
+  align-items: center;
+  background: linear-gradient(135deg, var(--white) 0%, var(--cream) 100%);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 28px 32px;
+}
+
+.admin-overview__address { flex: 1; }
+
+.admin-overview__eyebrow {
+  color: var(--text-muted);
+  display: block;
+  font: 700 10px / 1 var(--sans);
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.admin-overview__address h2 {
+  color: var(--text);
+  font: 700 26px / 1.15 var(--serif);
+  margin: 0;
+}
+
+.admin-overview__quick-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+/* Overview-specific quick-action pill. Distinct from .admin-pill--action
+   (already used elsewhere as an indigo-fill CTA) — this one is a softer
+   indigo-50 fill, sized for the masthead. */
+.admin-overview__quick-actions .admin-pill--action {
+  background: var(--indigo-50);
+  border: 1px solid var(--indigo-100);
+  color: var(--indigo);
+  font: 600 12px var(--sans);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.admin-overview__quick-actions .admin-pill--action:hover {
+  background: var(--indigo-100);
+}
+
+.admin-overview__grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr 1.4fr;
+}
+@media (max-width: 860px) {
+  .admin-overview__grid { grid-template-columns: 1fr; }
+}
+
+.admin-overview__section {
+  background: var(--white);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+
+.admin-overview__section h4 {
+  color: var(--text);
+  font: 700 13px / 1 var(--sans);
+  letter-spacing: 0.08em;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+
+.admin-overview__empty {
+  color: var(--text-muted);
+  font: 400 13px / 1.5 var(--sans);
+  margin: 0;
+}
+
+.admin-overview__about {
+  color: var(--text);
+  font: 400 14px / 1.55 var(--sans);
+  margin: 0 0 16px;
+}
+
+.admin-overview__inst-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-overview__inst-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-overview__inst-label {
+  color: var(--text-muted);
+  font: 700 11px / 1 var(--sans);
+  letter-spacing: 0.08em;
+  min-width: 70px;
+  text-transform: uppercase;
+}
+
+.admin-overview__inst-note {
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.admin-overview__contact-row {
+  align-items: center;
+  background: var(--pearl);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+}
+.admin-overview__contact-row:last-child { margin-bottom: 0; }
+
+.admin-overview__contact-row strong {
+  color: var(--text);
+  font: 600 13px var(--sans);
+}
+
+.admin-overview__coverage-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 720px) {
+  .admin-overview__coverage-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.admin-overview__coverage-tile {
+  background: var(--pearl);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 16px 14px;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, transform 80ms ease;
+}
+.admin-overview__coverage-tile:hover {
+  background: var(--indigo-50);
+  border-color: var(--indigo-100);
+}
+.admin-overview__coverage-tile:active { transform: scale(0.99); }
+
+.admin-overview__cov-num {
+  color: var(--text);
+  display: block;
+  font: 700 24px / 1 var(--serif);
+  margin-bottom: 6px;
+}
+
+.admin-overview__cov-of {
+  color: var(--text-muted);
+  font: 400 14px var(--sans);
+}
+
+.admin-overview__cov-label {
+  color: var(--text-muted);
+  font: 600 11px / 1 var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-overview__cases {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-overview__case-row {
+  align-items: center;
+  background: var(--pearl);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+  width: 100%;
+}
+.admin-overview__case-row:hover {
+  background: var(--indigo-50);
+  border-color: var(--indigo-100);
+}
+.admin-overview__case-row strong {
+  font: 600 13px var(--sans);
+}
+.admin-overview__case-row .admin-muted {
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.admin-overview__chevron {
+  color: var(--text-muted);
+  font: 600 14px / 1 var(--sans);
+}
+
+.admin-overview__activity {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -11211,4 +11702,24 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-queue__case.is-active .cockpit-queue__case-household {
   color: var(--brand-strong, #ED6955);
+
+.admin-overview__activity-row {
+  align-items: baseline;
+  background: var(--pearl);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 12px;
+  padding: 8px 14px;
+}
+
+.admin-overview__activity-row strong { font: 600 13px var(--sans); }
+
+.admin-overview__reminder-row {
+  align-items: baseline;
+  background: var(--pearl);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 12px;
+  margin-bottom: 6px;
+  padding: 8px 14px;
 }

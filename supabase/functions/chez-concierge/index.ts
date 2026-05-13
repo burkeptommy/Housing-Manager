@@ -4163,6 +4163,234 @@ async function handleAdminSubmit(
 // (every owned entity grouped by type + open cases + recent workbench
 // actions). One round-trip for the whole panel.
 
+// ============================================================================
+// Phase 86A — handleFetchTodayBrief
+// ============================================================================
+// Cross-home triage payload powering the admin "Today" command center.
+// Mirrors the shape of fetch_households_list: admin-only, parallel reads,
+// graceful per-query failure via `safe()`.
+//
+// Returns four buckets the operator needs at the start of a shift:
+//   - urgent_cases — chez_requests where SLA is overdue OR due within
+//       6 hours OR there's an unread homeowner message waiting for admin.
+//   - todays_visits — chez_visits with scheduled_for between now and
+//       EOD (UTC; the iOS app handles local-time display per household tz).
+//   - upcoming_visits — chez_visits scheduled +1d through +7d.
+//   - recent_unread — concierge_messages from the last 48h where the
+//       homeowner sent the message and the admin hasn't replied yet
+//       (request.unread_for_admin = true). Already covered partially by
+//       urgent_cases, but surfaced separately for "needs a quick reply"
+//       triage.
+//
+// Each item is enriched with the household name + primary property address
+// so the Today list renders as "[address] — [case summary]" without a
+// second lookup. Households with no name fall back to the primary user's
+// email; properties with no address fall back to the household name.
+// ============================================================================
+
+async function handleFetchTodayBrief(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[today_brief] ${label} failed:`, e); return null; }
+  };
+
+  const now = new Date();
+  const sixHoursOut = new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString();
+  const endOfDayUtc = new Date(now);
+  endOfDayUtc.setUTCHours(23, 59, 59, 999);
+  const endOfDayIso = endOfDayUtc.toISOString();
+  const oneWeekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+  const nowIso = now.toISOString();
+
+  // Parallel reads. Each is best-effort — a failure on one bucket doesn't
+  // sink the whole brief.
+  const [
+    householdsRes,
+    propertiesRes,
+    requestsRes,
+    visitsRes,
+    recentMsgsRes,
+  ] = await Promise.all([
+    safe(service.from("households").select("id, name"), "households"),
+    safe(service.from("properties").select("id, household_id, street, city, state, zip"), "properties"),
+    safe(service.from("chez_requests")
+      .select("id, household_id, category, summary, status, sla_due_at, last_message_at, unread_for_admin, pending_proposal_count, created_at")
+      .in("status", ["open", "waiting_customer"])
+      .order("sla_due_at", { ascending: true })
+      .limit(200), "requests"),
+    safe(service.from("chez_visits")
+      .select("id, household_id, request_id, vendor_name, vendor_phone, state, scheduled_for, scheduled_window, notes")
+      .in("state", ["awaiting_date", "scheduled", "in_progress"])
+      .gte("scheduled_for", nowIso)
+      .lte("scheduled_for", oneWeekOut)
+      .order("scheduled_for", { ascending: true })
+      .limit(100), "visits"),
+    safe(service.from("concierge_messages")
+      .select("id, request_id, role, content, created_at")
+      .eq("role", "user")
+      .gte("created_at", fortyEightHoursAgo)
+      .order("created_at", { ascending: false })
+      .limit(40), "recent_msgs"),
+  ]);
+
+  type HH = { id: string; name: string | null };
+  type Prop = { id: string; household_id: string; street: string | null; city: string | null; state: string | null; zip: string | null };
+  type Req = { id: string; household_id: string; category: string; summary: string; status: string; sla_due_at: string | null; last_message_at: string | null; unread_for_admin: boolean | null; pending_proposal_count: number | null; created_at: string };
+  type Visit = { id: string; household_id: string; request_id: string | null; vendor_name: string | null; vendor_phone: string | null; state: string; scheduled_for: string | null; scheduled_window: string | null; notes: string | null };
+  type Msg = { id: string; request_id: string; role: string; content: string; created_at: string };
+
+  const households = ((householdsRes as { data?: HH[] })?.data ?? []) as HH[];
+  const properties = ((propertiesRes as { data?: Prop[] })?.data ?? []) as Prop[];
+  const requests = ((requestsRes as { data?: Req[] })?.data ?? []) as Req[];
+  const visits = ((visitsRes as { data?: Visit[] })?.data ?? []) as Visit[];
+  const recentMsgs = ((recentMsgsRes as { data?: Msg[] })?.data ?? []) as Msg[];
+
+  // Lookup maps for enrichment. First property wins as "primary address".
+  const householdName = new Map<string, string>();
+  for (const h of households) householdName.set(h.id, h.name || "Household");
+  const householdAddress = new Map<string, string>();
+  for (const p of properties) {
+    if (householdAddress.has(p.household_id)) continue; // first wins
+    const street = (p.street || "").trim();
+    const city = (p.city || "").trim();
+    const stateCode = (p.state || "").trim();
+    const pieces = [street, [city, stateCode].filter(Boolean).join(", ")].filter(Boolean);
+    if (pieces.length > 0) householdAddress.set(p.household_id, pieces.join(" · "));
+  }
+  const addressOrName = (hid: string) =>
+    householdAddress.get(hid) || householdName.get(hid) || "Unknown home";
+
+  // ---------- urgent_cases ----------
+  // Rules (any one qualifies):
+  //   1. SLA is overdue (sla_due_at < now AND status = open)
+  //   2. SLA is due within 6 hours
+  //   3. unread_for_admin = true (homeowner sent something we haven't read)
+  // Severity ranking: overdue > unread > due_soon. Caps at 30 rows so the
+  // Today view doesn't degenerate into the full case list.
+  const urgentCases = requests
+    .map((r) => {
+      const slaTime = r.sla_due_at ? new Date(r.sla_due_at).getTime() : null;
+      const nowT = now.getTime();
+      const isOverdue = r.status === "open" && slaTime !== null && slaTime < nowT;
+      const isDueSoon = r.status === "open" && slaTime !== null && slaTime >= nowT && slaTime <= nowT + 6 * 60 * 60 * 1000;
+      const isUnread = r.unread_for_admin === true;
+      let severity: "overdue" | "unread" | "due_soon" | null = null;
+      if (isOverdue) severity = "overdue";
+      else if (isUnread) severity = "unread";
+      else if (isDueSoon) severity = "due_soon";
+      if (!severity) return null;
+      return {
+        id: r.id,
+        household_id: r.household_id,
+        household_address: addressOrName(r.household_id),
+        category: r.category,
+        summary: r.summary,
+        status: r.status,
+        sla_due_at: r.sla_due_at,
+        last_message_at: r.last_message_at,
+        unread_for_admin: r.unread_for_admin === true,
+        pending_proposal_count: r.pending_proposal_count ?? 0,
+        severity,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  // Sort severity → SLA time. Overdue first (most past-due at top), then
+  // unread, then due-soon (closest-due at top).
+  const sevRank = { overdue: 0, unread: 1, due_soon: 2 } as const;
+  urgentCases.sort((a, b) => {
+    if (sevRank[a.severity] !== sevRank[b.severity]) return sevRank[a.severity] - sevRank[b.severity];
+    const aT = a.sla_due_at ? new Date(a.sla_due_at).getTime() : 0;
+    const bT = b.sla_due_at ? new Date(b.sla_due_at).getTime() : 0;
+    return aT - bT;
+  });
+  urgentCases.splice(30);
+
+  // ---------- todays_visits ----------
+  const todaysVisits = visits
+    .filter((v) => v.scheduled_for && v.scheduled_for <= endOfDayIso)
+    .map((v) => ({
+      id: v.id,
+      household_id: v.household_id,
+      household_address: addressOrName(v.household_id),
+      request_id: v.request_id,
+      vendor_name: v.vendor_name,
+      vendor_phone: v.vendor_phone,
+      state: v.state,
+      scheduled_for: v.scheduled_for,
+      scheduled_window: v.scheduled_window,
+    }));
+
+  // ---------- upcoming_visits (tomorrow → +7d) ----------
+  const upcomingVisits = visits
+    .filter((v) => v.scheduled_for && v.scheduled_for > endOfDayIso)
+    .map((v) => ({
+      id: v.id,
+      household_id: v.household_id,
+      household_address: addressOrName(v.household_id),
+      request_id: v.request_id,
+      vendor_name: v.vendor_name,
+      vendor_phone: v.vendor_phone,
+      state: v.state,
+      scheduled_for: v.scheduled_for,
+      scheduled_window: v.scheduled_window,
+    }));
+
+  // ---------- recent_unread ----------
+  // Match concierge_messages to requests where admin still owes a reply.
+  const requestById = new Map(requests.map((r) => [r.id, r]));
+  const seen = new Set<string>(); // dedup by request_id (only show most-recent message per case)
+  const recentUnread = recentMsgs
+    .filter((m) => {
+      if (seen.has(m.request_id)) return false;
+      const req = requestById.get(m.request_id);
+      if (!req || !req.unread_for_admin) return false;
+      seen.add(m.request_id);
+      return true;
+    })
+    .map((m) => {
+      const req = requestById.get(m.request_id)!;
+      return {
+        message_id: m.id,
+        request_id: m.request_id,
+        household_id: req.household_id,
+        household_address: addressOrName(req.household_id),
+        category: req.category,
+        summary: req.summary,
+        excerpt: m.content.length > 160 ? m.content.slice(0, 160) + "…" : m.content,
+        sent_at: m.created_at,
+      };
+    });
+  recentUnread.splice(15);
+
+  // ---------- stats ----------
+  const openCases = requests.filter((r) => r.status === "open" || r.status === "waiting_customer").length;
+  const slaOverdue = urgentCases.filter((u) => u.severity === "overdue").length;
+  const slaDueSoon = urgentCases.filter((u) => u.severity === "due_soon").length;
+  const homesUnderManagement = new Set([...requests.map((r) => r.household_id), ...visits.map((v) => v.household_id)]).size;
+
+  return json({
+    urgent_cases: urgentCases,
+    todays_visits: todaysVisits,
+    upcoming_visits: upcomingVisits,
+    recent_unread: recentUnread,
+    stats: {
+      open_cases: openCases,
+      sla_overdue: slaOverdue,
+      sla_due_soon: slaDueSoon,
+      visits_today: todaysVisits.length,
+      visits_this_week: todaysVisits.length + upcomingVisits.length,
+      homes_under_management: homesUnderManagement,
+    },
+    fetched_at: now.toISOString(),
+  });
+}
+
 async function handleFetchHouseholdsList(
   service: ServiceClient,
   user: { id: string; email?: string | null } | null
@@ -5378,6 +5606,14 @@ serve(async (req: Request) => {
           user,
           body as unknown as FetchHouseholdWorkbenchPayload
         );
+
+      // Phase 86A — Today command center brief. Admin-only. Returns a
+      // cross-home triage payload: SLA-due cases, today's visits,
+      // upcoming visits (+1d through +7d), recent unread homeowner
+      // replies, plus aggregate stats. Replaces the catalog-tool default
+      // landing with a customer-service surface.
+      case "fetch_today_brief":
+        return handleFetchTodayBrief(service, user);
 
       // Phase 84 PR 4 — project negotiation tracking. Each call appends
       // one turn to project_quotes.negotiation_history. Admin-only;
