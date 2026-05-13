@@ -218,6 +218,17 @@ struct HouseQuizView: View {
     /// added to the registry auto-surfaces without a quiz-side change.
     @State private var showQ15bLibrary: Bool = false
 
+    /// Phase 2.4: collected Chez delegation intents shown by
+    /// HouseQuizChezSummaryCard right before the cinematic reveal.
+    /// Loaded on `.task` once the cinematic stage mounts. An empty
+    /// array short-circuits the card so legacy zero-intent quizzes
+    /// look identical to the pre-Phase-2 reveal.
+    @State private var chezQuizSummaryIntents: [ChezQuizRequestSubmitter.QuizIntent] = []
+    /// Dismissed locally once the user taps Continue on the card so
+    /// the reveal slides into view. Resets on quiz re-entry so a
+    /// resumed quiz can re-show the card if a new intent was added.
+    @State private var chezQuizSummaryDismissed: Bool = false
+
     /// Build 84 — Q17 forwarding-email milestone "Copied" badge state. The
     /// reveal card flips the copy button to a check + "Copied" for ~2 seconds
     /// after a successful clipboard write, mirroring ProjectEmailView's pattern.
@@ -5542,6 +5553,43 @@ struct HouseQuizView: View {
     private var cinematicRevealStage: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 0) {
+                // Phase 2.4: surface the Chez delegation summary BEFORE
+                // the cinematic reveal whenever the quiz captured one or
+                // more intents AND the user hasn't already dismissed it
+                // this session. Zero-intent quizzes render the reveal
+                // unchanged. Once the user taps Continue the card
+                // collapses and the standard reveal scrolls into view.
+                if !chezQuizSummaryDismissed, !chezQuizSummaryIntents.isEmpty {
+                    HouseQuizChezSummaryCard(
+                        intents: chezQuizSummaryIntents,
+                        onContinue: {
+                            withAnimation(HavenTheme.animationStandard) {
+                                chezQuizSummaryDismissed = true
+                            }
+                            Analytics.track(.quizChezSummaryContinue, [
+                                "intent_count": chezQuizSummaryIntents.count,
+                            ])
+                        },
+                        onTapRow: { intent in
+                            Analytics.track(.quizChezSummaryRowTapped, [
+                                "question_id": intent.questionId,
+                                "slot_key": intent.slotKey,
+                            ])
+                            // Dismiss the quiz then route to the Chez
+                            // inbox. The dashboard's notification observer
+                            // picks the destination switch up and the
+                            // user lands in their thread queue.
+                            dismiss()
+                            NotificationCenter.default.post(
+                                name: .switchToTab,
+                                object: nil,
+                                userInfo: ["index": 3]
+                            )
+                        }
+                    )
+                    .padding(.bottom, HavenTheme.spacing16)
+                }
+
                 QuizCinematicReveal(
                     protectionValue: viewModel.finaleTotals.projectedValueProtected,
                     yearsProjected: 10
@@ -5571,6 +5619,26 @@ struct HouseQuizView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .background(HavenColors.background.ignoresSafeArea())
+        // Phase 2.4: load Chez delegation intents on mount so the
+        // summary card has data to render. Refresh whenever the
+        // submitter posts its completion notification so users see
+        // the card update in real time if Chez requests land later
+        // than the reveal first renders.
+        .task {
+            chezQuizSummaryIntents = ChezQuizRequestSubmitter.collectIntents(
+                state: viewModel.state
+            )
+            if !chezQuizSummaryIntents.isEmpty {
+                Analytics.track(.quizChezSummaryShown, [
+                    "intent_count": chezQuizSummaryIntents.count,
+                ])
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .chezQuizRequestsSubmitted)) { _ in
+            chezQuizSummaryIntents = ChezQuizRequestSubmitter.collectIntents(
+                state: viewModel.state
+            )
+        }
         // Phase 19l: load eligible vendor/either-task pairs once the quiz
         // is done, then surface the bulk delegation sheet over this view.
         // The sheet defaults to all vendors selected so the primary path
