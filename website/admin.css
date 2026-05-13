@@ -10758,3 +10758,28 @@ details.admin-chez__analysis-section pre {
   background: rgba(237, 105, 85, 0.08) !important;
   box-shadow: inset 3px 0 0 var(--brand-strong, #ED6955);
 }
+
+/* ========================================================================
+   Phase 95.1 — collapsed vendor card notes preview
+   ======================================================================== */
+.cockpit-vendor__notes-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--border, #EDEEF0);
+  background: rgba(67, 75, 145, 0.03);
+}
+.cockpit-vendor__notes-label {
+  font: 600 9px var(--sans);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-soft, #9C98AD);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.cockpit-vendor__notes-text {
+  font: 400 12px var(--sans);
+  color: var(--text-muted, #6F6A88);
+  line-height: 1.45;
+}

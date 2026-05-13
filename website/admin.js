@@ -6313,6 +6313,12 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
         <span class="cockpit-spark cockpit-spark--sm">✦</span>
         <span><b>Alfred:</b> ${escapeHtml(reasoning)}</span>
       </div>
+      ${!isExpanded && callData?.notes ? `
+        <div class="cockpit-vendor__notes-preview">
+          <span class="cockpit-vendor__notes-label">Your notes</span>
+          <span class="cockpit-vendor__notes-text">${escapeHtml(callData.notes.slice(0, 140))}${callData.notes.length > 140 ? "…" : ""}</span>
+        </div>
+      ` : ""}
       ${callForm}
     </article>
   `;
@@ -8357,6 +8363,60 @@ function attachConciergeVendorHandlers(host, req) {
     };
     input.addEventListener("input", handler);
     input.addEventListener("change", handler);
+  });
+
+  // Phase 95.1 bug fix — the cockpit's main click delegator handles
+  // `data-cockpit-action` but the per-vendor card uses `data-action`
+  // (a legacy convention from the pre-cockpit focused panel). The
+  // legacy focused-detail surface (`el.auditFocused`, line ~9804)
+  // wires expand/collapse-vendor against `[data-action]`, but the
+  // cockpit context has no equivalent — so clicking "Log this call"
+  // on any vendor whose form wasn't already expanded did literally
+  // nothing. Tom's report: "I can only save notes for one vendor
+  // call." Diagnosis: the first vendor expanded was a happy accident
+  // (state persisted across re-renders); no one had wired the
+  // toggle in the cockpit codepath. Fix: same handler shape as the
+  // legacy surface, scoped to the cockpit host. Toggles each
+  // vendor's expand state independently — multiple vendors can be
+  // open at once so the operator can copy notes between them or
+  // capture a follow-up while a previous one is fresh.
+  //
+  // The header div (line ~6284) ALSO carries data-action; clicking
+  // anywhere on the vendor head row should expand/collapse the same
+  // way as the CTA button, matching the original design intent.
+  host.querySelectorAll("[data-vendor-key] [data-action='expand-vendor'], [data-vendor-key] [data-action='collapse-vendor']").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const card = btn.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      const action = btn.dataset.action;
+      state.chezExpandedVendorKeys = state.chezExpandedVendorKeys || {};
+      state.chezExpandedVendorKeys[req.id] = state.chezExpandedVendorKeys[req.id] || {};
+      state.chezExpandedVendorKeys[req.id][key] = action === "expand-vendor";
+      renderConciergeCockpit();
+    });
+  });
+
+  // The vendor card head row is also data-action="expand-vendor" /
+  // "collapse-vendor" — match the legacy clickable-header pattern.
+  // We skip nodes that are also inner buttons (they have their own
+  // listener above and stopPropagation), so this only fires for
+  // bare-head clicks.
+  host.querySelectorAll("[data-vendor-key] .cockpit-vendor__head[data-action]").forEach((head) => {
+    head.addEventListener("click", (e) => {
+      // If the click came from an inner button / link, let the
+      // dedicated handler above own the toggle.
+      if (e.target.closest("button, a")) return;
+      const card = head.closest("[data-vendor-key]");
+      if (!card) return;
+      const key = card.getAttribute("data-vendor-key");
+      const action = head.dataset.action;
+      state.chezExpandedVendorKeys = state.chezExpandedVendorKeys || {};
+      state.chezExpandedVendorKeys[req.id] = state.chezExpandedVendorKeys[req.id] || {};
+      state.chezExpandedVendorKeys[req.id][key] = action === "expand-vendor";
+      renderConciergeCockpit();
+    });
   });
 
   // Slot add/remove buttons (rendered with data-action="add-slot" /
