@@ -71,6 +71,22 @@ class InvoiceProcessingViewModel: ObservableObject {
     /// candidate chips don't include the right vendor.
     @Published var showVendorPicker = false
 
+    /// Phase 95.3 — non-fatal failures accumulated during `applyChanges`.
+    /// Each entry is a one-line description of which item failed and a
+    /// short reason. Surfaces in `InvoiceReviewSheet` as a "Heads up:
+    /// some items didn't save" callout after the success path runs.
+    ///
+    /// Why this exists: every loop inside `applyChanges` previously
+    /// shared one big `do/catch` — a single failure aborted EVERY
+    /// subsequent operation. Worse, the user got a generic error with
+    /// no idea which items landed or what to retry. We now wrap each
+    /// per-item operation in its own try/catch, append the failure to
+    /// this array, and keep going. The final UI shows a summary so the
+    /// user can decide whether to retry specific things from elsewhere
+    /// (system detail, the document, etc.) without losing the items
+    /// that DID save.
+    @Published var applyWarnings: [String] = []
+
     init(documentId: UUID, propertyId: UUID, householdId: UUID) {
         self.documentId = documentId
         self.propertyId = propertyId
@@ -194,19 +210,33 @@ class InvoiceProcessingViewModel: ObservableObject {
         guard let result else { return }
         isApplying = true
         error = nil
+        // Phase 95.3 — reset warnings at the top of every apply pass so
+        // a previous run's partial failures don't carry over into the
+        // user's view of THIS apply.
+        applyWarnings = []
 
         let db = DatabaseService.shared
         let invoiceDateStr = result.invoiceDate ?? ISO8601DateFormatter().string(from: Date()).prefix(10).description
 
         do {
             // 1. Complete matched maintenance tasks
+            //
+            // Phase 95.3: each task completion is now wrapped in its own
+            // try/catch so one failed update doesn't abort the rest of
+            // the apply flow. The failed task gets a warning entry; the
+            // user sees a "couldn't complete X" line in the summary and
+            // can retry from the task detail screen.
             for task in result.completedTasks where selectedTaskIds.contains(task.id) {
                 guard let taskIdStr = task.matchedMaintenanceTaskId,
                       let taskId = UUID(uuidString: taskIdStr) else { continue }
-
-                _ = try await db.updateMaintenanceTask(id: taskId, MaintenanceTaskUpdate(
-                    lastCompletedDate: invoiceDateStr
-                ))
+                do {
+                    _ = try await db.updateMaintenanceTask(id: taskId, MaintenanceTaskUpdate(
+                        lastCompletedDate: invoiceDateStr
+                    ))
+                } catch {
+                    applyWarnings.append("Couldn't mark \"\(task.description)\" complete (\(Self.friendlyReason(error)))")
+                    print("[InvoiceProcessing] Task completion failed: \(error)")
+                }
             }
 
             // For vehicle invoices, the server already handled task completion, mileage,
@@ -220,10 +250,19 @@ class InvoiceProcessingViewModel: ObservableObject {
                     if let systemIdStr = task.matchedSystemId,
                        let systemId = UUID(uuidString: systemIdStr),
                        !updatedSystemIds.contains(systemId) {
-                        _ = try await db.updateHomeSystem(id: systemId, HomeSystemUpdate(
-                            lastServiceDate: invoiceDateStr
-                        ))
-                        updatedSystemIds.insert(systemId)
+                        do {
+                            _ = try await db.updateHomeSystem(id: systemId, HomeSystemUpdate(
+                                lastServiceDate: invoiceDateStr
+                            ))
+                            updatedSystemIds.insert(systemId)
+                        } catch {
+                            // Non-blocking — the service record below will
+                            // still capture the visit. Just flag for the
+                            // user so they know last-service-date didn't
+                            // refresh on the system row.
+                            applyWarnings.append("Couldn't update last service date on a system (\(Self.friendlyReason(error)))")
+                            print("[InvoiceProcessing] System last_service_date update failed: \(error)")
+                        }
                     }
                 }
             }
@@ -284,23 +323,32 @@ class InvoiceProcessingViewModel: ObservableObject {
                     parentId = nil
                 }
 
-                let newSystem = try await db.createHomeSystem(HomeSystemInsert(
-                    propertyId: propertyId,
-                    householdId: householdId,
-                    name: system.name,
-                    category: system.suggestedCategory ?? "Other",
-                    manufacturer: system.manufacturer,
-                    modelNumber: system.modelNumber,
-                    installDate: system.installDate,
-                    status: "good",
-                    notes: system.details,
-                    parentSystemId: parentId
-                ))
-                existingSystems.append(newSystem)
+                // Phase 95.3: per-system try/catch so a single create
+                // failure (RLS, duplicate, network) doesn't abort the
+                // whole apply. The user sees which system failed in
+                // the warning summary and can re-add manually.
+                do {
+                    let newSystem = try await db.createHomeSystem(HomeSystemInsert(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        name: system.name,
+                        category: system.suggestedCategory ?? "Other",
+                        manufacturer: system.manufacturer,
+                        modelNumber: system.modelNumber,
+                        installDate: system.installDate,
+                        status: "good",
+                        notes: system.details,
+                        parentSystemId: parentId
+                    ))
+                    existingSystems.append(newSystem)
 
-                // Migrate equipment-specific tasks from parent to this new child system
-                if let parentId {
-                    await migrateMatchingTasks(newSystem: newSystem, parentId: parentId, db: db)
+                    // Migrate equipment-specific tasks from parent to this new child system
+                    if let parentId {
+                        await migrateMatchingTasks(newSystem: newSystem, parentId: parentId, db: db)
+                    }
+                } catch {
+                    applyWarnings.append("Couldn't add \"\(system.name)\" (\(Self.friendlyReason(error)))")
+                    print("[InvoiceProcessing] System create failed for \(system.name): \(error)")
                 }
             }
 
@@ -324,34 +372,44 @@ class InvoiceProcessingViewModel: ObservableObject {
 
                 if systemTaskDescriptions.isEmpty {
                     // No system matches — create one general service record
-                    _ = try await db.createServiceRecord(ServiceRecordInsert(
-                        propertyId: propertyId,
-                        householdId: householdId,
-                        serviceDate: invoiceDateStr,
-                        serviceType: "Maintenance",
-                        description: result.serviceSummary ?? "Service performed per invoice",
-                        contractorId: contractorId,
-                        cost: result.totalAmount,
-                        invoiceDocumentId: documentId
-                    ))
+                    do {
+                        _ = try await db.createServiceRecord(ServiceRecordInsert(
+                            propertyId: propertyId,
+                            householdId: householdId,
+                            serviceDate: invoiceDateStr,
+                            serviceType: "Maintenance",
+                            description: result.serviceSummary ?? "Service performed per invoice",
+                            contractorId: contractorId,
+                            cost: result.totalAmount,
+                            invoiceDocumentId: documentId
+                        ))
+                    } catch {
+                        applyWarnings.append("Couldn't save the service record (\(Self.friendlyReason(error)))")
+                        print("[InvoiceProcessing] Service record create failed: \(error)")
+                    }
                 } else {
                     // Create one service record per system, split cost proportionally
                     var isFirst = true
                     for (systemId, descriptions) in systemTaskDescriptions {
                         let summary = descriptions.joined(separator: "; ")
                         let truncated = summary.count > 200 ? String(summary.prefix(197)) + "..." : summary
-                        _ = try await db.createServiceRecord(ServiceRecordInsert(
-                            propertyId: propertyId,
-                            householdId: householdId,
-                            serviceDate: invoiceDateStr,
-                            serviceType: "Maintenance",
-                            description: truncated,
-                            systemId: systemId,
-                            contractorId: contractorId,
-                            cost: isFirst ? result.totalAmount : nil,
-                            invoiceDocumentId: isFirst ? documentId : nil
-                        ))
-                        isFirst = false
+                        do {
+                            _ = try await db.createServiceRecord(ServiceRecordInsert(
+                                propertyId: propertyId,
+                                householdId: householdId,
+                                serviceDate: invoiceDateStr,
+                                serviceType: "Maintenance",
+                                description: truncated,
+                                systemId: systemId,
+                                contractorId: contractorId,
+                                cost: isFirst ? result.totalAmount : nil,
+                                invoiceDocumentId: isFirst ? documentId : nil
+                            ))
+                            isFirst = false
+                        } catch {
+                            applyWarnings.append("Couldn't save the service record for one system (\(Self.friendlyReason(error)))")
+                            print("[InvoiceProcessing] Service record create failed for system \(systemId): \(error)")
+                        }
                     }
                 }
             }
@@ -361,14 +419,19 @@ class InvoiceProcessingViewModel: ObservableObject {
                vendor.matchedContractorId == nil,
                let companyName = vendor.companyName,
                !companyName.isEmpty {
-                _ = try await db.createContractor(ContractorInsert(
-                    householdId: householdId,
-                    companyName: companyName,
-                    phone: vendor.phone ?? "Not provided",
-                    email: vendor.email,
-                    address: vendor.address,
-                    notes: "Auto-added from invoice processing"
-                ))
+                do {
+                    _ = try await db.createContractor(ContractorInsert(
+                        householdId: householdId,
+                        companyName: companyName,
+                        phone: vendor.phone ?? "Not provided",
+                        email: vendor.email,
+                        address: vendor.address,
+                        notes: "Auto-added from invoice processing"
+                    ))
+                } catch {
+                    applyWarnings.append("Couldn't add \(companyName) as a contractor (\(Self.friendlyReason(error)))")
+                    print("[InvoiceProcessing] Contractor create failed: \(error)")
+                }
             }
 
             // 5. Create follow-up maintenance tasks
@@ -422,7 +485,12 @@ class InvoiceProcessingViewModel: ObservableObject {
                     insert.assignedContractorId = followUpContractorId
                     insert.needsVendor = followUpContractorId == nil
                     insert.serviceKey = ServiceLibrary.serviceKey(for: insert) ?? "custom_seasonal_service"
-                    _ = try await ServiceOrchestrator.createCustomService(insert)
+                    do {
+                        _ = try await ServiceOrchestrator.createCustomService(insert)
+                    } catch {
+                        applyWarnings.append("Couldn't create the follow-up \"\(followUp.description)\" (\(Self.friendlyReason(error)))")
+                        print("[InvoiceProcessing] Follow-up create failed: \(error)")
+                    }
                 }
             }
 
@@ -498,6 +566,27 @@ class InvoiceProcessingViewModel: ObservableObject {
         }
 
         isApplying = false
+    }
+
+    // MARK: - Phase 95.3 Error Helpers
+
+    /// Convert an error into a short, user-readable reason. Used inside
+    /// every per-item try/catch in `applyChanges` so the warning lines
+    /// in InvoiceReviewSheet stay scannable. Never leaks raw error
+    /// types or stack traces to the user.
+    private static func friendlyReason(_ error: Error) -> String {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return "network error"
+        }
+        // PostgrestError comes through as a generic description; strip
+        // any obvious "Failed to ..." prefix Supabase appends so the
+        // line reads tighter inside the parenthesis.
+        let message = error.localizedDescription
+        if message.count > 60 {
+            return "save failed"
+        }
+        return message
     }
 
     // MARK: - Task Migration

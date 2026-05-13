@@ -32,6 +32,30 @@ final class HouseQuizViewModel: ObservableObject {
     /// an inline error banner with a Retry action. Cleared on retry success.
     @Published var saveErrorMessage: String?
 
+    /// Phase 95.3 — flips true when ANY per-answer auto-save (`persistState`)
+    /// fails. The view watches this and renders a non-blocking
+    /// "Couldn't sync your last answer — tap to retry" banner. Cleared on
+    /// the next successful persist (which writes the entire `state.answers`
+    /// blob, so one good write recovers every pending answer at once).
+    ///
+    /// Why this exists: the per-answer auto-save path silently swallowed
+    /// errors. The user would answer a question, the DB write would fail,
+    /// the in-memory state would still show the answer, and the user would
+    /// advance — leaving the answer stranded in memory only. Force-quit
+    /// before the next successful persist = lost answer with no warning.
+    /// Mirrors the resilient-persistence pattern shipped with the ATTOM
+    /// recap bug (Phase 95.2): never silently swallow a write that's part
+    /// of the user's "I just did the work" mental model.
+    @Published var hasUnsyncedAnswers: Bool = false
+    /// Phase 95.3 — the most recent persist error, captured for the
+    /// banner copy + diagnostics. Format: "<short description>". Cleared
+    /// on the next successful persist.
+    @Published var persistErrorMessage: String?
+    /// Phase 95.3 — guards against concurrent retries when the user
+    /// hammers the banner's Retry button or scene foreground races the
+    /// banner tap. One retry in flight at a time.
+    private var isRetryingPersist: Bool = false
+
     /// Phase 17b — running totals from `MaintenanceTaskReconciler`. Each
     /// answer that touches a system subtype merges its result into this; the
     /// final `runFinalReconciliation()` pass after the last question merges
@@ -455,11 +479,46 @@ final class HouseQuizViewModel: ObservableObject {
     /// even one fact landed, we assume the user's seeing approximately
     /// what they should be and don't redo the work.
     private func recoverMissingAttomFactsIfNeeded() async {
-        let hasAnyFact = property.yearBuilt != nil
-            || property.squareFootage != nil
-            || property.currentEstimatedValue != nil
-            || property.attributes?["bedrooms"]?.stringValue != nil
-        guard !hasAnyFact else { return }
+        // Phase 95.3: relaxed gate. Previously fired only when EVERY
+        // ATTOM fact was missing (Phase 95.2 ship). That was too
+        // conservative — if the row had yearBuilt but not bathrooms
+        // (e.g. one of the Phase 95.1 attribute writes silently failed
+        // with try?, or the user's address has partial ATTOM coverage),
+        // the recap card kept showing "Not on file" forever because
+        // the recovery never triggered. Now we fire whenever ANY of
+        // the canonical ATTOM facts is missing AND we have a usable
+        // address. ATTOM cost is bounded: one call per quiz init at
+        // worst, on a property whose recap card would otherwise show
+        // missing data — the right side of the tradeoff.
+        let missingYearBuilt = property.yearBuilt == nil
+        let missingSquareFootage = property.squareFootage == nil
+        let missingEstimatedValue = property.currentEstimatedValue == nil
+        let missingBedrooms = property.attributes?["bedrooms"]?.stringValue == nil
+        let missingBathrooms = property.attributes?["bathrooms"]?.stringValue == nil
+        let missingLotSize = property.attributes?["lot_size"]?.stringValue == nil
+        let missingPurchaseDate = property.purchaseDate == nil
+
+        let needsRecovery = missingYearBuilt
+            || missingSquareFootage
+            || missingEstimatedValue
+            || missingBedrooms
+            || missingBathrooms
+            || missingLotSize
+            || missingPurchaseDate
+        guard needsRecovery else { return }
+
+        // Cost-control safeguard: don't re-fetch if a recent lookup
+        // already ran (within 24h). The dashboard's "Refresh from
+        // public records" path stamps `last_value_lookup_at` whenever
+        // it runs; honor that so users don't burn ATTOM credits on
+        // every quiz open when their property genuinely has no public
+        // record data for a given field.
+        if let lastLookupRaw = property.attributes?["last_value_lookup_at"]?.stringValue,
+           let lastLookup = ISO8601DateFormatter().date(from: lastLookupRaw),
+           Date().timeIntervalSince(lastLookup) < 24 * 60 * 60 {
+            print("[ATTOM persist] HouseQuizViewModel backstop: skipping recovery, last lookup was \(lastLookup) — within 24h cooldown")
+            return
+        }
 
         let address = [property.street, property.city, property.state, property.zipCode]
             .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
@@ -1362,13 +1421,54 @@ final class HouseQuizViewModel: ObservableObject {
 
     /// Backwards-compatible wrapper used by the per-answer auto-save path.
     /// Logs failures but never throws.
+    ///
+    /// Phase 95.3: on failure, sets `hasUnsyncedAnswers = true` and
+    /// `persistErrorMessage` so the view can render an inline retry banner.
+    /// On success, clears both flags — one good write flushes every queued
+    /// answer because `persistStateThrowing` writes the whole `state.answers`
+    /// blob at once. The user is never silently de-synced.
     private func persistState() async {
         do {
             try await persistStateThrowing()
+            // One successful write covers every pending answer; clear flags.
+            if hasUnsyncedAnswers || persistErrorMessage != nil {
+                hasUnsyncedAnswers = false
+                persistErrorMessage = nil
+                print("[HouseQuizViewModel] persistState recovered after prior failure")
+                Analytics.track(.quizPersistRecovered)
+            }
         } catch {
             print("[HouseQuizViewModel] persistState failed: \(error)")
             Analytics.track(.quizPersistFailed, ["error": "\(error)"])
+            hasUnsyncedAnswers = true
+            persistErrorMessage = Self.friendlyPersistError(error)
         }
+    }
+
+    /// Phase 95.3 — retry the most recent failed persist when the user taps
+    /// the "Couldn't sync — tap to retry" banner OR when the app returns to
+    /// foreground after a backgrounded persist failure. Same write as the
+    /// per-answer auto-save (we're sending the whole state blob, so any
+    /// queued answers ride along on this single write). Guards against
+    /// re-entry so rapid taps / scene-phase races don't fan out into
+    /// concurrent updates.
+    func retryPendingPersist() async {
+        guard hasUnsyncedAnswers, !isRetryingPersist else { return }
+        isRetryingPersist = true
+        defer { isRetryingPersist = false }
+        await persistState()
+    }
+
+    /// Phase 95.3 — friendly copy for the retry banner. Keep this short
+    /// (one short clause). Never leak the underlying error type to the
+    /// homeowner — they don't care it was a URLError vs a PostgrestError.
+    private static func friendlyPersistError(_ error: Error) -> String {
+        let nsError = error as NSError
+        // URLErrorDomain covers the connectivity cases.
+        if nsError.domain == NSURLErrorDomain {
+            return "Couldn't reach the server"
+        }
+        return "Couldn't sync your last answer"
     }
 
     /// Phase 19 — explicit save the X button confirmation dialog awaits

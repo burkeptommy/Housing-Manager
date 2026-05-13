@@ -71,6 +71,11 @@ enum AnalyticsEvent: String {
     /// payload distinguishes which.
     case quizMidQuizHandymanFailed = "quiz_mid_quiz_handyman_failed"
     case quizPersistFailed = "quiz_persist_failed"
+    /// Phase 95.3: fires when a previously-failed per-answer persist
+    /// succeeds on retry (banner tap, scene foreground, or the next
+    /// successful auto-save). Pairs with `quizPersistFailed` for funnel
+    /// analysis — recovery / failure ratio is the user-visible-loss rate.
+    case quizPersistRecovered = "quiz_persist_recovered"
     // Phase 85: intake → walk-through split + path-decision flow
     case quizPathChosen = "quiz_path_chosen"
     case quizWalkthroughCompleted = "quiz_walkthrough_completed"

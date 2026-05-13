@@ -789,18 +789,66 @@ struct InvoiceReviewSheet: View {
             Divider()
 
             if viewModel.applySuccess {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(HavenColors.success)
-                    Text("Changes applied successfully")
-                        .font(HavenTypography.headline)
-                        .foregroundColor(HavenColors.success)
-                }
-                .padding(.vertical, HavenTheme.spacing16)
-                .task {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    onComplete?()
-                    dismiss()
+                // Phase 95.3: if any per-item operations failed during
+                // the apply, show a warning summary instead of the
+                // instant "Changes applied" + auto-dismiss. The user
+                // sees exactly which items didn't save AND has to tap
+                // Done to acknowledge, so they don't miss the fact
+                // that some changes need manual follow-up. The items
+                // that DID save are committed — they just won't all
+                // be there.
+                if viewModel.applyWarnings.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(HavenColors.success)
+                        Text("Changes applied successfully")
+                            .font(HavenTypography.headline)
+                            .foregroundColor(HavenColors.success)
+                    }
+                    .padding(.vertical, HavenTheme.spacing16)
+                    .task {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        onComplete?()
+                        dismiss()
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(HavenColors.warning)
+                            Text("Saved with \(viewModel.applyWarnings.count) issue\(viewModel.applyWarnings.count == 1 ? "" : "s")")
+                                .font(HavenTypography.headline)
+                                .foregroundColor(HavenColors.textPrimary)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(viewModel.applyWarnings, id: \.self) { warning in
+                                HStack(alignment: .top, spacing: 6) {
+                                    Text("•")
+                                        .foregroundColor(HavenColors.textTertiary)
+                                    Text(warning)
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundColor(HavenColors.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        Button("Done") {
+                            onComplete?()
+                            dismiss()
+                        }
+                        .font(HavenTypography.uiButton)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(HavenColors.navy800)
+                        .cornerRadius(HavenTheme.radiusButton)
+                        .padding(.top, 4)
+                    }
+                    .padding(HavenTheme.spacing12)
+                    .background(HavenColors.warning.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .padding(.horizontal, HavenTheme.pageMargin)
+                    .padding(.bottom, 12)
                 }
             } else {
                 VStack(spacing: 8) {

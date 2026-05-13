@@ -6,6 +6,11 @@ import SwiftUI
 struct HouseQuizView: View {
     @StateObject var viewModel: HouseQuizViewModel
     @Environment(\.dismiss) private var dismiss
+    /// Phase 95.3 — observed so we can fire one more retry pass when the
+    /// quiz comes back to foreground. If the user backgrounded the app
+    /// after a failed per-answer persist, this is the cheapest recovery
+    /// point — no UI noise, no banner tap needed.
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Phase 85: drives the WalkthroughView fullScreenCover when the
     /// homeowner picks "Keep going" on the path-decision screen.
@@ -358,6 +363,52 @@ struct HouseQuizView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
+                // Phase 95.3 — per-answer auto-save retry banner. Distinct
+                // from the saveAndExit banner above (which surfaces only on
+                // an explicit X-button save). This one fires when the
+                // background per-answer persist fails so the user knows
+                // their last few answers haven't reached the server. Tap
+                // to retry; banner auto-dismisses on the next successful
+                // persist. Non-blocking — the quiz keeps working in
+                // memory, and the next answer's persist will also clear
+                // the flag if it succeeds.
+                if viewModel.hasUnsyncedAnswers,
+                   viewModel.saveErrorMessage == nil {
+                    VStack {
+                        Button {
+                            Haptics.light()
+                            Task { await viewModel.retryPendingPersist() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.clockwise.icloud")
+                                    .foregroundStyle(HavenColors.warning)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(viewModel.persistErrorMessage ?? "Couldn't sync your last answer")
+                                        .font(HavenTypography.uiLabel.weight(.semibold))
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Text("Tap to retry")
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(HavenTheme.spacing12)
+                            .background(HavenColors.warning.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                                    .strokeBorder(HavenColors.warning.opacity(0.4), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, HavenTheme.pageMargin)
+                        .padding(.top, HavenTheme.spacing8)
+                        Spacer()
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(11)
+                }
+
                 // Apr 7, 2026 (build 82) — full-screen insight overlay.
                 // When the user picks an answer that has an associated
                 // insight, the screen dims and the insight floats in the
@@ -650,6 +701,16 @@ struct HouseQuizView: View {
         .onChange(of: q22GeneratorType) { _, _ in persistCurrentDraft() }
         .onChange(of: q22GeneratorFuel) { _, _ in persistCurrentDraft() }
         .onChange(of: q22GeneratorProvider?.id) { _, _ in persistCurrentDraft() }
+        // Phase 95.3 — when the quiz returns to foreground, retry any
+        // failed per-answer persist silently. If the prior failure was a
+        // transient connectivity issue (most common cause), the user
+        // backgrounded the app, network recovered while they were away,
+        // and this single retry on .active flushes everything without
+        // them having to tap the banner.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active, viewModel.hasUnsyncedAnswers else { return }
+            Task { await viewModel.retryPendingPersist() }
+        }
     }
 
     /// Phase 95 (gap #10) — pulls every tracked inline-form `@State`

@@ -42,6 +42,14 @@ struct AddVehicleView: View {
     // = leave the toggle off; we'll persist nil.
     @State private var isEv = false
     @State private var batteryCapacityKwhInput = ""
+
+    /// Phase 95.3 — when vehicle saves OK but secondary writes (recalls,
+    /// AI-generated maintenance schedule) silently dropped, this gets set
+    /// and the view shows an alert before dismissing. Without it, the
+    /// vehicle landed on the dashboard with 0 recalls / 0 maintenance
+    /// items and the user had no idea NHTSA actually returned data the
+    /// app couldn't persist.
+    @State private var saveWarning: String?
     @State private var chargerType = "tesla"
     private let chargerTypes = ["tesla", "nacs", "ccs", "j1772", "chademo"]
 
@@ -89,6 +97,22 @@ struct AddVehicleView: View {
                 VINScannerView { imageBase64 in
                     Task { await lookupVIN(imageBase64: imageBase64) }
                 }
+            }
+            // Phase 95.3 — surface secondary-write failures (recalls,
+            // maintenance tasks) so the vehicle doesn't land on the
+            // dashboard with 0 recalls when NHTSA actually returned a
+            // list. The vehicle row already saved by the time this
+            // shows; dismissal happens when the user acknowledges.
+            .alert("Vehicle saved", isPresented: Binding(
+                get: { saveWarning != nil },
+                set: { if !$0 { saveWarning = nil } }
+            ), presenting: saveWarning) { _ in
+                Button("OK") {
+                    saveWarning = nil
+                    dismiss()
+                }
+            } message: { warning in
+                Text(warning)
             }
         }
     }
@@ -470,17 +494,29 @@ struct AddVehicleView: View {
             }
 
             // Save recalls
+            //
+            // Phase 95.3: count failures so we can warn the user instead
+            // of silently landing them on a vehicle with 0 recalls when
+            // NHTSA actually returned a list. The vehicle row already
+            // saved (line 458) so the user keeps the vehicle either
+            // way; we just tell them how many recalls didn't persist.
+            var recallFailures = 0
             for recall in recallsToSave {
-                _ = try? await db.createVehicleRecall(VehicleRecallInsert(
-                    vehicleId: vehicle.id,
-                    householdId: householdId,
-                    nhtsaCampaignNumber: recall.nhtsaCampaignNumber,
-                    component: recall.component,
-                    summary: recall.summary,
-                    consequence: recall.consequence,
-                    remedy: recall.remedy,
-                    recallDate: recall.reportDate
-                ))
+                do {
+                    _ = try await db.createVehicleRecall(VehicleRecallInsert(
+                        vehicleId: vehicle.id,
+                        householdId: householdId,
+                        nhtsaCampaignNumber: recall.nhtsaCampaignNumber,
+                        component: recall.component,
+                        summary: recall.summary,
+                        consequence: recall.consequence,
+                        remedy: recall.remedy,
+                        recallDate: recall.reportDate
+                    ))
+                } catch {
+                    recallFailures += 1
+                    print("[AddVehicle] Recall save failed for \(recall.nhtsaCampaignNumber): \(error)")
+                }
             }
 
             // Create maintenance tasks from AI-generated schedule.
@@ -498,6 +534,10 @@ struct AddVehicleView: View {
             taskDateFormatter.dateFormat = "yyyy-MM-dd"
             taskDateFormatter.locale = Locale(identifier: "en_US_POSIX")
             taskDateFormatter.timeZone = TimeZone(identifier: "UTC")
+            // Phase 95.3: track per-interval failures so we can surface
+            // them in the post-save warning summary. Mirrors the recall
+            // failure counter above.
+            var maintenanceTaskFailures = 0
             for interval in maintenanceSchedule {
                 guard interval.intervalMiles != nil || interval.intervalMonths != nil else { continue }
                 // Phase 95 (gap #91) — drop ICE-only intervals for
@@ -517,17 +557,23 @@ struct AddVehicleView: View {
                 } else {
                     nextDue = Date()
                 }
-                _ = try? await db.createMaintenanceTask(MaintenanceTaskInsert(
-                    vehicleId: vehicle.id,
-                    householdId: householdId,
-                    title: interval.type.replacingOccurrences(of: "_", with: " ").capitalized,
-                    frequency: interval.intervalMonths.map { "Every \($0) months" } ?? (interval.intervalMiles.map { "Every \($0.formatted()) miles" } ?? "As needed"),
-                    nextDueDate: taskDateFormatter.string(from: nextDue),
-                    description: interval.description,
-                    estimatedCost: interval.estimatedCost,
-                    priority: "medium",
-                    templateId: interval.type
-                ))
+                // Phase 95.3: track maintenance task failures.
+                do {
+                    _ = try await db.createMaintenanceTask(MaintenanceTaskInsert(
+                        vehicleId: vehicle.id,
+                        householdId: householdId,
+                        title: interval.type.replacingOccurrences(of: "_", with: " ").capitalized,
+                        frequency: interval.intervalMonths.map { "Every \($0) months" } ?? (interval.intervalMiles.map { "Every \($0.formatted()) miles" } ?? "As needed"),
+                        nextDueDate: taskDateFormatter.string(from: nextDue),
+                        description: interval.description,
+                        estimatedCost: interval.estimatedCost,
+                        priority: "medium",
+                        templateId: interval.type
+                    ))
+                } catch {
+                    maintenanceTaskFailures += 1
+                    print("[AddVehicle] Maintenance task save failed for \(interval.type): \(error)")
+                }
             }
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
             // Phase 95 audit fix — fresh vehicles need to surface in the
@@ -542,11 +588,35 @@ struct AddVehicleView: View {
             Analytics.track(.vehicleCreated, [
                 "has_vin": !vin.isEmpty,
                 "recall_count": recallsToSave.count,
-                "maintenance_items": maintenanceSchedule.count
+                "maintenance_items": maintenanceSchedule.count,
+                "recall_failures": recallFailures,
+                "maintenance_task_failures": maintenanceTaskFailures
             ])
             Haptics.success()
-            onComplete?(vehicle)
-            dismiss()
+
+            // Phase 95.3: if any secondary writes silently failed (recalls
+            // or AI-generated maintenance tasks), surface a warning so the
+            // user knows what didn't persist before they walk away. The
+            // vehicle itself saved (line 458) — dismissal happens after
+            // the user dismisses the alert via the alert handler.
+            if recallFailures > 0 || maintenanceTaskFailures > 0 {
+                var pieces: [String] = []
+                if recallFailures > 0 {
+                    pieces.append("\(recallFailures) recall\(recallFailures == 1 ? "" : "s")")
+                }
+                if maintenanceTaskFailures > 0 {
+                    pieces.append("\(maintenanceTaskFailures) maintenance task\(maintenanceTaskFailures == 1 ? "" : "s")")
+                }
+                saveWarning = "Your vehicle was saved, but \(pieces.joined(separator: " and ")) couldn't be added right now. You can retry from the vehicle detail screen."
+                // Don't dismiss yet — let the user acknowledge the
+                // warning. onComplete still fires so the parent surface
+                // refreshes; the vehicle is in the DB. Dismiss happens
+                // in the alert's onDismiss handler.
+                onComplete?(vehicle)
+            } else {
+                onComplete?(vehicle)
+                dismiss()
+            }
         } catch {
             lookupError = error.localizedDescription
             Haptics.error()

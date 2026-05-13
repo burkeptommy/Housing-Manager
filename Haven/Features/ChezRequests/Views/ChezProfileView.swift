@@ -19,6 +19,12 @@ import SwiftUI
 struct ChezProfileView: View {
     @StateObject private var viewModel = ChezProfileViewModel()
     @Environment(\.dismiss) private var dismiss
+    /// Phase 95.3 — watch scenePhase so we can flush the debounced save
+    /// when the user backgrounds the app mid-edit. Without this, a user
+    /// who types a standing instruction and hits the home button within
+    /// 600ms loses the change because the debounce task is cancelled by
+    /// suspension before it ever fires.
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Optional: when presented as a sheet from another flow (e.g.
     /// "Set up your Chez profile" CTA inside the composer), call this
@@ -46,7 +52,14 @@ struct ChezProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") {
-                        Task { await viewModel.saveNow() }
+                        // Phase 95.3 — flushPendingSave cancels the
+                        // 600ms debounce and saves once. saveNow alone
+                        // would also work (a second save after a
+                        // queued debounce is harmless), but
+                        // flushPendingSave is the explicit "we're
+                        // closing, don't lose the in-flight edit"
+                        // primitive — same one .onDisappear uses.
+                        Task { await viewModel.flushPendingSave() }
                         onDone?()
                         dismiss()
                     }
@@ -67,6 +80,22 @@ struct ChezProfileView: View {
             .task {
                 Analytics.track(.chezProfileViewed)
                 await viewModel.load()
+            }
+            // Phase 95.3 — flush pending save on swipe-down dismiss or
+            // any parent-driven pop. The Done toolbar button already
+            // saves explicitly; this covers the sheet-drag-to-dismiss
+            // path that bypasses it.
+            .onDisappear {
+                Task { await viewModel.flushPendingSave() }
+            }
+            // Phase 95.3 — flush pending save when the user backgrounds
+            // the app mid-edit. SwiftUI's Task is cancelled when the
+            // scene suspends, so without this any edit made in the
+            // ~600ms before backgrounding is lost.
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .background || newPhase == .inactive {
+                    Task { await viewModel.flushPendingSave() }
+                }
             }
             .trackScreen("ChezProfileView")
         }

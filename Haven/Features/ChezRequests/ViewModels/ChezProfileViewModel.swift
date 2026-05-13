@@ -40,6 +40,23 @@ final class ChezProfileViewModel: ObservableObject {
         }
     }
 
+    /// Phase 95.3 — flush any pending debounced save immediately, then
+    /// run `saveNow()`. Called from `.onDisappear` (swipe-down dismiss,
+    /// parent navigation pop) and from the scenePhase `.background`
+    /// observer in `ChezProfileView`. Without this, a user who types a
+    /// standing instruction and closes the sheet within 600ms loses the
+    /// change — the debounced task is cancelled by sheet teardown
+    /// before it ever runs. We cancel the pending task and replace it
+    /// with a synchronous save so the edit always lands.
+    ///
+    /// Idempotent: if `saveTask` is already nil, this just calls
+    /// `saveNow()` once. Safe to invoke from multiple backstops.
+    func flushPendingSave() async {
+        saveTask?.cancel()
+        saveTask = nil
+        await saveNow()
+    }
+
     func saveNow() async {
         isSaving = true
         defer { isSaving = false }
