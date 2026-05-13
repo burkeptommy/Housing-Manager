@@ -382,9 +382,19 @@ struct ContractorDirectoryView: View {
                     .foregroundStyle(HavenColors.textPrimary)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(contractor.companyName)
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textPrimary)
+                    HStack(spacing: 6) {
+                        Text(contractor.companyName)
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        // Phase 3.2: surface Chez delegation status
+                        // inline on the directory row. Already powered
+                        // by the existing ContractorRow.isChezOwned
+                        // computed in DatabaseModels.swift; no new
+                        // schema or fetch needed.
+                        if contractor.isChezOwned {
+                            ChezOwnsBadge(compact: true)
+                        }
+                    }
                     if let contact = contractor.contactName {
                         Text(contact)
                             .font(HavenTypography.uiLabelSmall)
