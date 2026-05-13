@@ -67,6 +67,20 @@ final class HouseQuizViewModel: ObservableObject {
     /// summary. Defaults to `false` so an unfinished quiz never shows stale
     /// numbers.
     @Published var finalReconciliationDidRun: Bool = false
+    /// Phase 2.2: number of Chez requests submitted on the most recent
+    /// completion pass. The post-quiz summary card (Phase 2.4) reads
+    /// this to render the "Chez is taking N things off your plate"
+    /// hero. Updated from the detached submission task — never reset
+    /// to zero by the view model itself so stale-quiz re-completions
+    /// still show the historical count.
+    @Published var chezQuizRequestsSubmittedCount: Int = 0
+    /// Phase 2.2: in-memory guard so the submitter only fires once
+    /// per app launch per property. Combined with the per-intent
+    /// idempotency flags inside ChezQuizRequestSubmitter, this
+    /// prevents wasted network calls on every persist after intake
+    /// completion. Resets on next launch (the submitter's own flags
+    /// keep multi-launch retries from creating duplicate rows).
+    @Published var didFireChezQuizSubmission: Bool = false
 
     /// Build 90 fix: handle to the detached completion-time reconciler so
     /// `loadFinaleTotals()` can await it. Without this the cinematic reveal
@@ -1510,6 +1524,36 @@ final class HouseQuizViewModel: ObservableObject {
         update.houseQuizState = state
         _ = try await db.updateProperty(id: property.id, update)
         NotificationCenter.default.post(name: .propertyChanged, object: nil)
+
+        // Phase 2.2: fire the Chez request submitter ONCE per launch
+        // after intake completion. The submitter is safe to call
+        // multiple times via its per-intent attribute flags, but the
+        // in-memory guard keeps us from doing the network round-trip
+        // on every persist. Detached so the persist call still
+        // returns quickly. The summary card observes
+        // `chezQuizRequestsSubmittedCount` on the published path.
+        if state.intakeCompletedAt != nil && !didFireChezQuizSubmission {
+            didFireChezQuizSubmission = true
+            let snapshot = state
+            let snapshotProperty = property
+            Task.detached { [weak self] in
+                let intents = await MainActor.run {
+                    ChezQuizRequestSubmitter.collectIntents(state: snapshot)
+                }
+                guard !intents.isEmpty else { return }
+                let submitted = await ChezQuizRequestSubmitter.submitIntents(
+                    intents: intents,
+                    property: snapshotProperty
+                )
+                await MainActor.run {
+                    self?.chezQuizRequestsSubmittedCount = submitted
+                    NotificationCenter.default.post(
+                        name: .chezQuizRequestsSubmitted,
+                        object: nil
+                    )
+                }
+            }
+        }
     }
 
     // MARK: - Phase 85 path-decision API

@@ -380,6 +380,13 @@ extension Notification.Name {
     /// Phase 84.5 — Posted when a chez_assessment_complete push arrives
     /// so that the AssessmentReviewView auto-presents.
     static let openChezAssessmentReview = Notification.Name("openChezAssessmentReview")
+
+    /// Phase 2.2 — Posted when ChezQuizRequestSubmitter finishes
+    /// batch-creating chez_requests at quiz completion. The post-quiz
+    /// summary card (Phase 2.4) listens for this to refresh its row
+    /// count, but it's also a useful hook for any other surface that
+    /// wants to react to the wave of new homeowner intents.
+    static let chezQuizRequestsSubmitted = Notification.Name("chezQuizRequestsSubmitted")
 }
 
 // MARK: - Phase 84.5 — Home Assessment wrappers

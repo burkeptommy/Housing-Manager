@@ -277,6 +277,7 @@
 		48EBBCEBB43FC343DEA44810 /* ExpirationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB1E595AC46EC435723506 /* ExpirationBadge.swift */; };
 		48F02347E056AD2C02E2EFB0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E5AB75E21903A9833695E4FA /* Assets.xcassets */; };
 		4923D58BDCCA15DDA53B4234 /* LibraryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0777F76F2FE223391F32380E /* LibraryPicker.swift */; };
+		498E44D67AF08229E111591E /* ChezQuizRequestSubmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDB844E8104520CAA856B45 /* ChezQuizRequestSubmitter.swift */; };
 		4A67D195FB30C8FC75BCD0AF /* HavenColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AA43272E274ADD62E2592 /* HavenColors.swift */; };
 		4A69C6EB06F4487D7BF2443C /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */; };
 		4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */; };
@@ -784,6 +785,7 @@
 		DA66502501A32B80C299DD5F /* YearRibbon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EBCC1E36E5ADE525CE044D /* YearRibbon.swift */; };
 		DACC08101E8BA7738FA2A002 /* RealtimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8649F2BA7EF982C1DBCC227 /* RealtimeService.swift */; };
 		DAFA968727FFDCCB106A47D1 /* PropertyHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D253512E9703A545575048F1 /* PropertyHookView.swift */; };
+		DBCD665C8F2D2DECEA6D8BD9 /* ChezQuizRequestSubmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDB844E8104520CAA856B45 /* ChezQuizRequestSubmitter.swift */; };
 		DC1E77952703544F704E4A8B /* ChezOwnsToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF82EF48FF699827460350F3 /* ChezOwnsToggle.swift */; };
 		DC41477208101D5401312829 /* PropertyHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D253512E9703A545575048F1 /* PropertyHookView.swift */; };
 		DC426605D59D945142970B98 /* ProjectEmailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5627AB5E97358EFC5C1A0B /* ProjectEmailView.swift */; };
@@ -1048,6 +1050,7 @@
 		3B1FA359763C96ED224CADD3 /* MessageComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageComposeView.swift; sourceTree = "<group>"; };
 		3B6D2F3658561ADE37395D63 /* ChapterIntroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterIntroCard.swift; sourceTree = "<group>"; };
 		3B9EEC0AD9698228EA20EFFC /* DocumentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStatus.swift; sourceTree = "<group>"; };
+		3BDB844E8104520CAA856B45 /* ChezQuizRequestSubmitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezQuizRequestSubmitter.swift; sourceTree = "<group>"; };
 		3BE252A208C6E260188E1A3E /* HandymanTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanTabView.swift; sourceTree = "<group>"; };
 		3C149790C33B097708FA1F8D /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		3CBB124AA65CF4CD55F692FC /* QuizHomeManagerInviteInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizHomeManagerInviteInlineForm.swift; sourceTree = "<group>"; };
@@ -2060,6 +2063,7 @@
 			isa = PBXGroup;
 			children = (
 				C5C3E85C92E536C944040AD6 /* ChezConciergeService.swift */,
+				3BDB844E8104520CAA856B45 /* ChezQuizRequestSubmitter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -2726,6 +2730,7 @@
 				C93C99518366164CC4FC5215 /* ChezProfileViewModel.swift in Sources */,
 				CF00A608E9E39BB7C132EC68 /* ChezProposalCard.swift in Sources */,
 				31BFCFC126FB679920EAEA06 /* ChezQuickQuestionSheet.swift in Sources */,
+				DBCD665C8F2D2DECEA6D8BD9 /* ChezQuizRequestSubmitter.swift in Sources */,
 				88EF3B5CBC7AB85221EB059D /* ChezRequest.swift in Sources */,
 				52D1C3DA5552E4E44F9261EE /* ChezRequestComposeSheet.swift in Sources */,
 				9305A9A5ED5EC53675B0B734 /* ChezRequestComposeViewModel.swift in Sources */,
@@ -3197,6 +3202,7 @@
 				24E660EFB67FE63A756190B6 /* ChezProfileViewModel.swift in Sources */,
 				0AFD62B9E9761D1862B0A179 /* ChezProposalCard.swift in Sources */,
 				9A419CFE5283A423574B0F26 /* ChezQuickQuestionSheet.swift in Sources */,
+				498E44D67AF08229E111591E /* ChezQuizRequestSubmitter.swift in Sources */,
 				F70F5AA7A789D17522B34CF2 /* ChezRequest.swift in Sources */,
 				713DB3B5A775408EAA100E85 /* ChezRequestComposeSheet.swift in Sources */,
 				F1050517A2BB78D26DA5CF74 /* ChezRequestComposeViewModel.swift in Sources */,
