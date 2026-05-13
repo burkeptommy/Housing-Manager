@@ -71,6 +71,48 @@ Three small wins layered on top of Phase 1 + 2. No schema changes, no migrations
 - **3.2 — ChezOwnsBadge on contractor directory rows** (1e296b52). Surfaces the existing compact `ChezOwnsBadge` next to `companyName` in `ContractorDirectoryView.contractorCard` when `contractor.isChezOwned == true`. Already-populated from `contractors.chez_owned`; no fetch added.
 - **3.1 — HNW Subtype Review Dashboard card** (95c98d22). New `HNWSubtypeReviewCard` modeled on `WhatsNewPhase57Card`. Renders for properties created within the last 14 days (new onboards) and opens the existing `UpdateHomeDetailsSheet` with the 10 HNW toggles. Per-property dismissal under `hnwSubtypeReviewDismissed` (comma-joined UUID list) so multi-property households can review each one independently.
 - **3.3 — Push when Chez schedules a chez_owned routine visit** (b7e0f5f0). Edge function `chez-concierge` `schedule_visit` case now fetches the routine row after the visit insert, checks `chez_owned`, and fires a push to every linked household user. Title: "Chez scheduled a visit". Body: "{vendor} is booked for {date}". Wrapped in try/catch so push failure never fails the schedule. iOS `HavenApp.userNotificationCenter` gained an explicit `chez_routine_visit_scheduled` case BEFORE the `chez_` catch-all so empty `request_id` doesn't fall through to `.openChezRequest`. **Requires edge function deploy:** `supabase functions deploy chez-concierge --no-verify-jwt`.
+## Phase 86A–D: Chez admin panel CRM build-out (2026-05-12)
+
+Tom asked for a full audit of the Chez admin panel from a customer-service standpoint. The audit ([CHEZ_ADMIN_CRM_AUDIT.md](CHEZ_ADMIN_CRM_AUDIT.md)) identified 7 gaps and proposed a 4-phase build plan. Tom approved all recommendations and asked to ship. Four phases landed in one session:
+
+**Phase 86A — Home-first IA (commit b230e1bb):**
+- New "Today" top-level view (`renderTodayView` + `fetch_today_brief` edge action) — cross-home triage default landing. Greeting card adapts to current pressure (overdue / due-soon / today's visits / all-clear), three stacked sections (Needs you now / Today's visits / Recent customer messages / Coming up), every row clickable to deep-link into the cockpit.
+- "Households" tab relabeled "Homes" (id unchanged for backwards compat); demoted Concierge below Today + Homes.
+- New Home Overview as default workbench tab — address as serif h2, "Who lives here" contacts strip, standing-instructions card pulling from `households.chez_profile`, 8-tile coverage grid, open-cases section that opens cockpit, recent Chez activity feed.
+- Single-column layout mode (`admin-layout--single`) for Today so cards have room to breathe.
+- Default landing flipped from "quiz" to "today".
+
+**Phase 86B — CRM hygiene (commit 1226e483):**
+- Migration `20261313_chez_crm_hygiene.sql`: `chez_snippets` (operator-personal canned responses with org-shared seed library + token substitution), `chez_tag_definitions` (7 seeded tags with 6-color palette), `chez_request_tags` join table, plus `chez_requests.assigned_to_user_id` + `merged_into_request_id` + `related_case_ids` + a trigger that forces status=resolved on merge.
+- 10 new edge actions: snippets CRUD + record_use, tag list/apply/remove, assign_case, merge_cases (moves messages + visits + workbench_actions to surviving case), link_case, fetch_activity_feed.
+- Slash composer (`/`) in the cockpit reply textarea: filtered picker with keyboard nav, token substitution at insert-time, use_count bumps so frequently-used float to top.
+- Tag chip strip on every case header with inline removal + "+ Tag" picker dropdown.
+- Auto-system-message hook in `runWorkbenchSideEffect`: high-signal workbench actions (schedule_visit, log_service, complete_on_behalf, audit_bill, handle_recall, share_with_vendor) now drop a system message on the linked case AND write to `chez_activity_log` via the existing `log_chez_activity()` fn so the iOS Dashboard's `ChezActivityCard` (Phase 85 PR 5c) picks them up naturally.
+- New iOS `ChezActivity.swift` model + `fetchChezActivityFeed` service method for a future per-entity timeline.
+
+**Phase 86C — Vendor outbound + negotiation (commit e383dbf4):**
+- Migration `20261314_chez_vendor_outreach.sql`: `chez_vendor_outreach` table — outbound + inbound vendor email tracking with UNIQUE `reply_token`, status state machine, negotiation_payload JSONB. Operator-only RLS (homeowners see polished system messages, not raw vendor threads).
+- New `send-chez-vendor-email` edge function — SendGrid send from `hello@getchez.com`, reply-to `vendor+<token>@alfred.getchez.com` (16 hex chars / 64 bits entropy). Records outbound row + drops case-thread system message.
+- `receive-email` vendor-reply branch: matches `vendor+<token>@…` BEFORE household lookup. O(1) reply_token lookup → inserts inbound row + drops a truncated system message ("Petro Heating replied: …") + bumps `unread_for_admin`.
+- `draft_negotiation` action wired to Claude sonnet-4-6 (was NO-OP). Pulls `chez_profile` so the same prompt produces different output per homeowner's standing instructions. Returns JSON `{subject, body, suggested_target_cents, rationale}`. Always-review per Tom's call.
+- Cockpit vendor cards gained "📧 Email" (when email present) and "🤝 Counter" (when cost quoted) buttons opening slide-over composers. Counter composer fires `draft_negotiation`, populates editable subject/body, then sends through `send-chez-vendor-email`.
+
+**Phase 86D — Per-category playbooks (commit b3e9e7f2):**
+- `runChezPlaybookForRequest()` central dispatcher fires on every `submit` + every `delegate_task` so the homeowner sees "Chez is on it" immediately instead of waiting for the operator.
+- First-touch system message tailored per category (find_vendor / get_quote / schedule_visit / coordinate_task / find_handyman / general). First-person Chez voice ("we"), never names an operator, summary trimmed to 80 chars.
+- find_vendor playbook stamps a sentinel row in `chez_request_analyses` so the cockpit's analyze surface picks it up. Full background-Claude-analyze runs in 86E.
+- Every playbook creates a `chez_reminders` follow-up 4 business hours out. Best-effort: a playbook failure NEVER sinks the underlying submit/delegate.
+
+**Total stats:** 4 commits, ~5400 lines added (incl. ~1500 lines of audit doc), 1 new edge function, 2 new migrations, 1 new iOS model. Verified each phase in preview (mock-state injection → snapshot + inspect; no JS errors from the bundle).
+
+**Still pending** (deferred from audit, sequenced for follow-up sessions):
+- 86E: explicit per-category automation steps (auto-draft intro email to existing contractor on coordinate_task; parse "next Tuesday afternoon" hints on schedule_visit; pre-load comparable rates on get_quote).
+- Wire delegation playbooks for `delegate_routine` / `delegate_contractor` / `delegate_entity` (currently only `delegate_task` is wired; the others should follow the same pattern).
+- iOS "merged with…" redirect banner in `ChezRequestDetailView` when `merged_into_request_id` is set.
+- Tag chips on the queue rail (currently chips only render on the focused case header).
+- Per-operator queue ownership UI (Phase 86B added the column; admin UI for "Assign" / "Unassigned" filter still to wire).
+
+---
 
 ## CI Fix: DashboardView type-checker timeout (2026-05-05)
 
