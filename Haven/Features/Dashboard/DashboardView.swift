@@ -1120,6 +1120,24 @@ struct DashboardView: View {
             )
         }
 
+        // Phase 3.1: HNW subtype review for newly onboarded
+        // properties. The Phase 57 "What's New" card targets
+        // existing pre-release users; this companion card runs
+        // the same opt-in review for properties created within
+        // the last 14 days, while the homeowner is still
+        // actively configuring the home. Dismissal is tracked
+        // per-property so multi-property households can review
+        // each one independently.
+        if viewModel.hasCompletedAnyQuiz,
+           let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
+            HNWSubtypeReviewCard(
+                property: primaryProperty,
+                onReviewComplete: {
+                    Task { await viewModel.refresh() }
+                }
+            )
+        }
+
         // Phase 61: Legacy task cleanup notification.
         // Renders only when the household has archived tasks
         // AND the user hasn't dismissed. Tapping opens the
