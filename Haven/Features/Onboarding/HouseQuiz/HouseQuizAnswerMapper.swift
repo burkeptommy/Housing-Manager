@@ -1267,10 +1267,46 @@ final class HouseQuizAnswerMapper {
                 // reconciler for every property in the household so any
                 // existing `either`-tagged tasks flip to match the new
                 // tier.
+                //
+                // Phase 95.4 (2026-05-13): the full-household reconciler
+                // does one sequential `updateMaintenanceTask` per
+                // `.either` task in the household. On a mid-quiz user
+                // who already has 30-60 either-tagged tasks, that's
+                // 30-60 sequential round trips to Supabase — 5 to 10
+                // seconds of perceived freeze on the question screen
+                // because the answer's `persist(answer:)` path awaits
+                // the mapper before calling `advance()`. Same pattern
+                // Build 90 already detached for the completion-time
+                // reconciler ("so the completion screen appears
+                // immediately"); Q36 just never got the same treatment
+                // because it was originally the LAST question and
+                // didn't bottleneck UX. Now that it's the first
+                // question of Chapter 2 (Phase 60-something quiz
+                // reordering — display position 13/28), the block is
+                // smack in the middle of the quiz and very visible.
+                //
+                // Fix: detach the reconciler. The tier attribute write
+                // is still awaited so the next answer's mapper sees
+                // the new tier. The detached pass posts the standard
+                // refresh notifications when it finishes so any
+                // background-visible maintenance surface picks up the
+                // flipped rows. The completion screen counts tasks
+                // straight from the DB (Build 90 fix), so dropping the
+                // reconciliation totals from `reconciliationResult`
+                // here doesn't affect the final reveal numbers.
                 if let tierId = answer.answerId {
                     try await persistAttribute("vendor_preference_tier", value: tierId)
-                    let result = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
-                    reconciliationResult = reconciliationResult.merging(result)
+                    let householdIdCopy = householdId
+                    Task.detached(priority: .utility) {
+                        let result = await MaintenanceTaskReconciler.reconcileAllForHousehold(
+                            householdId: householdIdCopy
+                        )
+                        await MainActor.run {
+                            print("[HouseQuizAnswerMapper] q36 background reconcile done: added=\(result.added.count) removed=\(result.removed.count) preserved=\(result.preserved.count)")
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+                        }
+                    }
                 }
 
             default:
