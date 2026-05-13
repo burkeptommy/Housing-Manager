@@ -276,6 +276,29 @@ extension HavenSupabase {
         )
     }
 
+    // MARK: - Phase 86B — Chez activity feed
+
+    /// Fetch the recent Chez activity for the requesting user's household.
+    /// Server returns the last N workbench actions denormalized with
+    /// customer-facing verbs. Homeowner-only — admin override path is
+    /// not exposed from iOS.
+    ///
+    /// Dashboard surfaces the top 5 in the "Recent Chez activity" card
+    /// + offers a deep-link to the full timeline view (which calls this
+    /// with `limit = 50` for the longer history).
+    static func fetchChezActivityFeed(limit: Int = 25) async throws -> [ChezActivityRow] {
+        struct Body: Encodable {
+            let action = "fetch_activity_feed"
+            let limit: Int
+        }
+        struct Wrapper: Decodable { let items: [ChezActivityRow] }
+        let data = try await callConciergeEdgeFunction(body: Body(limit: limit))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .havenISO8601
+        let wrapper = try decoder.decode(Wrapper.self, from: data)
+        return wrapper.items
+    }
+
     // MARK: - Internal
 
     /// Direct fetch to the chez-concierge Edge Function. Mirrors the

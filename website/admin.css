@@ -11723,3 +11723,147 @@ details.admin-chez__analysis-section pre {
   margin-bottom: 6px;
   padding: 8px 14px;
 }
+
+/* ============================================================================
+ * Phase 86B — Slash composer picker + tag chips
+ * ============================================================================ */
+
+.cockpit-slash-picker {
+  background: var(--white, #fff);
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: var(--radius-sm, 10px);
+  box-shadow: 0 12px 36px rgba(42, 34, 82, 0.18);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.cockpit-slash-picker__row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text, #2A2252);
+  cursor: pointer;
+  display: flex;
+  font: 400 13px var(--sans);
+  gap: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  transition: background 120ms ease;
+  width: 100%;
+}
+.cockpit-slash-picker__row.is-active,
+.cockpit-slash-picker__row:hover {
+  background: var(--indigo-50, #F2EFF8);
+}
+
+.cockpit-slash-picker__row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+}
+
+.cockpit-slash-picker__row strong {
+  color: var(--indigo, #453A70);
+  font: 600 13px var(--mono, ui-monospace, monospace);
+}
+
+.cockpit-slash-picker__preview {
+  color: var(--text-muted, #6F6A88);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-slash-picker__empty {
+  color: var(--text-muted);
+  font: 400 13px var(--sans);
+  padding: 14px;
+}
+
+/* --- Tag chips on case header --- */
+.cockpit-tags {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.cockpit-tag-chip {
+  align-items: center;
+  background: var(--neutral-200, #EDEEF0);
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-muted, #6F6A88);
+  cursor: pointer;
+  display: inline-flex;
+  font: 600 11px var(--sans);
+  gap: 5px;
+  padding: 4px 10px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.cockpit-tag-chip:hover { background: rgba(199, 126, 46, 0.16); }
+
+.cockpit-tag-chip__x {
+  font-size: 14px;
+  line-height: 1;
+  margin-left: 2px;
+}
+
+.cockpit-tag-chip--add {
+  background: transparent;
+  border: 1px dashed var(--neutral-300, #D8DADF);
+  color: var(--text-muted, #6F6A88);
+}
+.cockpit-tag-chip--add:hover {
+  background: var(--indigo-50, #F2EFF8);
+  border-color: var(--indigo-100, #E8E4F2);
+  color: var(--indigo, #453A70);
+}
+
+/* Color variants — one per tag_definitions.color enum value. */
+.cockpit-tag-chip--indigo { background: var(--indigo-100, #E8E4F2); color: var(--indigo, #453A70); }
+.cockpit-tag-chip--salmon { background: var(--salmon-pale, #FFE8E2); color: #B23E2C; }
+.cockpit-tag-chip--amber  { background: rgba(199, 126, 46, 0.14); color: #7E4F18; }
+.cockpit-tag-chip--green  { background: rgba(74, 124, 89, 0.14); color: #3A6448; }
+.cockpit-tag-chip--red    { background: rgba(214, 71, 60, 0.12); color: #C03A2D; }
+.cockpit-tag-chip--muted  { background: var(--neutral-200, #EDEEF0); color: var(--text-muted, #6F6A88); }
+
+/* --- Tag picker dropdown --- */
+.cockpit-tag-picker {
+  background: var(--white, #fff);
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: var(--radius-sm, 10px);
+  box-shadow: 0 12px 36px rgba(42, 34, 82, 0.18);
+  max-width: 280px;
+  padding: 8px;
+}
+
+.cockpit-tag-picker__head {
+  color: var(--text-muted, #6F6A88);
+  font: 700 10px var(--sans);
+  letter-spacing: 0.12em;
+  padding: 6px 8px 10px;
+  text-transform: uppercase;
+}
+
+.cockpit-tag-picker__row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 8px;
+  text-align: left;
+  width: 100%;
+}
+.cockpit-tag-picker__row:hover {
+  background: var(--indigo-50, #F2EFF8);
+}

@@ -663,6 +663,49 @@ const state = {
     workbench: null,           // full per-household payload for the selected one
     workbenchLoadedAt: 0,
     workbenchTab: "routines",  // routines | systems | vendors | tasks | projects | documents | utilities | vehicles | cases
+    // Phase 86A — default tab is now "overview" (Home overview page). Was
+    // "routines" which dropped operators straight into the entity list
+    // without the home context that makes the rest of the workbench
+    // legible (address, family, standing instructions, coverage).
+    workbenchTab: "overview",  // overview | routines | systems | vendors | tasks | projects | documents | utilities | vehicles | cases
+    workbenchQuery: "",
+    workbenchOwnedOnly: false,
+  },
+  // Phase 86B — CRM hygiene (snippets + tags + assignment + merge).
+  // Loaded lazily on first cockpit render. Snippets sort: use_count DESC
+  // (personal float to top automatically), then label. Tag definitions
+  // are stable — fetched once per session. Applied tags is keyed by
+  // request_id so re-rendering a case doesn't refetch.
+  crm: {
+    snippets: [],
+    snippetsLoadedAt: 0,
+    tagDefinitions: [],
+    tagDefinitionsLoadedAt: 0,
+    appliedTagsByRequest: {},  // { [requestId]: [{ tag_definition_id, slug, label, color }] }
+    // Slash-picker UI state (transient — not persisted).
+    slashOpen: false,
+    slashQuery: "",
+    slashCursor: 0,
+    slashTargetRequestId: null,
+  },
+  // Phase 86A — Today command center state. Loaded on first render +
+  // refresh-every-2-min ticker.
+  today: {
+    loadedAt: 0,
+    loading: false,
+    error: null,
+    urgentCases: [],         // chez_requests with SLA overdue/due-soon or unread by admin
+    todaysVisits: [],        // chez_visits scheduled today across every household
+    upcomingVisits: [],      // chez_visits scheduled +1d through +7d
+    recentUnread: [],        // homeowner-initiated messages awaiting admin reply
+    stats: {
+      openCases: 0,
+      slaOverdue: 0,
+      slaDueSoon: 0,
+      visitsToday: 0,
+      visitsThisWeek: 0,
+      homesUnderManagement: 0,
+    },
   },
   // Phase 84 — Upcoming feed state.
   upcoming: {
@@ -5052,6 +5095,12 @@ function renderConciergeCockpit() {
   // guard against stale callbacks firing after the user switches away).
   if (state.view !== "chez") return;
 
+  // Phase 86B — make sure snippets + tag definitions are loaded once per
+  // session. Fire-and-forget on first cockpit render; subsequent renders
+  // skip because the loadedAt timestamps are set. Re-render happens
+  // automatically when the loads complete.
+  ensureCrmReferenceData();
+
   // Sort + filter the case list. Reuses the legacy logic so the queue
   // ordering Tom is used to (overdue first, then unread, then most recent)
   // stays consistent.
@@ -5967,6 +6016,7 @@ function renderConciergeCaseHeaderHtml(req) {
         <span class="cockpit-pill cockpit-pill--indigo">${escapeHtml(CHEZ_STATUS_LABELS[req.status] || req.status)} · ${escapeHtml(req.id.slice(0, 8))}</span>
         ${opened ? `<span class="cockpit-case-header__opened">${escapeHtml(opened)}</span>` : ""}
       </div>
+      ${renderTagChipsHtml(req)}
       <h2 class="cockpit-case-header__title">${escapeHtml(req.summary || "(no summary)")}</h2>
       <div class="cockpit-case-header__actions">
         <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="reassign" title="Single-agent setup — reassignment will be enabled when additional Chez operators come online.">
@@ -7389,6 +7439,285 @@ function renderConciergeAlfredSimilarHtml(req, dossier) {
 // the cockpit DOM, so listeners only ever bind to the freshly-rendered nodes.
 // =============================================================================
 
+// ============================================================================
+// Phase 86B — CRM hygiene helpers
+// ============================================================================
+// Fetches snippets + tag definitions lazily on first cockpit render.
+// Idempotent — once loaded, subsequent calls no-op. Re-renders the cockpit
+// when data arrives so the slash picker + tag chips pick up the fresh data.
+// ============================================================================
+
+async function ensureCrmReferenceData() {
+  const stale = (loadedAt) => Date.now() - loadedAt > 5 * 60_000; // 5 minutes
+  const promises = [];
+  if (state.crm.snippets.length === 0 || stale(state.crm.snippetsLoadedAt)) {
+    promises.push(
+      callChezConcierge({ action: "list_snippets" })
+        .then((r) => {
+          state.crm.snippets = r.snippets ?? [];
+          state.crm.snippetsLoadedAt = Date.now();
+        })
+        .catch((e) => console.warn("[crm] snippets load failed", e))
+    );
+  }
+  if (state.crm.tagDefinitions.length === 0 || stale(state.crm.tagDefinitionsLoadedAt)) {
+    promises.push(
+      callChezConcierge({ action: "list_tag_definitions" })
+        .then((r) => {
+          state.crm.tagDefinitions = r.tags ?? [];
+          state.crm.tagDefinitionsLoadedAt = Date.now();
+        })
+        .catch((e) => console.warn("[crm] tag defs load failed", e))
+    );
+  }
+  if (promises.length > 0) {
+    await Promise.allSettled(promises);
+    // Re-render with the freshly-loaded data, but only if we're still on
+    // the cockpit (operator may have navigated away during the fetch).
+    if (state.view === "chez") renderConciergeCockpit();
+  }
+}
+
+// Load applied tags for a single case. Fire-and-forget; the case header
+// re-renders on the next cockpit pass once data arrives.
+async function loadAppliedTagsForCase(requestId) {
+  if (!requestId) return;
+  try {
+    const { data, error } = await supabase
+      .from("chez_request_tags")
+      .select("tag_definition_id, applied_at")
+      .eq("request_id", requestId);
+    if (error) throw error;
+    // Join client-side against the tagDefinitions cache so the case
+    // header has slug + label + color without an extra round-trip.
+    const defsById = new Map(state.crm.tagDefinitions.map((d) => [d.id, d]));
+    state.crm.appliedTagsByRequest[requestId] = (data ?? []).map((row) => {
+      const def = defsById.get(row.tag_definition_id);
+      return def ? { ...def, applied_at: row.applied_at } : null;
+    }).filter(Boolean);
+  } catch (e) {
+    console.warn("[crm] applied tags load failed", e);
+    state.crm.appliedTagsByRequest[requestId] = [];
+  }
+}
+
+// Token substitution for snippet bodies. Tokens are inline placeholders the
+// operator can use in snippet copy — the slash picker resolves them at
+// insert-time. Unknown tokens get left in place so the operator sees
+// what's missing and can edit before sending.
+function applySnippetTokens(body, ctx) {
+  if (!body) return "";
+  return body
+    .replace(/\{homeowner_first_name\}/g, ctx.homeownerFirstName || "{homeowner_first_name}")
+    .replace(/\{homeowner_name\}/g, ctx.homeownerName || "{homeowner_name}")
+    .replace(/\{address_street\}/g, ctx.addressStreet || "{address_street}")
+    .replace(/\{vendor_name\}/g, ctx.vendorName || "{vendor_name}")
+    .replace(/\{visit_date\}/g, ctx.visitDate || "{visit_date}")
+    .replace(/\{question\}/g, ctx.question || "{question}");
+}
+
+// Slash picker — searchable dropdown of snippets, opens when the operator
+// types "/" at the start of a line or right after whitespace. Filters by
+// the chars typed after "/". Click or Enter inserts. Esc closes.
+function openSlashPicker(input, activeReq) {
+  state.crm.slashOpen = true;
+  state.crm.slashQuery = "";
+  state.crm.slashCursor = 0;
+  state.crm.slashTargetRequestId = activeReq?.id || null;
+  renderSlashPicker(input, activeReq);
+}
+
+function closeSlashPicker() {
+  state.crm.slashOpen = false;
+  state.crm.slashQuery = "";
+  state.crm.slashCursor = 0;
+  document.querySelector("[data-slash-picker]")?.remove();
+}
+
+function renderSlashPicker(input, activeReq) {
+  // Position the picker right below the textarea.
+  const rect = input.getBoundingClientRect();
+  let picker = document.querySelector("[data-slash-picker]");
+  if (!picker) {
+    picker = document.createElement("div");
+    picker.className = "cockpit-slash-picker";
+    picker.dataset.slashPicker = "true";
+    document.body.appendChild(picker);
+  }
+  picker.style.position = "fixed";
+  picker.style.left = `${rect.left}px`;
+  picker.style.top = `${rect.bottom + 6}px`;
+  picker.style.width = `${rect.width}px`;
+  picker.style.zIndex = "9999";
+
+  const q = (state.crm.slashQuery || "").toLowerCase();
+  const matches = state.crm.snippets.filter((s) => {
+    if (!q) return true;
+    return (
+      (s.slug || "").includes(q) ||
+      (s.label || "").toLowerCase().includes(q) ||
+      (s.category || "").toLowerCase().includes(q)
+    );
+  }).slice(0, 8);
+
+  if (matches.length === 0) {
+    picker.innerHTML = `
+      <div class="cockpit-slash-picker__empty">
+        No snippets match "${escapeHtml(q)}". <span class="cockpit-muted">Esc to close, or keep typing.</span>
+      </div>
+    `;
+    return;
+  }
+
+  state.crm.slashCursor = Math.min(state.crm.slashCursor, matches.length - 1);
+  picker.innerHTML = matches.map((s, i) => `
+    <button type="button"
+      class="cockpit-slash-picker__row ${i === state.crm.slashCursor ? "is-active" : ""}"
+      data-slash-snippet="${escapeHtml(s.id)}">
+      <div class="cockpit-slash-picker__row-left">
+        <strong>/${escapeHtml(s.slug)}</strong>
+        <span class="cockpit-muted">${escapeHtml(s.label)}</span>
+      </div>
+      <span class="cockpit-slash-picker__preview">${escapeHtml((s.body || "").slice(0, 80))}${(s.body || "").length > 80 ? "…" : ""}</span>
+    </button>
+  `).join("");
+
+  picker.querySelectorAll("[data-slash-snippet]").forEach((row) => {
+    row.addEventListener("mousedown", (e) => {
+      // mousedown (not click) so it fires before the textarea blur.
+      e.preventDefault();
+      const snippet = state.crm.snippets.find((s) => s.id === row.dataset.slashSnippet);
+      if (snippet) insertSnippetIntoComposer(input, snippet, activeReq);
+    });
+  });
+}
+
+function insertSnippetIntoComposer(input, snippet, activeReq) {
+  const ctx = buildSnippetTokenContext(activeReq);
+  const resolved = applySnippetTokens(snippet.body, ctx);
+  // Replace the "/abc" trigger range with the resolved body.
+  const value = input.value || "";
+  const caret = input.selectionStart ?? value.length;
+  // Find the slash-trigger that opened the picker (last "/" before caret).
+  const before = value.slice(0, caret);
+  const slashIdx = before.lastIndexOf("/");
+  const trigger = slashIdx >= 0 ? value.slice(slashIdx, caret) : "";
+  // Replace it inline.
+  const newValue = (slashIdx >= 0 ? value.slice(0, slashIdx) : value) + resolved + value.slice(caret);
+  input.value = newValue;
+  input.dispatchEvent(new Event("input", { bubbles: true })); // re-run critique
+  // Move caret to end of inserted snippet.
+  const newCaret = (slashIdx >= 0 ? slashIdx : caret) + resolved.length;
+  input.setSelectionRange(newCaret, newCaret);
+  input.focus();
+  closeSlashPicker();
+  // Bump use_count + last_used_at (fire-and-forget).
+  callChezConcierge({ action: "record_snippet_use", snippet_id: snippet.id }).catch(() => {});
+  // Reflect locally so the picker sort updates on next open.
+  snippet.use_count = (snippet.use_count || 0) + 1;
+  snippet.last_used_at = new Date().toISOString();
+}
+
+function buildSnippetTokenContext(activeReq) {
+  if (!activeReq) return {};
+  const ctx = activeReq.context || {};
+  const homeownerName = ctx.homeowner_name || ctx.user_name || "";
+  const homeownerFirstName = homeownerName ? homeownerName.split(/\s+/)[0] : "";
+  return {
+    homeownerFirstName,
+    homeownerName,
+    addressStreet: ctx.address_street || ctx.property_street || "",
+    vendorName: ctx.vendor_name || ctx.contractor_name || "",
+    visitDate: ctx.visit_date || "",
+    question: "",
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Tag chip strip — renders in the case header below the existing chips.
+// ----------------------------------------------------------------------------
+function renderTagChipsHtml(activeReq) {
+  if (!activeReq) return "";
+  // Trigger load if we haven't yet.
+  if (!state.crm.appliedTagsByRequest[activeReq.id]) {
+    loadAppliedTagsForCase(activeReq.id).then(() => {
+      if (state.view === "chez") renderConciergeCockpit();
+    });
+    return "";
+  }
+  const applied = state.crm.appliedTagsByRequest[activeReq.id] || [];
+  const chips = applied.map((t) => `
+    <button type="button" class="cockpit-tag-chip cockpit-tag-chip--${escapeHtml(t.color || "muted")}" data-tag-remove="${escapeHtml(t.slug)}" title="Click to remove">
+      ${escapeHtml(t.label)} <span class="cockpit-tag-chip__x">×</span>
+    </button>
+  `).join("");
+  return `
+    <div class="cockpit-tags" data-cockpit-tags>
+      ${chips}
+      <button type="button" class="cockpit-tag-chip cockpit-tag-chip--add" data-tag-picker-open>+ Tag</button>
+    </div>
+  `;
+}
+
+function openTagPicker(anchor, activeReq) {
+  if (!activeReq) return;
+  const rect = anchor.getBoundingClientRect();
+  let picker = document.querySelector("[data-tag-picker]");
+  if (!picker) {
+    picker = document.createElement("div");
+    picker.className = "cockpit-tag-picker";
+    picker.dataset.tagPicker = "true";
+    document.body.appendChild(picker);
+  }
+  picker.style.position = "fixed";
+  picker.style.left = `${rect.left}px`;
+  picker.style.top = `${rect.bottom + 6}px`;
+  picker.style.zIndex = "9999";
+  const applied = new Set((state.crm.appliedTagsByRequest[activeReq.id] || []).map((t) => t.slug));
+  picker.innerHTML = `
+    <div class="cockpit-tag-picker__head">Apply a tag</div>
+    ${state.crm.tagDefinitions.map((d) => `
+      <button type="button" class="cockpit-tag-picker__row" data-tag-apply="${escapeHtml(d.slug)}">
+        <span class="cockpit-tag-chip cockpit-tag-chip--${escapeHtml(d.color)}">${escapeHtml(d.label)}</span>
+        ${applied.has(d.slug) ? `<span class="cockpit-muted">applied</span>` : ""}
+      </button>
+    `).join("")}
+  `;
+  picker.querySelectorAll("[data-tag-apply]").forEach((row) => {
+    row.addEventListener("mousedown", async (e) => {
+      e.preventDefault();
+      const slug = row.dataset.tagApply;
+      if (applied.has(slug)) return; // already applied
+      await callChezConcierge({ action: "apply_tag", request_id: activeReq.id, tag_slug: slug });
+      delete state.crm.appliedTagsByRequest[activeReq.id]; // force reload
+      closeTagPicker();
+      await loadAppliedTagsForCase(activeReq.id);
+      renderConciergeCockpit();
+    });
+  });
+  // Click-outside to close.
+  setTimeout(() => {
+    const handler = (ev) => {
+      if (!picker.contains(ev.target)) {
+        closeTagPicker();
+        document.removeEventListener("mousedown", handler);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+  }, 0);
+}
+function closeTagPicker() {
+  document.querySelector("[data-tag-picker]")?.remove();
+}
+
+async function removeTagFromCase(activeReq, slug) {
+  if (!activeReq || !slug) return;
+  await callChezConcierge({ action: "remove_tag", request_id: activeReq.id, tag_slug: slug });
+  delete state.crm.appliedTagsByRequest[activeReq.id];
+  await loadAppliedTagsForCase(activeReq.id);
+  renderConciergeCockpit();
+}
+
 function attachConciergeCockpitHandlers(activeReq, filteredCases) {
   const host = el.conciergeHost;
   if (!host) return;
@@ -7540,10 +7869,51 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
 
   const composerInput = host.querySelector("[data-cockpit-reply-input]");
   if (composerInput) {
+    // Phase 86B — slash composer detection.
+    // Watches for "/" at start-of-line or after whitespace; opens the
+    // snippet picker. Picker filters by the chars typed after "/".
+    // Keyboard: ArrowUp/Down move cursor, Enter selects, Esc closes.
+    composerInput.addEventListener("keydown", (ev) => {
+      if (!state.crm.slashOpen) return;
+      if (ev.key === "Escape") { ev.preventDefault(); closeSlashPicker(); return; }
+      if (ev.key === "ArrowDown") { ev.preventDefault(); state.crm.slashCursor++; renderSlashPicker(composerInput, activeReq); return; }
+      if (ev.key === "ArrowUp")   { ev.preventDefault(); state.crm.slashCursor = Math.max(0, state.crm.slashCursor - 1); renderSlashPicker(composerInput, activeReq); return; }
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        const q = (state.crm.slashQuery || "").toLowerCase();
+        const matches = state.crm.snippets.filter((s) =>
+          !q ||
+          (s.slug || "").includes(q) ||
+          (s.label || "").toLowerCase().includes(q) ||
+          (s.category || "").toLowerCase().includes(q)
+        );
+        const snippet = matches[state.crm.slashCursor];
+        if (snippet) insertSnippetIntoComposer(composerInput, snippet, activeReq);
+      }
+    });
+
     composerInput.addEventListener("input", (e) => {
       state.concierge.composer = state.concierge.composer || {};
       const slot = state.concierge.composer[activeReq.id] = state.concierge.composer[activeReq.id] || { tone: "warm" };
       slot.draft = e.target.value;
+
+      // Slash trigger detection: look at the character right before the caret.
+      // A "/" at start-of-line or right after whitespace opens the picker.
+      const caret = e.target.selectionStart ?? slot.draft.length;
+      const before = slot.draft.slice(0, caret);
+      const slashIdx = before.lastIndexOf("/");
+      const shouldOpen = slashIdx >= 0 &&
+        (slashIdx === 0 || /\s/.test(before[slashIdx - 1])) &&
+        !before.slice(slashIdx).includes(" ") && // closed once they type a space
+        !before.slice(slashIdx).includes("\n");
+      if (shouldOpen) {
+        state.crm.slashQuery = before.slice(slashIdx + 1);
+        if (!state.crm.slashOpen) openSlashPicker(composerInput, activeReq);
+        else renderSlashPicker(composerInput, activeReq);
+      } else if (state.crm.slashOpen) {
+        closeSlashPicker();
+      }
+
       // Re-compute critique on debounce — but DON'T re-render the whole
       // cockpit on every keystroke (would lose focus). Update the critique
       // node in place.
@@ -7571,6 +7941,19 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
       }
     });
   }
+
+  // Phase 86B — tag chip interactions.
+  host.querySelector("[data-tag-picker-open]")?.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    openTagPicker(ev.currentTarget, activeReq);
+  });
+  host.querySelectorAll("[data-tag-remove]").forEach((chip) => {
+    chip.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const slug = chip.dataset.tagRemove;
+      await removeTagFromCase(activeReq, slug);
+    });
+  });
 
   host.querySelectorAll("[data-cockpit-tone]").forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -3206,7 +3206,115 @@ async function handleWorkbenchAction(
   if (auditErr) {
     console.warn("[chez-concierge] audit insert failed (side-effect already landed):", auditErr);
   }
+
+  // Phase 86B — auto-post a system message on the linked case thread for
+  // high-signal workbench actions. The homeowner sees the operator's
+  // work reflected in-thread instead of having to discover it by
+  // noticing a task changed state. Only fires when the workbench action
+  // came from inside a case (payload.request_id set).
+  const requestId = payload.request_id;
+  if (requestId && shouldPostSystemMessageForAction(actionType)) {
+    const verb = workbenchVerbForCustomer(actionType);
+    const entityLabel = extractEntityLabel(auditPayload);
+    const msg = entityLabel ? `Chez ${verb}: ${entityLabel}.` : `Chez ${verb}.`;
+    try {
+      await service.from("concierge_messages").insert({
+        request_id: requestId,
+        role: "system",
+        content: msg,
+      });
+      // Bump unread_for_user so the case rises in the homeowner's inbox.
+      await service
+        .from("chez_requests")
+        .update({ unread_for_user: true, last_message_at: new Date().toISOString() })
+        .eq("id", requestId);
+    } catch (e) {
+      console.warn("[workbench-action] auto-system-message failed:", e);
+    }
+  }
+
+  // Phase 86B — also write to chez_activity_log so the iOS Dashboard's
+  // existing "This week with Chez" tally card (Phase 85 PR 5c) picks
+  // up workbench actions in the rollup. The fn() is SECURITY DEFINER
+  // so it works through the service role without RLS friction.
+  if (shouldPostSystemMessageForAction(actionType)) {
+    const verb = workbenchVerbForCustomer(actionType);
+    const entityLabel = extractEntityLabel(auditPayload);
+    const title = entityLabel ? `${capitalizeFirst(verb)}: ${entityLabel}` : capitalizeFirst(verb);
+    try {
+      await service.rpc("log_chez_activity", {
+        p_household_id: householdId,
+        p_activity_type: actionType,
+        p_title: title,
+        p_description: null,
+        p_entity_type: entityType,
+        p_entity_id: entityId,
+        p_cost_cents: typeof auditPayload.cost_cents === "number" ? auditPayload.cost_cents : null,
+        p_occurred_at: new Date().toISOString(),
+        p_surface_on_dashboard: true,
+      });
+    } catch (e) {
+      console.warn("[workbench-action] chez_activity_log write failed:", e);
+    }
+  }
+
   return json({ ok: true, action: auditRow ?? null, side_effect: sideEffectResult });
+}
+
+function capitalizeFirst(s: string): string {
+  if (!s) return s;
+  return s[0].toUpperCase() + s.slice(1);
+}
+
+// ----------------------------------------------------------------------------
+// Phase 86B — auto-message helpers.
+//
+// `shouldPostSystemMessageForAction` is the allowlist of action_types that
+// the homeowner cares about seeing. Internal-only actions (admin notes,
+// snooze, etc.) stay silent so the thread isn't noisy. The verb table is
+// customer-facing copy — different from the operator-facing
+// WORKBENCH_ACTION_LABELS in admin.js because the audience is different.
+// ----------------------------------------------------------------------------
+function shouldPostSystemMessageForAction(actionType: string): boolean {
+  return new Set([
+    "schedule_visit",
+    "schedule_maintenance",
+    "schedule",
+    "schedule_service",
+    "log_visit",
+    "log_service",
+    "complete_on_behalf",
+    "audit_bill",
+    "share_with_vendor",
+    "handle_recall",
+  ]).has(actionType);
+}
+
+function workbenchVerbForCustomer(actionType: string): string {
+  switch (actionType) {
+    case "schedule_visit": return "scheduled a vendor visit";
+    case "schedule_maintenance": return "scheduled maintenance";
+    case "schedule": return "scheduled a task";
+    case "schedule_service": return "scheduled a service appointment";
+    case "log_visit": return "logged a vendor visit";
+    case "log_service": return "logged service";
+    case "complete_on_behalf": return "completed this for you";
+    case "audit_bill": return "audited a bill on your behalf";
+    case "share_with_vendor": return "shared a document with the vendor";
+    case "handle_recall": return "resolved a vehicle recall";
+    default: return "took action";
+  }
+}
+
+function extractEntityLabel(payload: Record<string, unknown>): string | null {
+  const candidates: Array<string | undefined> = [
+    typeof payload.entity_label === "string" ? payload.entity_label as string : undefined,
+    typeof payload.title === "string" ? payload.title as string : undefined,
+    typeof payload.vendor_name === "string" ? payload.vendor_name as string : undefined,
+    typeof payload.system_name === "string" ? payload.system_name as string : undefined,
+    typeof payload.task_title === "string" ? payload.task_title as string : undefined,
+  ];
+  return candidates.find((c) => typeof c === "string" && c.trim().length > 0) ?? null;
 }
 
 // ----------------------------------------------------------------------------
@@ -5681,6 +5789,35 @@ serve(async (req: Request) => {
           supabaseUrl, serviceRoleKey
         );
 
+      // ====================================================================
+      // Phase 86B — CRM hygiene actions
+      // ====================================================================
+      case "list_snippets":
+        return handleListSnippets(service, user);
+      case "save_snippet":
+        return handleSaveSnippet(service, user, body as SaveSnippetPayload);
+      case "delete_snippet":
+        return handleDeleteSnippet(service, user, body as { snippet_id?: string });
+      case "record_snippet_use":
+        return handleRecordSnippetUse(service, user, body as { snippet_id?: string });
+
+      case "list_tag_definitions":
+        return handleListTagDefinitions(service, user);
+      case "apply_tag":
+        return handleApplyTag(service, user, body as { request_id?: string; tag_slug?: string });
+      case "remove_tag":
+        return handleRemoveTag(service, user, body as { request_id?: string; tag_slug?: string });
+
+      case "assign_case":
+        return handleAssignCase(service, user, body as { request_id?: string; assignee_user_id?: string | null });
+      case "merge_cases":
+        return handleMergeCases(service, user, body as { source_id?: string; target_id?: string });
+      case "link_case":
+        return handleLinkCase(service, user, body as { request_id?: string; related_id?: string; unlink?: boolean });
+
+      case "fetch_activity_feed":
+        return handleFetchActivityFeed(service, user, body as { household_id?: string; limit?: number });
+
       default:
         return json({ error: `unknown action: ${action}` }, 400);
     }
@@ -5689,3 +5826,434 @@ serve(async (req: Request) => {
     return json({ error: String(error) }, 500);
   }
 });
+
+// ============================================================================
+// Phase 86B — CRM hygiene handlers
+// ============================================================================
+// Operator-personal snippets + shared org library. The org-shared seed
+// rows are returned in every list response so a freshly-onboarded operator
+// has a starter set before they save their own. `record_snippet_use`
+// bumps a counter that the picker sorts by so frequently-used snippets
+// float to the top of the list. Personal snippets always sort above
+// shared ones at equal use counts.
+// ============================================================================
+
+interface SaveSnippetPayload {
+  id?: string | null;       // null/undefined → create
+  slug?: string;
+  label?: string;
+  body?: string;
+  category?: string | null;
+  shared_with_org?: boolean;
+}
+
+async function handleListSnippets(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  // RLS already filters by ownership but we also want the org-shared
+  // seed rows (owner_user_id IS NULL). Use service role + an OR query.
+  const { data, error } = await service
+    .from("chez_snippets")
+    .select("*")
+    .or(`owner_user_id.eq.${user.id},shared_with_org.eq.true,owner_user_id.is.null`)
+    .order("use_count", { ascending: false })
+    .order("label", { ascending: true });
+  if (error) {
+    console.warn("[snippets:list]", error);
+    return json({ error: error.message }, 500);
+  }
+  return json({ snippets: data ?? [] });
+}
+
+async function handleSaveSnippet(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: SaveSnippetPayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const slug = payload.slug?.trim().toLowerCase();
+  const label = payload.label?.trim();
+  const body = payload.body?.trim();
+  if (!slug || !label || !body) {
+    return json({ error: "slug, label, and body are required" }, 400);
+  }
+  // Slug sanity: lowercase hyphenated, 2-40 chars.
+  if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(slug)) {
+    return json({ error: "slug must be lowercase, hyphenated, 2-40 chars" }, 400);
+  }
+
+  const row = {
+    owner_user_id: user.id,
+    slug,
+    label,
+    body,
+    category: payload.category ?? null,
+    shared_with_org: !!payload.shared_with_org,
+  };
+
+  if (payload.id) {
+    // Update existing (must be operator's own — DB policy enforces, but we
+    // also surface a clear 404 if the id doesn't belong to them).
+    const { data, error } = await service
+      .from("chez_snippets")
+      .update(row)
+      .eq("id", payload.id)
+      .eq("owner_user_id", user.id)
+      .select("*")
+      .maybeSingle();
+    if (error) return json({ error: error.message }, 500);
+    if (!data) return json({ error: "snippet not found or not yours" }, 404);
+    return json({ snippet: data });
+  }
+
+  // Insert. UNIQUE (owner_user_id, slug) catches collisions.
+  const { data, error } = await service
+    .from("chez_snippets")
+    .insert(row)
+    .select("*")
+    .single();
+  if (error) {
+    if (error.code === "23505") {
+      return json({ error: `you already have a snippet with slug "${slug}"` }, 409);
+    }
+    return json({ error: error.message }, 500);
+  }
+  return json({ snippet: data });
+}
+
+async function handleDeleteSnippet(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { snippet_id?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  if (!payload.snippet_id) return json({ error: "snippet_id required" }, 400);
+  const { error } = await service
+    .from("chez_snippets")
+    .delete()
+    .eq("id", payload.snippet_id)
+    .eq("owner_user_id", user.id);
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true });
+}
+
+async function handleRecordSnippetUse(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { snippet_id?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  if (!payload.snippet_id) return json({ error: "snippet_id required" }, 400);
+  // Bump counter + stamp last_used_at. Fire-and-forget — non-fatal if it
+  // misses (the snippet was still inserted in the composer).
+  // Read-modify-write because PostgREST doesn't support column arithmetic
+  // and we don't want to load a stored-procedure migration just for this.
+  const { data: row } = await service
+    .from("chez_snippets")
+    .select("use_count")
+    .eq("id", payload.snippet_id)
+    .maybeSingle();
+  if (!row) return json({ ok: true });
+  await service
+    .from("chez_snippets")
+    .update({
+      use_count: (row.use_count ?? 0) + 1,
+      last_used_at: new Date().toISOString(),
+    })
+    .eq("id", payload.snippet_id);
+  return json({ ok: true });
+}
+
+// ----------------------------------------------------------------------------
+// Tags
+// ----------------------------------------------------------------------------
+async function handleListTagDefinitions(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const { data, error } = await service
+    .from("chez_tag_definitions")
+    .select("*")
+    .is("archived_at", null)
+    .order("label", { ascending: true });
+  if (error) return json({ error: error.message }, 500);
+  return json({ tags: data ?? [] });
+}
+
+async function handleApplyTag(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; tag_slug?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  if (!payload.request_id || !payload.tag_slug) {
+    return json({ error: "request_id and tag_slug required" }, 400);
+  }
+  // Resolve slug → tag_definition_id.
+  const { data: tagDef, error: tagErr } = await service
+    .from("chez_tag_definitions")
+    .select("id")
+    .eq("slug", payload.tag_slug)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (tagErr) return json({ error: tagErr.message }, 500);
+  if (!tagDef) return json({ error: `tag "${payload.tag_slug}" not found` }, 404);
+
+  // Upsert. PK is (request_id, tag_definition_id) so re-applying is a no-op.
+  const { error } = await service
+    .from("chez_request_tags")
+    .upsert({
+      request_id: payload.request_id,
+      tag_definition_id: tagDef.id,
+      applied_by_user_id: user.id,
+    }, { onConflict: "request_id,tag_definition_id" });
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true });
+}
+
+async function handleRemoveTag(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; tag_slug?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  if (!payload.request_id || !payload.tag_slug) {
+    return json({ error: "request_id and tag_slug required" }, 400);
+  }
+  const { data: tagDef } = await service
+    .from("chez_tag_definitions")
+    .select("id")
+    .eq("slug", payload.tag_slug)
+    .maybeSingle();
+  if (!tagDef) return json({ ok: true }); // tag doesn't exist; nothing to remove
+  await service
+    .from("chez_request_tags")
+    .delete()
+    .eq("request_id", payload.request_id)
+    .eq("tag_definition_id", tagDef.id);
+  return json({ ok: true });
+}
+
+// ----------------------------------------------------------------------------
+// Assign + merge + link
+// ----------------------------------------------------------------------------
+async function handleAssignCase(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; assignee_user_id?: string | null }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  if (!payload.request_id) return json({ error: "request_id required" }, 400);
+  // assignee_user_id: explicit null = unassign. Otherwise must be admin
+  // (we don't surface a UI to assign to non-admin users today; gate the
+  // value to admins via env allowlist lookup is overkill for v1 — solo
+  // operator means assignee = user.id 100% of the time).
+  const { error } = await service
+    .from("chez_requests")
+    .update({ assigned_to_user_id: payload.assignee_user_id ?? null })
+    .eq("id", payload.request_id);
+  if (error) return json({ error: error.message }, 500);
+
+  // Drop a system-role message in the thread for audit clarity.
+  const note = payload.assignee_user_id
+    ? "Chez took ownership of this case."
+    : "Chez released ownership of this case (back to the queue).";
+  await service.from("concierge_messages").insert({
+    request_id: payload.request_id,
+    role: "system",
+    content: note,
+  });
+  return json({ ok: true });
+}
+
+async function handleMergeCases(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { source_id?: string; target_id?: string }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const sourceId = payload.source_id?.trim();
+  const targetId = payload.target_id?.trim();
+  if (!sourceId || !targetId) {
+    return json({ error: "source_id and target_id required" }, 400);
+  }
+  if (sourceId === targetId) {
+    return json({ error: "cannot merge a case into itself" }, 400);
+  }
+
+  // Both cases must exist and live in the same household. Cross-household
+  // merge is a footgun — refuse it.
+  const { data: rows, error: fetchErr } = await service
+    .from("chez_requests")
+    .select("id, household_id, summary")
+    .in("id", [sourceId, targetId]);
+  if (fetchErr) return json({ error: fetchErr.message }, 500);
+  if (!rows || rows.length !== 2) return json({ error: "source or target not found" }, 404);
+  const source = rows.find((r) => r.id === sourceId);
+  const target = rows.find((r) => r.id === targetId);
+  if (!source || !target) return json({ error: "source or target not found" }, 404);
+  if (source.household_id !== target.household_id) {
+    return json({ error: "cannot merge across households" }, 400);
+  }
+
+  // Move source messages onto target so the thread reads continuously.
+  // The original ordering is preserved (we don't touch created_at).
+  const { error: msgErr } = await service
+    .from("concierge_messages")
+    .update({ request_id: targetId })
+    .eq("request_id", sourceId);
+  if (msgErr) return json({ error: msgErr.message }, 500);
+
+  // Move chez_visits + chez_workbench_actions onto the target (best-effort).
+  await service.from("chez_visits").update({ request_id: targetId }).eq("request_id", sourceId);
+  await service.from("chez_workbench_actions").update({ request_id: targetId }).eq("request_id", sourceId);
+
+  // Soft-archive the source. The trigger forces status → resolved when
+  // merged_into_request_id is set, so we don't need to send it explicitly.
+  const { error: updErr } = await service
+    .from("chez_requests")
+    .update({
+      merged_into_request_id: targetId,
+      unread_for_user: false,
+      unread_for_admin: false,
+    })
+    .eq("id", sourceId);
+  if (updErr) return json({ error: updErr.message }, 500);
+
+  // Audit-trail message on the surviving case.
+  await service.from("concierge_messages").insert({
+    request_id: targetId,
+    role: "system",
+    content: `Chez merged a related conversation into this one ("${source.summary || "Untitled"}").`,
+  });
+
+  return json({ ok: true, merged_into: targetId });
+}
+
+async function handleLinkCase(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; related_id?: string; unlink?: boolean }
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  if (!payload.request_id || !payload.related_id) {
+    return json({ error: "request_id and related_id required" }, 400);
+  }
+  if (payload.request_id === payload.related_id) {
+    return json({ error: "cannot link a case to itself" }, 400);
+  }
+
+  // Two-sided link: update both rows' arrays so either case shows the
+  // relationship. Read-modify-write since postgres doesn't have a
+  // single-statement array union via PostgREST.
+  for (const [a, b] of [
+    [payload.request_id, payload.related_id],
+    [payload.related_id, payload.request_id],
+  ]) {
+    const { data: row } = await service
+      .from("chez_requests")
+      .select("related_case_ids")
+      .eq("id", a)
+      .maybeSingle();
+    if (!row) continue;
+    const existing: string[] = row.related_case_ids ?? [];
+    let next: string[];
+    if (payload.unlink) {
+      next = existing.filter((x) => x !== b);
+    } else {
+      next = existing.includes(b) ? existing : [...existing, b];
+    }
+    await service
+      .from("chez_requests")
+      .update({ related_case_ids: next })
+      .eq("id", a);
+  }
+  return json({ ok: true });
+}
+
+// ----------------------------------------------------------------------------
+// Activity feed — Phase 86B iOS reader for chez_workbench_actions.
+// ----------------------------------------------------------------------------
+// Homeowner-facing. Returns the last N workbench actions for the
+// requesting user's household so iOS can render the "Recent Chez activity"
+// card on the Dashboard. Each row is denormalized with a friendly verb +
+// optional entity label so the iOS side doesn't have to do its own
+// translation table.
+//
+// Verb mapping mirrors WORKBENCH_ACTION_LABELS in admin.js so admin +
+// homeowner see the same copy.
+// ----------------------------------------------------------------------------
+async function handleFetchActivityFeed(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { household_id?: string; limit?: number }
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  // Admin can override household_id to spot-check any home; non-admin
+  // gets only their own household (looked up from their `users` row).
+  let householdId = payload.household_id?.trim() || null;
+  if (!isAdminUser(user)) {
+    const { data: u } = await service
+      .from("users")
+      .select("household_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!u?.household_id) return json({ error: "no household" }, 404);
+    householdId = u.household_id as string;
+  }
+  if (!householdId) return json({ error: "household_id required" }, 400);
+
+  const limit = Math.min(Math.max(payload.limit ?? 25, 1), 100);
+
+  const { data, error } = await service
+    .from("chez_workbench_actions")
+    .select("id, action_type, entity_type, entity_id, payload, request_id, created_at")
+    .eq("household_id", householdId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return json({ error: error.message }, 500);
+
+  // Friendly verb mapping. Keep aligned with admin.js WORKBENCH_ACTION_LABELS.
+  const VERB: Record<string, string> = {
+    schedule_visit: "Scheduled a vendor visit",
+    log_visit: "Logged a vendor visit",
+    log_service: "Logged service",
+    schedule_maintenance: "Scheduled maintenance",
+    schedule: "Scheduled a task",
+    complete_on_behalf: "Marked a task complete",
+    snooze: "Snoozed a task",
+    log_call: "Logged a vendor call",
+    send_message: "Recorded a vendor message",
+    mark_filed: "Filed a document",
+    share_with_vendor: "Shared a document with a vendor",
+    audit_bill: "Audited a bill",
+    draft_negotiation: "Drafted a negotiation",
+    schedule_service: "Scheduled service",
+    handle_recall: "Resolved a recall",
+    admin_note: "Added a note",
+  };
+
+  const items = (data ?? []).map((row) => {
+    const p = (row.payload ?? {}) as Record<string, unknown>;
+    // Extract a human-readable entity label from the payload when present.
+    const entityLabel =
+      (typeof p.entity_label === "string" && p.entity_label) ||
+      (typeof p.title === "string" && p.title) ||
+      (typeof p.vendor_name === "string" && p.vendor_name) ||
+      (typeof p.system_name === "string" && p.system_name) ||
+      null;
+    return {
+      id: row.id,
+      verb: VERB[row.action_type] || row.action_type.replace(/_/g, " "),
+      entity_type: row.entity_type,
+      entity_id: row.entity_id,
+      entity_label: entityLabel,
+      request_id: row.request_id,
+      occurred_at: row.created_at,
+    };
+  });
+  return json({ items });
+}
