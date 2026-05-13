@@ -1430,6 +1430,139 @@ struct HouseQuizView: View {
         }
     }
 
+    // MARK: - Phase 2.1: "Have Chez handle this" affordance
+
+    /// Returns the title / subtitle pair shown on the ChezHandleButton
+    /// for a single-question surface. Returns nil when this surface
+    /// doesn't carry a Chez affordance.
+    private static func chezCopy(forQuestion id: String) -> (title: String, subtitle: String)? {
+        switch id {
+        case "q11_lawn":             return ("Have Chez find a landscaper", "We'll vet local pros and send you options.")
+        case "q12_pool":             return ("Have Chez find a pool service", "We'll source vetted local pool techs.")
+        case "q13_pest":             return ("Have Chez find a pest pro", "Chez will research local options.")
+        case "q14_irrigation":       return ("Have Chez find an irrigation specialist", "We'll find a local irrigation pro.")
+        case "q15_security":         return ("Have Chez find a monitoring company", "We'll compare local monitoring options.")
+        case "q16_electric":         return ("Have Chez figure out my provider", "We'll check which utility serves your address.")
+        case "q17_internet":         return ("Have Chez shop providers", "We'll compare local internet options.")
+        case "q18_trash":            return ("Have Chez find a hauler", "We'll research private haulers in your area.")
+        case "q19_heating_provider": return ("Have Chez find a delivery service", "We'll line up an oil or propane vendor.")
+        case "q21_solar":            return ("Have Chez quote a solar install", "We'll pull a few solar proposals.")
+        case "q22_generator":        return ("Have Chez quote a generator", "We'll get installer quotes.")
+        default: return nil
+        }
+    }
+
+    /// Conditional visibility rule per question. Returns true when the
+    /// surface should render a "Have Chez handle this" button at the
+    /// user's current answer state. Hidden until the user has made a
+    /// meaningful choice (e.g. picked "pro service" on Q11) so the
+    /// button doesn't crowd out the primary affordance.
+    private func shouldShowChezButton(forQuestion q: HouseQuizQuestion) -> Bool {
+        let answers = viewModel.state.answers
+        switch q.id {
+        case "q11_lawn":
+            return answers["q11_lawn"]?.answerId == "pro"
+        case "q12_pool":
+            let id = answers["q12_pool"]?.answerId ?? progressivePoolKind
+            return id != nil && id != "none"
+        case "q13_pest":
+            let id = answers["q13_pest"]?.answerId
+            return id == "quarterly_pro" || id == "termite_bond"
+        case "q14_irrigation":
+            let id = answers["q14_irrigation"]?.answerId
+            return id == "full" || id == "drip"
+        case "q15_security":
+            return answers["q15_security"]?.answerId == "monitored"
+        case "q16_electric", "q17_internet", "q18_trash":
+            return true
+        case "q19_heating_provider":
+            let comboId = answers["q3_heating_system"]?.answerId
+            let fuel = HouseQuizFuelDerivation.heatingFuel(from: comboId) ?? ""
+            return fuel == "oil" || fuel == "propane" || fuel == "natural_gas"
+        case "q21_solar":
+            return answers["q21_solar"]?.answerId == "considering"
+        case "q22_generator":
+            return (answers["q22_generator"]?.answerId ?? q22EffectiveGeneratorType) == "none"
+        default:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private func chezHandleAffordance(for q: HouseQuizQuestion) -> some View {
+        if q.id == "q26_insurance" {
+            chezHandleDualInsuranceAffordance(for: q)
+        } else if shouldShowChezButton(forQuestion: q),
+                  let copy = Self.chezCopy(forQuestion: q.id) {
+            ChezHandleButton(
+                title: copy.title,
+                subtitle: copy.subtitle,
+                isActive: viewModel.isChezHandling(questionId: q.id),
+                action: {
+                    let active = viewModel.isChezHandling(questionId: q.id)
+                    Task {
+                        if active {
+                            await viewModel.clearChezHandles(questionId: q.id)
+                        } else {
+                            await viewModel.recordChezHandles(questionId: q.id)
+                        }
+                    }
+                }
+            )
+            .padding(.top, HavenTheme.spacing8)
+        } else {
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func chezHandleDualInsuranceAffordance(for q: HouseQuizQuestion) -> some View {
+        // Q26 has two independent slots. Each slot shows its own button
+        // ONLY when the user hasn't yet picked or typed a carrier on
+        // that slot — otherwise the user has a carrier and Chez doesn't
+        // need to be involved.
+        let hasAuto = (progressiveAutoProvider != nil)
+            || !progressiveAutoCustomName.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasHome = (progressiveHomeProvider != nil)
+            || !progressiveHomeCustomName.trimmingCharacters(in: .whitespaces).isEmpty
+        VStack(spacing: HavenTheme.spacing12) {
+            if !hasAuto {
+                ChezHandleButton(
+                    title: "Have Chez shop auto insurance",
+                    subtitle: "We'll pull a few quotes.",
+                    isActive: viewModel.isChezHandling(questionId: q.id, key: "chezHandlesAuto"),
+                    action: {
+                        let active = viewModel.isChezHandling(questionId: q.id, key: "chezHandlesAuto")
+                        Task {
+                            if active {
+                                await viewModel.clearChezHandles(questionId: q.id, key: "chezHandlesAuto")
+                            } else {
+                                await viewModel.recordChezHandles(questionId: q.id, key: "chezHandlesAuto")
+                            }
+                        }
+                    }
+                )
+            }
+            if !hasHome {
+                ChezHandleButton(
+                    title: "Have Chez shop home insurance",
+                    subtitle: "We'll compare carriers in your area.",
+                    isActive: viewModel.isChezHandling(questionId: q.id, key: "chezHandlesHome"),
+                    action: {
+                        let active = viewModel.isChezHandling(questionId: q.id, key: "chezHandlesHome")
+                        Task {
+                            if active {
+                                await viewModel.clearChezHandles(questionId: q.id, key: "chezHandlesHome")
+                            } else {
+                                await viewModel.recordChezHandles(questionId: q.id, key: "chezHandlesHome")
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
     private func singleChoiceBody(_ q: HouseQuizQuestion) -> some View {
         // Apr 7, 2026: read the persisted answer for this question so we
         // can render the selected chip with a navy tint, navy border, and
@@ -1524,6 +1657,12 @@ struct HouseQuizView: View {
             if pendingProviderForAnswer != nil {
                 providerCaptureInline(answerId: pendingProviderForAnswer!)
             }
+
+            // Phase 2.1: "Have Chez handle this" affordance for Q13 /
+            // Q14 / Q15 / Q21 (all rendered through singleChoiceBody).
+            // No-op for other singleChoice questions because
+            // shouldShowChezButton returns false.
+            chezHandleAffordance(for: q)
         }
     }
 
@@ -1821,6 +1960,12 @@ struct HouseQuizView: View {
                     .padding(.top, HavenTheme.spacing8)
             }
 
+            // Phase 2.1: "Have Chez handle this" — only when the user
+            // picked "pro" and hasn't yet captured a provider. The
+            // affordance is a third option alongside "I have one"
+            // (provider picker) and "Skip" (Continue without provider).
+            chezHandleAffordance(for: q)
+
             // Continue
             QuizContinueButton(
                 title: "Continue",
@@ -1916,6 +2061,11 @@ struct HouseQuizView: View {
                 providerCaptureInline(answerId: kind)
                     .padding(.top, HavenTheme.spacing8)
             }
+
+            // Phase 2.1: "Have Chez handle this" — pool / hot tub
+            // owners can offload provider sourcing to Chez. Hidden
+            // when the user picked "none" via shouldShowChezButton.
+            chezHandleAffordance(for: q)
 
             // Continue
             QuizContinueButton(
@@ -2033,6 +2183,11 @@ struct HouseQuizView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            // Phase 2.1: "Have Chez handle this" affordance — always
+            // shown on Q18 so homeowners who don't know who their
+            // hauler is can offload research.
+            chezHandleAffordance(for: q)
 
             // Continue. Validates BOTH the service kind and (when the kind
             // is municipal/private) at least one pickup day. Pre-2026-05-05
@@ -2280,6 +2435,11 @@ struct HouseQuizView: View {
                     .frame(minHeight: 200)
                 }
             }
+
+            // Phase 2.1: "Have Chez handle this" — per-slot. Each slot
+            // hides its button as soon as a carrier (catalog or
+            // free-form) is captured for that line of business.
+            chezHandleAffordance(for: q)
 
             // Continue / skip
             // Both slots are independently skippable, so the Continue
@@ -3216,6 +3376,12 @@ struct HouseQuizView: View {
                 // @State (allProviders, searchText, etc.). Belt-and-suspenders
                 // alongside the .task(id:) reload inside the picker.
                 .id(q.id)
+
+                // Phase 2.1: "Have Chez handle this" affordance for
+                // utility provider questions. Q16 / Q17 / Q18 always
+                // show it; Q19 only when the fuel is oil / propane /
+                // natural gas. shouldShowChezButton gates visibility.
+                chezHandleAffordance(for: q)
             }
         } else {
             // Defensive fallback for any provider-search question that doesn't
@@ -3355,6 +3521,12 @@ struct HouseQuizView: View {
                         .transition(.opacity)
                 }
             }
+
+            // Phase 2.1: "Have Chez handle this" — only when the user
+            // picked "none" (no generator yet) so Chez can source
+            // installer quotes. Hidden once a real generator has been
+            // captured.
+            chezHandleAffordance(for: q)
 
             // Continue button — disabled-with-reason instead of silent grey.
             QuizContinueButton(
@@ -4395,6 +4567,80 @@ struct HouseQuizView: View {
                     .padding(.leading, 36)
                     .padding(.trailing, HavenTheme.spacing16)
                     .padding(.top, HavenTheme.spacing8)
+            }
+
+            // Phase 2.1: per-chip "Have Chez find one" footer. Visible
+            // only when the chip is selected, the inline picker is
+            // collapsed, AND NO vendor / manual / catalog provider is
+            // attached. Hidden as soon as the user attaches a vendor.
+            // Library chips (`lib:<category>`) share the same path —
+            // the chip ID lives on the marker verbatim, including the
+            // `lib:` prefix.
+            if isSelected,
+               !isExpanded,
+               attachedDisplayName == nil {
+                chezHandlesChipFooter(for: option)
+                    .padding(.leading, 36)
+                    .padding(.trailing, HavenTheme.spacing16)
+                    .padding(.top, HavenTheme.spacing8)
+            }
+        }
+    }
+
+    /// Phase 2.1: tap-to-toggle "Have Chez find one" footer rendered
+    /// under each selected Q15b chip that has no vendor yet. Persists
+    /// as `"chez:<chipId>"` in q15b_household_contractors.customEntries
+    /// so the Phase 2.2 submitter can batch the chez_requests at
+    /// completion.
+    @ViewBuilder
+    private func chezHandlesChipFooter(for option: AnswerOption) -> some View {
+        let active = isChezHandlingChip(option.id)
+        Button {
+            Haptics.medium()
+            toggleChezForChip(chipId: option.id)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: active ? "checkmark.circle.fill" : "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(active ? "Chez is on it" : "Have Chez find one")
+            }
+            .font(HavenTypography.uiLabelMedium)
+            .foregroundStyle(active ? HavenColors.success : HavenColors.action)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(active ? "Chez is on it for \(option.label)." : "Have Chez find a \(option.label).")
+    }
+
+    private func isChezHandlingChip(_ chipId: String) -> Bool {
+        let entries = viewModel.state.answers["q15b_household_contractors"]?.customEntries ?? []
+        return entries.contains("chez:\(chipId)")
+    }
+
+    private func toggleChezForChip(chipId: String) {
+        Task {
+            let key = "chez:\(chipId)"
+            var existing = viewModel.state.answers["q15b_household_contractors"]
+                ?? HouseQuizAnswer(answerId: nil)
+            var entries = existing.customEntries ?? []
+            if let idx = entries.firstIndex(of: key) {
+                entries.remove(at: idx)
+                Analytics.track(.quizChezHandlesCleared, [
+                    "question_id": "q15b_household_contractors",
+                    "key": key,
+                ])
+            } else {
+                entries.append(key)
+                Analytics.track(.quizChezHandlesCaptured, [
+                    "question_id": "q15b_household_contractors",
+                    "key": key,
+                ])
+            }
+            existing.customEntries = entries
+            viewModel.state.answers["q15b_household_contractors"] = existing
+            do {
+                try await viewModel.persistStateAfterChezChipToggle()
+            } catch {
+                print("[HouseQuizView] toggleChezForChip persist failed: \(error)")
             }
         }
     }

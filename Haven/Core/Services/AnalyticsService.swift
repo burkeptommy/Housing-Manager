@@ -92,6 +92,16 @@ enum AnalyticsEvent: String {
     case quizChapterIntroConfirmed = "quiz_chapter_intro_confirmed"
     // Phase 60.4: per-chip feedback on Q15b (F8) + title personalization
     case quizChipFeedbackShown = "quiz_chip_feedback_shown"
+    // Phase 2.1: Chez delegation capture during the quiz
+    case quizChezHandlesCaptured = "quiz_chez_handles_captured"
+    case quizChezHandlesCleared = "quiz_chez_handles_cleared"
+    // Phase 2.2: post-quiz Chez request submission
+    case quizChezRequestsBatchSubmitted = "quiz_chez_requests_batch_submitted"
+    case quizChezRequestSubmitFailed = "quiz_chez_request_submit_failed"
+    // Phase 2.4: post-quiz Chez summary card surface
+    case quizChezSummaryShown = "quiz_chez_summary_shown"
+    case quizChezSummaryRowTapped = "quiz_chez_summary_row_tapped"
+    case quizChezSummaryContinue = "quiz_chez_summary_continue"
 
     // MARK: - Tab Navigation
     case tabSelected = "tab_selected"

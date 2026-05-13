@@ -1086,6 +1086,79 @@ final class HouseQuizViewModel: ObservableObject {
     }
 
     /// Exit path for the visible "Save for later" action.
+    // MARK: - Phase 2.1: "Have Chez handle this" intent capture
+
+    /// Stamps an intent flag on the question's answer payload so the
+    /// Phase 2.2 submitter can batch-create `chez_requests` at quiz
+    /// completion. Single-question surfaces use the default
+    /// `chezHandles` key; Q26's dual-insurance flow uses
+    /// `chezHandlesAuto` / `chezHandlesHome` for per-slot capture.
+    ///
+    /// Tapping the button does NOT advance the question — the user
+    /// still has to hit Continue. That matches Hard Rule 4 of the
+    /// plan ("don't inhibit users") and prevents accidental Chez
+    /// commitments when the homeowner only wanted to peek.
+    @MainActor
+    func recordChezHandles(
+        questionId: String,
+        key: String = "chezHandles"
+    ) async {
+        let existing = state.answers[questionId]
+        var answer = existing ?? HouseQuizAnswer(answerId: existing?.answerId)
+        var payload = answer.payload ?? [:]
+        payload[key] = "true"
+        answer.payload = payload
+        state.answers[questionId] = answer
+        do {
+            try await persistStateThrowing()
+            Analytics.track(.quizChezHandlesCaptured, [
+                "question_id": questionId,
+                "key": key,
+            ])
+        } catch {
+            print("[HouseQuizViewModel] recordChezHandles persist failed: \(error)")
+        }
+    }
+
+    @MainActor
+    func clearChezHandles(
+        questionId: String,
+        key: String = "chezHandles"
+    ) async {
+        guard var answer = state.answers[questionId] else { return }
+        var payload = answer.payload ?? [:]
+        payload.removeValue(forKey: key)
+        answer.payload = payload.isEmpty ? nil : payload
+        state.answers[questionId] = answer
+        do {
+            try await persistStateThrowing()
+            Analytics.track(.quizChezHandlesCleared, [
+                "question_id": questionId,
+                "key": key,
+            ])
+        } catch {
+            print("[HouseQuizViewModel] clearChezHandles persist failed: \(error)")
+        }
+    }
+
+    func isChezHandling(
+        questionId: String,
+        key: String = "chezHandles"
+    ) -> Bool {
+        return state.answers[questionId]?.payload?[key] == "true"
+    }
+
+    /// Phase 2.1: Exposed persist hook for Q15b's per-chip Chez
+    /// toggle. The chip footer mutates `state.answers[...].customEntries`
+    /// directly and then calls this to flush the change to Supabase.
+    /// Mirrors the existing `recordChezHandles` / `clearChezHandles`
+    /// shape, just without the payload write because the chip flow
+    /// stores its marker in `customEntries` instead of `payload`.
+    @MainActor
+    func persistStateAfterChezChipToggle() async throws {
+        try await persistStateThrowing()
+    }
+
     func saveCurrentQuestionForLaterAndExit() async {
         guard let q = currentQuestion else { return }
         isSaving = true

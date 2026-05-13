@@ -1807,6 +1807,15 @@ final class HouseQuizAnswerMapper {
     /// Build 85: promoted from `fileprivate` to internal so the view
     /// can reuse it when hydrating Q15b's chip state on back-navigation.
     static func parseContractorChipEntry(_ raw: String) -> ParsedContractorEntry? {
+        // Phase 2.1: "chez:<chipId>" markers signal that the user
+        // wants Chez to find a vendor for this category at quiz
+        // completion. They never carry a vendor name and should
+        // never produce a contractor row here. The Phase 2.2
+        // submitter walks customEntries separately to extract these
+        // markers and create the corresponding chez_requests. Prefix
+        // ordering matters: "chez:lib:..." entries also start with
+        // "chez:" so this check correctly catches both shapes.
+        if raw.hasPrefix("chez:") { return nil }
         let parts = raw.components(separatedBy: "|")
         guard parts.count >= 2 else { return nil }
         let chipId = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
