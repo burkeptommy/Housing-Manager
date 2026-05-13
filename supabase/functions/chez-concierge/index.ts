@@ -3267,6 +3267,60 @@ async function runWorkbenchSideEffect(args: {
         .select("id")
         .single();
       if (error) throw new Error(`routine_visits insert failed: ${error.message}`);
+
+      // Phase 3.3: when the schedule lands on a chez_owned routine,
+      // push the homeowner so the household sees "Chez scheduled
+      // <vendor> for <date>" in their Notification Center. Admin-only
+      // since handleWorkbenchAction is gated on isAdminUser. Wrapped
+      // in try/catch so push failure never fails the schedule itself.
+      try {
+        const { data: routine } = await service
+          .from("routines")
+          .select("id, household_id, vendor_id, chez_owned, label")
+          .eq("id", entityId)
+          .maybeSingle();
+        if (routine && routine.chez_owned === true) {
+          let vendorName: string | null = null;
+          if (routine.vendor_id) {
+            const { data: vendor } = await service
+              .from("contractors")
+              .select("company_name")
+              .eq("id", routine.vendor_id)
+              .maybeSingle();
+            vendorName = (vendor?.company_name as string | undefined) ?? null;
+          }
+          const { data: users } = await service
+            .from("users")
+            .select("id")
+            .eq("household_id", routine.household_id);
+          const recipientIds = (users ?? [])
+            .map((u: { id: string }) => u.id)
+            .filter((id: string | null | undefined): id is string => !!id);
+          if (recipientIds.length > 0) {
+            const serviceUrl = Deno.env.get("SUPABASE_URL") ?? "";
+            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+            const label = (routine.label as string | undefined)?.trim();
+            const vendorPart = vendorName?.trim() && vendorName.trim().length > 0 ? vendorName.trim() : (label && label.length > 0 ? label : "Your vendor");
+            const body = `${vendorPart} is booked for ${dateOnly}`;
+            await sendPush(
+              serviceUrl,
+              serviceRoleKey,
+              recipientIds,
+              "Chez scheduled a visit",
+              body,
+              {
+                type: "chez_routine_visit_scheduled",
+                routine_id: entityId,
+                visit_id: String(data.id),
+                scheduled_date: dateOnly,
+              }
+            );
+          }
+        }
+      } catch (pushError) {
+        console.error("[chez-concierge] chez_owned routine push failed:", pushError);
+      }
+
       return { visit_id: data.id, scheduled_date: dateOnly };
     }
     case "log_visit": {

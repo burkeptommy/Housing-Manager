@@ -299,6 +299,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 // dashboard refresh.
                 NotificationCenter.default.post(name: .chezHomeAssessmentChanged, object: nil)
 
+            // Phase 3.3 — chez_owned routine visit scheduled. Doesn't
+            // carry a chez_request id (the schedule is workbench-side,
+            // not request-side) so it must NOT fall through to the
+            // catch-all chez_ branch below, which would post
+            // .openChezRequest with an empty request_id. Routes to the
+            // Tasks tab where routines surface; no further fan-out
+            // because the routine_id is already on userInfo for any
+            // future deep-link surface to read.
+            case "chez_routine_visit_scheduled":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+
             // Phase 80 — Chez Concierge pushes. Server sends
             // `type: "chez_request_reply"` (Tom replied), `"chez_status_change"`
             // (Tom marked open / waiting / resolved), or `"chez_admin_request"`
