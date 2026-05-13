@@ -5817,6 +5817,49 @@
   display: none;
 }
 
+/* Phase 86E.5 — Concierge sub-nav. Nested categorization under the
+   Concierge button so the operator can see at a glance "3 cases need a
+   reply, 2 waiting on customer." Indented + smaller font so the eye
+   reads the parent first. Same colors as the parent nav buttons. */
+.admin-nav__sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 2px 0 6px 14px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-nav__sub {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  font: 500 12px var(--sans);
+  gap: 8px;
+  justify-content: space-between;
+  margin: 0 0 1px 0;
+  padding: 5px 10px;
+  text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+  width: calc(100% - 2px);
+}
+.admin-nav__sub:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+.admin-nav__sub.is-active {
+  background: rgba(237, 105, 85, 0.15);
+  color: #fff;
+}
+.admin-nav__sub.is-active .admin-nav-badge {
+  background: var(--salmon, #ED6955);
+  color: #fff;
+}
+
 /* =============================================================================
    Phase 5z+18 — Coverage Audit view
    ============================================================================= */

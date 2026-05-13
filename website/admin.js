@@ -2203,22 +2203,28 @@ function jumpToRoutine(kind) {
 function renderNav() {
   const counts = countByView();
   const collapsed = loadNavCollapsedState();
+  const renderBadge = (c) => {
+    if (c === null || c === undefined) return "";
+    if (c === 0) return `<small class="admin-nav-badge admin-nav-badge--zero">0</small>`;
+    return `<small class="admin-nav-badge">${c}</small>`;
+  };
   const renderButton = (view) => {
     const c = counts[view.id];
-    let badge = "";
-    if (c === null || c === undefined) {
-      badge = "";
-    } else if (c === 0) {
-      badge = `<small class="admin-nav-badge admin-nav-badge--zero">0</small>`;
-    } else {
-      badge = `<small class="admin-nav-badge">${c}</small>`;
-    }
-    return `
+    const button = `
       <button type="button" class="${state.view === view.id ? "is-active" : ""}" data-view="${escapeHtml(view.id)}">
         <span>${escapeHtml(view.label)}</span>
-        ${badge}
+        ${renderBadge(c)}
       </button>
     `;
+    // Phase 86E.5 — Concierge gets a nested sub-list under it that
+    // categorizes cases by status. Each sub-item is clickable: jumps to
+    // the cockpit AND sets the queue filter to that bucket. Sub-items
+    // always render so the operator can see counts at a glance — they
+    // don't need to be on Concierge to know "3 cases need a reply".
+    if (view.id === "chez") {
+      return button + renderConciergeSubNavHtml();
+    }
+    return button;
   };
   const groupHtml = VIEW_GROUPS.map((group) => {
     const views = VIEWS.filter((v) => (v.group || "catalog") === group.id);
@@ -2279,6 +2285,92 @@ function renderNav() {
       renderNav();
     });
   });
+  // Phase 86E.5 — Concierge sub-nav items. Click jumps to the cockpit
+  // and applies the corresponding queue filter so the rail shows only
+  // matching cases. The filter is set BEFORE render() so the cockpit
+  // opens with the right subset on first paint.
+  el.nav.querySelectorAll("[data-concierge-subnav]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const slot = btn.dataset.conciergeSubnav;
+      state.view = "chez";
+      state.concierge.queueFilter = slot;
+      // Clear the case-specific selection so the cockpit auto-picks
+      // the first matching case for the new filter.
+      state.selectedChezRequest = null;
+      state.concierge.queueMode = "list";
+      render();
+    });
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Phase 86E.5 — Concierge sub-nav: case categorization in the left rail.
+//
+// Five sub-items so the operator can see at a glance:
+//   needs_reply       — unread_for_admin (homeowner waiting on you)
+//   waiting_customer  — you replied, ball is in their court
+//   urgent_sla        — overdue or critical SLA tone
+//   all_open          — open + waiting_customer (mirrors the legacy "Mine")
+//   resolved_recent   — resolved in the last 7 days (audit trail / re-open)
+//
+// Counts come from state.chezRequests directly (already loaded for the
+// cockpit). Renders even when on a different view so the operator can
+// triage from any tab.
+// ----------------------------------------------------------------------------
+function renderConciergeSubNavHtml() {
+  const reqs = state.chezRequests || [];
+  if (reqs.length === 0) return ""; // no data yet, don't flash an empty sub-list
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const buckets = [
+    {
+      slot: "needs_reply",
+      label: "Needs reply",
+      count: reqs.filter((r) => r.unread_for_admin === true && r.status !== "resolved").length,
+    },
+    {
+      slot: "waiting_customer",
+      label: "Waiting customer",
+      count: reqs.filter((r) => r.status === "waiting_customer").length,
+    },
+    {
+      slot: "urgent_sla",
+      label: "Critical SLA",
+      count: reqs.filter((r) => {
+        if (r.status === "resolved") return false;
+        const sla = chezSlaPill(r);
+        return sla && (sla.tone === "red" || sla.tone === "amber");
+      }).length,
+    },
+    {
+      slot: "all_open",
+      label: "All open",
+      count: reqs.filter((r) => r.status === "open" || r.status === "waiting_customer").length,
+    },
+    {
+      slot: "resolved_recent",
+      label: "Resolved · 7d",
+      count: reqs.filter((r) => {
+        if (r.status !== "resolved") return false;
+        const t = r.resolved_at || r.last_message_at;
+        if (!t) return false;
+        return new Date(t).getTime() >= sevenDaysAgo;
+      }).length,
+    },
+  ];
+  const items = buckets.map((b) => {
+    const isActive = state.view === "chez" && state.concierge.queueFilter === b.slot;
+    const badgeClass = b.count === 0 ? "admin-nav-badge admin-nav-badge--zero" : "admin-nav-badge";
+    return `
+      <button type="button"
+        class="admin-nav__sub ${isActive ? "is-active" : ""}"
+        data-concierge-subnav="${escapeHtml(b.slot)}">
+        <span>${escapeHtml(b.label)}</span>
+        <small class="${badgeClass}">${b.count}</small>
+      </button>
+    `;
+  }).join("");
+  return `<div class="admin-nav__sub-list">${items}</div>`;
 }
 
 // ----------------------------------------------------------------------------
@@ -5196,15 +5288,49 @@ function renderConciergeCockpit() {
   const tagFilterId = tagFilterSlug
     ? (state.crm.tagDefinitions.find((d) => d.slug === tagFilterSlug)?.id || null)
     : null;
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const filtered = requests.filter((r) => {
-    if (filterMode === "urgent") {
-      const sla = chezSlaPill(r);
-      if (!sla || (sla.tone !== "red" && sla.tone !== "amber")) return false;
-    }
-    if (filterMode === "mine") {
-      // Single-agent system for v1 — every open case is "mine". Filter to
-      // active so the bucket label still feels useful.
-      if (r.status === "resolved") return false;
+    // Phase 86E.5 — left-nav sub-item filters. Each slot maps to a
+    // distinct queue narrowing. Legacy "all"/"mine"/"urgent" still work
+    // (top-of-queue tabs); the new slots come from the Concierge sub-nav.
+    switch (filterMode) {
+      case "urgent": {
+        const sla = chezSlaPill(r);
+        if (!sla || (sla.tone !== "red" && sla.tone !== "amber")) return false;
+        break;
+      }
+      case "mine": {
+        // Single-agent v1: "Mine" means everything active.
+        if (r.status === "resolved") return false;
+        break;
+      }
+      case "needs_reply": {
+        // Homeowner sent something we haven't read. Most urgent triage.
+        if (r.unread_for_admin !== true) return false;
+        if (r.status === "resolved") return false;
+        break;
+      }
+      case "waiting_customer": {
+        if (r.status !== "waiting_customer") return false;
+        break;
+      }
+      case "urgent_sla": {
+        if (r.status === "resolved") return false;
+        const sla = chezSlaPill(r);
+        if (!sla || (sla.tone !== "red" && sla.tone !== "amber")) return false;
+        break;
+      }
+      case "all_open": {
+        if (r.status === "resolved") return false;
+        break;
+      }
+      case "resolved_recent": {
+        if (r.status !== "resolved") return false;
+        const t = r.resolved_at || r.last_message_at;
+        if (!t || new Date(t).getTime() < sevenDaysAgo) return false;
+        break;
+      }
+      // "all" (default) — no status filter applied.
     }
     if (tagFilterId) {
       const applied = state.crm.allTagsByRequest[r.id] || [];
@@ -18264,6 +18390,53 @@ function countForView(view) {
     // shouldn't push the badge up since they're "done".
     const apps = state.vendorApplications?.items || [];
     return apps.filter((a) => a.status === "pending_email_confirm" || a.status === "live_unverified").length;
+  // Phase 86E.5 — fix nav counts for the customer-service views.
+  // These read from live state caches (chezRequests, upcoming.items,
+  // vendorApps.applications, today.* counters), NOT from state.adminItems
+  // which is the catalog-editor data. Falling through to the generic
+  // "item-list" branch made every one of these show 0 forever.
+  if (view.id === "chez") {
+    // Concierge badge = open + waiting_customer cases. Resolved hidden
+    // (they're done; no operator action needed). Merged-into rows are
+    // already resolved by trigger so they're excluded automatically.
+    return (state.chezRequests || []).filter((r) =>
+      r.status === "open" || r.status === "waiting_customer"
+    ).length;
+  }
+  if (view.id === "today") {
+    // Today badge = "items needing eyes now" — SLA-overdue + unread
+    // admin replies. Avoids double-counting (an overdue case that's
+    // also unread shows up once). Falls back to 0 before today brief
+    // loads on first paint.
+    const overdue = state.today?.stats?.sla_overdue || 0;
+    const dueSoon = state.today?.stats?.sla_due_soon || 0;
+    // Cap at the actual "things to act on right now" set so the
+    // badge reads as urgency, not volume.
+    return overdue + dueSoon;
+  }
+  if (view.id === "households") {
+    // Homes badge = total managed households. Pulled from the loaded
+    // households list when present; null badge before it loads (the
+    // count would be misleading at 0 while the fetch is in flight).
+    if (!state.households?.list?.length) return null;
+    return state.households.list.length;
+  }
+  if (view.id === "upcoming") {
+    // Upcoming badge = items in this-week + today + overdue priority
+    // bands. Excludes the "next 14 days" tail so the badge means
+    // "near-term work" not "everything on the horizon".
+    return (state.upcoming?.items || []).filter((i) =>
+      i.priority === "overdue" || i.priority === "today" || i.priority === "this_week"
+    ).length;
+  }
+  if (view.id === "vendor_apps") {
+    // Vendor Apps badge = the pending review queue (email-confirmed,
+    // not yet certified or rejected). Cached list; null when the list
+    // hasn't loaded yet (vendorApps has no fetchedAt; an empty array
+    // before first fetch returns null so we don't show a misleading 0).
+    const apps = state.vendorApps?.applications || [];
+    if (apps.length === 0) return null;
+    return apps.filter((a) => a.status === "live_unverified" || a.status === "pending_email_confirm").length;
   }
   // Tool/info views don't have an item list — no badge.
   if (["simulator", "architecture", "claude_file"].includes(view.id)) {
