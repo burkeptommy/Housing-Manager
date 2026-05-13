@@ -77,6 +77,12 @@ actor PropertyCreationService {
         insert.yearBuilt = resolvedLookup?.yearBuilt
         insert.squareFootage = resolvedLookup?.squareFootage
         insert.purchasePrice = resolvedLookup?.lastSalePrice
+        // Phase 95.2 (parity with OnboardingViewModel.runComplete): stamp
+        // the sale DATE alongside the sale PRICE. PropertyRecapCard's
+        // "Purchased on" row was rendering "Not on file" on the
+        // AddressConfirmationIntercept / AddPropertyFlow paths because
+        // this single line wasn't here.
+        insert.purchaseDate = resolvedLookup?.lastSaleDate
 
         // Phase 16e — always pipe through whatever value the lookup chain
         // produced, plus the source/confidence so the Investment Summary can
@@ -98,12 +104,52 @@ actor PropertyCreationService {
         insert.estimatedValueReasoning = resolvedLookup?.estimatedValueReasoning
 
         // Phase 60.1: log the PropertyInsert right before the DB write.
-        print("[ATTOM persist] PropertyInsert built: purchasePrice=\(insert.purchasePrice?.description ?? "nil") currentEstimatedValue=\(insert.currentEstimatedValue?.description ?? "nil") source=\(insert.estimatedValueSource ?? "nil")")
+        print("[ATTOM persist] PropertyInsert built: purchasePrice=\(insert.purchasePrice?.description ?? "nil") purchaseDate=\(insert.purchaseDate ?? "nil") yearBuilt=\(insert.yearBuilt?.description ?? "nil") sqft=\(insert.squareFootage?.description ?? "nil") currentEstimatedValue=\(insert.currentEstimatedValue?.description ?? "nil") source=\(insert.estimatedValueSource ?? "nil")")
 
         let property = try await DatabaseService.shared.createProperty(insert)
 
         // Phase 60.1: verify the server round-tripped the numbers faithfully.
         print("[ATTOM persist] PropertyRow after insert: purchasePrice=\(property.purchasePrice?.description ?? "nil") currentEstimatedValue=\(property.currentEstimatedValue?.description ?? "nil")")
+
+        // Phase 95.2 (parity with OnboardingViewModel.runComplete Phase 95.1):
+        // persist bedrooms / bathrooms / lot_size from the ATTOM lookup
+        // result to property.attributes so PropertyRecapCard renders the
+        // same facts the user just saw on PropertyHookView page 2 / the
+        // AddressConfirmationIntercept lookup. The recap card reads these
+        // exact attribute keys (see PropertyRecapCard.bedroomsValue /
+        // bathroomsValue / lotSizeValue) — without these three writes,
+        // every property created via AddPropertyFlow or the post-purge
+        // intercept renders "Not on file" for those rows.
+        if let beds = resolvedLookup?.bedrooms {
+            _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                propertyId: property.id,
+                key: "bedrooms",
+                value: .string(String(beds))
+            )
+        }
+        if let baths = resolvedLookup?.bathrooms {
+            _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                propertyId: property.id,
+                key: "bathrooms",
+                value: .string(String(baths))
+            )
+        }
+        if let lot = resolvedLookup?.lotSize {
+            _ = try? await DatabaseService.shared.updatePropertyAttribute(
+                propertyId: property.id,
+                key: "lot_size",
+                value: .string(String(lot))
+            )
+        }
+
+        // Re-fetch so the returned PropertyRow reflects the attributes we
+        // just wrote. Callers (AddressConfirmationIntercept,
+        // AddPropertyFlow) stamp this row on AppState directly without a
+        // separate refresh, so the freshness has to come from this path.
+        // Failure leaves the un-merged row, which still has every column-
+        // level field correct — the recap card just won't see bedrooms /
+        // bathrooms / lot_size until the next DB read.
+        let finalProperty = (try? await DatabaseService.shared.fetchProperty(id: property.id)) ?? property
 
         // 3. Auto-create home systems. Universal systems (HVAC, Roof, Water
         // Heater, Electrical Panel) are always created so the Maintenance tab
@@ -134,7 +180,7 @@ actor PropertyCreationService {
         // proper assignmentType, vendor linking, and bundling.
 
         return PropertyCreationResult(
-            property: property,
+            property: finalProperty,
             systemsCreated: systemsCreated,
             tasksCreated: 0,
             lookupSucceeded: lookupSucceeded

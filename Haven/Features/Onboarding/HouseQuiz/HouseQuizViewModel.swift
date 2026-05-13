@@ -414,6 +414,22 @@ final class HouseQuizViewModel: ObservableObject {
             await self?.loadDetectedSystemsIfNeeded()
         }
 
+        // Phase 95.2 — last-line-of-defense ATTOM backstop. If the
+        // property the dashboard just handed us has every ATTOM-derived
+        // fact empty (yearBuilt nil AND squareFootage nil AND
+        // currentEstimatedValue nil AND no bedrooms attribute), the
+        // recap card would render "Not on file" across the board and
+        // immediately kill the user's trust in the product. That's the
+        // bug Tom hit on 2026-05-12 — every field empty even though the
+        // pre-auth PropertyHookView showed full data. Fire one ATTOM
+        // refresh in the background and live-update `property` so the
+        // recap card repairs itself before the user can confirm.
+        // Failures are silent; the recap card already handles missing
+        // data gracefully via per-row "Not on file" copy.
+        Task { @MainActor [weak self] in
+            await self?.recoverMissingAttomFactsIfNeeded()
+        }
+
         // Phase 60.3 — restore the protection meter from persisted answers
         // so save-for-later resume lands the user back at the same value
         // they saw when they left. Silent (no haptic / animation) since
@@ -422,6 +438,118 @@ final class HouseQuizViewModel: ObservableObject {
             from: state,
             property: property
         )
+    }
+
+    /// Phase 95.2: when the property has no ATTOM-derived facts on file,
+    /// re-run the property-lookup edge function against the property's
+    /// address and merge whatever it returns into the in-memory row.
+    /// Persists the recovered values back to the DB (one `PropertyUpdate`
+    /// for column fields, three `updatePropertyAttribute` calls for
+    /// bedrooms / bathrooms / lot_size) so future surfaces — Property
+    /// Detail, dashboard hero, scenario projections — see the same
+    /// recovered data without each one re-fetching independently.
+    ///
+    /// "No facts on file" is conservative: we only fire when EVERY one
+    /// of `yearBuilt`, `squareFootage`, `currentEstimatedValue`, and the
+    /// `bedrooms` attribute is empty AND we have a usable address. If
+    /// even one fact landed, we assume the user's seeing approximately
+    /// what they should be and don't redo the work.
+    private func recoverMissingAttomFactsIfNeeded() async {
+        let hasAnyFact = property.yearBuilt != nil
+            || property.squareFootage != nil
+            || property.currentEstimatedValue != nil
+            || property.attributes?["bedrooms"]?.stringValue != nil
+        guard !hasAnyFact else { return }
+
+        let address = [property.street, property.city, property.state, property.zipCode]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+        guard !address.isEmpty else {
+            print("[ATTOM persist] HouseQuizViewModel backstop: property has no usable address, skipping recovery")
+            return
+        }
+
+        print("[ATTOM persist] HouseQuizViewModel backstop: property \(property.id) missing all ATTOM facts, re-fetching for \(address)")
+
+        do {
+            let data = try await HavenSupabase.propertyLookup(address: address)
+            struct LookupResponse: Decodable {
+                let success: Bool
+                let property: PropertyLookupResult?
+            }
+            let response = try JSONDecoder().decode(LookupResponse.self, from: data)
+            guard response.success, let lookup = response.property else {
+                print("[ATTOM persist] HouseQuizViewModel backstop: edge function returned no property")
+                return
+            }
+
+            // Same ladder OnboardingViewModel + PropertyDetailViewModel use.
+            let recoveredEstimatedValue: Double? = {
+                if let canonical = lookup.estimatedValue { return canonical }
+                if let low = lookup.estimatedValueLow, let high = lookup.estimatedValueHigh {
+                    return (low + high) / 2
+                }
+                if let high = lookup.estimatedValueHigh { return high }
+                if let low = lookup.estimatedValueLow { return low }
+                if let assessed = lookup.taxAssessment?.assessedValue { return assessed }
+                return nil
+            }()
+
+            var update = PropertyUpdate()
+            update.yearBuilt = lookup.yearBuilt
+            update.squareFootage = lookup.squareFootage
+            update.currentEstimatedValue = recoveredEstimatedValue
+            update.currentEstimatedValueLow = lookup.estimatedValueLow
+            update.currentEstimatedValueHigh = lookup.estimatedValueHigh
+            update.estimatedValueConfidence = lookup.estimatedValueConfidence
+            update.estimatedValueReasoning = lookup.estimatedValueReasoning
+            update.estimatedValueSource = lookup.estimatedValueSource
+                ?? (recoveredEstimatedValue != nil ? "computed" : nil)
+            update.purchasePrice = lookup.lastSalePrice
+            update.purchaseDate = lookup.lastSaleDate
+
+            let updated = try await db.updateProperty(id: property.id, update)
+
+            // Attributes for bedrooms / bathrooms / lot_size live in
+            // property.attributes JSONB, not as columns, so each goes
+            // through `updatePropertyAttribute` separately. Best-effort
+            // — column-level recovery above is already enough to clear
+            // most "Not on file" rows on the recap card.
+            if let beds = lookup.bedrooms {
+                _ = try? await db.updatePropertyAttribute(
+                    propertyId: property.id,
+                    key: "bedrooms",
+                    value: .string(String(beds))
+                )
+            }
+            if let baths = lookup.bathrooms {
+                _ = try? await db.updatePropertyAttribute(
+                    propertyId: property.id,
+                    key: "bathrooms",
+                    value: .string(String(baths))
+                )
+            }
+            if let lot = lookup.lotSize {
+                _ = try? await db.updatePropertyAttribute(
+                    propertyId: property.id,
+                    key: "lot_size",
+                    value: .string(String(lot))
+                )
+            }
+
+            // Re-fetch so we pick up the attribute writes alongside the
+            // column update. Falls back to the column-only row if the
+            // re-fetch trips on RLS (e.g. brand-new row, race with the
+            // SELECT policy) — at minimum the recap card now has year
+            // built, square footage, and estimated value populated.
+            let merged = (try? await db.fetchProperty(id: property.id)) ?? updated
+            property = merged
+            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+            print("[ATTOM persist] HouseQuizViewModel backstop: recovered yearBuilt=\(merged.yearBuilt?.description ?? "nil") sqft=\(merged.squareFootage?.description ?? "nil") estValue=\(merged.currentEstimatedValue?.description ?? "nil") purchaseDate=\(merged.purchaseDate ?? "nil")")
+        } catch {
+            print("[ATTOM persist] HouseQuizViewModel backstop: recovery failed: \(error)")
+        }
     }
 
     private func refreshAdminCatalog() async {

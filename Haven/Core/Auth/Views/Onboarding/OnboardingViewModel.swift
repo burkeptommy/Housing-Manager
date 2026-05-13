@@ -607,6 +607,43 @@ final class OnboardingViewModel: ObservableObject {
                 setupProgress = "Locking in your property..."
                 let propertyName = [street, city].filter { !$0.isEmpty }.joined(separator: ", ")
 
+                // Phase 95.2: defensive re-fetch when the UserDefaults
+                // cache didn't deliver a lookup result. The pre-auth
+                // PropertyHookView ran ATTOM and showed the user their
+                // home's facts; if any step between (cache encode, sign-up
+                // round trip, cache decode) silently dropped that
+                // payload, we'd build a PropertyInsert with every ATTOM
+                // field nil and PropertyRecapCard would render "Not on
+                // file" across the board — exactly the trust-killer Tom
+                // flagged on 2026-05-12. Re-running the lookup here
+                // costs one extra second on the bad path, never fires on
+                // the good path, and guarantees PropertyRecapCard sees
+                // the same facts the homeowner just saw pre-auth.
+                if propertyLookupResult == nil {
+                    let fallbackAddress = [street, unit, city, state, zipCode]
+                        .filter { !$0.isEmpty }
+                        .joined(separator: ", ")
+                    if !fallbackAddress.isEmpty {
+                        print("[ATTOM persist] runComplete fallback: cache empty, re-fetching from edge function for \(fallbackAddress)")
+                        if let data = try? await HavenSupabase.propertyLookup(address: fallbackAddress) {
+                            struct LookupResponse: Decodable {
+                                let success: Bool
+                                let property: PropertyLookupResult?
+                            }
+                            if let response = try? JSONDecoder().decode(LookupResponse.self, from: data),
+                               response.success,
+                               let fresh = response.property {
+                                propertyLookupResult = fresh
+                                print("[ATTOM persist] runComplete fallback: recovered yearBuilt=\(fresh.yearBuilt?.description ?? "nil") sqft=\(fresh.squareFootage?.description ?? "nil") lastSale=\(fresh.lastSalePrice?.description ?? "nil")")
+                            } else {
+                                print("[ATTOM persist] runComplete fallback: edge function returned no usable property")
+                            }
+                        } else {
+                            print("[ATTOM persist] runComplete fallback: edge function call failed")
+                        }
+                    }
+                }
+
                 var propertyInsert = PropertyInsert(
                     householdId: householdId,
                     name: propertyName,
@@ -643,19 +680,38 @@ final class OnboardingViewModel: ObservableObject {
                     return nil
                 }()
                 propertyInsert.currentEstimatedValue = attomEstimatedValue
+                // Phase 95.2: persist the AVM band alongside the midpoint
+                // and the confidence + reasoning paragraph. Previously these
+                // four fields were only set on the PropertyCreationService
+                // path (AddressConfirmationIntercept / AddPropertyFlow),
+                // never on the primary signup path. The recap card's range
+                // caption ("$908K–$1.0M") and the InvestmentSummaryCard
+                // transparency caption both depend on these landing here.
+                propertyInsert.currentEstimatedValueLow = propertyLookupResult?.estimatedValueLow
+                propertyInsert.currentEstimatedValueHigh = propertyLookupResult?.estimatedValueHigh
+                propertyInsert.estimatedValueConfidence = propertyLookupResult?.estimatedValueConfidence
+                propertyInsert.estimatedValueReasoning = propertyLookupResult?.estimatedValueReasoning
                 propertyInsert.estimatedValueSource = propertyLookupResult?.estimatedValueSource
                     ?? (attomEstimatedValue != nil ? "computed" : nil)
                 propertyInsert.purchasePrice = propertyLookupResult?.lastSalePrice
+                // Phase 95.2: stamp the sale DATE alongside the sale PRICE
+                // so PropertyRecapCard's "Purchased on" row renders the
+                // correct value instead of "Not on file". ATTOM returns
+                // both fields together; the previous code only stamped
+                // price, which is why the recap card showed an empty
+                // purchased-on row even when the price was filled in
+                // correctly.
+                propertyInsert.purchaseDate = propertyLookupResult?.lastSaleDate
 
                 // Diagnostic logging so future failures are traceable without
                 // a debugger. Captures every signal we considered so we can
                 // tell at a glance whether ATTOM returned nothing, returned a
                 // range only, or returned data the ladder should have caught.
-                print("[Onboarding] ATTOM persistence: estValue=\(attomEstimatedValue?.description ?? "nil") lastSale=\(propertyLookupResult?.lastSalePrice?.description ?? "nil") range=\(propertyLookupResult?.estimatedValueLow?.description ?? "nil")-\(propertyLookupResult?.estimatedValueHigh?.description ?? "nil") taxAssessed=\(propertyLookupResult?.taxAssessment?.assessedValue?.description ?? "nil") source=\(propertyLookupResult?.estimatedValueSource ?? "nil")")
+                print("[Onboarding] ATTOM persistence: estValue=\(attomEstimatedValue?.description ?? "nil") lastSale=\(propertyLookupResult?.lastSalePrice?.description ?? "nil") lastSaleDate=\(propertyLookupResult?.lastSaleDate ?? "nil") range=\(propertyLookupResult?.estimatedValueLow?.description ?? "nil")-\(propertyLookupResult?.estimatedValueHigh?.description ?? "nil") taxAssessed=\(propertyLookupResult?.taxAssessment?.assessedValue?.description ?? "nil") source=\(propertyLookupResult?.estimatedValueSource ?? "nil")")
 
                 // Phase 60.1: log the PropertyInsert right before the DB
                 // write so we can see exactly what made it to the server.
-                print("[ATTOM persist] PropertyInsert built: purchasePrice=\(propertyInsert.purchasePrice?.description ?? "nil") currentEstimatedValue=\(propertyInsert.currentEstimatedValue?.description ?? "nil") source=\(propertyInsert.estimatedValueSource ?? "nil")")
+                print("[ATTOM persist] PropertyInsert built: purchasePrice=\(propertyInsert.purchasePrice?.description ?? "nil") purchaseDate=\(propertyInsert.purchaseDate ?? "nil") yearBuilt=\(propertyInsert.yearBuilt?.description ?? "nil") sqft=\(propertyInsert.squareFootage?.description ?? "nil") currentEstimatedValue=\(propertyInsert.currentEstimatedValue?.description ?? "nil") source=\(propertyInsert.estimatedValueSource ?? "nil")")
 
                 let property = try await DatabaseService.shared.createProperty(propertyInsert)
                 print("[Onboarding] runComplete: createProperty OK id=\(property.id)")
